@@ -1,7 +1,8 @@
 export { loader } from "./scripts.loader.server";
 export { action } from "./scripts.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, useLoaderData } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import type { ContextType } from "@/lib/types";
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
@@ -60,7 +61,13 @@ type LoaderData =
 // ActionData inferred from action's return via typeof action
 
 export default function WorkspaceScripts() {
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
   const loaderData = useLoaderData<LoaderData>();
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
   const downloadFetcher = useFetcher<{
     fileContent?: string;
     contentType?: string;
@@ -99,8 +106,7 @@ export default function WorkspaceScripts() {
 
   const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const isWorkspaceAudioEmpty = !scripts || scripts.length === 0;
-  const title =
-    workspace != null ? `${workspace.name} Scripts` : "Scripts";
+  const title = "Scripts";
 
   return (
     <WorkspaceResourceListShell
@@ -116,7 +122,7 @@ export default function WorkspaceScripts() {
     >
       {scripts && scripts.length > 0 ? (
         <DataTable
-          className="rounded-md border-2 border-border font-semibold text-foreground"
+          className="font-semibold text-foreground"
           columns={[
             {
               accessorKey: "name",

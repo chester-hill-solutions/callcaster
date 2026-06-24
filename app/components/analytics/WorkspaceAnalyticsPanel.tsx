@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -37,7 +37,7 @@ function toDateInputValue(iso: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-function MetricCard({
+function MetricStat({
   title,
   value,
   detail,
@@ -47,15 +47,11 @@ function MetricCard({
   detail?: string;
 }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="font-Zilla-Slab text-3xl font-bold text-brand-primary">{value}</p>
-        {detail ? <p className="mt-1 text-sm text-muted-foreground">{detail}</p> : null}
-      </CardContent>
-    </Card>
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="text-2xl font-bold text-foreground">{value}</p>
+      {detail ? <p className="text-sm text-muted-foreground">{detail}</p> : null}
+    </div>
   );
 }
 
@@ -154,26 +150,26 @@ export function WorkspaceAnalyticsPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <MetricCard title="Total dials" value={String(analytics.summary.totalDials)} />
-        <MetricCard
+      <div className="grid grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-3 xl:grid-cols-6">
+        <MetricStat title="Total dials" value={String(analytics.summary.totalDials)} />
+        <MetricStat
           title="Total connected"
           value={String(analytics.summary.totalConnected)}
           detail={`${connectRate}% connect rate`}
         />
-        <MetricCard
+        <MetricStat
           title="Dialing time"
           value={formatAnalyticsDuration(analytics.summary.dialingSeconds)}
         />
-        <MetricCard
+        <MetricStat
           title="Connected on line"
           value={formatAnalyticsDuration(analytics.summary.connectedSeconds)}
         />
-        <MetricCard
+        <MetricStat
           title="Caller interface time"
           value={formatAnalyticsDuration(analytics.summary.interfaceSeconds)}
         />
-        <MetricCard
+        <MetricStat
           title="Shifts"
           value={String(analytics.summary.totalShifts)}
           detail={
@@ -185,11 +181,9 @@ export function WorkspaceAnalyticsPanel({
       </div>
 
       {canFilterUsers && analytics.users.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-Zilla-Slab text-xl">By user</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Section variant="flat">
+          <SectionHeader branded={false} compact title="By user" />
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -220,16 +214,14 @@ export function WorkspaceAnalyticsPanel({
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
       ) : null}
 
       {canFilterUsers && analytics.shifts.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-Zilla-Slab text-xl">Shifts</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Section variant="flat">
+          <SectionHeader branded={false} compact title="Shifts" />
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -260,8 +252,8 @@ export function WorkspaceAnalyticsPanel({
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
       ) : null}
     </div>
   );

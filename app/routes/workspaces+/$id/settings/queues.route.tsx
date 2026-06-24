@@ -101,7 +101,9 @@ export default function QueueSettings() {
   return (
     <main className="mt-8 flex h-fit flex-col">
       <div className="flex justify-between px-4">
-        <Heading branded>Queue Settings</Heading>
+        <Heading level={2} branded={false}>
+          Queue Settings
+        </Heading>
         <Button asChild variant="outline">
           <Link to=".." relative="path">Back</Link>
         </Button>

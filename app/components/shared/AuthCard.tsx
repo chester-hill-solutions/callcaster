@@ -39,7 +39,7 @@ export function AuthCard({
           {title}
         </Heading>
         {description ? (
-          <CardDescription className="text-base text-black/80 dark:text-white/80">
+          <CardDescription className="text-base text-muted-foreground">
             <Text as="span" variant="lead" className="text-inherit">
               {description}
             </Text>

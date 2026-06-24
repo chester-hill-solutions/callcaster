@@ -1,5 +1,12 @@
 import { TableHeader } from "@/components/call-list/records/TableHeader";
 import QueueContact from "@/components/call-list/records/participant/CallContact";
+import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/typography";
+import {
+  callPanelBodyScrollClass,
+  callPanelHeaderSecondaryClass,
+  callPanelShellClass,
+} from "@/components/call/call-panel-classes";
 import { Tables } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
@@ -48,92 +55,50 @@ const QueueList = ({
           />
         )),
       );
-    } else {
-      return queue.map((contact) => {
-        return (
-          <QueueContact
-            key={contact.contact?.id}
-            contact={contact.contact}
-            selected={nextRecipient?.contact?.id === contact.contact?.id}
-          />
-        );
-      });
     }
+
+    return queue.map((contact) => (
+      <QueueContact
+        key={contact.contact?.id}
+        contact={contact.contact}
+        selected={nextRecipient?.contact?.id === contact.contact?.id}
+      />
+    ));
   };
 
   return (
-    <div
-      style={{
-        flex: "1 1 20%",
-        border: "3px solid #BCEBFF",
-        borderRadius: "20px",
-        minHeight: "300px",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderTopLeftRadius: "18px",
-          borderTopRightRadius: "18px",
-          padding: "16px",
-        }}
-        className="bg-brand-secondary font-Tabac-Slab text-xl text-slate-800"
-      >
-        <div
-          className="row gap2 flex"
-          style={{ display: "flex", gap: "8px", flex: "auto" }}
-        >
-          {!predictive ? (
-            <>
-              <button
-                onClick={() => handleNextNumber(true)}
-                style={{
-                  flex: "1 1 auto",
-                  padding: "4px 8px",
-                  background: "#d60000",
-                  borderRadius: "5px",
-                  color: "white",
-                  fontSize: "small",
-                }}
-                disabled={isBusy}
-              >
-                Skip Household
-              </button>
-              <button
-                onClick={() => handleNextNumber(false)}
-                style={{
-                  flex: "1 1 auto",
-                  padding: "4px 8px",
-                  border: "1px solid #d60000",
-                  borderRadius: "5px",
-                  fontSize: "small",
-                }}
-                disabled={isBusy}
-              >
-                Skip Person
-              </button>
-            </>
-          ) : (
-            <div className="flex-1 text-center">
-              <h4>Recipient List</h4>
-            </div>
-          )}
-        </div>
+    <div className={callPanelShellClass}>
+      <div className={callPanelHeaderSecondaryClass}>
+        {!predictive ? (
+          <div className="flex w-full gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="flex-1 font-Zilla-Slab text-xs"
+              onClick={() => handleNextNumber(true)}
+              disabled={isBusy}
+            >
+              Skip Household
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="flex-1 border-primary font-Zilla-Slab text-xs text-primary"
+              onClick={() => handleNextNumber(false)}
+              disabled={isBusy}
+            >
+              Skip Person
+            </Button>
+          </div>
+        ) : (
+          <span className="font-semibold">Recipient List</span>
+        )}
       </div>
 
-      <div
-        className="column flex"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          maxHeight: "80vh",
-          overflowY: "scroll",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className={callPanelBodyScrollClass}>
+        <table className="w-full border-collapse">
           <TableHeader keys={["Name", "Number", "Address"]} />
           {queue.length > 0 ? (
             <tbody>{renderQueueContacts()}</tbody>
@@ -141,51 +106,32 @@ const QueueList = ({
             <tbody>
               {!predictive && (
                 <tr>
-                  <td
-                    colSpan={3}
-                    style={{ padding: "36px", textAlign: "center" }}
-                  >
-                    <button
+                  <td colSpan={3} className="px-4 py-9 text-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-primary font-Zilla-Slab text-primary"
                       onClick={handleQueueButton}
-                      style={{
-                        flex: "1 1 auto",
-                        padding: "4px 8px",
-                        border: "1px solid #d60000",
-                        borderRadius: "5px",
-                        fontSize: "small",
-                      }}
                     >
                       Load Queue
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               )}
               {!queue.length && count === 0 && completed === 0 && (
                 <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      padding: "36px",
-                      textAlign: "center",
-                      opacity: ".5",
-                    }}
-                  >
-                    Check with your administration to ensure your queue is set
-                    up.
+                  <td colSpan={3} className="px-4 py-9 text-center">
+                    <Text variant="muted">
+                      Check with your administration to ensure your queue is set up.
+                    </Text>
                   </td>
                 </tr>
               )}
               {!queue.length && completed > 0 && (
                 <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      padding: "36px",
-                      textAlign: "center",
-                      opacity: ".5",
-                    }}
-                  >
-                    You're all done! Great work.
+                  <td colSpan={3} className="px-4 py-9 text-center">
+                    <Text variant="muted">You&apos;re all done! Great work.</Text>
                   </td>
                 </tr>
               )}

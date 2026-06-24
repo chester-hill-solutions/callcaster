@@ -35,9 +35,9 @@ export default function NewAudience() {
   return (
     <section
       id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
+      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
     >
-      <BrandedCard bgColor="bg-brand-secondary dark:bg-card">
+      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
         <BrandedCardTitle>Add an Audience</BrandedCardTitle>
         {actionData?.error != null ? (
           <Text className="text-center text-destructive">

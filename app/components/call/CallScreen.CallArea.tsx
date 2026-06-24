@@ -2,6 +2,10 @@ import { Tables } from "@/lib/database.types";
 import { QueueItem } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  callPanelShellClass,
+} from "@/components/call/call-panel-classes";
 
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
@@ -33,10 +37,20 @@ interface CallAreaProps {
   recentAttempt: Attempt | null;
   predictive: boolean;
   conference: Conference | null;
-  voiceDrop:boolean;
+  voiceDrop: boolean;
   displayState: string;
   callState: string;
-  callDuration: number
+  callDuration: number;
+}
+
+function statusBarClass(displayState: string): string {
+  if (displayState === "failed") {
+    return "bg-primary";
+  }
+  if (displayState === "connected" || displayState === "dialing") {
+    return "bg-emerald-600";
+  }
+  return "bg-muted-foreground";
 }
 
 export const CallArea: React.FC<CallAreaProps> = ({
@@ -54,8 +68,8 @@ export const CallArea: React.FC<CallAreaProps> = ({
   callState: state,
   callDuration,
   dispositionOptions,
-  voiceDrop = false
-}:CallAreaProps) => {
+  voiceDrop = false,
+}: CallAreaProps) => {
   const handleHangUp = () => {
     hangUp();
   };
@@ -64,59 +78,32 @@ export const CallArea: React.FC<CallAreaProps> = ({
   };
 
   return (
-    <div
-      style={{
-        border: "3px solid hsl(var(--brand-secondary))",
-        flex: "1 1 20%",
-        borderRadius: "20px",
-        backgroundColor: "hsl(var(--card))",
-        minHeight: "300px",
-        alignItems: "stretch",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        display: "flex",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-      }}
-    >
+    <div className={cn(callPanelShellClass, "justify-between")}>
       <div className="flex flex-1 flex-col">
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderTopLeftRadius: "18px",
-            borderTopRightRadius: "18px",
-            padding: "16px",
-            marginBottom: "8px",
-            background:
-              displayState === "failed"
-                ? "hsl(var(--primary))"
-                : displayState === "connected" || displayState === "dialing"
-                  ? "hsl(142 71% 45%)"
-                  : "hsl(var(--muted-foreground))",
-          }}
-          className={`font-Tabac-Slab text-xl text-white ${state === "connected" || state === "dialing" ? "bg-green-300" : "bg-slate-700"}`}
+          className={cn(
+            "mb-2 flex items-center justify-center rounded-t-[14px] px-4 py-3 font-Tabac-Slab text-xl text-white",
+            statusBarClass(displayState),
+          )}
         >
-          <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-            {displayState === "failed" && <div>Call Failed</div>}
-            {displayState === "dialing" && (
-              <div>Dialing... {formatTime(callDuration)}</div>
-            )}
-            {displayState === "connected" && (
-              <div>Connected {formatTime(callDuration)}</div>
-            )}
-            {displayState === "no-answer" && <div>No Answer</div>}
-            {displayState === "voicemail" && <div>Voicemail Left</div>}
-            {displayState === "completed" && <div>Call Completed</div>}
-            {(!displayState || displayState === "idle") && <div>Pending</div>}
-          </div>
+          {displayState === "failed" && <div>Call Failed</div>}
+          {displayState === "dialing" && (
+            <div>Dialing... {formatTime(callDuration)}</div>
+          )}
+          {displayState === "connected" && (
+            <div>Connected {formatTime(callDuration)}</div>
+          )}
+          {displayState === "no-answer" && <div>No Answer</div>}
+          {displayState === "voicemail" && <div>Voicemail Left</div>}
+          {displayState === "completed" && <div>Call Completed</div>}
+          {(!displayState || displayState === "idle") && <div>Pending</div>}
         </div>
         {!conference && predictive && state === "idle" && (
           <div className="flex h-full flex-1 justify-center align-middle">
             <Button
               disabled={isBusy}
               onClick={handleDialNext}
-              className="self-center rounded-lg bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white"
+              className="self-center rounded-lg bg-primary px-4 py-2 font-Zilla-Slab text-xl text-primary-foreground"
             >
               Start Dialing
             </Button>
@@ -125,13 +112,17 @@ export const CallArea: React.FC<CallAreaProps> = ({
         {nextRecipient && (
           <div className="flex justify-between p-4">
             <div className="flex flex-col">
-              <div className="font-Zilla-Slab text-lg font-bold">
+              <div className="font-Zilla-Slab text-lg font-bold text-foreground">
                 {nextRecipient.contact?.firstname}{" "}
                 {nextRecipient.contact?.surname}
               </div>
-              <div className="text-lg">{nextRecipient.contact?.phone}</div>
-              <div>{nextRecipient.contact?.email}</div>
-              <div>
+              <div className="text-lg text-foreground">
+                {nextRecipient.contact?.phone}
+              </div>
+              <div className="text-muted-foreground">
+                {nextRecipient.contact?.email}
+              </div>
+              <div className="text-muted-foreground">
                 {nextRecipient.contact?.address
                   ?.split(",")
                   ?.map((t) => t.trim())
@@ -143,36 +134,24 @@ export const CallArea: React.FC<CallAreaProps> = ({
       </div>
       <div>
         <div className="flex flex-col">
-          <div
-            className="flex flex-1 gap-2 px-4 py-2"
-            style={{ position: "relative" }}
-          >
+          <div className="relative flex flex-1 gap-2 px-4 py-2">
             <Button
               onClick={handleHangUp}
-              style={{
-                flex: "1",
-                padding: "4px 8px",
-                background: "hsl(var(--destructive))",
-                borderRadius: "20px",
-                color: "white",
-              }}
+              variant="destructive"
+              className="flex-1 rounded-full"
               disabled={state !== "connected" && state !== "dialing"}
             >
               Hang Up
             </Button>
-           {voiceDrop && <Button
-              onClick={handleVoiceDrop}
-              style={{
-                flex: "1",
-                padding: "4px 8px",
-                background: "hsl(var(--primary))",
-                borderRadius: "20px",
-                color: "white",
-              }}
-             disabled={state !== "connected"}
-            >
-              Audio Drop
-            </Button>}
+            {voiceDrop ? (
+              <Button
+                onClick={handleVoiceDrop}
+                className="flex-1 rounded-full bg-primary text-primary-foreground"
+                disabled={state !== "connected"}
+              >
+                Audio Drop
+              </Button>
+            ) : null}
             <Button
               onClick={handleDialNext}
               disabled={
@@ -182,13 +161,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 (!predictive && !nextRecipient)
               }
               data-testid="call-screen-dial"
-              style={{
-                flex: "1",
-                padding: "4px 8px",
-                background: "hsl(142 71% 45%)",
-                borderRadius: "20px",
-                color: "white",
-              }}
+              className="flex-1 rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
               title={
                 state === "connected" || state === "dialing" || !nextRecipient
                   ? "Load your queue to get started"
@@ -198,25 +171,20 @@ export const CallArea: React.FC<CallAreaProps> = ({
               {!predictive ? "Dial" : "Start"}
             </Button>
           </div>
-          <div className="flex gap-2 px-4" style={{ paddingBottom: ".5rem" }}>
+          <div className="flex gap-2 px-4 pb-2">
             <select
               disabled={!nextRecipient}
               onChange={(e) => handleSetDisposition(e.currentTarget.value)}
               value={disposition}
               data-testid="call-screen-disposition"
-              style={{
-                flex: "1 1 75%",
-                padding: "4px 8px",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "20px",
-                color: "hsl(var(--foreground))",
-                background: "hsl(var(--background))",
-              }}
+              className="min-w-0 flex-[3] rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground"
             >
               <option value="idle">Select a disposition</option>
               {dispositionOptions?.map((option, i) => {
-                const value = typeof option === 'string' ? option : option.value;
-                const label = typeof option === 'string' ? option : option.label;
+                const value =
+                  typeof option === "string" ? option : option.value;
+                const label =
+                  typeof option === "string" ? option : option.label;
                 return (
                   <option value={value} key={i}>
                     {label}
@@ -224,25 +192,15 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 );
               })}
             </select>
-            <button
+            <Button
+              type="button"
+              variant="outline"
               disabled={isBusy || disposition === "idle"}
               onClick={() => handleDequeueNext()}
-              style={{
-                flex: "1 1 25%",
-                padding: "4px 8px",
-                border: "1px solid hsl(142 71% 45%)",
-                fontSize: "10px",
-                borderRadius: "20px",
-                color: "hsl(var(--foreground))",
-                background: "hsl(var(--background))",
-                opacity:
-                  state === "connected" || state === "dialing" || !nextRecipient
-                    ? ".6"
-                    : "unset",
-              }}
+              className="flex-1 rounded-full text-xs"
             >
               Save and Next
-            </button>
+            </Button>
           </div>
         </div>
       </div>

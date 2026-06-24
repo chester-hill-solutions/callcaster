@@ -7,6 +7,7 @@ import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 import AudienceUploader from "@/components/audience/AudienceUploader";
 import { Button } from "@/components/ui/button";
+import { Heading } from "@/components/ui/typography";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { Database } from "@/lib/database.types";
@@ -61,9 +62,9 @@ export default function AudienceView() {
   return (
     <main className="flex h-full flex-col gap-4 text-white">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+        <Heading as="h1" level={2} branded={false}>
           {audience?.name || `Unnamed Audience ${audience_id}`}
-        </h1>
+        </Heading>
         <div className="flex gap-1">
           <Form
             method="DELETE"

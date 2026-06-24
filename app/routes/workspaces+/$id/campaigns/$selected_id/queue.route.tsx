@@ -85,7 +85,7 @@ export function ErrorBoundary() {
     return (
         <div className="flex flex-col items-center justify-center p-8">
             <h2 className="text-xl font-semibold mb-4">Error Loading Queue</h2>
-            <p className="text-gray-600 mb-4">There was a problem loading the queue data. Please try again.</p>
+            <p className="mb-4 text-muted-foreground">There was a problem loading the queue data. Please try again.</p>
             <div>{error?.message || "An unknown error occurred"}</div>
             <Button onClick={() => window.location.reload()}>
                 Retry

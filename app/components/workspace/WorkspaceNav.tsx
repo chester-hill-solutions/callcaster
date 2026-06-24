@@ -1,18 +1,18 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router";
 import {
-  MdBarChart,
-  MdCampaign,
-  MdCall,
-  MdChat,
-  MdCreditCard,
-  MdGraphicEq,
-  MdHeadsetMic,
-  MdPeople,
-  MdSettings,
-  MdTextSnippet,
-  MdUploadFile,
-} from "react-icons/md";
+  BarChart3,
+  CreditCard,
+  FileText,
+  Headset,
+  Megaphone,
+  MessageSquare,
+  Phone,
+  Settings,
+  Upload,
+  Users,
+  AudioLines,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -49,20 +49,20 @@ const NAV_ITEMS: NavItem[] = [
     name: "Campaigns",
     path: "",
     end: true,
-    icon: MdCampaign,
+    icon: Megaphone,
     subItems: [
       { name: "New Campaign", path: "campaigns/new" },
       { name: "Archived Campaigns", path: "campaigns/archive" },
     ],
   },
-  { name: "Chats", path: "chats", icon: MdChat },
-  { name: "Calls", path: "calls", icon: MdCall },
-  { name: "Analytics", path: "analytics", icon: MdBarChart },
-  { name: "Handset", path: "handset", icon: MdHeadsetMic },
-  { name: "Scripts", path: "scripts", callerHidden: true, icon: MdTextSnippet },
-  { name: "Audio", path: "audios", callerHidden: true, icon: MdGraphicEq },
-  { name: "Audiences", path: "audiences", callerHidden: true, icon: MdPeople },
-  { name: "Exports", path: "exports", callerHidden: true, icon: MdUploadFile },
+  { name: "Chats", path: "chats", icon: MessageSquare },
+  { name: "Calls", path: "calls", icon: Phone },
+  { name: "Analytics", path: "analytics", icon: BarChart3 },
+  { name: "Handset", path: "handset", icon: Headset },
+  { name: "Scripts", path: "scripts", callerHidden: true, icon: FileText },
+  { name: "Audio", path: "audios", callerHidden: true, icon: AudioLines },
+  { name: "Audiences", path: "audiences", callerHidden: true, icon: Users },
+  { name: "Exports", path: "exports", callerHidden: true, icon: Upload },
 ];
 
 interface WorkspaceNavProps {
@@ -234,14 +234,14 @@ const WorkspaceNav = ({
         <div className="rounded-lg border border-border/80 bg-card/70 p-2">
           <NavLink to={`${baseUrl}/settings`} className={utilityLinkClass} end>
             <span className="inline-flex items-center gap-2">
-              <MdSettings className="h-4 w-4" />
+              <Settings className="h-4 w-4" />
               Settings
             </span>
           </NavLink>
           {isAdmin ? (
             <NavLink to={`${baseUrl}/billing`} className={utilityLinkClass}>
               <span className="inline-flex items-center gap-2">
-                <MdCreditCard className="h-4 w-4" />
+                <CreditCard className="h-4 w-4" />
                 Credits
               </span>
               <span className="rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground">
@@ -267,13 +267,13 @@ const WorkspaceNav = ({
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
             Workspace
           </p>
-          <h2 className="truncate font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
+          <h2 className="line-clamp-2 break-words font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
             {workspace.name}
           </h2>
         </div>
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="outline" className="font-Zilla-Slab font-semibold">
+            <Button variant="outline" size="sm" className="font-Zilla-Slab font-semibold">
               Browse Workspace
             </Button>
           </SheetTrigger>

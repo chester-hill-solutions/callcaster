@@ -44,3 +44,61 @@ For a full inventory of components, static assets, icons, route surfaces, and kn
 ## Tokens
 
 - Prefer semantic tokens: `text-foreground`, `text-muted-foreground`, `bg-card`, `border-border`, etc. Use `Heading`/`Text` and shared components so brand colors and type scales live in one place rather than in ad hoc route classes.
+
+## Design north star
+
+### Character vs work surfaces
+
+Reserve **slab typography and bold brand color** for chrome and moments of action:
+
+- **Character zones:** navbar wordmark (`font-Tabac-Slab`), `Button` labels (`font-Zilla-Slab`), `AuthCard` heroes, `BrandedCardTitle` on creation wizards, primary CTAs
+- **Work surfaces:** in-app page titles, table chrome, settings sections — use `Heading` / `Text` with **`branded={false}`** and semantic tokens
+
+### Typography tiers
+
+| Use | Component |
+|-----|-----------|
+| Navbar wordmark | `font-Tabac-Slab text-brand-primary` |
+| Button / CTA labels | `Button` (Zilla Slab via `button.tsx`) |
+| Auth / marketing hero | `AuthCard` → `Heading branded level={1}` |
+| In-app page title | `Heading as="h1" level={2} branded={false}` |
+| Section title | `SectionHeader branded={false}` or `Heading level={3}` |
+| Wizard card title | `BrandedCardTitle` (modest branded slab) |
+| Body / metadata | `Text variant="body"` / `"muted"` |
+
+### Layout and spacing
+
+- **Full-bleed dashboards:** workspace shell ([`workspaces+/$id.tsx`](app/routes/workspaces+/$id.tsx)) uses `w-full` with `px-4 sm:px-6` only — no `max-w-[1500px]` on in-workspace routes
+- **One padding owner:** workspace content panel OR inner route content, not both (`container mx-auto p-6` inside the panel is wrong)
+- **Page stack:** `space-y-6` between major sections
+- **Section gap:** `gap-4` for flex/grid siblings
+- **Card inset:** `p-4 sm:p-6` on workspace panel shell
+- **Creation wizards:** `max-w-2xl` centered section — forms stay readable on ultrawide screens
+
+### Visual polish (restrained)
+
+| Layer | Use |
+|-------|-----|
+| `rounded-md` | inputs, buttons, badges |
+| `rounded-lg` | `ui/card`, `Section`, `BrandedCard` |
+| `rounded-2xl` | workspace shell panel, `WorkspaceNav` only |
+| `shadow-sm` | resting panels and cards |
+| `shadow-md` | overlays (Dialog, Sheet, Dropdown, Popover) only |
+| Motion | `transition-colors duration-150` on interactive rows; Radix `animate-in` on popovers — no page entrance animations |
+
+### Page structure note
+
+- **`Section` + `SectionHeader`:** settings blocks, billing, dashboard sections (sans-serif titles)
+- **`BrandedCard`:** creation wizards and flows that need branded slab titles + `BrandedCardActions`
+
+### Call screen panels
+
+- Use shared classes from [`call-panel-classes.ts`](app/components/call/call-panel-classes.ts) for queue, script, household, and call area panels — consistent border, radius, and header bars.
+
+### Quality bar (PR checklist)
+
+1. 375px + 1280px + ≥1920px — no clipped controls; dashboards use full width on ultrawide
+2. Light + dark — semantic tokens only on touched surfaces
+3. Typography tier — page titles sans-serif; slab on CTAs/chrome only
+4. One padding owner per region
+5. Reuse composition components; no new parallel shells

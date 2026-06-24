@@ -61,7 +61,7 @@ export default function NewScript() {
   return (
     <section
       id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
+      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
     >
       {actionData?.error != null ? (
         <Text className="mb-4 text-center text-destructive">
@@ -73,7 +73,7 @@ export default function NewScript() {
               : "An error occurred"}
         </Text>
       ) : null}
-      <BrandedCard bgColor="bg-brand-secondary dark:bg-card">
+      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
         <BrandedCardTitle>Add Script</BrandedCardTitle>
         <BrandedCardContent>
           <Form

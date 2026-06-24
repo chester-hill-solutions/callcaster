@@ -9,7 +9,6 @@ type WorkspaceResourceListShellProps = {
   emptyMessage: string;
   addAction?: ReactNode;
   children?: ReactNode;
-  tableClassName?: string;
 };
 
 export function WorkspaceResourceListShell({
@@ -23,13 +22,13 @@ export function WorkspaceResourceListShell({
   const showError = Boolean(error) && !isEmpty;
 
   return (
-    <main className="flex h-full flex-col gap-4 rounded-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex h-full flex-col gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Heading
           as="h1"
           level={2}
-          branded
-          className="mb-4 text-center sm:text-left"
+          branded={false}
+          className="text-center sm:text-left"
         >
           {title}
         </Heading>
@@ -37,23 +36,34 @@ export function WorkspaceResourceListShell({
       </div>
 
       {showError ? (
-        <Text className="text-center text-4xl font-bold text-destructive">
+        <Heading
+          as="p"
+          level={4}
+          branded={false}
+          className="text-center text-destructive"
+        >
           {error}
-        </Text>
+        </Heading>
       ) : null}
 
       {isEmpty ? (
-        <Heading
-          as="p"
-          level={3}
-          branded
-          className="py-16 text-center"
-        >
-          {emptyMessage}
-        </Heading>
+        addAction ? (
+          <Text variant="muted" className="py-16 text-center">
+            {emptyMessage}
+          </Text>
+        ) : (
+          <Heading
+            as="p"
+            level={3}
+            branded={false}
+            className="py-16 text-center"
+          >
+            {emptyMessage}
+          </Heading>
+        )
       ) : (
         children
       )}
-    </main>
+    </div>
   );
 }

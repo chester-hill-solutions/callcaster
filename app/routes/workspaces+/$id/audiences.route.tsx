@@ -22,8 +22,7 @@ export default function WorkspaceAudiencesPage() {
     return <Outlet context={parentContext} />;
   }
 
-  const title =
-    workspace != null ? `${workspace?.name} Audiences` : "No Workspace";
+  const title = "Audiences";
 
   return (
     <WorkspaceResourceListShell
@@ -39,7 +38,7 @@ export default function WorkspaceAudiencesPage() {
     >
       {!isWorkspaceAudienceEmpty ? (
         <DataTable
-          className="rounded-md border-2 border-border font-semibold text-foreground"
+          className="font-semibold text-foreground"
           columns={audienceColumns}
           data={audienceData}
         />

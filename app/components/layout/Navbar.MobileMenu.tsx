@@ -1,7 +1,6 @@
 import { Link, NavLink } from "react-router";
+import { X } from "lucide-react";
 import { capitalize } from "@/lib/utils";
-
-import { FaTimes } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { User, WorkspaceInvite } from "@/lib/types";
 
@@ -36,7 +35,7 @@ export const MobileMenu = ({
           onClick={onClose}
           className="rounded-md border border-border p-2 text-2xl"
         >
-          <FaTimes />
+          <X className="h-6 w-6" />
         </button>
       </div>
 

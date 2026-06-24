@@ -1,5 +1,5 @@
-import React from 'react';
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface PhoneKeypadProps {
   onKeyPress: (key: string) => void;
@@ -8,50 +8,52 @@ interface PhoneKeypadProps {
   callDuration: number;
 }
 
-export const PhoneKeypad: React.FC<PhoneKeypadProps> = ({
+const KEYPAD_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, "*", 0, "#"] as const;
+
+export function PhoneKeypad({
   onKeyPress,
   displayState,
   displayColor,
-  callDuration
-}) => {
+  callDuration,
+}: PhoneKeypadProps) {
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   return (
-    <div className={`border-2 border-[${displayColor}] rounded-lg`}>
+    <div
+      className="overflow-hidden rounded-lg border-2 border-border"
+      style={{ borderColor: displayColor }}
+    >
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "4px",
-          background: displayColor,
-        }}
-        className="rounded-t-lg font-Tabac-Slab text-white"
+        className="flex items-center justify-center rounded-t-lg px-3 py-2 font-Tabac-Slab text-sm text-white"
+        style={{ background: displayColor }}
       >
-        <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-          {displayState === "failed" && <div>Call Failed</div>}
-          {displayState === "dialing" && (
-            <div>Dialing... {formatTime(callDuration)}</div>
-          )}
-          {displayState === "connected" && (
-            <div>Connected {formatTime(callDuration)}</div>
-          )}
-          {displayState === "no-answer" && <div>No Answer</div>}
-          {displayState === "voicemail" && <div>Voicemail Left</div>}
-          {displayState === "completed" && <div>Call Completed</div>}
-          {displayState === "idle" && <div>Pending</div>}
-        </div>
+        {displayState === "failed" && <span>Call Failed</span>}
+        {displayState === "dialing" && (
+          <span>Dialing... {formatTime(callDuration)}</span>
+        )}
+        {displayState === "connected" && (
+          <span>Connected {formatTime(callDuration)}</span>
+        )}
+        {displayState === "no-answer" && <span>No Answer</span>}
+        {displayState === "voicemail" && <span>Voicemail Left</span>}
+        {displayState === "completed" && <span>Call Completed</span>}
+        {displayState === "idle" && <span>Pending</span>}
       </div>
-      <div className="flex w-[130px] flex-wrap justify-between p-4">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, "*", 0, "#"].map((item, index) => (
+      <div className="grid grid-cols-3 gap-2 p-4">
+        {KEYPAD_KEYS.map((item) => (
           <Button
-            className="m-0.5 h-6 w-6 rounded-xl p-1 text-xs transition-all hover:shadow-inner active:bg-red-900"
-            key={index}
-            onClick={() => onKeyPress(`${item}`)}
+            key={String(item)}
+            type="button"
+            variant="outline"
+            className={cn(
+              "h-10 w-10 min-w-10 p-0 text-base font-semibold",
+              "transition-colors duration-150 hover:bg-muted",
+            )}
+            onClick={() => onKeyPress(String(item))}
           >
             {item}
           </Button>
@@ -59,4 +61,4 @@ export const PhoneKeypad: React.FC<PhoneKeypadProps> = ({
       </div>
     </div>
   );
-};
+}

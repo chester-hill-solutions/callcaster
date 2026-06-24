@@ -27,11 +27,11 @@ export default function Media() {
   };
 
   return (
-      <section
-        id="form"
-        className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
-        >
-      <BrandedCard bgColor="bg-brand-secondary dark:bg-card">
+    <section
+      id="form"
+      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
+    >
+      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
         <BrandedCardTitle>Add Audio</BrandedCardTitle>
         {actionData?.error != null ? (
           <Text className="text-center text-destructive">

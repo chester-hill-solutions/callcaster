@@ -13,19 +13,18 @@ export default function WorkspaceVoicemailsPage() {
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
   const voicemails = audioMedia;
 
-  const title =
-    workspace != null ? `${workspace?.name} Voicemails` : "No Workspace";
+  const title = "Voicemails";
 
   return (
     <WorkspaceResourceListShell
       title={title}
       error={error}
       isEmpty={isWorkspaceAudioEmpty}
-      emptyMessage="Add Your Own Audio to this Workspace!"
+      emptyMessage="Add a voicemail greeting to this workspace."
     >
       {voicemails != null && !isWorkspaceAudioEmpty ? (
         <DataTable
-          className="rounded-md border-2 border-border font-semibold text-foreground"
+          className="font-semibold text-foreground"
           columns={mediaColumns}
           data={voicemails}
         />

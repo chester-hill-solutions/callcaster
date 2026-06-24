@@ -5,6 +5,7 @@ import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
 import {
   BrandedCard,
+  BrandedCardActions,
   BrandedCardContent,
   BrandedCardTitle,
 } from "@/components/shared/BrandedCard";
@@ -58,9 +59,9 @@ export default function AudiencesNew() {
   return (
     <section
       id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
+      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
     >
-      <BrandedCard bgColor="bg-brand-secondary dark:bg-card w-[60vw]">
+      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
         <BrandedCardTitle>Add an Audience</BrandedCardTitle>
         {actionData?.error ? (
           <Text className="text-center text-destructive">
@@ -107,7 +108,7 @@ export default function AudiencesNew() {
                   />
                 </FormField>
                 
-                <div className="flex items-center justify-between gap-4">
+                <BrandedCardActions>
                   <Button
                     type="button"
                     variant="outline"
@@ -115,35 +116,31 @@ export default function AudiencesNew() {
                   >
                     Cancel
                   </Button>
-                  
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="submit"
-                      disabled={!audienceName || isSubmitting}
-                      className="bg-brand-primary text-white hover:bg-brand-secondary"
-                    >
-                      Create Empty Audience
-                    </Button>
-                    
-                    <Button
-                      type="button"
-                      onClick={goToNextStep}
-                      disabled={!audienceName}
-                      className="bg-brand-primary text-white hover:bg-brand-secondary"
-                    >
-                      Next: Upload Contacts <MdArrowForward className="ml-2" />
-                    </Button>
-                  </div>
-                </div>
+                  <Button
+                    type="submit"
+                    disabled={!audienceName || isSubmitting}
+                    className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  >
+                    Create Empty Audience
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={goToNextStep}
+                    disabled={!audienceName}
+                    className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  >
+                    Next: Upload Contacts <MdArrowForward className="ml-2" />
+                  </Button>
+                </BrandedCardActions>
               </form>
             </TabsContent>
             
             <TabsContent value="step-2" className="space-y-4">
               <div className="text-center mb-4">
                 <h3 className="text-lg font-medium">Upload Contacts</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+                <Text variant="muted" className="text-center">
                   Upload a CSV file with your contacts. You'll be able to map the columns in the next step.
-                </p>
+                </Text>
               </div>
               
               <div className="space-y-6">
@@ -167,9 +164,9 @@ export default function AudiencesNew() {
             <TabsContent value="step-3" className="space-y-4">
               <div className="text-center">
                 <h3 className="text-lg font-medium mb-2">Upload Complete</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+                <Text variant="muted">
                   Your audience has been created and contacts are being processed.
-                </p>
+                </Text>
               </div>
             </TabsContent>
           </Tabs>

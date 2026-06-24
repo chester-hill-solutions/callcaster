@@ -148,7 +148,7 @@ export default function Navbar({
     <div></div>
   ) : (
     <header className={`w-full border-b border-border/70 ${className}`}>
-      <nav className="relative mx-auto flex w-full max-w-[1500px] items-center justify-between px-4 py-3 sm:h-[80px] sm:px-6">
+      <nav className="relative mx-auto flex w-full items-center justify-between px-4 py-3 sm:h-[80px] sm:px-6">
         <Link
           to="/"
           className="hidden font-Tabac-Slab text-4xl font-black text-brand-primary sm:block"

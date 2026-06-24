@@ -2,12 +2,11 @@ export { loader } from "./surveys.loader.server";
 
 import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
 
-
 import { Survey } from "@/lib/types";
 import type { ContextType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Heading, Text } from "@/components/ui/typography";
 import { Plus, Calendar, Users, CheckCircle, XCircle } from "lucide-react";
 
 export default function SurveysPage() {
@@ -20,13 +19,15 @@ export default function SurveysPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Surveys</h1>
-          <p className="text-muted-foreground">
+          <Heading as="h1" level={2} branded={false}>
+            Surveys
+          </Heading>
+          <Text variant="muted">
             Create and manage surveys for your workspace
-          </p>
+          </Text>
         </div>
         <Button asChild>
           <Link to={`/workspaces/${workspaceId}/surveys/new`}>
@@ -37,72 +38,69 @@ export default function SurveysPage() {
       </div>
 
       {surveys.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="text-center">
-              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No surveys yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first survey to start collecting responses
-              </p>
-              <Button asChild>
-                <Link to={`/workspaces/${workspaceId}/surveys/new`}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Survey
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center py-12 text-center">
+          <Users className="mb-4 h-12 w-12 text-muted-foreground" />
+          <Heading level={4} branded={false} className="mb-2">
+            No surveys yet
+          </Heading>
+          <Text variant="muted" className="mb-4 max-w-sm">
+            Create your first survey to start collecting responses
+          </Text>
+          <Button asChild>
+            <Link to={`/workspaces/${workspaceId}/surveys/new`}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Survey
+            </Link>
+          </Button>
+        </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <ul className="divide-y divide-border">
           {surveys.map((survey: Survey & { survey_response: { count: number }[] }) => (
-            <Card key={survey.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{survey.title}</CardTitle>
-                    <CardDescription className="mt-1">
-                      ID: {survey.survey_id}
-                    </CardDescription>
-                  </div>
+            <li
+              key={survey.id}
+              className="flex flex-col gap-4 py-4 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{survey.title}</p>
                   <Badge variant={survey.is_active ? "default" : "secondary"}>
                     {survey.is_active ? (
-                      <CheckCircle className="w-3 h-3 mr-1" />
+                      <CheckCircle className="mr-1 h-3 w-3" />
                     ) : (
-                      <XCircle className="w-3 h-3 mr-1" />
+                      <XCircle className="mr-1 h-3 w-3" />
                     )}
                     {survey.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
+                <Text variant="small" className="text-muted-foreground">
+                  ID: {survey.survey_id}
+                </Text>
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  <span className="inline-flex items-center">
+                    <Calendar className="mr-1 h-4 w-4" />
                     Created {new Date(survey.created_at).toLocaleDateString()}
-                  </div>
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
+                  </span>
+                  <span className="inline-flex items-center">
+                    <Users className="mr-1 h-4 w-4" />
                     {survey.survey_response[0]?.count || 0} responses
-                  </div>
+                  </span>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" asChild className="flex-1">
-                    <Link to={`/workspaces/${workspaceId}/surveys/${survey.survey_id}`}>
-                      View
-                    </Link>
-                  </Button>
-                  <Button variant="outline" size="sm" asChild className="flex-1">
-                    <Link to={`/workspaces/${workspaceId}/surveys/${survey.survey_id}/edit`}>
-                      Edit
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/workspaces/${workspaceId}/surveys/${survey.survey_id}`}>
+                    View
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/workspaces/${workspaceId}/surveys/${survey.survey_id}/edit`}>
+                    Edit
+                  </Link>
+                </Button>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

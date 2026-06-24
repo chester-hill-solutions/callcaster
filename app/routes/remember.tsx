@@ -29,7 +29,7 @@ export default function Remember() {
   });
 
   return (
-    <main className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-slate-800">
+    <main className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">
       <AuthCard
         id="login-hero"
         title="Reset Password"
@@ -45,7 +45,6 @@ export default function Remember() {
               type="text"
               name="email"
               id="email"
-              className="border-border bg-white/90 dark:bg-background/80"
             />
           </FormField>
           <Button

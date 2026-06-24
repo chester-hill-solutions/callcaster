@@ -2,7 +2,6 @@ export { loader } from "./exports.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, useLoaderData, useRevalidator } from "react-router";
 
-import { Card } from "@/components/ui/card";
 import { Download, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Heading, Text } from "@/components/ui/typography";
 
 interface ExportItem {
   id: string;
@@ -77,11 +77,11 @@ export default function WorkspaceExports() {
 
   const getProgressDisplay = (exportItem: ExportItem) => {
     if (exportItem.status === "completed") {
-      return <span className="text-green-600">Complete</span>;
+      return <span className="text-emerald-600 dark:text-emerald-400">Complete</span>;
     }
 
     if (exportItem.status === "error") {
-      return <span className="text-red-600">Failed</span>;
+      return <span className="text-destructive">Failed</span>;
     }
 
     if (exportItem.status === "processing" || exportItem.status === "started") {
@@ -89,7 +89,7 @@ export default function WorkspaceExports() {
       return (
         <div className="flex items-center gap-2">
           <Progress value={progress} className="w-[100px]" />
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             {exportItem.processed && exportItem.total ? 
               `${exportItem.processed}/${exportItem.total}` :
               `${progress}%`
@@ -99,17 +99,19 @@ export default function WorkspaceExports() {
       );
     }
 
-    return <span className="text-gray-500">-</span>;
+    return <span className="text-muted-foreground">-</span>;
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Campaign Exports</h1>
-          <p className="text-gray-500 mt-2">
+          <Heading as="h1" level={2} branded={false}>
+            Campaign Exports
+          </Heading>
+          <Text variant="muted" className="mt-2">
             Exports are available for download for 24 hours after creation
-          </p>
+          </Text>
         </div>
         <Button
           onClick={() => revalidate()}
@@ -123,13 +125,11 @@ export default function WorkspaceExports() {
       </div>
 
       {exports.length === 0 ? (
-        <Card className="p-8">
-          <p className="text-center text-gray-500">
-            No exports available. Export data from your campaigns to see them here.
-          </p>
-        </Card>
+        <Text variant="muted" className="py-12 text-center">
+          No exports available. Export data from your campaigns to see them here.
+        </Text>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -148,7 +148,7 @@ export default function WorkspaceExports() {
                     <div className="break-words">
                       {exportItem.campaignName}
                       {exportItem.stage && (
-                        <div className="text-sm text-gray-500">{exportItem.stage}</div>
+                        <div className="text-sm text-muted-foreground">{exportItem.stage}</div>
                       )}
                     </div>
                   </TableCell>
@@ -180,13 +180,13 @@ export default function WorkspaceExports() {
                       </a>
                     )}
                     {exportItem.isExpired && (
-                      <span className="text-sm text-red-500">Expired</span>
+                      <span className="text-sm text-destructive">Expired</span>
                     )}
                     {(exportItem.status === "processing" || exportItem.status === "started") && (
-                      <span className="text-sm text-gray-500">Processing...</span>
+                      <span className="text-sm text-muted-foreground">Processing...</span>
                     )}
                     {exportItem.status === "error" && (
-                      <span className="text-sm text-red-500">Failed</span>
+                      <span className="text-sm text-destructive">Failed</span>
                     )}
                   </TableCell>
                 </TableRow>
