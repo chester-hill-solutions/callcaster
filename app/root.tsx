@@ -49,7 +49,7 @@ export default function App() {
     [env.SUPABASE_KEY, env.SUPABASE_URL],
   );
 
-  const serverAccessToken = session.access_token;
+  const serverAccessToken = session?.access_token ?? null;
   const navigate = useNavigate();
 
   async function signOut(): Promise<{

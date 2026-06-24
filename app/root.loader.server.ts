@@ -9,7 +9,7 @@ import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 
 export type RootLoaderData = {
   env: ENV;
-  session: Session;
+  session: Session | null;
   workspaces: WorkspaceData[] | null;
   user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
   params: Params<string>;
