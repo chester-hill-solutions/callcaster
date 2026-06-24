@@ -40,7 +40,7 @@ export const loader = async ({
 
     const userRole = await getUserRole({
       supabaseClient: supabaseClient as SupabaseClient,
-      user: user as unknown as User,
+      user: user,
       workspaceId: workspace_id,
     });
 

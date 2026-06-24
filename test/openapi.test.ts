@@ -9,6 +9,7 @@ import {
 import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-script";
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
+import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
 
 const scriptCampaignTypes = [
   "live_call",
@@ -114,6 +115,18 @@ describe("openapi spec", () => {
         campaign_id: "123",
       }).success,
     ).toBe(true);
+  });
+
+  test("auth token request fields match Zod schema", () => {
+    const required = openApiSpec.components.schemas.TokenRequest.required;
+    expect(required).toEqual(expect.arrayContaining(["email", "password"]));
+    expect(
+      tokenBodySchema.safeParse({
+        email: "user@example.com",
+        password: "secret",
+      }).success,
+    ).toBe(true);
+    expect(openApiSpec.paths).toHaveProperty("/api/auth/token");
   });
 
   test("create-with-script operation description documents XOR rule", () => {

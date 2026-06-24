@@ -14,9 +14,7 @@ export default function WorkspaceVoicemailsPage() {
     useLoaderData();
   const {workspace } = useOutletContext<{workspace: Workspace}>();
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const voicemails = audioMedia?.filter(
-    (media: FileObject) => media.name.includes("voicemail-+") || media.name.includes("voicemail-undefined"),
-  );
+  const voicemails = audioMedia;
 
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">

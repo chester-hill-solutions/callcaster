@@ -1,5 +1,6 @@
 import { useFetcher } from "react-router";
 import { useEffect, useState } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -43,20 +44,34 @@ export default function ApiKeysSection({
     }
   }, [workspaceId, hasAccess]);
 
-  useEffect(() => {
-    if (mutateFetcher.data && "key" in mutateFetcher.data && mutateFetcher.data.key) {
-      setNewKeyReveal(mutateFetcher.data.key);
-      setShowCreateForm(false);
-      setCreateName("");
-      listFetcher.load(`/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`);
-    }
-    if (mutateFetcher.data && "error" in mutateFetcher.data && mutateFetcher.data.error) {
-      toast.error(mutateFetcher.data.error);
-    }
-    if (mutateFetcher.data && "success" in mutateFetcher.data) {
-      listFetcher.load(`/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`);
-    }
-  }, [mutateFetcher.data]);
+  useActionFeedback(mutateFetcher.data, {
+    getError: (data) =>
+      data && typeof data === "object" && "error" in data
+        ? String((data as { error?: string }).error ?? "")
+        : undefined,
+    onSuccess: (data) => {
+      if (data && "key" in data && data.key) {
+        setNewKeyReveal(data.key);
+        setShowCreateForm(false);
+        setCreateName("");
+        listFetcher.load(
+          `/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`,
+        );
+        return;
+      }
+      if (data && "success" in data) {
+        listFetcher.load(
+          `/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`,
+        );
+      }
+    },
+    getSuccess: (data) =>
+      Boolean(
+        data &&
+          (("key" in data && Boolean(data.key)) ||
+            ("success" in data && data.success)),
+      ),
+  });
 
   const keys: ApiKeyRecord[] = listFetcher.data?.keys ?? [];
   const isLoading = listFetcher.state === "loading" || listFetcher.state === "idle";

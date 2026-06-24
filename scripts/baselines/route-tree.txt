@@ -82,7 +82,6 @@ api/message_media
 api/numbers
 api/outreach-attempts
 api/outreach_attempts/:id
-api/outreach_attempts/:id
 api/questions
 api/queues
 api/recording

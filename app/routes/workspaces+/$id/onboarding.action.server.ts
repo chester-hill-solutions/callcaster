@@ -4,7 +4,6 @@ import {
 } from "@/lib/database.server";
 import { data as routeData, redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
-import type { User } from "@/lib/types";
 import type { ActionFunctionArgs } from "react-router";
 import {
   isOnboardingActionName,
@@ -12,9 +11,8 @@ import {
   type OnboardingActionName,
 } from "@/lib/onboarding-actions.server";
 import {
+  mapOnboardingHandlerResult,
   runOnboardingAction,
-  type OnboardingActionContext,
-  type OnboardingHandlerResult,
 } from "@/lib/platform-onboarding.server";
 
 export type { OnboardingActionData } from "@/lib/onboarding-actions.server";
@@ -29,37 +27,46 @@ function redirectToOnboardingStep(
   throw redirect(`/workspaces/${workspaceId}/onboarding?${params.toString()}`, { headers });
 }
 
-function applyHandlerResult(
+async function runUiOnboardingAction(
   workspaceId: string,
   headers: Headers,
-  result: OnboardingHandlerResult,
-): ReturnType<typeof routeData<OnboardingActionData>> | never {
-  if (result.kind === "redirect") {
-    redirectToOnboardingStep(workspaceId, result.step, headers, result.searchParams);
-  }
-
-  return routeData<OnboardingActionData>(result.data, {
-    status: result.status ?? (result.data.error ? 400 : 200),
-  });
-}
-
-async function runUiOnboardingAction(
-  ctx: OnboardingActionContext & { headers: Headers },
+  userId: string,
+  supabaseClient: Awaited<ReturnType<typeof verifyAuth>>["supabaseClient"],
   actionName: OnboardingActionName,
+  input: FormData,
 ): Promise<ReturnType<typeof routeData<OnboardingActionData>> | never> {
   const outcome = await runOnboardingAction(
-    ctx.supabaseClient,
-    ctx.user.id,
-    ctx.workspaceId,
+    supabaseClient,
+    userId,
+    workspaceId,
     actionName,
-    ctx.input,
+    input,
   );
 
   if (!outcome.ok) {
     return routeData<OnboardingActionData>({ error: outcome.error }, { status: outcome.status });
   }
 
-  return applyHandlerResult(ctx.workspaceId, ctx.headers, outcome.result);
+  const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
+  if (mapped.kind === "ui_redirect") {
+    redirectToOnboardingStep(
+      workspaceId,
+      mapped.step,
+      headers,
+      mapped.searchParams,
+    );
+  }
+
+  if (mapped.kind !== "ui_payload") {
+    return routeData<OnboardingActionData>(
+      { error: "Unexpected onboarding response." },
+      { status: 500 },
+    );
+  }
+
+  return routeData<OnboardingActionData>(mapped.data, {
+    status: mapped.status,
+  });
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -72,7 +79,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!wsId) {
     return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });
   }
-  const actorUserId = user.id ?? null;
 
   await requireWorkspaceAccess({
     supabaseClient,
@@ -80,13 +86,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     workspaceId: wsId,
   });
 
-  const role = (
-    await getUserRole({
-      supabaseClient,
-      user: user as unknown as User,
-      workspaceId: wsId,
-    })
-  )?.role;
+  const role = (await getUserRole({ supabaseClient, user, workspaceId: wsId }))?.role;
 
   if (role !== "owner" && role !== "admin") {
     return routeData<OnboardingActionData>(
@@ -102,17 +102,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return routeData<OnboardingActionData>({ error: "Unknown onboarding action." }, { status: 400 });
   }
 
-  const ctx = {
-    input: formData,
-    workspaceId: wsId,
-    headers,
-    supabaseClient,
-    user: { id: user.id },
-    actorUserId,
-  };
-
   try {
-    return await runUiOnboardingAction(ctx, actionName);
+    return await runUiOnboardingAction(
+      wsId,
+      headers,
+      user.id,
+      supabaseClient,
+      actionName,
+      formData,
+    );
   } catch (error) {
     if (error instanceof Response) {
       throw error;

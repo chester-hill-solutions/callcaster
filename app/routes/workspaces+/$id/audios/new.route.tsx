@@ -4,7 +4,7 @@ export { action } from "./new.action.server";
 import { Form, Link, useActionData, useNavigation } from "react-router";
 import { useState } from "react";
 import { FaPlus } from "react-icons/fa";
-import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import { BrandedCard as Card, BrandedCardActions as CardActions, BrandedCardContent as CardContent, BrandedCardTitle as CardTitle } from "@/components/shared/BrandedCard";
 import { Button } from "@/components/ui/button";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 

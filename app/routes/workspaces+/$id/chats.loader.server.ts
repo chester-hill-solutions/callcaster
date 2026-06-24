@@ -39,7 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const userRole = await getUserRole({
     supabaseClient: supabaseClient as SupabaseClient,
-    user: user as unknown as User,
+    user: user,
     workspaceId: workspaceId as string,
   });
 

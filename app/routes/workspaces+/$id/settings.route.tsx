@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 
 import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
-import { Card } from "@/components/shared/CustomCard";
+import { BrandedCard as Card } from "@/components/shared/BrandedCard";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import { compareMembersByRole } from "@/lib/workspace-members";

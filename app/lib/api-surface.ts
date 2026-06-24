@@ -730,30 +730,12 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
   seed({
     path: "/api/outreach_attempts/:id",
     routeModule: "app/routes/api+/outreach_attempts/$id.route.tsx",
-    authClass: "weakUnknown",
+    authClass: "session",
     ownerArea: "campaigns",
-    exposure: "unsupported",
+    exposure: "internalOnly",
     docsGuide: GUIDE.internal,
-    duplicate: true,
-    duplicateGroup: "outreach_attempts-id",
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-    securityWarning:
-      "Session cookie client only; no verifyAuth. Duplicate legacy route also registered.",
-    notes: "Updates outreach_attempt table.",
-  }),
-  seed({
-    path: "/api/outreach_attempts/:id",
-    routeModule: "app/routes/api.outreach_attempts.$id.js",
-    authClass: "weakUnknown",
-    ownerArea: "campaigns",
-    exposure: "unsupported",
-    docsGuide: GUIDE.internal,
-    duplicate: true,
-    duplicateGroup: "outreach_attempts-id",
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-    securityWarning:
-      "Legacy JS module; updates outreach_attempts table (typo). Do not use for integrations.",
-    notes: "Legacy flat-route duplicate of TS handler.",
+    notes: "Session-scoped outreach attempt updates via requireJsonAuthForOutreachAttempt.",
   }),
   seed({
     path: "/api/questions",
@@ -769,17 +751,16 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
   seed({
     path: "/api/queues",
     routeModule: "app/routes/api+/queues.tsx",
-    authClass: "weakUnknown",
+    authClass: "session",
     ownerArea: "queues",
     exposure: "sessionOnly",
-    docsGuide: GUIDE.internal,
+    docsGuide: GUIDE.telephony,
     operations: [
       { method: "GET", handler: "loader", bodyType: "query" },
       { method: "POST", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
-    securityWarning:
-      "Uses session client but does not require authenticated user on all code paths.",
+    notes: "Campaign queue dequeue and reset; requires session auth and workspace access.",
   }),
   seed({
     path: "/api/recording",

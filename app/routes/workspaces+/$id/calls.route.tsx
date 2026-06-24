@@ -3,7 +3,7 @@ export { action } from "./calls.action.server";
 
 import { Link, useFetcher, useLoaderData } from "react-router";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { CallLogTable } from "@/components/calls/CallLogTable";
 import { IncomingCallReceiver } from "@/components/calls/IncomingCallReceiver";
@@ -41,33 +41,35 @@ export default function WorkspaceCallLogPage() {
     setListenTokenError(listening.tokenError);
   }, [listening.active, listening.token, listening.tokenError]);
 
-  useEffect(() => {
-    if (!pickupFetcher.data) return;
-
-    if (pickupFetcher.data.error) {
-      toast.error(pickupFetcher.data.error);
-      return;
-    }
-
-    if (pickupFetcher.data.listening === true) {
-      setIsListening(true);
-      setListenToken(pickupFetcher.data.token ?? null);
-      setListenTokenError(pickupFetcher.data.tokenError ?? null);
-      if (pickupFetcher.data.tokenError) {
-        toast.error(pickupFetcher.data.tokenError);
-      } else {
-        toast.success("Listening for incoming calls");
+  useActionFeedback(pickupFetcher.data, {
+    getError: (data) =>
+      data?.error ??
+      (data?.listening === true && data?.tokenError ? data.tokenError : undefined),
+    onSuccess: (data) => {
+      if (data.listening === true) {
+        setIsListening(true);
+        setListenToken(data.token ?? null);
+        setListenTokenError(data.tokenError ?? null);
+        return;
       }
-      return;
-    }
-
-    if (pickupFetcher.data.listening === false) {
-      setIsListening(false);
-      setListenToken(null);
-      setListenTokenError(null);
-      toast.success("Stopped listening for incoming calls");
-    }
-  }, [pickupFetcher.data]);
+      if (data.listening === false) {
+        setIsListening(false);
+        setListenToken(null);
+        setListenTokenError(null);
+      }
+    },
+    getSuccess: (data) =>
+      data?.listening === true || data?.listening === false,
+    successMessage: (data) => {
+      if (data.listening === true && !data.tokenError) {
+        return "Listening for incoming calls";
+      }
+      if (data.listening === false) {
+        return "Stopped listening for incoming calls";
+      }
+      return "";
+    },
+  });
 
   const startListening = () => {
     pickupFetcher.submit({ intent: "start_listening" }, { method: "POST" });

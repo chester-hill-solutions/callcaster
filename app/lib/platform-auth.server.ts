@@ -42,6 +42,31 @@ export type AuthTokensResponse = {
   };
 };
 
+export type PasswordLoginResult =
+  | { ok: true; session: Session; user: User }
+  | { ok: false; error: string };
+
+/** Shared email/password login used by HTML sign-in and JSON token API. */
+export async function loginWithPassword(
+  supabaseClient: SupabaseClient<Database>,
+  email: string,
+  password: string,
+): Promise<PasswordLoginResult> {
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.session || !data.user) {
+    return {
+      ok: false,
+      error: error?.message ?? "Invalid credentials",
+    };
+  }
+
+  return { ok: true, session: data.session, user: data.user };
+}
+
 function mapUserProfile(user: User): AuthTokensResponse["user"] {
   const meta = user.user_metadata ?? {};
   return {
@@ -113,21 +138,16 @@ export async function tokenLogin(
   | { ok: false; error: string; status: number }
 > {
   const { supabaseClient } = createSupabaseServerClient(request);
+  const login = await loginWithPassword(supabaseClient, body.email, body.password);
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: body.email,
-    password: body.password,
-  });
-
-  if (error || !data.session || !data.user) {
-    return {
-      ok: false,
-      error: error?.message ?? "Invalid credentials",
-      status: 401,
-    };
+  if (!login.ok) {
+    return { ok: false, error: login.error, status: 401 };
   }
 
-  return { ok: true, data: mapSessionResponse(data.session, data.user) };
+  return {
+    ok: true,
+    data: mapSessionResponse(login.session, login.user),
+  };
 }
 
 export async function refreshTokens(

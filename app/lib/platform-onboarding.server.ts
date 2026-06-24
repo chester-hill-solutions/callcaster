@@ -651,3 +651,65 @@ export async function runOnboardingAction(
     };
   }
 }
+
+export type MappedOnboardingResult =
+  | {
+      kind: "ui_redirect";
+      step: string;
+      searchParams?: Record<string, string>;
+    }
+  | {
+      kind: "ui_payload";
+      data: OnboardingActionData;
+      status: number;
+    }
+  | {
+      kind: "api_json";
+      body: Record<string, unknown>;
+      status: number;
+    };
+
+export function mapOnboardingHandlerResult(
+  handlerResult: OnboardingHandlerResult,
+  detail: WorkspaceOnboardingDetail,
+  target: "ui" | "api",
+): MappedOnboardingResult {
+  if (handlerResult.kind === "redirect") {
+    if (target === "ui") {
+      return {
+        kind: "ui_redirect",
+        step: handlerResult.step,
+        searchParams: handlerResult.searchParams,
+      };
+    }
+    return {
+      kind: "api_json",
+      body: {
+        ...detail,
+        redirect: {
+          step: handlerResult.step,
+          search_params: handlerResult.searchParams ?? null,
+        },
+      },
+      status: 200,
+    };
+  }
+
+  const status = handlerResult.status ?? (handlerResult.data.error ? 400 : 200);
+  if (target === "ui") {
+    return {
+      kind: "ui_payload",
+      data: handlerResult.data,
+      status,
+    };
+  }
+
+  const apiStatus =
+    handlerResult.data.error && status < 400 ? 400 : status;
+
+  return {
+    kind: "api_json",
+    body: { ...detail, ...handlerResult.data },
+    status: apiStatus,
+  };
+}

@@ -17,7 +17,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // Get user role for this workspace
   const userRole = await getUserRole({ 
     supabaseClient, 
-    user: user as unknown as User, 
+    user: user, 
     workspaceId 
   });
 
