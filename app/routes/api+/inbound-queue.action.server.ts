@@ -1,46 +1,65 @@
-import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import {
+  getAuthSupabaseClient,
+  requireJsonAuth,
+} from "@/lib/api-auth.server";
 import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  if (!user) return routeData({ error: "Unauthorized" }, { status: 401, headers });
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
 
+  const supabaseClient = getAuthSupabaseClient(auth);
   const body = await request.json().catch(() => ({}));
   const workspaceId = body.workspace_id;
-  if (!workspaceId) return routeData({ error: "workspace_id required" }, { status: 400, headers });
+  if (!workspaceId) {
+    return jsonError("workspace_id required", 400);
+  }
 
-  await requireWorkspaceAccess({ supabaseClient, user: { id: user.id }, workspaceId });
+  await requireWorkspaceAccess({
+    supabaseClient,
+    user: { id: auth.user.id },
+    workspaceId,
+  });
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
+  const userRole = await getUserRole({
+    supabaseClient,
+    user: { id: auth.user.id },
+    workspaceId,
+  });
   if (userRole?.role === MemberRole.Caller) {
-    return routeData({ error: "Callers cannot manage queues" }, { status: 403, headers });
+    return jsonError("Callers cannot manage queues", 403);
   }
 
   switch (request.method) {
     case "POST": {
       const { name, description, hold_audio } = body;
-      if (!name) return routeData({ error: "name required" }, { status: 400, headers });
+      if (!name) return jsonError("name required", 400);
 
       const { data, error } = await supabaseClient
         .from("inbound_queue")
-        .insert({ name, description, hold_audio: hold_audio || null, workspace_id: workspaceId })
+        .insert({
+          name,
+          description,
+          hold_audio: hold_audio || null,
+          workspace_id: workspaceId,
+        })
         .select()
         .single();
 
       if (error) {
         logger.error("Failed to create queue", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return jsonError(error.message, 500);
       }
-      return routeData({ queue: data }, { headers });
+      return jsonResponse({ queue: data }, 200);
     }
 
     case "PUT": {
       const { id, name, description, hold_audio } = body;
-      if (!id) return routeData({ error: "id required" }, { status: 400, headers });
+      if (!id) return jsonError("id required", 400);
 
       const updates: Record<string, unknown> = {};
       if (name !== undefined) updates.name = name;
@@ -57,14 +76,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (error) {
         logger.error("Failed to update queue", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return jsonError(error.message, 500);
       }
-      return routeData({ queue: data }, { headers });
+      return jsonResponse({ queue: data }, 200);
     }
 
     case "DELETE": {
       const { id } = body;
-      if (!id) return routeData({ error: "id required" }, { status: 400, headers });
+      if (!id) return jsonError("id required", 400);
 
       const { error } = await supabaseClient
         .from("inbound_queue")
@@ -74,16 +93,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (error) {
         logger.error("Failed to delete queue", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return jsonError(error.message, 500);
       }
-      return routeData({ ok: true }, { headers });
+      return jsonResponse({ ok: true }, 200);
     }
 
     case "PATCH": {
-      // Add or remove member from queue
       const { queue_id, user_id, action: memberAction } = body;
       if (!queue_id || !user_id || !memberAction) {
-        return routeData({ error: "queue_id, user_id, and action required" }, { status: 400, headers });
+        return jsonError("queue_id, user_id, and action required", 400);
       }
 
       if (memberAction === "add") {
@@ -92,7 +110,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           .insert({ queue_id, user_id, workspace_id: workspaceId });
         if (error) {
           logger.error("Failed to add member", error);
-          return routeData({ error: error.message }, { status: 500, headers });
+          return jsonError(error.message, 500);
         }
       } else if (memberAction === "remove") {
         const { error } = await supabaseClient
@@ -102,15 +120,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           .eq("user_id", user_id);
         if (error) {
           logger.error("Failed to remove member", error);
-          return routeData({ error: error.message }, { status: 500, headers });
+          return jsonError(error.message, 500);
         }
       } else {
-        return routeData({ error: "action must be 'add' or 'remove'" }, { status: 400, headers });
+        return jsonError("action must be 'add' or 'remove'", 400);
       }
-      return routeData({ ok: true }, { headers });
+      return jsonResponse({ ok: true }, 200);
     }
 
     default:
-      return routeData({ error: "Method not allowed" }, { status: 405, headers });
+      return jsonError("Method not allowed", 405);
   }
 };

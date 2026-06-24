@@ -611,7 +611,7 @@ export function QueueTable({
             <div className="rounded-md border">
                 <div className="relative">
                     <div className="max-h-[800px] overflow-y-auto">
-                        <table className="w-full">
+                        <table className="w-full" data-testid="campaign-queue-table">
                             <thead className="sticky top-0 bg-gray-100 border-b">
                                 {table.getHeaderGroups().map(headerGroup => (
                                     <tr key={headerGroup.id}>

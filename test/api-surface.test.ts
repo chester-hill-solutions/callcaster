@@ -94,9 +94,9 @@ describe("api surface inventory enums", () => {
       expect(entry?.supported).toBe(true);
     }
     const publicEntries = getPublicOpenApiEntries();
-    expect(publicEntries.length).toBeGreaterThan(40);
-    expect(publicEntries.some((e) => e.path === "/api/workspace")).toBe(true);
-    expect(publicEntries.some((e) => e.path === "/api/campaigns")).toBe(true);
+    expect(publicEntries.length).toBeGreaterThanOrEqual(100);
+    expect(publicEntries.some((e) => e.path === "/api/workspaces")).toBe(true);
+    expect(publicEntries.some((e) => e.path === "/api/auth/token")).toBe(true);
   });
 
   test("public OpenAPI covers publicOpenApi inventory", () => {

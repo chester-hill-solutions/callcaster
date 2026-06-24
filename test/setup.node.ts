@@ -1,4 +1,6 @@
 import { beforeAll, vi } from "vitest";
+import "./setup-route-auth-mock";
+import "./helpers/route-auth-mock";
 
 beforeAll(() => {
   process.env.NODE_ENV = "test";

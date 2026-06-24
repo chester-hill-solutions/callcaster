@@ -44,7 +44,13 @@
     "test:coverage:report:strict": "node scripts/coverage/report-strict-failures.mjs",
     "test:coverage": "npm run test:coverage:vitest && npm run test:coverage:deno && npm run test:coverage:merge",
     "check:client-bundle": "node scripts/check-client-bundle-for-server-imports.mjs",
-    "check:route-server-leaks": "node scripts/check-route-server-leaks.mjs"
+    "check:route-server-leaks": "node scripts/check-route-server-leaks.mjs",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
+    "test:e2e:debug": "playwright test -c e2e/playwright.config.ts --headed --debug",
+    "test:e2e:rbac": "playwright test -c e2e/playwright.config.ts e2e/specs/rbac.spec.ts",
+    "test:e2e:seed": "node scripts/e2e/seed-database.mjs",
+    "test:e2e:server": "node scripts/e2e/start-e2e-server.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.15",
@@ -104,6 +110,7 @@
   "devDependencies": {
     "@hey-api/client-fetch": "^0.13.1",
     "@hey-api/openapi-ts": "^0.66.7",
+    "@playwright/test": "^1.49.1",
     "@react-router/dev": "^7.0.0",
     "@react-router/fs-routes": "^7.0.0",
     "@react-router/remix-routes-option-adapter": "^7.15.1",

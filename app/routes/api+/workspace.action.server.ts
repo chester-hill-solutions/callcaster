@@ -1,9 +1,11 @@
+import { data as routeData } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import { createErrorResponse } from "@/lib/errors.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 
 interface WorkspaceUpdate {
@@ -75,7 +77,13 @@ const updateWorkspace = async ({
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-  const { supabaseClient, user } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabaseClient = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   const { workspace_id, update }: WorkspaceRequest =
     await safeParseJson(request);
 

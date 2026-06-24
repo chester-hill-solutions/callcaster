@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
@@ -18,7 +18,12 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({ verifyAuth: (...args: any[]) => mocks.verifyAuth(...args) }));
+vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
+}));
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...args: any[]) => mocks.createClient(...args) }));
 vi.mock("@/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
@@ -79,7 +84,6 @@ function makeServiceSupabase(opts: {
 
 describe("app/routes/api+/call/route-status-poll.tsx", () => {
   beforeEach(() => {
-    mocks.verifyAuth.mockReset();
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
@@ -92,7 +96,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("returns 401 when verifyAuth returns no user", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: null,
@@ -104,7 +108,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("returns 400 when callSid/workspaceId missing", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -116,7 +120,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("returns 404 when call not found and logs debug", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -136,7 +140,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
   test("returns 403 for workspace mismatch or missing membership", async () => {
     const userSupabase = makeUserSupabase({ membership: null });
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -153,7 +157,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     } as any));
     expect(resMismatch.status).toBe(403);
 
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -174,7 +178,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("returns 200 unsupported status when normalizeProviderStatus returns null", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -199,7 +203,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("no DB update when status unchanged", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -225,7 +229,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("status changed updates call (covers endTime/duration true branch) and returns 500 on update error", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -252,7 +256,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("status changed updates call (covers endTime/duration false branch) and logs attempt update error", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -281,7 +285,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("status changed with null db status updates call and skips outreach_attempt update when no attempt id", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -305,7 +309,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
   test("status changed updates outreach_attempt when attempt id present and no update error", async () => {
     const userSupabase = makeUserSupabase({ membership: { id: "w1" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -335,7 +339,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.createClient.mockReturnValue(svc);
 
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -352,7 +356,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       statusCode: 500,
     });
 
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: userSupabase,
       headers: new Headers(),
       user: { id: "u1" },

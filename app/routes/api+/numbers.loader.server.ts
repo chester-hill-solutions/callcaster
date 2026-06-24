@@ -1,3 +1,5 @@
+import { data as routeData } from "react-router";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import {
   getNumberSearchNumberType,
   jsonNumbersSearchResponse,
@@ -7,13 +9,19 @@ import {
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import Twilio from "twilio";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient, user } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabase = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   if (!user) {
     return jsonNumbersSearchResponse({ ok: false, error: "Unauthorized." }, 401);
   }
@@ -29,13 +37,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     let twilio: Twilio.Twilio;
     if (workspaceId) {
-      await requireWorkspaceAccess({
-        supabaseClient,
+      await requireWorkspaceAccess({ supabaseClient: supabase,
         user,
         workspaceId,
       });
       twilio = (await createWorkspaceTwilioInstance({
-        supabase: supabaseClient,
+        supabase: supabase,
         workspace_id: workspaceId,
       })) as Twilio.Twilio;
     } else {

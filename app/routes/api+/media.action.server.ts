@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -10,7 +11,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const live_campaign_id_raw = formData.get('live_campaign_id');
     const live_campaign_id = live_campaign_id_raw == null ? null : Number(live_campaign_id_raw);
     const campaignName = formData.get('campaign_name') as string || Date.now().toString();
-    const { supabaseClient: supabase, user } = await verifyAuth(request);
+    const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabase = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
     const arrayBuffer = await file.arrayBuffer();   
     const buffer = Buffer.from(arrayBuffer);
     const fileName = `${user.id}.${campaignName}`;

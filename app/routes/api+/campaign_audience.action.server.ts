@@ -1,14 +1,19 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { logger } from "@/lib/logger.server";
 import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
 import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-    const { supabaseClient, headers } = await verifyAuth(request);
+    const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getDualAuthSupabase(auth);
     const method = request.method;
 
     try {
@@ -24,7 +29,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             // First check if this audience is already added to the campaign
-            const { data: existing, error: checkError } = await supabaseClient
+            const { data: existing, error: checkError } = await supabase
                 .from("campaign_audience")
                 .select()
                 .eq("campaign_id", campaignId)
@@ -40,7 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             // Add the audience to the campaign
-            const { error: addError } = await supabaseClient
+            const { error: addError } = await supabase
                 .from("campaign_audience")
                 .insert({
                     campaign_id: campaignId,
@@ -49,7 +54,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             if (addError) throw addError;
 
-            const { data: audienceContacts, error: contactsError } = await supabaseClient
+            const { data: audienceContacts, error: contactsError } = await supabase
                 .from('contact_audience')
                 .select('contact_id')
                 .eq('audience_id', audienceId);
@@ -62,7 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             let warning: string | undefined;
 
             if (audienceContactIds.length > 0) {
-                const { data: existingQueueRows, error: queueError } = await supabaseClient
+                const { data: existingQueueRows, error: queueError } = await supabase
                     .from("campaign_queue")
                     .select("contact_id")
                     .eq("campaign_id", campaignId)
@@ -88,8 +93,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 }
 
                 try {
-                    await enqueueContactsForCampaign(
-                        supabaseClient,
+                    await enqueueContactsForCampaign(supabase,
                         campaignId,
                         contactIds,
                         { requeue: false }
@@ -124,7 +128,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             // Remove the audience from the campaign
-            const { error } = await supabaseClient
+            const { error } = await supabase
                 .from("campaign_audience")
                 .delete()
                 .eq("campaign_id", campaignId)
@@ -133,14 +137,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (error) throw error;
 
             // Get all contacts that are only in this audience (not in other audiences of this campaign)
-            const { data: campaignAudiences } = await supabaseClient
+            const { data: campaignAudiences } = await supabase
                 .from('campaign_audience')
                 .select('audience_id')
                 .eq('campaign_id', campaignId);
 
             const remainingAudienceIds = (campaignAudiences ?? []).map((audience) => audience.audience_id);
 
-            const { data: removedAudienceContacts, error: removedAudienceContactsError } = await supabaseClient
+            const { data: removedAudienceContacts, error: removedAudienceContactsError } = await supabase
                 .from('contact_audience')
                 .select('contact_id')
                 .eq('audience_id', audienceId);
@@ -150,7 +154,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             let contactsToRemove = removedAudienceContacts ?? [];
 
             if (remainingAudienceIds.length > 0 && contactsToRemove.length > 0) {
-                const { data: retainedContacts, error: retainedContactsError } = await supabaseClient
+                const { data: retainedContacts, error: retainedContactsError } = await supabase
                     .from("contact_audience")
                     .select("contact_id")
                     .in("audience_id", remainingAudienceIds);
@@ -167,7 +171,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             if (contactsToRemove && contactsToRemove.length > 0) {
                 // Remove these contacts from the queue if they haven't been called yet
-                const { error: removeError } = await supabaseClient
+                const { error: removeError } = await supabase
                     .from('campaign_queue')
                     .delete()
                     .eq('campaign_id', campaignId)

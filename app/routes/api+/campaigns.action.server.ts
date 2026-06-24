@@ -1,12 +1,17 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { createCampaign, deleteCampaign, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
 import { parseJsonField } from "@/lib/parse-utils.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 
 export const action = async ({ request }: { request: Request }) => {
 
-  const { supabaseClient, headers } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getDualAuthSupabase(auth);
 
   try {
     const data = await parseActionRequest(request);
@@ -15,20 +20,20 @@ export const action = async ({ request }: { request: Request }) => {
       const campaignData = parseJsonField<Parameters<typeof updateCampaign>[0]["campaignData"]>(data.campaignData);
       const campaignDetails = parseJsonField<Parameters<typeof updateCampaign>[0]["campaignDetails"]>(data.campaignDetails);
       const { campaign, campaignDetails: updatedCampaignDetails } =
-        await updateCampaign({ supabase: supabaseClient, campaignData, campaignDetails });
+        await updateCampaign({ supabase: supabase, campaignData, campaignDetails });
       return routeData({ campaign, campaignDetails: updatedCampaignDetails }, { headers });
     }
 
     if (request.method === "DELETE") {
       const campaignId = String(data.campaignId ?? "");
-      await deleteCampaign({ supabase: supabaseClient, campaignId });
+      await deleteCampaign({ supabase: supabase, campaignId });
       return routeData({ success: true }, { headers });
     }
 
     if (request.method === "POST") {
       const campaignData = parseJsonField<Parameters<typeof createCampaign>[0]["campaignData"]>(data.campaignData);
       const { campaign, campaignDetails: createdCampaignDetails } = await createCampaign({
-        supabase: supabaseClient,
+        supabase: supabase,
         campaignData,
       });
       return routeData({ campaign, campaignDetails: createdCampaignDetails }, { headers });

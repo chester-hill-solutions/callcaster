@@ -35,8 +35,7 @@ export const action = async ({ request }: { request: Request }) => {
     selected_device: string;
   }>(request);
   const { user_id, campaign_id, workspace_id, selected_device } = body;
-  const twilioClient = await createWorkspaceTwilioInstance({
-    supabase,
+  const twilioClient = await createWorkspaceTwilioInstance({ supabase: supabase,
     workspace_id,
   });
   const realtime = supabase.channel(user_id);

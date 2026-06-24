@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
+import { queueDualAuthSession } from "./helpers/route-auth-mock";
+const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     parseRequestData: vi.fn(),
     enqueueContactsForCampaign: vi.fn(),
     filteredSearch: vi.fn(),
@@ -12,7 +12,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: supabaseServerMocks.headers,
+  }),
 }));
 vi.mock("@/lib/database.server", () => ({
   parseRequestData: (...args: any[]) => mocks.parseRequestData(...args),
@@ -27,23 +30,23 @@ vi.mock("@/lib/queue-filter-search.server", () => ({
 describe("app/routes/api+/campaign_queue/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.parseRequestData.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
     mocks.filteredSearch.mockReset();
   });
 
   test("redirects to /signin when user missing", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, user: null });
+    queueDualAuthSession({ supabaseClient: {}, user: null });
     const mod = await import("../app/routes/api+/campaign_queue");
-    await expect(
-      mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
-    ).rejects.toBeInstanceOf(Response);
+    const res = await asRouteResponse(
+      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    );
+    expect(res.status).toBe(401);
   });
 
   test("POST enqueues contact ids (string->number), with defaults", async () => {
     const supabaseClient = {};
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: ["1", 2], campaign_id: "10" });
 
     const mod = await import("../app/routes/api+/campaign_queue");
@@ -64,7 +67,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     const from = vi.fn().mockReturnValueOnce({ delete: () => ({ eq: (col: string, v: any) => ({ in: (c: string, b: any) => ({ select }) }) }) });
 
     const supabaseClient = { from };
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1, 2], campaign_id: 10 });
 
     const mod = await import("../app/routes/api+/campaign_queue");
@@ -85,7 +88,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
         }),
       }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1], campaign_id: 10 });
 
     const mod = await import("../app/routes/api+/campaign_queue");
@@ -104,7 +107,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
         }),
       }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.filteredSearch.mockResolvedValueOnce({
       data: [{ id: "5", contact_id: 1, campaign_id: 10, status: "queued", created_at: "", contact: {} }, {}],
@@ -121,7 +124,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     const supabaseClient = {
       from: vi.fn(),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.filteredSearch.mockResolvedValueOnce({ data: null, error: null });
 
@@ -141,7 +144,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
         }),
       }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.filteredSearch.mockResolvedValueOnce({
       data: [{ id: 5, contact_id: 1, campaign_id: 10, status: "queued", created_at: "", contact: {} }],
@@ -156,7 +159,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
 
   test("DELETE without ids returns 500 on filteredSearch error", async () => {
     const supabaseClient = {};
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.filteredSearch.mockResolvedValueOnce({ data: null, error: { message: "lookup bad" } });
 
@@ -167,7 +170,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("returns 405 for unsupported method", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({});
 
     const mod = await import("../app/routes/api+/campaign_queue");

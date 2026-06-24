@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -85,7 +86,6 @@ describe("app/routes/api+/dial/tsx.route", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createSupabaseServerClient.mockReset();
-    mocks.verifyAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
@@ -112,12 +112,13 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: null });
+    queueJsonAuthSession({ supabaseClient: supabase, user: null });
 
     const mod = await import("../app/routes/api+/dial");
-    await expect(
-      mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any),
-    ).rejects.toMatchObject({ status: 401 });
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://localhost/api/dial", { method: "POST" }),
+    } as any));
+    expect(res.status).toBe(401);
   });
 
   test("returns creditsError when credits <= 0", async () => {
@@ -132,7 +133,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/dial");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
@@ -153,7 +154,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       caller_id: "+1555",
       selected_device: "computer",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     const callsCreate = vi.fn(async () => ({ sid: "CA1", from: "+1555" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: callsCreate } });
 
@@ -182,7 +183,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       caller_id: "+1555",
       selected_device: "+15550001111",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
 
     const mod = await import("../app/routes/api+/dial");
@@ -203,7 +204,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     await expect(
       (await import("../app/routes/api+/dial")).action({
         request: new Request("http://localhost/api/dial", { method: "POST" }),
@@ -223,7 +224,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: { create: async () => Promise.reject(new Error("tw")) },
     });
@@ -255,7 +256,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/dial");
     await expect(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any)).rejects.toThrow("db");
@@ -274,7 +275,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
 
     const mod = await import("../app/routes/api+/dial");
@@ -316,7 +317,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       outreach_id: "oa1",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
 
     const mod = await import("../app/routes/api+/dial");
@@ -362,7 +363,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
       selectedChannels: ["voice_compliance"],
       emergencyVoice: {
@@ -413,7 +414,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
       queue_id: "3",
       caller_id: "+1555",
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
       selectedChannels: ["a2p10dlc"],
       emergencyVoice: {

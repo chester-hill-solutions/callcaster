@@ -152,7 +152,10 @@ export default function ApiKeysSection({
           )}
 
           {newKeyReveal && (
-            <div className="mt-4 rounded border border-amber-500/50 bg-amber-500/10 p-3">
+            <div
+              className="mt-4 rounded border border-amber-500/50 bg-amber-500/10 p-3"
+              data-testid="api-key-reveal"
+            >
               <p className="mb-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
                 Copy your key now. We won’t show it again.
               </p>

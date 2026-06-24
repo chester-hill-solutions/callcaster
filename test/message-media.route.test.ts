@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
+import { queueDualAuthSession } from "./helpers/route-auth-mock";
+const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
 vi.mock("../app/lib/supabase.server", () => ({
-  verifyAuth: (...a: any[]) => mocks.verifyAuth(...a),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: supabaseServerMocks.headers,
+  }),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -58,12 +61,12 @@ function req(method: string, fd: FormData) {
 describe("app/routes/api+/message_media/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("requires workspaceId", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), headers: new Headers({ "X": "1" }) });
+    supabaseServerMocks.headers = new Headers({ "X": "1" });
+    queueDualAuthSession({ supabaseClient: makeSupabase(), headers: new Headers({ "X": "1" }) });
     const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     const res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
@@ -78,13 +81,15 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("image", new File(["x"], "a.png"));
     fd.set("fileName", "a b@.png");
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ uploadError: { statusCode: "500" } }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ uploadError: { statusCode: "500" } }), headers: new Headers() });
     let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(mocks.logger.error).toHaveBeenCalled();
 
     // 409 conflict: upload error ignored, then no campaignId => signed url
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ uploadError: { statusCode: "409" } }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ uploadError: { statusCode: "409" } }), headers: new Headers() });
     res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true, url: "https://signed" });
   });
@@ -97,15 +102,17 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("fileName", "x.png");
     fd.set("campaignId", "1");
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaignError: new Error("c") }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ campaignError: new Error("c") }), headers: new Headers() });
     let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ updateError: new Error("u") }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ updateError: new Error("u") }), headers: new Headers() });
     res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: [] } }), headers: new Headers() });
+    queueDualAuthSession({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: [] } }), headers: new Headers() });
     res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
@@ -117,11 +124,13 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("image", new File(["x"], "a.png"));
     fd.set("fileName", "x.png");
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ signedUrlError: new Error("s") }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ signedUrlError: new Error("s") }), headers: new Headers() });
     let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase(), headers: new Headers() });
     res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true, url: "https://signed" });
   });
@@ -133,15 +142,17 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("fileName", "x.png");
     fd.set("campaignId", "1");
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaignError: new Error("c") }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ campaignError: new Error("c") }), headers: new Headers() });
     let res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ updateError: new Error("u") }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ updateError: new Error("u") }), headers: new Headers() });
     res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: ["x.png", "y.png"] } }), headers: new Headers() });
+    queueDualAuthSession({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: ["x.png", "y.png"] } }), headers: new Headers() });
     res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
@@ -155,7 +166,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("image", new File(["x"], "a.png"));
     fd.set("fileName", new File(["x"], "name.txt"));
     fd.set("campaignId", "1");
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({ campaign: null }),
       headers: new Headers(),
     });
@@ -166,7 +177,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     const fd2 = new FormData();
     fd2.set("workspaceId", "w1");
     fd2.set("fileName", new File(["x"], "name.txt"));
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({ campaign: { id: 1, message_media: null } }),
       headers: new Headers(),
     });
@@ -181,20 +192,22 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("workspaceId", "w1");
     fd.set("image", new File(["x"], "a.png"));
     // omit fileName
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaign: null }), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase({ campaign: null }), headers: new Headers() });
     const r1 = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     expect(r1.status).toBe(200);
 
     const fd2 = new FormData();
     fd2.set("workspaceId", "w1");
     // omit fileName and campaignId
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: [] } }), headers: new Headers() });
+    queueDualAuthSession({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: [] } }), headers: new Headers() });
     const r2 = await asRouteResponse(await mod.action({ request: req("DELETE", fd2) } as any));
     expect(r2.status).toBe(200);
   });
 
   test("returns 405 for unsupported method", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: makeSupabase(), headers: new Headers() });
     const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");

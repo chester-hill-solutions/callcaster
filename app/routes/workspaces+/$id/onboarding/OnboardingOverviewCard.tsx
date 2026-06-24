@@ -38,7 +38,7 @@ export function OnboardingOverviewCard({
     !firstNumberComplete && !hasCreditsForNumberRental(creditsBalance);
 
   return (
-    <Card>
+    <Card data-testid="onboarding-step">
       <CardHeader className="space-y-4">
         <div className="space-y-1">
           <CardTitle className="text-lg">Setup: {workspaceName}</CardTitle>

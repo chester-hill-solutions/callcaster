@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  queueDualAuthSession,
+  setDualAuthSession,
+  setDualAuthUnauthorized,
+} from "./helpers/route-auth-mock";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -21,34 +26,47 @@ let userPresent = true;
 let statusJsonText = JSON.stringify({ status: "processing" });
 let downloadThrows: unknown = null;
 
-vi.mock("@/lib/supabase.server", () => {
+function buildSupabaseClient() {
   return {
-    verifyAuth: vi.fn(async () => {
-      const supabaseClient: any = {
-        storage: {
-          from: () => ({
-            download: async () => {
-              if (downloadThrows != null) throw downloadThrows;
-              if (downloadBehavior === "not_found") {
-                return { data: null, error: new Error("Object not found") };
-              }
-              if (downloadBehavior === "other_error") {
-                return { data: null, error: new Error("Storage exploded") };
-              }
-              return {
-                data: new Blob([statusJsonText], {
-                  type: "application/json",
-                }),
-                error: null,
-              };
-            },
-          }),
+    storage: {
+      from: () => ({
+        download: async () => {
+          if (downloadThrows != null) throw downloadThrows;
+          if (downloadBehavior === "not_found") {
+            return { data: null, error: new Error("Object not found") };
+          }
+          if (downloadBehavior === "other_error") {
+            return { data: null, error: new Error("Storage exploded") };
+          }
+          return {
+            data: new Blob([statusJsonText], {
+              type: "application/json",
+            }),
+            error: null,
+          };
         },
-      };
-      return { supabaseClient, user: userPresent ? { id: "u1" } : null };
-    }),
+      }),
+    },
   };
-});
+}
+
+function applyDualAuth() {
+  if (!userPresent) {
+    setDualAuthUnauthorized();
+    return;
+  }
+  setDualAuthSession({
+    supabaseClient: buildSupabaseClient(),
+    user: { id: "u1" },
+  });
+}
+
+vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
+}));
 
 describe("api.campaign-export-status error handling", () => {
   beforeEach(() => {
@@ -57,6 +75,7 @@ describe("api.campaign-export-status error handling", () => {
     userPresent = true;
     statusJsonText = JSON.stringify({ status: "processing" });
     downloadThrows = null;
+    applyDualAuth();
   });
 
   test("returns 400 when exportId/workspaceId missing", async () => {
@@ -69,6 +88,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 404 when status object not found", async () => {
     downloadBehavior = "not_found";
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -80,7 +100,7 @@ describe("api.campaign-export-status error handling", () => {
   });
 
   test("returns 401 when user is missing", async () => {
-    userPresent = false;
+    queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -92,6 +112,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 200 with parsed JSON when download succeeds", async () => {
     statusJsonText = JSON.stringify({ status: "done", url: "x" });
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -105,6 +126,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 500 on non-not-found download error and on JSON parse error", async () => {
     downloadThrows = new Error("storage down");
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -116,6 +138,7 @@ describe("api.campaign-export-status error handling", () => {
 
     downloadThrows = null;
     statusJsonText = "{";
+    applyDualAuth();
     const res2 = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
@@ -127,6 +150,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 500 when download returns error that isn't Object not found", async () => {
     downloadBehavior = "other_error";
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -139,6 +163,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 500 with Unknown error when a non-Error is thrown", async () => {
     downloadThrows = "nope";
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -149,4 +174,3 @@ describe("api.campaign-export-status error handling", () => {
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });
 });
-

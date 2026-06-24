@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     updateCampaign: vi.fn(),
     deleteCampaign: vi.fn(),
@@ -14,7 +14,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers({ "X": "1" }),
+  }),
 }));
 vi.mock("@/lib/database.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
@@ -26,10 +29,17 @@ vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
 }));
 
+function authSession(supabaseClient: unknown, headers = new Headers()) {
+  return queueDualAuthSession({
+    supabaseClient,
+    headers,
+    user: { id: "u1" },
+  });
+}
+
 describe("app/routes/api+/campaigns/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.updateCampaign.mockReset();
     mocks.deleteCampaign.mockReset();
@@ -38,7 +48,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
   });
 
   test("PATCH parses JSON fields and returns updated campaign", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { sb: 1 }, headers: new Headers({ "X": "1" }) });
+    authSession({ sb: 1 }, new Headers({ "X": "1" }));
     mocks.parseActionRequest.mockResolvedValueOnce({
       campaignData: JSON.stringify({ title: "t" }),
       campaignDetails: { x: 1 },
@@ -54,7 +64,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
   });
 
   test("DELETE calls deleteCampaign", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { sb: 1 }, headers: new Headers() });
+    authSession({ sb: 1 });
     mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: 123 });
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(await mod.action({
@@ -65,7 +75,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
   });
 
   test("DELETE campaignId fallback covers ?? '' branch", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { sb: 1 }, headers: new Headers() });
+    authSession({ sb: 1 });
     mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: null });
     const mod = await import("../app/routes/api+/campaigns");
     await mod.action({
@@ -75,7 +85,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
   });
 
   test("POST calls createCampaign", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { sb: 1 }, headers: new Headers() });
+    authSession({ sb: 1 });
     mocks.parseActionRequest.mockResolvedValueOnce({ campaignData: { title: "x" } });
     mocks.createCampaign.mockResolvedValueOnce({ campaign: { id: 2 }, campaignDetails: { campaign_id: 2 } });
     const mod = await import("../app/routes/api+/campaigns");
@@ -86,7 +96,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
   });
 
   test("returns 405 on unsupported method", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers() });
+    authSession({});
     mocks.parseActionRequest.mockResolvedValueOnce({});
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(await mod.action({
@@ -96,7 +106,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
   });
 
   test("errors call createErrorResponse", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers({ "X": "1" }) });
+    authSession({}, new Headers({ "X": "1" }));
     mocks.parseActionRequest.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(await mod.action({
@@ -111,4 +121,3 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     );
   });
 });
-

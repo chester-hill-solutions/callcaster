@@ -66,6 +66,7 @@ const UserDropdownMenu = ({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
+          data-testid="navbar-user-menu"
           variant="outline"
           className="relative border border-border bg-background/90 transition-colors duration-150 hover:border-foreground hover:bg-accent dark:text-secondary-foreground dark:hover:bg-accent"
         >

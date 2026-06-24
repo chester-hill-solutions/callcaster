@@ -123,8 +123,7 @@ export const action = async ({
   }
 
   try {
-    await d.requireWorkspaceAccess({
-      supabaseClient: supabase,
+    await d.requireWorkspaceAccess({ supabaseClient: supabase,
       user: authenticatedUser,
       workspaceId: workspace_id,
     });
@@ -153,8 +152,7 @@ export const action = async ({
     };
   }
 
-  const twilio = await d.createWorkspaceTwilioInstance({
-    supabase,
+  const twilio = await d.createWorkspaceTwilioInstance({ supabase: supabase,
     workspace_id,
   });
   const conferenceName = authenticatedUser.id;

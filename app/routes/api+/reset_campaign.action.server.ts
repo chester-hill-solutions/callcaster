@@ -1,10 +1,14 @@
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-    const { supabaseClient, user } = await verifyAuth(request);
+    const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabaseClient = getAuthSupabaseClient(auth);
+  const user = auth.user;
     const formData = await request.formData();
     const campaign_id = formData.get("campaign_id");
     

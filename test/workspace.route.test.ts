@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -24,13 +25,6 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: vi.fn(async () => ({
-    supabaseClient: {},
-    user: { id: "u1" },
-    headers: new Headers(),
-  })),
-}));
 
 function makeSupabaseWorkspaceClient(result: { data: any; error: any }) {
   const terminal = {
@@ -63,12 +57,15 @@ describe("app/routes/api+/workspace/route.tsx", () => {
 
   test("returns 200 with updated row", async () => {
     mocks.safeParseJson.mockResolvedValueOnce({ workspace_id: "w1" });
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabaseWorkspaceClient({
-        data: { id: "w1", twilio_data: {} },
-        error: null,
-      }),
-    );
+    const supabaseClient = makeSupabaseWorkspaceClient({
+      data: { id: "w1", twilio_data: {} },
+      error: null,
+    });
+    mocks.createClient.mockReturnValueOnce(supabaseClient);
+    queueDualAuthSession({
+      supabaseClient,
+      user: { id: "u1" },
+    });
 
     const mod = await import("../app/routes/api+/workspace");
     const res = await asRouteResponse(await mod.action({
@@ -88,9 +85,12 @@ describe("app/routes/api+/workspace/route.tsx", () => {
 
   test("returns 500 and logs when update throws", async () => {
     mocks.safeParseJson.mockResolvedValueOnce({ workspace_id: "w2" });
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabaseWorkspaceClient({ data: null, error: { message: "bad" } }),
-    );
+    const supabaseClient = makeSupabaseWorkspaceClient({ data: null, error: { message: "bad" } });
+    mocks.createClient.mockReturnValueOnce(supabaseClient);
+    queueDualAuthSession({
+      supabaseClient,
+      user: { id: "u1" },
+    });
 
     const mod = await import("../app/routes/api+/workspace");
     const res = await asRouteResponse(await mod.action({

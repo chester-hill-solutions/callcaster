@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const WORKSPACE_ID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -51,7 +52,6 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
-    mocks.verifyAuth.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.normalizePhoneNumber.mockReset();
     mocks.logger.debug.mockReset();
@@ -67,7 +67,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       user_id: { id: "u1" },
       workspace_id: WORKSPACE_ID,
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabaseClient(async () => ({ data: null, error: new Error("rpc") })),
       user: { id: "u1" },
     });
@@ -81,7 +81,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       user_id: { id: "u1" },
       workspace_id: WORKSPACE_ID,
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabaseClient(async () => ({
         data: [{ id: "q1", contact_id: "c1", caller_id: "+1", phone: "555" }],
         error: null,
@@ -103,7 +103,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       user_id: { id: "u1" },
       workspace_id: WORKSPACE_ID,
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabaseClient(async () => ({ data: queue, error: null })),
       user: { id: "u1" },
     });

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -16,6 +15,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
 
@@ -75,7 +78,6 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
 
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.getUserRole.mockReset();
     mocks.logger.error.mockReset();
   });

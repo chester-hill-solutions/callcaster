@@ -181,6 +181,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 isBusy ||
                 (!predictive && !nextRecipient)
               }
+              data-testid="call-screen-dial"
               style={{
                 flex: "1",
                 padding: "4px 8px",
@@ -202,6 +203,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
               disabled={!nextRecipient}
               onChange={(e) => handleSetDisposition(e.currentTarget.value)}
               value={disposition}
+              data-testid="call-screen-disposition"
               style={{
                 flex: "1 1 75%",
                 padding: "4px 8px",

@@ -1,39 +1,61 @@
-import { createErrorResponse } from "@/lib/errors.server";
-import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
-import { data as routeData } from "react-router";
-import { logger } from "@/lib/logger.server";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import {
+  getAuthSupabaseClient,
+  requireJsonAuth,
+} from "@/lib/api-auth.server";
+import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { verifyWorkspaceCallerId } from "@/lib/platform-workspace-numbers.server";
+import { z } from "zod";
 import type { ActionFunctionArgs } from "react-router";
 
-interface RequestBody {
-  phoneNumber: string;
-  workspace_id: string;
-  friendlyName: string;
-}
+const legacyCallerIdBodySchema = z
+  .object({
+    workspace_id: z.string().uuid(),
+    phone_number: z.string().min(1).optional(),
+    phoneNumber: z.string().min(1).optional(),
+    friendly_name: z.string().min(1).optional(),
+    friendlyName: z.string().min(1).optional(),
+  })
+  .refine(
+    (value) =>
+      Boolean(value.phone_number ?? value.phoneNumber) &&
+      Boolean(value.friendly_name ?? value.friendlyName),
+    { message: "phone_number and friendly_name are required" },
+  )
+  .transform((value) => ({
+    workspace_id: value.workspace_id,
+    phone_number: value.phone_number ?? value.phoneNumber ?? "",
+    friendly_name: value.friendly_name ?? value.friendlyName ?? "",
+  }));
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient: userSupabase, user } = await verifyAuth(request);
-  try {
-    const { phoneNumber, workspace_id, friendlyName }: RequestBody =
-      await safeParseJson(request);
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
 
-    await requireWorkspaceAccess({
-      supabaseClient: userSupabase,
-      user,
-      workspaceId: workspace_id,
-    });
-
-    const { validationRequest, numberRequest } = await startWorkspaceCallerIdVerification({
-      supabaseClient: userSupabase,
-      workspaceId: workspace_id,
-      phoneNumber,
-      friendlyName,
-    });
-
-    return routeData({ validationRequest, numberRequest });
-  } catch (error) {
-    logger.error("Action error:", error);
-    return createErrorResponse(error, "Failed to create caller ID");
+  if (request.method !== "POST") {
+    return jsonError("Method not allowed", 405);
   }
+
+  const parsed = await parseJsonBodyOrResponse(request, legacyCallerIdBodySchema);
+  if (parsed instanceof Response) return parsed;
+
+  const result = await verifyWorkspaceCallerId(
+    getAuthSupabaseClient(auth),
+    auth.user.id,
+    parsed.workspace_id,
+    parsed.phone_number,
+    parsed.friendly_name,
+  );
+
+  if (!result.ok) {
+    return jsonError(result.error, result.status);
+  }
+
+  return jsonResponse(
+    {
+      validationRequest: result.validationRequest,
+      numberRequest: result.numberRequest,
+    },
+    200,
+  );
 };

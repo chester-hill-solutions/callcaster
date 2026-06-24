@@ -154,6 +154,19 @@ Relevant runtime wiring:
 5. Run `npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url <your-localtunnel-url>`
 6. Test the calling flow
 
+## E2E tests (Playwright)
+
+For browser end-to-end tests without Twilio tunneling, see **[e2e-testing.md](e2e-testing.md)**. Summary:
+
+```bash
+supabase start && supabase db reset
+npm run test:e2e:seed && npm run build
+npm run test:e2e:server &   # separate terminal
+npm run test:e2e
+```
+
+E2E uses mocked Twilio/Stripe and runs in CI on main/nightly only.
+
 ## Troubleshooting
 
 `Missing required environment variables`

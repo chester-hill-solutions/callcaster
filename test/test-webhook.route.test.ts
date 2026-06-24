@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -27,9 +28,8 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
     mocks.testWebhook.mockReset();
-    mocks.verifyAuth.mockReset();
     mocks.logger.warn.mockReset();
-    mocks.verifyAuth.mockResolvedValue({ user: { id: "u1" } });
+    setDualAuthSession({ user: { id: "u1" } });
   });
 
   test("returns 400 on invalid input (event not object or destination_url not string)", async () => {

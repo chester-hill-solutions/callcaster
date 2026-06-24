@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
 const mocks = vi.hoisted(() => {
   class AudioUploadError extends Error {
     status: number;
@@ -36,6 +35,10 @@ vi.mock("@/lib/audio.server", () => ({
   normalizeUploadedAudio: (...args: unknown[]) => mocks.normalizeUploadedAudio(...args),
 }));
 vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -63,7 +66,6 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     vi.resetModules();
     mocks.getSafeMediaBaseName.mockClear();
     mocks.normalizeUploadedAudio.mockReset();
-    mocks.verifyAuth.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
   });

@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -173,8 +174,9 @@ async function handleSubmitResponse(
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-
-  const { supabaseClient } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabaseClient = getDualAuthSupabase(auth);
   
   if (request.method === "POST") {
     return handleSubmitResponse(request, supabaseClient);

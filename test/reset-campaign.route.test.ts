@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -17,13 +18,12 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 describe("app/routes/api+/reset_campaign/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("returns error when campaign_id missing or not string", async () => {
     const supabaseClient = { rpc: vi.fn() };
-    mocks.verifyAuth.mockResolvedValue({ supabaseClient, user: { id: "u1" } });
+    setDualAuthSession({ supabaseClient, user: { id: "u1" } });
     const mod = await import("../app/routes/api+/reset_campaign");
 
     const r1 = await asRouteResponse(await mod.action({
@@ -41,7 +41,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
 
   test("returns error when campaign_id is not a number", async () => {
     const supabaseClient = { rpc: vi.fn() };
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "nope");
     const mod = await import("../app/routes/api+/reset_campaign");
@@ -53,7 +53,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
 
   test("throws when supabase rpc errors", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ error: { message: "bad" } });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { rpc }, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
@@ -65,7 +65,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
 
   test("returns success true when rpc succeeds", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ error: null });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { rpc }, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");

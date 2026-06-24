@@ -3,15 +3,15 @@ import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
 import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, getDualAuthSupabase, getDualAuthUser, requireDualAuth, requireJsonAuth } from "@/lib/api-auth.server";
+
 
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { user } = await verifyAuth(request);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const user = auth.user;
 
   const { event, destination_url, custom_headers } = await safeParseJson<{
     event: string;

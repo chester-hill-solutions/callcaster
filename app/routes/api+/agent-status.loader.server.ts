@@ -1,16 +1,17 @@
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import {
+  getAuthSupabaseClient,
+  requireJsonAuth,
+} from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
+import { createErrorResponse } from "@/lib/errors.server";
 import { getAgentStatus } from "@/lib/agent-status.server";
 import { logger } from "@/lib/logger.server";
-import { createErrorResponse } from "@/lib/errors.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient: supabase, user } = await verifyAuth(request);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const url = new URL(request.url);
@@ -19,13 +20,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return routeData({ error: "workspace_id is required" }, { status: 400 });
     }
 
-    await requireWorkspaceAccess({
-      supabaseClient: supabase,
-      user,
+    const supabase = getAuthSupabaseClient(auth);
+    await requireWorkspaceAccess({ supabaseClient: supabase,
+      user: auth.user,
       workspaceId,
     });
 
-    const status = await getAgentStatus(supabase, workspaceId, user.id);
+    const status = await getAgentStatus(supabase, workspaceId, auth.user.id);
     return routeData({ status });
   } catch (error) {
     logger.error("agent-status loader error:", error);

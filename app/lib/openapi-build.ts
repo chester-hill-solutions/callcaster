@@ -10,6 +10,10 @@ import {
   integratorOpenApiComponents,
   integratorPathOverrides,
 } from "@/lib/openapi-integrator";
+import {
+  platformOpenApiComponents,
+  platformPathOverrides,
+} from "@/lib/openapi-platform";
 
 const broadObjectSchema = {
   type: "object" as const,
@@ -184,8 +188,12 @@ export type BuildOpenApiSpecOptions = {
   tagStrategy: "owner" | "auth";
   /** Merge detailed integrator path definitions (schemas, examples). */
   useIntegratorPathOverrides?: boolean;
+  /** Merge detailed platform path definitions (auth, workspaces). */
+  usePlatformPathOverrides?: boolean;
   /** Append integrator JSON schemas to components. */
   includeIntegratorSchemas?: boolean;
+  /** Append platform JSON schemas to components. */
+  includePlatformSchemas?: boolean;
   unsupportedDescription?: string;
 };
 
@@ -257,6 +265,12 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
     }
   }
 
+  if (options.usePlatformPathOverrides) {
+    for (const [path, override] of Object.entries(platformPathOverrides)) {
+      paths[path] = { ...paths[path], ...override };
+    }
+  }
+
   const tagNames = new Set<string>();
   for (const entry of options.entries) {
     for (const tag of tagsForEntry(entry, options.tagStrategy)) {
@@ -267,6 +281,9 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
     tagNames.add("Integrator API");
     tagNames.add("Campaigns");
     tagNames.add("Messaging");
+  }
+  if (options.usePlatformPathOverrides) {
+    tagNames.add("Platform API");
   }
 
   const tags = [...tagNames].sort().map((name) => ({
@@ -291,9 +308,15 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
     paths,
     components: {
       securitySchemes: integratorOpenApiComponents.securitySchemes,
-      schemas: options.includeIntegratorSchemas
-        ? integratorOpenApiComponents.schemas
-        : { Error: integratorOpenApiComponents.schemas.Error },
+      schemas: {
+        Error: integratorOpenApiComponents.schemas.Error,
+        ...(options.includeIntegratorSchemas
+          ? integratorOpenApiComponents.schemas
+          : {}),
+        ...(options.includePlatformSchemas
+          ? platformOpenApiComponents.schemas
+          : {}),
+      },
     },
   } as const;
 }

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
+import { queueDualAuthSession } from "./helpers/route-auth-mock";
+const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     removeContactFromAudience: vi.fn(),
     createErrorResponse: vi.fn((e: any) => new Response(String(e?.message ?? e), { status: 500 })),
@@ -12,7 +12,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("../app/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: supabaseServerMocks.headers,
+  }),
 }));
 vi.mock("../app/lib/database.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
@@ -25,16 +28,16 @@ vi.mock("@/lib/errors.server", () => ({
 describe("app/routes/api+/contact-audience/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.removeContactFromAudience.mockReset();
     mocks.createErrorResponse.mockClear();
   });
 
   test("DELETE returns 400 when ids missing", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    supabaseServerMocks.headers = new Headers({ "X-Test": "1" });
+    queueDualAuthSession({
       supabaseClient: {},
-      headers: new Headers({ "X-Test": "1" }),
+      headers: supabaseServerMocks.headers,
     });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "", audience_id: "" });
     const mod = await import("../app/routes/api+/contact-audience");
@@ -47,8 +50,9 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
 
   test("DELETE removes contact from audience", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
+    supabaseServerMocks.headers = headers;
     const supabaseClient = {};
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
+    queueDualAuthSession({ supabaseClient, headers });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockResolvedValueOnce({ ok: true });
 
@@ -63,7 +67,8 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
   });
 
   test("DELETE error uses createErrorResponse", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers() });
+    supabaseServerMocks.headers = new Headers();
+    queueDualAuthSession({ supabaseClient: {}, headers: new Headers() });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockRejectedValueOnce(new Error("nope"));
 
@@ -76,7 +81,8 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
   });
 
   test("non-DELETE returns json(undefined) with headers", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers({ "X": "1" }) });
+    supabaseServerMocks.headers = new Headers({ "X": "1" });
+    queueDualAuthSession({ supabaseClient: {}, headers: new Headers({ "X": "1" }) });
     const mod = await import("../app/routes/api+/contact-audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "POST" }),

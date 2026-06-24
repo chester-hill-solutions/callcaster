@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -21,6 +20,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
@@ -121,7 +124,6 @@ function makeSupabaseForSettingsRoute(options?: {
 describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.updateCampaign.mockReset();
     mocks.fetchCampaignAudience.mockReset();

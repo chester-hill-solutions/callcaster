@@ -1,8 +1,10 @@
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { safeParseJson } from "@/lib/database.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  getAuthSupabaseClient,
+  requireJsonAuth,
+} from "@/lib/api-auth.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { updateAgentStatus } from "@/lib/agent-status.server";
 import { logger } from "@/lib/logger.server";
@@ -17,23 +19,21 @@ interface UpdateStatusBody {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient: supabase, user } = await verifyAuth(request);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const body = await safeParseJson<UpdateStatusBody>(request);
-    await requireWorkspaceAccess({
-      supabaseClient: supabase,
-      user,
+    const supabase = getAuthSupabaseClient(auth);
+    await requireWorkspaceAccess({ supabaseClient: supabase,
+      user: auth.user,
       workspaceId: body.workspace_id,
     });
 
     const result = await updateAgentStatus(
       supabase,
       body.workspace_id,
-      user.id,
+      auth.user.id,
       body.status,
       body.reason,
     );

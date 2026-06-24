@@ -1,12 +1,19 @@
 import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, user } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabaseClient = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   const url = new URL(request.url);
   const searchQuery = url.searchParams.get("q")?.toLowerCase() || "";
   const workspaceId = url.searchParams.get("workspace_id") || "";

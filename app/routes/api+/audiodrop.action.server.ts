@@ -1,7 +1,7 @@
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { resolveJsonAuthSession } from "@/lib/api-route-auth.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type TwilioSDK from "twilio";
 
@@ -24,7 +24,7 @@ export const action = async ({
   deps?: AudiodropDeps;
 }) => {
   const d = {
-    verifyAuth: deps?.verifyAuth ?? verifyAuth,
+    verifyAuth: deps?.verifyAuth ?? resolveJsonAuthSession,
     createWorkspaceTwilioInstance:
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
   };

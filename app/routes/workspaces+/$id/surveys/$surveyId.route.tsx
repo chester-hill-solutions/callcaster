@@ -1,8 +1,8 @@
 export { loader } from "./$surveyId.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
+import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
 
-import type { SurveyWithPages } from "@/lib/types";
+import type { SurveyWithPages, ContextType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +75,13 @@ type LoaderData = {
 };
 
 export default function SurveyDetailPage() {
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
   const { survey, recentResponses, workspaceId, userRole } = useLoaderData<LoaderData>();
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
 
   const surveyUrl = `${window.location.origin}/survey/${survey.survey_id}`;
 

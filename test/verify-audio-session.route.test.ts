@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   const say = vi.fn();
@@ -12,10 +13,13 @@ const mocks = vi.hoisted(() => {
   });
 
   return {
-    verifyAuth: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
-    env: { BASE_URL: vi.fn(() => "http://base") },
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+    env: {
+      BASE_URL: vi.fn(() => "http://base"),
+      SUPABASE_URL: vi.fn(() => "http://supabase"),
+      SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
+    },
     VoiceResponse,
     say,
     pause,
@@ -24,13 +28,12 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/supabase.server")>();
-  return {
-    ...actual,
-    verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
-  };
-});
+vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers({ "Set-Cookie": "a=1" }),
+  }),
+}));
 vi.mock("@/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
@@ -68,7 +71,6 @@ function makeSupabase(opts: {
 describe("app/routes/api+/verify-audio-session/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.logger.error.mockReset();
     mocks.env.BASE_URL.mockClear();
@@ -81,7 +83,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
   });
 
   test("loader returns 401 when user missing", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: null,
@@ -95,7 +97,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
   });
 
   test("loader throws for invalid phone normalization length", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: { id: "u1" },
@@ -116,7 +118,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: null, error: { message: "ins" } },
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -135,7 +137,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: { id: 9, pin: "123456" }, error: null },
     });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, headers, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, headers, user: { id: "u1" } });
     const create = vi.fn(async () => ({ sid: "CA1" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create } });
 
@@ -163,7 +165,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: { id: 3, pin: "222222" }, error: null },
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -185,7 +187,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: { id: 4, pin: "333333" }, error: null },
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -209,7 +211,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
       insertResult: { data: { id: 2, pin: "999999" }, error: null },
       deleteSpy: delEq,
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -251,4 +253,3 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     );
   });
 });
-

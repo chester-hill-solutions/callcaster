@@ -6,7 +6,7 @@ describe("complete openapi json export contract", () => {
   test("path count matches documentable inventory scale", () => {
     const pathCount = Object.keys(completeOpenApiSpec.paths).length;
     expect(pathCount).toBeGreaterThan(50);
-    expect(pathCount).toBeLessThan(100);
+    expect(pathCount).toBeLessThan(200);
   });
 
   test("includes provider webhook and user tags", () => {

@@ -1,17 +1,30 @@
 # Analytics & Export API Routes
 
-Session endpoints for async exports and call-status polling. Documented in the **public** OpenAPI spec.
+Session and bearer JSON endpoints for workspace analytics, exports, and survey CSV download. Documented in the **public** OpenAPI spec.
 
 Spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs)
 
-## Campaign export
+Auth: `requireJsonAuth` (session cookie or `Authorization: Bearer <access_token>`). Workspace API keys are not used on these routes.
+
+## Workspace analytics & media
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/campaign-export` | Start async campaign CSV export |
+| GET | `/api/workspaces/:workspaceId/analytics` | Workspace operator analytics (`from`, `to`, `userId` query params) |
+| GET/POST | `/api/workspaces/:workspaceId/audios` | List workspace audio library / upload (multipart `name`, `file`) |
+| GET | `/api/workspaces/:workspaceId/voicemails` | List voicemail recordings |
+| GET | `/api/campaigns/:campaignId/results` | Campaign disposition stats |
+| GET/POST | `/api/workspaces/:workspaceId/exports` | Export job history / start async campaign CSV export (JSON `campaign_id`) |
+| GET | `/api/surveys/:surveyId/responses/export` | Survey responses CSV (`workspace_id` query required) |
+
+## Campaign export (legacy flat path)
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/api/campaign-export` | Start async campaign CSV export (form body; prefer workspace exports POST) |
 | GET | `/api/campaign-export-status` | Poll export job by `exportId` |
 
-Auth: session + workspace access. Request/export contract: [csv-export-contract.md](./csv-export-contract.md)
+Request/export contract: [csv-export-contract.md](./csv-export-contract.md)
 
 ## Call status polling
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { setJsonAuthSession } from "./helpers/route-auth-mock";
 
 describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   beforeEach(() => {
@@ -221,9 +222,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   test("covers resolveDeps fallbacks and non-Error outer catch message", async () => {
     vi.resetModules();
 
-    vi.doMock("../app/lib/supabase.server", () => ({
-      verifyAuth: async () => ({ supabaseClient: {}, user: { id: "u1" } }),
-    }));
+    setJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     vi.doMock("../app/lib/database.server", () => ({
       safeParseJson: async () => ({ workspaceId: "w1" }),
       createWorkspaceTwilioInstance: async () => ({

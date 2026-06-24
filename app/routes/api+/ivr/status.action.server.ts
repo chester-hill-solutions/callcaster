@@ -168,7 +168,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (callError) throw callError;
         if (!dbCall) throw new Error("Call not found");
 
-        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace as string});
+        const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: dbCall.workspace as string});
         
         const callStatus = parsedBody.CallStatus;
         const timestamp = String(parsedBody.Timestamp || '');

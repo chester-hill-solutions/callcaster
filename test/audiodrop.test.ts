@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { setJsonAuthSession } from "./helpers/route-auth-mock";
 import { logger } from "@/lib/logger.server";
 
 describe("api.audiodrop action", () => {
@@ -199,10 +200,9 @@ describe("api.audiodrop action", () => {
       storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: "https://s" }, error: null }) }) },
     };
 
-    const verifyAuth = vi.fn(async () => ({ supabaseClient }));
     const createWorkspaceTwilioInstance = vi.fn(async () => ({ calls: () => ({ update }) }));
 
-    vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
+    setJsonAuthSession({ supabaseClient, user: { id: "u1" } });
     vi.doMock("@/lib/database.server", () => ({ createWorkspaceTwilioInstance }));
 
     const mod = await import("../app/routes/api+/audiodrop");

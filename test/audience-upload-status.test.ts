@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  queueDualAuthSession,
+  setDualAuthSession,
+  setDualAuthUnauthorized,
+} from "./helpers/route-auth-mock";
 
 let user: null | { id: string } = { id: "u1" };
 let downloadMode:
@@ -22,7 +27,7 @@ let uploadMode: { kind: "ok"; row: any } | { kind: "error"; message: string } =
     },
   };
 
-const verifyAuth = vi.fn(async () => {
+function buildSupabaseClient() {
   const storageDownload = async () => {
     if (downloadMode.kind === "throw") throw downloadMode.value;
     if (downloadMode.kind === "error")
@@ -41,7 +46,7 @@ const verifyAuth = vi.fn(async () => {
     return { data: uploadMode.row, error: null };
   };
 
-  const supabaseClient: any = {
+  return {
     storage: { from: () => ({ download: storageDownload }) },
     from: () => ({
       select: () => ({
@@ -51,15 +56,14 @@ const verifyAuth = vi.fn(async () => {
       }),
     }),
   };
+}
 
-  return {
-    supabaseClient,
+vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
     headers: new Headers({ "set-cookie": "x=y" }),
-    user,
-  };
-});
-
-vi.mock("@/lib/supabase.server", () => ({ verifyAuth }));
+  }),
+}));
 
 vi.mock("@/lib/logger.server", () => {
   return {
@@ -81,11 +85,20 @@ describe("api.audience-upload-status loader", () => {
         error_message: null,
       },
     };
-    verifyAuth.mockClear();
+
+    if (user) {
+      setDualAuthSession({
+        supabaseClient: buildSupabaseClient(),
+        headers: new Headers({ "set-cookie": "x=y" }),
+        user,
+      });
+    } else {
+      setDualAuthUnauthorized();
+    }
   });
 
   test("returns 401 when no user", async () => {
-    user = null;
+    queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/audience-upload-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api.audience-upload-status"),
@@ -113,6 +126,11 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 500 when storage download errors", async () => {
     downloadMode = { kind: "error", message: "nope" };
+    setDualAuthSession({
+      supabaseClient: buildSupabaseClient(),
+      headers: new Headers({ "set-cookie": "x=y" }),
+      user: { id: "u1" },
+    });
     const mod = await import("../app/routes/api+/audience-upload-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -129,6 +147,11 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 500 when upload record query errors", async () => {
     uploadMode = { kind: "error", message: "db" };
+    setDualAuthSession({
+      supabaseClient: buildSupabaseClient(),
+      headers: new Headers({ "set-cookie": "x=y" }),
+      user: { id: "u1" },
+    });
     const mod = await import("../app/routes/api+/audience-upload-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -151,6 +174,11 @@ describe("api.audience-upload-status loader", () => {
         error_message: null,
       },
     };
+    setDualAuthSession({
+      supabaseClient: buildSupabaseClient(),
+      headers: new Headers({ "set-cookie": "x=y" }),
+      user: { id: "u1" },
+    });
     const mod = await import("../app/routes/api+/audience-upload-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -173,6 +201,11 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 500 with Unknown error when thrown value is not Error", async () => {
     downloadMode = { kind: "throw", value: "boom" };
+    setDualAuthSession({
+      supabaseClient: buildSupabaseClient(),
+      headers: new Headers({ "set-cookie": "x=y" }),
+      user: { id: "u1" },
+    });
     const mod = await import("../app/routes/api+/audience-upload-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
@@ -185,6 +218,11 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 500 with error.message when thrown value is Error", async () => {
     downloadMode = { kind: "throw", value: new Error("boom") };
+    setDualAuthSession({
+      supabaseClient: buildSupabaseClient(),
+      headers: new Headers({ "set-cookie": "x=y" }),
+      user: { id: "u1" },
+    });
     const mod = await import("../app/routes/api+/audience-upload-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(

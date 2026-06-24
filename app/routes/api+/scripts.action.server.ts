@@ -1,13 +1,22 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { TablesInsert } from "@/lib/database.types";
 
 export const action = async ({ request }: { request: Request }) => {
 
-  const { supabaseClient: supabase, user } =
-    await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabase = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   const data = await safeParseJson<Record<string, unknown>>(request);
   const {
     id,

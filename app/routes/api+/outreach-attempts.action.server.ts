@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
 
 interface OutreachAttemptRequest {
@@ -11,10 +12,15 @@ interface OutreachAttemptRequest {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-    const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
-    const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest = await safeParseJson(request);
+    const auth = await requireJsonAuth(request);
+    if (auth instanceof Response) return auth;
+    const { headers } = createSupabaseServerClient(request);
+    const supabase = getAuthSupabaseClient(auth);
+    const user = auth.user;
+    const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest =
+      await safeParseJson(request);
 
-    const { data, error } = await supabase.rpc('create_outreach_attempt', {
+    const { data, error } = await supabase.rpc("create_outreach_attempt", {
       con_id: Number(contact_id),
       cam_id: Number(campaign_id),
       usr_id: user?.id ?? '',

@@ -2,11 +2,15 @@ import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAcce
 import { data as routeData } from "react-router";
 import { isAssignedToUser } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+
 
 export const action = async ({ request }: { request: Request }) => {
 
-    const {supabaseClient:supabase, user} = await verifyAuth(request);
+    const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabase = getAuthSupabaseClient(auth);
+  const user = auth.user;
     const data = await parseActionRequest(request);
     const conferenceId =
         typeof data.conference_id === "string" ? data.conference_id : null;
@@ -34,7 +38,7 @@ export const action = async ({ request }: { request: Request }) => {
         const realtime = resolvedConferenceId
             ? supabase.realtime.channel(resolvedConferenceId)
             : null;
-        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: workspaceId});
+        const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: workspaceId});
         try {
             await twilio.calls(callSid).update({ twiml: `<Response><Hangup/></Response>` });
         } catch (twilioErr: unknown) {

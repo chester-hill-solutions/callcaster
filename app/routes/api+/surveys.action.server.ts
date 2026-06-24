@@ -3,14 +3,15 @@ import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { SurveyFormData } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function handleCreateSurvey(
   request: Request,
-  supabaseClient: SupabaseClient<Database>,
+  supabase: SupabaseClient<Database>,
   user: { id: string }
 ) {
 
@@ -32,7 +33,7 @@ async function handleCreateSurvey(
   }
 
   // Check user role - convert Supabase Auth User to database User type
-  const { data: dbUser, error: dbUserError } = await supabaseClient
+  const { data: dbUser, error: dbUserError } = await supabase
     .from("user")
     .select("*")
     .eq("id", user.id)
@@ -42,8 +43,7 @@ async function handleCreateSurvey(
     return routeData({ error: "User not found" }, { status: 404 });
   }
   
-  const userRole = await getUserRole({ 
-    supabaseClient, 
+  const userRole = await getUserRole({ supabaseClient: supabase, 
     user: dbUser, 
     workspaceId 
   });
@@ -53,7 +53,7 @@ async function handleCreateSurvey(
   }
 
   // Create survey
-  const { data: survey, error: surveyError } = await supabaseClient
+  const { data: survey, error: surveyError } = await supabase
     .from("survey")
     .insert({
       survey_id: surveyData.survey_id,
@@ -72,7 +72,7 @@ async function handleCreateSurvey(
   if (surveyData.pages && surveyData.pages.length > 0) {
     for (const page of surveyData.pages) {
       // Create page
-      const { data: surveyPage, error: pageError } = await supabaseClient
+      const { data: surveyPage, error: pageError } = await supabase
         .from("survey_page")
         .insert({
           survey_id: survey.id,
@@ -92,7 +92,7 @@ async function handleCreateSurvey(
       if (page.questions && page.questions.length > 0) {
         for (const question of page.questions) {
           // Create question
-          const { data: surveyQuestion, error: questionError } = await supabaseClient
+          const { data: surveyQuestion, error: questionError } = await supabase
             .from("survey_question")
             .insert({
               page_id: surveyPage.id,
@@ -113,7 +113,7 @@ async function handleCreateSurvey(
           // Create options for this question
           if (question.options && question.options.length > 0) {
             for (const option of question.options) {
-              await supabaseClient
+              await supabase
                 .from("question_option")
                 .insert({
                   question_id: surveyQuestion.id,
@@ -133,7 +133,7 @@ async function handleCreateSurvey(
 
 async function handleUpdateSurvey(
   request: Request,
-  supabaseClient: SupabaseClient<Database>,
+  supabase: SupabaseClient<Database>,
   user: { id: string }
 ) {
 
@@ -156,7 +156,7 @@ async function handleUpdateSurvey(
     }
 
     // Get survey to check workspace
-    const { data: existingSurvey, error: fetchError } = await supabaseClient
+    const { data: existingSurvey, error: fetchError } = await supabase
       .from("survey")
       .select("workspace")
       .eq("survey_id", surveyId)
@@ -167,9 +167,7 @@ async function handleUpdateSurvey(
     }
 
     // Check user role
-    const userRole = await getUserRole({ 
-      supabaseClient, 
-      user, 
+    const userRole = await getUserRole({ supabaseClient: supabase, user, 
       workspaceId: existingSurvey.workspace 
     });
 
@@ -178,7 +176,7 @@ async function handleUpdateSurvey(
     }
 
     // Update survey
-    const { data: survey, error: surveyError } = await supabaseClient
+    const { data: survey, error: surveyError } = await supabase
       .from("survey")
       .update({
         title: surveyData.title,
@@ -202,7 +200,7 @@ async function handleUpdateSurvey(
 
 async function handleDeleteSurvey(
   request: Request,
-  supabaseClient: SupabaseClient<Database>,
+  supabase: SupabaseClient<Database>,
   user: { id: string }
 ) {
 
@@ -215,7 +213,7 @@ async function handleDeleteSurvey(
     }
 
     // Get survey to check workspace
-    const { data: existingSurvey, error: fetchError } = await supabaseClient
+    const { data: existingSurvey, error: fetchError } = await supabase
       .from("survey")
       .select("workspace")
       .eq("survey_id", surveyId)
@@ -226,9 +224,7 @@ async function handleDeleteSurvey(
     }
 
     // Check user role
-    const userRole = await getUserRole({ 
-      supabaseClient, 
-      user, 
+    const userRole = await getUserRole({ supabaseClient: supabase, user, 
       workspaceId: existingSurvey.workspace 
     });
 
@@ -237,7 +233,7 @@ async function handleDeleteSurvey(
     }
 
     // Delete survey (cascade will handle related records)
-    const { error: deleteError } = await supabaseClient
+    const { error: deleteError } = await supabase
       .from("survey")
       .delete()
       .eq("survey_id", surveyId);
@@ -257,10 +253,16 @@ async function handleDeleteSurvey(
 export async function action({ request }: ActionFunctionArgs) {
 
   try {
-    const { supabaseClient, user } = await verifyAuth(request);
-    if (!user) {
-      return routeData({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabaseClient = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
     
     if (request.method === "POST") {
       return await handleCreateSurvey(request, supabaseClient, user);
