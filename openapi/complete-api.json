@@ -1,0 +1,6337 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CallCaster Complete API Surface",
+    "description": "Classified inventory of all callable CallCaster HTTP API routes: public SDK, session, workspace admin, provider webhooks, public forms, internal/trusted, and documented security gaps. For integrator use, prefer the public spec at /api/docs/openapi (POST /api/campaigns/create-with-script, POST /api/chat_sms, POST /api/sms only).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current origin"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Public API",
+      "description": "Integrator-facing JSON APIs (also in public OpenAPI spec)."
+    },
+    {
+      "name": "Session API",
+      "description": "Session API routes in the complete surface inventory."
+    },
+    {
+      "name": "Workspace Admin",
+      "description": "Workspace Admin routes in the complete surface inventory."
+    },
+    {
+      "name": "Provider Webhook",
+      "description": "Provider Webhook routes in the complete surface inventory."
+    },
+    {
+      "name": "Public Form",
+      "description": "Public Form routes in the complete surface inventory."
+    },
+    {
+      "name": "Internal Trusted",
+      "description": "Internal Trusted routes in the complete surface inventory."
+    },
+    {
+      "name": "Security Gap",
+      "description": "Callable routes with weak or unknown auth — not for integrator use."
+    }
+  ],
+  "paths": {
+    "/api/agent-status": {
+      "get": {
+        "operationId": "getAgent_status",
+        "summary": "GET /api/agent-status",
+        "description": "Agent presence for workspace dialer sessions.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "workspace"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAgent_status",
+        "summary": "POST /api/agent-status",
+        "description": "Agent presence for workspace dialer sessions.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "workspace"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audience-upload-status": {
+      "get": {
+        "operationId": "getAudience_upload_status",
+        "summary": "GET /api/audience-upload-status",
+        "description": "Poll audience CSV upload job status.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "audiences"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audience-upload": {
+      "post": {
+        "operationId": "postAudience_upload",
+        "summary": "POST /api/audience-upload",
+        "description": "Upload audience CSV with column mapping.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "audiences"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audiences": {
+      "get": {
+        "operationId": "getAudiences",
+        "summary": "GET /api/audiences",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "audiences"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchAudiences",
+        "summary": "PATCH /api/audiences",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "audiences"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAudiences",
+        "summary": "DELETE /api/audiences",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "audiences"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audiodrop": {
+      "post": {
+        "operationId": "postAudiodrop",
+        "summary": "POST /api/audiodrop",
+        "description": "Voicemail drop during live call.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/callback": {
+      "get": {
+        "operationId": "getAuth_callback",
+        "summary": "GET /api/auth/callback",
+        "description": "Supabase auth callback; sets session cookies and redirects.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Public Form",
+          "auth"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-auth-matrix.md",
+        "security": [],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto-dial": {
+      "post": {
+        "operationId": "postAuto_dial",
+        "summary": "POST /api/auto-dial",
+        "description": "Start auto-dial session for workspace.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto-dial/:roomId": {
+      "post": {
+        "operationId": "postAuto_dial_roomId",
+        "summary": "POST /api/auto-dial/:roomId",
+        "description": "Twilio conference/AMD TwiML callback.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto-dial/dialer": {
+      "post": {
+        "operationId": "postAuto_dial_dialer",
+        "summary": "POST /api/auto-dial/dialer",
+        "description": "Predictive/auto-dial worker endpoint.\n\n**Security:** No user/API-key auth; trusts workspace_id/user_id in JSON body via service role.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Internal Trusted",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto-dial/end": {
+      "post": {
+        "operationId": "postAuto_dial_end",
+        "summary": "POST /api/auto-dial/end",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto-dial/status": {
+      "post": {
+        "operationId": "postAuto_dial_status",
+        "summary": "POST /api/auto-dial/status",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/call-status-poll": {
+      "get": {
+        "operationId": "getCall_status_poll",
+        "summary": "GET /api/call-status-poll",
+        "description": "Poll Twilio call status for call-screen UI.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-analytics-export.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/call-status": {
+      "post": {
+        "operationId": "postCall_status",
+        "summary": "POST /api/call-status",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/call": {
+      "post": {
+        "operationId": "postCall",
+        "summary": "POST /api/call",
+        "description": "Returns TwiML.\n\n**Security:** Twilio Voice URL without signature validation; handset path uses session cookie lookup.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Internal Trusted",
+          "handset"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/caller-id": {
+      "post": {
+        "operationId": "postCaller_id",
+        "summary": "POST /api/caller-id",
+        "description": "Start outbound caller-ID verification.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/caller-id/status": {
+      "post": {
+        "operationId": "postCaller_id_status",
+        "summary": "POST /api/caller-id/status",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaign-export-status": {
+      "get": {
+        "operationId": "getCampaign_export_status",
+        "summary": "GET /api/campaign-export-status",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "analytics"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-analytics-export.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaign-export": {
+      "post": {
+        "operationId": "postCampaign_export",
+        "summary": "POST /api/campaign-export",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "analytics"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-analytics-export.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaign_audience": {
+      "post": {
+        "operationId": "postCampaign_audience",
+        "summary": "POST /api/campaign_audience",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCampaign_audience",
+        "summary": "DELETE /api/campaign_audience",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaign_queue": {
+      "post": {
+        "operationId": "postCampaign_queue",
+        "summary": "POST /api/campaign_queue",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "queues"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCampaign_queue",
+        "summary": "DELETE /api/campaign_queue",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "queues"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns": {
+      "post": {
+        "operationId": "postCampaigns",
+        "summary": "POST /api/campaigns",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchCampaigns",
+        "summary": "PATCH /api/campaigns",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCampaigns",
+        "summary": "DELETE /api/campaigns",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/create-with-script": {
+      "post": {
+        "operationId": "postCampaigns_create_with_script",
+        "summary": "POST /api/campaigns/create-with-script",
+        "description": "",
+        "tags": [
+          "Public API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "publicSdk",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-create-campaign-with-script.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Campaign created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateCampaignWithScriptResponse"
+                },
+                "example": {
+                  "campaign": {
+                    "id": 42,
+                    "title": "Q1 outbound",
+                    "type": "live_call",
+                    "status": "draft"
+                  },
+                  "campaignDetails": {
+                    "campaign_id": 42,
+                    "script_id": 7
+                  },
+                  "script": {
+                    "id": 7,
+                    "name": "Main script",
+                    "type": "script",
+                    "steps": {}
+                  },
+                  "audiences_linked": 2,
+                  "contacts_enqueued": 150
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or creation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing or invalid session / API key)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (e.g. workspace_id does not match API key)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat_sms": {
+      "post": {
+        "operationId": "postChat_sms",
+        "summary": "POST /api/chat_sms",
+        "description": "",
+        "tags": [
+          "Public API",
+          "messaging"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "publicSdk",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-send-sms.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSmsResponse"
+                },
+                "example": {
+                  "data": {
+                    "id": 1
+                  },
+                  "message": {
+                    "sid": "SM123",
+                    "status": "queued"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (workspace mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid phone number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Send failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connect-campaign-conference/:workspaceId/:campaignId": {
+      "get": {
+        "operationId": "getConnect_campaign_conference_workspaceId_campaignId",
+        "summary": "GET /api/connect-campaign-conference/:workspaceId/:campaignId",
+        "description": "Twilio voice URL after connect-phone-device; returns TwiML.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connect-phone-device": {
+      "post": {
+        "operationId": "postConnect_phone_device",
+        "summary": "POST /api/connect-phone-device",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contact-audience": {
+      "delete": {
+        "operationId": "deleteContact_audience",
+        "summary": "DELETE /api/contact-audience",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "contacts"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contact-audience/bulk-delete": {
+      "delete": {
+        "operationId": "deleteContact_audience_bulk_delete",
+        "summary": "DELETE /api/contact-audience/bulk-delete",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "contacts"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contact-form": {
+      "post": {
+        "operationId": "postContact_form",
+        "summary": "POST /api/contact-form",
+        "description": "Marketing contact form; sends email via Resend.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Public Form",
+          "misc"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contacts": {
+      "get": {
+        "operationId": "getContacts",
+        "summary": "GET /api/contacts",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "contacts"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postContacts",
+        "summary": "POST /api/contacts",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "contacts"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchContacts",
+        "summary": "PATCH /api/contacts",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "contacts"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dial": {
+      "post": {
+        "operationId": "postDial",
+        "summary": "POST /api/dial",
+        "description": "Campaign dial initiation; returns TwiML.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dial/:number": {
+      "post": {
+        "operationId": "postDial_number",
+        "summary": "POST /api/dial/:number",
+        "description": "Returns TwiML.\n\n**Security:** Twilio TwiML sub-route without signature validation.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Security Gap",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dial/status": {
+      "post": {
+        "operationId": "postDial_status",
+        "summary": "POST /api/dial/status",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/disconnect": {
+      "post": {
+        "operationId": "postDisconnect",
+        "summary": "POST /api/disconnect",
+        "description": "**Security:** Twilio Device disconnect using account credentials; no session or signature check.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Security Gap",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/email-vm": {
+      "post": {
+        "operationId": "postEmail_vm",
+        "summary": "POST /api/email-vm",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/error-report": {
+      "post": {
+        "operationId": "postError_report",
+        "summary": "POST /api/error-report",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "misc"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/handset-token": {
+      "get": {
+        "operationId": "getHandset_token",
+        "summary": "GET /api/handset-token",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "handset"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hangup": {
+      "post": {
+        "operationId": "postHangup",
+        "summary": "POST /api/hangup",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-handset-dial-end": {
+      "post": {
+        "operationId": "postInbound_handset_dial_end",
+        "summary": "POST /api/inbound-handset-dial-end",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "handset"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-handset": {
+      "post": {
+        "operationId": "postInbound_handset",
+        "summary": "POST /api/inbound-handset",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "handset"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-ivr/:numberId/:pageId": {
+      "post": {
+        "operationId": "postInbound_ivr_numberId_pageId",
+        "summary": "POST /api/inbound-ivr/:numberId/:pageId",
+        "description": "Returns TwiML.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-ivr/:numberId/:pageId/:blockId": {
+      "post": {
+        "operationId": "postInbound_ivr_numberId_pageId_blockId",
+        "summary": "POST /api/inbound-ivr/:numberId/:pageId/:blockId",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-ivr/:numberId/:pageId/:blockId/response": {
+      "post": {
+        "operationId": "postInbound_ivr_numberId_pageId_blockId_response",
+        "summary": "POST /api/inbound-ivr/:numberId/:pageId/:blockId/response",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-queue": {
+      "get": {
+        "operationId": "getInbound_queue",
+        "summary": "GET /api/inbound-queue",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "inbound"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postInbound_queue",
+        "summary": "POST /api/inbound-queue",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "inbound"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "putInbound_queue",
+        "summary": "PUT /api/inbound-queue",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "inbound"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchInbound_queue",
+        "summary": "PATCH /api/inbound-queue",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "inbound"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteInbound_queue",
+        "summary": "DELETE /api/inbound-queue",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "inbound"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-sms": {
+      "post": {
+        "operationId": "postInbound_sms",
+        "summary": "POST /api/inbound-sms",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "messaging"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound-verification": {
+      "post": {
+        "operationId": "postInbound_verification",
+        "summary": "POST /api/inbound-verification",
+        "description": "Returns TwiML.\n\n**Security:** Call-in verification TwiML; service role, no Twilio signature.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Internal Trusted",
+          "inbound"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inbound": {
+      "post": {
+        "operationId": "postInbound",
+        "summary": "POST /api/inbound",
+        "description": "Returns TwiML.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "inbound"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/initiate-ivr": {
+      "post": {
+        "operationId": "postInitiate_ivr",
+        "summary": "POST /api/initiate-ivr",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ivr": {
+      "post": {
+        "operationId": "postIvr",
+        "summary": "POST /api/ivr",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ivr/status": {
+      "post": {
+        "operationId": "postIvr_status",
+        "summary": "POST /api/ivr/status",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ivr/:campaignId/:pageId": {
+      "post": {
+        "operationId": "postIvr_campaignId_pageId",
+        "summary": "POST /api/ivr/:campaignId/:pageId",
+        "description": "Returns TwiML.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ivr/:campaignId/:pageId/:blockId": {
+      "post": {
+        "operationId": "postIvr_campaignId_pageId_blockId",
+        "summary": "POST /api/ivr/:campaignId/:pageId/:blockId",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ivr/:campaignId/:pageId/:blockId/response": {
+      "post": {
+        "operationId": "postIvr_campaignId_pageId_blockId_response",
+        "summary": "POST /api/ivr/:campaignId/:pageId/:blockId/response",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media": {
+      "post": {
+        "operationId": "postMedia",
+        "summary": "POST /api/media",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "media"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/message_media": {
+      "post": {
+        "operationId": "postMessage_media",
+        "summary": "POST /api/message_media",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "messaging"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMessage_media",
+        "summary": "DELETE /api/message_media",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "messaging"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/numbers": {
+      "get": {
+        "operationId": "getNumbers",
+        "summary": "GET /api/numbers",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postNumbers",
+        "summary": "POST /api/numbers",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outreach-attempts": {
+      "post": {
+        "operationId": "postOutreach_attempts",
+        "summary": "POST /api/outreach-attempts",
+        "description": "Hyphenated path; preferred outreach attempt API.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outreach_attempts/:id": {
+      "post": {
+        "operationId": "postOutreach_attempts_id",
+        "summary": "POST /api/outreach_attempts/:id",
+        "description": "Updates outreach_attempt table.\n\n**Security:** Session cookie client only; no verifyAuth. Duplicate legacy route also registered.\n\nDuplicate/legacy route registration.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Security Gap",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "unsupported",
+        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/questions": {
+      "post": {
+        "operationId": "postQuestions",
+        "summary": "POST /api/questions",
+        "description": "Call disposition / survey question updates on call screen.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queues": {
+      "get": {
+        "operationId": "getQueues",
+        "summary": "GET /api/queues",
+        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Security Gap",
+          "queues"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postQueues",
+        "summary": "POST /api/queues",
+        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Security Gap",
+          "queues"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteQueues",
+        "summary": "DELETE /api/queues",
+        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Security Gap",
+          "queues"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recording": {
+      "post": {
+        "operationId": "postRecording",
+        "summary": "POST /api/recording",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reset_campaign": {
+      "post": {
+        "operationId": "postReset_campaign",
+        "summary": "POST /api/reset_campaign",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scripts": {
+      "post": {
+        "operationId": "postScripts",
+        "summary": "POST /api/scripts",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "scripts"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sms": {
+      "post": {
+        "operationId": "postSms",
+        "summary": "POST /api/sms",
+        "description": "",
+        "tags": [
+          "Public API",
+          "messaging"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "publicSdk",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-send-sms.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch dispatch completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignSmsDispatchResponse"
+                },
+                "example": {
+                  "responses": [
+                    {
+                      "101": {
+                        "success": true,
+                        "skipped": false
+                      }
+                    },
+                    {
+                      "102": {
+                        "success": true,
+                        "skipped": true,
+                        "reason": "Duplicate SMS prevented"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or campaign error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (workspace mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Dispatch failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sms/status": {
+      "post": {
+        "operationId": "postSms_status",
+        "summary": "POST /api/sms/status",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "messaging"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stripe-webhook": {
+      "post": {
+        "operationId": "postStripe_webhook",
+        "summary": "POST /api/stripe-webhook",
+        "description": "Stripe-Signature header required; see docs/stripe-webhook.md.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Provider Webhook",
+          "billing"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "stripeSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Raw webhook payload; verify provider signature."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event acknowledged"
+          },
+          "400": {
+            "description": "Invalid Stripe signature or payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/survey-answer": {
+      "post": {
+        "operationId": "postSurvey_answer",
+        "summary": "POST /api/survey-answer",
+        "description": "Public survey respondent flow.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Public Form",
+          "surveys"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/survey-complete": {
+      "post": {
+        "operationId": "postSurvey_complete",
+        "summary": "POST /api/survey-complete",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Public Form",
+          "surveys"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/survey-responses": {
+      "post": {
+        "operationId": "postSurvey_responses",
+        "summary": "POST /api/survey-responses",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "surveys"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/surveys": {
+      "post": {
+        "operationId": "postSurveys",
+        "summary": "POST /api/surveys",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "surveys"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchSurveys",
+        "summary": "PATCH /api/surveys",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "surveys"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSurveys",
+        "summary": "DELETE /api/surveys",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "surveys"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/test-webhook": {
+      "post": {
+        "operationId": "postTest_webhook",
+        "summary": "POST /api/test-webhook",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "workspace"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/token": {
+      "get": {
+        "operationId": "getToken",
+        "summary": "GET /api/token",
+        "description": "Twilio client access token for browser dialer.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify-audio-pin/:pin": {
+      "get": {
+        "operationId": "getVerify_audio_pin_pin",
+        "summary": "GET /api/verify-audio-pin/:pin",
+        "description": "Static TwiML gather entry; returns TwiML.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Public Form",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify-audio-session": {
+      "get": {
+        "operationId": "getVerify_audio_session",
+        "summary": "GET /api/verify-audio-session",
+        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postVerify_audio_session",
+        "summary": "POST /api/verify-audio-session",
+        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify-call-in-session": {
+      "get": {
+        "operationId": "getVerify_call_in_session",
+        "summary": "GET /api/verify-call-in-session",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Session API",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify-pin-input": {
+      "post": {
+        "operationId": "postVerify_pin_input",
+        "summary": "POST /api/verify-pin-input",
+        "description": "Returns TwiML.\n\n**Security:** Twilio gather callback; service role, no Twilio signature.\n\n**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Internal Trusted",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Twilio or HTML form fields."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-api-keys": {
+      "get": {
+        "operationId": "getWorkspace_api_keys",
+        "summary": "GET /api/workspace-api-keys",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "workspace"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope when applicable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postWorkspace_api_keys",
+        "summary": "POST /api/workspace-api-keys",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "workspace"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWorkspace_api_keys",
+        "summary": "DELETE /api/workspace-api-keys",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "workspace"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace": {
+      "post": {
+        "operationId": "postWorkspace",
+        "summary": "POST /api/workspace",
+        "description": "**Not supported for external integrators.** Session, webhook, or internal use only.",
+        "tags": [
+          "Workspace Admin",
+          "workspace"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (session/internal route)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sb-access-token",
+        "description": "Session cookie (browser). Use workspace API key for server/script access."
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Workspace API key (prefix cc_). Alternatively: Authorization: Bearer <key>."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "WorkspaceId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Required in the request body when using session auth. Optional with API key; must match the key workspace if provided."
+      },
+      "CreateCampaignWithScriptRequest": {
+        "type": "object",
+        "description": "Provide exactly one of `script` or `script_id` (XOR). Enforced in Zod validation, not in OpenAPI required fields.",
+        "required": [
+          "title",
+          "type",
+          "caller_id"
+        ],
+        "properties": {
+          "workspace_id": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "title": {
+            "type": "string",
+            "description": "Campaign title."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "live_call",
+              "robocall",
+              "simple_ivr",
+              "complex_ivr"
+            ],
+            "description": "Campaign type (script-based)."
+          },
+          "caller_id": {
+            "type": "string",
+            "description": "Outbound caller ID. Must be a workspace phone number (e.g. +15551234567)."
+          },
+          "script": {
+            "type": "object",
+            "description": "Inline script to create and attach. Use this OR script_id.",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Script display name."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "script",
+                  "ivr"
+                ],
+                "description": "script for live_call, ivr for IVR types. Defaults from campaign type."
+              },
+              "steps": {
+                "type": "object",
+                "description": "Script content (pages, blocks). See docs/script-json-format.md.",
+                "additionalProperties": true
+              }
+            }
+          },
+          "script_id": {
+            "type": "integer",
+            "description": "ID of an existing script to attach. Use this OR script."
+          },
+          "audience_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Audience IDs to attach (must belong to workspace)."
+          },
+          "enqueue_audience_contacts": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, enqueue contacts from attached audiences; if false, only link audiences."
+          },
+          "status": {
+            "type": "string",
+            "default": "draft",
+            "description": "Campaign status (e.g. draft, active)."
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "start_date": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "end_date": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "schedule": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "CreateCampaignWithScriptResponse": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "description": "Created campaign row (id, title, workspace, type, caller_id, status, ...).",
+            "additionalProperties": true
+          },
+          "campaignDetails": {
+            "type": "object",
+            "description": "Type-specific details (e.g. live_campaign/ivr_campaign) with campaign_id, script_id.",
+            "additionalProperties": true
+          },
+          "script": {
+            "type": "object",
+            "description": "Present only when a script was created in this request.",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "nullable": true
+              },
+              "steps": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          },
+          "audiences_linked": {
+            "type": "integer",
+            "description": "Number of campaign–audience links created."
+          },
+          "contacts_enqueued": {
+            "type": "integer",
+            "description": "Total contacts added to the campaign queue."
+          }
+        }
+      },
+      "ChatSmsRequest": {
+        "type": "object",
+        "description": "Session auth requires workspace_id in the body.",
+        "required": [
+          "workspace_id",
+          "to_number",
+          "caller_id",
+          "body"
+        ],
+        "properties": {
+          "workspace_id": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "to_number": {
+            "type": "string",
+            "description": "Recipient phone number (E.164 recommended)."
+          },
+          "caller_id": {
+            "type": "string",
+            "description": "Workspace outbound caller ID."
+          },
+          "body": {
+            "type": "string",
+            "description": "SMS message body."
+          },
+          "contact_id": {
+            "type": "string",
+            "description": "Optional contact ID for template tag substitution."
+          },
+          "media": {
+            "type": "string",
+            "description": "Optional media URL or path for MMS."
+          },
+          "message_intent": {
+            "type": "string",
+            "description": "Twilio message intent (e.g. marketing, utility)."
+          },
+          "messaging_service_sid": {
+            "type": "string",
+            "description": "Optional Twilio Messaging Service SID override."
+          }
+        }
+      },
+      "ChatSmsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "message": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "CampaignSmsDispatchRequest": {
+        "type": "object",
+        "description": "Session auth requires workspace_id. API key auth requires user_id for outreach attribution.",
+        "required": [
+          "workspace_id",
+          "campaign_id"
+        ],
+        "properties": {
+          "workspace_id": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "campaign_id": {
+            "type": "string",
+            "description": "Message campaign ID whose queued contacts receive SMS."
+          },
+          "caller_id": {
+            "type": "string",
+            "description": "Outbound caller ID. Required when campaign sms_send_mode requires it."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Required when using API key auth (outreach attribution). Session auth uses the logged-in user."
+          },
+          "message_intent": {
+            "type": "string",
+            "description": "Twilio message intent override."
+          },
+          "messaging_service_sid": {
+            "type": "string",
+            "description": "Twilio Messaging Service SID override."
+          }
+        }
+      },
+      "CampaignSmsDispatchResponse": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Per-contact send results keyed by contact_id (success, skipped, or error)."
+          }
+        }
+      }
+    }
+  }
+}

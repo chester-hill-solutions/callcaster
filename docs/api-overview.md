@@ -6,8 +6,12 @@ CallCaster exposes a **small, documented public API** for programmatic integrati
 
 ## Interactive docs
 
-- **Scalar UI:** [`/docs`](/docs) — try-it-out API reference
-- **Raw OpenAPI 3.0 spec:** [`/api/docs/openapi`](/api/docs/openapi)
+- **Public API (Scalar):** [`/docs`](/docs) — integrator SDK-safe reference
+- **Complete API surface:** [`/docs?spec=complete`](/docs?spec=complete) — all classified routes (session, webhooks, internal)
+- **Public OpenAPI JSON:** [`/api/docs/openapi`](/api/docs/openapi)
+- **Complete OpenAPI JSON:** [`/api/docs/openapi/all`](/api/docs/openapi/all)
+
+Human guides: [API auth matrix](./api-auth-matrix.md), [complete inventory](./api-surface-inventory.md), [workspace admin](./api-workspace-admin.md), [webhooks](./api-webhooks.md), [internal/unsupported](./api-internal-unsupported.md).
 
 ---
 

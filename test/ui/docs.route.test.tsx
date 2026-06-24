@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { createElement } from "react";
+import { createMemoryRouter, RouterProvider } from "react-router";
 
 import { asRouteResponse } from "../helpers/route-result";
 
@@ -40,10 +41,14 @@ describe("app/routes/docs.tsx", () => {
     );
   });
 
-  test("mounts Scalar with openapi url", async () => {
+  test("mounts Scalar with public openapi url by default", async () => {
     const { createApiReference } = await import("@scalar/api-reference");
     const mod = await import("../../app/routes/docs");
-    const { container } = render(createElement(mod.default));
+    const router = createMemoryRouter(
+      [{ path: "/docs", Component: mod.default }],
+      { initialEntries: ["/docs"] },
+    );
+    const { container } = render(createElement(RouterProvider, { router }));
 
     await waitFor(() => {
       expect(createApiReference).toHaveBeenCalledWith(
