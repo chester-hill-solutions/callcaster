@@ -17,6 +17,9 @@ import {
   USERS,
   WORKSPACE_NUMBER_ID,
   WORKSPACES,
+  WORKSPACE_PERMISSIONS,
+  CALLER_PERMISSIONS,
+  MEMBER_PERMISSIONS,
 } from "./seed-data.mjs";
 
 function requireEnv(name, fallbackName) {
@@ -87,6 +90,26 @@ async function upsertUserProfile(db, user, accessLevel = null) {
   }
 }
 
+async function seedWorkspacePermissions(db) {
+  const rows = [];
+  for (const permission of WORKSPACE_PERMISSIONS) {
+    rows.push({ role: "owner", permission });
+    rows.push({ role: "admin", permission });
+  }
+  for (const permission of MEMBER_PERMISSIONS) {
+    rows.push({ role: "member", permission });
+  }
+  for (const permission of CALLER_PERMISSIONS) {
+    rows.push({ role: "caller", permission });
+  }
+  const { error } = await db.from("workspace_permissions").upsert(rows, {
+    onConflict: "role,permission",
+  });
+  if (error) {
+    throw new Error(`Failed workspace_permissions seed: ${error.message}`);
+  }
+}
+
 async function upsertMembership(db, workspaceId, userId, role) {
   const { error } = await db.from("workspace_users").upsert(
     {
@@ -112,6 +135,8 @@ async function seed() {
 
   console.log(`[e2e-seed] version=${SEED_VERSION}`);
 
+  await seedWorkspacePermissions(db);
+
   for (const user of Object.values(USERS)) {
     await ensureAuthUser(admin, user);
     const accessLevel = user.id === USERS.sudo.id ? "sudo" : null;
@@ -133,6 +158,8 @@ async function seed() {
       disabled: false,
       stripe_id: isReady ? "cus_e2e_test" : null,
       twilio_data: isReady ? readyTwilioData() : {},
+      key: isReady ? "SK_e2e_test_api_key" : null,
+      token: isReady ? "e2e_test_api_secret" : null,
       feature_flags: {},
     });
     if (error) {
@@ -144,8 +171,27 @@ async function seed() {
   await upsertMembership(db, readyId, USERS.admin.id, "admin");
   await upsertMembership(db, readyId, USERS.member.id, "member");
   await upsertMembership(db, readyId, USERS.caller.id, "caller");
+  await upsertMembership(db, readyId, USERS.authflow.id, "member");
   await upsertMembership(db, onboardingId, USERS.owner.id, "owner");
+  await upsertMembership(db, onboardingId, USERS.admin.id, "admin");
+  await upsertMembership(db, onboardingId, USERS.member.id, "member");
   await upsertMembership(db, emptyId, USERS.owner.id, "owner");
+  await upsertMembership(db, emptyId, USERS.member.id, "member");
+  await upsertMembership(db, emptyId, USERS.caller.id, "caller");
+
+  const { error: emptyNumberError } = await db.from("workspace_number").upsert({
+    id: 940002,
+    workspace: emptyId,
+    phone_number: "+15555501099",
+    type: "rented",
+    friendly_name: "E2E Empty Workspace Number",
+    handset_enabled: false,
+    inbound_ring_count: 3,
+    capabilities: {},
+  });
+  if (emptyNumberError) {
+    throw new Error(`Failed empty workspace_number: ${emptyNumberError.message}`);
+  }
 
   const { error: numberError } = await db.from("workspace_number").upsert({
     id: WORKSPACE_NUMBER_ID,
@@ -205,7 +251,7 @@ async function seed() {
     }
   }
 
-  await db.from("live_campaign").upsert([
+  const { error: liveCampaignError } = await db.from("live_campaign").upsert([
     {
       id: 970001,
       campaign_id: CAMPAIGNS.liveCall,
@@ -231,6 +277,9 @@ async function seed() {
       questions: {},
     },
   ]);
+  if (liveCampaignError) {
+    throw new Error(`Failed live_campaign seed: ${liveCampaignError.message}`);
+  }
 
   await db.from("message_campaign").upsert({
     id: 970010,
@@ -264,22 +313,55 @@ async function seed() {
     }
   }
 
-  await db.from("audience").upsert({
+  const { error: audienceError } = await db.from("audience").upsert({
     id: AUDIENCE_ID,
     workspace: readyId,
     name: "E2E Audience",
-    created_by: USERS.owner.id,
+    status: "completed",
   });
+  if (audienceError) {
+    throw new Error(`Failed audience seed: ${audienceError.message}`);
+  }
 
-  await db.from("campaign_audience").upsert({
-    campaign_id: CAMPAIGNS.liveCall,
-    audience_id: AUDIENCE_ID,
-  });
+  for (const contact of contacts) {
+    const { error: linkError } = await db.from("contact_audience").upsert({
+      contact_id: contact.id,
+      audience_id: AUDIENCE_ID,
+    });
+    if (linkError) {
+      throw new Error(`Failed contact_audience ${contact.id}: ${linkError.message}`);
+    }
+  }
+
+  await db.from("campaign_audience").upsert([
+    {
+      campaign_id: CAMPAIGNS.liveCall,
+      audience_id: AUDIENCE_ID,
+    },
+    {
+      campaign_id: CAMPAIGNS.livePredictive,
+      audience_id: AUDIENCE_ID,
+    },
+  ]);
 
   for (let i = 0; i < contacts.length; i += 1) {
     await db.from("campaign_queue").upsert({
       id: 980001 + i,
       campaign_id: CAMPAIGNS.liveCall,
+      contact_id: contacts[i].id,
+      status: USERS.owner.id,
+      queue_order: i + 1,
+      queue_state: "assigned",
+      attempts: 0,
+      attempt_count: 0,
+      assigned_to_user_id: USERS.owner.id,
+    });
+  }
+
+  for (let i = 0; i < contacts.length; i += 1) {
+    await db.from("campaign_queue").upsert({
+      id: 980010 + i,
+      campaign_id: CAMPAIGNS.livePredictive,
       contact_id: contacts[i].id,
       status: "queued",
       queue_order: i + 1,

@@ -19,6 +19,6 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL =
     (config.projects[0]?.use?.baseURL as string | undefined) ??
     process.env.E2E_BASE_URL ??
-    "http://localhost:3000";
+    "http://127.0.0.1:3100";
   await waitForReady(baseURL);
 }

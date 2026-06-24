@@ -5,20 +5,22 @@ ownerTest.describe("Campaign create @authenticated", () => {
   for (const [type, label] of [
     ["live_call", "Live Call"],
     ["message", "Message"],
-    ["robocall", "Robocall"],
+    ["robocall", "Interactive Voice Recording"],
   ] as const) {
     ownerTest(`CAM-0${type}: create ${type} campaign`, async ({ page }) => {
+      const uniqueName = `E2E New ${label} ${Date.now()}`;
       await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "campaigns/new"));
-      await page.getByLabel(/title|name/i).fill(`E2E New ${label}`);
-      await page.getByRole("radio", { name: new RegExp(label, "i") }).check();
-      await page.getByRole("button", { name: /create|save/i }).click();
-      await expect(page).toHaveURL(/\/campaigns\/\d+/);
+      await page.locator("#campaign-name").fill(uniqueName);
+      await page.locator("#campaign-type").selectOption(type);
+      await page.getByRole("button", { name: "Add Campaign" }).click();
+      await expect(page).toHaveURL(/\/campaigns\/\d+\/settings/);
     });
   }
 
   ownerTest("CAM-04 empty title validation", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "campaigns/new"));
-    await page.getByRole("button", { name: /create|save/i }).click();
-    await expect(page.getByText(/required|enter|title/i).first()).toBeVisible();
+    await page.locator("#campaign-type").selectOption("live_call");
+    await page.getByRole("button", { name: "Add Campaign" }).click();
+    await expect(page).toHaveURL(/\/campaigns\/new$/);
   });
 });

@@ -8,11 +8,16 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 
+const port = process.env.PORT ?? process.env.E2E_PORT ?? "3100";
+const baseURL =
+  process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
+
 const env = {
   ...process.env,
+  NODE_ENV: process.env.NODE_ENV ?? "development",
   HOST: process.env.HOST ?? "0.0.0.0",
-  PORT: process.env.PORT ?? "3000",
-  BASE_URL: process.env.BASE_URL ?? process.env.E2E_BASE_URL ?? "http://localhost:3000",
+  PORT: port,
+  BASE_URL: baseURL,
   TWILIO_VALIDATE_WEBHOOKS: process.env.TWILIO_VALIDATE_WEBHOOKS ?? "false",
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
@@ -23,10 +28,10 @@ const env = {
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER ?? "+15555501001",
 };
 
-async function waitForReady(baseURL, attempts = 90) {
+async function waitForReady(readyUrl, attempts = 90) {
   for (let i = 0; i < attempts; i += 1) {
     try {
-      const response = await fetch(`${baseURL}/readyz`);
+      const response = await fetch(`${readyUrl}/readyz`);
       if (response.ok) {
         return;
       }
@@ -35,10 +40,9 @@ async function waitForReady(baseURL, attempts = 90) {
     }
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
-  throw new Error(`Server not ready at ${baseURL}/readyz`);
+  throw new Error(`Server not ready at ${readyUrl}/readyz`);
 }
 
-const baseURL = env.BASE_URL;
 const child = spawn("node", ["./server/index.js"], {
   cwd: rootDir,
   env,

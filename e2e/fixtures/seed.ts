@@ -8,6 +8,7 @@ export const E2E_USERS = {
   caller: { id: "b1000000-0000-4000-8000-000000000004", email: "caller@e2e.test" },
   sudo: { id: "b1000000-0000-4000-8000-000000000005", email: "sudo@e2e.test" },
   invitee: { id: "b1000000-0000-4000-8000-000000000006", email: "invitee@e2e.test" },
+  authflow: { id: "b1000000-0000-4000-8000-000000000007", email: "authflow@e2e.test" },
 } as const;
 
 export const E2E_WORKSPACES = {

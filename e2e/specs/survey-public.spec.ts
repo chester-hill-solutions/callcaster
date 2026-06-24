@@ -9,10 +9,11 @@ test.describe("Public survey @smoke", () => {
     await expect(page.getByText(/E2E Public Survey|How are you/i).first()).toBeVisible();
   });
 
-  test("SURV-02 known contact banner", async ({ page }) => {
+  test("SURV-02 known contact param loads survey", async ({ page }) => {
     const survey = new SurveyPublicPage(page);
     await survey.goto(E2E_SURVEY.publicId, E2E_CONTACTS.primary.id);
-    await expect(page.getByText(/welcome|contact/i).first()).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`contact=${E2E_CONTACTS.primary.id}`));
+    await expect(page.getByText("E2E Public Survey")).toBeVisible();
   });
 
   test("SURV-08 invalid survey 404", async ({ page }) => {

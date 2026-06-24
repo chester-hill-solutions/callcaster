@@ -10,6 +10,8 @@ export const USERS = {
   caller: { id: "b1000000-0000-4000-8000-000000000004", email: "caller@e2e.test", first: "E2E", last: "Caller" },
   sudo: { id: "b1000000-0000-4000-8000-000000000005", email: "sudo@e2e.test", first: "E2E", last: "Sudo" },
   invitee: { id: "b1000000-0000-4000-8000-000000000006", email: "invitee@e2e.test", first: "E2E", last: "Invitee" },
+  /** Used only for sign-in/sign-out smoke tests — not in Playwright storageState fixtures. */
+  authflow: { id: "b1000000-0000-4000-8000-000000000007", email: "authflow@e2e.test", first: "E2E", last: "AuthFlow" },
 };
 
 export const WORKSPACES = {
@@ -98,3 +100,43 @@ export function readyTwilioData() {
 export function hashApiKey(key) {
   return createHash("sha256").update(key, "utf8").digest("hex");
 }
+
+/** Matches production workspace_permission enum — required for RLS on inserts. */
+export const WORKSPACE_PERMISSIONS = [
+  "workspace.delete",
+  "workspace.addUser",
+  "workspace.removeUser",
+  "workspace.call",
+  "workspace.addCampaign",
+  "workspace.addAudience",
+  "workspace.addContact",
+  "workspace.editUser",
+  "workspace.editCampaign",
+  "workspace.startCampaign",
+  "workspace.stopCampaign",
+  "workspace.removeCampaign",
+  "workspace.inviteCaller",
+  "workspace.manageCredits",
+  "workspace.pauseCampaign",
+  "workspace.editContact",
+  "workspace.removeContact",
+  "workspace.editAudience",
+  "workspace.removeAudience",
+  "workspace.transferOwnership",
+  "workspace.removeCaller",
+  "workspace.initializeMedia",
+  "workspace.addMedia",
+  "workspace.removeMedia",
+];
+
+export const CALLER_PERMISSIONS = ["workspace.call"];
+
+export const MEMBER_PERMISSIONS = [
+  "workspace.call",
+  "workspace.addContact",
+  "workspace.editContact",
+  "workspace.removeContact",
+  "workspace.addAudience",
+  "workspace.editAudience",
+  "workspace.editCampaign",
+];

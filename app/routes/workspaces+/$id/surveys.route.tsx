@@ -1,16 +1,23 @@
 export { loader } from "./surveys.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
+import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
 
 
-import { Survey, User } from "@/lib/types";
+import { Survey } from "@/lib/types";
+import type { ContextType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Calendar, Users, CheckCircle, XCircle } from "lucide-react";
 
 export default function SurveysPage() {
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
   const { surveys, workspaceId } = useLoaderData();
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
 
   return (
     <div className="container mx-auto py-6">

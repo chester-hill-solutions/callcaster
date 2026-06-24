@@ -24,8 +24,8 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
 
   ownerTest("ERR-07 empty workspace owner CTA", async ({ page }) => {
     const ws = new WorkspacePage(page);
-    await ws.goto(E2E_WORKSPACES.empty.id);
-    await expect(page.getByText(/campaign|create|new/i).first()).toBeVisible();
+    await ws.goto(E2E_WORKSPACES.empty.id, "campaigns");
+    await expect(page.getByText(/Get started|Add Campaign|Get a Number/i).first()).toBeVisible();
   });
 
   ownerTest("ERR-10 chats empty copy", async ({ page }) => {
@@ -35,11 +35,11 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
 
   ownerTest("ERR-11 audios empty copy", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.empty.id, "audios"));
-    await expect(page.getByText(/no audio/i)).toBeVisible();
+    await expect(page.getByText("Add Your Own Audio to this Workspace!")).toBeVisible();
   });
 });
 
 callerTest("ERR-07 caller empty workspace copy", async ({ page }) => {
-  await page.goto(workspacePath(E2E_WORKSPACES.empty.id));
-  await expect(page.getByText(/contact.*admin|administrator/i)).toBeVisible();
+  await page.goto(workspacePath(E2E_WORKSPACES.empty.id, "campaigns"));
+  await expect(page.getByText(/contact your admin team/i)).toBeVisible();
 });

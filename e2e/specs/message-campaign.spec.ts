@@ -20,7 +20,7 @@ ownerTest.describe("Message campaign @authenticated", () => {
         `campaigns/${E2E_CAMPAIGNS.message.id}/settings`,
       ),
     );
-    await expect(page.getByText(/send mode|messaging|from number/i).first()).toBeVisible();
+    await expect(page.getByText(/Send using|Phone number|Messaging Service/i).first()).toBeVisible();
   });
 });
 

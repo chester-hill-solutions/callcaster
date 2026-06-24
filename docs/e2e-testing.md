@@ -17,12 +17,13 @@ export SUPABASE_URL="${API_URL}"
 export SUPABASE_SERVICE_KEY="${SERVICE_ROLE_KEY}"
 export SUPABASE_ANON_KEY="${ANON_KEY}"
 export SUPABASE_PUBLISHABLE_KEY="${ANON_KEY}"
-supabase db reset
-npm run test:e2e:seed
+npm run test:e2e:seed          # idempotent; use instead of db reset if migrations are incomplete locally
 npm run build
-npm run test:e2e:server &   # separate terminal — waits for /readyz
-npm run test:e2e
+npm run test:e2e:server &      # separate terminal — waits for /readyz on port 3100
+E2E_BASE_URL=http://127.0.0.1:3100 npm run test:e2e
 ```
+
+E2E defaults to **port 3100** (`e2e/playwright.config.ts`) so it does not collide with a dev server on 3000. Override with `E2E_BASE_URL` if needed.
 
 ## Scripts
 
@@ -45,6 +46,9 @@ npm run test:e2e
 | `caller@e2e.test` | caller | `E2eTestPass1!` |
 | `sudo@e2e.test` | sudo admin | `E2eTestPass1!` |
 | `invitee@e2e.test` | pending invite | `E2eTestPass1!` |
+| `authflow@e2e.test` | sign-in/sign-out smoke only (not in Playwright storage fixtures) | `E2eTestPass1!` |
+
+AUTH-06 signs out as `authflow@e2e.test` so Supabase session revocation does not invalidate parallel tests that reuse `owner@e2e.test` / `member@e2e.test` storage state.
 
 ## Workspaces
 

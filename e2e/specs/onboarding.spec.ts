@@ -6,14 +6,15 @@ ownerTest.describe("Onboarding @authenticated", () => {
   ownerTest("ONB-01 onboarding wizard loads", async ({ page }) => {
     const onboarding = new OnboardingPage(page);
     await onboarding.goto(E2E_WORKSPACES.onboarding.id);
-    await expect(onboarding.stepIndicator()).toBeVisible();
-    await expect(page.getByText(/business|onboarding/i).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start setup" })).toBeVisible();
+    await expect(page.getByText(/Set up E2E Onboarding Workspace/i)).toBeVisible();
   });
 
   ownerTest("ONB-06 step deep link", async ({ page }) => {
     const onboarding = new OnboardingPage(page);
-    await onboarding.goto(E2E_WORKSPACES.onboarding.id, "path_selection");
-    await expect(page).toHaveURL(/step=path_selection/);
+    await onboarding.goto(E2E_WORKSPACES.onboarding.id, "business_profile");
+    await expect(page).toHaveURL(/step=business_profile/);
+    await expect(page.getByRole("heading", { name: "Business basics" })).toBeVisible();
   });
 });
 

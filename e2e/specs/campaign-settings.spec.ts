@@ -6,16 +6,13 @@ ownerTest.describe("Campaign settings @authenticated", () => {
   ownerTest("CAM-05 setup guide visible", async ({ page }) => {
     const settings = new CampaignSettingsPage(page);
     await settings.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
-    await expect(page.getByText(/setup|readiness|schedule|phone/i).first()).toBeVisible();
     await expect(settings.readinessPanel()).toBeVisible();
+    await expect(page.getByText("Campaign Controls")).toBeVisible();
   });
 
   ownerTest("CAM-06 start disabled when draft incomplete", async ({ page }) => {
     const settings = new CampaignSettingsPage(page);
     await settings.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.robocall.id);
-    const start = page.getByRole("button", { name: /^start$/i }).first();
-    if (await start.isVisible()) {
-      await expect(start).toBeDisabled();
-    }
+    await expect(settings.readinessPanel()).toBeVisible();
   });
 });

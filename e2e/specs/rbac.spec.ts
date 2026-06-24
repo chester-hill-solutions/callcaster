@@ -1,14 +1,14 @@
-import { setWorkspaceCredits } from "../fixtures/factories";
 import { callerTest, memberTest, ownerTest, adminTest, expect } from "../fixtures/test-base";
+import { setWorkspaceCredits } from "../fixtures/factories";
 import { WorkspacePage } from "../pages/WorkspacePage";
 import {
   E2E_CAMPAIGNS,
-  E2E_USERS,
   E2E_WORKSPACES,
   workspacePath,
 } from "../fixtures/seed";
 import { AUTH_PATHS } from "../fixtures/auth";
 import { test } from "@playwright/test";
+import { CallScreenPage } from "../pages/CallScreenPage";
 
 test.describe("RBAC @rbac @security", () => {
   callerTest("RBAC-01 caller nav restrictions", async ({ page }) => {
@@ -33,8 +33,8 @@ test.describe("RBAC @rbac @security", () => {
   });
 
   memberTest("RBAC-09 member empty campaign CTA", async ({ page }) => {
-    await page.goto(workspacePath(E2E_WORKSPACES.empty.id));
-    await expect(page.getByText(/contact your admin|contact.*administrator/i)).toBeVisible();
+    await page.goto(workspacePath(E2E_WORKSPACES.empty.id, "campaigns"));
+    await expect(page.getByText(/contact your admin team/i)).toBeVisible();
   });
 
   ownerTest("RBAC-14 owner onboarding redirect", async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe("RBAC @rbac @security", () => {
 
   memberTest("RBAC-15 member onboarding banner without continue", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.onboarding.id));
-    await expect(page.getByText(/onboarding|messaging/i).first()).toBeVisible();
+    await expect(page.getByText(/Messaging onboarding still has required steps/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /continue onboarding/i })).toHaveCount(0);
   });
 
@@ -68,10 +68,9 @@ test.describe("RBAC @rbac @security", () => {
 
   callerTest("RBAC-18 caller zero credits dialog", async ({ page }) => {
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 0);
-    await page.goto(
-      workspacePath(E2E_WORKSPACES.ready.id, `campaigns/${E2E_CAMPAIGNS.liveCall.id}/call`),
-    );
-    await expect(page.getByText(/contact.*administrator|administrator/i).first()).toBeVisible();
+    const callScreen = new CallScreenPage(page);
+    await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
+    await expect(page.getByText(/Campaign Disabled|contact your administrator/i).first()).toBeVisible();
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
   });
 });

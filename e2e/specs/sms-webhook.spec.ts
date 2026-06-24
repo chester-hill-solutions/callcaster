@@ -4,14 +4,17 @@ import { ChatsPage } from "../pages/ChatsPage";
 import { E2E_WORKSPACES } from "../fixtures/seed";
 
 ownerTest("CHAT-04 inbound SMS webhook creates thread visibility", async ({ page, request }) => {
+  const from = "+15555501999";
+  const body = `E2E inbound ${Date.now()}`;
   const response = await postInboundSms(request, {
-    from: "+15555501999",
+    from,
     to: "+15555501001",
-    body: `E2E inbound ${Date.now()}`,
+    body,
   });
-  expect([200, 400, 404]).toContain(response.status());
+  expect(response.status()).toBeGreaterThanOrEqual(200);
+  expect(response.status()).toBeLessThan(300);
 
   const chats = new ChatsPage(page);
   await chats.goto(E2E_WORKSPACES.ready.id);
-  await expect(page.getByText(/conversation|chat|message/i).first()).toBeVisible();
+  await expect(page.getByText(from).first()).toBeVisible({ timeout: 15_000 });
 });

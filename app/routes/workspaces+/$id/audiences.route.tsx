@@ -1,21 +1,25 @@
 export { loader } from "./audiences.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, Link, useLoaderData, useNavigate } from "react-router";
+import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { audienceColumns } from "@/components/workspace/tables/columns";
 import { Button } from "@/components/ui/button";
 
-
-import { User } from "@/lib/types";
+import type { ContextType } from "@/lib/types";
 
 export default function WorkspaceAudiencesPage() {
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
   const loaderData = useLoaderData();
   const audienceData = "audienceData" in loaderData ? loaderData.audienceData : [];
   const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const error = "error" in loaderData ? loaderData.error : null;
-  const userRole = "userRole" in loaderData ? loaderData.userRole : null;
 
   const isWorkspaceAudienceEmpty = !audienceData?.length;
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
 
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">

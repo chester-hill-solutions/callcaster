@@ -6,12 +6,12 @@ ownerTest.describe("Chats @authenticated", () => {
   ownerTest("CHAT-01 inbox lists threads", async ({ page }) => {
     const chats = new ChatsPage(page);
     await chats.goto(E2E_WORKSPACES.ready.id);
-    await expect(page.getByText(/Contact1|conversation/i).first()).toBeVisible();
+    await expect(page.getByText(/Contact1|\+15555501002|\+15555501999|\d+ messages/i).first()).toBeVisible();
   });
 
   ownerTest("CHAT-02 thread view", async ({ page }) => {
     const chats = new ChatsPage(page);
     await chats.goto(E2E_WORKSPACES.ready.id, E2E_CONTACTS.primary.phone);
-    await expect(page.getByText(/Hello from contact|Reply from agent/i).first()).toBeVisible();
+    await expect(page.getByText(/Chat with Contact1|Contact1 E2E/i).first()).toBeVisible();
   });
 });

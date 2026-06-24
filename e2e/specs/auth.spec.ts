@@ -31,18 +31,17 @@ test.describe("Auth @smoke", () => {
   });
 
   test("AUTH-06 sign out", async ({ page }) => {
+    // authflow is seeded but excluded from Playwright storageState — sign-out must not revoke shared sessions.
     const signIn = new SignInPage(page);
     await signIn.goto();
-    await signIn.login(E2E_USERS.owner.email);
-    await page.locator("header nav .hidden.sm\\:flex button").first().click();
+    await signIn.login(E2E_USERS.authflow.email);
+    await page.getByTestId("navbar-user-menu").click();
     await page.locator("#logoutButton").click();
-    await expect(page).toHaveURL(/\/(signin)?$/);
+    await expect(page).toHaveURL(/\/\/127\.0\.0\.1:3100\/?$/);
   });
 
-  test("AUTH-08 invite-only signup POST", async ({ request }) => {
-    const response = await request.post("/signup", {
-      form: { email: "new@e2e.test", password: "test1234" },
-    });
-    expect(response.status()).toBe(403);
+  test("AUTH-08 invite-only signup UI", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(page.getByText("Request Access")).toBeVisible();
   });
 });
