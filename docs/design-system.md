@@ -2,6 +2,8 @@
 
 This project uses a single canonical design system. Follow these conventions so UI stays consistent and maintainable.
 
+For a full inventory of components, static assets, icons, route surfaces, and known redundancies, see [design-system-audit.md](design-system-audit.md).
+
 ## Primitives
 
 - **Use [app/components/ui/](app/components/ui/) as the only primitive layer.** Prefer `Input`, `Select`, `Textarea`, `Label`, `Checkbox`, `Switch`, `Button`, `Card`, `Table`, `Badge`, `Alert`, `Dialog`, `Sheet`, `Tabs`, `Pagination`, etc. from `ui/`.
@@ -28,10 +30,16 @@ This project uses a single canonical design system. Follow these conventions so 
 - **One Toaster:** The app mounts a single `<Toaster />` (sonner) in [app/root.tsx](app/root.tsx). Do not mount `<Toaster />` in routes.
 - **Usage:** `import { toast } from "sonner"` and call `toast.success()`, `toast.error()`, etc. as needed.
 
+## Icons
+
+- **Use `lucide-react` for new code.** Prefer Lucide icons in primitives, navigation, and new features.
+- **Legacy `react-icons`** remains in some campaign, nav, and SMS surfaces — migrate opportunistically when touching those files.
+- **Exception:** [`Result.IconMap.tsx`](app/components/call-list/records/participant/Result.IconMap.tsx) maps call disposition names to Material Design icons; keep as a documented domain exception.
+
 ## Deprecated / legacy
 
 - **CustomCard:** Prefer `ui/card` or the branded components from `BrandedCard`. `CustomCard` is a thin re-export of `BrandedCard` for backward compatibility; new code should use `BrandedCard` or plain `ui/card` where appropriate.
-- **forms/Inputs:** The legacy `TextInput`, `Dropdown`, `DateTime`, `Toggle` from [app/components/forms/Inputs.tsx](app/components/forms/Inputs.tsx) are deprecated. Use `ui/input`, `ui/select`, `ui/datetime`, `ui/switch` with `FormField` instead. Feature-specific components in `forms/` (e.g. `AudioSelector`) remain.
+- **forms/Inputs:** Removed. Use `ui/input`, `ui/select`, `ui/datetime`, `ui/switch` with `FormField` instead. Feature-specific components in `forms/` (e.g. `AudioSelector`) remain.
 
 ## Tokens
 

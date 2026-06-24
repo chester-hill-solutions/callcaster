@@ -4,8 +4,16 @@ export { action } from "./new.action.server";
 import { Form, Link, useActionData, useNavigation } from "react-router";
 import { useState } from "react";
 import { FaPlus } from "react-icons/fa";
-import { BrandedCard as Card, BrandedCardActions as CardActions, BrandedCardContent as CardContent, BrandedCardTitle as CardTitle } from "@/components/shared/BrandedCard";
+import {
+  BrandedCard,
+  BrandedCardActions,
+  BrandedCardContent,
+  BrandedCardTitle,
+} from "@/components/shared/BrandedCard";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Text } from "@/components/ui/typography";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
 export default function Media() {
@@ -23,37 +31,27 @@ export default function Media() {
         id="form"
         className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
         >
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-      <CardTitle>Add Audio</CardTitle>
-      {actionData?.error != null && (
-            <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-              Error: {typeof actionData.error === "string" ? actionData.error : actionData.error.message}
-            </p>
-          )}
-          <CardContent>
-            <Form
-              method="POST"
-              className="space-y-6"
-              encType="multipart/form-data"
-            >
-              <label
-                htmlFor="media-name"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
-                Audio Name
-                <input
-                  type="text"
-                  name="media-name"
-                  id="media-name"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                  />
-              </label>
-              <label
-                htmlFor="media"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
-                Upload:
-                <div className="flex w-full items-center justify-center rounded-xl border-2 border-black py-8 transition-colors duration-150 ease-in-out hover:bg-zinc-800 dark:border-white">
+      <BrandedCard bgColor="bg-brand-secondary dark:bg-card">
+        <BrandedCardTitle>Add Audio</BrandedCardTitle>
+        {actionData?.error != null ? (
+          <Text className="text-center text-destructive">
+            Error:{" "}
+            {typeof actionData.error === "string"
+              ? actionData.error
+              : actionData.error.message}
+          </Text>
+        ) : null}
+        <BrandedCardContent>
+          <Form
+            method="POST"
+            className="space-y-6"
+            encType="multipart/form-data"
+          >
+            <FormField htmlFor="media-name" label="Audio Name">
+              <Input type="text" name="media-name" id="media-name" />
+            </FormField>
+            <FormField htmlFor="media" label="Upload">
+              <div className="flex w-full items-center justify-center rounded-xl border-2 border-border py-8 transition-colors duration-150 ease-in-out hover:bg-muted">
                   {pendingFileName === "" ? (
                     <FaPlus size={"26px"} />
                   ) : (
@@ -68,9 +66,9 @@ export default function Media() {
                     onChange={displayFileToUpload}
                   />
                 </div>
-              </label>
+            </FormField>
 
-              <CardActions>
+              <BrandedCardActions>
                 <Button
                   className="h-fit min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px] text-white
             transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black w-full"
@@ -88,10 +86,10 @@ export default function Media() {
                     Back
                   </Link>
                 </Button>
-                </CardActions>
+                </BrandedCardActions>
             </Form>
-          </CardContent>
-        </Card>
+          </BrandedCardContent>
+        </BrandedCard>
       </section>
   );
 }

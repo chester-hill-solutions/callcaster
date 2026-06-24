@@ -13,6 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar,
@@ -303,41 +311,36 @@ export default function SurveyResponsesPage() {
                   <p className="text-muted-foreground">No responses yet</p>
                 ) : (
                   <div className="w-full overflow-x-auto">
-                    <table className="w-full table-fixed border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="w-32 border border-gray-300 px-4 py-2 text-left font-medium">
+                    <Table className="table-fixed border border-border">
+                      <TableHeader>
+                        <TableRow className="bg-muted">
+                          <TableHead className="w-32 border border-border px-4 py-2">
                             Respondent
-                          </th>
-                          <th className="w-32 border border-gray-300 px-4 py-2 text-left font-medium">
+                          </TableHead>
+                          <TableHead className="w-32 border border-border px-4 py-2">
                             Status
-                          </th>
-                          <th className="w-24 border border-gray-300 px-4 py-2 text-left font-medium">
+                          </TableHead>
+                          <TableHead className="w-24 border border-border px-4 py-2">
                             Started
-                          </th>
+                          </TableHead>
                           {allQuestions.map((question) => (
-                            <th
+                            <TableHead
                               key={question.question_id}
-                              className="w-48 border border-gray-300 px-4 py-2 text-left font-medium"
+                              className="w-48 border border-border px-4 py-2"
                             >
                               {question.question_text}
-                            </th>
+                            </TableHead>
                           ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(responses as SurveyResponseWithContact[]).map((response, index) => {
-                          return (
-                            <tr
-                              key={response.id}
-                              className={
-                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                              }
-                            >
-                              <td className="truncate border border-gray-300 px-4 py-2 font-medium">
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(responses as SurveyResponseWithContact[]).map(
+                          (response) => (
+                            <TableRow key={response.id}>
+                              <TableCell className="truncate border border-border px-4 py-2 font-medium">
                                 {getContactName(response)}
-                              </td>
-                              <td className="border border-gray-300 px-4 py-2">
+                              </TableCell>
+                              <TableCell className="border border-border px-4 py-2">
                                 <Badge
                                   variant={
                                     response.completed_at
@@ -350,28 +353,28 @@ export default function SurveyResponsesPage() {
                                     ? "Completed"
                                     : "In Progress"}
                                 </Badge>
-                              </td>
-                              <td className="truncate border border-gray-300 px-4 py-2 text-sm">
+                              </TableCell>
+                              <TableCell className="truncate border border-border px-4 py-2 text-sm">
                                 {new Date(
                                   response.started_at,
                                 ).toLocaleDateString()}
-                              </td>
+                              </TableCell>
                               {allQuestions.map((question) => (
-                                <td
+                                <TableCell
                                   key={question.question_id}
-                                  className="truncate border border-gray-300 px-4 py-2"
+                                  className="truncate border border-border px-4 py-2"
                                 >
                                   {getAnswerForQuestion(
                                     response,
                                     question.question_id,
                                   )}
-                                </td>
+                                </TableCell>
                               ))}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                            </TableRow>
+                          ),
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>

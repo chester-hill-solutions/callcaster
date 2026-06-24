@@ -4,7 +4,7 @@ import { BellOff } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { BrandedCard as Card } from "@/components/shared/BrandedCard";
 import {
   Select,
   SelectContent,

@@ -4,6 +4,15 @@ export { action } from "./billing.action.server";
 import { data as routeData, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useState } from "react";
 
 import Stripe from "stripe";
@@ -67,16 +76,24 @@ export default function Credits() {
     <div className="container mx-auto p-6">
       <h1 className="mb-8 text-3xl font-bold">Credits</h1>
 
-      {paymentStatus === "success" && (
-        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-          Added {formatCredits(creditsAdded)} credits successfully. Your balance has been refreshed.
-        </div>
-      )}
-      {paymentStatus === "error" && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-          {paymentMessage || "We could not confirm this payment. If your card was charged, please contact support."}
-        </div>
-      )}
+      {paymentStatus === "success" ? (
+        <Alert className="mb-6 border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+          <AlertTitle>Payment successful</AlertTitle>
+          <AlertDescription>
+            Added {formatCredits(creditsAdded)} credits successfully. Your balance
+            has been refreshed.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {paymentStatus === "error" ? (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTitle>Payment error</AlertTitle>
+          <AlertDescription>
+            {paymentMessage ||
+              "We could not confirm this payment. If your card was charged, please contact support."}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {paymentStatus === "canceled" && (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
           Checkout was canceled. No charge was made.
@@ -195,17 +212,17 @@ export default function Credits() {
       <Card className="p-6">
         <h2 className="mb-4 text-xl font-semibold">Credit Usage Log</h2>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="pb-2 text-left">Date</th>
-                <th className="pb-2 text-left">Source</th>
-                <th className="pb-2 text-left">Description</th>
-                <th className="pb-2 text-left">Idempotency key</th>
-                <th className="pb-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Idempotency key</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {credits.history.map((transaction: TransactionRow) => {
                 const source = getBillingEventSource({
                   type: transaction.type as TransactionType,
@@ -216,38 +233,41 @@ export default function Credits() {
                       : null,
                 });
                 return (
-                  <tr key={transaction.id} className="border-b">
-                    <td className="py-2 whitespace-nowrap">
+                  <TableRow key={transaction.id}>
+                    <TableCell className="whitespace-nowrap">
                       {new Date(transaction.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-2">{getBillingEventSourceLabel(source)}</td>
-                    <td className="py-2 px-2 max-w-xs text-xs">
+                    </TableCell>
+                    <TableCell>{getBillingEventSourceLabel(source)}</TableCell>
+                    <TableCell className="max-w-xs text-xs">
                       {getTransactionDisplayDescription({
                         type: transaction.type as TransactionType,
                         amount: transaction.amount,
                         note:
-                          "note" in transaction && typeof transaction.note === "string"
+                          "note" in transaction &&
+                          typeof transaction.note === "string"
                             ? transaction.note
                             : null,
                       })}
-                    </td>
-                    <td className="py-2 font-mono text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       {typeof transaction.idempotency_key === "string"
                         ? transaction.idempotency_key
                         : "—"}
-                    </td>
-                    <td
-                      className={`py-2 text-right ${
-                        transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
+                    </TableCell>
+                    <TableCell
+                      className={`text-right ${
+                        transaction.type === "CREDIT"
+                          ? "text-green-600"
+                          : "text-destructive"
                       }`}
                     >
                       {transaction.amount}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </Card>
     </div>

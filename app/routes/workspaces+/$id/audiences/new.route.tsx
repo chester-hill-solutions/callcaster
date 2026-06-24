@@ -3,8 +3,15 @@ export { action } from "./new.action.server";
 import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
-import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import {
+  BrandedCard,
+  BrandedCardContent,
+  BrandedCardTitle,
+} from "@/components/shared/BrandedCard";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Text } from "@/components/ui/typography";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
@@ -53,14 +60,14 @@ export default function AudiencesNew() {
       id="form"
       className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
     >
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900 w-[60vw]">
-        <CardTitle>Add an Audience</CardTitle>
-        {actionData?.error && (
-          <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
+      <BrandedCard bgColor="bg-brand-secondary dark:bg-card w-[60vw]">
+        <BrandedCardTitle>Add an Audience</BrandedCardTitle>
+        {actionData?.error ? (
+          <Text className="text-center text-destructive">
             Error: {actionData.error}
-          </p>
-        )}
-        <CardContent>
+          </Text>
+        ) : null}
+        <BrandedCardContent>
           <Tabs value={`step-${currentStep}`} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger 
@@ -89,21 +96,16 @@ export default function AudiencesNew() {
             
             <TabsContent value="step-1" className="space-y-4">
               <form onSubmit={handleCreateAudience} className="space-y-6">
-                <label
-                  htmlFor="audience-name"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
-                  Audience Name
-                  <input
+                <FormField htmlFor="audience-name" label="Audience Name">
+                  <Input
                     type="text"
                     name="audience-name"
                     id="audience-name"
                     value={audienceName}
                     onChange={(e) => setAudienceName(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
                     required
                   />
-                </label>
+                </FormField>
                 
                 <div className="flex items-center justify-between gap-4">
                   <Button
@@ -171,8 +173,8 @@ export default function AudiencesNew() {
               </div>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+        </BrandedCardContent>
+      </BrandedCard>
     </section>
   );
 }

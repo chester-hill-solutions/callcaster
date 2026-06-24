@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Page, IVROption, IVRBlock } from "@/lib/types";
-import { AddIcon } from "@/components/shared/Icons";
 import {
   MdAdd,
   MdAddCircle,

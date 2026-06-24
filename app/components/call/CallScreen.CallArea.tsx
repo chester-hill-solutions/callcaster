@@ -66,7 +66,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   return (
     <div
       style={{
-        border: "3px solid #BCEBFF",
+        border: "3px solid hsl(var(--brand-secondary))",
         flex: "1 1 20%",
         borderRadius: "20px",
         backgroundColor: "hsl(var(--card))",
@@ -92,8 +92,8 @@ export const CallArea: React.FC<CallAreaProps> = ({
               displayState === "failed"
                 ? "hsl(var(--primary))"
                 : displayState === "connected" || displayState === "dialing"
-                  ? "#4CA83D"
-                  : "#333333",
+                  ? "hsl(142 71% 45%)"
+                  : "hsl(var(--muted-foreground))",
           }}
           className={`font-Tabac-Slab text-xl text-white ${state === "connected" || state === "dialing" ? "bg-green-300" : "bg-slate-700"}`}
         >
@@ -152,7 +152,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
               style={{
                 flex: "1",
                 padding: "4px 8px",
-                background: "#d60000",
+                background: "hsl(var(--destructive))",
                 borderRadius: "20px",
                 color: "white",
               }}
@@ -165,7 +165,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
               style={{
                 flex: "1",
                 padding: "4px 8px",
-                background: "#2288d8",
+                background: "hsl(var(--primary))",
                 borderRadius: "20px",
                 color: "white",
               }}
@@ -185,7 +185,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
               style={{
                 flex: "1",
                 padding: "4px 8px",
-                background: "#4CA83D",
+                background: "hsl(142 71% 45%)",
                 borderRadius: "20px",
                 color: "white",
               }}
@@ -207,9 +207,10 @@ export const CallArea: React.FC<CallAreaProps> = ({
               style={{
                 flex: "1 1 75%",
                 padding: "4px 8px",
-                border: "1px solid #333",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: "20px",
-                color: "#333",
+                color: "hsl(var(--foreground))",
+                background: "hsl(var(--background))",
               }}
             >
               <option value="idle">Select a disposition</option>
@@ -229,10 +230,11 @@ export const CallArea: React.FC<CallAreaProps> = ({
               style={{
                 flex: "1 1 25%",
                 padding: "4px 8px",
-                border: "1px solid #4CA83D",
+                border: "1px solid hsl(142 71% 45%)",
                 fontSize: "10px",
                 borderRadius: "20px",
-                color: "#333",
+                color: "hsl(var(--foreground))",
+                background: "hsl(var(--background))",
                 opacity:
                   state === "connected" || state === "dialing" || !nextRecipient
                     ? ".6"

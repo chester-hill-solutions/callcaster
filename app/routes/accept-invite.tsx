@@ -3,6 +3,7 @@ export { action } from "./accept-invite.action.server";
 
 import { useActionData, useLoaderData, useNavigation, NavLink } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
 import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
@@ -74,11 +75,12 @@ export default function AcceptInvite() {
   });
 
   return (
-    <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
-      <div className="flex flex-col items-center justify-center gap-5  rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:text-white dark:shadow-none">
-        <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary  dark:text-white">
-          Accept your invitations
-        </h1>
+    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">
+      <AuthCard
+        title="Accept your invitations"
+        description="Review and accept workspace invitations sent to your email."
+        id="accept-invite-hero"
+      >
         {loaderData.status === "verified" && (
           <VerifiedNewUser email={verifiedEmail} state={state} />
         )}
@@ -96,7 +98,7 @@ export default function AcceptInvite() {
         {actionData?.status === "accept_failed" && (
           <div>Some invitations could not be accepted. Please review and try again.</div>
         )}
-      </div>
+      </AuthCard>
     </main>
   );
 }

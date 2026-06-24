@@ -7,10 +7,15 @@ import React, { useState } from "react";
 import { MdAdd, MdClose } from "react-icons/md";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
-
-import { CardContent } from "@/components/ui/card";
-import { Card, CardActions, CardTitle } from "@/components/shared/CustomCard";
-import type { Json } from "@/lib/database.types";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import {
+  BrandedCard,
+  BrandedCardActions,
+  BrandedCardContent,
+  BrandedCardTitle,
+} from "@/components/shared/BrandedCard";
+import { Text } from "@/components/ui/typography";
 
 export default function NewScript() {
   const loaderData = useLoaderData();
@@ -58,55 +63,52 @@ export default function NewScript() {
       id="form"
       className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
     >
-      {actionData?.error != null && (
-        <p className="absolute bottom-4 text-center font-Zilla-Slab text-2xl font-bold text-red-500">
+      {actionData?.error != null ? (
+        <Text className="mb-4 text-center text-destructive">
           Error:{" "}
           {actionData.error instanceof Error
             ? actionData.error.message
             : typeof actionData.error === "string"
               ? actionData.error
               : "An error occurred"}
-        </p>
-      )}
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-        <CardTitle>Add Script</CardTitle>
-        <CardContent>
+        </Text>
+      ) : null}
+      <BrandedCard bgColor="bg-brand-secondary dark:bg-card">
+        <BrandedCardTitle>Add Script</BrandedCardTitle>
+        <BrandedCardContent>
           <Form
             method="POST"
             className="space-y-6"
             encType="multipart/form-data"
           >
-            <input hidden value={ref ?? ""} id="ref" name="ref" />
-            <label
-              htmlFor="script-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              Script Name
-              <input
+            <input hidden value={ref ?? ""} id="ref" name="ref" readOnly />
+            <FormField htmlFor="script-name" label="Script Name">
+              <Input
                 type="text"
                 name="script-name"
                 id="script-name"
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
               />
-            </label>
-            <label
-              htmlFor="type"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              Script Type
+            </FormField>
+            <FormField htmlFor="type" label="Script Type">
               <select
                 name="type"
                 id="type"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                defaultValue={campaignType ? campaignType === "live_call" ? "script" : "ivr" : "script"}
+                defaultValue={
+                  campaignType
+                    ? campaignType === "live_call"
+                      ? "script"
+                      : "ivr"
+                    : "script"
+                }
+                className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
               >
                 <option value="script">Live Caller Script</option>
                 <option value="ivr">Interactive Voice Recording (IVR)</option>
                 <option value="inbound_ivr">Inbound IVR Menu</option>
               </select>
-            </label>
-            <div className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            </FormField>
+            <div className="block text-sm font-medium text-foreground">
               <div>
                 <div className="flex items-baseline gap-4">
                   <div>Upload Steps (Optional JSON file):</div>
@@ -145,27 +147,22 @@ export default function NewScript() {
               </p>
             </div>
 
-            <CardActions>
+            <BrandedCardActions>
               <Button
-                className="rounded-md bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white
-                transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
+                className="rounded-md bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary"
                 type="submit"
               >
                 Save
               </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white dark:border-white"
-              >
+              <Button asChild variant="outline">
                 <Link to=".." relative="path">
                   Back
                 </Link>
               </Button>
-            </CardActions>
+            </BrandedCardActions>
           </Form>
-        </CardContent>
-      </Card>
+        </BrandedCardContent>
+      </BrandedCard>
     </section>
   );
 }
