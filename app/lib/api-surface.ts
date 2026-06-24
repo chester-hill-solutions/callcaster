@@ -1,4 +1,6 @@
-import { PUBLIC_API_PATHS } from "@/lib/public-api";
+import {
+  isUserFacingAuthClass,
+} from "@/lib/public-api";
 import type {
   ApiSurfaceEntry,
   AuthClass,
@@ -61,13 +63,28 @@ type Seed = {
   workspaceScoped?: boolean;
 };
 
+function isCompleteOnlySurface(input: Seed): boolean {
+  if (input.duplicate) return true;
+  if (input.exposure === "unsupported") return true;
+  if (
+    input.authClass === "weakUnknown" ||
+    input.authClass === "internalTrusted" ||
+    input.authClass === "twilioSignature" ||
+    input.authClass === "stripeSignature"
+  ) {
+    return true;
+  }
+  return !isUserFacingAuthClass(input.authClass);
+}
+
 function seed(input: Seed): ApiSurfaceEntry {
-  const supported =
-    input.supported ??
-    (PUBLIC_API_PATHS as readonly string[]).includes(input.path);
   const specTarget =
     input.specTarget ??
-    (supported ? "publicOpenApi" : "completeOpenApi");
+    (isCompleteOnlySurface(input) ? "completeOpenApi" : "publicOpenApi");
+
+  const supported =
+    input.supported ??
+    (specTarget === "publicOpenApi" && input.authClass !== "weakUnknown");
 
   return {
     path: input.path,
@@ -334,8 +351,6 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     authClass: "apiKeyOrSession",
     ownerArea: "campaigns",
     exposure: "publicSdk",
-    supported: true,
-    specTarget: "publicOpenApi",
     docsGuide: "docs/api-create-campaign-with-script.md",
     workspaceScoped: true,
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
@@ -346,8 +361,6 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     authClass: "apiKeyOrSession",
     ownerArea: "messaging",
     exposure: "publicSdk",
-    supported: true,
-    specTarget: "publicOpenApi",
     docsGuide: "docs/api-send-sms.md",
     workspaceScoped: true,
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
@@ -800,8 +813,6 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     authClass: "apiKeyOrSession",
     ownerArea: "messaging",
     exposure: "publicSdk",
-    supported: true,
-    specTarget: "publicOpenApi",
     docsGuide: "docs/api-send-sms.md",
     workspaceScoped: true,
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
@@ -966,6 +977,10 @@ export const API_SURFACE_BY_KEY = new Map(
     ]),
   ),
 );
+
+export function getPublicOpenApiEntries(): ApiSurfaceEntry[] {
+  return API_SURFACE.filter((e) => e.specTarget === "publicOpenApi");
+}
 
 export function getCompleteOpenApiEntries(): ApiSurfaceEntry[] {
   return API_SURFACE.filter((e) => e.specTarget !== "inventoryOnly");

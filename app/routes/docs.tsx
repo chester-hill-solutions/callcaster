@@ -30,13 +30,13 @@ const SPEC_CONFIG: Record<
     url: "/api/docs/openapi",
     title: "Public API",
     description:
-      "Integrator-facing SDK-safe endpoints (API key or session). Use this spec for external integrations.",
+      "Everything a signed-in user (or API key) can use to run a workspace: campaigns, contacts, audiences, scripts, dialer/call-screen, messaging, exports, and workspace admin. Webhooks and internal telephony workers are in Complete Surface.",
   },
   complete: {
     url: "/api/docs/openapi/all",
     title: "Complete API Surface",
     description:
-      "All classified HTTP routes including session, webhooks, internal, and documented security gaps. Not all routes are supported for external integrators.",
+      "Full inventory including Twilio/Stripe webhooks, internal telephony workers, and documented security gaps — not all routes belong in the public user API.",
   },
 };
 

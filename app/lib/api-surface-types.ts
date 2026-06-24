@@ -86,8 +86,8 @@ export type HttpMethod = (typeof HTTP_METHODS)[number];
 
 /** OpenAPI / docs grouping tags derived from auth class. */
 export const AUTH_CLASS_TAGS: Record<AuthClass, string> = {
-  apiKeyOrSession: "Public API",
-  session: "Session API",
+  apiKeyOrSession: "Integrator API",
+  session: "User API",
   workspaceAdmin: "Workspace Admin",
   twilioSignature: "Provider Webhook",
   stripeSignature: "Provider Webhook",

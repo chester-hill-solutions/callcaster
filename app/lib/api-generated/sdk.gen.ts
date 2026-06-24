@@ -72,7 +72,7 @@ export const sendChatSms = <ThrowOnError extends boolean = false>(options: Optio
 
 /**
  * Dispatch SMS to queued campaign contacts
- * Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. Does not use the primary queue-next dispatcher. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.
+ * Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.
  */
 export const dispatchCampaignSms = <ThrowOnError extends boolean = false>(options: Options<DispatchCampaignSmsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<DispatchCampaignSmsResponse, DispatchCampaignSmsError, ThrowOnError>({

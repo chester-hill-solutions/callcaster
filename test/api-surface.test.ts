@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   API_SURFACE,
+  getPublicOpenApiEntries,
   AUTH_CLASSES,
   BODY_TYPES,
   EXPOSURE_CLASSES,
@@ -10,7 +11,8 @@ import {
   surfaceEntryKey,
 } from "../app/lib/api-surface";
 import { completeOpenApiSpec } from "../app/lib/openapi-complete";
-import { PUBLIC_API_PATHS } from "../app/lib/public-api";
+import { openApiSpec } from "../app/lib/openapi";
+import { INTEGRATOR_API_PATHS } from "../app/lib/public-api";
 
 describe("complete openapi spec", () => {
   test("has basic OpenAPI structure", () => {
@@ -18,8 +20,8 @@ describe("complete openapi spec", () => {
     expect(completeOpenApiSpec.info.title).toBe("CallCaster Complete API Surface");
   });
 
-  test("includes all public SDK paths", () => {
-    for (const path of PUBLIC_API_PATHS) {
+  test("includes all integrator SDK paths", () => {
+    for (const path of INTEGRATOR_API_PATHS) {
       expect(completeOpenApiSpec.paths).toHaveProperty(path);
       expect(completeOpenApiSpec.paths[path as keyof typeof completeOpenApiSpec.paths]?.post).toBeDefined();
     }
@@ -59,11 +61,11 @@ describe("complete openapi spec", () => {
     }
   });
 
-  test("uses auth class tags on operations", () => {
+  test("uses integrator tag on chat_sms operation", () => {
     const publicOp =
       completeOpenApiSpec.paths["/api/chat_sms" as keyof typeof completeOpenApiSpec.paths]
         ?.post as { tags?: string[] } | undefined;
-    expect(publicOp?.tags).toContain("Public API");
+    expect(publicOp?.tags).toContain("Integrator API");
   });
 
   test("excludes inventory-only meta routes from paths", () => {
@@ -85,11 +87,23 @@ describe("api surface inventory enums", () => {
     }
   });
 
-  test("public API inventory matches PUBLIC_API_PATHS", () => {
-    const publicFromInventory = API_SURFACE.filter(
-      (e) => e.specTarget === "publicOpenApi" && e.supported,
-    ).map((e) => e.path);
-    expect(publicFromInventory.sort()).toEqual([...PUBLIC_API_PATHS].sort());
+  test("integrator paths are publicOpenApi; user session routes are too", () => {
+    for (const path of INTEGRATOR_API_PATHS) {
+      const entry = API_SURFACE.find((e) => e.path === path);
+      expect(entry?.specTarget).toBe("publicOpenApi");
+      expect(entry?.supported).toBe(true);
+    }
+    const publicEntries = getPublicOpenApiEntries();
+    expect(publicEntries.length).toBeGreaterThan(40);
+    expect(publicEntries.some((e) => e.path === "/api/workspace")).toBe(true);
+    expect(publicEntries.some((e) => e.path === "/api/campaigns")).toBe(true);
+  });
+
+  test("public OpenAPI covers publicOpenApi inventory", () => {
+    for (const entry of getPublicOpenApiEntries()) {
+      if (entry.duplicate && entry.routeModule.endsWith(".js")) continue;
+      expect(openApiSpec.paths).toHaveProperty(entry.path);
+    }
   });
 
   test("weakUnknown routes include security warnings", () => {

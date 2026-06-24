@@ -9,10 +9,10 @@ describe("complete openapi json export contract", () => {
     expect(pathCount).toBeLessThan(100);
   });
 
-  test("includes provider webhook and session tags", () => {
+  test("includes provider webhook and user tags", () => {
     const tags = completeOpenApiSpec.tags.map((t) => t.name);
     expect(tags).toContain("Provider Webhook");
-    expect(tags).toContain("Session API");
+    expect(tags).toContain("User API");
     expect(tags).toContain("Security Gap");
   });
 });

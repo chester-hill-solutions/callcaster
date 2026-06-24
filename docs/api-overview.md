@@ -2,12 +2,14 @@
 
 ## Purpose
 
-CallCaster exposes a **small, documented public API** for programmatic integration (scripts, partners, automation). Most routes under `/api/*` are **internal**: dialer controls, Twilio webhooks, React Router form actions, and UI fetchers. Those are intentionally **not** listed in OpenAPI.
+CallCaster documents **user-facing HTTP APIs** at [`/docs`](/docs): everything a signed-in user (session cookie) or workspace API key can call to run a workspace — campaigns, contacts, audiences, scripts, dialer/call-screen, messaging, exports, and workspace admin.
+
+**Integrator automation** (API-key JSON endpoints with detailed schemas) is a subset documented under the **Integrator API** tag. **Webhooks, internal telephony workers, and security gaps** are in the [complete surface spec](/docs?spec=complete) only.
 
 ## Interactive docs
 
-- **Public API (Scalar):** [`/docs`](/docs) — integrator SDK-safe reference
-- **Complete API surface:** [`/docs?spec=complete`](/docs?spec=complete) — all classified routes (session, webhooks, internal)
+- **Public API (Scalar):** [`/docs`](/docs) — workspace control, campaigns, contacts, telephony, messaging (session or API key)
+- **Complete API surface:** [`/docs?spec=complete`](/docs?spec=complete) — webhooks, internal routes, security gaps
 - **Public OpenAPI JSON:** [`/api/docs/openapi`](/api/docs/openapi)
 - **Complete OpenAPI JSON:** [`/api/docs/openapi/all`](/api/docs/openapi/all)
 
@@ -93,6 +95,10 @@ Validation errors from Zod-backed public routes may include field paths, e.g. `t
 
 ## Public endpoints (OpenAPI)
 
+The public spec at [`/api/docs/openapi`](/api/docs/openapi) documents **all user-facing routes** grouped by area (Campaigns, Workspace, Contacts, Telephony, etc.).
+
+### Integrator API (detailed schemas + SDK)
+
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/api/campaigns/create-with-script` | One-shot campaign creation with script, caller ID, audiences |
@@ -104,11 +110,15 @@ See dedicated guides:
 - [Create campaign with script](./api-create-campaign-with-script.md)
 - [Send SMS](./api-send-sms.md)
 
+### Session workspace control (also in public spec)
+
+Campaign CRUD, contacts, audiences, scripts, dialer/call-screen, exports, workspace settings, and API key management — browse by tag in Scalar or see [workspace admin](./api-workspace-admin.md), [data management](./api-data-management.md), [telephony control](./api-telephony-control.md), [analytics & export](./api-analytics-export.md).
+
 ---
 
 ## Generated SDK (Hey API)
 
-After running `npm run tools:api:codegen` in the repo, integrators can import the generated fetch SDK:
+Codegen uses **`openapi/integrator-api.json`** (integrator paths only). After `npm run tools:api:codegen`:
 
 ```ts
 import { createCampaignWithScript } from "@/lib/api-generated/sdk.gen";
@@ -128,15 +138,15 @@ Generated types live under [`app/lib/api-generated/`](../app/lib/api-generated/)
 
 ---
 
-## Route categories (not public)
+## Route categories (complete spec only)
 
 | Category | Examples | Documentation |
 |----------|----------|---------------|
-| Twilio webhooks | `/api/call-status`, `/api/sms/status`, `/api/ivr/*` | [Twilio webhook auth](./twilio-webhook-auth.md) |
+| Twilio webhooks | `/api/call-status`, `/api/sms/status`, `/api/ivr/*` | [Webhooks map](./api-webhooks.md) |
 | Stripe webhook | `/api/stripe-webhook` | [Stripe webhook](./stripe-webhook.md) |
-| Dialer / IVR / queue UI | `/api/auto-dial`, `/api/dial`, `/api/campaign_queue` | Internal only |
-| Session-only CRUD | `/api/scripts`, `/api/audiences`, `/api/contacts` | App UI only |
-| API key admin | `/api/workspace-api-keys` | Workspace settings (session) |
+| Internal / security gaps | `/api/auto-dial/dialer`, `/api/queues`, legacy outreach | [Internal & unsupported](./api-internal-unsupported.md) |
+
+User-facing dialer, campaign, and workspace routes are in the **public** spec, not this table.
 
 ## Script JSON
 
@@ -144,9 +154,7 @@ Campaign scripts use a pages/blocks JSON structure. See [Script JSON format](./s
 
 ## Coverage note
 
-OpenAPI documents **integrator-facing JSON APIs** only. Full `/api/*` route coverage is intentionally low (~80 internal routes vs 3 public endpoints) by design.
-
-For tracked test/coverage drift, see [public-api-test-drift.md](./public-api-test-drift.md).
+The public OpenAPI spec documents user-facing session and integrator routes. The [complete inventory](./api-surface-inventory.md) adds webhooks, internal workers, and security gaps.
 
 ## CORS
 

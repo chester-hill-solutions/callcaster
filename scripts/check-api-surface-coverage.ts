@@ -3,9 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { API_SURFACE } from "../app/lib/api-surface";
+import { API_SURFACE, getPublicOpenApiEntries } from "../app/lib/api-surface";
 import { completeOpenApiSpec } from "../app/lib/openapi-complete";
-import { PUBLIC_API_PATHS } from "../app/lib/public-api";
+import { openApiSpec } from "../app/lib/openapi";
+import {
+  INTEGRATOR_API_PATHS,
+} from "../app/lib/public-api";
 import {
   groupRouteModulesByPath,
   parseApiRoutesFromReactRouter,
@@ -78,15 +81,43 @@ async function main() {
     }
   }
 
-  for (const publicPath of PUBLIC_API_PATHS) {
-    const entry = API_SURFACE.find((e) => e.path === publicPath);
+  for (const integratorPath of INTEGRATOR_API_PATHS) {
+    const entry = API_SURFACE.find((e) => e.path === integratorPath);
     if (!entry || entry.specTarget !== "publicOpenApi" || !entry.supported) {
       errors.push(
-        `public API path ${publicPath} not marked supported/publicOpenApi`,
+        `integrator API path ${integratorPath} not marked supported/publicOpenApi`,
       );
     }
-    if (!completeOpenApiSpec.paths[publicPath as keyof typeof completeOpenApiSpec.paths]) {
-      errors.push(`complete OpenAPI missing public path ${publicPath}`);
+    if (!openApiSpec.paths[integratorPath as keyof typeof openApiSpec.paths]) {
+      errors.push(`public OpenAPI missing integrator path ${integratorPath}`);
+    }
+    if (!completeOpenApiSpec.paths[integratorPath as keyof typeof completeOpenApiSpec.paths]) {
+      errors.push(`complete OpenAPI missing integrator path ${integratorPath}`);
+    }
+  }
+
+  for (const entry of getPublicOpenApiEntries()) {
+    if (entry.duplicate && entry.routeModule.endsWith(".js")) {
+      continue;
+    }
+    const pathItem =
+      openApiSpec.paths[entry.path as keyof typeof openApiSpec.paths];
+    if (!pathItem) {
+      errors.push(
+        `public OpenAPI missing inventory entry ${entry.path} (specTarget publicOpenApi)`,
+      );
+      continue;
+    }
+    for (const op of entry.operations) {
+      const method = op.method.toLowerCase() as
+        | "get"
+        | "post"
+        | "put"
+        | "patch"
+        | "delete";
+      if (!(method in pathItem)) {
+        errors.push(`public OpenAPI missing ${op.method} ${entry.path}`);
+      }
     }
   }
 

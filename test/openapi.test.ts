@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 
+import { getPublicOpenApiEntries } from "../app/lib/api-surface";
 import { openApiSpec } from "../app/lib/openapi";
-import { PUBLIC_API_PATHS } from "../app/lib/public-api";
+import {
+  INTEGRATOR_API_PATHS,
+  INTEGRATOR_API_TAG,
+} from "../app/lib/public-api";
 import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-script";
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
@@ -19,20 +23,39 @@ describe("openapi spec", () => {
     expect(openApiSpec.info.title).toBe("CallCaster API");
   });
 
-  test("documents all public API paths", () => {
-    for (const path of PUBLIC_API_PATHS) {
-      expect(openApiSpec.paths).toHaveProperty(path);
-    }
-    expect(Object.keys(openApiSpec.paths)).toHaveLength(PUBLIC_API_PATHS.length);
+  test("includes user-facing workspace and campaign routes", () => {
+    expect(openApiSpec.paths).toHaveProperty("/api/campaigns");
+    expect(openApiSpec.paths).toHaveProperty("/api/workspace");
+    expect(openApiSpec.paths).toHaveProperty("/api/contacts");
+    expect(Object.keys(openApiSpec.paths).length).toBeGreaterThan(40);
   });
 
-  test("each public operation has required metadata", () => {
-    for (const path of PUBLIC_API_PATHS) {
+  test("excludes webhooks and internal-only routes", () => {
+    expect(openApiSpec.paths).not.toHaveProperty("/api/inbound");
+    expect(openApiSpec.paths).not.toHaveProperty("/api/stripe-webhook");
+    expect(openApiSpec.paths).not.toHaveProperty("/api/auto-dial/dialer");
+  });
+
+  test("matches publicOpenApi inventory entries", () => {
+    for (const entry of getPublicOpenApiEntries()) {
+      if (entry.duplicate && entry.routeModule.endsWith(".js")) continue;
+      expect(openApiSpec.paths).toHaveProperty(entry.path);
+    }
+  });
+
+  test("documents all integrator API paths with detailed schemas", () => {
+    for (const path of INTEGRATOR_API_PATHS) {
+      expect(openApiSpec.paths).toHaveProperty(path);
+    }
+  });
+
+  test("each integrator operation has required metadata", () => {
+    for (const path of INTEGRATOR_API_PATHS) {
       const pathItem = openApiSpec.paths[path as keyof typeof openApiSpec.paths];
       const operation = pathItem.post;
       expect(operation).toBeDefined();
       expect(operation?.operationId).toBeTruthy();
-      expect(operation?.tags).toContain("Public");
+      expect(operation?.tags).toContain(INTEGRATOR_API_TAG);
       expect(operation?.security).toEqual([
         { sessionCookie: [] },
         { apiKey: [] },
@@ -102,13 +125,13 @@ describe("openapi spec", () => {
     ).toMatch(/Zod/i);
   });
 
-  test("each public operation has success response with content schema", () => {
-    const successByPath: Record<(typeof PUBLIC_API_PATHS)[number], string> = {
+  test("each integrator operation has success response with content schema", () => {
+    const successByPath: Record<(typeof INTEGRATOR_API_PATHS)[number], string> = {
       "/api/campaigns/create-with-script": "201",
       "/api/chat_sms": "201",
       "/api/sms": "200",
     };
-    for (const path of PUBLIC_API_PATHS) {
+    for (const path of INTEGRATOR_API_PATHS) {
       const op = openApiSpec.paths[path].post;
       const code = successByPath[path];
       const schema =
