@@ -20,6 +20,8 @@ jobs:
       - run: npm run lint
       - run: npm run test:node
       - run: npm run test:ui
+      - run: npm run tools:routes:verify
+      - run: npm run tools:api:surface:check
       - run: npm run tools:api:codegen
       - run: git diff --exit-code
 

@@ -12,6 +12,14 @@ This directory contains project documentation and archived implementation notes.
 - `stripe-webhook.md`
 - `number-rental-billing.md`
 - `api-overview.md` — Public integrator API boundary, quickstart, auth, errors, SDK
+- `api-auth-matrix.md` — Auth modes for all callable API routes
+- `api-surface-inventory.md` — Generated complete route inventory (run `npm run tools:api:surface:report`)
+- `api-workspace-admin.md` — Workspace, API keys, numbers, agent status
+- `api-data-management.md` — Contacts, audiences, scripts, campaigns
+- `api-analytics-export.md` — Exports and status polling
+- `api-telephony-control.md` — Dialer, IVR, auto-dial, call screen session APIs
+- `api-webhooks.md` — Twilio and Stripe callback map
+- `api-internal-unsupported.md` — Internal trusted routes and security gaps
 - `api-create-campaign-with-script.md` — `POST /api/campaigns/create-with-script` one-shot campaign setup
 - `api-send-sms.md` — `POST /api/chat_sms` and `POST /api/sms` messaging endpoints
 - `public-api-test-drift.md` — Public API test/coverage drift tracker
