@@ -4373,16 +4373,20 @@
       "post": {
         "operationId": "postOutreach_attempts_id",
         "summary": "POST /api/outreach_attempts/:id",
-        "description": "Updates outreach_attempt table.\n\n**Security:** Session cookie client only; no verifyAuth. Duplicate legacy route also registered.\n\nDuplicate/legacy route registration.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Session-scoped outreach attempt updates via requireJsonAuthForOutreachAttempt.",
         "tags": [
-          "Security Gap",
+          "User API",
           "campaigns"
         ],
-        "x-callcaster-supported": false,
-        "x-callcaster-exposure": "unsupported",
-        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4499,16 +4503,20 @@
       "get": {
         "operationId": "getQueues",
         "summary": "GET /api/queues",
-        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
         "tags": [
-          "Security Gap",
+          "User API",
           "queues"
         ],
-        "x-callcaster-supported": false,
+        "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4546,16 +4554,20 @@
       "post": {
         "operationId": "postQueues",
         "summary": "POST /api/queues",
-        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
         "tags": [
-          "Security Gap",
+          "User API",
           "queues"
         ],
-        "x-callcaster-supported": false,
+        "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4605,16 +4617,20 @@
       "delete": {
         "operationId": "deleteQueues",
         "summary": "DELETE /api/queues",
-        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
         "tags": [
-          "Security Gap",
+          "User API",
           "queues"
         ],
-        "x-callcaster-supported": false,
+        "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",

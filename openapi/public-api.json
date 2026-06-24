@@ -3119,6 +3119,71 @@
         }
       }
     },
+    "/api/outreach_attempts/:id": {
+      "post": {
+        "operationId": "postOutreach_attempts_id",
+        "summary": "POST /api/outreach_attempts/:id",
+        "description": "Session-scoped outreach attempt updates via requireJsonAuthForOutreachAttempt.",
+        "tags": [
+          "Campaigns",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/questions": {
       "post": {
         "operationId": "postQuestions",
@@ -3149,6 +3214,173 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queues": {
+      "get": {
+        "operationId": "getQueues",
+        "summary": "GET /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postQueues",
+        "summary": "POST /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteQueues",
+        "summary": "DELETE /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
