@@ -42,7 +42,7 @@ Interactive specs:
 | `/api/dial` | POST | User API | sessionOnly | yes | `routes/api+/dial.tsx` | `docs/api-telephony-control.md` | Campaign dial initiation; returns TwiML. |
 | `/api/dial/:number` | POST | Security Gap | internalOnly | no | `routes/api+/dial/$number.route.tsx` | `docs/api-internal-unsupported.md` | Twilio TwiML sub-route without signature validation. |
 | `/api/dial/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/dial/status.route.tsx` | `docs/api-webhooks.md` |  |
-| `/api/docs/openapi` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/docs/openapi.route.tsx` | `docs/api-overview.md` | Public integrator OpenAPI JSON (SDK-safe subset). |
+| `/api/docs/openapi` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/docs/openapi.route.tsx` | `docs/api-overview.md` | Public user-facing OpenAPI JSON (session + workspace + integrator routes). |
 | `/api/docs/openapi/all` | GET | Public Form | publicUnauthenticated | no | `routes/api+/docs/openapi/all.route.tsx` | `docs/api-overview.md` | Complete classified API surface OpenAPI JSON. |
 | `/api/disconnect` | POST | Security Gap | internalOnly | no | `routes/api.disconnect.ts` | `docs/api-internal-unsupported.md` | Twilio Device disconnect using account credentials; no session or signature check. |
 | `/api/email-vm` | POST | Provider Webhook | providerOnly | no | `routes/api+/email-vm.tsx` | `docs/api-webhooks.md` |  |

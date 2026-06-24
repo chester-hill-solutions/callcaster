@@ -1,8 +1,8 @@
 # Analytics & Export API Routes
 
-Session endpoints for async exports and call-status polling. **Not integrator SDK endpoints.**
+Session endpoints for async exports and call-status polling. Documented in the **public** OpenAPI spec.
 
-Spec: [`/api/docs/openapi/all`](/api/docs/openapi/all)
+Spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs)
 
 ## Campaign export
 

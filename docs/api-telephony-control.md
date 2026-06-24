@@ -2,7 +2,7 @@
 
 Session and internal telephony control for live calling, IVR, auto-dial, and handset flows. Provider callbacks are documented in [api-webhooks.md](./api-webhooks.md).
 
-Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all)
+Public spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs) · Webhooks: [complete surface](/docs?spec=complete)
 
 ## Browser dialer / tokens
 

@@ -1,8 +1,8 @@
 # Workspace & Admin API Routes
 
-Session-scoped workspace administration endpoints. **Not part of the public integrator SDK.** See the [auth matrix](./api-auth-matrix.md) and [complete OpenAPI spec](/api/docs/openapi/all).
+Session-scoped workspace administration endpoints. Documented in the **public** OpenAPI spec at [`/docs`](/docs) (Workspace Admin tag). Webhooks and internal routes are in [complete surface](/docs?spec=complete).
 
-Interactive docs: [`/docs?spec=complete`](/docs?spec=complete)
+Spec: [`/api/docs/openapi`](/api/docs/openapi) · Auth: [auth matrix](./api-auth-matrix.md)
 
 ## Workspace settings
 

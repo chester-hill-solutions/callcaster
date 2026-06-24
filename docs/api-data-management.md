@@ -1,8 +1,8 @@
 # Data Management API Routes
 
-Session APIs for contacts, audiences, scripts, campaigns, and related media. **Not integrator SDK endpoints.**
+Session APIs for contacts, audiences, scripts, campaigns, and related media. In the **public** OpenAPI spec (User API tag); integrator JSON shortcuts are under Integrator API.
 
-Spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) · UI: [`/docs?spec=complete`](/docs?spec=complete)
+Spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs)
 
 ## Contacts
 

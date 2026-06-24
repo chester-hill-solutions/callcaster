@@ -468,7 +468,7 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     specTarget: "inventoryOnly",
     docsGuide: GUIDE.overview,
     operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-    notes: "Public integrator OpenAPI JSON (SDK-safe subset).",
+    notes: "Public user-facing OpenAPI JSON (session + workspace + integrator routes).",
   }),
   seed({
     path: "/api/docs/openapi/all",
