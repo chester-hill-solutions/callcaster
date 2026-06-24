@@ -12,5 +12,7 @@ export const openApiSpec = buildOpenApiSpec({
     "User-facing HTTP API for CallCaster: control workspaces, campaigns, contacts, audiences, scripts, dialer/call-screen flows, and messaging. Authenticate with a browser session cookie (signed-in user) or workspace API key (automation). Webhooks, internal telephony workers, and undocumented security gaps are in the complete surface spec at /api/docs/openapi/all.",
   tagStrategy: "owner",
   useIntegratorPathOverrides: true,
+  usePlatformPathOverrides: true,
   includeIntegratorSchemas: true,
+  includePlatformSchemas: true,
 });

@@ -105,8 +105,7 @@ const sendMessage = async ({
 
   await assertWorkspaceCanSendSms({ supabaseClient: supabase, workspaceId: workspace });
 
-  const twilio = await createWorkspaceTwilioInstance({
-    supabase,
+  const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
     workspace_id: workspace,
   });
 

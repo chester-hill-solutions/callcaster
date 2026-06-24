@@ -45,8 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return routeData({ success: false, error: "Call not found" });
     }
 
-    const twilio = await createWorkspaceTwilioInstance({
-      supabase,
+    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
       workspace_id: dbCall.workspace,
     });
     const { data: campaign, error: campaignError } = await supabase

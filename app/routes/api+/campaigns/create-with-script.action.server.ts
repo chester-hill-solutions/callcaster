@@ -297,8 +297,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
 
       if (contactIdsToEnqueue.length > 0) {
-        await enqueueContactsForCampaign(
-          supabase,
+        await enqueueContactsForCampaign(supabase,
           campaignId,
           contactIdsToEnqueue,
           { requeue: false },

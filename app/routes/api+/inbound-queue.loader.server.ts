@@ -1,33 +1,38 @@
-import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import {
+  getAuthSupabaseClient,
+  requireJsonAuth,
+} from "@/lib/api-auth.server";
 import { getUserRole } from "@/lib/database.server";
-import { MemberRole } from "@/lib/member-role";
+import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  if (!user) return routeData({ error: "Unauthorized" }, { status: 401, headers });
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
 
+  const supabaseClient = getAuthSupabaseClient(auth);
   const url = new URL(request.url);
   const workspaceId = url.searchParams.get("workspace_id") || params.id;
-  if (!workspaceId) return routeData({ error: "workspace_id required" }, { status: 400, headers });
+  if (!workspaceId) {
+    return jsonError("workspace_id required", 400);
+  }
 
   const userRole = await getUserRole({
     supabaseClient,
-    user,
+    user: { id: auth.user.id },
     workspaceId,
   });
-  if (!userRole) return routeData({ error: "Not a member" }, { status: 403, headers });
+  if (!userRole) {
+    return jsonError("Not a member", 403);
+  }
 
-  // Load queues
   const { data: queues } = await supabaseClient
     .from("inbound_queue")
     .select("*")
     .eq("workspace_id", workspaceId)
     .order("name");
 
-  // Load queue members for each queue
   const queueIds = (queues || []).map((q) => q.id);
   let members: Database["public"]["Tables"]["inbound_queue_member"]["Row"][] = [];
   if (queueIds.length > 0) {
@@ -38,14 +43,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     members = memberData || [];
   }
 
-  // Load workspace numbers
   const { data: numbers } = await supabaseClient
     .from("workspace_number")
     .select("id, phone_number, friendly_name, inbound_queue_id")
     .eq("workspace", workspaceId);
 
-  return routeData(
-    { queues, members, numbers },
-    { headers },
-  );
+  return jsonResponse({ queues, members, numbers }, 200);
 };

@@ -5,12 +5,16 @@ import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/dat
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }:ActionFunctionArgs) => {
 
-  const { supabaseClient: userSupabase, user } = await verifyAuth(request);
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const userSupabase = getAuthSupabaseClient(auth);
+  const user = auth.user;
   const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
   const formData = await request.formData();
 
@@ -26,8 +30,7 @@ export const action = async ({ request }:ActionFunctionArgs) => {
   }
   let outreachAttemptId;
   let call;
-  const twilio = await createWorkspaceTwilioInstance({
-    supabase,
+  const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
     workspace_id,
   });
 

@@ -1,12 +1,16 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
 import { parseActionRequest, removeContactFromAudience } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 
 export const action = async ({ request }: { request: Request }) => {
 
-    const { supabaseClient, headers } =
-        await verifyAuth(request);
+    const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getDualAuthSupabase(auth);
 
     const method = request.method;
 
@@ -21,7 +25,7 @@ export const action = async ({ request }: { request: Request }) => {
         }
 
         try {
-            response = await removeContactFromAudience(supabaseClient, contactId, audienceId);
+            response = await removeContactFromAudience(supabase, contactId, audienceId);
         } catch (updateError) {
             return createErrorResponse(updateError, "Failed to remove contact from audience", 500);
         }

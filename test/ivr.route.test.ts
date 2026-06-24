@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -62,9 +63,8 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
-    mocks.verifyAuth.mockReset();
     mocks.logger.error.mockReset();
-    mocks.verifyAuth.mockResolvedValue({
+    setJsonAuthSession({
       supabaseClient: {},
       user: { id: "u1" },
     });

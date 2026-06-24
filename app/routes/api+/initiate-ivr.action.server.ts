@@ -1,6 +1,7 @@
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { initiateIvrBodySchema } from "@/lib/schemas/api/common";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
@@ -13,10 +14,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const { campaign_id, user_id, workspace_id } = parsed.data;
-  const { supabaseClient: supabase, user } = await verifyAuth(request);
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabase = getAuthSupabaseClient(auth);
+  const user = auth.user;
 
-  await requireWorkspaceAccess({
-    supabaseClient: supabase,
+  await requireWorkspaceAccess({ supabaseClient: supabase,
     user,
     workspaceId: workspace_id,
   });

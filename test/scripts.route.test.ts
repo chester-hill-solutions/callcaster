@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -21,7 +22,6 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 describe("app/routes/api+/scripts/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.logger.error.mockReset();
   });
@@ -30,7 +30,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     const select = vi.fn().mockResolvedValueOnce({ data: [{ id: 1, name: "N (Copy)" }], error: null });
     const insert = vi.fn().mockReturnValueOnce({ select });
     const from = vi.fn().mockReturnValueOnce({ insert });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { from }, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: 123,
       name: "N",
@@ -51,7 +51,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     const eq = vi.fn().mockReturnValueOnce({ select });
     const update = vi.fn().mockReturnValueOnce({ eq });
     const from = vi.fn().mockReturnValueOnce({ update });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { from }, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: 2,
       name: "N",
@@ -71,7 +71,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     const select = vi.fn().mockResolvedValueOnce({ data: [], error: { code: "23505", message: "dup" } });
     const insert = vi.fn().mockReturnValueOnce({ select });
     const from = vi.fn().mockReturnValueOnce({ insert });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { from }, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: null,
       name: "N",
@@ -92,7 +92,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     const select = vi.fn().mockResolvedValueOnce({ data: [], error: { code: "X", message: "nope" } });
     const insert = vi.fn().mockReturnValueOnce({ select });
     const from = vi.fn().mockReturnValueOnce({ insert });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { from }, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: null,
       name: "N",

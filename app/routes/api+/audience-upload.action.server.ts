@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { parseCSV } from '@/lib/csv';
 import { processAudienceUpload } from "@/lib/audience-upload-process.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { resolveDualAuthSession } from "@/lib/api-route-auth.server";
 import type { Database, Tables } from "@/lib/database.types";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
@@ -51,7 +51,7 @@ export const action = async ({
 }) => {
 
   const d = {
-    verifyAuth: deps?.verifyAuth ?? verifyAuth,
+    verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
     processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
   };
   const { supabaseClient, headers, user } = await d.verifyAuth(request);

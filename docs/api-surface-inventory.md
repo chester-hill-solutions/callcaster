@@ -90,6 +90,58 @@ Interactive specs:
 | `/api/verify-pin-input` | POST | Internal Trusted | internalOnly | no | `routes/api+/verify-pin-input.tsx` | `docs/api-internal-unsupported.md` | Twilio gather callback; service role, no Twilio signature. |
 | `/api/workspace-api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspace-api-keys.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspace` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspace.tsx` | `docs/api-workspace-admin.md` |  |
+| `/api/auth/register` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/register.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/token` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/token.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/refresh` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/refresh.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/signout` | POST | User API | sessionOnly | yes | `routes/api+/auth/signout.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/forgot-password` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/forgot-password.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/reset-password` | POST | User API | sessionOnly | yes | `routes/api+/auth/reset-password.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/verify-email` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/verify-email.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/invites` | GET, POST | User API | sessionOnly | yes | `routes/api+/auth/invites.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/me` | GET, PATCH | User API | sessionOnly | yes | `routes/api+/me.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces` | GET, POST | User API | sessionOnly | yes | `routes/api+/workspaces.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces/:workspaceId/transfer-ownership` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/transfer-ownership.route.tsx` | `docs/api-workspace-admin.md` |  |
+| `/api/workspaces/:workspaceId/billing` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces/:workspaceId/billing/checkout-session` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing/checkout-session.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces/:workspaceId/billing/sessions/:sessionId` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing/sessions/$sessionId.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces/:workspaceId/onboarding` | GET, PATCH | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/onboarding.route.tsx` | `docs/api-telephony-provisioning.md` |  |
+| `/api/workspaces/:workspaceId/onboarding/actions` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/onboarding/actions.route.tsx` | `docs/api-telephony-provisioning.md` |  |
+| `/api/workspaces/:workspaceId/numbers` | GET, POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/numbers.route.tsx` | `docs/api-telephony-provisioning.md` |  |
+| `/api/workspaces/:workspaceId/numbers/:numberId` | PATCH, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/numbers/$numberId.route.tsx` | `docs/api-telephony-provisioning.md` |  |
+| `/api/workspaces/:workspaceId/webhook` | GET, PUT, POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
+| `/api/workspaces/:workspaceId/members` | GET, POST, PATCH, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/members.route.tsx` | `docs/api-workspace-admin.md` |  |
+| `/api/workspaces/:workspaceId/api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/api-keys.route.tsx` | `docs/api-workspace-admin.md` |  |
+| `/api/workspaces/:workspaceId/campaigns` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/campaigns.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/campaigns/:campaignId` | GET, POST | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/campaigns/:campaignId/queue` | GET, PATCH | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId/queue.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/campaigns/:campaignId/results` | GET | Integrator API | sessionOnly | yes | `routes/api+/campaigns+/$campaignId/results.route.tsx` | `docs/api-analytics-export.md` |  |
+| `/api/campaigns/:campaignId/call-session` | GET | User API | sessionOnly | yes | `routes/api+/campaigns+/$campaignId/call-session.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/campaigns/:campaignId/call-session/release` | POST | User API | sessionOnly | yes | `routes/api+/campaigns+/$campaignId/call-session/release.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/workspaces/:workspaceId/contacts` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/contacts.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/contacts/:contactId` | GET, DELETE | Integrator API | sessionOnly | yes | `routes/api+/contacts/$contactId.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/audiences` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audiences.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/audiences/:audienceId` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audiences/$audienceId.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/audience-uploads/:uploadId` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audience-uploads/$uploadId.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/scripts` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/scripts.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/scripts/:scriptId` | GET | Integrator API | sessionOnly | yes | `routes/api+/scripts/$scriptId.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/surveys` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/surveys.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/surveys/:surveyId` | GET | Integrator API | sessionOnly | yes | `routes/api+/surveys/$surveyId.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/surveys/:surveyId/responses` | GET | Integrator API | sessionOnly | yes | `routes/api+/surveys/$surveyId/responses.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/surveys/:surveyId/responses/export` | GET | Integrator API | sessionOnly | yes | `routes/api+/surveys+/$surveyId/responses/export.route.tsx` | `docs/api-analytics-export.md` |  |
+| `/api/workspaces/:workspaceId/conversations` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/conversations.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/conversations/:contactNumber` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/audios` | GET, POST | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audios.route.tsx` | `docs/api-analytics-export.md` |  |
+| `/api/workspaces/:workspaceId/voicemails` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/voicemails.route.tsx` | `docs/api-analytics-export.md` |  |
+| `/api/workspaces/:workspaceId/analytics` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/analytics.route.tsx` | `docs/api-analytics-export.md` |  |
+| `/api/workspaces/:workspaceId/exports` | GET, POST | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/exports.route.tsx` | `docs/api-analytics-export.md` |  |
+| `/api/workspaces/:workspaceId/calls` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/workspaces/:workspaceId/calls/listening` | POST, DELETE | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls/listening.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/workspaces/:workspaceId/handset/session` | GET, DELETE | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/handset/session.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/admin/dashboard` | GET, POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/dashboard.route.tsx` | `docs/api-admin.md` | Sudo-only admin dashboard and actions. |
+| `/api/admin/users/:userId` | GET, PATCH | Internal Trusted | internalOnly | yes | `routes/api+/admin+/users+/$userId.route.tsx` | `docs/api-admin.md` |  |
+| `/api/admin/users/:userId/workspaces` | GET, POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/users+/$userId/workspaces.route.tsx` | `docs/api-admin.md` |  |
+| `/api/admin/workspaces/:workspaceId/twilio` | POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/workspaces+/$workspaceId/twilio.route.tsx` | `docs/api-admin.md` |  |
 
-Total entries: **80**
+Total entries: **132**
 

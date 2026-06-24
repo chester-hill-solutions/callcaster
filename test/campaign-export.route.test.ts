@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { setDualAuthSession, setDualAuthUnauthorized } from "./helpers/route-auth-mock";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -290,13 +291,23 @@ function makeSupabase(config: ExportSupabaseConfig) {
 let authUser: any = { id: "u1" };
 let supabaseForAuth: any = null;
 
-vi.mock("@/lib/supabase.server", () => {
-  return {
-    verifyAuth: vi.fn(async () => {
-      return { supabaseClient: supabaseForAuth, user: authUser };
-    }),
-  };
-});
+vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
+}));
+
+function applyDualAuth() {
+  if (!authUser) {
+    setDualAuthUnauthorized();
+    return;
+  }
+  setDualAuthSession({
+    supabaseClient: supabaseForAuth ?? {},
+    user: authUser,
+  });
+}
 
 function reqForm(url: string, fd: Record<string, string>) {
   const form = new FormData();
@@ -310,6 +321,7 @@ describe("api.campaign-export", () => {
     loggerError.mockClear();
     authUser = { id: "u1" };
     supabaseForAuth = null;
+    applyDualAuth();
     vi.useRealTimers();
   });
   afterEach(() => {
@@ -319,6 +331,7 @@ describe("api.campaign-export", () => {
 
   test("returns 401 when user missing", async () => {
     authUser = null;
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
@@ -331,6 +344,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({ request: reqForm("http://x", {}) } as any));
     expect(res.status).toBe(400);
@@ -342,6 +356,7 @@ describe("api.campaign-export", () => {
       campaignError: "not found",
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
@@ -354,6 +369,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w2", type: "message", title: "T" },
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
@@ -367,6 +383,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w1", type: "nope", title: "T" },
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
@@ -379,6 +396,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
 
     const res = await asRouteResponse(await mod.action({
@@ -452,6 +470,7 @@ describe("api.campaign-export", () => {
       ],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -515,6 +534,7 @@ describe("api.campaign-export", () => {
       ],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -550,6 +570,7 @@ describe("api.campaign-export", () => {
       uploadBehaviors: ["throwNonError", "ok"],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -579,6 +600,7 @@ describe("api.campaign-export", () => {
       messages: [],
     });
     supabaseForAuth = sbMsg;
+    applyDualAuth();
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "6", workspaceId: "w1" }),
     } as any));
@@ -597,6 +619,7 @@ describe("api.campaign-export", () => {
       outreachAttempts: [],
     });
     supabaseForAuth = sbCall;
+    applyDualAuth();
     const res2 = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "7", workspaceId: "w1" }),
     } as any));
@@ -638,6 +661,7 @@ describe("api.campaign-export", () => {
       ],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -664,6 +688,7 @@ describe("api.campaign-export", () => {
       messages: [],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "9", workspaceId: "w1" }),
@@ -691,6 +716,7 @@ describe("api.campaign-export", () => {
       uploadBehaviors: ["ok", "ok", "ok", "error"],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -720,6 +746,7 @@ describe("api.campaign-export", () => {
       campaignExportError: "campaign export error",
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "10", workspaceId: "w1" }),
     } as any));
@@ -743,6 +770,7 @@ describe("api.campaign-export", () => {
       campaignExportMissing: true,
     });
     supabaseForAuth = sb2;
+    applyDualAuth();
     const res2 = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "11", workspaceId: "w1" }),
     } as any));
@@ -772,6 +800,7 @@ describe("api.campaign-export", () => {
       campaignQueueError: "queue err",
     });
     supabaseForAuth = sbQueueErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "20", workspaceId: "w1" }),
     } as any);
@@ -782,6 +811,7 @@ describe("api.campaign-export", () => {
       campaignQueueContactIds: [],
     });
     supabaseForAuth = sbNoContacts;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "21", workspaceId: "w1" }),
     } as any);
@@ -793,6 +823,7 @@ describe("api.campaign-export", () => {
       contactsError: "contact err",
     });
     supabaseForAuth = sbContactErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "22", workspaceId: "w1" }),
     } as any);
@@ -805,6 +836,7 @@ describe("api.campaign-export", () => {
       messageCountError: "count err",
     });
     supabaseForAuth = sbCountErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "23", workspaceId: "w1" }),
     } as any);
@@ -818,6 +850,7 @@ describe("api.campaign-export", () => {
       messagesError: "messages err",
     });
     supabaseForAuth = sbMsgErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "24", workspaceId: "w1" }),
     } as any);
@@ -834,6 +867,7 @@ describe("api.campaign-export", () => {
       uploadBehavior: (path) => (path.endsWith(".csv") ? "error" : "ok"),
     });
     supabaseForAuth = sbCsvErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "25", workspaceId: "w1" }),
     } as any);
@@ -863,6 +897,7 @@ describe("api.campaign-export", () => {
       signedUrlBehavior: "error",
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -908,6 +943,7 @@ describe("api.campaign-export", () => {
       ],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -934,6 +970,7 @@ describe("api.campaign-export", () => {
       campaignQueueError: "",
     });
     supabaseForAuth = sbQueueErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "60", workspaceId: "w1" }),
     } as any);
@@ -953,6 +990,7 @@ describe("api.campaign-export", () => {
       contactsError: "",
     });
     supabaseForAuth = sbBatchErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "61", workspaceId: "w1" }),
     } as any);
@@ -973,6 +1011,7 @@ describe("api.campaign-export", () => {
       messageCountError: "",
     });
     supabaseForAuth = sbCountErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "62", workspaceId: "w1" }),
     } as any);
@@ -994,6 +1033,7 @@ describe("api.campaign-export", () => {
       messagesError: "",
     });
     supabaseForAuth = sbMsgsErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "63", workspaceId: "w1" }),
     } as any);
@@ -1093,6 +1133,7 @@ describe("api.campaign-export", () => {
       ],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -1132,6 +1173,7 @@ describe("api.campaign-export", () => {
       campaignExportError: "campaign export error",
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "40", workspaceId: "w1" }),
     } as any));
@@ -1155,6 +1197,7 @@ describe("api.campaign-export", () => {
       campaignExportMissing: true,
     });
     supabaseForAuth = sb2;
+    applyDualAuth();
     const res2 = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "41", workspaceId: "w1" }),
     } as any));
@@ -1182,6 +1225,7 @@ describe("api.campaign-export", () => {
       uploadBehavior: (path) => (path.endsWith(".csv") ? "error" : "ok"),
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -1211,6 +1255,7 @@ describe("api.campaign-export", () => {
       callsError: "calls blew up",
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -1242,6 +1287,7 @@ describe("api.campaign-export", () => {
       uploadBehaviors: ["error"],
     });
     supabaseForAuth = sbStatusErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "30", workspaceId: "w1" }),
     } as any);
@@ -1252,6 +1298,7 @@ describe("api.campaign-export", () => {
       outreachAttemptCountError: "attempt count err",
     });
     supabaseForAuth = sbAttemptCountErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "31", workspaceId: "w1" }),
     } as any);
@@ -1263,6 +1310,7 @@ describe("api.campaign-export", () => {
       outreachAttemptsError: "attempts err",
     });
     supabaseForAuth = sbAttemptsErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "32", workspaceId: "w1" }),
     } as any);
@@ -1275,6 +1323,7 @@ describe("api.campaign-export", () => {
       signedUrlBehavior: "error",
     });
     supabaseForAuth = sbAttemptsEmpty;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "33", workspaceId: "w1" }),
     } as any);
@@ -1287,6 +1336,7 @@ describe("api.campaign-export", () => {
       contactsError: "contacts err",
     });
     supabaseForAuth = sbContactsErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "34", workspaceId: "w1" }),
     } as any);
@@ -1300,6 +1350,7 @@ describe("api.campaign-export", () => {
       callsError: "calls err",
     });
     supabaseForAuth = sbCallsErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "35", workspaceId: "w1" }),
     } as any);
@@ -1316,6 +1367,7 @@ describe("api.campaign-export", () => {
       },
     });
     supabaseForAuth = sbNested;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "36", workspaceId: "w1" }),
     } as any);
@@ -1361,6 +1413,7 @@ describe("api.campaign-export", () => {
       calls: [],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -1389,6 +1442,7 @@ describe("api.campaign-export", () => {
       outreachAttempts: [],
     });
     supabaseForAuth = sbNullScript;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "71", workspaceId: "w1" }),
     } as any);
@@ -1407,6 +1461,7 @@ describe("api.campaign-export", () => {
       scriptError: "",
     });
     supabaseForAuth = sbScriptErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "72", workspaceId: "w1" }),
     } as any);
@@ -1425,6 +1480,7 @@ describe("api.campaign-export", () => {
       outreachAttemptCountError: "",
     });
     supabaseForAuth = sbCountErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "73", workspaceId: "w1" }),
     } as any);
@@ -1444,6 +1500,7 @@ describe("api.campaign-export", () => {
       outreachAttemptsError: "",
     });
     supabaseForAuth = sbAttemptsErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "74", workspaceId: "w1" }),
     } as any);
@@ -1464,6 +1521,7 @@ describe("api.campaign-export", () => {
       contactsError: "",
     });
     supabaseForAuth = sbContactsErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "75", workspaceId: "w1" }),
     } as any);
@@ -1484,6 +1542,7 @@ describe("api.campaign-export", () => {
       callsError: "",
     });
     supabaseForAuth = sbCallsErr;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "76", workspaceId: "w1" }),
     } as any);
@@ -1502,6 +1561,7 @@ describe("api.campaign-export", () => {
       uploadBehaviors: ["throwNonError", "ok"],
     });
     supabaseForAuth = sbNonError;
+    applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "77", workspaceId: "w1" }),
     } as any);
@@ -1538,6 +1598,7 @@ describe("api.campaign-export", () => {
       calls: null as any,
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -1566,6 +1627,7 @@ describe("api.campaign-export", () => {
       messages: [],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
@@ -1603,6 +1665,7 @@ describe("api.campaign-export", () => {
       messages: [],
     });
     supabaseForAuth = supabaseClient;
+    applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({

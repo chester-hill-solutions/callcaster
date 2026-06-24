@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { setDualAuthSession } from "./helpers/route-auth-mock";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -307,20 +308,20 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
   test("action: calling without deps hits verifyAuth fallback", async () => {
     vi.resetModules();
-    const verifyAuth = vi.fn(async () => ({
-      supabaseClient: {
-        from: () => ({
-          insert: () => ({
-            select: () => ({
-              single: async () => ({ data: { id: 1 }, error: null }),
-            }),
+    const supabaseClient = {
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: { id: 1 }, error: null }),
           }),
         }),
-      },
+      }),
+    };
+    setDualAuthSession({
+      supabaseClient,
       headers: new Headers(),
       user: { id: "u1" },
-    }));
-    vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
+    });
 
     const mod = await import("../app/routes/api+/audience-upload");
     const fd = new FormData();
@@ -329,7 +330,6 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd.set("contacts", new File(["x"], "c.csv"));
     const res = await asRouteResponse(await mod.action({ request: makeReq(fd) } as any));
     expect(res.status).toBe(200);
-    expect(verifyAuth).toHaveBeenCalled();
   }, 30000);
 
   test("action: catch branch returns Unknown error for non-Error throw", async () => {

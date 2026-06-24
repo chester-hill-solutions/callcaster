@@ -1,6 +1,8 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 
 function sanitizeFilename(filename: string) {
@@ -17,7 +19,10 @@ function sanitizeFilename(filename: string) {
 
 export async function action({ request }: ActionFunctionArgs) {
 
-    const { supabaseClient, headers } = await verifyAuth(request);
+    const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getDualAuthSupabase(auth);
     const method = request.method;
     const formData = await request.formData();
     const workspaceId = formData.get('workspaceId')
@@ -36,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
         const campaignId = campaignIdRaw == null ? null : Number(campaignIdRaw);
         const safeFileName = sanitizeFilename(encodedMediaName);
 
-        const { error: uploadError } = await supabaseClient.storage
+        const { error: uploadError } = await supabase.storage
             .from("messageMedia")
             .upload(`${workspaceId}/${safeFileName}`, mediaToUpload as any, {
                 cacheControl: "60",
@@ -47,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
             return routeData({ success: false, error: uploadError }, { headers });
         }
         if (campaignId) {
-            const { data: campaign, error } = await supabaseClient
+            const { data: campaign, error } = await supabase
                 .from('message_campaign')
                 .select('id, message_media')
                 .eq('campaign_id', campaignId as number)
@@ -56,7 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 logger.error('Campaign Error', error);
                 return routeData({ success: false, error: error }, { headers });
             }
-            const { data: campaignUpdate, error: updateError } = await supabaseClient
+            const { data: campaignUpdate, error: updateError } = await supabase
                 .from('message_campaign')
                 .update({
                     message_media: [...((campaign?.message_media ?? []) as string[]), safeFileName]
@@ -68,7 +73,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 return routeData({ success: false, error: updateError }, { headers });
             }
 
-            const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
                 .from("messageMedia")
                 .createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
 
@@ -85,7 +90,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 url: signedUrlData.signedUrl,
             }, { headers });
         } else {
-            const { data, error: imageError } = await supabaseClient.storage.from('messageMedia').createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
+            const { data, error: imageError } = await supabase.storage.from('messageMedia').createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
             if (imageError) return routeData({ success: false, error: imageError }, { headers });
             return routeData({ success: true, error: null, url: data.signedUrl }, { headers });
         }
@@ -95,7 +100,7 @@ export async function action({ request }: ActionFunctionArgs) {
         const mediaNameRaw = formData.get("fileName");
         const mediaName = typeof mediaNameRaw === 'string' ? mediaNameRaw : String(mediaNameRaw ?? '');
         const encodedMediaName = encodeURI(mediaName);
-        const { data: campaign, error } = await supabaseClient
+        const { data: campaign, error } = await supabase
             .from("message_campaign")
             .select("id, message_media")
             .eq("campaign_id", campaignId as number)
@@ -105,7 +110,7 @@ export async function action({ request }: ActionFunctionArgs) {
             return routeData({ success: false, error: error }, { headers });
         }
 
-        const { data: campaignUpdate, error: updateError } = await supabaseClient
+        const { data: campaignUpdate, error: updateError } = await supabase
             .from("message_campaign")
             .update({
                 message_media: (campaign.message_media ?? []).filter(

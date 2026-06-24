@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
+const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     safeParseJson: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
@@ -12,7 +12,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: supabaseServerMocks.headers,
+  }),
 }));
 vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
@@ -49,7 +52,6 @@ function makeUpdateBuilder(selectResult: { data: any; error: any }, updateSpy?: 
 describe("app/routes/api+/questions/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.logger.error.mockReset();
@@ -57,11 +59,12 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when recent outreach search errors (non-PGRST116)", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
+    supabaseServerMocks.headers = headers;
     const searchError = { code: "SOMETHING", message: "bad" };
     const supabaseClient = {
       from: vi.fn().mockReturnValueOnce(makeSearchBuilder({ data: null, error: searchError })),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },
@@ -90,6 +93,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("creates outreach when none recent (PGRST116), coerces rpc id string, and returns updated outreach", async () => {
     const headers = new Headers({ "Set-Cookie": "b=2" });
+    supabaseServerMocks.headers = headers;
     const finalUpdateSpy = vi.fn().mockReturnValue({
       eq: vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: 7, disposition: "done", result: { a: 1 } }], error: null })) })),
     });
@@ -100,7 +104,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
         .mockReturnValueOnce({ update: finalUpdateSpy }),
       rpc: vi.fn().mockResolvedValueOnce({ data: "7", error: null }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },
@@ -134,12 +138,13 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when rpc create_outreach_attempt errors", async () => {
     const headers = new Headers();
+    supabaseServerMocks.headers = headers;
     const rpcError = { message: "rpc bad" };
     const supabaseClient = {
       from: vi.fn().mockReturnValueOnce(makeSearchBuilder({ data: null, error: { code: "PGRST116" } })),
       rpc: vi.fn().mockResolvedValueOnce({ data: null, error: rpcError }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },
@@ -166,6 +171,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("updates existing outreach when recentOutreach exists (update undefined branch)", async () => {
     const headers = new Headers();
+    supabaseServerMocks.headers = headers;
     const supabaseClient = {
       from: vi
         .fn()
@@ -185,7 +191,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
           }),
         }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },
@@ -211,6 +217,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when updating recent outreach attempt errors", async () => {
     const headers = new Headers();
+    supabaseServerMocks.headers = headers;
     const updateError = { message: "update bad" };
     const supabaseClient = {
       from: vi
@@ -224,7 +231,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
           }),
         }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },
@@ -251,6 +258,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("covers data[0]?.id ?? null when recent update returns empty data", async () => {
     const headers = new Headers();
+    supabaseServerMocks.headers = headers;
     const supabaseClient = {
       from: vi
         .fn()
@@ -270,7 +278,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
           }),
         }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },
@@ -296,6 +304,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when final outreach update errors", async () => {
     const headers = new Headers();
+    supabaseServerMocks.headers = headers;
     const updateError = { message: "final bad" };
     const supabaseClient = {
       from: vi
@@ -310,7 +319,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
         }),
       rpc: vi.fn().mockResolvedValueOnce({ data: 9, error: null }),
     };
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },

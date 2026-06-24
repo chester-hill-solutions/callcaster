@@ -24,6 +24,13 @@ pnpm-debug.log*
 # Local generated files
 /public/exports/
 
+# Playwright E2E
+/e2e/.auth/
+/e2e/test-results/
+/e2e/playwright-report/
+/playwright-report/
+/test-results/
+
 # OS/editor noise
 .DS_Store
 *.swp

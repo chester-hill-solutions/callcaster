@@ -1,7 +1,9 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 import type { Json } from "@/lib/database.types";
 
@@ -16,11 +18,15 @@ interface RequestData {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-    const { supabaseClient, headers, user } = await verifyAuth(request);
+    const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getAuthSupabaseClient(auth);
+  const user = auth.user;
     const { update, contact_id, campaign_id, workspace, disposition, queue_id }: RequestData = await safeParseJson(request);
-    await requireWorkspaceAccess({ supabaseClient, user, workspaceId: workspace });
+    await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId: workspace });
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const { data: recentOutreach, error: searchError } = await supabaseClient
+    const { data: recentOutreach, error: searchError } = await supabase
         .from('outreach_attempt')
         .select()
         .eq('contact_id', contact_id)
@@ -38,7 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let outreachAttemptId: number | null = null;
 
     if (recentOutreach) {
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabase
             .from('outreach_attempt')
             .update({
                 ...(update !== undefined ? { result: update as Json } : {}),
@@ -54,7 +60,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         outreachAttemptId = data[0]?.id ?? null;
     } else {
-        const { data, error } = await supabaseClient.rpc('create_outreach_attempt', {
+        const { data, error } = await supabase.rpc('create_outreach_attempt', {
             con_id: contact_id,
             cam_id: campaign_id,
             queue_id,
@@ -68,7 +74,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         outreachAttemptId = typeof data === 'number' ? data : Number(data);
     }
-    const { data: updatedOutreach, error: updateError } = await supabaseClient
+    const { data: updatedOutreach, error: updateError } = await supabase
         .from('outreach_attempt')
         .update({
             ...(update !== undefined ? { result: update as Json } : {}),

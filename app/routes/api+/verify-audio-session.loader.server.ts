@@ -1,20 +1,22 @@
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from "twilio";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
 
 export const loader = async ({ request }: { request: Request }) => {
 
-    const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
-    if (!user) {
-        return routeData({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getAuthSupabaseClient(auth);
+  const user = auth.user;
     const url = new URL(request.url);
     const workspace_id = url.searchParams.get('workspace_id') as string;
-    const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
+    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id });
     
     const twiml = new Twilio.twiml.VoiceResponse();
     const phoneNumber = normalizePhoneNumber(url.searchParams.get('phoneNumber') as string)

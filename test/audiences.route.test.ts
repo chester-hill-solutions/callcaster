@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { setDualAuthSession } from "./helpers/route-auth-mock";
 import { logger } from "@/lib/logger.server";
 
 const loggerMock = vi.hoisted(() => ({
@@ -261,11 +262,10 @@ describe("api.audiences route", () => {
       }),
     };
 
-    const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers() }));
     const parseActionRequest = vi.fn(async () => ({ id: "1", name: "x" }));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
-    vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
+    setDualAuthSession({ supabaseClient, headers: new Headers(), user: { id: "u1" } });
     vi.doMock("@/lib/database.server", () => ({ parseActionRequest, requireWorkspaceAccess }));
 
     const mod = await import("../app/routes/api+/audiences");

@@ -1,12 +1,18 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { parseActionRequest, removeContactsFromAudience } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request }: ActionFunctionArgs) {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getAuthSupabaseClient(auth);
+  const user = auth.user;
 
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401, headers });
@@ -38,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const contactIds = contactIdsStr.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
 
     const { removed_count, new_total } = await removeContactsFromAudience(
-      supabaseClient,
+      supabase,
       audienceId,
       contactIds
     );

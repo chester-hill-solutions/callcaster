@@ -1,4 +1,3 @@
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
@@ -8,6 +7,7 @@ import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
 import type { TablesInsert, Database } from "@/lib/database.types";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
 
 interface DialRequest {
   to_number: string;
@@ -22,8 +22,11 @@ interface DialRequest {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+    const auth = await requireJsonAuth(request);
+    if (auth instanceof Response) return auth;
 
-    const { supabaseClient: supabase } = createSupabaseServerClient(request);
+    const supabase = getAuthSupabaseClient(auth);
+    const user = auth.user;
     const raw = await parseActionRequest(request) as Partial<DialRequest>;
     const {
         to_number,
@@ -47,8 +50,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ) {
         throw new Response("Invalid dial payload", { status: 400 });
     }
-    const { user } = await verifyAuth(request);
-    if (!user) throw new Response("Unauthorized", { status: 401 });
     await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId: workspace_id });
 
     const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
@@ -86,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     }
     const to = normalizePhoneNumber(to_number)
-    const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
+    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id });
     const twiml = new Twilio.twiml.VoiceResponse();
     try {
         const call = await withTwilioRetry(

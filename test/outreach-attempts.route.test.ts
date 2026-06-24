@@ -1,34 +1,36 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
-const mocks = vi.hoisted(() => {
-  return {
-    verifyAuth: vi.fn(),
-    safeParseJson: vi.fn(),
-  };
-});
+const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
+const mocks = vi.hoisted(() => ({
+  safeParseJson: vi.fn(),
+}));
 
 vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: supabaseServerMocks.headers,
+  }),
 }));
 vi.mock("@/lib/database.server", () => ({
-  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
+  safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
 }));
 
 describe("app/routes/api+/outreach-attempts/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.safeParseJson.mockReset();
+    supabaseServerMocks.headers = new Headers();
   });
 
   test("returns json({ error }) when rpc errors", async () => {
-    const headers = new Headers({ "Set-Cookie": "a=1" });
+    supabaseServerMocks.headers = new Headers({ "Set-Cookie": "a=1" });
     const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: { message: "nope" } });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: { rpc },
-      headers,
+      headers: supabaseServerMocks.headers,
       user: { id: "u1" },
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: 1, contact_id: 2, queue_id: 3 });
@@ -50,12 +52,12 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
   });
 
   test("returns data with headers and handles missing user", async () => {
-    const headers = new Headers({ "Set-Cookie": "b=2" });
+    supabaseServerMocks.headers = new Headers({ "Set-Cookie": "b=2" });
     const rpc = vi.fn().mockResolvedValueOnce({ data: 123, error: null });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: { rpc },
-      headers,
-      user: null,
+      headers: supabaseServerMocks.headers,
+      user: { id: "" },
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: "10", contact_id: "20", queue_id: "30" });
 
@@ -76,4 +78,3 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
     });
   });
 });
-

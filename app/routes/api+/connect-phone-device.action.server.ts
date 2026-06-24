@@ -27,8 +27,7 @@ export const action = async ({ request }: { request: Request }) => {
         return routeData({ error: "Invalid connect phone payload" }, { status: 400, headers });
     }
 
-    await requireWorkspaceAccess({
-        supabaseClient: supabase,
+    await requireWorkspaceAccess({ supabaseClient: supabase,
         user,
         workspaceId,
     });

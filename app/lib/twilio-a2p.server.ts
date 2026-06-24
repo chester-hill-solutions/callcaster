@@ -73,7 +73,7 @@ async function persistOnboardingState({
   }
 }
 
-function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {
+export function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {
   const issues: string[] = [];
 
   if (!onboarding.businessProfile.legalBusinessName) {

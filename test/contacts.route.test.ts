@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
+import { queueDualAuthSession } from "./helpers/route-auth-mock";
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     parseRequestData: vi.fn(),
     updateContact: vi.fn(),
     bulkCreateContacts: vi.fn(),
@@ -14,7 +13,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("../app/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
 }));
 vi.mock("../app/lib/database.server", () => ({
   parseRequestData: (...args: any[]) => mocks.parseRequestData(...args),
@@ -37,7 +39,6 @@ function makeContactQuery(result: { data: any[]; error: any }) {
 describe("app/routes/api+/contacts/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.parseRequestData.mockReset();
     mocks.updateContact.mockReset();
     mocks.bulkCreateContacts.mockReset();
@@ -46,7 +47,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action PATCH updates contact", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: {},
       headers: new Headers(),
       user: { id: "u1" },
@@ -63,7 +64,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action POST bulk vs single", async () => {
-    mocks.verifyAuth.mockResolvedValue({
+    queueDualAuthSession({
       supabaseClient: {},
       headers: new Headers(),
       user: { id: "u1" },
@@ -83,6 +84,11 @@ describe("app/routes/api+/contacts/route.tsx", () => {
 
     mocks.parseRequestData.mockResolvedValueOnce({ firstname: "a", audience_id: 2 });
     mocks.createContact.mockResolvedValueOnce({ id: 9 });
+    queueDualAuthSession({
+      supabaseClient: {},
+      headers: new Headers(),
+      user: { id: "u1" },
+    });
     res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any));
@@ -90,7 +96,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action default unsupported method", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({});
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -100,7 +106,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action returns 415 for unsupported content type error", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("Unsupported content type"));
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -110,7 +116,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action other errors go through handleError (non-Error)", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -121,7 +127,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action errors go through handleError (Error instance)", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -132,7 +138,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("loader returns [] when q missing", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/contacts"),
@@ -161,7 +167,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
         throw new Error("unexpected");
       },
     };
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
 
     // Override second/third Promise.all results by swapping from() behavior mid-call:
     const q1 = makeContactQuery({ data: [contactA], error: null });
@@ -194,7 +200,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     expect(body.contacts.find((c: any) => c.id === 2).queued).toBe(true);
 
     // allContacts empty => returns contacts:[]
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: {
         from: (table: string) => {
           if (table === "contact") return makeContactQuery({ data: [], error: null });
@@ -209,7 +215,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     await expect(rEmpty.json()).resolves.toEqual({ contacts: [] });
 
     // queuedError => handleError
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: {
         from: (table: string) => {
           if (table === "contact") return makeContactQuery({ data: [contactA], error: null });
@@ -234,7 +240,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     expect(mocks.handleError).toHaveBeenCalled();
 
     // Error path: one of the contact queries errors -> handleError
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: {
         from: (table: string) => {
           if (table === "contact") return makeContactQuery({ data: [], error: new Error("q") });
@@ -254,7 +260,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     const qPhoneErr = makeContactQuery({ data: [], error: new Error("phone") });
     const qEmailErr = makeContactQuery({ data: [], error: new Error("email") });
     let i = 0;
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: {
         from: (table: string) => {
           if (table !== "contact") throw "nope";
@@ -275,7 +281,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     const qOk3 = makeContactQuery({ data: [contactB], error: null });
     const qEmailOnlyErr = makeContactQuery({ data: [], error: new Error("email") });
     let j = 0;
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: {
         from: (table: string) => {
           if (table !== "contact") throw new Error("unexpected");
@@ -291,7 +297,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     expect(rEmail.status).toBe(500);
 
     // non-Error throw inside try -> catch wraps into Error(String(err))
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: {
         from: (table: string) => {
           if (table === "contact") return makeContactQuery({ data: [contactA], error: null });

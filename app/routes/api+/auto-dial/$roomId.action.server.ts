@@ -192,7 +192,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
             return await handleDeviceCheck(dbCall);
         } else {
             //This is a non-client device (outbound call)
-            const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace ?? '' });
+            const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: dbCall.workspace ?? '' });
             const call: CallContext = twilio.calls(callSid);
             realtime.send({
                 type: "broadcast", event: "message", payload: {

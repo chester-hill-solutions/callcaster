@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   env: {
@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
@@ -47,12 +50,11 @@ function makeSupabase(opts: { insertResult?: { data: unknown; error: unknown } }
 describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReset();
   });
 
   test("loader returns 401 when user missing", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: null,
@@ -70,7 +72,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   });
 
   test("loader returns 503 when VERIFICATION_PHONE_NUMBER not configured", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: { id: "u1" },
@@ -90,7 +92,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   });
 
   test("loader returns 400 when phoneNumber missing", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: { id: "u1" },
@@ -108,7 +110,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   });
 
   test("loader returns 400 when phoneNumber invalid", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: { id: "u1" },
@@ -138,7 +140,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
         error: null,
       },
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },
@@ -166,7 +168,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: null, error: { message: "db error" } },
     });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },

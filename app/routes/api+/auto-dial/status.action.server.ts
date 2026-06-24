@@ -353,8 +353,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Failed to fetch call data: " + callError.message);
     }
 
-    const twilio = await createWorkspaceTwilioInstance({
-      supabase,
+    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
       workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
     realtime = supabase.channel(parsedBody.ConferenceSid ?? dbCall.conference_id ?? "default");

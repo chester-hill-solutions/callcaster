@@ -8,6 +8,7 @@ import type {
   HttpMethod,
   OwnerArea,
 } from "@/lib/api-surface-types";
+import { PLATFORM_API_SURFACE } from "@/lib/api-surface-platform";
 import {
   AUTH_CLASSES,
   BODY_TYPES,
@@ -966,6 +967,7 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     workspaceScoped: true,
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
   }),
+  ...PLATFORM_API_SURFACE,
 ];
 
 /** Flat map keyed by `METHOD /path` (includes duplicate legacy modules). */
@@ -997,11 +999,16 @@ export const API_SURFACE_GUIDES = [
   "docs/api-surface-inventory.md",
   "docs/api-workspace-admin.md",
   "docs/api-data-management.md",
+  "docs/api-data-plane.md",
   "docs/api-analytics-export.md",
   "docs/api-telephony-control.md",
+  "docs/api-telephony-provisioning.md",
+  "docs/api-live-operations.md",
   "docs/api-webhooks.md",
   "docs/api-internal-unsupported.md",
   "docs/api-overview.md",
+  "docs/api-agent-quickstart.md",
+  "docs/api-admin.md",
   "docs/api-create-campaign-with-script.md",
   "docs/api-send-sms.md",
 ] as const;

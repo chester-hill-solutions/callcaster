@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -97,7 +98,6 @@ function makeSupabase(options?: {
 describe("app/routes/api+/hangup/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
@@ -106,7 +106,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
 
   test("hangs up, broadcasts idle, dequeues, updates outreach, removes channel", async () => {
     const { supabase, realtimeSend, removeChannel } = makeSupabase();
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({
       conference_id: "conf",
       workspaceId: "w1",
@@ -126,7 +126,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
 
   test("returns 200 when Twilio returns 21220 (call already ended)", async () => {
     const { supabase, realtimeSend } = makeSupabase();
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     const err21220 = new Error("Call is not in-progress. Cannot redirect.") as Error & { code: number };
     err21220.code = 21220;
@@ -148,7 +148,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
 
   test("returns 500 when Twilio throws non-21220", async () => {
     const { supabase } = makeSupabase();
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({
@@ -165,7 +165,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
 
   test("returns 200 when no queue entry (handset mode)", async () => {
     const { supabase } = makeSupabase({ queueRows: [] });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "conf", workspaceId: "w1", callSid: "CA1" });
     const callUpdate = vi.fn(async () => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
@@ -177,7 +177,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
 
   test("outreach update error is thrown and returns 500", async () => {
     const { supabase } = makeSupabase({ outreachError: new Error("outreach") });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     const mod = await import("../app/routes/api+/hangup");

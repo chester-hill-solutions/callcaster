@@ -194,7 +194,7 @@ export const CampaignBasicInfo = ({
 
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4" data-testid="campaign-readiness">
           <div className="flex items-center space-x-2">
             <TimerIcon className="h-4 w-4" />
             <span className="text-sm font-medium">Campaign Controls</span>

@@ -1,9 +1,10 @@
-import { data as routeData, redirect } from "react-router";
+import { data as routeData } from "react-router";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { filteredSearch } from "@/lib/queue-filter-search.server";
 import { parseRequestData } from "@/lib/database.server";
 import { safeNumber } from "@/lib/type-utils";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 import type { CampaignQueue } from "@/lib/types";
 
@@ -24,8 +25,13 @@ interface ContactMapping {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, user } = await verifyAuth(request);
-  if (!user) throw redirect("/signin");
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabaseClient = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   const data = await parseRequestData(request);
 
   if (request.method === "POST") {

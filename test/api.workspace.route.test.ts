@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -40,13 +41,12 @@ describe("app/routes/api+/workspace/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
-    mocks.verifyAuth.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.createErrorResponse.mockClear();
     mocks.logger.error.mockReset();
 
-    mocks.verifyAuth.mockResolvedValue({
+    setDualAuthSession({
       supabaseClient: {},
       user: { id: "u1" },
     });

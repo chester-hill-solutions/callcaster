@@ -3,7 +3,8 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { Resend } from "resend";
 import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+
 
 export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
 
@@ -11,12 +12,14 @@ export const action = async ({ request, params }: { request: Request, params: { 
 
   try {
     const error = await safeParseJson<unknown>(request);
-    const {supabaseClient, user} = await verifyAuth(request);
+    const auth = await requireJsonAuth(request);
+    if (auth instanceof Response) return auth;
+    const user = auth.user;
     
     const result = await resend.emails.send({
       from: "info@callcaster.ca",
       to: ["info@callcaster.ca"],
-      replyTo: user.email || user.user_metadata.email,
+      replyTo: user.email,
       subject: `An error occured which needs your attention`,
       text: `An error occured which needs your attention\n\n: ${JSON.stringify({error, user: user})}`,
     });

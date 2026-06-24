@@ -8,20 +8,18 @@ import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/dat
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
 import type { Database, Tables } from "@/lib/database.types";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
 
-  const { supabaseClient: userSupabase, headers, user } = await verifyAuth(
-    request,
-    "/signin"
-  );
-
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401, headers });
-  }
+  const { headers } = createSupabaseServerClient(request);
+  const userSupabase = getAuthSupabaseClient(auth);
+  const user = auth.user;
 
   const url = new URL(request.url);
   const callSid = url.searchParams.get("callSid");

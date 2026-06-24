@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.mock("@/lib/api-auth.server", async (importOriginal) => importOriginal());
+
 // Avoid env validation noise when importing server modules in tests.
-vi.mock("../app/lib/env.server", () => {
+vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
   return { env: new Proxy({}, handler) };
 });
@@ -13,7 +15,7 @@ const supabaseJsMocks = vi.hoisted(() => {
 let sessionUser: any = null;
 let sessionError: any = null;
 
-vi.mock("../app/lib/supabase.server", () => {
+vi.mock("@/lib/supabase.server", () => {
   return {
     createSupabaseServerClient: () => ({
       supabaseClient: {
@@ -61,14 +63,20 @@ vi.mock("@supabase/supabase-js", () => {
   };
 });
 
-import {
-  hashApiKeyForStorage,
-  verifyApiKeyOrSession,
-  API_KEY_PREFIX_LENGTH,
-} from "../app/lib/api-auth.server";
+type ApiAuthModule = typeof import("@/lib/api-auth.server");
 
 describe("verifyApiKeyOrSession", () => {
-  beforeEach(() => {
+  let verifyApiKeyOrSession: ApiAuthModule["verifyApiKeyOrSession"];
+  let hashApiKeyForStorage: ApiAuthModule["hashApiKeyForStorage"];
+  let API_KEY_PREFIX_LENGTH: ApiAuthModule["API_KEY_PREFIX_LENGTH"];
+
+  beforeEach(async () => {
+    vi.resetModules();
+    const mod = await import("@/lib/api-auth.server");
+    verifyApiKeyOrSession = mod.verifyApiKeyOrSession;
+    hashApiKeyForStorage = mod.hashApiKeyForStorage;
+    API_KEY_PREFIX_LENGTH = mod.API_KEY_PREFIX_LENGTH;
+
     sessionUser = null;
     sessionError = null;
     apiKeyRow = null;

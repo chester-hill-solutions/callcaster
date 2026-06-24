@@ -1,13 +1,21 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { ActionFunctionArgs } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, user } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const supabase = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   const url = new URL(request.url);
   const searchQuery = url.searchParams.get("q")?.toLowerCase() || "";
   const workspaceId = url.searchParams.get("workspace_id") || "";
@@ -23,19 +31,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       { data: phoneContacts, error: phoneError },
       { data: emailContacts, error: emailError }
     ] = await Promise.all([
-      supabaseClient
+      supabase
         .from('contact')
         .select(`*, contact_audience(audience_id)`)
         .textSearch('fullname', searchQuery)
         .eq('workspace', workspaceId)
         .limit(10),
-      supabaseClient
+      supabase
         .from('contact')
         .select('*, contact_audience(audience_id)')
         .ilike('phone', `%${searchQuery}%`)
         .eq('workspace', workspaceId)
         .limit(10),
-      supabaseClient
+      supabase
         .from('contact')
         .select('*, contact_audience(audience_id)')
         .ilike('email', `%${searchQuery}%`)
@@ -47,7 +55,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (allContacts.length === 0) {
       return routeData({ contacts: [] });
     } else {
-      const { data: queuedContacts, error: queuedError } = await supabaseClient
+      const { data: queuedContacts, error: queuedError } = await supabase
         .from('campaign_queue')
         .select('contact_id')
         .eq('campaign_id', Number(campaignId))
@@ -66,7 +74,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   const method = request.method;
 
   try {
@@ -74,16 +89,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     switch (method) {
       case 'PATCH': {
-        const updatedContact = await updateContact(supabaseClient, data);
+        const updatedContact = await updateContact(supabase, data);
         return routeData({ data: updatedContact }, { status: 200 });
       }
 
       case 'POST':
         if (Array.isArray(data.contacts)) {
-            const bulkResult = await bulkCreateContacts(supabaseClient, data.contacts, data.workspace_id, data.audience_id, user.id);
+            const bulkResult = await bulkCreateContacts(supabase, data.contacts, data.workspace_id, data.audience_id, user.id);
           return routeData(bulkResult);
         } else {
-          const newContact = await createContact(supabaseClient, data, data.audience_id, user.id);
+          const newContact = await createContact(supabase, data, data.audience_id, user.id);
           return routeData(newContact);
         }
 

@@ -101,11 +101,15 @@ function makeSupabaseStub(args: { currentDisposition: string }) {
 let supabaseStub: ReturnType<typeof makeSupabaseStub>;
 const supabaseState = vi.hoisted(() => ({ supabase: null as any }));
 
-vi.mock("@supabase/supabase-js", () => {
-  return {
-    createClient: () => supabaseState.supabase,
-  };
-});
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: () => supabaseState.supabase,
+}));
+vi.mock("@/lib/supabase.server", () => ({
+  getServiceSupabase: () => supabaseState.supabase,
+}));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: vi.fn(async () => ({ ok: true as const })),
+}));
 
 describe("outreach disposition transitions", () => {
   beforeEach(() => {

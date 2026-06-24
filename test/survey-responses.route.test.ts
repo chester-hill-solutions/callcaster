@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -94,19 +95,18 @@ function makeReq(form: Record<string, string>) {
 describe("app/routes/api+/survey-responses/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("returns 405 for non-POST", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}) });
+    queueDualAuthSession({ supabaseClient: makeSupabase({}) });
     const mod = await import("../app/routes/api+/survey-responses");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields and bad JSON", async () => {
-    mocks.verifyAuth.mockResolvedValue({ supabaseClient: makeSupabase({}) });
+    setDualAuthSession({ supabaseClient: makeSupabase({}) });
     const mod = await import("../app/routes/api+/survey-responses");
 
     const r0 = await asRouteResponse(await mod.action({ request: makeReq({ surveyId: "S1" }) } as any));
@@ -126,7 +126,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   test("returns 404 when survey missing and 400 when inactive", async () => {
     const mod = await import("../app/routes/api+/survey-responses");
 
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({ survey: { data: null, error: null } }),
     });
     const r1 = await asRouteResponse(await mod.action({
@@ -134,7 +134,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
     } as any));
     expect(r1.status).toBe(404);
 
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({ survey: { data: { id: 1, is_active: false }, error: null } }),
     });
     const r2 = await asRouteResponse(await mod.action({
@@ -146,7 +146,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   test("non-unique insert error 500; unique violation fetch existing error 500", async () => {
     const mod = await import("../app/routes/api+/survey-responses");
 
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         insertResponse: { data: null, error: { code: "X", message: "bad" } },
       }),
@@ -156,7 +156,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
     } as any));
     expect(r1.status).toBe(500);
 
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         insertResponse: { data: null, error: { code: "23505" } },
         existingResponse: { data: null, error: { message: "no" } },
@@ -169,7 +169,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("unique violation fetches existing and updates progress fields", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         insertResponse: { data: null, error: { code: "23505" } },
         existingResponse: { data: { id: 11 }, error: null },
@@ -192,7 +192,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("unique violation update sets null completed_at when completed=false", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         insertResponse: { data: null, error: { code: "23505" } },
         existingResponse: { data: { id: 12 }, error: null },
@@ -213,7 +213,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("last_page_completed set but page not found keeps pageId null and still inserts answer", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         page: { data: null, error: null },
         question: { data: { id: 5 }, error: null },
@@ -269,7 +269,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
       throw new Error(`Unexpected table: ${table}`);
     });
 
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase });
+    queueDualAuthSession({ supabaseClient: supabase });
     const mod = await import("../app/routes/api+/survey-responses");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({
@@ -288,7 +288,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("answer insert success with non-array value; no pageId branch", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         question: { data: { id: 5 }, error: null },
         answerInsert: { error: null },
@@ -308,7 +308,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("answer insert non-unique error logs and continues", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         question: { data: { id: 5 }, error: null },
         answerInsert: { error: { code: "X" } },
@@ -329,7 +329,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("answer insert error non-object logs and continues", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueDualAuthSession({
       supabaseClient: makeSupabase({
         question: { data: { id: 5 }, error: null },
         answerInsert: { error: "boom" },
@@ -350,7 +350,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("returns 500 on unexpected error (formData throws)", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}) });
+    queueDualAuthSession({ supabaseClient: makeSupabase({}) });
     const mod = await import("../app/routes/api+/survey-responses");
     const res = await asRouteResponse(await mod.action({
       request: {

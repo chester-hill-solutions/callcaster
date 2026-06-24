@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 

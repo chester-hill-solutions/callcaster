@@ -8,6 +8,7 @@ This directory contains project documentation and archived implementation notes.
 - `design-system-audit.md`
 - `local-development.md`
 - `testing-map.md`
+- `e2e-testing.md`
 - `error-handling.md`
 - `stripe-webhook.md`
 - `number-rental-billing.md`

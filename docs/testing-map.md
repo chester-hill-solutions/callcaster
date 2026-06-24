@@ -141,3 +141,19 @@ Top remaining blockers (smallest surface area first — use strict report for ex
   - `_shared/*` modules and many function entrypoints currently show very low line coverage; export pure handlers guarded by `import.meta.main` so tests can invoke handlers directly.
 - **UI (JSDOM) breadth**:
   - Focus on **small, deterministic components/hooks first**, then expand with targeted smoke renders for wiring components.
+
+### E2E (Playwright browser)
+
+Full browser journeys complement Vitest route tests. See **[e2e-testing.md](e2e-testing.md)** for runbook, seed users, and scenario catalog.
+
+| Area | Vitest (route/unit) | E2E adds |
+|------|---------------------|----------|
+| Auth / session | `test/supabase.server.test.ts` | Sign-in UI, `?next=` redirect, sign-out |
+| RBAC | `test/authz.test.ts` | Nav hidden vs direct URL (`rbac.spec.ts`) |
+| Campaign readiness | `test/campaign-readiness.test.ts` | Disabled controls + issue copy in settings UI |
+| Twilio webhooks | `test/call-status-billing.test.ts`, etc. | Webhook POST + visible call log / chat updates |
+| Surveys | `test/survey-*.route.test.ts` | Public survey pages without auth |
+| Billing | `test/confirm-payment.route.test.ts` | Billing page banners and credits display |
+
+- **Run locally**: `npm run test:e2e` (after seed + build + server — see e2e-testing.md)
+- **CI**: `.github/workflows/e2e.yml` on main push + nightly only

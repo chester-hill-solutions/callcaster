@@ -4,7 +4,6 @@ import type { Database, Tables } from "@/lib/database.types";
 import { getHandsetNumberForWorkspace } from "@/lib/database.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { env } from "@/lib/env.server";
-import type { User } from "@supabase/supabase-js";
 import { getAgentStatus } from "@/lib/agent-status.server";
 
 export const SESSION_EXPIRY_MINUTES = 60;
@@ -25,7 +24,7 @@ export async function getHandsetLoaderData({
   workspaceId,
 }: {
   supabaseClient: SupabaseClient<Database>;
-  user: User;
+  user: { id: string };
   workspaceId: string;
 }): Promise<HandsetLoaderData> {
   const { data: handsetData } = await getHandsetNumberForWorkspace({

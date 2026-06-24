@@ -1,11 +1,20 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) return auth;
+  const { headers } = createSupabaseServerClient(request);
+  const supabase = getDualAuthSupabase(auth);
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
   
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401, headers });
@@ -25,7 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const { data: uploadData, error: uploadError } = await supabaseClient
+    const { data: uploadData, error: uploadError } = await supabase
       .from("audience_upload")
       .select("*")
       .eq("id", uploadId)
@@ -36,7 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     let statusFileData: Record<string, unknown> = {};
-    const { data: statusData, error: statusError } = await supabaseClient.storage
+    const { data: statusData, error: statusError } = await supabase.storage
       .from("audience-uploads")
       .download(`${workspaceId}/${uploadId}.json`);
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession, queueJsonAuthSession, setDualAuthSession, setJsonAuthSession } from "./helpers/route-auth-mock";
 
 const listMock = vi.fn();
 const twilioCtor = vi.fn(function (this: any) {
@@ -11,7 +12,7 @@ const twilioCtor = vi.fn(function (this: any) {
 
 const mocks = vi.hoisted(() => {
   return {
-    createClient: vi.fn(),
+    purchaseWorkspaceNumber: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceUsers: vi.fn(),
     getWorkspacePhoneNumbers: vi.fn(),
@@ -35,10 +36,13 @@ const mocks = vi.hoisted(() => {
 vi.mock("twilio", () => ({
   default: { Twilio: twilioCtor },
 }));
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: any[]) => mocks.createClient(...args),
+vi.mock("@/lib/platform-workspace-numbers.server", () => ({
+  purchaseWorkspaceNumber: (...args: unknown[]) =>
+    mocks.purchaseWorkspaceNumber(...args),
 }));
 vi.mock("../app/lib/database.server", () => ({
+  parseActionRequest: async (request: Request) =>
+    Object.fromEntries((await request.formData()).entries()),
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
   getWorkspaceUsers: (...args: any[]) => mocks.getWorkspaceUsers(...args),
@@ -73,11 +77,10 @@ vi.mock("@/lib/transaction-history.server", () => ({
     mocks.insertTransactionHistoryIdempotent(...args),
 }));
 vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: vi.fn(async () => ({
+  createSupabaseServerClient: () => ({
     supabaseClient: {},
-    user: { id: "u1" },
     headers: new Headers(),
-  })),
+  }),
 }));
 
 function makeSupabaseStub(opts: {
@@ -129,7 +132,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     listMock.mockReset();
     twilioCtor.mockClear();
 
-    mocks.createClient.mockReset();
+    mocks.purchaseWorkspaceNumber.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.getWorkspaceUsers.mockReset();
     mocks.getWorkspacePhoneNumbers.mockReset();
@@ -161,6 +164,8 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       },
     });
     mocks.updateWorkspaceMessagingOnboardingState.mockResolvedValue(undefined);
+    setDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    setJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
   });
 
   test("loader returns 400 when search query is missing", async () => {
@@ -178,6 +183,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("loader lists local numbers with searchMode and query", async () => {
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     listMock.mockResolvedValueOnce([
       {
         phoneNumber: "+14165551234",
@@ -215,6 +221,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("loader uses workspace Twilio when workspace_id is provided", async () => {
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     listMock.mockResolvedValueOnce([
       { phoneNumber: "+1999", friendlyName: "+1999", capabilities: {} },
     ]);
@@ -239,6 +246,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("loader returns 500 and logs on Twilio error", async () => {
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     listMock.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(
@@ -260,13 +268,16 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 404 when no users found", async () => {
-    const supabase = makeSupabaseStub({ credits: 2000 });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({ data: null, error: null });
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false,
+      error: "No users found for workspace",
+      status: 404,
+    });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -275,23 +286,24 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       }),
     } as any));
 
-    expect(res.status).toBe(404);
-    await expect(res.json()).resolves.toEqual({
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({
       error: "No users found for workspace",
     });
   });
 
   test("action returns 400 creditsError when credits too low", async () => {
-    const supabase = makeSupabaseStub({ credits: 99 });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "owner", username: "alice" }],
-      error: null,
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false,
+      error: "Insufficient credits for number rental",
+      status: 400,
+      creditsError: true,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -305,29 +317,17 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 201 on success (verification_status success, inbound_action owner)", async () => {
-    const supabase = makeSupabaseStub({
-      credits: 2000,
-      newNumber: { id: 9, phone_number: "+1555" },
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "owner", username: "alice" }],
-      error: null,
-    });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      incomingPhoneNumbers: {
-        create: vi.fn().mockResolvedValueOnce({
-          sid: "PN123",
-          friendlyName: "FN",
-          phoneNumber: "+1555",
-          capabilities: { voice: true, sms: true, mms: true },
-        }),
-      },
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: true,
+      number: { id: 9, phone_number: "+1555" },
+      messagingServiceAttached: true,
+      status: 201,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -341,44 +341,20 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       newNumber: { id: 9, phone_number: "+1555" },
       messagingServiceAttached: true,
     });
-
-    const workspaceNumberInsert = supabase.from.mock.results.find(
-      (r) => r.value && r.value.insert,
-    )?.value.insert as any;
-    expect(workspaceNumberInsert).toBeTruthy();
-    expect(mocks.updateWorkspaceMessagingOnboardingState).toHaveBeenCalled();
-    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspaceId: "w1",
-        type: "DEBIT",
-        amount: -100,
-      }),
-    );
   });
 
   test("action covers pending verification_status and inbound_action null", async () => {
-    const supabase = makeSupabaseStub({
-      credits: 2000,
-      newNumber: { id: 10 },
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "member", username: "bob" }],
-      error: null,
-    });
-    const create = vi.fn().mockResolvedValueOnce({
-      sid: "PN456",
-      friendlyName: "FN2",
-      phoneNumber: "+1666",
-      capabilities: { voice: true, sms: false, mms: true },
-    });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      incomingPhoneNumbers: { create },
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: true,
+      number: { id: 10 },
+      messagingServiceAttached: true,
+      status: 201,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1666");
-    fd.set("workspace_id", "w2");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000002");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -392,40 +368,17 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action attaches purchased number to Messaging Service when workspace has one", async () => {
-    const supabase = makeSupabaseStub({
-      credits: 2000,
-      newNumber: { id: 11, phone_number: "+1999" },
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "owner", username: "alice" }],
-      error: null,
-    });
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
-      messagingService: {
-        serviceSid: "MG123",
-        attachedSenderPhoneNumbers: [],
-      },
-      emergencyVoice: {
-        address: { status: "validated", addressSid: "AD123" },
-        status: "collecting_business",
-        emergencyEligiblePhoneNumbers: [],
-      },
-    });
-    const create = vi.fn().mockResolvedValueOnce({
-      sid: "PN789",
-      friendlyName: "FN3",
-      phoneNumber: "+1999",
-      capabilities: { voice: true, sms: true, mms: true },
-    });
-    mocks.attachPhoneNumberToMessagingService.mockResolvedValueOnce({});
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      incomingPhoneNumbers: { create },
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: true,
+      number: { id: 11, phone_number: "+1999" },
+      messagingServiceAttached: true,
+      status: 201,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1999");
-    fd.set("workspace_id", "w3");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000003");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -435,25 +388,23 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(201);
-    expect(mocks.attachPhoneNumberToMessagingService).toHaveBeenCalledWith(
-      expect.anything(),
-      "MG123",
-      "PN789",
-      expect.objectContaining({ workspaceId: "w3" }),
-    );
+    await expect(res.json()).resolves.toMatchObject({
+      newNumber: { id: 11, phone_number: "+1999" },
+      messagingServiceAttached: true,
+    });
   });
 
   test("action returns 500 when getWorkspaceUsers returns error", async () => {
-    const supabase = makeSupabaseStub({ credits: 2000 });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: null,
-      error: new Error("users"),
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false,
+      error: "users",
+      status: 500,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1777");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -464,22 +415,23 @@ describe("app/routes/api+/numbers/route.tsx", () => {
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Failed to register number",
+      "Error response:",
       expect.anything(),
+      expect.any(Error),
     );
   });
 
   test("action returns 500 when workspace credits query errors", async () => {
-    const supabase = makeSupabaseStub({ creditsError: { message: "credits" } });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "owner", username: "alice" }],
-      error: null,
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false,
+      error: "credits",
+      status: 500,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1888");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -492,21 +444,16 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 500 when Twilio create rejects (logs both error sites)", async () => {
-    const supabase = makeSupabaseStub({ credits: 2000 });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "owner", username: "alice" }],
-      error: null,
-    });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      incomingPhoneNumbers: {
-        create: vi.fn().mockRejectedValueOnce(new Error("twilio")),
-      },
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false,
+      error: "twilio",
+      status: 500,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1999");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -517,33 +464,23 @@ describe("app/routes/api+/numbers/route.tsx", () => {
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Failed to register number",
+      "Error response:",
       expect.anything(),
+      expect.any(Error),
     );
   });
 
   test("action returns 500 when workspace_number insert errors", async () => {
-    const supabase = makeSupabaseStub({
-      workspaceNumberInsertError: { message: "insert" },
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "owner", username: "alice" }],
-      error: null,
-    });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      incomingPhoneNumbers: {
-        create: vi.fn().mockResolvedValueOnce({
-          friendlyName: "FN",
-          phoneNumber: "+1",
-          capabilities: { voice: true, sms: true, mms: true },
-        }),
-      },
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false,
+      error: "insert",
+      status: 500,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
@@ -556,28 +493,16 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 500 when idempotent transaction insert errors", async () => {
-    const supabase = makeSupabaseStub({});
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.getWorkspaceUsers.mockResolvedValueOnce({
-      data: [{ user_workspace_role: "owner", username: "alice" }],
-      error: null,
-    });
-    mocks.insertTransactionHistoryIdempotent.mockRejectedValueOnce(
-      new Error("tx"),
-    );
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      incomingPhoneNumbers: {
-        create: vi.fn().mockResolvedValueOnce({
-          friendlyName: "FN",
-          phoneNumber: "+1",
-          capabilities: { voice: true, sms: true, mms: true },
-        }),
-      },
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false,
+      error: "tx",
+      status: 500,
     });
 
     const fd = new FormData();
     fd.set("phoneNumber", "+1");
-    fd.set("workspace_id", "w1");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {

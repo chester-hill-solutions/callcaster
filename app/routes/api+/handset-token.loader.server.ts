@@ -1,14 +1,16 @@
 import { data as routeData } from "react-router";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
+import {
+  getAuthSupabaseClient,
+  requireJsonAuth,
+} from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { createErrorResponse } from "@/lib/errors.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient: supabase, user } = await verifyAuth(request);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
 
   const url = new URL(request.url);
   const workspace = url.searchParams.get("workspace") ?? "";
@@ -21,22 +23,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  await requireWorkspaceAccess({
-    supabaseClient: supabase,
-    user,
-    workspaceId: workspace,
-  });
+  try {
+    const supabase = getAuthSupabaseClient(auth);
+    await requireWorkspaceAccess({ supabaseClient: supabase,
+      user: auth.user,
+      workspaceId: workspace,
+    });
 
-  const result = await createHandsetAccessToken({
-    supabaseClient: supabase,
-    workspaceId: workspace,
-    clientIdentity,
-  });
+    const result = await createHandsetAccessToken({ supabaseClient: supabase,
+      workspaceId: workspace,
+      clientIdentity,
+    });
 
-  if (result.error) {
-    const status = result.error === "Workspace not found" ? 404 : 400;
-    return routeData({ error: result.error }, { status });
+    if (result.error) {
+      const status = result.error === "Workspace not found" ? 404 : 400;
+      return routeData({ error: result.error }, { status });
+    }
+
+    return routeData({ token: result.token });
+  } catch (error) {
+    return createErrorResponse(error, "Failed to generate handset token");
   }
-
-  return routeData({ token: result.token });
 };

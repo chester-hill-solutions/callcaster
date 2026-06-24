@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
+const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     removeContactsFromAudience: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
@@ -12,7 +13,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: supabaseServerMocks.headers,
+  }),
 }));
 vi.mock("@/lib/database.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
@@ -23,14 +27,13 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.removeContactsFromAudience.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("returns 401 when user missing", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: {},
       headers: new Headers(),
       user: null,
@@ -43,7 +46,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
   });
 
   test("returns 405 when method not DELETE", async () => {
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: {},
       headers: new Headers(),
       user: { id: "u1" },
@@ -56,19 +59,16 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
   });
 
   test("validates audience_id and contact_ids", async () => {
-    mocks.verifyAuth.mockResolvedValue({
-      supabaseClient: {},
-      headers: new Headers(),
-      user: { id: "u1" },
-    });
     const mod = await import("../app/routes/api+/contact-audience/bulk-delete.route");
 
+    queueJsonAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: null, "contact_ids[]": ["1"] });
     const r1 = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any));
     expect(r1.status).toBe(400);
 
+    queueJsonAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: "1", "contact_ids[]": null });
     const r2 = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
@@ -78,8 +78,9 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
 
   test("parses contact_ids[] string/array, filters NaN, and returns success payload", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
+    supabaseServerMocks.headers = headers;
     const supabaseClient = {};
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient,
       headers,
       user: { id: "u1" },
@@ -109,13 +110,9 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
   });
 
   test("logs and returns 500 on thrown Error and non-Error", async () => {
-    mocks.verifyAuth.mockResolvedValue({
-      supabaseClient: {},
-      headers: new Headers(),
-      user: { id: "u1" },
-    });
     const mod = await import("../app/routes/api+/contact-audience/bulk-delete.route");
 
+    queueJsonAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: "1", "contact_ids[]": "2" });
     mocks.removeContactsFromAudience.mockRejectedValueOnce(new Error("boom"));
     const r1 = await asRouteResponse(await mod.action({
@@ -123,6 +120,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
     } as any));
     expect(r1.status).toBe(500);
 
+    queueJsonAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: "1", "contact_ids[]": "2" });
     mocks.removeContactsFromAudience.mockRejectedValueOnce("nope");
     const r2 = await asRouteResponse(await mod.action({

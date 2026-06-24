@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
     send: vi.fn(),
     safeParseJson: vi.fn(),
-    verifyAuth: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
@@ -14,7 +14,12 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/env.server", () => ({ env: { RESEND_API_KEY: () => "rk" } }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/database.server", () => ({ safeParseJson: (...a: any[]) => mocks.safeParseJson(...a) }));
-vi.mock("@/lib/supabase.server", () => ({ verifyAuth: (...a: any[]) => mocks.verifyAuth(...a) }));
+vi.mock("@/lib/supabase.server", () => ({
+  createSupabaseServerClient: () => ({
+    supabaseClient: {},
+    headers: new Headers(),
+  }),
+}));
 
 vi.mock("resend", () => {
   class Resend {
@@ -29,15 +34,14 @@ describe("app/routes/api+/error-report/route.tsx", () => {
     vi.resetModules();
     mocks.send.mockReset();
     mocks.safeParseJson.mockReset();
-    mocks.verifyAuth.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("sends report using user.email fallback and returns success", async () => {
     mocks.safeParseJson.mockResolvedValueOnce({ e: 1 });
-    mocks.verifyAuth.mockResolvedValueOnce({
+    queueJsonAuthSession({
       supabaseClient: {},
-      user: { email: "", user_metadata: { email: "m@e.com" } },
+      user: { id: "u1", email: "m@e.com" },
     });
     mocks.send.mockResolvedValueOnce({ id: "em" });
     const mod = await import("../app/routes/api+/error-report");
@@ -55,6 +59,7 @@ describe("app/routes/api+/error-report/route.tsx", () => {
 
   test("returns 500 on error", async () => {
     mocks.safeParseJson.mockRejectedValueOnce(new Error("boom"));
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     const mod = await import("../app/routes/api+/error-report");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
@@ -65,4 +70,3 @@ describe("app/routes/api+/error-report/route.tsx", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 });
-
