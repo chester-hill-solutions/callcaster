@@ -110,7 +110,7 @@
   "devDependencies": {
     "@hey-api/client-fetch": "^0.13.1",
     "@hey-api/openapi-ts": "^0.66.7",
-    "@playwright/test": "^1.49.1",
+    "@playwright/test": "^1.55.1",
     "@react-router/dev": "^7.0.0",
     "@react-router/fs-routes": "^7.0.0",
     "@react-router/remix-routes-option-adapter": "^7.15.1",
@@ -142,7 +142,7 @@
     "tailwindcss": "^3.4.3",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3",
-    "vite": "^6.4.2",
+    "vite": "^6.4.3",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.0.18"
   },
@@ -151,6 +151,10 @@
     "bun": ">=1.2.15"
   },
   "overrides": {
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "handlebars": "^4.7.9",
+    "tar": "^7.5.16",
+    "form-data": "^4.0.6",
+    "js-yaml": "^4.2.0"
   }
 }
