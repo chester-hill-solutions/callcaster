@@ -4,14 +4,8 @@ import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, 
 
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Heading, Text } from "@/components/ui/typography";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -142,10 +136,12 @@ export default function SurveyResponsesPage() {
               </Link>
             </Button>
           </div>
-          <h1 className="text-3xl font-bold">Survey Responses</h1>
-          <p className="text-muted-foreground">
+          <Heading as="h1" level={2} branded={false}>
+            Survey Responses
+          </Heading>
+          <Text variant="muted">
             {survey.title} - Response Analysis
-          </p>
+          </Text>
         </div>
         <Button 
           variant="outline"
@@ -159,71 +155,63 @@ export default function SurveyResponsesPage() {
         </Button>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics tiles */}
       <div className="mb-6 grid gap-6 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-6">
+        <div className="rounded-lg border border-border/60 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <Text variant="small">
                   Total Responses
-                </p>
+                </Text>
                 <p className="text-2xl font-bold">{stats.total}</p>
               </div>
               <Users className="h-8 w-8 text-muted-foreground" />
             </div>
-          </CardContent>
-        </Card>
+        </div>
 
-        <Card>
-          <CardContent className="p-6">
+        <div className="rounded-lg border border-border/60 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <Text variant="small">
                   Completed
-                </p>
-                <p className="text-2xl font-bold text-green-600">
+                </Text>
+                <p className="text-2xl font-bold text-success">
                   {stats.completed}
                 </p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+              <CheckCircle className="h-8 w-8 text-success" />
             </div>
-          </CardContent>
-        </Card>
+        </div>
 
-        <Card>
-          <CardContent className="p-6">
+        <div className="rounded-lg border border-border/60 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <Text variant="small">
                   In Progress
-                </p>
-                <p className="text-2xl font-bold text-orange-600">
+                </Text>
+                <p className="text-2xl font-bold text-warning">
                   {stats.inProgress}
                 </p>
               </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+              <Clock className="h-8 w-8 text-warning" />
             </div>
-          </CardContent>
-        </Card>
+        </div>
 
-        <Card>
-          <CardContent className="p-6">
+        <div className="rounded-lg border border-border/60 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <Text variant="small">
                   Completion Rate
-                </p>
+                </Text>
                 <p className="text-2xl font-bold">
                   {stats.completionRate.toFixed(1)}%
                 </p>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                <span className="text-sm font-bold text-blue-600">%</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                <span className="text-sm font-bold text-primary">%</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
 
       <Tabs defaultValue="list" className="space-y-4">
@@ -235,22 +223,19 @@ export default function SurveyResponsesPage() {
 
         <TabsContent value="list" className="space-y-4">
           <div className={cardWidthClass}>
-            <Card>
-              <CardHeader>
-                <CardTitle>All Responses</CardTitle>
-                <CardDescription>
-                  {responses.length} total responses
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Section variant="flat">
+              <SectionHeader
+                title="All Responses"
+                description={`${responses.length} total responses`}
+              />
                 {responses.length === 0 ? (
-                  <p className="text-muted-foreground">No responses yet</p>
+                  <Text variant="muted">No responses yet</Text>
                 ) : (
                   <div className="space-y-4">
                     {(responses as SurveyResponseWithContact[]).map((response) => (
                       <div
                         key={response.id}
-                        className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50"
+                        className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-4">
@@ -294,21 +279,19 @@ export default function SurveyResponsesPage() {
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+            </Section>
           </div>
         </TabsContent>
 
         <TabsContent value="chart" className="space-y-4">
           <div className={cardWidthClass}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Response Chart</CardTitle>
-                <CardDescription>All responses in table format</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Section variant="flat">
+              <SectionHeader
+                title="Response Chart"
+                description="All responses in table format"
+              />
                 {responses.length === 0 ? (
-                  <p className="text-muted-foreground">No responses yet</p>
+                  <Text variant="muted">No responses yet</Text>
                 ) : (
                   <div className="w-full overflow-x-auto">
                     <Table className="table-fixed border border-border">
@@ -377,23 +360,18 @@ export default function SurveyResponsesPage() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+            </Section>
           </div>
         </TabsContent>
 
         <TabsContent value="details" className="space-y-4">
           <div className={cardWidthClass}>
             {selectedResponse ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Response Details</CardTitle>
-                  <CardDescription>
-                    {getContactName(selectedResponse)} -{" "}
-                    {new Date(selectedResponse.created_at).toLocaleString()}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+              <Section variant="flat">
+                <SectionHeader
+                  title="Response Details"
+                  description={`${getContactName(selectedResponse)} - ${new Date(selectedResponse.created_at).toLocaleString()}`}
+                />
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -451,12 +429,12 @@ export default function SurveyResponsesPage() {
                               key={answer.id}
                               className="rounded-lg border p-4"
                             >
-                              <h4 className="mb-2 font-medium">
+                              <Heading as="h4" level={4} branded={false} className="mb-2">
                                 {answer.survey_question?.question_text}
-                              </h4>
-                              <p className="text-sm text-muted-foreground">
+                              </Heading>
+                              <Text variant="muted">
                                 Type: {answer.survey_question?.question_type}
-                              </p>
+                              </Text>
                               <p className="mt-2">
                                 <strong>Answer:</strong> {formatAnswer(answer)}
                               </p>
@@ -466,20 +444,17 @@ export default function SurveyResponsesPage() {
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+              </Section>
             ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <Eye className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                  <h3 className="mb-2 text-lg font-semibold">
-                    No Response Selected
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Select a response from the list to view its details
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-lg border border-border/60 p-8 text-center">
+                <Eye className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                <Heading as="h3" level={4} branded={false} className="mb-2">
+                  No Response Selected
+                </Heading>
+                <Text variant="muted">
+                  Select a response from the list to view its details
+                </Text>
+              </div>
             )}
           </div>
         </TabsContent>

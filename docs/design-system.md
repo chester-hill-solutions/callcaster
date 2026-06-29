@@ -38,12 +38,13 @@ For a full inventory of components, static assets, icons, route surfaces, and kn
 
 ## Deprecated / legacy
 
-- **CustomCard:** Prefer `ui/card` or the branded components from `BrandedCard`. `CustomCard` is a thin re-export of `BrandedCard` for backward compatibility; new code should use `BrandedCard` or plain `ui/card` where appropriate.
+- **CustomCard:** Prefer `ui/card` or the branded components from `BrandedCard`. `CustomCard` is a thin re-export of `BrandedCard` for backward compatibility; all production imports have been migrated to `BrandedCard` (0 `CustomCard` imports remain — the alias is a candidate for deletion). New code should use `BrandedCard` or plain `ui/card` where appropriate.
 - **forms/Inputs:** Removed. Use `ui/input`, `ui/select`, `ui/datetime`, `ui/switch` with `FormField` instead. Feature-specific components in `forms/` (e.g. `AudioSelector`) remain.
 
 ## Tokens
 
 - Prefer semantic tokens: `text-foreground`, `text-muted-foreground`, `bg-card`, `border-border`, etc. Use `Heading`/`Text` and shared components so brand colors and type scales live in one place rather than in ad hoc route classes.
+- **Status tokens:** `success` / `warning` semantic tokens are defined in [`tailwind.css`](app/tailwind.css) (light + dark) and mapped in [`tailwind.config.js`](tailwind.config.js). `Badge` (`success`, `warning` variants) and `Alert` (`success`, `warning` variants) consume them. Use these for success/warning status indicators instead of raw `emerald`/`amber`/`green` Tailwind palette classes. `destructive` covers error states.
 
 ## Design north star
 

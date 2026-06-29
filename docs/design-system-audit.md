@@ -20,7 +20,7 @@ The repo has a solid primitive layer in [`app/components/ui/`](app/components/ui
 | `Section` / `SectionHeader` | [`Section.tsx`](app/components/shared/Section.tsx) | canonical |
 | `BrandedCard*` | [`BrandedCard.tsx`](app/components/shared/BrandedCard.tsx) | canonical (wraps `ui/card` + `Heading`) |
 | `Skeleton` | [`skeleton.tsx`](app/components/ui/skeleton.tsx) | canonical; used by DataTable |
-| Single `<Toaster />` | [`root.tsx`](app/root.tsx) L109 | canonical |
+| Single `<Toaster />` | [`root.tsx`](app/root.tsx) L110 | canonical |
 | `forms/Inputs` in production | — | **dead code** (test-only via re-export) |
 
 **Remaining problem:** uneven adoption — creation routes, list shells, raw tables, dual icon libraries, and ad hoc Tailwind bypass the components above.
@@ -92,7 +92,6 @@ The repo has a solid primitive layer in [`app/components/ui/`](app/components/ui
 | `border-gray-300` | creation routes, survey responses, contact forms | `border-border` + `Input`/`Select` |
 | `dark:bg-zinc-800` | creation routes | `bg-background` / `Input` |
 | Hex literals | [`pricing.tsx`](app/routes/pricing.tsx) | semantic brand/primary tokens |
-| Inline hex | [`CallScreen.CallArea.tsx`](app/components/call/CallScreen.CallArea.tsx) | CSS variables or semantic tokens |
 | Raw `font-Zilla-Slab text-*` on routes | list pages, auth links | `Heading` / `Text` with `branded` |
 
 ---
@@ -163,7 +162,7 @@ The repo has a solid primitive layer in [`app/components/ui/`](app/components/ui
 | Domain | ~Files | DS adoption | Notable gaps |
 |--------|--------|-------------|--------------|
 | `campaign/` | 36 | mixed | script builder, settings, results |
-| `call/`, `calls/` | 17 | low | inline hex in CallArea |
+| `call/`, `calls/` | 17 | medium | overlays were hand-rolled (now `Dialog` on Header); status colors on semantic tokens |
 | `workspace/` | 8 | high | — |
 | `sms-ui/` | 6 | mixed | ChatHeader bespoke menus |
 | `phone-numbers/` | 10 | medium | NumbersTable raw `<table>` |
@@ -178,7 +177,7 @@ The repo has a solid primitive layer in [`app/components/ui/`](app/components/ui
 | `CampaignSettings` | campaign | campaign settings route | partial |
 | `CampaignHomeScreen` | campaign | campaign home | partial |
 | `CallScreen.*` | call | call route | low |
-| `SoftphonePanel` | calls | calls route | CustomCard import |
+| `SoftphonePanel` | calls | calls route | `BrandedCard` (was CustomCard) |
 | `NumbersTable` | phone-numbers | settings/numbers | raw table |
 | `QueueTable` | queue | queue route | DataTable-like custom |
 | `ContactsPage` | contact | contacts route | high |
