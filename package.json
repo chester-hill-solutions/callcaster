@@ -56,8 +56,8 @@
     "test:e2e:server": "node scripts/e2e/start-e2e-server.mjs"
   },
   "dependencies": {
-    "@chester-hill-solutions/scriptkit-call-script-core": "file:../chester-hill-solutions/packages/scriptkit-call-script-core",
-    "@chester-hill-solutions/scriptkit-call-script-react": "file:../chester-hill-solutions/packages/scriptkit-call-script-react",
+    "@chester-hill-solutions/scriptkit-call-script-core": "file:vendor/scriptkit/scriptkit-call-script-core",
+    "@chester-hill-solutions/scriptkit-call-script-react": "file:vendor/scriptkit/scriptkit-call-script-react",
     "@electric-sql/pglite": "^0.2.15",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-checkbox": "^1.1.1",

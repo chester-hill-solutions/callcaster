@@ -1,0 +1,33 @@
+.call-script-root {
+  --call-script-border: #d4d4d8;
+  --call-script-muted: #71717a;
+  --call-script-accent: #2563eb;
+  font-family: system-ui, sans-serif;
+}
+
+.call-script-editor,
+.call-script-runner {
+  display: grid;
+  gap: 1rem;
+}
+
+.call-script-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.call-script-block {
+  border: 1px solid var(--call-script-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.call-script-block--active {
+  border-color: var(--call-script-accent);
+}
+
+.call-script-muted {
+  color: var(--call-script-muted);
+  font-size: 0.875rem;
+}
