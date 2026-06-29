@@ -13,8 +13,21 @@ const mocks = vi.hoisted(() => {
       SUPABASE_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
+    callFindFirst: vi.fn(async () => null),
+    callInsert: vi.fn(async () => []),
+    callUpdate: vi.fn(async () => []),
   };
 });
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => ({
+    call: {
+      findFirst: (...args: unknown[]) => mocks.callFindFirst(...args),
+      insert: (...args: unknown[]) => mocks.callInsert(...args),
+      update: (...args: unknown[]) => mocks.callUpdate(...args),
+    },
+  })),
+}));
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
@@ -45,6 +58,12 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     mocks.safeParseJson.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
+    mocks.callFindFirst.mockReset();
+    mocks.callInsert.mockReset();
+    mocks.callUpdate.mockReset();
+    mocks.callFindFirst.mockResolvedValue(null);
+    mocks.callInsert.mockResolvedValue([]);
+    mocks.callUpdate.mockResolvedValue([]);
     vi.resetModules();
   });
 
@@ -70,9 +89,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       throw new Error(`unexpected rpc ${fn}`);
     });
 
-    const upsertSelect = vi.fn(async () => ({ error: null }));
     supabase.from.mockImplementation((table: string) => {
-      if (table === "call") return { upsert: () => ({ select: upsertSelect }) };
       throw new Error(`unexpected table ${table}`);
     });
 
@@ -103,7 +120,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     expect(res.status).toEqual(expect.any(Number));
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(twilioCallsCreate).toHaveBeenCalled();
-    expect(upsertSelect).toHaveBeenCalled();
+    expect(mocks.callInsert).toHaveBeenCalled();
     expect(supabase.removeChannel).toHaveBeenCalled();
   });
 
@@ -120,9 +137,8 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       if (fn === "dequeue_contact") return { data: {}, error: null };
       throw new Error(`unexpected rpc ${fn}`);
     });
-    supabase.from.mockImplementation((table: string) => {
-      if (table === "call") return { upsert: () => ({ select: async () => ({ error: null }) }) };
-      throw new Error(`unexpected table ${table}`);
+    supabase.from.mockImplementation(() => {
+      throw new Error("unexpected supabase.from during saveCallToDatabase sid-missing test");
     });
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.safeParseJson.mockResolvedValueOnce({
@@ -267,12 +283,9 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       ),
     ).rejects.toThrow("oa");
 
-    // saveCallToDatabase: shapes optional fields and logs on upsert error
-    const upsertSelect = vi.fn(async () => ({ error: new Error("ins") }));
+    // saveCallToDatabase: shapes optional fields and logs on persistence error
     await helpers.saveCallToDatabase(
-      {
-        from: () => ({ upsert: () => ({ select: upsertSelect }) }),
-      } as any,
+      "w1",
       {
         sid: "CA1",
         to: "",
@@ -284,10 +297,20 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
         price: 0.5 as any,
         campaign_id: 0 as any,
         contact_id: 0 as any,
-        workspace: "",
         outreach_attempt_id: 0 as any,
         conference_id: "",
-      } as any,
+      },
+      {
+        tdb: {
+          call: {
+            findFirst: vi.fn(async () => null),
+            insert: vi.fn(async () => {
+              throw new Error("ins");
+            }),
+            update: vi.fn(),
+          },
+        } as any,
+      },
     );
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Error saving the call to the database:",

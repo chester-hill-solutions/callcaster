@@ -49,8 +49,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       .select("type")
       .eq("id", Number(selected_id))
       .single(),
-    fetchQueueCounts(supabaseClient, selected_id),
-    fetchCampaignData(supabaseClient, selected_id),
+    fetchQueueCounts({ workspaceId: workspace_id, campaignId: selected_id, supabaseClient }),
+    fetchCampaignData({ workspaceId: workspace_id, campaignId: selected_id }),
     getUserRole({ supabaseClient, user, workspaceId: workspace_id }),
   ]);
   if (!campaignType || !campaignType.data) {
@@ -63,17 +63,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
 
-  const campaignDetails = await fetchCampaignDetails(
-    supabaseClient,
-    selected_id,
-    workspace_id,
-    campaignTable,
-  );
+  const campaignDetails = await fetchCampaignDetails({
+    workspaceId: workspace_id,
+    campaignId: selected_id,
+  });
 
-  const resultsPromise = fetchBasicResults(
+  const resultsPromise = fetchBasicResults({
+    workspaceId: workspace_id,
+    campaignId: selected_id,
     supabaseClient,
-    selected_id,
-  ) as unknown as {
+  }) as unknown as {
     disposition: string;
     count: number;
     average_call_duration: string;

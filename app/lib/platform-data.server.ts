@@ -320,12 +320,12 @@ export async function getCampaignDetailApi(
   campaignId: string,
   workspaceId: string,
 ) {
-  const campaign = await fetchCampaignData(supabase, campaignId);
+  const campaign = await fetchCampaignData({ workspaceId, campaignId });
   if (!campaign || campaign.workspace !== workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
-  const queueCounts = await fetchQueueCounts(supabase, campaignId);
+  const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabase });
   let details: unknown = null;
   if (
     campaign.type &&
@@ -334,15 +334,10 @@ export async function getCampaignDetailApi(
       campaign.type,
     )
   ) {
-    const tableKey = getCampaignTableKey(
-      campaign.type as Exclude<Campaign["type"], "email" | null>,
-    );
-    details = await fetchCampaignDetails(
-      supabase,
-      campaignId,
+    details = await fetchCampaignDetails({
       workspaceId,
-      tableKey,
-    );
+      campaignId,
+    });
   }
 
   return {
@@ -360,7 +355,7 @@ export async function duplicateCampaignApi(
   campaignId: string,
   workspaceId: string,
 ) {
-  const campaign = await fetchCampaignData(supabase, campaignId);
+  const campaign = await fetchCampaignData({ workspaceId, campaignId });
   if (!campaign || campaign.workspace !== workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
@@ -405,12 +400,10 @@ export async function duplicateCampaignApi(
     const tableKey = getCampaignTableKey(
       campaign.type as Exclude<Campaign["type"], "email" | null>,
     );
-    const details = await fetchCampaignDetails(
-      supabase,
-      campaignId,
+    const details = await fetchCampaignDetails({
       workspaceId,
-      tableKey,
-    );
+      campaignId,
+    });
 
     if (details) {
       const { campaign_id: _detailCampaignId, ...detailRest } = details as Record<
@@ -499,7 +492,7 @@ export async function transitionCampaignStatusApi(
       return { ok: false as const, error: detailError.message, status: 500 };
     }
 
-    const queueCounts = await fetchQueueCounts(supabase, campaignId);
+    const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabase });
     const readiness = getCampaignReadiness(
       campaignRecord as Campaign,
       campaignDetails,
@@ -547,7 +540,7 @@ export async function getCampaignQueueApi(
   workspaceId: string,
   searchParams: URLSearchParams,
 ) {
-  const campaign = await fetchCampaignData(supabase, campaignId);
+  const campaign = await fetchCampaignData({ workspaceId, campaignId });
   if (!campaign || campaign.workspace !== workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
@@ -618,7 +611,7 @@ export async function patchCampaignQueueApi(
   workspaceId: string,
   body: PatchCampaignQueueBody,
 ) {
-  const campaign = await fetchCampaignData(supabase, campaignId);
+  const campaign = await fetchCampaignData({ workspaceId, campaignId });
   if (!campaign || campaign.workspace !== workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }

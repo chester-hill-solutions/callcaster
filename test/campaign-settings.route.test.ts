@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => {
     parseActionRequest: vi.fn(),
     updateCampaign: vi.fn(),
     fetchCampaignAudience: vi.fn(),
+    fetchCampaignDetails: vi.fn(),
     fetchQueueCounts: vi.fn(),
-    getCampaignTableKey: vi.fn(),
     getSignedUrls: vi.fn(),
     logger: {
       debug: vi.fn(),
@@ -29,8 +29,8 @@ vi.mock("@/lib/supabase.server", () => ({
 
 vi.mock("@/lib/database.server", () => ({
   fetchCampaignAudience: (...args: any[]) => mocks.fetchCampaignAudience(...args),
+  fetchCampaignDetails: (...args: any[]) => mocks.fetchCampaignDetails(...args),
   fetchQueueCounts: (...args: any[]) => mocks.fetchQueueCounts(...args),
-  getCampaignTableKey: (...args: any[]) => mocks.getCampaignTableKey(...args),
   getSignedUrls: (...args: any[]) => mocks.getSignedUrls(...args),
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
@@ -91,19 +91,6 @@ function makeSupabaseForSettingsRoute(options?: {
         };
       }
 
-      if (table === "message_campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({ data: details, error: null }),
-              }),
-            }),
-          }),
-          insert: async () => ({ data: null, error: null }),
-        };
-      }
-
       if (table === "campaign_queue") {
         return {
           select: () => ({
@@ -127,12 +114,16 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.parseActionRequest.mockReset();
     mocks.updateCampaign.mockReset();
     mocks.fetchCampaignAudience.mockReset();
+    mocks.fetchCampaignDetails.mockReset();
     mocks.fetchQueueCounts.mockReset();
-    mocks.getCampaignTableKey.mockReset();
     mocks.getSignedUrls.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
-    mocks.getCampaignTableKey.mockReturnValue("message_campaign");
+    mocks.fetchCampaignDetails.mockResolvedValue({
+      campaign_id: 99,
+      body_text: "Hello",
+      message_media: [],
+    });
   });
 
   test("blocks invalid start requests with the shared readiness message", async () => {

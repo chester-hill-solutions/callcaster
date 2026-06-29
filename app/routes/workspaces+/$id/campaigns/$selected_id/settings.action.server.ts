@@ -16,7 +16,7 @@ import { data as routeData, redirect } from "react-router";
 import { normalizeCampaignData } from "@/lib/campaign-settings";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
-import { fetchQueueCounts, parseActionRequest, updateCampaign } from "@/lib/database.server";
+import { fetchCampaignDetails, fetchQueueCounts, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -194,21 +194,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
             );
           }
 
-          const detailTable = getCampaignTableKey(
-            campaignRecord.type as Exclude<Campaign["type"], "email" | null>,
-          );
-          const { data: campaignDetails, error: detailError } = await supabaseClient
-            .from(detailTable)
-            .select("*")
-            .eq("campaign_id", Number(selected_id))
-            .eq("workspace", workspace_id)
-            .maybeSingle();
+          const campaignDetails = await fetchCampaignDetails({
+            workspaceId: workspace_id,
+            campaignId: selected_id,
+          });
 
-          if (detailError) {
-            throw detailError;
-          }
-
-          const queueCounts = await fetchQueueCounts(supabaseClient, selected_id);
+          const queueCounts = await fetchQueueCounts({
+            workspaceId: workspace_id,
+            campaignId: selected_id,
+            supabaseClient,
+          });
           const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as CampaignDetails, {
             queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
           });

@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { CALL_WITH_CAMPAIGN_SCRIPT_SELECT, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { redirect } from "react-router";
@@ -22,7 +23,7 @@ const getCallWithRetry = async (
 ) => {
   const { data, error } = await supabase
     .from("call")
-    .select("*, campaign(*, ivr_campaign(*, script(*)))")
+    .select(CALL_WITH_CAMPAIGN_SCRIPT_SELECT)
     .eq("sid", callSid)
     .single();
 
@@ -61,7 +62,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   try {
     const callData = await getCallWithRetry(supabase, callSid);
-    const script = callData.campaign?.ivr_campaign?.[0]?.script?.steps as
+    const script = ivrScriptStepsFromCampaign(callData.campaign) as
       | IvrScriptSteps
       | null
       | undefined;

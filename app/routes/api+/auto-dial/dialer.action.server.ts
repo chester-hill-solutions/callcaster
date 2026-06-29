@@ -109,7 +109,7 @@ export const action = async ({ request }: { request: Request }) => {
         conference_id: user_id,
       };
 
-      await saveCallToDatabase(supabase, callData as unknown as Partial<Call>);
+      await saveCallToDatabase(workspace_id, callData as unknown as Partial<Call>);
       supabase.removeChannel(realtime);
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },

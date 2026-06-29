@@ -4,6 +4,28 @@ vi.mock("@/lib/logger.server", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+const tenantDbMocks = vi.hoisted(() => ({
+  fetchCampaignWithScriptForWorkspace: vi.fn(),
+  outreachFindMany: vi.fn(),
+  callFindMany: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignWithScriptForWorkspace: (...args: unknown[]) =>
+    tenantDbMocks.fetchCampaignWithScriptForWorkspace(...args),
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => ({
+    outreach_attempt: {
+      findMany: (...args: unknown[]) => tenantDbMocks.outreachFindMany(...args),
+    },
+    call: {
+      findMany: (...args: unknown[]) => tenantDbMocks.callFindMany(...args),
+    },
+  })),
+}));
+
 import {
   getCallScreenData,
   getInitialCallsList,
@@ -105,6 +127,8 @@ describe("call-screen.server", () => {
   });
 
   test("getCallScreenData throws when any query errors", async () => {
+    tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockRejectedValue(new Error("boom"));
+    tenantDbMocks.outreachFindMany.mockResolvedValue([]);
     let queueEqCalls = 0;
     const supabase = {
       from: vi.fn((table: string) => {
@@ -116,17 +140,8 @@ describe("call-screen.server", () => {
                 if (queueEqCalls === 1) {
                   return Promise.resolve({ count: 0, error: null });
                 }
-                return {
-                  or: vi.fn().mockResolvedValue({ count: 0, error: null }),
-                };
+                return applyCompletedCountQuery();
               }),
-            })),
-          };
-        }
-        if (table === "outreach_attempt") {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn().mockReturnThis(),
             })),
           };
         }
@@ -145,16 +160,27 @@ describe("call-screen.server", () => {
     );
   });
 
+  function applyCompletedCountQuery() {
+    return {
+      or: vi.fn().mockResolvedValue({ count: 4, error: null }),
+    };
+  }
+
   test("getCallScreenData returns aggregated loader data", async () => {
+    tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockResolvedValue({
+      id: 1,
+      script: null,
+    });
+    tenantDbMocks.outreachFindMany.mockResolvedValue([]);
+    tenantDbMocks.callFindMany.mockResolvedValue([]);
+
     const queueSelect = vi
       .fn()
       .mockReturnValueOnce({
         eq: vi.fn().mockResolvedValue({ count: 10, error: null }),
       })
       .mockReturnValueOnce({
-        eq: vi.fn().mockReturnValue({
-          or: vi.fn().mockResolvedValue({ count: 4, error: null }),
-        }),
+        eq: vi.fn().mockReturnValue(applyCompletedCountQuery()),
       });
 
     const supabase = {
@@ -162,23 +188,11 @@ describe("call-screen.server", () => {
         if (table === "campaign_queue") {
           return { select: queueSelect };
         }
-        if (table === "outreach_attempt") {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn().mockReturnThis(),
-            })),
-          };
-        }
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               single: vi.fn().mockResolvedValue({
-                data:
-                  table === "workspace"
-                    ? { id: "ws-1" }
-                    : table === "campaign"
-                      ? { id: 1 }
-                      : { campaign_id: 1, script: null },
+                data: table === "workspace" ? { id: "ws-1" } : null,
                 error: null,
               }),
             })),
@@ -190,7 +204,7 @@ describe("call-screen.server", () => {
 
     const result = await getCallScreenData(supabase as never, "1", "ws-1", "user-1");
     expect(result.workspaceData).toEqual({ id: "ws-1" });
-    expect(result.campaign).toEqual({ id: 1 });
+    expect(result.campaign).toEqual({ id: 1, script: null });
     expect(result.audiences).toEqual([{ id: "aud-1" }]);
     expect(result.queueCount).toBe(10);
     expect(result.completedCount).toBe(4);

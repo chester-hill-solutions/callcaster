@@ -6,6 +6,7 @@ import { env } from "@/lib/env.server";
 import { getServiceSupabase } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import Twilio from "twilio";
@@ -19,11 +20,13 @@ const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>
     return data;
 };
 
-const fetchCampaignData = async (campaignId: string) => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase.from('campaign').select('voicemail_file, group_household_queue, caller_id').eq('id', Number(campaignId)).single();
-    if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
-    return data;
+const fetchCampaignData = async (campaignId: string, workspaceId: string) => {
+  const row = await fetchCampaignByIdForWorkspace(workspaceId, campaignId);
+  return {
+    voicemail_file: row.voicemail_file,
+    group_household_queue: row.group_household_queue,
+    caller_id: row.caller_id,
+  };
 };
 
 const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) => {
@@ -184,7 +187,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
             });
         }
         const dbCall = await fetchCallData(callSid);
-        const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '');
+        const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
 
         if (await checkUserDevices(dbCall.contact_id?.toString() ?? '', conferenceName, called, campaign.caller_id?.toString() ?? '')) {
             return await handleDeviceCheck(dbCall);
@@ -201,7 +204,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
 
             if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
                 //This is an answering machine
-                const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '');
+                const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
                 const signedUrl = await getVoicemailSignedUrl(dbCall.workspace?.toString() ?? '', campaign.voicemail_file?.toString() ?? '');
                 const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id?.toString() ?? '', { disposition: 'voicemail' });
                 supabase.removeChannel(realtime);

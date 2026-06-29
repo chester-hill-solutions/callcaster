@@ -8,8 +8,18 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     fetch: vi.fn(async () => ({ ok: true })),
+    fetchCampaignByIdForWorkspace: vi.fn(async () => ({
+      voicemail_file: "vm.mp3",
+      group_household_queue: true,
+      caller_id: "+1555",
+    })),
   };
 });
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignByIdForWorkspace: (...args: unknown[]) =>
+    mocks.fetchCampaignByIdForWorkspace(...args),
+}));
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
@@ -89,6 +99,12 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.logger.error.mockReset();
     mocks.fetch.mockClear();
+    mocks.fetchCampaignByIdForWorkspace.mockReset();
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_file: "vm.mp3",
+      group_household_queue: true,
+      caller_id: "+1555",
+    });
     vi.stubGlobal("fetch", mocks.fetch);
     vi.resetModules();
   });
@@ -354,6 +370,11 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("machine answer: conferences empty + fallbacks + campaign_queue dequeue success", async () => {
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_file: "vm.mp3",
+      group_household_queue: null,
+      caller_id: null,
+    });
     const updateCallTwiml = vi.fn(async () => ({}));
     const twilio = {
       calls: (_sid: string) => ({ update: updateCallTwiml }),
@@ -372,10 +393,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
             eq: () => ({
               single: async () => ({
                 data: {
-                  campaign_id: null,
-                  outreach_attempt_id: null,
-                  contact_id: null,
-                  workspace: null,
+                  campaign_id: 1,
+                  outreach_attempt_id: 1,
+                  contact_id: 2,
+                  workspace: "w1",
                   conference_id: "u1",
                 },
                 error: null,
@@ -846,6 +867,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("machine answer: campaign fetch error is caught", async () => {
+    mocks.fetchCampaignByIdForWorkspace.mockRejectedValueOnce(new Error("camp"));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ update: vi.fn() }),
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
@@ -920,6 +942,11 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("machine answer: group_household_queue=false uses campaign_queue update and handles its error", async () => {
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValueOnce({
+      voicemail_file: "vm.mp3",
+      group_household_queue: false,
+      caller_id: "+1555",
+    });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ update: vi.fn() }),
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),

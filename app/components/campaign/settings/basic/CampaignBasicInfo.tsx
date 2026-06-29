@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Campaign, Flags, WorkspaceNumbers } from "@/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
-import SelectPhase from "./CampaignBasicInfo.SelectPhase";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
 
@@ -165,13 +164,6 @@ export const CampaignBasicInfo = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
           <SelectType
-            campaignData={campaignData}
-            handleInputChange={(name, value) =>
-              handleInputChange(name, typeof value === "boolean" ? (value ? 1 : 0) : value as string | number | null)
-            }
-          />
-
-          <SelectPhase
             campaignData={campaignData}
             handleInputChange={(name, value) =>
               handleInputChange(name, typeof value === "boolean" ? (value ? 1 : 0) : value as string | number | null)

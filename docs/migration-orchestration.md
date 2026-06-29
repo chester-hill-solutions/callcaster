@@ -21,11 +21,11 @@ Railway-first schema cleanup and full v2 stack on staging; single big-bang produ
 
 | Phase | Status | Blocker |
 |-------|--------|---------|
-| 0 — Audit & compose | **Done** | Ledger 34/34 on PostgreSQL 18 |
-| 1 — Schema transform | **Mostly applied** | `schema.ts` synced (unified campaign); 06/07/09 sketches |
+| 0 — Audit & compose | **Done** | — |
+| 1 — Schema transform | **Mostly applied** | Transforms 06/07/09; introspect blocked |
 | 1D — Scriptkit packages | Not started | CHS monorepo upstream |
-| 2 — Drizzle port | **In progress** | `workspace`, `stripe`, `campaign`, `contact*` ported; remaining `app/lib/database/*` |
-| 3A–3F — Staging stack | Not started | Parallel with Phase 2 |
+| 2 — Drizzle port | **In progress** | See [`migration-delivery-board.md`](./migration-delivery-board.md) § Phase 2 |
+| 3A–3F — Staging stack | Not started | 3D.1 partial (Remix sms-status) |
 | 4 — Staging gate | Blocked | Phases 2–3 |
 | 5 — Prod cutover | Blocked | Phase 4 |
 | 6 — Docs cleanup | Not started | Phase 5 |
@@ -67,9 +67,4 @@ npm run typecheck && npm run lint && npm run test && npm run test:e2e
 
 ## Orchestrator next dispatch
 
-1. **WS-A:** Apply pending sketches `06`/`07`/`09` when SSE/worker tracks unblock.
-2. **WS-B:** Port remaining `app/lib/database/*` modules; retire subtype-table callers (`database.types` cleanup).
-3. **WS-C:** Delete Edge `sms-status`; repoint live Twilio callbacks to Remix handler.
-4. **WS-D:** Open CHS monorepo issue for scriptkit-survey packages.
-
-See [`migration-delivery-board.md`](./migration-delivery-board.md) for full task IDs and checkboxes.
+**Next 5 actions** and full task checkboxes: [`migration-delivery-board.md`](./migration-delivery-board.md).

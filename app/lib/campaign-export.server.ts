@@ -314,18 +314,19 @@ export async function processCallCampaignExport(
     if (campaignError || !campaignData) {
       throw new Error(campaignError?.message || "Campaign not found");
     }
-    const campaignTableKey = campaignData?.type === "live_call" ? "live_campaign" : "ivr_campaign";
-    const { data: scriptData, error: scriptError } = await supabaseClient
-      .from(campaignTableKey)
-      .select('id, script_id, script(*)')
-      .eq('campaign_id', campaignId)
+    // Campaign row includes joined script for live_call and IVR exports.
+    const { data: campaignWithScript, error: scriptError } = await supabaseClient
+      .from('campaign')
+      .select('id, title, start_date, end_date, type, status, script_id, script(*)')
+      .eq('id', campaignId)
+      .eq('workspace', workspaceId)
       .single();
     if (scriptError) {
       throw new Error(scriptError.message || "Error fetching script");
     }
-    
-    const script = castExportScript(scriptData?.script);
-    const campaign = campaignData as ExportCampaign;
+
+    const script = castExportScript(campaignWithScript?.script);
+    const campaign = (campaignWithScript ?? campaignData) as ExportCampaign;
     const scriptQuestions = extractScriptQuestions(script);
     const pages = Object.entries(script?.steps?.pages ?? {}).map(([pageId, pageData]) => ({
       id: pageId,

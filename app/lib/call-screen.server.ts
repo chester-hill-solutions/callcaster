@@ -1,11 +1,18 @@
 import {
-  COMPLETED_QUEUE_COUNT_FILTER,
+  applyQueueStatusFilter,
   isAssignedToUser,
   isQueued,
 } from "@/lib/queue-status";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { OutreachAttempt, QueueItem } from "@/lib/types";
 import { logger } from "@/lib/logger.server";
+import { fetchCampaignWithScriptForWorkspace } from "@/lib/campaign-ivr.server";
+import {
+  call as callTable,
+  outreach_attempt as outreachAttemptTable,
+} from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
+import { and, eq, inArray } from "drizzle-orm";
 
 export async function getCallScreenData(
   supabase: SupabaseClient,
@@ -13,57 +20,76 @@ export async function getCallScreenData(
   workspaceId: string,
   userId: string,
 ) {
+  const tdb = createTenantDb(workspaceId);
+  const campaignIdNum = parseInt(campaignId);
+
   const [
     workspaceData,
-    campaign,
-    campaignDetails,
+    campaignWithScript,
     audiences,
     queueCount,
     completedCount,
-    attempts,
+    attemptRows,
   ] = await Promise.all([
     supabase.from("workspace").select("*").eq("id", workspaceId).single(),
-    supabase.from("campaign").select().eq("id", parseInt(campaignId)).single(),
-    supabase.from("campaign").select(`*, script:script(*)`).eq("id", parseInt(campaignId)).single(),
-    supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: parseInt(campaignId) }),
+    fetchCampaignWithScriptForWorkspace(workspaceId, campaignIdNum).catch((error) => {
+      logger.error("Error fetching campaign data:", error);
+      return null;
+    }),
+    supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: campaignIdNum }),
     supabase
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
-      .eq("campaign_id", parseInt(campaignId)),
-    supabase
-      .from("campaign_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", parseInt(campaignId))
-      .or(COMPLETED_QUEUE_COUNT_FILTER),
-    supabase
-      .from("outreach_attempt")
-      .select(`*, call:call(*)`)
-      .eq("campaign_id", parseInt(campaignId))
-      .eq("user_id", userId),
+      .eq("campaign_id", campaignIdNum),
+    applyQueueStatusFilter(
+      supabase
+        .from("campaign_queue")
+        .select("id", { count: "exact", head: true })
+        .eq("campaign_id", campaignIdNum),
+      "completed",
+    ),
+    tdb.outreach_attempt.findMany({
+      where: and(
+        eq(outreachAttemptTable.campaign_id, campaignIdNum),
+        eq(outreachAttemptTable.user_id, userId),
+      ),
+    }),
   ]);
+
+  let attempts: OutreachAttempt[] = [];
+  if (attemptRows.length > 0) {
+    const attemptIds = attemptRows.map((row) => row.id);
+    const callRows = await tdb.call.findMany({
+      where: inArray(callTable.outreach_attempt_id, attemptIds),
+    });
+    attempts = attemptRows.map((attempt) => ({
+      ...attempt,
+      call: callRows.filter((call) => call.outreach_attempt_id === attempt.id),
+    })) as OutreachAttempt[];
+  }
 
   const errors = [
     workspaceData.error,
-    campaign.error,
-    campaignDetails.error,
+    campaignWithScript ? null : new Error("Campaign not found"),
     audiences.error,
     queueCount.error,
     completedCount.error,
-    attempts.error,
   ].filter(Boolean);
 
   if (errors.length) {
     logger.error("Error fetching campaign data:", errors);
     throw new Error("Error fetching campaign data");
   }
+
+  const campaign = campaignWithScript!;
   return {
     workspaceData: workspaceData.data,
-    campaign: campaign.data,
-    campaignDetails: campaignDetails.data,
+    campaign,
+    campaignDetails: campaign,
     audiences: audiences.data,
     queueCount: queueCount.count,
     completedCount: completedCount.count,
-    attempts: attempts.data,
+    attempts,
   };
 }
 

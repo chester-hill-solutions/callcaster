@@ -145,11 +145,6 @@ export async function handleNewCampaign({
 }: NewCampaignParams) {
   const newCampaignName = formData.get("campaign-name") as string;
   const newCampaignType = formData.get("campaign-type") as CampaignType;
-  const phaseRaw = formData.get("campaign-phase");
-  const newCampaignPhase =
-    phaseRaw === "persuasion" || phaseRaw === "gotv"
-      ? (phaseRaw as "persuasion" | "gotv")
-      : "identification";
   logger.debug("Campaign Type: ", newCampaignType);
 
   const { start_date, end_date } = getDefaultCampaignDates();
@@ -172,7 +167,6 @@ export async function handleNewCampaign({
       workspace: workspaceId,
       status: "draft",
       type: newCampaignType,
-      phase: newCampaignPhase,
       start_date,
       end_date,
       schedule: DEFAULT_WEEKDAY_CALLING_SCHEDULE,
@@ -190,32 +184,6 @@ export async function handleNewCampaign({
     }
     return routeData(
       { campaignData: null, error: campaignError },
-      { headers },
-    );
-  }
-
-  const tableKey = newCampaignType === "live_call" ? "live_campaign" : 
-                   newCampaignType === "message" ? "message_campaign" :
-                   newCampaignType === "robocall" ? "ivr_campaign" : null;
-
-  if (!tableKey) {
-    return routeData(
-      { campaignData: null, error: "Invalid campaign type" },
-      { headers },
-    );
-  }
-
-  const { error: detailsError } = await supabaseClient
-    .from(tableKey)
-    .insert({ campaign_id: campaignData.id, workspace: workspaceId });
-
-  if (detailsError) {
-    logger.error(
-      "Campaign details insert failed; redirecting to settings for lazy repair",
-      detailsError,
-    );
-    return redirect(
-      `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
       { headers },
     );
   }

@@ -148,7 +148,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
         b1: { id: "b1", type: "recorded", audioFile: "a.mp3", options: [{ value: "1", next: "hangup" }] },
       },
     };
-    const campaignData = { workspace: "w1", ivr_campaign: [{ script: { steps: script } }] };
+    const campaignData = { workspace: "w1", script: { steps: script } };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(await mod.action({
@@ -170,7 +170,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
         b3: { id: "b3", type: "say", audioFile: "three" },
       },
     };
-    const campaignData = { workspace: "w1", ivr_campaign: [{ script: { steps: script } }] };
+    const campaignData = { workspace: "w1", script: { steps: script } };
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
@@ -203,7 +203,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   });
 
   test("catch logs and says generic error on invalid script or signed url error", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", ivr_campaign: [{ script: { steps: null } }] } }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", script: { steps: null } } }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -215,7 +215,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       pages: { page_1: { blocks: ["b1"] } },
       blocks: { b1: { id: "b1", type: "recorded", audioFile: "a.mp3" } },
     };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", ivr_campaign: [{ script: { steps: script } }] }, signedUrlError: new Error("sig") }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", script: { steps: script } }, signedUrlError: new Error("sig") }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),

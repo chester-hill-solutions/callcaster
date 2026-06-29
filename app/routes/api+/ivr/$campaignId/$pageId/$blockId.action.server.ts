@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
@@ -10,16 +11,6 @@ interface Script {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<string, { id: string; type: string; audioFile: string; options?: Array<{ value: string; next?: string }> }>;
 }
-
-const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
-  const { data: campaign, error } = await supabase
-    .from("campaign")
-    .select(`*, ivr_campaign(*, script(*))`)
-    .eq("id", Number(campaign_id))
-    .single();
-  if (error) throw error;
-  return campaign;
-};
 
 const handleAudio = async (supabase: SupabaseClient<Database>, twiml: Twilio.twiml.VoiceResponse, block: { type: string; audioFile: string }, workspace: string) => {
   const { type, audioFile } = block;
@@ -150,8 +141,8 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   }
 
   try {
-    const campaignData = await getCampaignData(supabase, campaignId);
-    const script = (campaignData.ivr_campaign[0]?.script?.steps as unknown) as Script;
+    const campaignData = await fetchCampaignWithScript(supabase, campaignId);
+    const script = ivrScriptStepsFromCampaign(campaignData) as Script;
     if (!script || !script.blocks || !script.pages) {
       throw new Error("Invalid script structure");
     }

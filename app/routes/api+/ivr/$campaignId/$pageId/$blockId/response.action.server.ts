@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { redirect } from "react-router";
@@ -6,16 +7,6 @@ import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
-
-const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
-  const { data: campaign, error } = await supabase
-    .from("campaign")
-    .select(`*, ivr_campaign(*, script(*))`)
-    .eq("id", Number(campaign_id))
-    .single();
-  if (error) throw error;
-  return campaign;
-};
 
 const getOutreach = async (supabase: SupabaseClient<Database>, outreachId: number) => {
   const { data, error } = await supabase
@@ -161,14 +152,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   try {
     const [{ data: call }, campaignData] = await Promise.all([
       supabase.from("call").select("*").eq("sid", callSid).single(),
-      getCampaignData(supabase, campaignId),
+      fetchCampaignWithScript(supabase, campaignId),
     ]);
 
     if (!call) {
       throw new Error("Call not found");
     }
 
-    const stepsValue = campaignData.ivr_campaign[0]?.script?.steps;
+    const stepsValue = ivrScriptStepsFromCampaign(campaignData);
     if (!stepsValue) {
       throw new Error("Script steps not found");
     }

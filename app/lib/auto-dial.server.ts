@@ -1,11 +1,12 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance, safeParseJson } from "@/lib/database.server";
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
 import type { Call } from '@/lib/types';
-import type { Database } from '@/lib/database.types';
 import type TwilioSDK from "twilio";
+import { call as callTable } from "@/db/schema";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { eq } from "drizzle-orm";
 
 type TwilioClient = TwilioSDK.Twilio;
 
@@ -62,27 +63,19 @@ export async function createTwilioCall(
   });
 }
 
-export async function saveCallToDatabase(
-  supabase: SupabaseClient<Database>,
-  callData: Partial<Call>
-) {
-  if (!callData.sid) {
-    logger.error("Cannot save call without sid");
-    return;
-  }
-  
-  const insertData: Database['public']['Tables']['call']['Insert'] = {
-    sid: callData.sid,
+function buildCallRow(callData: Partial<Call>) {
+  return {
+    sid: callData.sid!,
     account_sid: callData.account_sid || null,
     to: callData.to || null,
     from: callData.from || null,
-    status: (callData.status as Database['public']['Enums']['call_status']) || null,
+    status: callData.status || null,
     start_time: callData.start_time ? new Date(callData.start_time).toISOString() : null,
     end_time: callData.end_time ? new Date(callData.end_time).toISOString() : null,
     duration: callData.duration ? String(callData.duration) : null,
     price: callData.price ? String(callData.price) : null,
     direction: callData.direction || null,
-    answered_by: (callData.answered_by as Database['public']['Enums']['answered_by']) || null,
+    answered_by: callData.answered_by || null,
     api_version: callData.api_version || null,
     forwarded_from: callData.forwarded_from || null,
     group_sid: callData.group_sid || null,
@@ -90,18 +83,48 @@ export async function saveCallToDatabase(
     uri: callData.uri || null,
     campaign_id: callData.campaign_id || null,
     contact_id: callData.contact_id || null,
-    workspace: callData.workspace || null,
     outreach_attempt_id: callData.outreach_attempt_id || null,
     conference_id: callData.conference_id || null,
     phone_number_sid: callData.phone_number_sid || null,
     parent_call_sid: callData.parent_call_sid || null,
+    date_updated: callData.date_updated
+      ? new Date(callData.date_updated).toISOString()
+      : null,
   };
-  
-  const { error } = await supabase
-    .from("call")
-    .upsert(insertData)
-    .select();
-  if (error) logger.error("Error saving the call to the database:", error);
+}
+
+export async function saveCallToDatabase(
+  workspaceId: string,
+  callData: Partial<Call>,
+  options?: { tdb?: TenantDb },
+) {
+  if (!callData.sid) {
+    logger.error("Cannot save call without sid");
+    return;
+  }
+
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  const row = buildCallRow(callData);
+
+  try {
+    const existing = await tdb.call.findFirst({
+      where: eq(callTable.sid, callData.sid),
+    });
+    if (existing) {
+      await tdb.call.update({
+        set: row,
+        where: eq(callTable.sid, callData.sid),
+      });
+      return;
+    }
+    await tdb.call.insert({
+      ...row,
+      date_created: new Date().toISOString(),
+      is_last: false,
+    });
+  } catch (error) {
+    logger.error("Error saving the call to the database:", error);
+  }
 }
 
 export async function completeAllConferences(client: TwilioClient, user_id: string) {

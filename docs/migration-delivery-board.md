@@ -1,11 +1,23 @@
 # Migration delivery board
 
-Master checklist for the Supabase → Railway Postgres big-bang. Update status as work completes.
+Master checklist for the Supabase → Railway Postgres big-bang. **Update this file when migration tasks complete** (status, snapshot metrics, dispatch log).
 
 **Plan:** [`supabase-postgres-migration-plan.md`](./supabase-postgres-migration-plan.md)  
 **Orchestration:** [`migration-orchestration.md`](./migration-orchestration.md)  
 **Branch:** `feat/supabase-postgres-migration`  
-**Railway:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)
+**Railway:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
+**Last updated:** 2026-06-29
+
+### Snapshot (rolling)
+
+| Metric | Value | Gate |
+|--------|------:|------|
+| Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
+| `app/lib/database/*.server.ts` on tenant-db | **6 / 13** | G2 |
+| App routes with literal `supabase.from()` | **~14 route files** | G2 |
+| `database.types` imports in `app/` | **~168 files** | G2 (delete at exit) |
+| Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
+| E2E on review URL | Not run | G4 |
 
 ---
 
@@ -51,13 +63,13 @@ Master checklist for the Supabase → Railway Postgres big-bang. Update status a
 | 1.9 | `08-household-key.sql` | Done | WS-E |
 | 1.10 | `09-drop-legacy-presence.sql` | Done — guarded | WS-A + WS-C |
 | 1.11 | `10-verify.sql` | Done | WS-A |
-| 1.12 | Apply transform on Railway review | **Mostly done** | 06, 07, 09 pending |
+| 1.12 | Apply transform on Railway review | **Mostly done** | 01–05, 08, 08b, 10 applied; **06, 07, 09** pending (SSE/worker) |
 | 1.13 | `pg_dump --schema-only` → `drizzle/0000_baseline.sql` | Done | 6951 lines via `dump-baseline.sh` |
-| 1.14 | Regenerate `app/db/schema.ts` (introspect) | **Blocked** | drizzle-kit introspect JSON error on PG 18 — manual sync from baseline |
+| 1.14 | Regenerate `app/db/schema.ts` (introspect) | **Blocked** | drizzle-kit introspect JSON error on PG 18 — hand-synced from baseline |
 | 1.15 | Archive `supabase/migrations/` | Done | 34 files in `docs/archive/supabase-migrations/` |
-| 1.16 | Update `workspace-scoped-tables.ts` for new shape | Done | Dropped vestigial + subtype tables |
-| 2.0 | `stripe.server.ts` Drizzle port | Done | Pattern for workspace port |
-| 3D.1 | sms-status canonical on Remix | Done | `/api/sms/status`; new sends use BASE_URL |
+| 1.16 | Update `workspace-scoped-tables.ts` for new shape | Done | 22 scoped tables; vestigial + subtype tables removed |
+| 1.17 | App unified `campaign` runtime | **Done** | IVR Remix routes, export, create/settings flows; no subtype table writes |
+| 1.18 | `campaign-ivr.server.ts` + queue_state UI/stats | **Done** | Shared script helpers; `applyQueueStatusFilter` replaces dropped `status` column |
 
 ### Phase 1D — Scriptkit (WS-D, parallel)
 
@@ -76,21 +88,21 @@ Inventory: [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventor
 
 | ID | Module | Status | Owner |
 |----|--------|--------|-------|
-| 2.1 | `workspace.server.ts` | **In progress** | WS-B — follow stripe port pattern |
-| 2.2 | `campaign.server.ts` + `campaign-stats.server.ts` | Todo | WS-B |
-| 2.3 | Queue/dial stack | Todo | WS-B |
-| 2.4 | Contacts + audiences | Todo | WS-B |
-| 2.5 | Messaging + chats | Todo | WS-B |
-| 2.6 | Billing + ledger + RPC wrappers | Todo | WS-B |
-| 2.7 | Telephony adjunct | Todo | WS-B |
-| 2.8 | Twilio config modules | Todo | WS-B |
-| 2.9 | Platform facades | Todo | WS-B |
-| 2.10 | Route stragglers (12 files) | Todo | WS-B |
-| 2.11 | UI/hooks type cleanup (27 files) | Todo | WS-B |
-| 2.12 | Delete `database.types.ts` | Todo | WS-B |
-| 2.13 | E2E factories → Drizzle | Todo | WS-B |
+| 2.1 | `workspace.server.ts` | **Done** | Supabase retained for auth + RPCs only |
+| 2.2 | `campaign.server.ts` + `campaign-stats.server.ts` | **Done** | Tenant-db for campaign/message/script/outreach; Supabase for RPC + `campaign_queue` |
+| 2.3 | Queue/dial stack | **In progress** | Done: `call-screen`, `auto-dial` call persist, campaign reads, `$roomId` tenant-db campaign. Remaining: `$roomId`/`status`/`dial` call+outreach writes, `ivr-initiate` |
+| 2.4 | Contacts + audiences | **Done** | `contact.server.ts`, `contact-audience.server.ts` |
+| 2.5 | Messaging + chats | Todo | `workspace-conversations.server.ts`, `chat-sms`, SMS routes |
+| 2.6 | Billing + ledger + RPC wrappers | **Partial** | `stripe.server.ts` done; `transaction-history`, reconciliation remain |
+| 2.7 | Telephony adjunct | Todo | `agent-status`, handset, inbound queue |
+| 2.8 | Twilio config modules | Todo | 4× `workspace-twilio-*.server.ts` |
+| 2.9 | Platform facades | Todo | `platform-data.server.ts` (~39 `.from(` calls) |
+| 2.10 | Route stragglers | **In progress** | ~14 route files still use `supabase.from()` |
+| 2.11 | UI/hooks type cleanup | Todo | `LiveCampaign` / `IVRCampaign` / `MessageCampaign` in components |
+| 2.12 | Delete `database.types.ts` | Todo | ~168 imports remain |
+| 2.13 | E2E factories → Drizzle | Todo | `e2e/fixtures/factories.ts` still references subtype tables |
 
-**Progress:** 0 / 11 modules · 166 `database.types` imports remaining
+**Progress:** **4 done** · **2 in progress** · 7 todo (of 13 modules) · ~168 `database.types` imports
 
 ---
 
@@ -114,8 +126,8 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3C.4 | Port number_rental_billing handler | Todo | WS-C |
 | 3C.5 | Port billing_reconcile handler | Todo | WS-C |
 | 3C.6 | Port queue-next, audience-upload, active_change | Todo | WS-C |
-| 3D.1 | Port sms-status (canonical) | Todo | WS-C |
-| 3D.2 | Port ivr-flow, ivr-status, ivr-recording | Todo | WS-C |
+| 3D.1 | Port sms-status (canonical) | **Partial** | Remix `/api/sms/status` live; Edge `sms-status` not deleted |
+| 3D.2 | Port ivr-flow, ivr-status, ivr-recording | Todo | Edge still uses `ivr_campaign`; Remix IVR routes migrated |
 | 3D.3 | Port acd-router | Todo | WS-C |
 | 3D.4 | Repoint Twilio webhook URLs | Todo | WS-C |
 | 3D.5 | Deno tests → Vitest | Todo | WS-C |
@@ -190,11 +202,11 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. ~~Ledger · core transform · baseline · archive~~ ✓
-2. **Manual `schema.ts` sync** from review DB / `0000_baseline.sql` (introspect blocked)
-3. **WS-B 2.1** — port `workspace.server.ts` (stripe pattern landed)
-4. **3D cleanup** — remove Edge sms-status; repoint live Twilio callbacks via audit
-5. Sketches **06, 07, 09** when billing/twilio/SSE ready
+1. **WS-B 2.3** — Finish dial stack: tenant-db for `call` / `outreach_attempt` in auto-dial + dial routes
+2. **WS-B 2.5** — Port `workspace-conversations.server.ts` + messaging route stragglers
+3. **WS-B 2.8–2.9** — Twilio config modules + `platform-data.server.ts`
+4. **WS-C 3D** — Delete Edge `sms-status`; port Edge IVR handlers off subtype tables
+5. **WS-A 1.12** — Apply transform **06, 07, 09** when SSE/worker schema lands
 
 ---
 
@@ -206,3 +218,6 @@ gantt
 | 2026-06-29 | explore | [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md) |
 | 2026-06-29 | generalPurpose | `scripts/schema-transform/00`–`04` SQL |
 | 2026-06-29 | orchestrator | SQL `05`–`10`, delivery board, branch, inventories |
+| 2026-06-29 | agent | Unified campaign: IVR Remix routes, export, create flow, `campaign-ivr.server.ts` |
+| 2026-06-29 | agent | Phase 2 B1: `campaign-stats.server.ts` → tenant-db |
+| 2026-06-29 | agent | Phase 2 B2 (partial): `call-screen`, `auto-dial`, settings readiness fix |

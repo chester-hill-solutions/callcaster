@@ -94,7 +94,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
         status: 403,
       }),
     });
-    const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };
+    const callData = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }]));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
@@ -110,7 +110,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
 
     // success
-    const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };
+    const callData = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }]));
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -121,7 +121,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     expect(await res.text()).toContain("redirect:/api/ivr/1/page_1/b1");
 
     // page missing blocks => say+hangup
-    const callData2 = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: [] } } } } }] } };
+    const callData2 = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: [] } } } } } };
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData2, error: null }]));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
@@ -130,7 +130,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     expect(await res.text()).toContain("There was an error in the IVR flow");
 
     // invalid script => catch
-    const callData3 = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: null } }] } };
+    const callData3 = { workspace: "w1", campaign: { script: { steps: null } } };
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData3, error: null }]));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },

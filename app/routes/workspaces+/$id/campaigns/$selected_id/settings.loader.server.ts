@@ -41,7 +41,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     campaignCountResult,
     campaignStatusResult,
   ] = await Promise.all([
-    fetchCampaignAudience(supabaseClient, selected_id, workspace_id),
+    fetchCampaignAudience({
+      workspaceId: workspace_id,
+      campaignId: selected_id,
+      supabaseClient,
+    }),
     supabaseClient
       .from("campaign")
       .select("*")
@@ -118,11 +122,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     | null = null;
   if (campaignType?.type) {
     try {
-      campaignDetailsForReadiness = (await fetchCampaignDetails(
-        supabaseClient,
-        selected_id,
-        workspace_id,
-      )) as LiveCampaign | MessageCampaign | IVRCampaign | null;
+      campaignDetailsForReadiness = (await fetchCampaignDetails({
+        workspaceId: workspace_id,
+        campaignId: selected_id,
+      })) as LiveCampaign | MessageCampaign | IVRCampaign | null;
     } catch (detailsError) {
       logger.error("Failed to load campaign details for readiness", detailsError);
     }

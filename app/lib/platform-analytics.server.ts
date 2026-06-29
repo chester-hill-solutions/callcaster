@@ -115,8 +115,8 @@ export async function getCampaignResultsApi(
   });
 
   const [results, queueCounts] = await Promise.all([
-    fetchBasicResults(supabaseClient, campaignId),
-    fetchQueueCounts(supabaseClient, campaignId),
+    fetchBasicResults({ workspaceId, campaignId, supabaseClient }),
+    fetchQueueCounts({ workspaceId, campaignId, supabaseClient }),
   ]);
 
   return {

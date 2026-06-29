@@ -1,5 +1,6 @@
-import { Call, Campaign, IVRCampaign, OutreachAttempt, Script, type Block } from "@/lib/types";
+import { Call, Campaign, OutreachAttempt, Script, type Block } from "@/lib/types";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { resolveCampaignScript } from "@/lib/campaign-ivr.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
@@ -85,10 +86,10 @@ function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: 
     return null;
 }
 
-const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { ivr_campaign: IVRCampaign & { script: Script } }, supabase: SupabaseClient): Promise<void> => {
+const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { script: Script | Script[] | null }, supabase: SupabaseClient): Promise<void> => {
     const call = twilio.calls(callSid);
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
-    const scriptSteps = (campaign.ivr_campaign.script?.steps as unknown) as ScriptSteps | null | undefined;
+    const scriptSteps = (resolveCampaignScript(campaign)?.steps as unknown) as ScriptSteps | null | undefined;
     const step = findVoicemailPage(scriptSteps?.pages);
     if (!step) {
         await call.update({ twiml: hangupTwiml() });
@@ -155,7 +156,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         const { data: dbCall, error: callError } = await supabase
             .from('call')
-            .select('outreach_attempt_id, workspace, campaign(*, ivr_campaign(*, script(*)))')
+            .select('outreach_attempt_id, workspace, campaign(*, script:script(*))')
             .eq('sid', callSid)
             .single();
         if (callError) throw callError;
@@ -178,7 +179,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 twilio,
                 callSid,
                 dbCall as unknown as Call,
-                dbCall.campaign as unknown as Campaign & { ivr_campaign: IVRCampaign & { script: Script } },
+                dbCall.campaign as unknown as Campaign & { script: Script | Script[] | null },
                 supabase,
             );
         } else {

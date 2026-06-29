@@ -161,6 +161,8 @@ function makeSupabase(config: ExportSupabaseConfig) {
           const isExportQuery = qb.filters.some(
             (f) => f[0] === "eq" && f[1] === "workspace",
           );
+          const selectStr = String(qb.selectArgs[0] ?? "");
+          const wantsScript = selectStr.includes("script");
           if (isExportQuery) {
             if (config.campaignExportError) {
               return {
@@ -170,6 +172,21 @@ function makeSupabase(config: ExportSupabaseConfig) {
             }
             if (config.campaignExportMissing) {
               return { data: null, error: null };
+            }
+            if (wantsScript && config.scriptError != null) {
+              return { data: null, error: { message: config.scriptError } };
+            }
+            if (wantsScript) {
+              return {
+                data: {
+                  ...campaign,
+                  script:
+                    config.script === undefined
+                      ? { steps: { pages: {}, blocks: {} } }
+                      : config.script,
+                },
+                error: null,
+              };
             }
           }
 
@@ -230,20 +247,6 @@ function makeSupabase(config: ExportSupabaseConfig) {
           if (config.messagesError != null)
             return { data: null, error: { message: config.messagesError } };
           return { data: filteredMessages, error: null };
-        }
-
-        if (table === "live_campaign" || table === "ivr_campaign") {
-          if (config.scriptError != null)
-            return { data: null, error: { message: config.scriptError } };
-          return {
-            data: {
-              script:
-                config.script === undefined
-                  ? { steps: { pages: {}, blocks: {} } }
-                  : config.script,
-            },
-            error: null,
-          };
         }
 
         if (table === "outreach_attempt") {
@@ -1239,7 +1242,7 @@ describe("api.campaign-export", () => {
     );
   });
 
-  test("call export covers ivr_campaign selection and errors (script/count/calls)", async () => {
+  test("call export covers unified campaign script selection and errors (script/count/calls)", async () => {
     vi.useFakeTimers();
     const { supabaseClient } = makeSupabase({
       campaign: {

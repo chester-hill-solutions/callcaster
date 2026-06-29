@@ -234,7 +234,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     expect(body.error).toBe("An unexpected error occurred");
   });
 
-  test("handleNewCampaign covers duplicate-name, generic error, invalid type, details error, and success redirect", async () => {
+  test("handleNewCampaign covers duplicate-name, generic error, and success redirect", async () => {
     const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
 
@@ -243,7 +243,6 @@ describe("WorkspaceSelectedNewUtils", () => {
     fd.set("campaign-type", "live_call");
 
     const insertSingle = vi.fn();
-    const detailsInsert = vi.fn();
     const supabaseClient: any = {
       from: (table: string) => {
         if (table === "campaign") {
@@ -255,7 +254,7 @@ describe("WorkspaceSelectedNewUtils", () => {
             }),
           };
         }
-        return { insert: detailsInsert };
+        return { insert: vi.fn() };
       },
     };
 
@@ -267,27 +266,13 @@ describe("WorkspaceSelectedNewUtils", () => {
     const r2 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
     expect((await r2.json()).error).toMatchObject({ code: "X", message: "nope" });
 
-    const fdBad = new FormData();
-    fdBad.set("campaign-name", "C");
-    fdBad.set("campaign-type", "bad");
-    insertSingle.mockResolvedValueOnce({ data: { id: 1 }, error: null });
-    const r3 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fdBad, workspaceId: "w1", headers }));
-    expect((await r3.json()).error).toBe("Invalid campaign type");
-
     insertSingle.mockResolvedValueOnce({ data: { id: 2 }, error: null });
-    detailsInsert.mockResolvedValueOnce({ error: { message: "details" } });
-    const r4 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
-    expect(r4.status).toBe(302);
-    expect(r4.headers.get("Location")).toBe("/workspaces/w1/campaigns/2/settings");
-
-    insertSingle.mockResolvedValueOnce({ data: { id: 3 }, error: null });
-    detailsInsert.mockResolvedValueOnce({ error: null });
-    const r5 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
-    expect(r5.status).toBe(302);
-    expect(r5.headers.get("Location")).toBe("/workspaces/w1/campaigns/3/settings");
+    const r3 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
+    expect(r3.status).toBe(302);
+    expect(r3.headers.get("Location")).toBe("/workspaces/w1/campaigns/2/settings");
   });
 
-  test("handleNewCampaign selects correct details table for message and robocall", async () => {
+  test("handleNewCampaign creates message and robocall without subtype table inserts", async () => {
     const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
 
@@ -325,7 +310,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     const r2 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fdRobo, workspaceId: "w1", headers }));
     expect(r2.status).toBe(302);
 
-    expect(insertsByTable).toEqual(["message_campaign", "ivr_campaign"]);
+    expect(insertsByTable).toEqual([]);
   });
 
   test("handleNewCampaign seeds schedule, dates, and auto caller_id for a single workspace number", async () => {

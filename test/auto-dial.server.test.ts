@@ -9,6 +9,22 @@ vi.mock("@/lib/logger.server", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+const tenantDbMocks = vi.hoisted(() => ({
+  findFirst: vi.fn(),
+  update: vi.fn(),
+  insert: vi.fn(),
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => ({
+    call: {
+      findFirst: (...args: unknown[]) => tenantDbMocks.findFirst(...args),
+      update: (...args: unknown[]) => tenantDbMocks.update(...args),
+      insert: (...args: unknown[]) => tenantDbMocks.insert(...args),
+    },
+  })),
+}));
+
 import {
   completeAllConferences,
   createOutreachAttempt,
@@ -86,24 +102,32 @@ describe("auto-dial.server", () => {
   });
 
   test("saveCallToDatabase skips when sid missing", async () => {
-    const upsert = vi.fn();
-    const supabase = { from: vi.fn(() => ({ upsert, select: vi.fn() })) };
-    await saveCallToDatabase(supabase as never, {});
-    expect(upsert).not.toHaveBeenCalled();
+    await saveCallToDatabase("ws-1", {});
+    expect(tenantDbMocks.findFirst).not.toHaveBeenCalled();
   });
 
-  test("saveCallToDatabase upserts call row", async () => {
-    const select = vi.fn().mockResolvedValue({ error: null });
-    const upsert = vi.fn().mockReturnValue({ select });
-    const supabase = { from: vi.fn(() => ({ upsert, select })) };
-    await saveCallToDatabase(supabase as never, {
+  test("saveCallToDatabase inserts call row when missing", async () => {
+    tenantDbMocks.findFirst.mockResolvedValue(null);
+    tenantDbMocks.insert.mockResolvedValue([]);
+    await saveCallToDatabase("ws-1", {
       sid: "CA123",
       status: "completed",
       campaign_id: 1,
     });
-    expect(upsert).toHaveBeenCalledWith(
+    expect(tenantDbMocks.insert).toHaveBeenCalledWith(
       expect.objectContaining({ sid: "CA123", campaign_id: 1 }),
     );
+  });
+
+  test("saveCallToDatabase updates call row when existing", async () => {
+    tenantDbMocks.findFirst.mockResolvedValue({ sid: "CA123" });
+    tenantDbMocks.update.mockResolvedValue([]);
+    await saveCallToDatabase("ws-1", {
+      sid: "CA123",
+      status: "completed",
+      campaign_id: 1,
+    });
+    expect(tenantDbMocks.update).toHaveBeenCalled();
   });
 
   test("completeAllConferences completes in-progress conferences", async () => {

@@ -64,11 +64,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
         { headers },
       );
     }
-    const tableKey = type === "script" ? "live_campaign" : "ivr_campaign";
     const { error: updateError } = await supabaseClient
-      .from(tableKey)
+      .from("campaign")
       .update({ script_id: createdScript.id })
-      .eq("campaign_id", Number(ref) || 0)
+      .eq("id", Number(ref) || 0)
       .select();
     if (updateError) {
       return routeData(

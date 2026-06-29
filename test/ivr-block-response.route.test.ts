@@ -144,7 +144,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       }),
     });
     const script = { pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1", options: [] } } };
-    const campaignData = { ivr_campaign: [{ script: { steps: script } }] };
+    const campaignData = { script: { steps: script } };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData, workspaceTwilioData: { authToken: "t" } }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
     const res = await asRouteResponse(await mod.action({
@@ -162,7 +162,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
         b2: { id: "b2", options: [] },
       },
     };
-    const campaignData = { ivr_campaign: [{ script: { steps: script } }] };
+    const campaignData = { script: { steps: script } };
     const supabase = makeSupabase({
       call: { sid: "CA1", workspace: null, outreach_attempt_id: 9 },
       campaignData,
@@ -204,7 +204,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       pages: { page_1: { blocks: ["b1"] } },
       blocks: { b1: { id: "b1", options: [{ value: "1", next: "page_2" }] } },
     };
-    const campaignData = { ivr_campaign: [{ script: { steps: script } }] };
+    const campaignData = { script: { steps: script } };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData, workspaceTwilioData: null }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
     let res = await mod.action({
@@ -222,7 +222,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     expect(await res.text()).toContain("say:Call not found");
 
     // missing stepsValue => say error message
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData: { ivr_campaign: [{ script: { steps: null } }] } }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData: { script: { steps: null } } }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
@@ -239,7 +239,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
         b2: { id: "b2" },
       },
     };
-    const campaignData = { ivr_campaign: [{ script: { steps: script } }] };
+    const campaignData = { script: { steps: script } };
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
 
     // currentBlockIndex < ... => next block in same page
@@ -271,7 +271,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       pages: { page_1: { blocks: ["b1"] } },
       blocks: { b1: { id: "b1", options: [{ value: "1", next: "block_2" }] } },
     };
-    const campaignData2 = { ivr_campaign: [{ script: { steps: script2 } }] };
+    const campaignData2 = { script: { steps: script2 } };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData: campaignData2, outreachResult: {} }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -293,7 +293,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
 
     // outreachError in getOutreach
     const script = { pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1" } } };
-    const campaignData = { ivr_campaign: [{ script: { steps: script } }] };
+    const campaignData = { script: { steps: script } };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData, outreachError: new Error("out") }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -302,7 +302,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     expect(await res.text()).toContain("say:out");
 
     // invalid script structure
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData: { ivr_campaign: [{ script: { steps: { pages: null, blocks: null } } }] } }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData: { script: { steps: { pages: null, blocks: null } } } }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
@@ -311,7 +311,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
 
     // block not found
     const script2 = { pages: { page_1: { blocks: ["b1"] } }, blocks: {} };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData: { ivr_campaign: [{ script: { steps: script2 } }] } }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: null, outreach_attempt_id: 1 }, campaignData: { script: { steps: script2 } } }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),

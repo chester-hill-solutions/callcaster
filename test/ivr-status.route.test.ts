@@ -143,7 +143,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       }),
     });
     const supabase = makeSupabase({
-      callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: {} } } } } },
+      callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { voicemail_file: "v.mp3", script: { steps: { pages: {} } } } },
       workspaceAuthToken: "tok",
     });
     mocks.createClient.mockReturnValueOnce(supabase);
@@ -155,7 +155,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
 
   test("handles failed/no-answer/completed status updates", async () => {
     const supabase = makeSupabase({
-      callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
+      callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } },
       workspaceAuthToken: "tok",
     });
     mocks.createClient.mockReturnValueOnce(supabase);
@@ -186,7 +186,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       callRow: {
         outreach_attempt_id: 1,
         workspace: "w1",
-        campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { page_1: { title: "Other", blocks: [] } } } } } },
+        campaign: { voicemail_file: "v.mp3", script: { steps: { pages: { page_1: { title: "Other", blocks: [] } } } } },
       },
       workspaceAuthToken: "tok",
     });
@@ -205,7 +205,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       callRow: {
         outreach_attempt_id: 1,
         workspace: "w1",
-        campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } } } },
+        campaign: { voicemail_file: "v.mp3", script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } } },
       },
       workspaceAuthToken: "tok",
     });
@@ -224,7 +224,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       callRow: {
         outreach_attempt_id: 1,
         workspace: "w1",
-        campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
+        campaign: { voicemail_file: "v.mp3", script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } },
       },
       workspaceAuthToken: "tok",
       voicemailSignedUrl: "https://signed",
@@ -243,7 +243,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       callRow: {
         outreach_attempt_id: 1,
         workspace: "w1",
-        campaign: { voicemail_file: null, ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
+        campaign: { voicemail_file: null, script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } },
       },
       workspaceAuthToken: "tok",
     });
@@ -262,7 +262,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: null }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } }, workspaceAuthToken: null }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     mocks.validateTwilioWebhookParams.mockImplementationOnce((_p, _s, _u, tok) => {
       expect(tok).toBe("test");
@@ -271,13 +271,13 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: null, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: "tok" }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: null, workspace: "w1", campaign: { script: { steps: { pages: {} } } } }, workspaceAuthToken: "tok" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
     // persistCallStatusFromParams skips outreach update when outreach_attempt_id is null (matches canonical call-status route)
     await expect(res.json()).resolves.toMatchObject({ success: true });
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: "tok", updateOutreachError: new Error("up") }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } }, workspaceAuthToken: "tok", updateOutreachError: new Error("up") }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
@@ -301,7 +301,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
         callRow: {
           outreach_attempt_id: 1,
           workspace: "w1",
-          campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: null } } },
+          campaign: { voicemail_file: "v.mp3", script: { steps: null } },
         },
         workspaceAuthToken: "tok",
       }),
@@ -320,7 +320,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
         callRow: {
           outreach_attempt_id: 1,
           workspace: "w1",
-          campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
+          campaign: { voicemail_file: "v.mp3", script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } },
         },
         workspaceAuthToken: "tok",
         voicemailSignedUrlError: new Error("sig"),
@@ -337,7 +337,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
         callRow: {
           outreach_attempt_id: 1,
           workspace: "w1",
-          campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
+          campaign: { voicemail_file: "v.mp3", script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } },
         },
         workspaceAuthToken: "tok",
         voicemailSignedUrl: null,
@@ -351,7 +351,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     // timestamp fallback '' + updateResult error throw (failed path)
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
+        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } },
         workspaceAuthToken: "tok",
         updateOutreachError: new Error("upd"),
       }),
@@ -367,7 +367,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     // completed branch success
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
+        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } },
         workspaceAuthToken: "tok",
       }),
     );
@@ -380,7 +380,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
+        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } },
         workspaceAuthToken: "tok",
         updateCallError: new Error("call-update"),
       }),
@@ -394,7 +394,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
+        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } },
         workspaceAuthToken: "tok",
         updateCallError: new Error("completed-update"),
       }),
@@ -421,7 +421,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
                   data: {
                     outreach_attempt_id: 1,
                     workspace: "w1",
-                    campaign: { ivr_campaign: { script: { steps: { pages: {} } } } },
+                    campaign: { script: { steps: { pages: {} } } },
                   },
                   error: null,
                 }),
@@ -486,7 +486,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
+        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { script: { steps: { pages: {} } } } },
         workspaceAuthToken: "tok",
       }),
     );
