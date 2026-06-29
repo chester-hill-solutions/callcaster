@@ -67,13 +67,10 @@ export {
   fetchCampaignsByType,
   getCampaignQueueById,
   checkSchedule,
-  fetchOutreachData,
-  processOutreachExportData,
   getCampaignTableKey,
   type CampaignType,
   type CampaignData,
   type CampaignDetails,
-  type OutreachExportData,
 } from "./database/campaign.server";
 
 // Re-export contact functions
@@ -171,10 +168,11 @@ export const handleError = (error: Error, message: string, status = 500) => {
 };
 
 // Legacy functions that need to be kept for now
-import Twilio from "twilio";
+import type Twilio from "twilio";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { createWorkspaceTwilioInstance } from "./database/workspace.server";
 
 // Marked for deprecation
 export async function endConferenceByUser({
@@ -186,19 +184,10 @@ export async function endConferenceByUser({
   user_id: string;
   supabaseClient: SupabaseClient;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data, key, token")
-    .eq("id", workspace_id)
-    .single();
-  if (error || !data) {
-    throw error || new Error("No workspace found");
-  }
-  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
-  if (!creds) {
-    throw new Error("Workspace missing Twilio credentials");
-  }
-  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
+  const twilio = await createWorkspaceTwilioInstance({
+    supabase: supabaseClient,
+    workspace_id,
+  });
   if (!user_id) {
     throw new Error("User ID is required");
   }
@@ -223,7 +212,7 @@ export async function endConferenceByUser({
             try {
               await twilio
                 .calls(call.sid)
-                .update({ twiml: `<Response><Hangup/></Response>` });
+                .update({ twiml: hangupTwiml() });
             } catch (callError) {
               logger.error(`Error updating call ${call.sid}:`, callError);
             }

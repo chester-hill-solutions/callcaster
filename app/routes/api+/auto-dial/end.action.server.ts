@@ -1,7 +1,8 @@
 import { createWorkspaceTwilioInstance, safeParseJson } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { resolveJsonAuthSession } from "@/lib/api-route-auth.server";
+import { resolveJsonAuthSession } from "@/lib/api-auth.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database, Tables } from "@/lib/database.types";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
@@ -99,7 +100,7 @@ export const action = async ({
                   );
                   await twilio
                     .calls(call.sid)
-                    .update({ twiml: `<Response><Hangup/></Response>` });
+                    .update({ twiml: hangupTwiml() });
               } catch (callError) {
                 d.logger.error(`Error updating call ${call.sid}:`, callError);
               }

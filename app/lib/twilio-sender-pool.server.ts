@@ -7,6 +7,7 @@ import {
   createWorkspaceTwilioClient,
   listMessagingServicePhoneNumbers,
 } from "@/lib/twilio-client.server";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import type { TwilioAccountData } from "@/lib/types";
 
 export type SenderPoolVerificationResult = {
@@ -29,15 +30,10 @@ export async function verifyWorkspaceMessagingSenderPool({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<SenderPoolVerificationResult> {
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) throw error;
-
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(
+    supabaseClient,
+    workspaceId,
+  )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const serviceSid = onboarding.messagingService.serviceSid;
   const expectedPhoneNumbers = onboarding.messagingService.attachedSenderPhoneNumbers.map(

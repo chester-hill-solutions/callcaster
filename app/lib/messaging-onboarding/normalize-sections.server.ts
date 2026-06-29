@@ -12,7 +12,8 @@ import {
   WORKSPACE_ONBOARDING_STEP_STATUS_VALUES,
   WORKSPACE_TWILIO_AUTH_MODE_VALUES,
 } from "@/lib/types";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import {
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
 } from "@/lib/messaging-onboarding/defaults.server";
@@ -39,7 +40,7 @@ export function normalizeStep(
   value: unknown,
   fallback: WorkspaceOnboardingStepState,
 ): WorkspaceOnboardingStepState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return fallback;
   }
 
@@ -60,7 +61,7 @@ export function mergeStoredOnboardingSteps(
 ): WorkspaceOnboardingStepState[] {
   const storedById = new Map<string, unknown>();
   for (const step of storedSteps) {
-    if (isRecord(step) && typeof step.id === "string" && step.id.trim()) {
+    if (isObject(step) && typeof step.id === "string" && step.id.trim()) {
       storedById.set(step.id, step);
     }
   }
@@ -72,7 +73,7 @@ export function mergeStoredOnboardingSteps(
 }
 
 export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAddressState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return {
       addressSid: null,
       customerName: "",
@@ -106,7 +107,7 @@ export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAdd
 }
 
 export function normalizeReviewState(value: unknown): WorkspaceOnboardingReviewState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return {
       blockingIssues: [],
       lastError: null,
@@ -125,7 +126,7 @@ export function normalizeBusinessProfile(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["businessProfile"],
 ): WorkspaceMessagingOnboardingState["businessProfile"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     legalBusinessName: parseString(value.legalBusinessName),
@@ -148,7 +149,7 @@ export function normalizeMessagingServiceSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["messagingService"],
 ): WorkspaceMessagingOnboardingState["messagingService"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     desiredSendMode:
@@ -184,7 +185,7 @@ export function normalizeSubaccountBootstrapSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["subaccountBootstrap"],
 ): WorkspaceMessagingOnboardingState["subaccountBootstrap"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(
@@ -213,7 +214,7 @@ export function normalizeEmergencyVoiceSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["emergencyVoice"],
 ): WorkspaceMessagingOnboardingState["emergencyVoice"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(
@@ -237,7 +238,7 @@ export function normalizeA2p10dlcSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["a2p10dlc"],
 ): WorkspaceMessagingOnboardingState["a2p10dlc"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(
@@ -261,7 +262,7 @@ export function normalizeRcsSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["rcs"],
 ): WorkspaceMessagingOnboardingState["rcs"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(

@@ -27,9 +27,10 @@ export function readTwilioWorkspaceCredentials(
   return { sid, authToken };
 }
 
-/** Auth token for Twilio webhook signature validation (Edge). */
+/** Auth token for Twilio webhook signature validation (Edge).
+ *  Accepts either credential shape (`{ sid, authToken }` or `{ accountSid, authToken }`). */
 export function resolveTwilioWebhookAuthToken(
-  creds: TwilioWorkspaceCredentials | null,
+  creds: { authToken?: string } | null,
 ): string | null {
   if (creds?.authToken) {
     return creds.authToken;

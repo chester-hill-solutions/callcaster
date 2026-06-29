@@ -1,19 +1,22 @@
 export { loader } from "./new.loader.server";
 export { action } from "./new.action.server";
 
-import { data as routeData, Form, Link, useActionData, useLoaderData } from "react-router";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { Form, useActionData, useLoaderData } from "react-router";
+import { useState } from "react";
+import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
-
-import { MdAdd, MdClose } from "react-icons/md";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Text } from "@/components/ui/typography";
+import {
+  BrandedCard,
+  BrandedCardContent,
+  BrandedCardTitle,
+} from "@/components/shared/BrandedCard";
 
 export default function NewAudience() {
-  const { campaign, error } = useLoaderData();
-  const actionData = useActionData();
+  useLoaderData();
+  const actionData = useActionData<{ error?: unknown }>();
   const [pendingFileName, setPendingFileName] = useState("");
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,35 +35,26 @@ export default function NewAudience() {
   return (
     <section
       id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
+      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
     >
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-        <CardTitle>Add an Audience</CardTitle>
-        {actionData?.error != null && (
-          <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
+      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
+        <BrandedCardTitle>Add an Audience</BrandedCardTitle>
+        {actionData?.error != null ? (
+          <Text className="text-center text-destructive">
             Error: {String(actionData.error)}
-          </p>
-        )}
-        <CardContent>
+          </Text>
+        ) : null}
+        <BrandedCardContent>
           <Form
             method="POST"
             className="space-y-6"
             encType="multipart/form-data"
           >
             <input type="hidden" name="formAction" value="newAudience" />
-            <label
-              htmlFor="audience-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              Audience Name
-              <input
-                type="text"
-                name="audience-name"
-                id="audience-name"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-              />
-            </label>
-            <div className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            <FormField htmlFor="audience-name" label="Audience Name">
+              <Input type="text" name="audience-name" id="audience-name" />
+            </FormField>
+            <div className="block text-sm font-medium text-foreground">
               <div>
                 <div className="flex items-baseline gap-4">
                   <div>Upload contacts (Optional .csv file):</div>
@@ -75,12 +69,12 @@ export default function NewAudience() {
                     />
                     <Button asChild variant="outline" size="icon">
                       <label htmlFor="contacts" className="cursor-pointer">
-                        <MdAdd />
+                        <Plus className="h-4 w-4" />
                       </label>
                     </Button>
                   </div>
                 </div>
-                {pendingFileName && (
+                {pendingFileName ? (
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{pendingFileName}</span>
                     <Button
@@ -89,29 +83,28 @@ export default function NewAudience() {
                       size="icon"
                       onClick={handleRemoveFile}
                     >
-                      <MdClose />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
-                )}
+                ) : null}
               </div>
-              <p className="text-sm font-normal italic">
+              <p className="text-sm font-normal italic text-muted-foreground">
                 If no file is uploaded, you can add contacts later.
               </p>
-              <p className="text-sm font-normal italic">Preferred format</p>
+              <p className="text-sm font-normal italic text-muted-foreground">
+                Preferred format
+              </p>
             </div>
 
-            <div className="flex items-center gap-4">
-              <Button
-                className="h-fit min-h-[48px] w-full rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px]
-                text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
-                type="submit"
-              >
-                Add Audience
-              </Button>{" "}
-            </div>
+            <Button
+              className="h-fit min-h-[48px] w-full bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white hover:bg-brand-secondary"
+              type="submit"
+            >
+              Add Audience
+            </Button>
           </Form>
-        </CardContent>
-      </Card>
+        </BrandedCardContent>
+      </BrandedCard>
     </section>
   );
 }

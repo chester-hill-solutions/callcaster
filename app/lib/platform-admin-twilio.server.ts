@@ -27,6 +27,7 @@ import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -149,13 +150,8 @@ export async function dispatchAdminTwilioAction({
 
     case "run_billing_reconciliation":
       try {
-        const { data: workspace } = await supabaseClient
-          .from("workspace")
-          .select("twilio_data")
-          .eq("id", workspaceId)
-          .single();
-
-        const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+        const twilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+        const creds = readTwilioWorkspaceCredentials(twilioData);
         if (!creds?.sid) {
           return {
             ok: false,

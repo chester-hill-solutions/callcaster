@@ -6,8 +6,18 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import { voiceCreditsFromDurationSeconds } from "@/lib/pricing";
-import Twilio from "twilio";
+import { voiceCreditsFromDurationSeconds, debitAmountFromCredits } from "@/lib/pricing";
+import { callKey } from "@/lib/billing-keys";
+import {
+  hangupTwiml,
+  pausePlayTwiml,
+  pauseSayTwiml,
+} from "@/lib/twilio-twiml.server";
+import {
+  persistCallStatusFromParams,
+  twilioParamsToUnderCase,
+} from "@/lib/twilio-call-status.server";
+import type Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
 export interface CallEvent {
@@ -56,14 +66,6 @@ export interface CallEvent {
     if (error) throw error;
 };
 
-const updateCallStatus = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string): Promise<void> => {
-    const { error } = await supabase
-        .from('call')
-        .update({ end_time: new Date(timestamp).toISOString(), status })
-        .eq('sid', callSid);
-    if (error) throw error;
-};
-
 interface ScriptSteps {
     pages?: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }>;
     blocks?: Record<string, Block>;
@@ -89,14 +91,10 @@ const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: C
     const scriptSteps = (campaign.ivr_campaign.script?.steps as unknown) as ScriptSteps | null | undefined;
     const step = findVoicemailPage(scriptSteps?.pages);
     if (!step) {
-        await call.update({
-            twiml: `<Response><Hangup/></Response>`
-        });
+        await call.update({ twiml: hangupTwiml() });
     } else {
         if (step.speechType === 'synthetic') {
-            await call.update({
-                twiml: `<Response><Pause length="1"/><Say>${step.say}</Say></Response>`
-            });
+            await call.update({ twiml: pauseSayTwiml(step.say ?? "") });
         } else {
             if (!campaign.voicemail_file) {
                 throw new Error("Voicemail file is undefined");
@@ -108,18 +106,9 @@ const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: C
             if (!data?.signedUrl) {
                 throw new Error("Failed to create signed URL for voicemail file");
             }
-            await call.update({
-                twiml: `<Response><Pause length="1"/><Play>${data.signedUrl}</Play></Response>`
-            });
+            await call.update({ twiml: pausePlayTwiml(data.signedUrl) });
         }
     }
-};
-
-const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string, outreach_attempt_id: number | null | undefined, disposition: string): Promise<void> => {
-    await Promise.all([
-        updateCallStatus(supabase, callSid, status, timestamp),
-        updateResult(supabase, outreach_attempt_id, { disposition })
-    ]);
 };
 
 const debitIvrCallCredits = async (
@@ -136,9 +125,10 @@ const debitIvrCallCredits = async (
         supabase,
         workspaceId: args.workspaceId,
         type: "DEBIT",
-        amount: -credits,
+        amount: debitAmountFromCredits(credits),
         note: `IVR Call ${args.callSid}, Campaign ${args.campaignName}, Duration ${args.durationSeconds}s`,
-        idempotencyKey: `call:${args.callSid}`,
+        idempotencyKey: callKey(args.callSid, "ivr"),
+        callSid: args.callSid,
     });
 };
 
@@ -146,10 +136,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const parsedBody = params as unknown as CallEvent;
-    const callSid = parsedBody.CallSid;
+    const underCase = twilioParamsToUnderCase(params);
+    const callSid = typeof underCase.call_sid === "string" ? underCase.call_sid : null;
 
     try {
+        if (!callSid) {
+            throw new Error("Missing CallSid");
+        }
         const validation = await validateTwilioWebhookForCallSid({
             request,
             supabase,
@@ -169,11 +162,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (!dbCall) throw new Error("Call not found");
 
         const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: dbCall.workspace as string});
-        
-        const callStatus = parsedBody.CallStatus;
-        const timestamp = String(parsedBody.Timestamp || '');
 
-        const answeredBy = parsedBody.AnsweredBy;
+        const callStatus = typeof underCase.call_status === "string" ? underCase.call_status : "";
+        const timestamp = typeof underCase.timestamp === "string" ? underCase.timestamp : '';
+
+        const answeredBy = typeof underCase.answered_by === "string" ? underCase.answered_by : "";
         const isMachine =
             Boolean(answeredBy) &&
             answeredBy.includes('machine') &&
@@ -191,39 +184,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         } else {
             switch (callStatus) {
                 case 'failed': {
-                    await handleCallStatusUpdate(
+                    await persistCallStatusFromParams({
                         supabase,
-                        callSid,
-                        callStatus,
-                        timestamp,
-                        dbCall.outreach_attempt_id as number | null,
-                        'failed',
-                    );
+                        params,
+                        disposition: 'failed',
+                        outreachAttemptId: dbCall.outreach_attempt_id as number | null,
+                    });
                     break;
                 }
                 case 'no-answer': {
-                    await handleCallStatusUpdate(
+                    await persistCallStatusFromParams({
                         supabase,
-                        callSid,
-                        callStatus,
-                        timestamp,
-                        dbCall.outreach_attempt_id as number | null,
-                        'no-answer',
-                    );
+                        params,
+                        disposition: 'no-answer',
+                        outreachAttemptId: dbCall.outreach_attempt_id as number | null,
+                    });
                     break;
                 }
                 case 'completed': {
-                    await handleCallStatusUpdate(
+                    await persistCallStatusFromParams({
                         supabase,
-                        callSid,
-                        callStatus,
-                        timestamp,
-                        dbCall.outreach_attempt_id as number | null,
-                        'completed',
-                    );
+                        params,
+                        disposition: 'completed',
+                        outreachAttemptId: dbCall.outreach_attempt_id as number | null,
+                    });
                     const durationSeconds = Math.max(
-                        Number(parsedBody.CallDuration) || 0,
-                        Number(parsedBody.Duration) || 0,
+                        Number(underCase.call_duration) || 0,
+                        Number(underCase.duration) || 0,
                     );
                     if (dbCall.workspace) {
                         const campaign = dbCall.campaign as { name?: string } | null;

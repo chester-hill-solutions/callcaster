@@ -2,18 +2,15 @@ export { loader } from "./archive.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, Link } from "react-router";
 
-
 import { Campaign } from "@/lib/types";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-
+import { Heading, Text } from "@/components/ui/typography";
 
 const StatusBadge = ({ status }: { status: string }) => {
   const badgeStyles: Record<string, string> = {
-    archived: "bg-gray-200 text-gray-800",
-    complete: "bg-teal-100 text-teal-800",
+    archived: "bg-muted text-muted-foreground",
+    complete: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200",
   };
 
   return (
@@ -28,13 +25,15 @@ export default function ArchivedCampaigns() {
   const { workspace } = useOutletContext<{ workspace: { id: string } }>();
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Archived Campaigns</h1>
-          <p className="text-muted-foreground mt-2">
+          <Heading as="h1" level={2} branded={false}>
+            Archived Campaigns
+          </Heading>
+          <Text variant="muted" className="mt-2">
             View and manage your completed and archived campaigns
-          </p>
+          </Text>
         </div>
         <Button asChild variant="outline">
           <Link to={`/workspaces/${workspace.id}/campaigns`}>
@@ -44,60 +43,57 @@ export default function ArchivedCampaigns() {
       </div>
 
       {archivedCampaigns.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground text-lg">
-              No archived campaigns found
-            </p>
-            <Button asChild className="mt-4">
-              <Link to={`/workspaces/${workspace.id}/campaigns/new`}>
-                Create Your First Campaign
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="py-12 text-center">
+          <Text variant="muted" className="text-lg">
+            No archived campaigns found
+          </Text>
+          <Button asChild className="mt-4">
+            <Link to={`/workspaces/${workspace.id}/campaigns/new`}>
+              Create Your First Campaign
+            </Link>
+          </Button>
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <ul className="divide-y divide-border">
           {archivedCampaigns.map((campaign: Campaign) => (
-            <Card key={campaign.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg line-clamp-2">
+            <li
+              key={campaign.id}
+              className="flex flex-col gap-4 py-4 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-start gap-2">
+                  <p className="line-clamp-2 font-medium">
                     {campaign.title || `Unnamed Campaign ${campaign.id}`}
-                  </CardTitle>
+                  </p>
                   <StatusBadge status={campaign.status || "archived"} />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div>
-                    <span className="font-medium">Type:</span>{" "}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span>
+                    <span className="font-medium text-foreground">Type:</span>{" "}
                     {campaign.type || "N/A"}
-                  </div>
-                  {campaign.created_at && (
-                    <div>
-                      <span className="font-medium">Created:</span>{" "}
+                  </span>
+                  {campaign.created_at ? (
+                    <span>
+                      <span className="font-medium text-foreground">Created:</span>{" "}
                       {new Date(campaign.created_at).toLocaleDateString()}
-                    </div>
-                  )}
-                  {campaign.end_date && (
-                    <div>
-                      <span className="font-medium">Ended:</span>{" "}
+                    </span>
+                  ) : null}
+                  {campaign.end_date ? (
+                    <span>
+                      <span className="font-medium text-foreground">Ended:</span>{" "}
                       {new Date(campaign.end_date).toLocaleDateString()}
-                    </div>
-                  )}
+                    </span>
+                  ) : null}
                 </div>
-                <div className="mt-4">
-                  <Button asChild variant="outline" className="w-full">
-                    <Link to={`/workspaces/${workspace.id}/campaigns/${campaign.id}`}>
-                      View Details
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+              <Button asChild variant="outline" size="sm" className="shrink-0">
+                <Link to={`/workspaces/${workspace.id}/campaigns/${campaign.id}`}>
+                  View Details
+                </Link>
+              </Button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

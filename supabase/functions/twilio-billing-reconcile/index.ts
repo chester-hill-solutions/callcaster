@@ -15,15 +15,13 @@ import {
   mapWithConcurrency,
   parseBillingReconcileBody,
 } from "../_shared/billing-reconcile-request.ts";
+import {
+  TERMINAL_BILLABLE_CALL_STATUSES,
+  TERMINAL_BILLABLE_SMS_STATUSES,
+} from "../../../shared/pricing.ts";
 
-const TERMINAL_SMS_STATUSES = ["delivered", "failed", "undelivered"];
-const BILLABLE_CALL_STATUSES = [
-  "completed",
-  "failed",
-  "busy",
-  "no-answer",
-  "canceled",
-];
+const TERMINAL_SMS_STATUSES = TERMINAL_BILLABLE_SMS_STATUSES;
+const BILLABLE_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
 
 function getReconciliationPeriod(referenceDate = new Date()) {
   const endDate = new Date(referenceDate);

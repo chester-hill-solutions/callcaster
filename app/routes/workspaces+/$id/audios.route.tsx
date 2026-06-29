@@ -1,15 +1,19 @@
 export { loader } from "./audios.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, Link, useLoaderData } from "react-router";
+import {
+  Link,
+  Outlet,
+  useLoaderData,
+  useOutlet,
+  useOutletContext,
+} from "react-router";
+import type { ContextType } from "@/lib/types";
 import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { mediaColumns } from "@/components/file-assets/columns";
-
 import { DataTable } from "@/components/workspace/tables/DataTable";
+import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
 
-
-
-import { User } from "@/lib/types";
 import type { FileObject } from "@supabase/storage-js";
 
 type LoaderData = {
@@ -20,13 +24,26 @@ type LoaderData = {
 };
 
 export default function WorkspaceAudiosPage() {
-  const { audioMedia, workspace, error, userRole } =
-    useLoaderData<LoaderData>();
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
+  const { audioMedia, workspace, error } = useLoaderData<LoaderData>();
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const workspaceAudios = audioMedia?.filter((media: FileObject) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));
+  const workspaceAudios = audioMedia?.filter(
+    (media: FileObject) =>
+      !media.name.includes("voicemail-undefined") &&
+      !media.name.includes("voicemail-+") &&
+      !media.name.includes("recording-"),
+  );
+
+  const title = "Audio Library";
+
   return (
-    <main className="flex h-full flex-col gap-4 rounded-sm ">
+    <>
       <QueryParamBanner
         param="uploaded"
         variants={{
@@ -36,37 +53,25 @@ export default function WorkspaceAudiosPage() {
           },
         }}
       />
-      <div className="flex flex-col sm:flex-row sm:justify-between">
-        <div className="flex">
-          <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">
-            {workspace != null
-              ? `${workspace?.name} Audio Library`
-              : "No Workspace"}
-          </h1>
-        </div>
-        <Button asChild className="font-Zilla-Slab text-lg font-semibold">
-          <Link to={`./new`}>Add Audio</Link>
-        </Button>
-      </div>
-      {error && !isWorkspaceAudioEmpty && (
-        <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
-          {error}
-        </h4>
-      )}
-      {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
-          Add Your Own Audio to this Workspace!
-        </h4>
-      )}
-
-      {workspaceAudios != null && (
-        <DataTable
-          className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
-          columns={mediaColumns}
-          data={workspaceAudios}
-          //   onRowClick={(item) => navigate(`./${item?.id}`)}
-        />
-      )}
-    </main>
+      <WorkspaceResourceListShell
+        title={title}
+        error={error}
+        isEmpty={isWorkspaceAudioEmpty}
+        emptyMessage="Add Your Own Audio to this Workspace!"
+        addAction={
+          <Button asChild className="font-Zilla-Slab text-lg font-semibold">
+            <Link to="./new">Add Audio</Link>
+          </Button>
+        }
+      >
+        {workspaceAudios != null && !isWorkspaceAudioEmpty ? (
+          <DataTable
+            className="font-semibold text-foreground"
+            columns={mediaColumns}
+            data={workspaceAudios}
+          />
+        ) : null}
+      </WorkspaceResourceListShell>
+    </>
   );
 }

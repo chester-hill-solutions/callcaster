@@ -1,6 +1,7 @@
 import { NavLink } from "react-router";
-import { MdCampaign } from "react-icons/md";
+import { Megaphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Heading } from "@/components/ui/typography";
 import { Enums } from "@/lib/database.types";
 
 type HeaderProps = {
@@ -43,8 +44,10 @@ export const CampaignHeader = ({
         relative="path"
         end
       >
-        {isDesktop && <MdCampaign size={18} />}
-        <h3 className="font-Zilla-Slab text-2xl font-semibold">{title}</h3>
+        {isDesktop && <Megaphone className="h-[18px] w-[18px]" />}
+        <Heading as="h3" level={3} branded={false} className="inline">
+          {title}
+        </Heading>
         <Badge variant="outline" className={`ml-2 ${getStatusColor(status)}`}>
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </Badge>

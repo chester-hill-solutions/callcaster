@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
 import {
   buildAgentBridgeTwiml,
   buildHoldMusicTwiml,
@@ -12,6 +13,9 @@ import {
   type QueueRecord,
   type TwilioCredentials,
 } from "../_shared/acd-router.ts";
+import { parseQueueIdFromName } from "../_shared/acd-utils.ts";
+import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
+import { resolveTwilioWebhookAuthToken } from "../_shared/twilio-workspace-credentials.ts";
 
 function getBaseUrl(): string {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -19,7 +23,86 @@ function getBaseUrl(): string {
   return supabaseUrl.replace(/\/$/, "");
 }
 
-async function handleWaitUrl(req: Request, url: URL): Promise<Response> {
+function clientFromOptions(options?: { supabase?: SupabaseClient }): SupabaseClient {
+  return (
+    options?.supabase ??
+    createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    )
+  );
+}
+
+/** Build the exact URL Twilio signed: base + sub-path + original query string. */
+function buildValidationUrl(path: string, search: string): string {
+  const base = getFunctionUrl("acd-router");
+  const suffix = path === "/" ? "" : path;
+  return `${base}${suffix}${search}`;
+}
+
+/** Resolve the workspace id for an ACD request from any of the identifiers Twilio sends. */
+async function resolveWorkspaceId(
+  supabase: SupabaseClient,
+  url: URL,
+  formData: FormData,
+): Promise<string | null> {
+  const queueIdRaw =
+    url.searchParams.get("queue_id") || String(formData.get("queue_id") || "");
+  const queueId = queueIdRaw ? parseInt(queueIdRaw, 10) : 0;
+  if (queueId) {
+    const queue = await lookupQueue(supabase, queueId);
+    if (queue) return queue.workspace_id;
+  }
+
+  const queueName =
+    url.searchParams.get("queue_name") || String(formData.get("queue_name") || "");
+  const parsedQueueId = parseQueueIdFromName(queueName);
+  if (parsedQueueId) {
+    const queue = await lookupQueue(supabase, parsedQueueId);
+    if (queue) return queue.workspace_id;
+  }
+
+  const entryIdRaw =
+    url.searchParams.get("entry_id") || String(formData.get("entry_id") || "");
+  const entryId = entryIdRaw ? parseInt(entryIdRaw, 10) : 0;
+  if (entryId) {
+    const { data } = await supabase
+      .from("inbound_queue_entry")
+      .select("workspace_id")
+      .eq("id", entryId)
+      .maybeSingle();
+    if (data?.workspace_id) return data.workspace_id;
+  }
+
+  return null;
+}
+
+/** Validate the Twilio webhook signature for an ACD request. Fail-closed. */
+async function validateAcdSignature(
+  req: Request,
+  path: string,
+  url: URL,
+  formData: FormData,
+  supabase: SupabaseClient,
+  workspaceId: string,
+): Promise<boolean> {
+  const creds = await loadWorkspaceTwilioCredentials(supabase, workspaceId);
+  const authToken = resolveTwilioWebhookAuthToken(creds);
+  if (!authToken) return false;
+  const signature = req.headers.get("x-twilio-signature") || "";
+  const params = Object.fromEntries(formData.entries());
+  const validationUrl = buildValidationUrl(path, url.search);
+  return validateRequest(authToken, signature, validationUrl, params);
+}
+
+const invalidSignature = (): Response => new Response("Invalid Twilio signature", { status: 403 });
+
+async function handleWaitUrl(
+  req: Request,
+  url: URL,
+  path: string,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   const queueId = parseInt(url.searchParams.get("queue_id") || "0", 10);
   if (!queueId) {
     return new Response(buildHoldMusicTwiml({ holdAudio: null, queueName: "" }), {
@@ -27,11 +110,7 @@ async function handleWaitUrl(req: Request, url: URL): Promise<Response> {
     });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
+  const supabase = clientFromOptions(options);
   const formData = await req.formData().catch(() => new FormData());
   const callSid = String(formData.get("CallSid") || url.searchParams.get("CallSid") || "");
   const callerNumber = String(formData.get("From") || url.searchParams.get("From") || "");
@@ -44,13 +123,13 @@ async function handleWaitUrl(req: Request, url: URL): Promise<Response> {
     });
   }
 
+  const isValid = await validateAcdSignature(req, path, url, formData, supabase, queue.workspace_id);
+  if (!isValid) return invalidSignature();
+
   const queueName = makeQueueName(queueId);
 
-  // Only try to claim an agent if this is the initial entry or periodic check
-  // Skip if caller has been waiting less than 2 seconds (initial entry, let them settle)
   const parsedQueueTime = parseInt(queueTime, 10);
   if (parsedQueueTime >= 0) {
-    // Attempt to claim an available agent
     const claimed = await claimAgentForQueue({
       supabase,
       queueId,
@@ -72,13 +151,6 @@ async function handleWaitUrl(req: Request, url: URL): Promise<Response> {
           callerNumber,
         });
       }
-
-      return new Response(buildHoldMusicTwiml({
-        holdAudio: queue.hold_audio,
-        queueName,
-      }), {
-        headers: { "Content-Type": "text/xml" },
-      });
     }
   }
 
@@ -90,15 +162,33 @@ async function handleWaitUrl(req: Request, url: URL): Promise<Response> {
   });
 }
 
-async function handleAgentBridge(req: Request, url: URL): Promise<Response> {
+async function handleAgentBridge(
+  req: Request,
+  url: URL,
+  path: string,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   const queueName = url.searchParams.get("queue_name") || "";
   const entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
 
+  if (!entryId && !queueName) {
+    return new Response(buildAgentBridgeTwiml(queueName), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  const supabase = clientFromOptions(options);
+  const formData = await req.formData().catch(() => new FormData());
+
+  const workspaceId = await resolveWorkspaceId(supabase, url, formData);
+  if (workspaceId) {
+    const isValid = await validateAcdSignature(req, path, url, formData, supabase, workspaceId);
+    if (!isValid) return invalidSignature();
+  } else if (entryId) {
+    return invalidSignature();
+  }
+
   if (entryId) {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
     await supabase.rpc("accept_inbound_offer", { p_entry_id: entryId }).catch(() => {});
   }
 
@@ -107,7 +197,12 @@ async function handleAgentBridge(req: Request, url: URL): Promise<Response> {
   });
 }
 
-async function handleAgentStatus(req: Request, url: URL): Promise<Response> {
+async function handleAgentStatus(
+  req: Request,
+  url: URL,
+  path: string,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   const entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
   const formData = await req.formData().catch(() => new FormData());
   const callStatus = String(formData.get("CallStatus") || "").toLowerCase();
@@ -118,10 +213,15 @@ async function handleAgentStatus(req: Request, url: URL): Promise<Response> {
     });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+  const supabase = clientFromOptions(options);
+
+  const workspaceId = await resolveWorkspaceId(supabase, url, formData);
+  if (workspaceId) {
+    const isValid = await validateAcdSignature(req, path, url, formData, supabase, workspaceId);
+    if (!isValid) return invalidSignature();
+  } else {
+    return invalidSignature();
+  }
 
   if (callStatus === "no-answer" || callStatus === "busy" || callStatus === "failed" || callStatus === "canceled") {
     await releaseAgent(supabase, entryId, "timed_out");
@@ -132,18 +232,24 @@ async function handleAgentStatus(req: Request, url: URL): Promise<Response> {
   });
 }
 
-async function handleComplete(req: Request, url: URL): Promise<Response> {
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
+async function handleComplete(
+  req: Request,
+  url: URL,
+  path: string,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
+  const supabase = clientFromOptions(options);
   const formData = await req.formData().catch(() => new FormData());
   const queueResult = String(formData.get("QueueResult") || "").toLowerCase();
 
-  // Extract entry_id from the queue_name query param if present
   const queueName = url.searchParams.get("queue_name") || "";
   const entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
+
+  const workspaceId = await resolveWorkspaceId(supabase, url, formData);
+  if (workspaceId) {
+    const isValid = await validateAcdSignature(req, path, url, formData, supabase, workspaceId);
+    if (!isValid) return invalidSignature();
+  }
 
   if (entryId) {
     if (queueResult === "bridged" || queueResult === "completed") {
@@ -156,22 +262,25 @@ async function handleComplete(req: Request, url: URL): Promise<Response> {
   return new Response("", { status: 200 });
 }
 
-export async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(
+  req: Request,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/functions\/v1\/acd-router/, "").replace(/\/$/, "") || "/";
 
   try {
     if (path === "/agent-bridge") {
-      return await handleAgentBridge(req, url);
+      return await handleAgentBridge(req, url, path, options);
     }
     if (path === "/agent-status") {
-      return await handleAgentStatus(req, url);
+      return await handleAgentStatus(req, url, path, options);
     }
     if (path === "/complete") {
-      return await handleComplete(req, url);
+      return await handleComplete(req, url, path, options);
     }
     // Default: wait URL handler
-    return await handleWaitUrl(req, url);
+    return await handleWaitUrl(req, url, path, options);
   } catch (error) {
     console.error("acd-router error", error);
     // Always return valid TwiML for wait URL failures

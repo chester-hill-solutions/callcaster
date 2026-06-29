@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
+  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
@@ -120,6 +121,7 @@ function makeSupabaseStub(args?: { currentOutreachDisposition?: string }) {
 
   return {
     from,
+    rpc: makeApplyLedgerEntryRpcStub(transactionRows),
     _transactionRows: transactionRows,
     _outreachUpdateCalls: outreachUpdateCalls,
     _messageUpdateCalls: messageUpdateCalls,

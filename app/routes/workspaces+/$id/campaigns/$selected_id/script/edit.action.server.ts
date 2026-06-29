@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { deepEqual } from "@/lib/utils";
 import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
-import { isObject } from "@/lib/type-utils";
+import { isObject } from "@/lib/type-safety-utils";
 import { logger } from "@/lib/logger.server";
 import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { verifyAuth } from "@/lib/supabase.server";

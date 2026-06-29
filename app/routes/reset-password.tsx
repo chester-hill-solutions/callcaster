@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-
+import { Text } from "@/components/ui/typography";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 export default function ResetPassword() {
@@ -18,17 +18,17 @@ export default function ResetPassword() {
   });
 
   return (
-    <main className="flex min-h-[calc(100vh-80px)] w-full items-center justify-center px-4 py-16 text-white">
+    <main className="flex min-h-[calc(100vh-80px)] w-full items-center justify-center px-4 py-16 text-foreground">
       <AuthCard
         id="login-hero"
         title="Choose New Password"
         description="Set a new password for your account to complete recovery."
       >
-        {actionData?.error && (
-          <p className="w-full font-Zilla-Slab text-2xl font-bold tracking-[1px] text-brand-primary">
+        {actionData?.error ? (
+          <Text className="w-full text-center text-destructive">
             {actionData.error.message}
-          </p>
-        )}
+          </Text>
+        ) : null}
 
         <Form
           method="POST"
@@ -40,7 +40,6 @@ export default function ResetPassword() {
               type="password"
               name="password"
               id="password"
-              className="border-border bg-white/90 dark:bg-background/80 dark:text-white"
               required
             />
           </FormField>
@@ -49,7 +48,6 @@ export default function ResetPassword() {
               type="password"
               name="confirmPassword"
               id="confirmPassword"
-              className="border-border bg-white/90 dark:bg-background/80 dark:text-white"
               required
             />
           </FormField>

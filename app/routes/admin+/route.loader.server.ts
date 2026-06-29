@@ -14,10 +14,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const { supabaseClient, user } = await verifyAuth(request)
 
-    if (!user) {
-        throw redirect("/signin");
-    }
-
     const { data: userData } = await supabaseClient
         .from("user")
         .select("*")

@@ -2,6 +2,8 @@
  * Twilio voice call status normalization for Edge (parity with app/lib/call-status.ts).
  */
 
+import { TERMINAL_BILLABLE_CALL_STATUSES } from "../../../shared/pricing.ts";
+
 export type CallStatusEnum =
   | "queued"
   | "ringing"
@@ -58,9 +60,6 @@ export function isActiveCallStatusForSync(
 }
 
 /** Terminal outcomes that trigger per-minute debit in api.call-status / ivr-style billing. */
-export const CALL_STATUSES_BILLABLE_ON_COMPLETION = new Set<string>([
-  "completed",
-  "failed",
-  "no-answer",
-  "busy",
-]);
+export const CALL_STATUSES_BILLABLE_ON_COMPLETION = new Set<string>(
+  TERMINAL_BILLABLE_CALL_STATUSES,
+);

@@ -11,8 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FaBars, FaUserAlt } from "react-icons/fa";
-import { MdOutlineLogout } from "react-icons/md";
+import { Menu, User as UserIcon, LogOut } from "lucide-react";
 import { capitalize } from "@/lib/utils";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
@@ -70,7 +69,7 @@ const UserDropdownMenu = ({
           variant="outline"
           className="relative border border-border bg-background/90 transition-colors duration-150 hover:border-foreground hover:bg-accent dark:text-secondary-foreground dark:hover:bg-accent"
         >
-          <FaUserAlt size="20px" />
+          <UserIcon className="h-5 w-5" />
           {user.workspace_invite.length > 0 && (
             <div className="text-dd absolute -right-1 -top-2 h-5 w-5 items-center rounded-full bg-primary font-Zilla-Slab text-white">
               {user.workspace_invite.length}
@@ -107,7 +106,7 @@ const UserDropdownMenu = ({
             className="w-full justify-start font-Zilla-Slab"
             onClick={handleSignOut}
           >
-            <MdOutlineLogout className="mr-2 h-4 w-4" />
+            <LogOut className="mr-2 h-4 w-4" />
             <span>Log Out</span>
           </Button>
         </DropdownMenuItem>
@@ -149,7 +148,7 @@ export default function Navbar({
     <div></div>
   ) : (
     <header className={`w-full border-b border-border/70 ${className}`}>
-      <nav className="relative mx-auto flex w-full max-w-[1500px] items-center justify-between px-4 py-3 sm:h-[80px] sm:px-6">
+      <nav className="relative mx-auto flex w-full items-center justify-between px-4 py-3 sm:h-[80px] sm:px-6">
         <Link
           to="/"
           className="hidden font-Tabac-Slab text-4xl font-black text-brand-primary sm:block"
@@ -187,7 +186,7 @@ export default function Navbar({
           className="rounded-md border border-border bg-background/80 p-2 text-2xl sm:hidden"
           onClick={() => setMobileMenuOpen(true)}
         >
-          <FaBars />
+          <Menu className="h-6 w-6" />
         </button>
       </nav>
       {mobileMenuOpen && (

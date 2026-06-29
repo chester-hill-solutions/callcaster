@@ -17,7 +17,8 @@ import {
 } from "../_shared/sms-status-logic.ts";
 import { insertTransactionHistoryIdempotent } from "../_shared/ivr-status-logic.ts";
 import { readTwilioWorkspaceCredentials, resolveTwilioWebhookAuthToken } from "../_shared/twilio-workspace-credentials.ts";
-import { SMS_SEGMENT_CREDITS } from "../../../shared/pricing.ts";
+import { SMS_SEGMENT_CREDITS, debitAmountFromCredits, TERMINAL_BILLABLE_SMS_STATUSES } from "../../../shared/pricing.ts";
+import { smsKey } from "../../../shared/billing-keys.ts";
 
 interface TwilioStatusEvent {
   SmsSid?: string;
@@ -110,15 +111,20 @@ export async function handleRequest(req: Request): Promise<Response> {
       throw new Error(`Failed to update message: ${updateError.message}`);
     }
 
-    // Debit credits when message is delivered (campaign and API-based SMS)
-    if ((status === 'delivered' || status === 'failed' || status === 'undelivered') && workspaceId) {
+    // Debit credits when message reaches a terminal billable status (campaign and API-based SMS)
+    if (TERMINAL_BILLABLE_SMS_STATUSES.includes(status as typeof TERMINAL_BILLABLE_SMS_STATUSES[number]) && workspaceId) {
+      const numSegments = Math.max(
+        1,
+        Number.parseInt(String((messageData as any)?.num_segments ?? "1"), 10) || 1,
+      );
       await insertTransactionHistoryIdempotent({
         supabase: supabase as any,
         workspaceId,
         type: "DEBIT",
-        amount: -SMS_SEGMENT_CREDITS,
-        note: `SMS ${sid} ${status}`,
-        idempotencyKey: `sms:${sid}`,
+        amount: debitAmountFromCredits(SMS_SEGMENT_CREDITS * numSegments),
+        note: `SMS ${sid} ${status} (${numSegments} segment${numSegments === 1 ? "" : "s"})`,
+        idempotencyKey: smsKey(sid),
+        messageSid: sid,
       });
     }
 

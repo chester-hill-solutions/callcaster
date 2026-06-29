@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Call } from "@twilio/voice-sdk";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { BrandedCard as Card } from "@/components/shared/BrandedCard";
 import { HeldCallsList } from "@/components/calls/HeldCallsList";
 import { IncomingCallPanel } from "@/components/calls/IncomingCallPanel";
 import { OutboundDialer } from "@/components/calls/OutboundDialer";

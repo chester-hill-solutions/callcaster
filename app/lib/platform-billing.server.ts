@@ -14,6 +14,7 @@ import { billingPricingSchema } from "@/lib/schemas/api/platform-billing";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { stripeSessionKey } from "@/lib/billing-keys";
 
 export const billingPricing = billingPricingSchema.parse({
   credit_price_cad: CREDIT_PRICE_CAD,
@@ -274,7 +275,7 @@ export async function pollBillingCheckoutSession(args: {
       type: "CREDIT",
       amount: creditAmount,
       note: `Added ${creditAmount} credits, stripe_session:${sessionId}`,
-      idempotencyKey: `stripe_session:${sessionId}`,
+      idempotencyKey: stripeSessionKey(sessionId),
     });
 
     return {
@@ -325,7 +326,7 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
       type: "CREDIT",
       amount: creditAmount,
       note: `Added ${creditAmount} credits, stripe_session:${sessionId}`,
-      idempotencyKey: `stripe_session:${sessionId}`,
+      idempotencyKey: stripeSessionKey(sessionId),
     });
 
     return {

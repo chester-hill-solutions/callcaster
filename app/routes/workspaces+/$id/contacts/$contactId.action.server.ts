@@ -32,10 +32,6 @@ export const action = async ({
   try {
     const { supabaseClient, user } = await verifyAuth(request);
 
-    if (!user) {
-      return redirect("/signin");
-    }
-
     await requireWorkspaceAccess({
       supabaseClient,
       user: { id: user.id },

@@ -26,6 +26,7 @@ export type { RootLoaderData } from "./root.loader.server";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
+  { rel: "icon", href: "/favicon.ico" },
   { rel: "modulepreload", href: "/buffer-polyfill.mjs" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {

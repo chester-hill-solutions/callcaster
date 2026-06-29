@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { stripeEventKey } from "@/lib/billing-keys";
 import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
 import type { ActionFunctionArgs } from "react-router";
@@ -70,7 +71,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       type: "CREDIT",
       amount: creditAmount,
       note: `Added ${creditAmount} credits, stripe_evt:${event.id}`,
-      idempotencyKey: `stripe_evt:${event.id}`,
+      idempotencyKey: stripeEventKey(event.id),
     });
 
     if (inserted) {

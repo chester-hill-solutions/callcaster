@@ -108,10 +108,12 @@ export const twilio = singleton<Twilio.Twilio>("twilio", () =>
   new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN())
 );
 
-export async function sendSms(request: {
-  from: string;
-  to: string;
-  body: string;
-}) {
-  return twilio.messages.create(request);
+/**
+ * Construct a fresh parent-account Twilio REST client.
+ * Use this when a route needs a one-off parent client (e.g. available-number
+ * search) without reusing the process-wide {@link twilio} singleton. Routes
+ * must not call `new Twilio.Twilio(...)` inline (ADR-0011 / issue #1007).
+ */
+export function createParentTwilioInstance(): Twilio.Twilio {
+  return new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
 }

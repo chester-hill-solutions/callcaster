@@ -1,7 +1,7 @@
 import { data as routeData, redirect } from "react-router";
 import { deepEqual } from "@/lib/utils";
 import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
-import { isObject } from "@/lib/type-utils";
+import { isObject } from "@/lib/type-safety-utils";
 import { logger } from "@/lib/logger.server";
 import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -26,10 +26,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const { supabaseClient, user } = await verifyAuth(request);
-  if (!user) {
-    return redirect("/signin");
-  }
-
   const userRole = await getUserRole({ supabaseClient, user, workspaceId: workspace_id });
   const scripts = await getWorkspaceScripts({
     workspace: workspace_id,

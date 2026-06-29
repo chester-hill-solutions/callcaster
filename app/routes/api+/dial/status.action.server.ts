@@ -3,6 +3,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -82,7 +83,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .select();
           if (outreachError) throw outreachError;
           await call.update({
-            twiml: `<Response><Pause length="5"/><Play>${voicemailData.signedUrl}</Play></Response>`,
+            twiml: pausePlayTwiml(voicemailData.signedUrl, 5),
           });
           return routeData({ success: true });
         } else {
@@ -93,7 +94,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .select();
           if (outreachError) throw outreachError;
           await call.update({
-            twiml: `<Response><Hangup/></Response>`,
+            twiml: hangupTwiml(),
           });
           return routeData({ success: true });
         }

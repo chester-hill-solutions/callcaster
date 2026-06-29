@@ -22,11 +22,46 @@ import {
     getQueueDisplayLabel,
     getQueueDisplayState,
     QUEUE_STATUS_FILTERS,
+    QUEUE_SETTABLE_STATUSES,
     type QueueStatusFilter,
+    type QueueSettableStatus,
 } from "@/lib/queue-status";
 
-const STATUS_OPTIONS = ["queued", "dequeued"] as const;
 const ATTEMPT_OPTIONS = ["completed", "failed", "no-answer", "voicemail", "unknown"] as const;
+
+type SupportLevel = 1 | 2 | 3 | 4 | 5;
+
+const SUPPORT_LEVEL_LABELS: Record<SupportLevel, string> = {
+    1: "Strong Support",
+    2: "Lean Support",
+    3: "Undecided",
+    4: "Lean Opposition",
+    5: "Strong Opposition",
+};
+
+const SUPPORT_LEVEL_BADGE_CLASS: Record<SupportLevel, string> = {
+    1: "bg-emerald-500/20 text-emerald-800 border-emerald-500/40",
+    2: "bg-green-500/10 text-green-800 border-green-500/30",
+    3: "bg-amber-500/20 text-amber-900 border-amber-500/60 ring-2 ring-amber-400/40 font-semibold",
+    4: "bg-orange-500/10 text-orange-800 border-orange-500/30",
+    5: "bg-red-500/20 text-red-800 border-red-500/40",
+};
+
+function getContactSupportLevel(contact: Contact & {
+    outreach_attempt?: Array<{ support_level?: number | null }>;
+    support_level?: number | null;
+}): SupportLevel | null {
+    const fromAttempt = contact?.outreach_attempt?.[0]?.support_level;
+    if (typeof fromAttempt === "number" && fromAttempt >= 1 && fromAttempt <= 5) {
+        return fromAttempt as SupportLevel;
+    }
+    const fromContact = contact?.support_level;
+    if (typeof fromContact === "number" && fromContact >= 1 && fromContact <= 5) {
+        return fromContact as SupportLevel;
+    }
+    return null;
+}
+
 interface QueueTableProps {
     queue: QueueItem[] | null;
     totalCount: number | null;
@@ -45,7 +80,7 @@ interface QueueTableProps {
     };
     handleFilterChange: (key: string, value: string) => void;
     clearFilter: () => void;
-    onStatusChange?: (selectedIds: string[], status: typeof STATUS_OPTIONS[number]) => void;
+    onStatusChange?: (selectedIds: string[], status: QueueSettableStatus) => void;
     onSelectAllFiltered: (isSelected: boolean) => void;
     isAllFilteredSelected: boolean;
     addContactToQueue: (contact: (Contact & { contact_audience: { audience_id: number }[] })[]) => void;
@@ -159,7 +194,7 @@ export function QueueTable({
     }, [optimisticQueue, onSelectAllFiltered]);
 
     // Optimistic update handlers
-    const handleStatusChangeOptimistic = useCallback((selectedIds: string[], newStatus: typeof STATUS_OPTIONS[number]) => {
+    const handleStatusChangeOptimistic = useCallback((selectedIds: string[], newStatus: QueueSettableStatus) => {
         snapshotRef.current = optimisticQueue ?? [];
         const idsToUpdate = selectedIds.length > 0
             ? selectedIds
@@ -464,7 +499,7 @@ export function QueueTable({
                             onChange={(e) => {
                                 const newValue = e.target.value;
                                 if (selectedRows.length > 0 || isAllFilteredSelected) {
-                                    handleStatusChangeOptimistic(selectedRows, newValue as typeof STATUS_OPTIONS[number]);
+                                    handleStatusChangeOptimistic(selectedRows, newValue as QueueSettableStatus);
                                 } else {
                                     setOptimisticQueueStatus(newValue);
                                     handleFilterChange('queueStatus', newValue);
@@ -475,7 +510,7 @@ export function QueueTable({
                             {selectedRows.length > 0 || isAllFilteredSelected ? (
                                 <>
                                     <option value="">Set status...</option>
-                                    {STATUS_OPTIONS.map((status) => (
+                                    {QUEUE_SETTABLE_STATUSES.map((status) => (
                                         <option key={status} value={status}>{status}</option>
                                     ))}
                                 </>
@@ -505,15 +540,18 @@ export function QueueTable({
         },
         {
             accessorFn: (row) => {
-                const contact = row.contact as Contact & { outreach_attempt?: Array<{ disposition: string }> };
-                return contact?.outreach_attempt?.[0]?.disposition || '-';
+                const contact = row.contact as Contact & {
+                    outreach_attempt?: Array<{ support_level?: number | null }>;
+                    support_level?: number | null;
+                };
+                return getContactSupportLevel(contact)?.toString() ?? '-';
             },
             id: 'disposition',
             header: ({ column }) => {
                 return (
                     <div className="flex flex-col items-center px-1 space-y-1">
                         <div className="space-y-1">
-                            <span className="font-medium text-xs">Attempt</span>
+                            <span className="font-medium text-xs">Support</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <select name="disposition" value={optimisticDisposition} className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs" onChange={(e) => { const v = e.target.value; setOptimisticDisposition(v); handleFilterChange('disposition', v); }}>
@@ -527,12 +565,30 @@ export function QueueTable({
                 )
             },
             cell: ({ row }) => {
-                const contact = row.original.contact as Contact & { outreach_attempt?: Array<{ disposition: string }> };
-                const disposition: 'completed' | 'failed' | 'no-answer' | 'voicemail' | 'unknown' = contact?.outreach_attempt?.[0]?.disposition as 'completed' | 'failed' | 'no-answer' | 'voicemail' | 'unknown' || 'unknown';
-                const badgeClass = disposition === 'completed' ? 'bg-green-500/10 text-green-800' : disposition === 'failed' ? 'bg-red-500/20 text-red-800' : disposition === 'no-answer' ? 'bg-yellow-500/20 text-yellow-800' : disposition === 'voicemail' ? 'bg-blue-500/10 text-blue-800' : 'bg-gray-500/10 text-gray-800';
+                const contact = row.original.contact as Contact & {
+                    outreach_attempt?: Array<{ support_level?: number | null }>;
+                    support_level?: number | null;
+                };
+                const level = getContactSupportLevel(contact);
+                if (level === null) {
+                    return (
+                        <span className="text-center w-full text-[8px] px-2 py-1 rounded-full bg-gray-500/10 text-gray-800 border border-gray-500/20">
+                            UNKNOWN
+                        </span>
+                    );
+                }
+                const badgeClass = SUPPORT_LEVEL_BADGE_CLASS[level];
+                const label = SUPPORT_LEVEL_LABELS[level];
+                const isUndecided = level === 3;
                 return (
-                    <span className={`text-center w-full text-[8px] px-2 py-1 rounded-full ${badgeClass}`}>{disposition?.trim().toUpperCase() || '-'}</span   >
-                )
+                    <span
+                        className={`text-center w-full text-[8px] px-2 py-1 rounded-full border ${badgeClass}`}
+                        title={label}
+                        aria-label={`Support level ${level}: ${label}`}
+                    >
+                        {level} · {isUndecided ? label.toUpperCase() : label.toUpperCase()}
+                    </span>
+                );
             },
         }
     ], [isAllFilteredSelected, onSelectAllFiltered, rowSelection, optimisticDisposition, optimisticQueueStatus]);

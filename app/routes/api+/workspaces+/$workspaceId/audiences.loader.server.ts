@@ -1,23 +1,12 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import {
-  listWorkspaceAudiencesApi,
-  resolveDataPlaneAuth,
-} from "@/lib/platform-data.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { listWorkspaceAudiencesApi } from "@/lib/platform-data.server";
+import { withWorkspaceApiLoader } from "@/lib/workspace-api-route.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-
-  const auth = await resolveDataPlaneAuth(request, workspaceId);
-  if (auth instanceof Response) return auth;
-
-  const result = await listWorkspaceAudiencesApi(auth.supabase, workspaceId);
+export const loader = withWorkspaceApiLoader(async ({ supabase, workspaceId }) => {
+  const result = await listWorkspaceAudiencesApi(supabase, workspaceId);
   if (!result.ok) {
     return jsonError(result.error, result.status);
   }
 
   return jsonResponse({ audiences: result.audiences }, 200);
-}
+});

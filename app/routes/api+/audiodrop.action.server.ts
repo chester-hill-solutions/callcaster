@@ -1,7 +1,8 @@
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
-import { resolveJsonAuthSession } from "@/lib/api-route-auth.server";
+import { resolveJsonAuthSession } from "@/lib/api-auth.server";
+import { playTwiml } from "@/lib/twilio-twiml.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type TwilioSDK from "twilio";
 
@@ -68,7 +69,7 @@ export const action = async ({
       return { success: false, error: "No signed URL found" };
     }
     twilio.calls(call.sid).update({
-      twiml: `<Response><Play>${audio.signedUrl}</Play></Response>`,
+      twiml: playTwiml(audio.signedUrl),
     });
   } catch (error) {
     logger.error("Error in audiodrop:", error);

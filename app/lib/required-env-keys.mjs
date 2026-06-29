@@ -1,6 +1,7 @@
 /** @typedef {import("./required-env-keys.ts").RequiredEnvKey} RequiredEnvKey */
 
 export const REQUIRED_ENV_KEYS = [
+  "DATABASE_URL",
   "SUPABASE_URL",
   "SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_KEY",

@@ -2,12 +2,11 @@ import { Link, NavLink, useLoaderData, useSearchParams } from "react-router";
 import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 
-import WorkspaceNav from "@/components/workspace/WorkspaceNav";
-import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Heading } from "@/components/ui/typography";
 import type { ContactsLoaderData } from "@/lib/contacts-loader.types";
 import { formatDateToLocale } from "@/lib/utils";
 
@@ -56,7 +55,7 @@ function formatOtherData(data: unknown[]) {
 }
 
 export default function ContactsPage() {
-  const { contacts, error, userRole, workspace, pagination, campaigns } =
+  const { contacts, error, pagination } =
     useLoaderData<ContactsLoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get("q") ?? "";
@@ -83,44 +82,31 @@ export default function ContactsPage() {
   const isSearchEmpty = (contacts?.length ?? 0) === 0 && searchTerm;
 
   return (
-    <main className="mx-auto flex h-full w-full max-w-[1500px] flex-col gap-4 px-4 py-6 sm:px-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-        {workspace && userRole && (
-          <WorkspaceNav
-            workspace={workspace}
-            campaigns={campaigns}
-            userRole={userRole}
-          />
-        )}
-        <div
-          className={`min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6 ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
-        >
-          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary">
-              {workspace != null
-                ? `${workspace?.name} Contacts`
-                : "No Workspace"}
-            </h1>
-            <div className="flex items-center gap-4">
-              <Button
-                asChild
-                className="font-Zilla-Slab text-base font-semibold"
-              >
-                <Link to={`./new`}>Add Contact</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="font-Zilla-Slab text-base font-semibold"
-              >
-                <Link to=".." relative="path">
-                  Back
-                </Link>
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <Heading as="h1" level={2} branded={false}>
+          Contacts
+        </Heading>
+        <div className="flex flex-wrap items-center gap-4">
+          <Button
+            asChild
+            className="font-Zilla-Slab text-base font-semibold"
+          >
+            <Link to={`./new`}>Add Contact</Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="font-Zilla-Slab text-base font-semibold"
+          >
+            <Link to=".." relative="path">
+              Back
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-          <div className="mt-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div className="relative w-72">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -170,16 +156,16 @@ export default function ContactsPage() {
               Add Your Own Contacts to this Workspace!
             </h4>
           )}
-          {isSearchEmpty && (
-            <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-foreground">
-              No contacts found matching "{searchTerm}"
-            </h4>
-          )}
+      {isSearchEmpty && (
+        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-foreground">
+          No contacts found matching "{searchTerm}"
+        </h4>
+      )}
 
-          {(contacts?.length ?? 0) > 0 && (
-            <>
-              <DataTable
-                className="rounded-md border-2 border-border font-semibold text-foreground"
+      {(contacts?.length ?? 0) > 0 && (
+        <>
+          <DataTable
+                className="font-semibold text-foreground"
                 data={contacts ?? []}
                 columns={[
                   {
@@ -276,19 +262,17 @@ export default function ContactsPage() {
                 ]}
               />
 
-              {pagination.totalPages > 1 && (
-                <div className="mb-8 mt-4 flex justify-center">
-                  <TablePagination
-                    currentPage={pagination.currentPage}
-                    totalPages={pagination.totalPages}
-                    onPageChange={handlePageChange}
-                  />
-                </div>
-              )}
-            </>
+          {pagination.totalPages > 1 && (
+            <div className="mb-8 mt-4 flex justify-center">
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
           )}
-        </div>
-      </div>
-    </main>
+        </>
+      )}
+    </div>
   );
 }

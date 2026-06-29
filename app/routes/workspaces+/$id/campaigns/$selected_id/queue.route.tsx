@@ -2,8 +2,8 @@ export { loader } from "./queue.loader.server";
 export { action } from "./queue.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
-import { Suspense, useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { toast } from "sonner";
+import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 
 import { Spinner } from "@/components/ui/spinner";
@@ -85,7 +85,7 @@ export function ErrorBoundary() {
     return (
         <div className="flex flex-col items-center justify-center p-8">
             <h2 className="text-xl font-semibold mb-4">Error Loading Queue</h2>
-            <p className="text-gray-600 mb-4">There was a problem loading the queue data. Please try again.</p>
+            <p className="mb-4 text-muted-foreground">There was a problem loading the queue data. Please try again.</p>
             <div>{error?.message || "An unknown error occurred"}</div>
             <Button onClick={() => window.location.reload()}>
                 Retry
@@ -210,29 +210,24 @@ function QueueResolvedContent({
         queueError: queueValue.queueError || null,
     } as QueueResponse;
 
-    useEffect(() => {
-        if (queueActions.queueFetcher.state !== "idle" || !queueActions.queueFetcher.data) {
-            return;
-        }
-        const data = queueActions.queueFetcher.data as {
-            error?: string;
-            warning?: string;
-            success?: boolean;
-            partial?: boolean;
-            enqueued?: number;
-        };
-        if (data.error) {
-            toast.error(data.error);
-            return;
-        }
-        if (data.warning) {
-            toast.warning(data.warning);
-            return;
-        }
-        if (data.success && typeof data.enqueued === "number" && data.enqueued > 0) {
-            toast.success(`Added ${data.enqueued} contacts to the queue`);
-        }
-    }, [queueActions.queueFetcher.state, queueActions.queueFetcher.data]);
+    useActionFeedback(queueActions.queueFetcher.data, {
+        enabled: queueActions.queueFetcher.state === "idle",
+        getWarning: (data) =>
+            data && typeof data === "object" && "warning" in data
+                ? (data as { warning?: string }).warning
+                : undefined,
+        getSuccess: (data) =>
+            Boolean(
+                data &&
+                    typeof data === "object" &&
+                    "success" in data &&
+                    (data as { success?: boolean }).success &&
+                    typeof (data as { enqueued?: number }).enqueued === "number" &&
+                    ((data as { enqueued?: number }).enqueued ?? 0) > 0,
+            ),
+        successMessage: (data) =>
+            `Added ${(data as { enqueued?: number }).enqueued} contacts to the queue`,
+    });
 
     return (
         <>

@@ -1,13 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import {
+  deriveWorkspaceMessagingReadiness,
+  evaluateWorkspaceReadinessByIds,
   getWorkspaceMessagingOnboardingState,
+  predicatePassed,
+  type WorkspaceReadinessContext,
 } from "@/lib/messaging-onboarding.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import {
   getWorkspaceTwilioPortalConfig,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
 } from "@/lib/database.server";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import type { TwilioAccountData } from "@/lib/types";
 
 export class WorkspaceSmsNotReadyError extends Error {
@@ -22,6 +27,10 @@ export class WorkspaceSmsNotReadyError extends Error {
 
 /**
  * Fail closed before outbound SMS when workspace Twilio messaging is not ready.
+ *
+ * Reuses `deriveWorkspaceMessagingReadiness` for the shared messaging/A2P predicates
+ * (so UI readiness and the send gate cannot diverge), then projects the send-gate-only
+ * predicates (sender pool, toll-free verification) over the same predicate table.
  */
 export async function assertWorkspaceCanSendSms({
   supabaseClient,
@@ -30,54 +39,52 @@ export async function assertWorkspaceCanSendSms({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<void> {
-  const [onboarding, portalConfig, senderPool, workspaceRow] = await Promise.all([
+  const twilioData = (await loadWorkspaceTwilioData(
+    supabaseClient,
+    workspaceId,
+  )) as unknown as TwilioAccountData;
+
+  const [onboarding, portalConfig, senderPool] = await Promise.all([
     getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
     getWorkspaceTwilioPortalConfig({ supabaseClient, workspaceId }),
     verifyWorkspaceMessagingSenderPool({ supabaseClient, workspaceId }),
-    supabaseClient
-      .from("workspace")
-      .select("twilio_data")
-      .eq("id", workspaceId)
-      .single(),
   ]);
 
-  const syncSnapshot = getWorkspaceTwilioSyncSnapshotFromTwilioData(
-    (workspaceRow.data?.twilio_data ?? null) as TwilioAccountData,
-  );
+  const syncSnapshot = getWorkspaceTwilioSyncSnapshotFromTwilioData(twilioData);
+
+  const readiness = deriveWorkspaceMessagingReadiness({
+    onboarding,
+    workspaceNumbers: [],
+    recentOutboundCount: 0,
+  });
+
+  const ctx: WorkspaceReadinessContext = {
+    onboarding,
+    workspaceNumbers: [],
+    recentOutboundCount: 0,
+    senderPool,
+    portalConfig: { sendMode: portalConfig.sendMode },
+    syncSnapshot: { tollFreeVerificationBlocked: syncSnapshot.tollFreeVerificationBlocked },
+  };
+
+  const sendGateResults = evaluateWorkspaceReadinessByIds(ctx, [
+    "sender_pool_in_sync",
+    "sender_pool_has_senders",
+    "toll_free_verified",
+  ]);
 
   const reasons: string[] = [];
 
-  if (!onboarding.messagingService.serviceSid) {
+  if (!readiness.messagingReady) {
     reasons.push("Messaging Service has not been provisioned.");
   }
 
-  const sendViaService =
-    portalConfig.sendMode === "messaging_service" ||
-    onboarding.messagingService.desiredSendMode === "messaging_service";
-
-  if (sendViaService && !senderPool.inSync) {
-    if (senderPool.missingFromPool.length > 0) {
-      reasons.push(
-        `Sender pool is missing numbers: ${senderPool.missingFromPool.join(", ")}.`,
-      );
-    }
-    if (senderPool.livePhoneNumbers.length === 0) {
-      reasons.push("Messaging Service has no senders in the Twilio sender pool.");
-    }
-  }
-
-  if (
-    onboarding.selectedChannels.includes("a2p10dlc") &&
-    onboarding.a2p10dlc.status !== "approved" &&
-    onboarding.a2p10dlc.status !== "live"
-  ) {
+  if (!predicatePassed("a2p_approved", ctx)) {
     reasons.push("A2P 10DLC registration is not approved yet.");
   }
 
-  if (syncSnapshot.tollFreeVerificationBlocked) {
-    reasons.push(
-      "Toll-free verification is pending or rejected. Bulk SMS is blocked until Twilio approves verification.",
-    );
+  for (const result of sendGateResults) {
+    reasons.push(result.message);
   }
 
   if (reasons.length > 0) {

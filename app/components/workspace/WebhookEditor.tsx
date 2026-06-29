@@ -5,20 +5,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Heading } from "@/components/ui/typography";
-
-type EventCategory = 
-  | "inbound_call" 
-  | "inbound_sms" 
-  | "outbound_call"
-  | "outbound_sms"
-  | "voicemail";
-
-type EventType = "INSERT" | "UPDATE";
-
-type WebhookEvent = {
-  category: EventCategory;
-  type: EventType;
-};
+import type {
+  WebhookEvent,
+  WebhookEventCategory,
+  WebhookEventType,
+} from "@/lib/twilio.types";
 
 type WebhookEditorProps = {
   initialWebhook?: {
@@ -115,7 +106,7 @@ export default function WebhookEditor({
     initialWebhook?.destination_url || "",
   );
   
-  const [eventConfig, setEventConfig] = useState<Record<EventCategory, {insert: boolean, update: boolean}>>({
+  const [eventConfig, setEventConfig] = useState<Record<WebhookEventCategory, {insert: boolean, update: boolean}>>({
     inbound_call: {
       insert: initialWebhook?.events?.some(e => e.category === "inbound_call" && e.type === "INSERT") || false,
       update: initialWebhook?.events?.some(e => e.category === "inbound_call" && e.type === "UPDATE") || false,
@@ -145,7 +136,7 @@ export default function WebhookEditor({
   const fetcher = useFetcher();
   const isBusy = fetcher.state !== "idle";
 
-  const submitTestEvent = (category: EventCategory, eventType: EventType) => {
+  const submitTestEvent = (category: WebhookEventCategory, eventType: WebhookEventType) => {
     if (isBusy || !destinationUrl) return;
     
     // Create a deep copy of the test event
@@ -194,7 +185,7 @@ export default function WebhookEditor({
     );
   };
 
-  const handleEventConfigChange = (category: EventCategory, type: "insert" | "update", checked: boolean) => {
+  const handleEventConfigChange = (category: WebhookEventCategory, type: "insert" | "update", checked: boolean) => {
     setEventConfig(prev => ({
       ...prev,
       [category]: {
@@ -218,10 +209,10 @@ export default function WebhookEditor({
     const events: WebhookEvent[] = [];
     Object.entries(eventConfig).forEach(([category, config]) => {
       if (config.insert) {
-        events.push({ category: category as EventCategory, type: "INSERT" });
+        events.push({ category: category as WebhookEventCategory, type: "INSERT" });
       }
       if (config.update) {
-        events.push({ category: category as EventCategory, type: "UPDATE" });
+        events.push({ category: category as WebhookEventCategory, type: "UPDATE" });
       }
     });
     

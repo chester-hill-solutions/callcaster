@@ -1,8 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { normalizePhoneNumber } from "@/lib/utils";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import Twilio from "twilio";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 
 export type CallerIdValidationRequest = {
   accountSid: string;
@@ -36,27 +35,9 @@ export async function startWorkspaceCallerIdVerification({
 }): Promise<StartWorkspaceCallerIdVerificationResult> {
   const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
 
-  const { data, error } = await supabase
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (error) {
-    throw new Error(`Supabase query error: ${error.message}`);
-  }
-  if (!data) {
-    throw new Error("No workspace data found");
-  }
-
-  const creds = readTwilioWorkspaceCredentials(
-    (data as { twilio_data?: unknown }).twilio_data,
-  );
-  if (!creds) {
-    throw new Error("Workspace twilio_data not found");
-  }
-
-  const twilio = new Twilio.Twilio(creds.sid, creds.authToken, {
-    accountSid: creds.sid,
+  const twilio = await createWorkspaceTwilioInstance({
+    supabase,
+    workspace_id: workspaceId,
   });
 
   const validationRequest = await twilio.validationRequests.create({

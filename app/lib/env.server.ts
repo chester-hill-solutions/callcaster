@@ -6,6 +6,8 @@
  */
 
 type EnvConfig = {
+  DATABASE_URL: string;
+  DATABASE_DIRECT_URL?: string;
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_KEY: string;
@@ -31,6 +33,7 @@ const optionalEnvVars: (keyof EnvConfig)[] = [
   'OPENAI_API_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'TWILIO_VALIDATE_WEBHOOKS',
+  'DATABASE_DIRECT_URL',
 ];
 
 /**
@@ -85,6 +88,8 @@ if (typeof window === 'undefined') {
  * Use this instead of directly accessing process.env
  */
 export const env = {
+  DATABASE_URL: () => getEnv('DATABASE_URL'),
+  DATABASE_DIRECT_URL: () => getEnv('DATABASE_DIRECT_URL'),
   SUPABASE_URL: () => getEnv('SUPABASE_URL'),
   SUPABASE_ANON_KEY: () => getEnv('SUPABASE_ANON_KEY'),
   SUPABASE_SERVICE_KEY: () => getEnv('SUPABASE_SERVICE_KEY'),

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     callUpdate: vi.fn(),
     twilioFactory: vi.fn(),
+    createParentTwilioInstance: vi.fn(),
   };
 });
 
@@ -15,9 +16,16 @@ vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/twilio-twiml.server", () => ({
+  pauseTwiml: (seconds: number) => `<Response><Pause length="${seconds}"/></Response>`,
+}));
 
 vi.mock("twilio", () => ({
   default: (...args: any[]) => mocks.twilioFactory(...args),
+}));
+
+vi.mock("@/twilio.server", () => ({
+  createParentTwilioInstance: () => mocks.createParentTwilioInstance(),
 }));
 
 describe("app/routes/api.disconnect.ts", () => {
@@ -29,6 +37,7 @@ describe("app/routes/api.disconnect.ts", () => {
     mocks.logger.error.mockReset();
     mocks.callUpdate.mockReset();
     mocks.twilioFactory.mockReset();
+    mocks.createParentTwilioInstance.mockReset();
     process.env = { ...origEnv };
   });
 
@@ -54,7 +63,7 @@ describe("app/routes/api.disconnect.ts", () => {
     process.env.TWILIO_SID = "sid";
     process.env.TWILIO_AUTH_TOKEN = "tok";
     mocks.safeParseJson.mockResolvedValueOnce({ call: { parameters: { CallSid: "CA1" } } });
-    mocks.twilioFactory.mockReturnValueOnce({
+    mocks.createParentTwilioInstance.mockReturnValueOnce({
       calls: (_sid: string) => ({ update: mocks.callUpdate }),
     });
     mocks.callUpdate.mockResolvedValueOnce({});
@@ -65,7 +74,7 @@ describe("app/routes/api.disconnect.ts", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
 
     mocks.safeParseJson.mockResolvedValueOnce({ call: { parameters: { CallSid: "CA1" } } });
-    mocks.twilioFactory.mockReturnValueOnce({
+    mocks.createParentTwilioInstance.mockReturnValueOnce({
       calls: (_sid: string) => ({ update: mocks.callUpdate }),
     });
     mocks.callUpdate.mockRejectedValueOnce(new Error("nope"));

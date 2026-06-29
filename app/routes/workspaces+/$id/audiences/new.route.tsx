@@ -3,8 +3,16 @@ export { action } from "./new.action.server";
 import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
-import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import {
+  BrandedCard,
+  BrandedCardActions,
+  BrandedCardContent,
+  BrandedCardTitle,
+} from "@/components/shared/BrandedCard";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Text } from "@/components/ui/typography";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
@@ -51,16 +59,16 @@ export default function AudiencesNew() {
   return (
     <section
       id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
+      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
     >
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900 w-[60vw]">
-        <CardTitle>Add an Audience</CardTitle>
-        {actionData?.error && (
-          <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
+      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
+        <BrandedCardTitle>Add an Audience</BrandedCardTitle>
+        {actionData?.error ? (
+          <Text className="text-center text-destructive">
             Error: {actionData.error}
-          </p>
-        )}
-        <CardContent>
+          </Text>
+        ) : null}
+        <BrandedCardContent>
           <Tabs value={`step-${currentStep}`} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger 
@@ -89,23 +97,18 @@ export default function AudiencesNew() {
             
             <TabsContent value="step-1" className="space-y-4">
               <form onSubmit={handleCreateAudience} className="space-y-6">
-                <label
-                  htmlFor="audience-name"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
-                  Audience Name
-                  <input
+                <FormField htmlFor="audience-name" label="Audience Name">
+                  <Input
                     type="text"
                     name="audience-name"
                     id="audience-name"
                     value={audienceName}
                     onChange={(e) => setAudienceName(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
                     required
                   />
-                </label>
+                </FormField>
                 
-                <div className="flex items-center justify-between gap-4">
+                <BrandedCardActions>
                   <Button
                     type="button"
                     variant="outline"
@@ -113,35 +116,31 @@ export default function AudiencesNew() {
                   >
                     Cancel
                   </Button>
-                  
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="submit"
-                      disabled={!audienceName || isSubmitting}
-                      className="bg-brand-primary text-white hover:bg-brand-secondary"
-                    >
-                      Create Empty Audience
-                    </Button>
-                    
-                    <Button
-                      type="button"
-                      onClick={goToNextStep}
-                      disabled={!audienceName}
-                      className="bg-brand-primary text-white hover:bg-brand-secondary"
-                    >
-                      Next: Upload Contacts <MdArrowForward className="ml-2" />
-                    </Button>
-                  </div>
-                </div>
+                  <Button
+                    type="submit"
+                    disabled={!audienceName || isSubmitting}
+                    className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  >
+                    Create Empty Audience
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={goToNextStep}
+                    disabled={!audienceName}
+                    className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  >
+                    Next: Upload Contacts <MdArrowForward className="ml-2" />
+                  </Button>
+                </BrandedCardActions>
               </form>
             </TabsContent>
             
             <TabsContent value="step-2" className="space-y-4">
               <div className="text-center mb-4">
                 <h3 className="text-lg font-medium">Upload Contacts</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+                <Text variant="muted" className="text-center">
                   Upload a CSV file with your contacts. You'll be able to map the columns in the next step.
-                </p>
+                </Text>
               </div>
               
               <div className="space-y-6">
@@ -165,14 +164,14 @@ export default function AudiencesNew() {
             <TabsContent value="step-3" className="space-y-4">
               <div className="text-center">
                 <h3 className="text-lg font-medium mb-2">Upload Complete</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+                <Text variant="muted">
                   Your audience has been created and contacts are being processed.
-                </p>
+                </Text>
               </div>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+        </BrandedCardContent>
+      </BrandedCard>
     </section>
   );
 }

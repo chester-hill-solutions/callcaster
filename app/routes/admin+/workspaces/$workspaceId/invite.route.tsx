@@ -5,7 +5,7 @@ import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useAct
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { BrandedCard as Card } from "@/components/shared/BrandedCard";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { compareMembersByRole } from "@/lib/workspace-members";

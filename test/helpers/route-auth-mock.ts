@@ -3,6 +3,8 @@ import {
   requireDualAuth,
   requireJsonAuth,
   requireSudo,
+  resolveDualAuthSession,
+  resolveJsonAuthSession,
 } from "@/lib/api-auth.server";
 
 export type RouteAuthSessionInput = {
@@ -66,9 +68,13 @@ export function resetRouteAuthMocks(): void {
   vi.mocked(requireDualAuth).mockReset();
   vi.mocked(requireJsonAuth).mockReset();
   vi.mocked(requireSudo).mockReset();
+  vi.mocked(resolveDualAuthSession).mockReset();
+  vi.mocked(resolveJsonAuthSession).mockReset();
   vi.mocked(requireDualAuth).mockResolvedValue(unauthorizedResponse());
   vi.mocked(requireJsonAuth).mockResolvedValue(unauthorizedResponse());
   vi.mocked(requireSudo).mockResolvedValue(forbiddenResponse());
+  vi.mocked(resolveDualAuthSession).mockRejectedValue(unauthorizedResponse());
+  vi.mocked(resolveJsonAuthSession).mockRejectedValue(unauthorizedResponse());
 }
 
 export function setDualAuthSession(session: RouteAuthSessionInput): unknown {
@@ -77,6 +83,13 @@ export function setDualAuthSession(session: RouteAuthSessionInput): unknown {
   vi.mocked(requireJsonAuth).mockResolvedValue(
     session.user ? buildJsonAuth(session) : unauthorizedResponse(),
   );
+  const sessionResult = {
+    supabaseClient: session.supabaseClient ?? {},
+    headers: session.headers ?? new Headers(),
+    user: session.user ?? undefined,
+  };
+  vi.mocked(resolveDualAuthSession).mockResolvedValue(sessionResult);
+  vi.mocked(resolveJsonAuthSession).mockResolvedValue(sessionResult);
   return auth;
 }
 
@@ -92,6 +105,11 @@ export function queueDualAuthSession(session: RouteAuthSessionInput): unknown {
 export function setJsonAuthSession(session: RouteAuthSessionInput): unknown {
   const auth = buildJsonAuth(session);
   vi.mocked(requireJsonAuth).mockResolvedValue(auth);
+  vi.mocked(resolveJsonAuthSession).mockResolvedValue({
+    supabaseClient: session.supabaseClient ?? {},
+    headers: session.headers ?? new Headers(),
+    user: session.user ?? undefined,
+  });
   return auth;
 }
 

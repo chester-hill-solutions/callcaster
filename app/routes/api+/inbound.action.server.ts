@@ -1,5 +1,5 @@
 import {
-  loadWorkspaceTwilioData,
+  resolveWorkspaceTwilioData,
   twilioWebhookBadRequest,
   twilioWebhookInternalError,
   twilioWebhookNotFound,
@@ -137,7 +137,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ? number.workspace
         : null;
 
-  twilioData = (await loadWorkspaceTwilioData(
+  twilioData = (await resolveWorkspaceTwilioData(
     supabase,
     workspaceIdFromNumber,
     twilioData,

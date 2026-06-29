@@ -1,3 +1,5 @@
+import { jsonError } from "./platform-api.server";
+
 type RateLimitBucket = {
   count: number;
   resetAt: number;
@@ -43,19 +45,9 @@ export function checkRateLimit(config: RateLimitConfig): RateLimitResult {
 }
 
 export function rateLimitResponse(retryAfterSeconds: number): Response {
-  return new Response(
-    JSON.stringify({
-      error: "Too many requests",
-      code: "rate_limited",
-    }),
-    {
-      status: 429,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": String(retryAfterSeconds),
-      },
-    },
-  );
+  return jsonError("Too many requests", 429, "rate_limited", {
+    "Retry-After": String(retryAfterSeconds),
+  });
 }
 
 export function clientRateLimitKey(request: Request, scope: string): string {

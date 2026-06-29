@@ -50,7 +50,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!user) return redirect("/signin");
   const [campaignType, queueCounts, workspace, userRole] = await Promise.all([
     supabaseClient
       .from("campaign")
@@ -89,6 +88,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     expected_total: number;
   }[];
 
+  const readiness = getCampaignReadiness(workspace, campaignDetails, {
+    queueCount: queueCounts.queuedCount ?? queueCounts.fullCount,
+  });
+  const joinDisabled = readiness.startDisabledReason
+    ? readiness.startDisabledReason
+    : workspace?.status === "scheduled"
+      ? "Campaign scheduled."
+      : !workspace?.is_active
+        ? "It is currently outside of the campaign's calling hours"
+        : null;
+  const scheduleDisabled = readiness.scheduleDisabledReason;
+
   return routeData({
     selected_id,
     hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(
@@ -98,5 +109,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     user: user,
     results: resultsPromise || [], // Deferred loading
     queueCounts,
+    readiness,
+    joinDisabled,
+    scheduleDisabled,
   });
 }

@@ -115,18 +115,10 @@ export function CallScreenLayout({
   } = phoneVerification;
 
   return (
-    <main className="container mx-auto p-6">
-      <div
-        style={{
-          border: "3px solid #BCEBFF",
-          alignItems: "stretch",
-          display: "flex",
-          borderRadius: "20px",
-          justifyContent: "space-between",
-        }}
-        className="mb-6"
-      >
+    <div className="w-full space-y-6">
+      <div className="flex flex-col gap-4 rounded-2xl border-2 border-brand-secondary/40 p-4 sm:p-6 lg:flex-row lg:items-start">
         <CampaignHeader
+          className="min-w-0 flex-1"
           campaign={campaign}
           count={count}
           completed={completed}
@@ -159,7 +151,7 @@ export function CallScreenLayout({
           onVerifyNewNumber={handleVerifyNewNumber}
           pin={pin || ""}
         />
-        <div className="m-4">
+        <div className="shrink-0 self-center lg:self-start">
           <PhoneKeypad
             onKeyPress={handleDTMF}
             displayState={displayState}
@@ -268,6 +260,6 @@ export function CallScreenLayout({
         creditsError={credits === 0 || creditsError}
         hasAccess={hasAccess}
       />
-    </main>
+    </div>
   );
 }

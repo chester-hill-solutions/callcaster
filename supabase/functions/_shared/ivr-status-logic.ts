@@ -35,7 +35,7 @@ export { voiceBillingKindFromCampaignType, type VoiceBillingKind } from "../../.
 
 export function billingUnitsFromDurationSeconds(
   durationSeconds: number,
-  kind: VoiceBillingKind = "ivr",
+  kind: VoiceBillingKind,
 ): number {
   return debitAmountFromCredits(
     voiceCreditsFromDurationSeconds(durationSeconds, kind),
@@ -77,6 +77,7 @@ type SupabaseArrayResult<T> = Promise<{ data: T[] | null; error: any }>;
 
 export type SupabaseLike = {
   from: (table: string) => any;
+  rpc?: (fn: string, args: Record<string, unknown>) => any;
 };
 
 export async function getCallWithRetry<TCall = any>(
@@ -117,6 +118,9 @@ export async function insertTransactionHistoryIdempotent(args: {
   amount: number;
   note: string;
   idempotencyKey: string;
+  campaignId?: number | null;
+  callSid?: string | null;
+  messageSid?: string | null;
 }): Promise<{ inserted: boolean }> {
   const idempotencyKey = args.idempotencyKey.trim();
   if (!idempotencyKey) {
@@ -126,19 +130,21 @@ export async function insertTransactionHistoryIdempotent(args: {
   return withTransactionHistoryInsertLock(
     `${args.workspaceId}:${args.type}:${idempotencyKey}`,
     async () => {
-      const { data, error } = (await args.supabase
-        .from("transaction_history")
-        .insert({
-          workspace: args.workspaceId,
-          type: args.type,
-          amount: args.amount,
-          note: args.note,
-          idempotency_key: idempotencyKey,
-        })
-        .select("id")
-        .single()) as Awaited<SupabaseSingleResult<{ id: number }>>;
+      const { data, error } = (await (args.supabase as any).rpc(
+        "apply_ledger_entry_and_sync_credits",
+        {
+          p_workspace_id: args.workspaceId,
+          p_type: args.type,
+          p_amount: args.amount,
+          p_idempotency_key: idempotencyKey,
+          p_description: args.note,
+          p_campaign_id: args.campaignId ?? null,
+          p_call_sid: args.callSid ?? null,
+          p_message_sid: args.messageSid ?? null,
+        },
+      )) as { data: { id: number; inserted: boolean } | null; error: any };
 
-      if (!error) {
+      if (!error && data?.id) {
         console.info(
           "billing.transaction",
           JSON.stringify({
@@ -146,43 +152,18 @@ export async function insertTransactionHistoryIdempotent(args: {
             type: args.type,
             amount: args.amount,
             idempotencyKey,
-            inserted: true,
+            inserted: data.inserted,
           }),
         );
-        return { inserted: true };
+        return { inserted: data.inserted };
       }
 
-      const pgCode = (error as { code?: string }).code;
-      if (pgCode === "23505") {
-        const { data: existing, error: existingError } = (await args.supabase
-          .from("transaction_history")
-          .select("id")
-          .eq("workspace", args.workspaceId)
-          .eq("type", args.type)
-          .eq("idempotency_key", idempotencyKey)
-          .limit(1)) as Awaited<SupabaseArrayResult<{ id: number }>>;
-
-        if (!existingError && existing && existing.length > 0) {
-          console.info(
-            "billing.transaction",
-            JSON.stringify({
-              workspaceId: args.workspaceId,
-              type: args.type,
-              amount: args.amount,
-              idempotencyKey,
-              inserted: false,
-            }),
-          );
-          return { inserted: false };
-        }
-      }
-
-      console.error("transaction_history insert failed", {
+      console.error("transaction_history RPC failed", {
         error,
         workspaceId: args.workspaceId,
         idempotencyKey,
       });
-      throw error;
+      throw error ?? new Error("apply_ledger_entry_and_sync_credits returned no row");
     },
   );
 }

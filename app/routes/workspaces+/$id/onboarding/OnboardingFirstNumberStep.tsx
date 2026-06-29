@@ -11,7 +11,7 @@ import {
   countVerifiedCallerIdNumbers,
   isVerifiedCallerIdNumber,
   workspaceHasFirstNumber,
-} from "@/lib/messaging-onboarding.server";
+} from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingActionData } from "../onboarding.action.server";
 import type { OnboardingStepProps } from "./types";
 

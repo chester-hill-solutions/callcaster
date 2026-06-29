@@ -3,13 +3,23 @@ import * as React from "react";
 import { Heading, Text } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 
-export interface SectionProps extends React.HTMLAttributes<HTMLElement> {}
+export interface SectionProps extends React.HTMLAttributes<HTMLElement> {
+  /** elevated = standalone card; flat = in-panel section (no nested card chrome) */
+  variant?: "elevated" | "flat";
+}
 
-export function Section({ children, className, ...props }: SectionProps) {
+export function Section({
+  children,
+  className,
+  variant = "elevated",
+  ...props
+}: SectionProps) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-border/80 bg-card p-6 text-card-foreground shadow-sm",
+        variant === "elevated"
+          ? "rounded-lg border border-border/80 bg-card p-6 text-card-foreground shadow-sm"
+          : "space-y-4 border-b border-border/60 pb-8 last:border-b-0 last:pb-0",
         className,
       )}
       {...props}
@@ -25,12 +35,15 @@ export interface SectionHeaderProps
   description?: React.ReactNode;
   actions?: React.ReactNode;
   branded?: boolean;
+  /** tighter spacing when nested in a flat in-panel section */
+  compact?: boolean;
 }
 
 export function SectionHeader({
   actions,
   branded,
   className,
+  compact,
   description,
   title,
   ...props
@@ -38,7 +51,8 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        "mb-6 flex flex-col gap-4 border-b border-border/60 pb-4 sm:flex-row sm:items-start sm:justify-between",
+        "flex flex-col gap-4 border-b border-border/60 sm:flex-row sm:items-start sm:justify-between",
+        compact ? "mb-4 pb-3" : "mb-6 pb-4",
         className,
       )}
       {...props}

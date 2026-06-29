@@ -378,6 +378,7 @@ export type Database = {
           id: number;
           is_active: boolean;
           next_queue_order: number;
+          phase: Database["public"]["Enums"]["campaign_phase"] | null;
           schedule: Json | null;
           sms_messaging_service_sid: string | null;
           sms_send_mode: string | null;
@@ -399,6 +400,7 @@ export type Database = {
           id?: number;
           is_active?: boolean;
           next_queue_order?: number;
+          phase?: Database["public"]["Enums"]["campaign_phase"] | null;
           schedule?: Json | null;
           sms_messaging_service_sid?: string | null;
           sms_send_mode?: string | null;
@@ -420,6 +422,7 @@ export type Database = {
           id?: number;
           is_active?: boolean;
           next_queue_order?: number;
+          phase?: Database["public"]["Enums"]["campaign_phase"] | null;
           schedule?: Json | null;
           sms_messaging_service_sid?: string | null;
           sms_send_mode?: string | null;
@@ -600,13 +603,19 @@ export type Database = {
           email: string | null;
           external_id: string | null;
           firstname: string | null;
+          household_id: string | null;
           id: number;
           opt_out: boolean | null;
           other_data: Json[];
           phone: string | null;
           postal: string | null;
           province: string | null;
+          support_level: number | null;
           surname: string | null;
+          voter_id: string | null;
+          voter_list_expires_at: string | null;
+          voter_list_imported_at: string | null;
+          voter_list_source: Database["public"]["Enums"]["voter_list_source"] | null;
           workspace: string | null;
           fullname: string | null;
         };
@@ -622,13 +631,19 @@ export type Database = {
           email?: string | null;
           external_id?: string | null;
           firstname?: string | null;
+          household_id?: string | null;
           id?: number;
           opt_out?: boolean | null;
           other_data?: Json[];
           phone?: string | null;
           postal?: string | null;
           province?: string | null;
+          support_level?: number | null;
           surname?: string | null;
+          voter_id?: string | null;
+          voter_list_expires_at?: string | null;
+          voter_list_imported_at?: string | null;
+          voter_list_source?: Database["public"]["Enums"]["voter_list_source"] | null;
           workspace?: string | null;
         };
         Update: {
@@ -643,13 +658,19 @@ export type Database = {
           email?: string | null;
           external_id?: string | null;
           firstname?: string | null;
+          household_id?: string | null;
           id?: number;
           opt_out?: boolean | null;
           other_data?: Json[];
           phone?: string | null;
           postal?: string | null;
           province?: string | null;
+          support_level?: number | null;
           surname?: string | null;
+          voter_id?: string | null;
+          voter_list_expires_at?: string | null;
+          voter_list_imported_at?: string | null;
+          voter_list_source?: Database["public"]["Enums"]["voter_list_source"] | null;
           workspace?: string | null;
         };
         Relationships: [
@@ -665,6 +686,13 @@ export type Database = {
             columns: ["workspace"];
             isOneToOne: false;
             referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
             referencedColumns: ["id"];
           },
         ];
@@ -698,6 +726,56 @@ export type Database = {
             columns: ["contact_id"];
             isOneToOne: false;
             referencedRelation: "contact";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      households: {
+        Row: {
+          id: string;
+          household_key: string;
+          workspace_id: string | null;
+          address: string | null;
+          city: string | null;
+          province: string | null;
+          postal: string | null;
+          do_not_knock: boolean;
+          last_contacted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_key: string;
+          workspace_id?: string | null;
+          address?: string | null;
+          city?: string | null;
+          province?: string | null;
+          postal?: string | null;
+          do_not_knock?: boolean;
+          last_contacted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_key?: string;
+          workspace_id?: string | null;
+          address?: string | null;
+          city?: string | null;
+          province?: string | null;
+          postal?: string | null;
+          do_not_knock?: boolean;
+          last_contacted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "households_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
             referencedColumns: ["id"];
           },
         ];
@@ -1059,40 +1137,61 @@ export type Database = {
         Row: {
           answered_at: string | null;
           campaign_id: number;
+          callback_audit: boolean | null;
           contact_id: number;
           created_at: string;
           current_step: string | null;
           disposition: string | null;
           ended_at: string | null;
           id: number;
+          issue_tags: string[] | null;
+          lawn_sign: boolean | null;
+          membership_sold: boolean | null;
           result: Json;
+          support_level: number | null;
           user_id: string | null;
+          volunteer_interest: string | null;
+          vote_by_mail: boolean | null;
           workspace: string;
         };
         Insert: {
           answered_at?: string | null;
           campaign_id: number;
+          callback_audit?: boolean | null;
           contact_id: number;
           created_at?: string;
           current_step?: string | null;
           disposition?: string | null;
           ended_at?: string | null;
           id?: number;
+          issue_tags?: string[] | null;
+          lawn_sign?: boolean | null;
+          membership_sold?: boolean | null;
           result?: Json;
+          support_level?: number | null;
           user_id?: string | null;
+          volunteer_interest?: string | null;
+          vote_by_mail?: boolean | null;
           workspace?: string;
         };
         Update: {
           answered_at?: string | null;
           campaign_id?: number;
+          callback_audit?: boolean | null;
           contact_id?: number;
           created_at?: string;
           current_step?: string | null;
           disposition?: string | null;
           ended_at?: string | null;
           id?: number;
+          issue_tags?: string[] | null;
+          lawn_sign?: boolean | null;
+          membership_sold?: boolean | null;
           result?: Json;
+          support_level?: number | null;
           user_id?: string | null;
+          volunteer_interest?: string | null;
+          vote_by_mail?: boolean | null;
           workspace?: string;
         };
         Relationships: [
@@ -2213,6 +2312,26 @@ export type Database = {
         };
         Returns: undefined;
       };
+      apply_ledger_entry_and_sync_credits: {
+        Args: {
+          p_workspace_id: string;
+          p_type: string;
+          p_amount: number;
+          p_idempotency_key: string;
+          p_description?: string | null;
+          p_campaign_id?: number | null;
+          p_call_sid?: string | null;
+          p_message_sid?: string | null;
+        };
+        Returns: {
+          id: number;
+          inserted: boolean;
+          amount: number;
+          type: string;
+          idempotency_key: string;
+          workspace: string;
+        };
+      };
       authorize: {
         Args: {
           selected_workspace_id: string;
@@ -2920,6 +3039,7 @@ export type Database = {
         | "busy"
         | "no-answer"
         | "initiated";
+      campaign_phase: "identification" | "persuasion" | "gotv";
       campaign_status:
         | "pending"
         | "scheduled"
@@ -2956,6 +3076,13 @@ export type Database = {
         | "read";
       queue_entry_state: "queued" | "offered" | "accepted" | "declined" | "timed_out" | "abandoned" | "completed";
       queue_status: "queued" | "dequeued";
+      voter_list_source:
+        | "liberalist"
+        | "van"
+        | "elections_canada"
+        | "elections_ontario"
+        | "manual"
+        | "other";
       workspace_permission:
         | "workspace.delete"
         | "workspace.addUser"

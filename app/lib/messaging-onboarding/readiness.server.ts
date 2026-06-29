@@ -5,16 +5,89 @@ import type {
 } from "@/lib/types";
 import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
 import { DEFAULT_WORKSPACE_ONBOARDING_STEPS } from "@/lib/messaging-onboarding/defaults.server";
+import {
+  type WorkspaceReadinessContext,
+  type ReadinessResult,
+  type WorkspaceReadinessChannel,
+  BUSINESS_PROFILE_REQUIRED_FIELDS,
+  WORKSPACE_READINESS_PREDICATES,
+  evaluateWorkspaceReadiness,
+  evaluateWorkspaceReadinessByIds,
+  evaluateWorkspaceReadinessForChannels,
+  predicatePassed,
+  workspaceHasFirstNumber,
+  countRentedWorkspaceNumbers,
+  countVerifiedCallerIdNumbers,
+  isVerifiedCallerIdNumber,
+} from "@/lib/messaging-onboarding/predicates";
+
+export {
+  countRentedWorkspaceNumbers,
+  countVerifiedCallerIdNumbers,
+  isVerifiedCallerIdNumber,
+  workspaceHasFirstNumber,
+} from "@/lib/messaging-onboarding/predicates";
+export type {
+  ReadinessResult,
+  WorkspaceReadinessChannel,
+  WorkspaceReadinessContext,
+  WorkspaceReadinessPredicate,
+  WorkspaceReadinessSenderPool,
+  WorkspaceReadinessNumber,
+  ReadinessResultSeverity,
+  EvaluateWorkspaceReadinessOptions,
+} from "@/lib/messaging-onboarding/predicates";
+export {
+  WORKSPACE_READINESS_PREDICATES,
+  BUSINESS_PROFILE_REQUIRED_FIELDS,
+  evaluateWorkspaceReadiness,
+  evaluateWorkspaceReadinessByIds,
+  evaluateWorkspaceReadinessForChannels,
+  predicatePassed,
+} from "@/lib/messaging-onboarding/predicates";
 
 export type BuildOnboardingStepsContext = {
   hasFirstNumber?: boolean;
 };
+
+function buildReadinessContext(
+  onboarding: WorkspaceMessagingOnboardingState,
+  workspaceNumbers: WorkspaceReadinessContext["workspaceNumbers"],
+  context: BuildOnboardingStepsContext = {},
+  extras: Partial<WorkspaceReadinessContext> = {},
+): WorkspaceReadinessContext {
+  return {
+    onboarding,
+    workspaceNumbers,
+    hasFirstNumber: context.hasFirstNumber,
+    rcsOnboardingEnabled: isRcsOnboardingEnabled(),
+    ...extras,
+  };
+}
+
+function isBusinessBasicsComplete(ctx: WorkspaceReadinessContext): boolean {
+  for (const field of BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc) {
+    const value = ctx.onboarding.businessProfile[field];
+    if (Array.isArray(value) ? value.length === 0 : !value || !value.trim()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isEmergencyReady(onboarding: WorkspaceMessagingOnboardingState): boolean {
+  return (
+    onboarding.emergencyVoice.address.status === "validated" &&
+    onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length > 0
+  );
+}
 
 export function buildOnboardingStepsForState(
   onboarding: WorkspaceMessagingOnboardingState,
   context: BuildOnboardingStepsContext = {},
 ): WorkspaceOnboardingStepState[] {
   const hasFirstNumber = context.hasFirstNumber ?? false;
+  const ctx = buildReadinessContext(onboarding, [], context);
   const stepById = Object.fromEntries(
     DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => [step.id, step]),
   ) as Record<string, WorkspaceOnboardingStepState>;
@@ -25,25 +98,13 @@ export function buildOnboardingStepsForState(
   const firstNumberStep = stepById.first_number!;
   const providerProvisioningStep = stepById.provider_provisioning!;
   const launchChecksStep = stepById.launch_checks!;
-  const businessBasicsComplete = Boolean(
-    onboarding.businessProfile.legalBusinessName &&
-      onboarding.businessProfile.websiteUrl &&
-      onboarding.businessProfile.useCaseSummary &&
-      onboarding.businessProfile.sampleMessages.length > 0,
-  );
-  const emergencyReady =
-    onboarding.emergencyVoice.address.status === "validated" &&
-    onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length > 0;
+
+  const businessBasicsComplete = isBusinessBasicsComplete(ctx);
   const providerReady =
-    (!onboarding.selectedChannels.includes("a2p10dlc") ||
-      onboarding.a2p10dlc.status === "approved" ||
-      onboarding.a2p10dlc.status === "live") &&
-    (!isRcsOnboardingEnabled() ||
-      !onboarding.selectedChannels.includes("rcs") ||
-      onboarding.rcs.status === "approved" ||
-      onboarding.rcs.status === "live" ||
-      onboarding.rcs.status === "in_review");
-  const hasFirstNumberComplete = hasFirstNumber;
+    predicatePassed("a2p_approved", ctx) && predicatePassed("rcs_ready", ctx);
+  const emergencyReady = isEmergencyReady(onboarding);
+  const messagingProvisioned = predicatePassed("messaging_service_provisioned", ctx);
+  const pathSelected = predicatePassed("path_selection_complete", ctx);
 
   return [
     {
@@ -56,15 +117,15 @@ export function buildOnboardingStepsForState(
     },
     {
       ...pathSelectionStep,
-      status: onboarding.selectedChannels.length > 0 ? "complete" : "in_progress",
+      status: pathSelected ? "complete" : "in_progress",
     },
     {
       ...messagingServiceStep,
-      status: onboarding.messagingService.serviceSid ? "complete" : "in_progress",
+      status: messagingProvisioned ? "complete" : "in_progress",
     },
     {
       ...firstNumberStep,
-      status: hasFirstNumberComplete ? "complete" : "in_progress",
+      status: hasFirstNumber ? "complete" : "in_progress",
     },
     {
       ...providerProvisioningStep,
@@ -73,60 +134,14 @@ export function buildOnboardingStepsForState(
     {
       ...launchChecksStep,
       status:
-        onboarding.messagingService.serviceSid &&
-        hasFirstNumberComplete &&
+        messagingProvisioned &&
+        hasFirstNumber &&
         providerReady &&
         (!onboarding.selectedChannels.includes("voice_compliance") || emergencyReady)
           ? "complete"
           : "pending",
     },
   ];
-}
-
-export function countRentedWorkspaceNumbers(
-  workspaceNumbers: Array<{ type?: string | null }>,
-): number {
-  return workspaceNumbers.filter((number) => number.type === "rented").length;
-}
-
-export function isVerifiedCallerIdNumber(number: {
-  type?: string | null;
-  capabilities?: unknown;
-}): boolean {
-  if (number.type !== "caller_id") {
-    return false;
-  }
-  if (
-    !number.capabilities ||
-    typeof number.capabilities !== "object" ||
-    Array.isArray(number.capabilities)
-  ) {
-    return false;
-  }
-  return (
-    (number.capabilities as Record<string, unknown>).verification_status === "success"
-  );
-}
-
-export function countVerifiedCallerIdNumbers(
-  workspaceNumbers: Array<{
-    type?: string | null;
-    capabilities?: unknown;
-  }>,
-): number {
-  return workspaceNumbers.filter(isVerifiedCallerIdNumber).length;
-}
-
-export function workspaceHasFirstNumber(
-  workspaceNumbers: Array<{
-    type?: string | null;
-    capabilities?: unknown;
-  }>,
-): boolean {
-  return (
-    countRentedWorkspaceNumbers(workspaceNumbers) > 0 ||
-    countVerifiedCallerIdNumbers(workspaceNumbers) > 0
-  );
 }
 
 export function deriveWorkspaceMessagingReadiness({
@@ -143,52 +158,28 @@ export function deriveWorkspaceMessagingReadiness({
   recentOutboundCount: number;
 }): WorkspaceMessagingReadiness {
   const numbers = workspaceNumbers.filter(Boolean);
-  const rentedNumbers = numbers.filter((number) => number.type === "rented");
-  const callerIds = numbers.filter((number) => number.type === "caller_id");
   const hasLegacyTraffic = recentOutboundCount > 0 || numbers.length > 0;
-  const messagingReady = Boolean(onboarding.messagingService.serviceSid);
-  const hasValidatedEmergencyAddress =
-    onboarding.emergencyVoice.address.status === "validated";
-  const businessCountryCode = onboarding.emergencyVoice.address.countryCode.trim().toUpperCase();
-  const isCanadianBusiness = businessCountryCode === "CA" || businessCountryCode === "CANADA";
-  const voiceReady =
-    !onboarding.selectedChannels.includes("voice_compliance") ||
-    (onboarding.emergencyVoice.enabled &&
-      hasValidatedEmergencyAddress &&
-      onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length > 0);
 
-  const warnings: string[] = [];
-  if (!messagingReady) {
-    warnings.push("Messaging Service has not been provisioned yet.");
-  }
-  if (
-    onboarding.selectedChannels.includes("a2p10dlc") &&
-    !isCanadianBusiness &&
-    onboarding.a2p10dlc.status !== "approved" &&
-    onboarding.a2p10dlc.status !== "live"
-  ) {
-    warnings.push("A2P 10DLC registration is not approved yet.");
-  }
-  if (
-    onboarding.selectedChannels.includes("voice_compliance") &&
-    !voiceReady
-  ) {
-    warnings.push("Emergency voice readiness is incomplete.");
-  }
-  if (callerIds.length > 0 && rentedNumbers.length === 0) {
-    warnings.push(
-      "Only verified caller IDs are present. Outbound is supported, but inbound SMS and calls require a rented number.",
-    );
-  }
-  if (!workspaceHasFirstNumber(numbers)) {
-    warnings.push("No phone number yet.");
-  }
+  const ctx = buildReadinessContext(onboarding, numbers, {
+    hasFirstNumber: workspaceHasFirstNumber(numbers),
+  });
 
-  const shouldRedirectToOnboarding = !hasLegacyTraffic && warnings.length > 0;
+  const results = evaluateWorkspaceReadinessByIds(ctx, [
+    "messaging_service_provisioned",
+    "a2p_approved",
+    "voice_ready",
+    "caller_ids_only",
+    "first_number_present",
+  ]);
+
+  const warnings = results.map((result) => result.message);
+  const messagingReady = predicatePassed("messaging_service_provisioned", ctx);
+  const voiceReady = predicatePassed("voice_ready", ctx);
+  const shouldRedirectToOnboarding = !hasLegacyTraffic && results.length > 0;
 
   return {
     shouldRedirectToOnboarding,
-    shouldShowOnboardingBanner: warnings.length > 0,
+    shouldShowOnboardingBanner: results.length > 0,
     messagingReady,
     voiceReady,
     legacyMode: hasLegacyTraffic,

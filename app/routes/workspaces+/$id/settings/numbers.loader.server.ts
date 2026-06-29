@@ -40,7 +40,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (user) {
     const userRole = await getUserRole({
       supabaseClient,
-      user: user as unknown as User,
+      user: user,
       workspaceId,
     });
     const hasAccess = userRole?.role !== MemberRole.Caller;

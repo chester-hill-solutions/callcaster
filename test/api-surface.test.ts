@@ -12,6 +12,7 @@ import {
 } from "../app/lib/api-surface";
 import { completeOpenApiSpec } from "../app/lib/openapi-complete";
 import { openApiSpec } from "../app/lib/openapi";
+import { toOpenApiPath } from "../app/lib/openapi-build";
 import { INTEGRATOR_API_PATHS } from "../app/lib/public-api";
 
 describe("complete openapi spec", () => {
@@ -34,12 +35,13 @@ describe("complete openapi spec", () => {
         !(e.duplicate && e.routeModule.endsWith(".js")),
     );
     for (const entry of documentable) {
-      expect(completeOpenApiSpec.paths).toHaveProperty(entry.path);
+      const openApiPath = toOpenApiPath(entry.path);
+      expect(completeOpenApiSpec.paths).toHaveProperty(openApiPath);
       for (const op of entry.operations) {
         const method = op.method.toLowerCase() as "post" | "get" | "put" | "patch" | "delete";
         const pathItem =
           completeOpenApiSpec.paths[
-            entry.path as keyof typeof completeOpenApiSpec.paths
+            openApiPath as keyof typeof completeOpenApiSpec.paths
           ];
         expect(pathItem?.[method]).toBeDefined();
       }
@@ -54,7 +56,7 @@ describe("complete openapi spec", () => {
     for (const entry of unsupported.slice(0, 5)) {
       const op = Object.values(
         completeOpenApiSpec.paths[
-          entry.path as keyof typeof completeOpenApiSpec.paths
+          toOpenApiPath(entry.path) as keyof typeof completeOpenApiSpec.paths
         ] ?? {},
       )[0] as { "x-callcaster-supported"?: boolean } | undefined;
       expect(op?.["x-callcaster-supported"]).toBe(false);
@@ -102,7 +104,7 @@ describe("api surface inventory enums", () => {
   test("public OpenAPI covers publicOpenApi inventory", () => {
     for (const entry of getPublicOpenApiEntries()) {
       if (entry.duplicate && entry.routeModule.endsWith(".js")) continue;
-      expect(openApiSpec.paths).toHaveProperty(entry.path);
+      expect(openApiSpec.paths).toHaveProperty(toOpenApiPath(entry.path));
     }
   });
 
@@ -112,12 +114,10 @@ describe("api surface inventory enums", () => {
     }
   });
 
-  test("duplicate outreach routes share duplicateGroup", () => {
-    const dupes = API_SURFACE.filter((e) => e.path === "/api/outreach_attempts/:id");
-    expect(dupes).toHaveLength(2);
-    expect(new Set(dupes.map((d) => d.duplicateGroup))).toEqual(
-      new Set(["outreach_attempts-id"]),
-    );
+  test("outreach attempt id route is singular in inventory", () => {
+    const entries = API_SURFACE.filter((e) => e.path === "/api/outreach_attempts/:id");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.routeModule).toBe("app/routes/api+/outreach_attempts/$id.route.tsx");
   });
 
   test("surface keys are unique except explicit duplicate modules", () => {

@@ -5,6 +5,7 @@ import {
   getWorkspaceMessagingOnboardingFromTwilioData,
 } from "@/lib/messaging-onboarding.server";
 import { createWorkspaceTwilioClient } from "@/lib/twilio-client.server";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import type { TwilioAccountData } from "@/lib/types";
 
 export type TwilioWebhookDriftSeverity = "error" | "warning" | "info";
@@ -56,15 +57,10 @@ export async function auditWorkspaceTwilioWebhooks({
   const baseUrl = env.BASE_URL().replace(/\/$/, "");
   const edgeSmsStatus = `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/sms-status`;
 
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) throw error;
-
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(
+    supabaseClient,
+    workspaceId,
+  )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const expected = {
     inboundVoice: `${baseUrl}/api/inbound`,

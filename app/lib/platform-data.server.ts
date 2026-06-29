@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  getDualAuthSupabase,
+  requireJsonAuth,
+  verifyApiKeyOrSession,
+  type VerifyApiKeyOrSessionResult,
+} from "@/lib/api-auth.server";
+import {
   getCampaignTableKey,
   getWorkspaceCampaigns,
 } from "@/lib/database/campaign.server";
@@ -10,7 +16,7 @@ import {
 } from "@/lib/database/campaign-stats.server";
 import { buildContactSearchFilter } from "@/lib/contacts/search.server";
 import { getChatSortOption } from "@/lib/chat-conversation-sort";
-import { csvResponse, toCsvString } from "@/lib/csv";
+import { csvResponse, formatDateUtc, safeFilenamePart, toCsvString } from "@/lib/csv";
 import {
   fetchConversationSummary,
   requireWorkspaceAccess,
@@ -19,16 +25,13 @@ import type { Database } from "@/lib/database.types";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { logger } from "@/lib/logger.server";
 import { jsonError } from "@/lib/platform-api.server";
+import { parsePagination, type PaginationMeta } from "@/lib/pagination.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
   filteredSearch,
   type QueueSearchFilters,
 } from "@/lib/queue-filter-search.server";
 import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
-import {
-  verifyApiKeyOrSession,
-  type VerifyApiKeyOrSessionResult,
-} from "@/lib/api-auth.server";
 import type { Campaign } from "@/lib/types";
 import type {
   CampaignStatusBody,
@@ -80,7 +83,7 @@ export async function resolveDataPlaneAuth(
     return jsonError(auth.error, auth.status);
   }
 
-  const supabase = getSupabaseFromAuth(auth);
+  const supabase = getDualAuthSupabase(auth);
 
   if (auth.authType === "api_key") {
     if (workspaceId && auth.workspaceId !== workspaceId) {
@@ -98,19 +101,6 @@ export async function resolveDataPlaneAuth(
   }
 
   return { supabase, userId: auth.user.id };
-}
-
-function getSupabaseFromAuth(
-  auth: Exclude<VerifyApiKeyOrSessionResult, { error: string; status: 401 }>,
-): SupabaseClient<Database> {
-  return auth.authType === "api_key" ? auth.supabase : auth.supabaseClient;
-}
-
-export async function requireResourceWorkspaceAccess(
-  request: Request,
-  workspaceId: string,
-): Promise<DataPlaneAuthContext | Response> {
-  return resolveDataPlaneAuth(request, workspaceId);
 }
 
 async function getCampaignWorkspaceId(
@@ -170,7 +160,7 @@ export async function authForCampaign(
     return jsonError(auth.error, auth.status);
   }
 
-  const supabase = getSupabaseFromAuth(auth);
+  const supabase = getDualAuthSupabase(auth);
   const workspaceId = await getCampaignWorkspaceId(supabase, campaignId);
   if (!workspaceId) {
     return jsonError("Campaign not found", 404);
@@ -200,7 +190,7 @@ export async function authForContact(
     return jsonError(auth.error, auth.status);
   }
 
-  const supabase = getSupabaseFromAuth(auth);
+  const supabase = getDualAuthSupabase(auth);
   const workspaceId = await getContactWorkspaceId(supabase, contactId);
   if (!workspaceId) {
     return jsonError("Contact not found", 404);
@@ -230,7 +220,7 @@ export async function authForScript(
     return jsonError(auth.error, auth.status);
   }
 
-  const supabase = getSupabaseFromAuth(auth);
+  const supabase = getDualAuthSupabase(auth);
   const workspaceId = await getScriptWorkspaceId(supabase, scriptId);
   if (!workspaceId) {
     return jsonError("Script not found", 404);
@@ -260,7 +250,7 @@ export async function authForSurvey(
     return jsonError(auth.error, auth.status);
   }
 
-  const supabase = getSupabaseFromAuth(auth);
+  const supabase = getDualAuthSupabase(auth);
   const workspaceId = await getSurveyWorkspaceId(supabase, surveyId);
   if (!workspaceId) {
     return jsonError("Survey not found", 404);
@@ -279,6 +269,38 @@ export async function authForSurvey(
     workspaceId,
   });
   return { supabase, userId: auth.user.id, workspaceId };
+}
+
+/** Auth for outreach attempt: session-only, resolves workspace from the attempt row. */
+export async function authForOutreachAttempt(
+  request: Request,
+  outreachAttemptId: number,
+): Promise<{ supabase: SupabaseClient<Database>; user: { id: string; email?: string } } | Response> {
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+
+  const supabase = getDualAuthSupabase(auth as any);
+  const { data: attempt, error } = await supabase
+    .from("outreach_attempt")
+    .select("workspace")
+    .eq("id", outreachAttemptId)
+    .single();
+
+  if (error || !attempt?.workspace) {
+    return jsonError("Outreach attempt not found", 404);
+  }
+
+  try {
+    await requireWorkspaceAccess({
+      supabaseClient: supabase,
+      user: (auth as any).user,
+      workspaceId: attempt.workspace,
+    });
+  } catch {
+    return jsonError("Forbidden", 403);
+  }
+
+  return { supabase, user: (auth as any).user };
 }
 
 export async function listWorkspaceCampaignsApi(
@@ -530,12 +552,9 @@ export async function getCampaignQueueApi(
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
-  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
-  const pageSize = Math.min(
-    100,
-    Math.max(1, Number.parseInt(searchParams.get("page_size") || "50", 10) || 50),
-  );
-  const offset = (page - 1) * pageSize;
+  const { page, pageSize, offset } = parsePagination(searchParams, {
+    defaultPageSize: 50,
+  });
 
   const filters = normalizeQueueFilters({
     name: searchParams.get("name") ?? undefined,
@@ -587,7 +606,7 @@ export async function getCampaignQueueApi(
         total_count: queueResult.count ?? 0,
         unfiltered_count: unfilteredCount.count ?? 0,
         queued_count: queuedCount.count ?? 0,
-      },
+      } satisfies PaginationMeta,
       filters,
     },
   };
@@ -701,11 +720,9 @@ export async function listWorkspaceContactsApi(
 ) {
   const rawSearchQuery = searchParams.get("q") ?? "";
   const searchQuery = rawSearchQuery.trim().replaceAll(",", " ");
-  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
-  const pageSize = Math.min(
-    100,
-    Math.max(1, Number.parseInt(searchParams.get("page_size") || "20", 10) || 20),
-  );
+  const { page, pageSize, offset } = parsePagination(searchParams, {
+    defaultPageSize: 20,
+  });
 
   let countQuery = supabase
     .from("contact")
@@ -718,7 +735,7 @@ export async function listWorkspaceContactsApi(
       "id, firstname, surname, phone, email, address, city, other_data, created_at",
     )
     .eq("workspace", workspaceId)
-    .range((page - 1) * pageSize, page * pageSize - 1)
+    .range(offset, offset + pageSize - 1)
     .order("created_at", { ascending: false });
 
   if (searchQuery) {
@@ -746,7 +763,7 @@ export async function listWorkspaceContactsApi(
       page_size: pageSize,
       total_count: totalCount,
       total_pages: Math.ceil(totalCount / pageSize),
-    },
+    } satisfies PaginationMeta,
     search_query: searchQuery || null,
   };
 }
@@ -825,14 +842,12 @@ export async function getAudienceDetailApi(
   audienceId: string,
   searchParams: URLSearchParams,
 ) {
-  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
-  const pageSize = Math.min(
-    100,
-    Math.max(1, Number.parseInt(searchParams.get("page_size") || "50", 10) || 50),
-  );
+  const { page, pageSize, offset } = parsePagination(searchParams, {
+    defaultPageSize: 50,
+  });
   const sortKey = searchParams.get("sort_key") || "id";
   const sortDirection = searchParams.get("sort_direction") === "desc" ? "desc" : "asc";
-  const from = (page - 1) * pageSize;
+  const from = offset;
   const to = from + pageSize - 1;
 
   const { data: audience, error: audienceError } = await supabase
@@ -877,7 +892,7 @@ export async function getAudienceDetailApi(
       page,
       page_size: pageSize,
       total_count: count ?? 0,
-    },
+    } satisfies PaginationMeta,
     sorting: { sort_key: sortKey, sort_direction: sortDirection },
     latest_upload: latestUpload
       ? {
@@ -1033,15 +1048,6 @@ export async function getSurveyResponsesApi(
   };
 }
 
-function safeFilenamePart(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
-}
-
-function formatDateUtc(value: string | null | undefined): string {
-  if (!value) return "-";
-  return new Date(value).toISOString();
-}
-
 export async function exportSurveyResponsesCsv(
   supabase: SupabaseClient<Database>,
   surveyId: string,
@@ -1168,12 +1174,10 @@ export async function listWorkspaceConversationsApi(
 ) {
   const campaignId = searchParams.get("campaign_id");
   const sortBy = getChatSortOption(searchParams.get("sort"));
-  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
-  const pageSize = Math.min(
-    100,
-    Math.max(10, Number.parseInt(searchParams.get("page_size") || "20", 10) || 20),
-  );
-  const offset = (page - 1) * pageSize;
+  const { page, pageSize, offset } = parsePagination(searchParams, {
+    defaultPageSize: 20,
+    minPageSize: 10,
+  });
 
   const { chats, chatsError, hasMore } = await fetchConversationSummary(
     supabase,
@@ -1193,7 +1197,7 @@ export async function listWorkspaceConversationsApi(
   return {
     ok: true as const,
     conversations: chats ?? [],
-    pagination: { page, page_size: pageSize, has_more: hasMore },
+    pagination: { page, page_size: pageSize, has_more: hasMore } satisfies PaginationMeta,
   };
 }
 

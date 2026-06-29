@@ -7,11 +7,11 @@ import {
   parseNumberSearchRequest,
 } from "@/lib/numbers-search.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { createParentTwilioInstance } from "@/twilio.server";
 
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
-import Twilio from "twilio";
+import type Twilio from "twilio";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -46,7 +46,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         workspace_id: workspaceId,
       })) as Twilio.Twilio;
     } else {
-      twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
+      // No workspace context (e.g. platform-admin search). Available-number
+      // search is parent-scoped, so use a fresh parent-account client.
+      twilio = createParentTwilioInstance();
     }
 
     const numberType = getNumberSearchNumberType(url.searchParams);

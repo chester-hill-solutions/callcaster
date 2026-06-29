@@ -18,7 +18,7 @@ vi.mock("@/twilio.server", () => ({
 }));
 
 import {
-  loadWorkspaceTwilioData,
+  resolveWorkspaceTwilioData,
   twilioWebhookForbidden,
   validateTwilioWebhookForCallSid,
   validateTwilioWebhookForPhoneNumber,
@@ -104,12 +104,12 @@ describe("twilio-webhook.server", () => {
     await expect(res.json()).resolves.toEqual({ error: "Nope" });
   });
 
-  test("loadWorkspaceTwilioData fetches workspace twilio_data when join lacks token", async () => {
+  test("resolveWorkspaceTwilioData fetches workspace twilio_data when join lacks token", async () => {
     const supabase = makeSupabase({
       workspaceTwilioData: { sid: "AC1", authToken: "fetched-token" },
     });
 
-    const result = await loadWorkspaceTwilioData(
+    const result = await resolveWorkspaceTwilioData(
       supabase as never,
       "w1",
       { sid: "AC1" },

@@ -26,14 +26,46 @@ interface MappedContact {
   [key: string]: unknown;
 }
 
+export type VoterListSource =
+  | "liberalist"
+  | "van"
+  | "elections_canada"
+  | "elections_ontario"
+  | "manual"
+  | "other";
+
+export const VOTER_LIST_SOURCE_ALIASES: Record<string, VoterListSource> = {
+  liberalist: "liberalist",
+  lib: "liberalist",
+  van: "van",
+  vanid: "van",
+  "van id": "van",
+  elections_canada: "elections_canada",
+  "elections canada": "elections_canada",
+  ec: "elections_canada",
+  elections_ontario: "elections_ontario",
+  "elections ontario": "elections_ontario",
+  eo: "elections_ontario",
+  manual: "manual",
+  other: "other",
+};
+
+export function normalizeVoterListSource(
+  raw: string | null | undefined,
+): VoterListSource | null {
+  if (!raw) return null;
+  const lower = raw.trim().toLowerCase();
+  return VOTER_LIST_SOURCE_ALIASES[lower] ?? null;
+}
+
 // Type guard for other_data array
 export function isOtherDataArray(
   value: unknown,
 ): value is Array<{ key: string; value: unknown }> {
-  return Array.isArray(value) && value.every(item => 
-    typeof item === 'object' && 
-    item !== null && 
-    'key' in item && 
+  return Array.isArray(value) && value.every(item =>
+    typeof item === 'object' &&
+    item !== null &&
+    'key' in item &&
     'value' in item
   );
 }
@@ -56,6 +88,7 @@ export const processAudienceUpload = async (
   headerMapping: Record<string, string>,
   splitNameColumn: string | null,
   deps: { parseCSV: typeof parseCSV } = { parseCSV },
+  voterListSource?: VoterListSource | null,
 ) => {
   // Initialize status data at the top level so it's available in catch block
   const statusData = {
@@ -128,14 +161,22 @@ export const processAudienceUpload = async (
     // Process contacts in chunks
     const CHUNK_SIZE = 100;
     let processedCount = 0;
+    const importedAt = new Date().toISOString();
+    const voterListStamp =
+      voterListSource != null
+        ? {
+            voter_list_source: voterListSource,
+            voter_list_imported_at: importedAt,
+          }
+        : null;
 
     for (let i = 0; i < parsedContacts.length; i += CHUNK_SIZE) {
       const chunk = parsedContacts.slice(i, i + CHUNK_SIZE);
-      
+
       // Map the contacts according to the header mapping
       const mappedContacts = chunk.map((contact: CSVContact) => {
         logger.debug('Processing contact:', contact);
-        
+
         const mappedContact: MappedContact = {
           workspace: workspaceId,
           created_by: userId,
@@ -185,6 +226,12 @@ export const processAudienceUpload = async (
         // Remove other_data if empty
         if (!mappedContact.other_data?.length) {
           delete mappedContact.other_data;
+        }
+
+        // ADR-0023: stamp voter-list provenance on every imported contact.
+        if (voterListStamp) {
+          mappedContact.voter_list_source = voterListStamp.voter_list_source;
+          mappedContact.voter_list_imported_at = voterListStamp.voter_list_imported_at;
         }
 
         logger.debug('Final mapped contact:', mappedContact);

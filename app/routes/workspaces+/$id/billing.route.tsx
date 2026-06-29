@@ -1,14 +1,34 @@
 export { loader } from "./billing.loader.server";
 export { action } from "./billing.action.server";
 
-import { data as routeData, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "react-router";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Form,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+  useSearchParams,
+} from "react-router";
 import { useState } from "react";
 
-import Stripe from "stripe";
-
-
+import { Section, SectionHeader } from "@/components/shared/Section";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Heading, Text } from "@/components/ui/typography";
 import {
   getTransactionDisplayDescription,
   getBillingEventSource,
@@ -47,7 +67,7 @@ export default function Credits() {
   const [selectedAmount, setSelectedAmount] = useState<number>(MIN_CREDITS);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
-  const actionData = useActionData();
+  const actionData = useActionData<{ error?: string }>();
 
   const paymentStatus = searchParams.get("payment_status");
   const paymentMessage = searchParams.get("payment_message");
@@ -63,79 +83,107 @@ export default function Credits() {
     { amount: 12500, price: 250 },
     { amount: 25000, price: 500 },
   ];
+
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="mb-8 text-3xl font-bold">Credits</h1>
+    <div className="space-y-6">
+      <Heading as="h1" level={2} branded={false}>
+        Credits
+      </Heading>
 
-      {paymentStatus === "success" && (
-        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-          Added {formatCredits(creditsAdded)} credits successfully. Your balance has been refreshed.
-        </div>
-      )}
-      {paymentStatus === "error" && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-          {paymentMessage || "We could not confirm this payment. If your card was charged, please contact support."}
-        </div>
-      )}
-      {paymentStatus === "canceled" && (
-        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Checkout was canceled. No charge was made.
-        </div>
-      )}
+      {paymentStatus === "success" ? (
+        <Alert variant="success">
+          <AlertTitle>Payment successful</AlertTitle>
+          <AlertDescription>
+            Added {formatCredits(creditsAdded)} credits successfully. Your balance
+            has been refreshed.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {paymentStatus === "error" ? (
+        <Alert variant="destructive">
+          <AlertTitle>Payment error</AlertTitle>
+          <AlertDescription>
+            {paymentMessage ||
+              "We could not confirm this payment. If your card was charged, please contact support."}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {paymentStatus === "canceled" ? (
+        <Alert variant="warning">
+          <AlertTitle>Checkout canceled</AlertTitle>
+          <AlertDescription>
+            Checkout was canceled. No charge was made.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
-      {/* Current Balance */}
-      <Card className="mb-8 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="mb-4 text-xl font-semibold">Current Balance</h2>
-            <div className="text-4xl font-bold text-primary">
-              {credits.balance} credits
-            </div>
-          </div>
-          <div className="text-sm text-gray-500 flex flex-col gap-2 max-w-xs">
-            <div>SMS: 1 credit per segment ($0.02)</div>
-            <div>
-              IVR / auto-dial: 2 credits per dial ($0.04), then 3 credits per
-              additional minute ($0.06)
-            </div>
-            <div>
-              Live staffed calls: 4 credits per dial ($0.08), then 5 credits per
-              additional minute ($0.10)
-            </div>
-            <div>Phone numbers: 100 credits per month ($2.00)</div>
-          </div>
+      <Section variant="flat">
+        <SectionHeader
+          branded={false}
+          compact
+          title="Current Balance"
+        />
+        <div className="text-4xl font-bold text-primary">
+          {credits.balance} credits
         </div>
-      </Card>
+        <Accordion type="single" collapsible className="w-full max-w-lg">
+          <AccordionItem value="rates" className="border-border/60">
+            <AccordionTrigger className="py-3 text-sm text-muted-foreground hover:no-underline">
+              Credit rates for messaging and calling
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                <div>SMS: 1 credit per segment ($0.02)</div>
+                <div>
+                  IVR / auto-dial: 2 credits per dial ($0.04), then 3 credits per
+                  additional minute ($0.06)
+                </div>
+                <div>
+                  Live staffed calls: 4 credits per dial ($0.08), then 5 credits per
+                  additional minute ($0.10)
+                </div>
+                <div>Phone numbers: 100 credits per month ($2.00)</div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </Section>
 
-      {/* Purchase Credits */}
-      <Card className="mb-8 p-6">
-        <h2 className="mb-4 text-xl font-semibold">Purchase Credits</h2>
-        <Form method="post">
+      <Section variant="flat">
+        <SectionHeader branded={false} compact title="Purchase Credits" />
+        <Form method="post" className="space-y-4">
           <input type="hidden" name="amount" value={selectedCredits || ""} />
-          <div className="mb-4 rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-            Credits cost {formatUnitPrice()} each. The minimum purchase is {formatCredits(MIN_CREDITS)} credits ({formatCurrency(MIN_PURCHASE_CAD)}).
-          </div>
+          <Text variant="muted" className="rounded-lg border bg-muted/30 p-4">
+            Credits cost {formatUnitPrice()} each. The minimum purchase is{" "}
+            {formatCredits(MIN_CREDITS)} credits ({formatCurrency(MIN_PURCHASE_CAD)}).
+          </Text>
           <div className="grid gap-4 md:grid-cols-3">
             {creditPackages.map((pkg) => (
               <button
                 type="button"
                 key={pkg.amount}
-                className={`w-full rounded-lg border p-4 text-left ${selectedAmount === pkg.amount && !isCustom ? "border-primary bg-primary/5" : "border-gray-700"
-                  }`}
+                className={`w-full rounded-lg border p-4 text-left transition-colors duration-150 ${
+                  selectedAmount === pkg.amount && !isCustom
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50"
+                }`}
                 onClick={() => {
                   setSelectedAmount(pkg.amount);
                   setIsCustom(false);
                 }}
               >
                 <div className="text-2xl font-bold">{formatCredits(pkg.amount)} credits</div>
-                <div className="text-gray-600">{formatCurrency(pkg.price)}</div>
+                <div className="text-muted-foreground">{formatCurrency(pkg.price)}</div>
               </button>
             ))}
             <div
               role="button"
               tabIndex={0}
-              className={`rounded-lg border p-4 ${isCustom ? "border-primary bg-primary/5" : "border-gray-700"
-                }`}
+              className={`rounded-lg border p-4 transition-colors duration-150 ${
+                isCustom
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:bg-muted/50"
+              }`}
               onClick={() => {
                 setIsCustom(true);
                 setSelectedAmount(0);
@@ -149,63 +197,61 @@ export default function Credits() {
               }}
             >
               <div className="text-2xl font-bold">Custom Credits</div>
-              <input
+              <Input
                 type="number"
                 value={customAmount}
                 onChange={(e) => {
                   setCustomAmount(e.target.value);
                   setIsCustom(true);
                 }}
-                className="mt-2 w-full rounded-md border px-2 py-1"
+                className="mt-2"
                 placeholder="Enter credits"
                 min={MIN_CREDITS}
               />
-              <div className="text-gray-500 text-sm">
+              <Text variant="small" className="mt-1">
                 {isCustom && selectedCredits > 0 && `${formatCurrency(estimatedCost)} CAD`}
-              </div>
+              </Text>
             </div>
           </div>
 
-          <div className="mt-4 rounded-lg border p-4">
-            <div className="text-sm text-muted-foreground">Checkout summary</div>
-            <div className="mt-1 text-lg font-semibold">
+          <div className="rounded-md bg-muted/30 p-4">
+            <Text variant="muted">Checkout summary</Text>
+            <p className="mt-1 text-lg font-semibold">
               {selectedCredits > 0
                 ? `${formatCredits(selectedCredits)} credits for ${formatCurrency(estimatedCost)}`
                 : "Select a package or enter a custom credit amount"}
-            </div>
+            </p>
           </div>
 
-          {actionData?.error && (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-              {actionData.error}
-            </div>
-          )}
+          {actionData?.error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{actionData.error}</AlertDescription>
+            </Alert>
+          ) : null}
 
           <Button
             type="submit"
-            className="mt-4"
             disabled={isSubmitting || selectedCredits < MIN_CREDITS}
           >
             {isSubmitting ? "Redirecting to checkout…" : "Purchase Credits"}
           </Button>
         </Form>
-      </Card>
+      </Section>
 
-      {/* Credit Usage Log */}
-      <Card className="p-6">
-        <h2 className="mb-4 text-xl font-semibold">Credit Usage Log</h2>
+      <Section variant="flat">
+        <SectionHeader branded={false} compact title="Credit Usage Log" />
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="pb-2 text-left">Date</th>
-                <th className="pb-2 text-left">Source</th>
-                <th className="pb-2 text-left">Description</th>
-                <th className="pb-2 text-left">Idempotency key</th>
-                <th className="pb-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Idempotency key</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {credits.history.map((transaction: TransactionRow) => {
                 const source = getBillingEventSource({
                   type: transaction.type as TransactionType,
@@ -216,40 +262,43 @@ export default function Credits() {
                       : null,
                 });
                 return (
-                  <tr key={transaction.id} className="border-b">
-                    <td className="py-2 whitespace-nowrap">
+                  <TableRow key={transaction.id}>
+                    <TableCell className="whitespace-nowrap">
                       {new Date(transaction.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-2">{getBillingEventSourceLabel(source)}</td>
-                    <td className="py-2 px-2 max-w-xs text-xs">
+                    </TableCell>
+                    <TableCell>{getBillingEventSourceLabel(source)}</TableCell>
+                    <TableCell className="max-w-xs text-xs">
                       {getTransactionDisplayDescription({
                         type: transaction.type as TransactionType,
                         amount: transaction.amount,
                         note:
-                          "note" in transaction && typeof transaction.note === "string"
+                          "note" in transaction &&
+                          typeof transaction.note === "string"
                             ? transaction.note
                             : null,
                       })}
-                    </td>
-                    <td className="py-2 font-mono text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       {typeof transaction.idempotency_key === "string"
                         ? transaction.idempotency_key
                         : "—"}
-                    </td>
-                    <td
-                      className={`py-2 text-right ${
-                        transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
+                    </TableCell>
+                    <TableCell
+                      className={`text-right ${
+                        transaction.type === "CREDIT"
+                          ? "text-success"
+                          : "text-destructive"
                       }`}
                     >
                       {transaction.amount}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
-      </Card>
+      </Section>
     </div>
   );
 }

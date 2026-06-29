@@ -17,19 +17,25 @@ import {
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
+import { Heading, Text } from "@/components/ui/typography";
 
 
 
 import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
-import { Card } from "@/components/shared/CustomCard";
+import { Section, SectionHeader } from "@/components/shared/Section";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import { compareMembersByRole } from "@/lib/workspace-members";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { Heading } from "@/components/ui/typography";
 
 type UserWithRole = Partial<User> & { role: string };
 
@@ -147,10 +153,7 @@ export default function WorkspaceSettings() {
           </select>
         </FormField>
       </div>
-      <Button
-        type="submit"
-        className="h-full w-full font-Zilla-Slab text-xl font-semibold"
-      >
+      <Button type="submit" className="w-full sm:w-auto">
         Invite
       </Button>
     </Form>
@@ -161,17 +164,10 @@ export default function WorkspaceSettings() {
       <input type="hidden" name="formName" value="deleteSelf" />
       <input type="hidden" name="user_id" value={activeUserId} />
       <div className="flex w-full gap-2">
-        <Button
-          className="h-full w-full font-Zilla-Slab text-2xl font-semibold"
-          variant="destructive"
-        >
+        <Button className="flex-1" variant="destructive">
           Quit This Workspace
         </Button>
-        <Button
-          asChild
-          variant="outline"
-          className="h-full w-1/3 border border-border bg-primary font-Zilla-Slab text-2xl font-semibold text-primary-foreground"
-        >
+        <Button asChild variant="outline" className="shrink-0">
           <Link to=".." relative="path">
             Back
           </Link>
@@ -185,191 +181,207 @@ export default function WorkspaceSettings() {
   }
 
   return (
-    <main className="mt-8 flex h-fit flex-col">
-      <div className="flex justify-center">
-        <Heading className="mb-4" branded>
+    <div className="space-y-8">
+      <div>
+        <Heading as="h1" level={2} branded={false}>
           Workspace Settings
         </Heading>
+        <Text variant="muted" className="mt-1">
+          Manage team, numbers, queues, and integrations
+        </Text>
       </div>
-      <div className="flex flex-wrap items-stretch gap-4">
-        <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex justify-between">
-          <div className="flex-1">
-            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
-              Manage Team Members
-            </h3>
-            <div className="flex flex-col py-4">
-              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
-                Owner
-              </p>
-              {workspaceOwner && <TeamMember
+
+      <Section variant="flat">
+        <SectionHeader branded={false} compact title="Team members" />
+        <div className="space-y-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Owner
+            </p>
+            {workspaceOwner ? (
+              <TeamMember
                 member={workspaceOwner}
                 userRole={userRole}
                 memberIsUser={workspaceOwner?.id === activeUserId}
-                workspaceOwner={workspaceOwner!}
-              />}
-            </div>
-            <div className="flex flex-col py-4">
-              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
-                Members
-              </p>
-              <ul className=" flex w-full flex-col items-center gap-2">
-                {users?.map((member) => {
-                  if (!member || !member.role) {
-                    return <></>;
-                  }
-                  if (member.role === "owner") {
-                    return <></>;
-                  }
-                  return (
-                    <li key={member.id} className="w-full">
-                      <TeamMember
-                        member={member}
-                        userRole={userRole}
-                        memberIsUser={member.id === activeUserId}
-                        workspaceOwner={workspaceOwner!}
-                      />
-                    </li>
-                  );
-                })}
-                {pendingInvites?.map((invite) => {
-                  if (!invite) {
-                    return <></>;
-                  }
-                  const inviteWithUser = invite as WorkspaceInvite & {user?: Partial<User>};
-                  return (
-                    <li key={invite.id} className="w-full">
-                      <TeamMember
-                        member={{
-                          ...(inviteWithUser.user || {}),
-                          role: "invited",
-                        } as UserWithRole}
-                        userRole={userRole}
-                        memberIsUser={false}
-                        workspaceOwner={workspaceOwner!}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+                workspaceOwner={workspaceOwner}
+              />
+            ) : null}
           </div>
-          <div className="flex flex-col pt-4">
-            <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
-              {hasAccess && "Invite User"}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Members
             </p>
-            {hasAccess ? addUserTabs : callerSelfDeleteForm}
+            <ul className="divide-y divide-border">
+              {users?.map((member) => {
+                if (!member?.role || member.role === "owner") return null;
+                return (
+                  <li key={member.id} className="py-2">
+                    <TeamMember
+                      member={member}
+                      userRole={userRole}
+                      memberIsUser={member.id === activeUserId}
+                      workspaceOwner={workspaceOwner!}
+                    />
+                  </li>
+                );
+              })}
+              {pendingInvites?.map((invite) => {
+                if (!invite) return null;
+                const inviteWithUser = invite as WorkspaceInvite & {
+                  user?: Partial<User>;
+                };
+                return (
+                  <li key={invite.id} className="py-2">
+                    <TeamMember
+                      member={{
+                        ...(inviteWithUser.user || {}),
+                        role: "invited",
+                      } as UserWithRole}
+                      userRole={userRole}
+                      memberIsUser={false}
+                      workspaceOwner={workspaceOwner!}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-        </Card>
-        <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
-          <div className="flex-1">
-            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
-              Manage Phone Numbers
-            </h3>
-            <div className="flex flex-col py-4">
-              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
-                Phone Numbers
-              </p>
-              <ul className="flex w-full flex-col items-center gap-2">
-                {phoneNumbers?.map((number) => {
-                  if (!number) {
-                    return <></>;
-                  } 
-                  return (
-                    <li key={number.id} className="w-full">
-                      <div className="flex w-full items-center justify-between border-b border-border bg-transparent p-2 text-xl shadow-sm">
-                        <p className="font-semibold">{number.phone_number}</p>
-                        <div>
-                          {number.capabilities?.verification_status ===
-                          "success" ? (
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs uppercase">
-                                {number.capabilities?.verification_status}
-                              </p>
-                              <MdCheckCircle fill="#008800" size={24} />
-                            </div>
-                          ) : number.capabilities?.verification_status ===
-                            "failed" ? (
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs uppercase">
-                                {number.capabilities?.verification_status}
-                              </p>
-                              <MdError fill="#880000" size={24} />
-                            </div>
-                          ) : number.capabilities?.verification_status ===
-                            "pending" ? (
-                            <div className="i gap-2tems-center flex">
-                              <p className="text-xs uppercase">
-                                {number.capabilities?.verification_status}
-                              </p>
-                              <MdCached size={24} />
-                            </div>
-                          ) : null}
-                        </div>
+          <div>
+            {hasAccess ? (
+              <>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Invite user
+                </p>
+                {addUserTabs}
+              </>
+            ) : (
+              callerSelfDeleteForm
+            )}
+          </div>
+        </div>
+      </Section>
+
+      <Section variant="flat">
+        <SectionHeader
+          branded={false}
+          compact
+          title="Phone numbers"
+          actions={
+            hasAccess ? (
+              <Button asChild size="sm" variant="outline">
+                <NavLink to="./numbers" relative="path">
+                  Manage numbers
+                </NavLink>
+              </Button>
+            ) : undefined
+          }
+        />
+        {phoneNumbers?.length ? (
+          <ul className="divide-y divide-border">
+            {phoneNumbers.map((number) => {
+              if (!number) return null;
+              return (
+                <li
+                  key={number.id}
+                  className="flex items-center justify-between gap-4 py-3"
+                >
+                  <p className="font-medium">{number.phone_number}</p>
+                  <div>
+                    {number.capabilities?.verification_status === "success" ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-xs uppercase">Verified</span>
+                        <MdCheckCircle className="text-emerald-600" size={20} />
                       </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </div>
-          {hasAccess && (
-            <div className="">
-              <Button
-                asChild
-                className="h-full w-full font-Zilla-Slab text-xl font-semibold"
-              >
-                <NavLink to={"./numbers"} relative="path">
-                  Manage Numbers
+                    ) : number.capabilities?.verification_status === "failed" ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-xs uppercase">Failed</span>
+                        <MdError className="text-destructive" size={20} />
+                      </div>
+                    ) : number.capabilities?.verification_status === "pending" ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-xs uppercase">Pending</span>
+                        <MdCached size={20} />
+                      </div>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <Text variant="muted">No phone numbers configured yet.</Text>
+        )}
+      </Section>
+
+      {hasAccess ? (
+        <Section variant="flat">
+          <SectionHeader
+            branded={false}
+            compact
+            title="Agent queues"
+            description="Configure inbound call routing queues for your agents."
+            actions={
+              <Button asChild size="sm">
+                <NavLink to="./queues" relative="path">
+                  Manage queues
                 </NavLink>
               </Button>
-            </div>
-          )}
-        </Card>
-          {hasAccess && (
-            <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
-              <div className="flex-1">
-                <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
-                  Manage Agent Queues
-                </h3>
-                <p className="p-2 text-center text-muted-foreground">
-                  Configure inbound call routing queues for your agents
-                </p>
-              </div>
-              <Button
-                asChild
-                className="h-full w-full font-Zilla-Slab text-xl font-semibold"
-              >
-                <NavLink to={"./queues"} relative="path">
-                  Manage Queues
-                </NavLink>
-              </Button>
-            </Card>
-          )}
-          {hasAccess && (
-            <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
-          )}
-        {hasAccess && <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
-          <div className="flex-1">
-            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
-              Manage Webhook
-            </h3>
-            <div className="flex flex-col py-4">
+            }
+          />
+        </Section>
+      ) : null}
+
+      {hasAccess ? (
+        <ApiKeysSection
+          workspaceId={workspaceRecord?.id ?? ""}
+          hasAccess={hasAccess}
+          variant="flat"
+        />
+      ) : null}
+
+      {hasAccess ? (
+        <Accordion type="single" collapsible className="border-b border-border/60 pb-8">
+          <AccordionItem value="webhook" className="border-border/60">
+            <AccordionTrigger className="py-0 text-base font-semibold hover:no-underline">
+              Webhook
+            </AccordionTrigger>
+            <AccordionContent className="pt-4">
+              <Text variant="muted" className="mb-4">
+                Send inbound call events to an external URL.
+              </Text>
               {canManageWebhook ? (
-                <WebhookEditor initialWebhook={webhook ? {
-                  id: String(webhook.id || ''),
-                  destination_url: webhook.destination_url || '',
-                  events: Array.isArray(webhook.event) ? webhook.event.map((e: string) => ({ category: 'inbound_call' as const, type: e as 'INSERT' | 'UPDATE' })) : [],
-                  custom_headers: typeof webhook.custom_headers === 'object' && webhook.custom_headers !== null ? webhook.custom_headers as Record<string, string> : undefined,
-                } : undefined} userId={webhookUserId} workspaceId={webhookWorkspaceId} />
+                <WebhookEditor
+                  initialWebhook={
+                    webhook
+                      ? {
+                          id: String(webhook.id || ""),
+                          destination_url: webhook.destination_url || "",
+                          events: Array.isArray(webhook.event)
+                            ? webhook.event.map((e: string) => ({
+                                category: "inbound_call" as const,
+                                type: e as "INSERT" | "UPDATE",
+                              }))
+                            : [],
+                          custom_headers:
+                            typeof webhook.custom_headers === "object" &&
+                            webhook.custom_headers !== null
+                              ? (webhook.custom_headers as Record<string, string>)
+                              : undefined,
+                        }
+                      : undefined
+                  }
+                  userId={webhookUserId}
+                  workspaceId={webhookWorkspaceId}
+                />
               ) : (
-                <p className="text-center text-muted-foreground">
-                  You don't have permission to manage webhooks.
-                </p>
+                <Text variant="muted">
+                  You don&apos;t have permission to manage webhooks.
+                </Text>
               )}
-            </div>
-          </div>
-        </Card>}
-      </div>
-    </main>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      ) : null}
+    </div>
   );
 }

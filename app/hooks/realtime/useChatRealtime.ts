@@ -2,6 +2,7 @@ import { SupabaseClient, RealtimePostgresChangesPayload } from "@supabase/supaba
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Message } from "@/lib/types";
 import type { Database, Tables } from "@/lib/database.types";
+import { compareByRecentActivity } from "@/lib/chat-conversation-sort";
 import { useSupabaseRealtimeSubscription } from "./useSupabaseRealtime";
 import { logger } from "@/lib/logger.client";
 
@@ -269,10 +270,7 @@ export const useConversationSummaryRealTime = ({
         });
         
         // Sort conversations by most recent first
-        processedData.sort((a, b) => {
-          return new Date(b.conversation_last_update).getTime() - 
-                 new Date(a.conversation_last_update).getTime();
-        });
+        processedData.sort(compareByRecentActivity);
         
         setConversations(processedData);
         
@@ -293,10 +291,7 @@ export const useConversationSummaryRealTime = ({
       initialRef.current = initial;
       
       // Sort by most recent first
-      const sortedConversations = [...initial].sort((a, b) => {
-        return new Date(b.conversation_last_update).getTime() - 
-               new Date(a.conversation_last_update).getTime();
-      });
+      const sortedConversations = [...initial].sort(compareByRecentActivity);
       
       setConversations(sortedConversations);
     }
@@ -357,10 +352,9 @@ export const useConversationSummaryRealTime = ({
               };
               
               // Add the new conversation and sort by most recent
-              const updatedConversations = [...prevConversations, newConversation].sort((a, b) => {
-                return new Date(b.conversation_last_update).getTime() - 
-                       new Date(a.conversation_last_update).getTime();
-              });
+              const updatedConversations = [...prevConversations, newConversation].sort(
+                compareByRecentActivity,
+              );
               
               return updatedConversations;
             }

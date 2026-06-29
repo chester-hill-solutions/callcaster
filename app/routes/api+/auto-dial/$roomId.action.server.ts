@@ -5,7 +5,9 @@ import { Database, Tables } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { getServiceSupabase } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
+import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import Twilio from "twilio";
 
 const getSupabase = () => getServiceSupabase();
@@ -44,12 +46,9 @@ const dequeueContact = async (contactId: string, groupOnHousehold: boolean, user
         if (error) throw new Error(`Error dequeueing household: ${error.message}`);
         return data;
     } else {
-        const { data, error } = await supabase.from('campaign_queue').update({
-            status: 'dequeued',
-            dequeued_by: userId,
-            dequeued_at: new Date().toISOString(),
-            dequeued_reason: "Auto-dial completed"
-        }).eq('contact_id', Number(contactId)).select();
+        const { data, error } = await supabase.from('campaign_queue')
+            .update(buildDequeuedQueueUpdate(userId, "Auto-dial completed", { includeNormalizedFields: true }))
+            .eq('contact_id', Number(contactId)).select();
         if (error) throw new Error(`Error updating queue status: ${error.message}`);
         return data;
     }
@@ -86,7 +85,7 @@ const handleMachineAnswer = async (
     const twiml = new Twilio.twiml.VoiceResponse();
     const firstOutreachStatus = outreachStatus[0];
     if (!firstOutreachStatus) {
-        await call.update({ twiml: "<Response><Hangup/></Response>" });
+        await call.update({ twiml: hangupTwiml() });
         return new Response(twiml.toString(), {
             headers: { 'Content-Type': 'text/xml' }
         });
@@ -99,8 +98,7 @@ const handleMachineAnswer = async (
         await triggerAutoDialer(firstOutreachStatus.user_id?.toString() ?? '', firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
     }
 
-    const playTwiml = `<Response><Pause length="5"/><Play>${signedUrl}</Play></Response>`;
-    await call.update({ twiml: playTwiml });
+    await call.update({ twiml: pausePlayTwiml(signedUrl, 5) });
 
     return new Response(twiml.toString(), {
         headers: { 'Content-Type': 'text/xml' }
@@ -180,7 +178,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
             params: parsedBody,
         });
         if (!validation.ok) {
-            return new Response(`<Response><Hangup/></Response>`, {
+            return new Response(hangupTwiml(), {
                 status: 403,
                 headers: { 'Content-Type': 'text/xml' }
             });
@@ -211,7 +209,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
                     response = await handleMachineAnswer(call, twilio, dbCall, campaign, signedUrl, outreachStatus);
                 } else {
                     //No voicemail file found, so we hang up
-                    response = new Response(`<Response><Hangup/></Response>`, {
+                    response = new Response(hangupTwiml(), {
                         headers: { 'Content-Type': 'text/xml' }
                     });
                 }
@@ -222,7 +220,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
         }
     } catch (error) {
         logger.error('General error:', error);
-        response = new Response(`<Response><Hangup/></Response>`, {
+        response = new Response(hangupTwiml(), {
             headers: { 'Content-Type': 'text/xml' }
         });
     }

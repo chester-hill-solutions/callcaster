@@ -1,9 +1,11 @@
 export { loader } from "./scripts.loader.server";
 export { action } from "./scripts.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, useLoaderData } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import type { ContextType } from "@/lib/types";
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
+import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
 
 
@@ -59,7 +61,13 @@ type LoaderData =
 // ActionData inferred from action's return via typeof action
 
 export default function WorkspaceScripts() {
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
   const loaderData = useLoaderData<LoaderData>();
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
   const downloadFetcher = useFetcher<{
     fileContent?: string;
     contentType?: string;
@@ -96,31 +104,25 @@ export default function WorkspaceScripts() {
     },
   );
 
+  const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const isWorkspaceAudioEmpty = !scripts || scripts.length === 0;
+  const title = "Scripts";
 
   return (
-    <main className="flex h-full flex-col gap-4 rounded-sm ">
-      <div className="flex flex-col sm:flex-row sm:justify-between">
-      <div className="flex">
-        </div>
+    <WorkspaceResourceListShell
+      title={title}
+      error={error}
+      isEmpty={isWorkspaceAudioEmpty}
+      emptyMessage="Add Your Own Scripts to this Workspace!"
+      addAction={
         <Button asChild className="font-Zilla-Slab text-lg font-semibold">
-            <Link to={`./new`}>Add a Script</Link>
-          </Button>
-      </div>
-      {error && !isWorkspaceAudioEmpty && (
-        <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
-          {error}
-        </h4>
-      )}
-      {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
-          Add Your Own Scripts to this Workspace!
-        </h4>
-      )}
-
-      {scripts && scripts.length > 0 && (
+          <Link to="./new">Add a Script</Link>
+        </Button>
+      }
+    >
+      {scripts && scripts.length > 0 ? (
         <DataTable
-          className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
+          className="font-semibold text-foreground"
           columns={[
             {
               accessorKey: "name",
@@ -195,7 +197,7 @@ export default function WorkspaceScripts() {
           ]}
           data={scripts}
         />
-      )}
-    </main>
+      ) : null}
+    </WorkspaceResourceListShell>
   );
 }

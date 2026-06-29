@@ -4,7 +4,7 @@ import {
   updateWorkspacePhoneNumber,
 } from "@/lib/database.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { isRecord } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import { hasVoiceCapability } from "@/lib/onboarding/voice-capabilities";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -81,7 +81,7 @@ export async function reviewWorkspaceEmergencyVoice(args: {
         continue;
       }
 
-      const baseCapabilities = isRecord(workspaceNumber.capabilities)
+      const baseCapabilities = isObject(workspaceNumber.capabilities)
         ? workspaceNumber.capabilities
         : {};
       const isRentedVoiceNumber =

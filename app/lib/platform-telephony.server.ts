@@ -18,10 +18,7 @@ import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import type { Database } from "@/lib/database.types";
 import { MemberRole } from "@/lib/member-role";
 import { generateToken } from "@/lib/twilio-token.server";
-import {
-  buildQueuedQueueUpdate,
-  isAssignedToUser,
-} from "@/lib/queue-status";
+import { releaseAssignedQueueForUser } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
 
 const EMPTY_LISTENING = {
@@ -281,37 +278,18 @@ export async function releaseCampaignCallSessionApi(
     workspaceId,
   });
 
-  const { data: assignedRows, error: assignedRowsError } = await supabaseClient
-    .from("campaign_queue")
-    .select("id, status, dequeued_at, assigned_to_user_id")
-    .eq("campaign_id", Number(campaignId))
-    .is("dequeued_at", null);
+  const result = await releaseAssignedQueueForUser(
+    supabaseClient,
+    userId,
+    campaignId,
+  );
 
-  if (assignedRowsError) {
-    logger.error("releaseCampaignCallSessionApi queue error", assignedRowsError);
-    return { ok: false as const, error: assignedRowsError.message, status: 500 };
+  if (!result.ok) {
+    logger.error("releaseCampaignCallSessionApi queue error", result.error);
+    return { ok: false as const, error: result.error, status: 500 };
   }
 
-  const assignedIds = (assignedRows ?? [])
-    .filter((row) => isAssignedToUser(row, userId))
-    .map((row) => row.id);
-
-  if (assignedIds.length === 0) {
-    return { ok: true as const, released: 0 };
-  }
-
-  const update = await supabaseClient
-    .from("campaign_queue")
-    .update(buildQueuedQueueUpdate())
-    .in("id", assignedIds)
-    .select("id");
-
-  if (update.error) {
-    logger.error("releaseCampaignCallSessionApi update error", update.error);
-    return { ok: false as const, error: update.error.message, status: 500 };
-  }
-
-  return { ok: true as const, released: update.data?.length ?? 0 };
+  return { ok: true as const, released: result.released };
 }
 
 export async function resolveCampaignWorkspaceId(

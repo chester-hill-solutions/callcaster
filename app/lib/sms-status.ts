@@ -1,4 +1,5 @@
 import type { OutreachDisposition, TwilioSmsStatus } from "@/lib/twilio.types";
+import { TERMINAL_BILLABLE_SMS_STATUSES } from "@/lib/pricing";
 
 const VALID_SMS_STATUSES: TwilioSmsStatus[] = [
   "accepted",
@@ -15,13 +16,9 @@ const VALID_SMS_STATUSES: TwilioSmsStatus[] = [
   "read",
 ];
 
-const TERMINAL_SMS_STATUSES = new Set<TwilioSmsStatus>([
-  "delivered",
-  "failed",
-  "undelivered",
-  "canceled",
-  "read",
-]);
+const TERMINAL_SMS_STATUSES = new Set<TwilioSmsStatus>(
+  TERMINAL_BILLABLE_SMS_STATUSES,
+);
 
 export function normalizeSmsStatus(
   status: string | null | undefined,

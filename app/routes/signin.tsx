@@ -32,7 +32,7 @@ export default function SignIn() {
         id="login-hero"
       >
         {actionData?.error ? (
-          <Text className="block text-center text-destructive sm:hidden">
+          <Text className="block text-center text-destructive">
             {actionData.error}
           </Text>
         ) : null}
@@ -47,7 +47,6 @@ export default function SignIn() {
               type="text"
               name="email"
               id="email"
-              className="border-border bg-white/90 dark:bg-background/80"
             />
           </FormField>
 
@@ -57,7 +56,6 @@ export default function SignIn() {
               type="password"
               name="password"
               id="password"
-              className="border-border bg-white/90 dark:bg-background/80"
             />
           </FormField>
         </Form>
@@ -69,19 +67,21 @@ export default function SignIn() {
         >
           Login
         </Button>
-        <NavLink
-          to={"/signup"}
-          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-all duration-150 hover:text-brand-primary hover:underline dark:text-secondary-foreground dark:hover:text-brand-primary"
-        >
-          Don't Have an Account Yet? Click{" "}
-          <span className="text-brand-primary">HERE</span> to Sign-Up!
-        </NavLink>
-        <NavLink
-          to={"/remember"}
-          className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-muted-foreground hover:text-brand-primary hover:underline dark:text-brand-tertiary"
-        >
-          I forgot my password
-        </NavLink>
+        <div className="flex flex-col space-y-3">
+          <NavLink
+            to={"/signup"}
+            className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-colors duration-150 hover:text-brand-primary hover:underline"
+          >
+            Don't Have an Account Yet? Click{" "}
+            <span className="text-brand-primary">HERE</span> to Sign-Up!
+          </NavLink>
+          <NavLink
+            to={"/remember"}
+            className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-muted-foreground transition-colors duration-150 hover:text-brand-primary hover:underline"
+          >
+            I forgot my password
+          </NavLink>
+        </div>
       </AuthCard>
       <img
         alt="background"

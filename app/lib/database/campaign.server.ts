@@ -10,10 +10,7 @@ import {
   Contact,
 } from "../types";
 import { logger } from "../logger.server";
-import {
-  COMPLETED_QUEUE_COUNT_FILTER,
-  QUEUE_STATUS_QUEUED,
-} from "../queue-status";
+import { applyQueueStatusFilter } from "../queue-status";
 
 export type CampaignType =
   | "live_call"
@@ -492,7 +489,7 @@ export async function getCampaignQueueById({
     .eq("campaign_id", Number(campaign_id));
 
   if (onlyQueued) {
-    query = query.eq("status", "queued").is("dequeued_at", null);
+    query = applyQueueStatusFilter(query, "queued");
   }
 
   const { data, error } = await query;
@@ -558,8 +555,3 @@ export function checkSchedule(campaignData: Campaign) {
   );
 }
 
-export type { OutreachExportData } from "./campaign-outreach-export.server";
-export {
-  fetchOutreachData,
-  processOutreachExportData,
-} from "./campaign-outreach-export.server";

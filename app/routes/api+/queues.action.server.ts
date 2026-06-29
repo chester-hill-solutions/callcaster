@@ -67,7 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const { data, error } = await supabase
         .from("campaign_queue")
-        .update(buildQueuedQueueUpdate())
+        .update(buildQueuedQueueUpdate({ includeNormalizedFields: true }))
         .eq("campaign_id", Number(campaignId))
         .select();
 

@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-import { resolveDualAuthSession } from "@/lib/api-route-auth.server";
+import { resolveDualAuthSession } from "@/lib/api-auth.server";
 
 import type { Database } from "@/lib/database.types";
 

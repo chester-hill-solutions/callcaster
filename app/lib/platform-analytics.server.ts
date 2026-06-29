@@ -1,4 +1,4 @@
-import { toCsvString } from "@/lib/csv";
+import { formatDateUtc, safeFilenamePart, toCsvString } from "@/lib/csv";
 import {
   fetchBasicResults,
   fetchQueueCounts,
@@ -325,21 +325,6 @@ export async function buildSurveyResponsesCsv(args: {
         .slice()
         .sort((a, b) => (a.question_order ?? 0) - (b.question_order ?? 0)),
     );
-
-  const formatDateUtc = (value: string | null | undefined) => {
-    if (!value) return "-";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toISOString().slice(0, 10);
-  };
-
-  const safeFilenamePart = (input: string) =>
-    input
-      .normalize("NFKD")
-      .replace(/[^\w.-]+/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 80) || "survey";
 
   const formatAnswer = (answer: ResponseAnswerWithQuestion) => {
     if (!answer) return "-";

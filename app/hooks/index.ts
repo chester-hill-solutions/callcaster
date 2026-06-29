@@ -6,7 +6,6 @@ export {
   useLazyImage,
 } from "./useIntersectionObserver";
 export { useLocalStorage, useLocalStorageMulti, useSessionStorage } from "./useLocalStorage";
-export { useForm } from "./useForm";
 
 export { useCallState, useTwilioDevice, useStartConferenceAndDial, useCallDuration, useTwilioConnection, useCallHandling, useCallStatusPolling } from "./call";
 export { useContactSearch } from "./contact";

@@ -5,8 +5,8 @@ import {
   isWizardOnboardingStepId,
   type WizardOnboardingStepId,
   WIZARD_ONBOARDING_STEP_IDS,
-  workspaceHasFirstNumber,
-} from "@/lib/messaging-onboarding.server";
+} from "@/lib/messaging-onboarding/wizard-steps";
+import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingLoaderData } from "../onboarding.loader.server";
 import { OnboardingBusinessBasicsStep } from "./OnboardingBusinessBasicsStep";
 import { OnboardingChannelsStep } from "./OnboardingChannelsStep";

@@ -102,7 +102,7 @@ export async function initiateIvrCall(
 
     const { error: dequeueError } = await supabase
       .from("campaign_queue")
-      .update(buildDequeuedQueueUpdate(input.user_id, "IVR call completed"))
+      .update(buildDequeuedQueueUpdate(input.user_id, "IVR call completed", { includeNormalizedFields: true }))
       .eq("id", input.contact.id);
 
     if (dequeueError) {

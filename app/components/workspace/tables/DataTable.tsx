@@ -60,7 +60,8 @@ export function DataTable<TData, TValue>({
   return (
     <div className="space-y-4">
       {toolbar}
-      <Table className={className}>
+      <div className="overflow-x-auto">
+        <Table className={className}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
@@ -112,6 +113,7 @@ export function DataTable<TData, TValue>({
           )}
         </TableBody>
       </Table>
+      </div>
       {pagination ? (
         <TablePagination
           currentPage={pagination.currentPage}

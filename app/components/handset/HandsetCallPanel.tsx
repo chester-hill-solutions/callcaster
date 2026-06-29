@@ -2,7 +2,7 @@ import { Link, useLoaderData, useNavigate, useFetcher } from "react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { BrandedCard as Card } from "@/components/shared/BrandedCard";
 import { SoftphonePanel } from "@/components/calls/SoftphonePanel";
 import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { useSoftphoneController } from "@/hooks/call/useSoftphoneController";

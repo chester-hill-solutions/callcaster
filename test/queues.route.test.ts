@@ -208,6 +208,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
       dequeued_at: null,
       dequeued_by: null,
       dequeued_reason: null,
+      assigned_to_user_id: null,
+      provider_status: null,
+      queue_state: "queued",
     });
   });
 

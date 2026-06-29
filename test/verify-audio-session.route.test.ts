@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => {
     return { say, pause, gather, toString };
   });
 
+  const serviceClientHolder: { value: unknown } = { value: undefined };
+
   return {
     createWorkspaceTwilioInstance: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -19,15 +21,21 @@ const mocks = vi.hoisted(() => {
       BASE_URL: vi.fn(() => "http://base"),
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
+      SUPABASE_SERVICE_KEY: vi.fn(() => "service-key"),
     },
     VoiceResponse,
     say,
     pause,
     gather,
     toString,
+    serviceClientHolder,
+    createClient: vi.fn(() => serviceClientHolder.value),
   };
 });
 
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: mocks.createClient,
+}));
 vi.mock("@/lib/supabase.server", () => ({
   createSupabaseServerClient: () => ({
     supabaseClient: {},
@@ -48,7 +56,14 @@ function makeSupabase(opts: {
   insertResult?: { data: any; error: any };
   deleteSpy?: any;
 }) {
-  const delEq = opts.deleteSpy ?? vi.fn(async () => ({}));
+  const delSpy = opts.deleteSpy ?? vi.fn();
+  const delChain: any = {
+    eq: vi.fn((col: string, val: any) => {
+      delSpy(col, val);
+      return delChain;
+    }),
+    then: (resolve: any) => Promise.resolve({}).then(resolve),
+  };
   return {
     from: vi.fn((table: string) => {
       if (table === "phone_verification") {
@@ -58,9 +73,7 @@ function makeSupabase(opts: {
               single: vi.fn(async () => opts.insertResult ?? { data: { id: 1, pin: "100000" }, error: null }),
             })),
           })),
-          delete: vi.fn(() => ({
-            eq: delEq,
-          })),
+          delete: vi.fn(() => delChain),
         };
       }
       throw new Error(`Unexpected table ${table}`);
@@ -80,6 +93,8 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     mocks.gather.mockReset();
     mocks.toString.mockReset();
     mocks.toString.mockReturnValue("<Response />");
+    mocks.createClient.mockClear();
+    mocks.serviceClientHolder.value = undefined;
   });
 
   test("loader returns 401 when user missing", async () => {
@@ -118,6 +133,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: null, error: { message: "ins" } },
     });
+    mocks.serviceClientHolder.value = supabase;
     queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
@@ -137,6 +153,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: { id: 9, pin: "123456" }, error: null },
     });
+    mocks.serviceClientHolder.value = supabase;
     queueJsonAuthSession({ supabaseClient: supabase, headers, user: { id: "u1" } });
     const create = vi.fn(async () => ({ sid: "CA1" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create } });
@@ -165,6 +182,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: { id: 3, pin: "222222" }, error: null },
     });
+    mocks.serviceClientHolder.value = supabase;
     queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
@@ -187,6 +205,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
     const supabase = makeSupabase({
       insertResult: { data: { id: 4, pin: "333333" }, error: null },
     });
+    mocks.serviceClientHolder.value = supabase;
     queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
@@ -211,6 +230,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
       insertResult: { data: { id: 2, pin: "999999" }, error: null },
       deleteSpy: delEq,
     });
+    mocks.serviceClientHolder.value = supabase;
     queueJsonAuthSession({
       supabaseClient: supabase,
       headers: new Headers(),
@@ -236,6 +256,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
       expect.anything()
     );
     expect(delEq).toHaveBeenCalledWith("id", 2);
+    expect(delEq).toHaveBeenCalledWith("user_id", "u1");
   });
 
   test("action returns TwiML xml", async () => {

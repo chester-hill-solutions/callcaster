@@ -104,8 +104,8 @@ export function useCampaignCallFlow({
     displayState === "failed"
       ? "hsl(var(--primary))"
       : displayState === "connected" || displayState === "dialing"
-        ? "#4CA83D"
-        : "#333333";
+        ? "hsl(var(--success))"
+        : "hsl(var(--muted-foreground))";
 
   return {
     displayState,

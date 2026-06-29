@@ -5,7 +5,10 @@ import {
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
-import { patchWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import {
+  loadWorkspaceTwilioData,
+  patchWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 import { createWorkspaceTwilioClient } from "@/lib/twilio-client.server";
 import type { TwilioAccountData, WorkspaceOnboardingStatus } from "@/lib/types";
 
@@ -26,15 +29,10 @@ export async function syncWorkspaceA2pStatus({
   workspaceId: string;
   actorUserId: string | null;
 }) {
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) throw error;
-
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(
+    supabaseClient,
+    workspaceId,
+  )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const brandSid = onboarding.a2p10dlc.brandSid;
   const campaignSid = onboarding.a2p10dlc.campaignSid;

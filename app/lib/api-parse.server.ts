@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import type { ZodError, ZodType } from "zod";
+import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { parseActionRequest, safeParseJson } from "@/lib/database.server";
 
 export function formatZodError(error: ZodError): string {
@@ -17,16 +18,6 @@ export function validationErrorResponse(
   status = 400,
 ): ReturnType<typeof routeData> {
   return routeData({ error: formatZodError(error) }, { status });
-}
-
-function jsonErrorResponse(
-  body: unknown,
-  status: number,
-): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }
 
 function thrownToJsonResponse(thrown: unknown): Response {
@@ -48,10 +39,10 @@ function thrownToJsonResponse(thrown: unknown): Response {
       typeof wrapped.init === "number"
         ? wrapped.init
         : wrapped.init?.status ?? 400;
-    return jsonErrorResponse(wrapped.data, status);
+    return jsonResponse(wrapped.data, status);
   }
 
-  return jsonErrorResponse({ error: "Invalid JSON body" }, 400);
+  return jsonError("Invalid JSON body", 400);
 }
 
 /**

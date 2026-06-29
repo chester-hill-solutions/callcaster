@@ -335,7 +335,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/campaigns/:campaignId/results",
     routeModule: "app/routes/api+/campaigns+/$campaignId/results.route.tsx",
-    authClass: "apiKeyOrSession",
+    authClass: "session",
     ownerArea: "analytics",
     exposure: "sessionOnly",
     docsGuide: GUIDE.analytics,
@@ -465,7 +465,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     path: "/api/surveys/:surveyId/responses/export",
     routeModule:
       "app/routes/api+/surveys+/$surveyId/responses/export.route.tsx",
-    authClass: "apiKeyOrSession",
+    authClass: "session",
     ownerArea: "analytics",
     exposure: "sessionOnly",
     docsGuide: GUIDE.analytics,
@@ -496,7 +496,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId/audios",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/audios.route.tsx",
-    authClass: "apiKeyOrSession",
+    authClass: "session",
     ownerArea: "media",
     exposure: "sessionOnly",
     docsGuide: GUIDE.analytics,
@@ -509,7 +509,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId/voicemails",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/voicemails.route.tsx",
-    authClass: "apiKeyOrSession",
+    authClass: "session",
     ownerArea: "media",
     exposure: "sessionOnly",
     docsGuide: GUIDE.analytics,
@@ -519,7 +519,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId/analytics",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/analytics.route.tsx",
-    authClass: "apiKeyOrSession",
+    authClass: "session",
     ownerArea: "analytics",
     exposure: "sessionOnly",
     docsGuide: GUIDE.analytics,
@@ -529,7 +529,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId/exports",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/exports.route.tsx",
-    authClass: "apiKeyOrSession",
+    authClass: "session",
     ownerArea: "analytics",
     exposure: "sessionOnly",
     docsGuide: GUIDE.analytics,

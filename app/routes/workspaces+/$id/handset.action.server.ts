@@ -8,7 +8,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (formData.get("intent") !== "end_session") return null;
 
   const { user } = await verifyAuth(request);
-  if (!user) return new Response("Unauthorized", { status: 401 });
 
   const workspaceId = params.id;
   if (!workspaceId) return new Response("Not found", { status: 404 });

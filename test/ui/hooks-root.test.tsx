@@ -7,16 +7,6 @@ vi.mock("@/lib/logger.client", () => ({
 }));
 
 describe("root hooks", () => {
-  const formInitialValues = { email: "", name: "x" };
-  const formValidationRules = {
-    email: {
-      required: true,
-      minLength: 3,
-      maxLength: 10,
-      pattern: /^.+@.+$/,
-      custom: (value: string) => (value === "bad@x.com" ? "custom" : null),
-    },
-  };
   const multiKeys = ["a", "b"] as Array<"a" | "b">;
   const multiStorageOptions = {};
 
@@ -27,50 +17,6 @@ describe("root hooks", () => {
 
   afterEach(() => {
     vi.useRealTimers();
-  });
-
-  test("useForm validation, submit, and field helpers", async () => {
-    const { useForm } = await import("@/hooks/useForm");
-    const onSubmit = vi.fn();
-    const onError = vi.fn();
-
-    const { result } = renderHook(() =>
-      useForm({
-        initialValues: formInitialValues,
-        validationRules: formValidationRules,
-        onSubmit,
-        onError,
-      }),
-    );
-
-    const [state, actions] = result.current;
-    expect(state.isDirty).toBe(false);
-
-    act(() => actions.setValue("email", "ab"));
-    expect(result.current[0].isDirty).toBe(true);
-    act(() => actions.setTouched("email", true));
-    await waitFor(() => expect(result.current[0].errors.email).toBeTruthy());
-
-    act(() => actions.setValue("email", "user@example.com"));
-    act(() => actions.setValues({ name: "new" }));
-    act(() => actions.setError("name", "err"));
-    act(() => actions.setErrors({ name: "bulk" }));
-    act(() => actions.setTouchedAll(true));
-    act(() => actions.reset());
-
-    act(() => result.current[1].setValue("email", "bad@x.com"));
-    expect(result.current[1].validateField("email")).toBe("custom");
-
-    await act(async () => {
-      await result.current[1].submit();
-    });
-    expect(onError).toHaveBeenCalled();
-
-    act(() => result.current[1].setValue("email", "ok@x.com"));
-    await act(async () => {
-      await result.current[1].submit();
-    });
-    expect(onSubmit).toHaveBeenCalled();
   });
 
   test("useLocalStorage, multi, and session storage", async () => {

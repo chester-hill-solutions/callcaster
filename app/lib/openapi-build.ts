@@ -180,6 +180,11 @@ function operationId(path: string, method: string): string {
   return `${method.toLowerCase()}${slug.charAt(0).toUpperCase()}${slug.slice(1)}`;
 }
 
+/** Convert an Express/React-Router `:param` path into an OpenAPI 3.0 `{param}` path template. */
+export function toOpenApiPath(path: string): string {
+  return path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+}
+
 export type BuildOpenApiSpecOptions = {
   entries: readonly ApiSurfaceEntry[];
   title: string;
@@ -215,7 +220,8 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
       continue;
     }
 
-    const pathItem = paths[entry.path] ?? {};
+    const openApiPath = toOpenApiPath(entry.path);
+    const pathItem = paths[openApiPath] ?? {};
     for (const op of entry.operations) {
       const method = op.method.toLowerCase();
       pathItem[method] = {
@@ -256,7 +262,7 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
         responses: responsesForEntry(entry, op),
       };
     }
-    paths[entry.path] = pathItem;
+    paths[openApiPath] = pathItem;
   }
 
   if (options.useIntegratorPathOverrides) {

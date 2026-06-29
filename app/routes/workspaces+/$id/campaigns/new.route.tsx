@@ -1,108 +1,126 @@
 export { action } from "./new.action.server";
 
-import { data as routeData, ActionFunctionArgs, Form, Link, useActionData, useOutletContext } from "react-router";
-import { CardAction } from "twilio/lib/rest/content/v1/content";
+import { Form, Link, useActionData } from "react-router";
+import { useState } from "react";
 import {
-  Card,
-  CardActions,
-  CardContent,
-  CardTitle,
-} from "@/components/shared/CustomCard";
+  BrandedCard,
+  BrandedCardActions,
+  BrandedCardContent,
+  BrandedCardTitle,
+} from "@/components/shared/BrandedCard";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Text } from "@/components/ui/typography";
 
-import { Flags } from "@/lib/types";
+const CREATION_SECTION_CLASS =
+  "mx-auto w-full max-w-2xl px-2 py-6 sm:px-4";
 
 export default function CampaignsNew() {
-  const { flags }:{flags:Flags} = useOutletContext();
-  const isLiveCallEnabled = true //flags?.call?.campaign === true;
-  const isMessageEnabled = true //flags?.sms?.campaign === true;
-  const isRobocallEnabled = true //flags?.ivr?.campaign === true;
+  const isLiveCallEnabled = true;
+  const isMessageEnabled = true;
+  const isRobocallEnabled = true;
 
-  const actionData = useActionData();
+  const actionData = useActionData<{ error?: unknown }>();
+  const defaultType = isLiveCallEnabled
+    ? "live_call"
+    : isMessageEnabled
+      ? "message"
+      : "robocall";
+  const [campaignType, setCampaignType] = useState(defaultType);
+  const [campaignPhase, setCampaignPhase] = useState<
+    "identification" | "persuasion" | "gotv"
+  >("identification");
+
   return (
-    <section
-      id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
-    >
-      {actionData?.error != null && (
-        <p className="absolute bottom-4 text-center font-Zilla-Slab text-2xl font-bold text-red-500">
+    <section id="form" className={CREATION_SECTION_CLASS}>
+      {actionData?.error != null ? (
+        <Text className="mb-4 text-center text-destructive">
           Error:{" "}
           {typeof actionData.error === "object" &&
           actionData.error !== null &&
           "message" in actionData.error
             ? String(actionData.error.message)
             : String(actionData.error)}
-        </p>
-      )}
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-        <CardTitle>Add Campaign</CardTitle>
+        </Text>
+      ) : null}
+      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
+        <BrandedCardTitle>Add Campaign</BrandedCardTitle>
         <Form method="POST" className="space-y-6">
-          <CardContent>
+          <BrandedCardContent>
             <input type="hidden" name="formAction" value="newCampaign" />
-            <label
-              htmlFor="campaign-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+            <FormField htmlFor="campaign-name" label="Campaign Name">
+              <Input type="text" name="campaign-name" id="campaign-name" />
+            </FormField>
+            <FormField htmlFor="campaign-type" label="Campaign Type">
+              <input type="hidden" name="campaign-type" value={campaignType} />
+              <Select value={campaignType} onValueChange={setCampaignType}>
+                <SelectTrigger id="campaign-type">
+                  <SelectValue placeholder="Select campaign type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLiveCallEnabled ? (
+                    <SelectItem value="live_call">Live Call</SelectItem>
+                  ) : null}
+                  {isMessageEnabled ? (
+                    <SelectItem value="message">Message</SelectItem>
+                  ) : null}
+                  {isRobocallEnabled ? (
+                    <SelectItem value="robocall">
+                      Interactive Voice Recording
+                    </SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField htmlFor="campaign-phase" label="Campaign Phase">
+              <input type="hidden" name="campaign-phase" value={campaignPhase} />
+              <Select
+                value={campaignPhase}
+                onValueChange={(next) =>
+                  setCampaignPhase(
+                    next === "persuasion" || next === "gotv"
+                      ? next
+                      : "identification",
+                  )
+                }
+              >
+                <SelectTrigger id="campaign-phase">
+                  <SelectValue placeholder="Select campaign phase" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="identification">
+                    Identification
+                  </SelectItem>
+                  <SelectItem value="persuasion">Persuasion</SelectItem>
+                  <SelectItem value="gotv">GOTV</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+          </BrandedCardContent>
+          <BrandedCardActions>
+            <Button
+              size="lg"
+              className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
+              type="submit"
             >
-              Campaign Name
-              <input
-                type="text"
-                name="campaign-name"
-                id="campaign-name"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-              />
-            </label>
-            <label
-              htmlFor="campaign-type"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              Campaign Type
-              <select
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                name="campaign-type"
-                id="campaign-type"
-                required
-                
-              >
-                {isLiveCallEnabled && (
-                  <option value="live_call" className="dark:bg-black">
-                    Live Call
-                  </option>
-                )}
-                {isMessageEnabled && (
-                  <option value="message" className="dark:bg-black">
-                    Message
-                  </option>
-                )}
-                {isRobocallEnabled && (
-                  <option value="robocall" className="dark:bg-black">
-                    Interactive Voice Recording
-                  </option>
-                )}
-              </select>
-            </label>
-          </CardContent>
-          <CardActions>
-            <div className="flex items-center gap-4">
-              <Button
-                size="lg"
-                className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
-                type="submit"
-              >
-                Add Campaign
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="w-full rounded-md bg-gray-200 px-4 py-2 text-center font-Zilla-Slab font-bold text-gray-700 transition duration-150 ease-in-out hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-              >
-                <Link to=".." relative="path">
-                  Back
-                </Link>
-              </Button>
-            </div>
-          </CardActions>
+              Add Campaign
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </BrandedCardActions>
         </Form>
-      </Card>
+      </BrandedCard>
     </section>
   );
 }

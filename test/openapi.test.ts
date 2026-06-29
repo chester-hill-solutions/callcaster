@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { getPublicOpenApiEntries } from "../app/lib/api-surface";
 import { openApiSpec } from "../app/lib/openapi";
+import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
   INTEGRATOR_API_TAG,
@@ -9,6 +10,7 @@ import {
 import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-script";
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
+import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
 
 const scriptCampaignTypes = [
   "live_call",
@@ -39,8 +41,17 @@ describe("openapi spec", () => {
   test("matches publicOpenApi inventory entries", () => {
     for (const entry of getPublicOpenApiEntries()) {
       if (entry.duplicate && entry.routeModule.endsWith(".js")) continue;
-      expect(openApiSpec.paths).toHaveProperty(entry.path);
+      expect(openApiSpec.paths).toHaveProperty(toOpenApiPath(entry.path));
     }
+  });
+
+  test("path keys use OpenAPI 3.0 {param} templating, not Express :param", () => {
+    for (const pathKey of Object.keys(openApiSpec.paths)) {
+      expect(pathKey, pathKey).not.toMatch(/:[A-Za-z0-9_]+/);
+    }
+    expect(openApiSpec.paths).toHaveProperty(
+      "/api/workspaces/{workspaceId}/analytics",
+    );
   });
 
   test("documents all integrator API paths with detailed schemas", () => {
@@ -114,6 +125,18 @@ describe("openapi spec", () => {
         campaign_id: "123",
       }).success,
     ).toBe(true);
+  });
+
+  test("auth token request fields match Zod schema", () => {
+    const required = openApiSpec.components.schemas.TokenRequest.required;
+    expect(required).toEqual(expect.arrayContaining(["email", "password"]));
+    expect(
+      tokenBodySchema.safeParse({
+        email: "user@example.com",
+        password: "secret",
+      }).success,
+    ).toBe(true);
+    expect(openApiSpec.paths).toHaveProperty("/api/auth/token");
   });
 
   test("create-with-script operation description documents XOR rule", () => {

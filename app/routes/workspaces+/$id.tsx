@@ -157,7 +157,7 @@ export default function Workspace() {
   const context = useOutletContext<ContextType>();
 
   return (
-    <main className="mx-auto flex min-h-[80vh] w-full max-w-[1500px] flex-col px-4 py-6 sm:px-6">
+    <main className="mx-auto flex min-h-[80vh] w-full flex-col px-4 py-6 sm:px-6">
       <Suspense fallback={<div>Loading workspace...</div>}>
         <Await
           resolve={workspaceData}

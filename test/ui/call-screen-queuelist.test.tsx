@@ -2,19 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("@/components/call-list/records/TableHeader", () => ({
-  TableHeader: ({ keys = [] }: any) => (
-    <thead data-testid="table-header">
-      <tr>
-        {keys.map((key: string) => (
-          <th key={key}>{key}</th>
-        ))}
-      </tr>
-    </thead>
-  ),
-}));
-
-vi.mock("@/components/call-list/records/participant/CallContact", () => ({
+vi.mock("@/components/call/CallContact", () => ({
   default: ({ contact, firstInHouse, grouped, selected }: any) => (
     <tr data-testid="queue-contact">
       <td>{contact?.id}</td>

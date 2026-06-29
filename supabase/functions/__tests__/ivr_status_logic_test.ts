@@ -6,10 +6,10 @@ import {
 } from "../_shared/ivr-status-logic.ts";
 
 Deno.test("billingUnitsFromDurationSeconds uses Option B IVR rates", () => {
-  assertEquals(billingUnitsFromDurationSeconds(0), -2);
-  assertEquals(billingUnitsFromDurationSeconds(1), -2);
-  assertEquals(billingUnitsFromDurationSeconds(60), -2);
-  assertEquals(billingUnitsFromDurationSeconds(61), -5);
+  assertEquals(billingUnitsFromDurationSeconds(0, "ivr"), -2);
+  assertEquals(billingUnitsFromDurationSeconds(1, "ivr"), -2);
+  assertEquals(billingUnitsFromDurationSeconds(60, "ivr"), -2);
+  assertEquals(billingUnitsFromDurationSeconds(61, "ivr"), -5);
 });
 
 Deno.test("canTransitionOutreachDisposition blocks terminal transitions", () => {

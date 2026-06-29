@@ -3119,6 +3119,71 @@
         }
       }
     },
+    "/api/outreach_attempts/{id}": {
+      "post": {
+        "operationId": "postOutreach_attempts_id",
+        "summary": "POST /api/outreach_attempts/:id",
+        "description": "Session-scoped outreach attempt updates via requireJsonAuthForOutreachAttempt.",
+        "tags": [
+          "Campaigns",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/questions": {
       "post": {
         "operationId": "postQuestions",
@@ -3149,6 +3214,173 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queues": {
+      "get": {
+        "operationId": "getQueues",
+        "summary": "GET /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postQueues",
+        "summary": "POST /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteQueues",
+        "summary": "DELETE /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -3890,7 +4122,7 @@
         }
       }
     },
-    "/api/verify-audio-pin/:pin": {
+    "/api/verify-audio-pin/{pin}": {
       "get": {
         "operationId": "getVerify_audio_pin_pin",
         "summary": "GET /api/verify-audio-pin/:pin",
@@ -5097,7 +5329,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId": {
+    "/api/workspaces/{workspaceId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId",
         "summary": "GET /api/workspaces/:workspaceId",
@@ -5275,7 +5507,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/transfer-ownership": {
+    "/api/workspaces/{workspaceId}/transfer-ownership": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_transfer_ownership",
         "summary": "POST /api/workspaces/:workspaceId/transfer-ownership",
@@ -5340,7 +5572,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing": {
+    "/api/workspaces/{workspaceId}/billing": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing",
         "summary": "GET /api/workspaces/:workspaceId/billing",
@@ -5404,7 +5636,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing/checkout-session": {
+    "/api/workspaces/{workspaceId}/billing/checkout-session": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_billing_checkout_session",
         "summary": "POST /api/workspaces/:workspaceId/billing/checkout-session",
@@ -5469,7 +5701,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing/sessions/:sessionId": {
+    "/api/workspaces/{workspaceId}/billing/sessions/{sessionId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing_sessions_sessionId",
         "summary": "GET /api/workspaces/:workspaceId/billing/sessions/:sessionId",
@@ -5533,7 +5765,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/onboarding": {
+    "/api/workspaces/{workspaceId}/onboarding": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_onboarding",
         "summary": "GET /api/workspaces/:workspaceId/onboarding",
@@ -5660,7 +5892,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/onboarding/actions": {
+    "/api/workspaces/{workspaceId}/onboarding/actions": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_onboarding_actions",
         "summary": "POST /api/workspaces/:workspaceId/onboarding/actions",
@@ -5725,7 +5957,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/numbers": {
+    "/api/workspaces/{workspaceId}/numbers": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_numbers",
         "summary": "GET /api/workspaces/:workspaceId/numbers",
@@ -5852,7 +6084,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/numbers/:numberId": {
+    "/api/workspaces/{workspaceId}/numbers/{numberId}": {
       "patch": {
         "operationId": "patchWorkspaces_workspaceId_numbers_numberId",
         "summary": "PATCH /api/workspaces/:workspaceId/numbers/:numberId",
@@ -5968,7 +6200,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/webhook": {
+    "/api/workspaces/{workspaceId}/webhook": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_webhook",
         "summary": "GET /api/workspaces/:workspaceId/webhook",
@@ -6158,7 +6390,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/members": {
+    "/api/workspaces/{workspaceId}/members": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_members",
         "summary": "GET /api/workspaces/:workspaceId/members",
@@ -6399,7 +6631,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/api-keys": {
+    "/api/workspaces/{workspaceId}/api-keys": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_api_keys",
         "summary": "GET /api/workspaces/:workspaceId/api-keys",
@@ -6577,7 +6809,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/campaigns": {
+    "/api/workspaces/{workspaceId}/campaigns": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_campaigns",
         "summary": "GET /api/workspaces/:workspaceId/campaigns",
@@ -6644,7 +6876,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId": {
+    "/api/campaigns/{campaignId}": {
       "get": {
         "operationId": "getCampaigns_campaignId",
         "summary": "GET /api/campaigns/:campaignId",
@@ -6766,7 +6998,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/queue": {
+    "/api/campaigns/{campaignId}/queue": {
       "get": {
         "operationId": "getCampaigns_campaignId_queue",
         "summary": "GET /api/campaigns/:campaignId/queue",
@@ -6888,25 +7120,22 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/results": {
+    "/api/campaigns/{campaignId}/results": {
       "get": {
         "operationId": "getCampaigns_campaignId_results",
         "summary": "GET /api/campaigns/:campaignId/results",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "responses": {
@@ -6944,7 +7173,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/call-session": {
+    "/api/campaigns/{campaignId}/call-session": {
       "get": {
         "operationId": "getCampaigns_campaignId_call_session",
         "summary": "GET /api/campaigns/:campaignId/call-session",
@@ -6997,7 +7226,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/call-session/release": {
+    "/api/campaigns/{campaignId}/call-session/release": {
       "post": {
         "operationId": "postCampaigns_campaignId_call_session_release",
         "summary": "POST /api/campaigns/:campaignId/call-session/release",
@@ -7062,7 +7291,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/contacts": {
+    "/api/workspaces/{workspaceId}/contacts": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_contacts",
         "summary": "GET /api/workspaces/:workspaceId/contacts",
@@ -7129,7 +7358,7 @@
         }
       }
     },
-    "/api/contacts/:contactId": {
+    "/api/contacts/{contactId}": {
       "get": {
         "operationId": "getContacts_contactId",
         "summary": "GET /api/contacts/:contactId",
@@ -7239,7 +7468,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audiences": {
+    "/api/workspaces/{workspaceId}/audiences": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audiences",
         "summary": "GET /api/workspaces/:workspaceId/audiences",
@@ -7306,7 +7535,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audiences/:audienceId": {
+    "/api/workspaces/{workspaceId}/audiences/{audienceId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audiences_audienceId",
         "summary": "GET /api/workspaces/:workspaceId/audiences/:audienceId",
@@ -7373,7 +7602,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audience-uploads/:uploadId": {
+    "/api/workspaces/{workspaceId}/audience-uploads/{uploadId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audience_uploads_uploadId",
         "summary": "GET /api/workspaces/:workspaceId/audience-uploads/:uploadId",
@@ -7440,7 +7669,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/scripts": {
+    "/api/workspaces/{workspaceId}/scripts": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_scripts",
         "summary": "GET /api/workspaces/:workspaceId/scripts",
@@ -7507,7 +7736,7 @@
         }
       }
     },
-    "/api/scripts/:scriptId": {
+    "/api/scripts/{scriptId}": {
       "get": {
         "operationId": "getScripts_scriptId",
         "summary": "GET /api/scripts/:scriptId",
@@ -7563,7 +7792,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/surveys": {
+    "/api/workspaces/{workspaceId}/surveys": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_surveys",
         "summary": "GET /api/workspaces/:workspaceId/surveys",
@@ -7630,7 +7859,7 @@
         }
       }
     },
-    "/api/surveys/:surveyId": {
+    "/api/surveys/{surveyId}": {
       "get": {
         "operationId": "getSurveys_surveyId",
         "summary": "GET /api/surveys/:surveyId",
@@ -7686,7 +7915,7 @@
         }
       }
     },
-    "/api/surveys/:surveyId/responses": {
+    "/api/surveys/{surveyId}/responses": {
       "get": {
         "operationId": "getSurveys_surveyId_responses",
         "summary": "GET /api/surveys/:surveyId/responses",
@@ -7742,25 +7971,22 @@
         }
       }
     },
-    "/api/surveys/:surveyId/responses/export": {
+    "/api/surveys/{surveyId}/responses/export": {
       "get": {
         "operationId": "getSurveys_surveyId_responses_export",
         "summary": "GET /api/surveys/:surveyId/responses/export",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "responses": {
@@ -7798,7 +8024,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/conversations": {
+    "/api/workspaces/{workspaceId}/conversations": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations",
         "summary": "GET /api/workspaces/:workspaceId/conversations",
@@ -7865,7 +8091,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/conversations/:contactNumber": {
+    "/api/workspaces/{workspaceId}/conversations/{contactNumber}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations_contactNumber",
         "summary": "GET /api/workspaces/:workspaceId/conversations/:contactNumber",
@@ -7932,25 +8158,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audios": {
+    "/api/workspaces/{workspaceId}/audios": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audios",
         "summary": "GET /api/workspaces/:workspaceId/audios",
         "description": "",
         "tags": [
           "Media",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8004,18 +8227,15 @@
         "description": "",
         "tags": [
           "Media",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "requestBody": {
@@ -8065,25 +8285,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/voicemails": {
+    "/api/workspaces/{workspaceId}/voicemails": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_voicemails",
         "summary": "GET /api/workspaces/:workspaceId/voicemails",
         "description": "",
         "tags": [
           "Media",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8132,25 +8349,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/analytics": {
+    "/api/workspaces/{workspaceId}/analytics": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_analytics",
         "summary": "GET /api/workspaces/:workspaceId/analytics",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8199,25 +8413,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/exports": {
+    "/api/workspaces/{workspaceId}/exports": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_exports",
         "summary": "GET /api/workspaces/:workspaceId/exports",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8271,18 +8482,15 @@
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "requestBody": {
@@ -8332,7 +8540,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/calls": {
+    "/api/workspaces/{workspaceId}/calls": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_calls",
         "summary": "GET /api/workspaces/:workspaceId/calls",
@@ -8396,7 +8604,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/calls/listening": {
+    "/api/workspaces/{workspaceId}/calls/listening": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_calls_listening",
         "summary": "POST /api/workspaces/:workspaceId/calls/listening",
@@ -8512,7 +8720,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/handset/session": {
+    "/api/workspaces/{workspaceId}/handset/session": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_handset_session",
         "summary": "GET /api/workspaces/:workspaceId/handset/session",
@@ -8735,7 +8943,7 @@
         }
       }
     },
-    "/api/admin/users/:userId": {
+    "/api/admin/users/{userId}": {
       "get": {
         "operationId": "getAdmin_users_userId",
         "summary": "GET /api/admin/users/:userId",
@@ -8843,7 +9051,7 @@
         }
       }
     },
-    "/api/admin/users/:userId/workspaces": {
+    "/api/admin/users/{userId}/workspaces": {
       "get": {
         "operationId": "getAdmin_users_userId_workspaces",
         "summary": "GET /api/admin/users/:userId/workspaces",
@@ -8951,7 +9159,7 @@
         }
       }
     },
-    "/api/admin/workspaces/:workspaceId/twilio": {
+    "/api/admin/workspaces/{workspaceId}/twilio": {
       "post": {
         "operationId": "postAdmin_workspaces_workspaceId_twilio",
         "summary": "POST /api/admin/workspaces/:workspaceId/twilio",

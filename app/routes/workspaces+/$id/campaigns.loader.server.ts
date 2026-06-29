@@ -12,8 +12,5 @@ import type { LoaderFunctionArgs } from "react-router";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { headers, user } = await verifyAuth(request);
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
   return null;
 }

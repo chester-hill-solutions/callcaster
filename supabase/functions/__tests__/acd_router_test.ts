@@ -167,13 +167,139 @@ Deno.test("acd-router edge handleRequest returns TwiML and JSON for simple paths
   );
   assertEquals(await waitResponse.text(), buildHoldMusicTwiml({ holdAudio: null, queueName: "" }));
 
-  const bridgeResponse = await handleRequest(
-    new Request("http://localhost/functions/v1/acd-router/agent-bridge?queue_name=inbound_q_7"),
-  );
-  assertEquals(await bridgeResponse.text(), buildAgentBridgeTwiml("inbound_q_7"));
-
   const statusResponse = await handleRequest(
     new Request("http://localhost/functions/v1/acd-router/agent-status"),
   );
   assertEquals(await statusResponse.json(), { ok: true });
+});
+
+function createAcdMockSupabase(args: {
+  queue?: { id: number; workspace_id: string; name: string; hold_audio: string | null } | null;
+  workspaceTwilioData?: Record<string, unknown> | null;
+  entryWorkspaceId?: string | null;
+}) {
+  return {
+    from(table: string) {
+      if (table === "inbound_queue") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({ data: args.queue ?? null, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: args.workspaceTwilioData === undefined
+                    ? null
+                    : { twilio_data: args.workspaceTwilioData },
+                  error: null,
+                }),
+            }),
+          }),
+        };
+      }
+      if (table === "inbound_queue_entry") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: args.entryWorkspaceId
+                    ? { workspace_id: args.entryWorkspaceId }
+                    : null,
+                  error: null,
+                }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+    rpc: () => Promise.resolve({ data: null, error: null }),
+  };
+}
+
+Deno.test("acd-router edge accepts agent-bridge with valid Twilio signature", async () => {
+  Deno.env.set("SUPABASE_URL", "http://localhost");
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-service-role");
+  const authToken = "test-token";
+  const workspaceId = "workspace-1";
+  const validationUrl = "http://localhost/functions/v1/acd-router/agent-bridge?queue_name=inbound_q_7";
+
+  const { getExpectedTwilioSignature } = await import(
+    "npm:twilio@^5.3.0/lib/webhooks/webhooks.js"
+  );
+  const signature = getExpectedTwilioSignature(authToken, validationUrl, {});
+
+  const mockSupabase = createAcdMockSupabase({
+    queue: { id: 7, workspace_id: workspaceId, name: "Support", hold_audio: null },
+    workspaceTwilioData: { account_sid: "AC123", auth_token: authToken },
+  });
+
+  const response = await handleRequest(
+    new Request("http://localhost/functions/v1/acd-router/agent-bridge?queue_name=inbound_q_7", {
+      method: "POST",
+      headers: { "x-twilio-signature": signature },
+    }),
+    { supabase: mockSupabase as never },
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(response.headers.get("Content-Type"), "text/xml");
+  assertEquals(await response.text(), buildAgentBridgeTwiml("inbound_q_7"));
+});
+
+Deno.test("acd-router edge rejects agent-bridge with invalid Twilio signature", async () => {
+  Deno.env.set("SUPABASE_URL", "http://localhost");
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-service-role");
+
+  const mockSupabase = createAcdMockSupabase({
+    queue: { id: 7, workspace_id: "workspace-1", name: "Support", hold_audio: null },
+    workspaceTwilioData: { account_sid: "AC123", auth_token: "test-token" },
+  });
+
+  const response = await handleRequest(
+    new Request("http://localhost/functions/v1/acd-router/agent-bridge?queue_name=inbound_q_7", {
+      method: "POST",
+      headers: { "x-twilio-signature": "invalid-signature" },
+    }),
+    { supabase: mockSupabase as never },
+  );
+
+  assertEquals(response.status, 403);
+  assertEquals(await response.text(), "Invalid Twilio signature");
+});
+
+Deno.test("acd-router edge rejects wait URL with invalid Twilio signature", async () => {
+  Deno.env.set("SUPABASE_URL", "http://localhost");
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-service-role");
+
+  const mockSupabase = createAcdMockSupabase({
+    queue: { id: 7, workspace_id: "workspace-1", name: "Support", hold_audio: null },
+    workspaceTwilioData: { account_sid: "AC123", auth_token: "test-token" },
+  });
+
+  const form = new FormData();
+  form.set("CallSid", "CA123");
+  form.set("From", "+15551234567");
+  form.set("QueueTime", "3");
+
+  const response = await handleRequest(
+    new Request("http://localhost/functions/v1/acd-router?queue_id=7", {
+      method: "POST",
+      headers: { "x-twilio-signature": "invalid-signature" },
+      body: form,
+    }),
+    { supabase: mockSupabase as never },
+  );
+
+  assertEquals(response.status, 403);
+  assertEquals(await response.text(), "Invalid Twilio signature");
 });

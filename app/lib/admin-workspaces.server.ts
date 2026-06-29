@@ -14,49 +14,12 @@ type UserRecord = Tables<"user">;
 type WorkspaceUserRecord = Tables<"workspace_users">;
 type WorkspaceNumberRecord = Tables<"workspace_number">;
 
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
-
-function getPortalConfigFromTwilioData(twilioData: unknown) {
-  const config =
-    isRecord(twilioData) && isRecord(twilioData.portalConfig)
-      ? twilioData.portalConfig
-      : {};
-  const sendMode: WorkspaceAdminRow["sendMode"] =
-    config.sendMode === "messaging_service"
-      ? "messaging_service"
-      : "from_number";
-
-  return {
-    sendMode,
-    messagingServiceSid: parseOptionalString(config.messagingServiceSid),
-  };
-}
-
-function getPortalSyncFromTwilioData(twilioData: unknown) {
-  const sync =
-    isRecord(twilioData) && isRecord(twilioData.portalSync)
-      ? twilioData.portalSync
-      : {};
-  const lastSyncStatus: WorkspaceAdminRow["twilioSyncStatus"] =
-    sync.lastSyncStatus === "syncing" ||
-    sync.lastSyncStatus === "healthy" ||
-    sync.lastSyncStatus === "error" ||
-    sync.lastSyncStatus === "never_synced"
-      ? sync.lastSyncStatus
-      : "never_synced";
-
-  return {
-    accountStatus: parseOptionalString(sync.accountStatus),
-    lastSyncedAt: parseOptionalString(sync.lastSyncedAt),
-    lastSyncError: parseOptionalString(sync.lastSyncError),
-    lastSyncStatus,
-    numberTypes: Array.isArray(sync.numberTypes)
-      ? sync.numberTypes.filter(
-          (item): item is string => typeof item === "string",
-        )
-      : [],
-  };
-}
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
+import {
+  parsePortalConfigFromTwilioData,
+  parsePortalSyncFromTwilioData,
+} from "@/lib/twilio-workspace.server";
 
 export function deriveWorkspaceAdminRows({
   workspaces,
@@ -81,8 +44,8 @@ export function deriveWorkspaceAdminRows({
     const phoneNumbers = workspaceNumbers.filter(
       (number) => number.workspace === workspace.id,
     );
-    const portalConfig = getPortalConfigFromTwilioData(workspace.twilio_data);
-    const syncSnapshot = getPortalSyncFromTwilioData(workspace.twilio_data);
+    const portalConfig = parsePortalConfigFromTwilioData(workspace.twilio_data);
+    const syncSnapshot = parsePortalSyncFromTwilioData(workspace.twilio_data);
     const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(
       workspace.twilio_data,
     );

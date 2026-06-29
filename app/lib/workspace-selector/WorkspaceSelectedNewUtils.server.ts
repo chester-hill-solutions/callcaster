@@ -146,6 +146,11 @@ export async function handleNewCampaign({
 }: NewCampaignParams) {
   const newCampaignName = formData.get("campaign-name") as string;
   const newCampaignType = formData.get("campaign-type") as CampaignType;
+  const phaseRaw = formData.get("campaign-phase");
+  const newCampaignPhase =
+    phaseRaw === "persuasion" || phaseRaw === "gotv"
+      ? (phaseRaw as "persuasion" | "gotv")
+      : "identification";
   logger.debug("Campaign Type: ", newCampaignType);
 
   const { start_date, end_date } = getDefaultCampaignDates();
@@ -168,6 +173,7 @@ export async function handleNewCampaign({
       workspace: workspaceId,
       status: "draft",
       type: newCampaignType,
+      phase: newCampaignPhase,
       start_date,
       end_date,
       schedule: DEFAULT_WEEKDAY_CALLING_SCHEDULE,

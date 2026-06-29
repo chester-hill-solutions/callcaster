@@ -68,23 +68,6 @@ describe("app/components/shared/ErrorBoundary.tsx", () => {
   });
 });
 
-describe("app/components/shared/Icons.tsx", () => {
-  test("renders exported icons", async () => {
-    const Icons = await import("@/components/shared/Icons");
-    for (const [name, Icon] of Object.entries(Icons)) {
-      if (typeof Icon !== "function") continue;
-      const { unmount } = render(<Icon />);
-      unmount();
-      if (name === "SignIcon") {
-        render(<Icon fill="#f00" height="12px" width="34px" text="A" />);
-      }
-      if (name === "EditIcon") {
-        render(<Icon fill="#0f0" height="1px" width="2px" />);
-      }
-    }
-  });
-});
-
 describe("app/components/shared/InfoPopover.tsx", () => {
   test("renders trigger and content", async () => {
     const InfoPopover = (await import("@/components/shared/InfoPopover")).default;

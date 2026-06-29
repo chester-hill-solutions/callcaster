@@ -1,58 +1,43 @@
-import { getUserRole } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { Workspace } from "@/lib/types";
-import type { FileObject } from "@supabase/storage-js";
+import { data as routeData } from "react-router";
+import { listWorkspaceVoicemailsApi } from "@/lib/platform-media.server";
+import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params["id"];
-  if (!workspaceId) {
-   return redirect("/workspaces") 
+  const access = await requireWorkspaceLoaderContext(request, params.id);
+  if (!access.ok) {
+    return access.response;
   }
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
-  const { data: mediaData, error: mediaError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .list(workspaceId, { sortBy: { column: 'created_at', order: 'desc' } });
+  const { supabaseClient, headers, user, workspaceId } = access.ctx;
 
-  if (mediaError) {
-    logger.error("Media Error: ", mediaError);
-    return {
-      audioMedia: null,
-      error: mediaError.message,
-    }
-  }
-  if (mediaData.length === 0) {
-    logger.debug("No workspace folder exists");
-    return {
-      audioMedia: null,
-      error: "No Audio in Workspace",
-    };
+  const mediaResult = await listWorkspaceVoicemailsApi(
+    supabaseClient,
+    user.id,
+    workspaceId,
+  );
+
+  if (!mediaResult.ok) {
+    return routeData(
+      { audioMedia: null, error: mediaResult.error },
+      { headers },
+    );
   }
 
-  const mediaPaths = mediaData.map((media) => `${workspaceId}/${media.name}`);
-  const { data: signedUrls, error: signedUrlsError } =
-    await supabaseClient.storage
-      .from("workspaceAudio")
-      .createSignedUrls(mediaPaths, 3600);
-
-  if (signedUrlsError) {
-    return {
-      audioMedia: null,
-      error: signedUrlsError.message,
-    };
+  if (mediaResult.audios.length === 0) {
+    return routeData(
+      { audioMedia: null, error: "No Audio in Workspace" },
+      { headers },
+    );
   }
 
-  // augment each media entry with a signedUrl in a type-safe way
-  const mediaWithUrls = mediaData.map((m) => {
-    const found = signedUrls.find((u) => u.path === `${workspaceId}/${m.name}`);
-    return { ...m, signedUrl: found?.signedUrl } as typeof m & { signedUrl?: string };
-  });
+  const audioMedia = mediaResult.audios.map((audio) => ({
+    name: audio.name,
+    id: audio.id,
+    created_at: audio.created_at,
+    updated_at: audio.updated_at,
+    signedUrl: audio.signed_url,
+  }));
 
-  return { audioMedia: mediaWithUrls, error: null };
+  return routeData({ audioMedia, error: null }, { headers });
 }

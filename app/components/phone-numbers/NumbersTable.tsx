@@ -229,7 +229,7 @@ const NumberRow = ({
       <TableCell className="mt-2 py-2">
         <Button
         variant={"ghost"}
-          className="text-red-500 hover:text-red-700"
+          className="text-destructive hover:text-destructive/80"
           onClick={() => handleNumberRemoval(number.id)}
           disabled={isBusy}
         >
@@ -396,8 +396,8 @@ const StatusIndicator = ({ status }: { status: string }) => {
     case "failed":
       return (
         <div className="flex items-center gap-2">
-          <p className="text-xs uppercase text-red-600">{status}</p>
-          <MdError className="text-red-600" size={24} />
+          <p className="text-xs uppercase text-destructive">{status}</p>
+          <MdError className="text-destructive" size={24} />
         </div>
       );
     case "pending":
