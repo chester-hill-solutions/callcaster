@@ -1,3 +1,5 @@
+> **Superseded (2026-06-29):** In-place big-bang on `callcaster/` per [`supabase-postgres-migration-plan.md`](../supabase-postgres-migration-plan.md). The `callcaster-v2` fork narrative below is **deprecated** — retained for historical context until Phase 6 revises this ADR.
+
 # Clean rebuild in callcaster-v2, one-shot cutover
 
 v2 is built clean in the `callcaster-v2` repo (fresh start from the React Router 8 template, zero Supabase code from day one). Live v1 continues running on Supabase until v2 is ready. One maintenance-window cutover: export Supabase Postgres → transform (drop vestigial tables, consolidate campaign types, SID→ID, normalize queue status, add domain columns, create household table, normalize twilio_data) → import to Railway Postgres → run Drizzle migrations → create Better Auth users (bcrypt preservation) → repoint Twilio webhook URLs → DNS switch. v1 stays running as fallback. Full feature parity required (drop RCS only, which is already feature-flagged off). The `callcaster-v2` repo is currently a bare RR7 template — it gets upgraded to RR8 and built from scratch.

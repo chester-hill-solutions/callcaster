@@ -95,7 +95,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const result = await acceptWorkspaceInvitations(
-      authContext.supabaseClient,
       invitationIds,
       authContext.user.id,
     );

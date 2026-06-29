@@ -89,16 +89,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     switch (method) {
       case 'PATCH': {
-        const updatedContact = await updateContact(supabase, data);
+        const updatedContact = await updateContact(data.workspace_id, data);
         return routeData({ data: updatedContact }, { status: 200 });
       }
 
       case 'POST':
         if (Array.isArray(data.contacts)) {
-            const bulkResult = await bulkCreateContacts(supabase, data.contacts, data.workspace_id, data.audience_id, user.id);
+            const bulkResult = await bulkCreateContacts(
+              data.contacts,
+              data.workspace_id,
+              data.audience_id,
+              user.id,
+            );
           return routeData(bulkResult);
         } else {
-          const newContact = await createContact(supabase, data, data.audience_id, user.id);
+          const newContact = await createContact(data, data.audience_id, user.id);
           return routeData(newContact);
         }
 

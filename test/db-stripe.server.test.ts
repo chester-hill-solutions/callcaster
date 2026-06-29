@@ -1,4 +1,5 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
+import type { TenantDb } from "@/server/tenant-db";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -6,6 +7,13 @@ const logger = vi.hoisted(() => ({
   info: vi.fn(),
   debug: vi.fn(),
 }));
+
+const adminDbMocks = vi.hoisted(() => ({
+  workspaceFindFirst: vi.fn(),
+  userFindFirst: vi.fn(),
+}));
+
+const workspaceUsersFindFirst = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/logger.server", () => ({ logger }));
 vi.mock("../app/lib/env.server", () => ({
@@ -16,6 +24,25 @@ vi.mock("../app/lib/env.server", () => ({
     },
   ),
 }));
+vi.mock("@/server/admin-db", () => ({
+  adminDb: {
+    query: {
+      workspace: { findFirst: adminDbMocks.workspaceFindFirst },
+      user: { findFirst: adminDbMocks.userFindFirst },
+    },
+  },
+}));
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => ({
+    workspace_users: { findFirst: workspaceUsersFindFirst },
+  })),
+}));
+
+function makeTdb(): TenantDb {
+  return {
+    workspace_users: { findFirst: workspaceUsersFindFirst },
+  } as unknown as TenantDb;
+}
 
 describe("app/lib/database/stripe.server.ts", () => {
   beforeEach(() => {
@@ -24,37 +51,29 @@ describe("app/lib/database/stripe.server.ts", () => {
     logger.warn.mockReset();
     logger.info.mockReset();
     logger.debug.mockReset();
+    adminDbMocks.workspaceFindFirst.mockReset();
+    adminDbMocks.userFindFirst.mockReset();
+    workspaceUsersFindFirst.mockReset();
   });
 
-  test("createStripeContact: throws and logs on supabase error", async () => {
+  test("createStripeContact: throws and logs on workspace query error", async () => {
     const customersCreate = vi.fn();
-    const meterCreate = vi.fn();
 
     vi.doMock("stripe", () => {
       class StripeMock {
         customers = { create: customersCreate };
-        billing = { meterEvents: { create: meterCreate } };
-        constructor(..._args: any[]) {}
+        billing = { meterEvents: { create: vi.fn() } };
+        constructor(..._args: unknown[]) {}
       }
       return { default: StripeMock };
     });
 
+    adminDbMocks.workspaceFindFirst.mockRejectedValue(new Error("db"));
+
     const mod = await import("../app/lib/database/stripe.server");
 
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: null, error: new Error("db") }),
-            }),
-          }),
-        }),
-      }),
-    };
-
     await expect(
-      mod.createStripeContact({ supabaseClient: supabase, workspace_id: "w1" }),
+      mod.createStripeContact({ workspace_id: "w1", tdb: makeTdb() }),
     ).rejects.toThrow("db");
     expect(logger.error).toHaveBeenCalled();
   });
@@ -65,93 +84,57 @@ describe("app/lib/database/stripe.server.ts", () => {
     vi.doMock("stripe", () => {
       class StripeMock {
         customers = { create: customersCreate };
-        constructor(..._args: any[]) {}
+        constructor(..._args: unknown[]) {}
       }
       return { default: StripeMock };
     });
 
     const mod = await import("../app/lib/database/stripe.server");
 
-    const supabaseNoOwner: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: { name: "W", workspace_users: [] }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValue({ name: "W" });
+    workspaceUsersFindFirst.mockResolvedValue(null);
     await expect(
-      mod.createStripeContact({ supabaseClient: supabaseNoOwner, workspace_id: "w1" }),
+      mod.createStripeContact({ workspace_id: "w1", tdb: makeTdb() }),
     ).rejects.toThrow("No owner found for the workspace");
 
-    const supabaseNoUser: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: { name: "W", workspace_users: [{ user: null }] }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    };
+    workspaceUsersFindFirst.mockResolvedValue({ user_id: "u1" });
+    adminDbMocks.userFindFirst.mockResolvedValue(null);
     await expect(
-      mod.createStripeContact({ supabaseClient: supabaseNoUser, workspace_id: "w1" }),
+      mod.createStripeContact({ workspace_id: "w1", tdb: makeTdb() }),
     ).rejects.toThrow("No owner user found");
 
-    const supabaseNoEmail: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: { name: "W", workspace_users: [{ user: { username: "" } }] }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.userFindFirst.mockResolvedValue({ id: "u1", username: "" });
     await expect(
-      mod.createStripeContact({ supabaseClient: supabaseNoEmail, workspace_id: "w1" }),
+      mod.createStripeContact({ workspace_id: "w1", tdb: makeTdb() }),
     ).rejects.toThrow("Owner user has no email or username");
   });
 
   test("createStripeContact: creates stripe customer with name+email", async () => {
-    const customersCreate = vi.fn(async (payload: any) => ({ id: "cus_1", ...payload }));
+    const customersCreate = vi.fn(async (payload: Record<string, unknown>) => ({
+      id: "cus_1",
+      ...payload,
+    }));
 
     vi.doMock("stripe", () => {
       class StripeMock {
         customers = { create: customersCreate };
-        constructor(..._args: any[]) {}
+        constructor(..._args: unknown[]) {}
       }
       return { default: StripeMock };
     });
 
     const mod = await import("../app/lib/database/stripe.server");
 
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: {
-                  name: "Workspace",
-                  workspace_users: [{ user: { username: "owner@example.com" } }],
-                },
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValue({ name: "Workspace" });
+    workspaceUsersFindFirst.mockResolvedValue({ user_id: "u1" });
+    adminDbMocks.userFindFirst.mockResolvedValue({
+      id: "u1",
+      username: "owner@example.com",
+    });
 
     const customer = await mod.createStripeContact({
-      supabaseClient: supabase,
       workspace_id: "w1",
+      tdb: makeTdb(),
     });
     expect(customer).toMatchObject({
       id: "cus_1",
@@ -170,66 +153,41 @@ describe("app/lib/database/stripe.server.ts", () => {
     vi.doMock("stripe", () => {
       class StripeMock {
         billing = { meterEvents: { create: meterCreate } };
-        constructor(..._args: any[]) {}
+        constructor(..._args: unknown[]) {}
       }
       return { default: StripeMock };
     });
 
     const mod = await import("../app/lib/database/stripe.server");
 
-    const supabaseErr: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: null, error: new Error("x") }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValue(undefined);
     await expect(
-      mod.meterEvent({ supabaseClient: supabaseErr, workspace_id: "w1", amount: 1, type: "sms" }),
+      mod.meterEvent({ workspace_id: "w1", amount: 1, type: "sms" }),
     ).resolves.toBeUndefined();
 
-    const supabaseNoId: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: { stripe_id: null }, error: null }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValue({ stripe_id: null });
     await expect(
-      mod.meterEvent({ supabaseClient: supabaseNoId, workspace_id: "w1", amount: 1, type: "sms" }),
+      mod.meterEvent({ workspace_id: "w1", amount: 1, type: "sms" }),
     ).resolves.toBeUndefined();
     expect(meterCreate).not.toHaveBeenCalled();
   });
 
   test("meterEvent sends stripe meter event when stripe_id is present", async () => {
-    const meterCreate = vi.fn(async (payload: any) => ({ ok: 1, payload }));
+    const meterCreate = vi.fn(async (payload: unknown) => ({ ok: 1, payload }));
 
     vi.doMock("stripe", () => {
       class StripeMock {
         billing = { meterEvents: { create: meterCreate } };
-        constructor(..._args: any[]) {}
+        constructor(..._args: unknown[]) {}
       }
       return { default: StripeMock };
     });
 
     const mod = await import("../app/lib/database/stripe.server");
 
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: { stripe_id: "cus_1" }, error: null }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValue({ stripe_id: "cus_1" });
 
     const res = await mod.meterEvent({
-      supabaseClient: supabase,
       workspace_id: "w1",
       amount: 2,
       type: "sms",
@@ -241,4 +199,3 @@ describe("app/lib/database/stripe.server.ts", () => {
     });
   });
 });
-

@@ -303,7 +303,7 @@ export async function listPendingInvites(
   supabaseClient: SupabaseClient<Database>,
   userId: string,
 ) {
-  const invites = await getInvitesByUserId(supabaseClient, userId);
+  const invites = await getInvitesByUserId(userId);
   return { invites: invites ?? [] };
 }
 
@@ -312,11 +312,7 @@ export async function acceptInvites(
   userId: string,
   body: AcceptInvitesBody,
 ) {
-  const result = await acceptWorkspaceInvitations(
-    supabaseClient,
-    body.invitation_ids,
-    userId,
-  );
+  const result = await acceptWorkspaceInvitations(body.invitation_ids, userId);
   const errors = result?.errors ?? [];
   if (errors.length > 0) {
     return { ok: false as const, errors, status: 400 };

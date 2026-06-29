@@ -1,0 +1,2 @@
+-- Squashed baseline lands here after Phase 1 transform on Railway review.
+-- Forward migrations: drizzle-kit generate → drizzle/

@@ -106,7 +106,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
       removed_count: 2,
       new_total: 5,
     });
-    expect(mocks.removeContactsFromAudience).toHaveBeenCalledWith(supabaseClient, 10, [1, 2]);
+    expect(mocks.removeContactsFromAudience).toHaveBeenCalledWith(10, [1, 2]);
   });
 
   test("logs and returns 500 on thrown Error and non-Error", async () => {

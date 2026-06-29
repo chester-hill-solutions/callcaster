@@ -51,7 +51,7 @@ export const sendMessage = async ({
     supabase,
     workspace_id: workspace,
   });
-  const statusCallback = `${env.SUPABASE_URL()}/functions/v1/sms-status`;
+  const statusCallback = `${env.BASE_URL()}/api/sms/status`;
 
   try {
     const processedBody = body;

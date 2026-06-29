@@ -1,9 +1,76 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
+const adminDbMocks = vi.hoisted(() => ({
+  workspaceFindFirst: vi.fn(),
+  selectChain: vi.fn(),
+  updateWhere: vi.fn(),
+}));
+
+const tdbMocks = vi.hoisted(() => ({
+  workspace_number: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  workspace_users: {
+    findFirst: vi.fn(),
+    insert: vi.fn(),
+  },
+  workspace_invite: {
+    delete: vi.fn(),
+  },
+  campaign: {
+    findMany: vi.fn(),
+  },
+  audience: {
+    findMany: vi.fn(),
+  },
+  script: {
+    findMany: vi.fn(),
+  },
+}));
+
 describe("app/lib/database/workspace.server.ts", () => {
   beforeEach(() => {
     vi.resetModules();
+
+    adminDbMocks.workspaceFindFirst.mockReset();
+    adminDbMocks.selectChain.mockReset();
+    adminDbMocks.updateWhere.mockReset();
+    for (const table of Object.values(tdbMocks)) {
+      for (const fn of Object.values(table)) {
+        (fn as ReturnType<typeof vi.fn>).mockReset();
+      }
+    }
+
+    vi.doMock("@/server/admin-db", () => ({
+      adminDb: {
+        query: {
+          workspace: { findFirst: adminDbMocks.workspaceFindFirst },
+        },
+        select: () => ({
+          from: () => ({
+            innerJoin: () => ({
+              where: () => ({
+                orderBy: () => adminDbMocks.selectChain(),
+              }),
+            }),
+            where: () => adminDbMocks.selectChain(),
+          }),
+        }),
+        update: () => ({
+          set: () => ({
+            where: adminDbMocks.updateWhere,
+          }),
+        }),
+      },
+    }));
+
+    vi.doMock("@/server/tenant-db", () => ({
+      createTenantDb: vi.fn(() => tdbMocks),
+    }));
 
     vi.doMock("@/components/workspace/TeamMember", () => ({
       MemberRole: {
@@ -104,14 +171,10 @@ describe("app/lib/database/workspace.server.ts", () => {
       auth: {
         getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
       },
-      from: () => ({
-        select: () => ({
-          order: async () => ({ data: [{ id: 1 }], error: { message: "x" } }),
-        }),
-      }),
     };
+    adminDbMocks.selectChain.mockRejectedValueOnce(new Error("x"));
     const res = await mod.getUserWorkspaces({ supabaseClient: supabaseErr });
-    expect(res.data).toEqual([{ id: 1 }]);
+    expect(res.data).toBeNull();
     expect(logger.error).toHaveBeenCalled();
   }, 30000);
 
@@ -123,12 +186,8 @@ describe("app/lib/database/workspace.server.ts", () => {
       auth: {
         getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
       },
-      from: () => ({
-        select: () => ({
-          order: async () => ({ data: [{ id: 1 }], error: null }),
-        }),
-      }),
     };
+    adminDbMocks.selectChain.mockResolvedValueOnce([{ workspace: { id: 1 } }]);
     const res = await mod.getUserWorkspaces({ supabaseClient: supabaseOk });
     expect(res).toEqual({ data: [{ id: 1 }], error: null });
     expect(logger.error).not.toHaveBeenCalled();
@@ -174,11 +233,6 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     const supabase: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: null })),
-      from: () => ({
-        update: () => ({
-          eq: async () => ({ error: null }),
-        }),
-      }),
     };
 
     await expect(
@@ -197,11 +251,6 @@ describe("app/lib/database/workspace.server.ts", () => {
     // rpc error now aborts before any provisioning
     const supabaseRpcErr: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: new Error("rpc") })),
-      from: () => ({
-        update: () => ({
-          eq: async () => ({ error: null }),
-        }),
-      }),
     };
     await expect(
       mod.createNewWorkspace({
@@ -215,12 +264,8 @@ describe("app/lib/database/workspace.server.ts", () => {
     // metadata update error is non-fatal; workspace is still created with a warning
     const supabaseUpdateErr: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: null })),
-      from: () => ({
-        update: () => ({
-          eq: async () => ({ error: new Error("upd") }),
-        }),
-      }),
     };
+    adminDbMocks.updateWhere.mockRejectedValueOnce(new Error("upd"));
     await expect(
       mod.createNewWorkspace({
         supabaseClient: supabaseUpdateErr,
@@ -291,47 +336,25 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     await expect(
       mod.getWorkspaceInfo({
-        supabaseClient: {} as any,
         workspaceId: undefined,
       }),
     ).resolves.toEqual({
       error: "No workspace id",
     });
 
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: { name: "W" },
-              error: { details: "x" },
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockRejectedValueOnce(new Error("x"));
     const res = await mod.getWorkspaceInfo({
-      supabaseClient: supabase,
       workspaceId: "w1",
     });
-    expect(res.data).toEqual({ name: "W" });
+    expect(res.data).toBeNull();
     expect(logger.error).toHaveBeenCalled();
   });
 
   test("getWorkspaceInfo success does not log", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
-    const supabaseOk: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: { name: "W" }, error: null }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValueOnce({ name: "W" });
     const res = await mod.getWorkspaceInfo({
-      supabaseClient: supabaseOk,
       workspaceId: "w1",
     });
     expect(res).toEqual({ data: { name: "W" }, error: null });
@@ -341,49 +364,28 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("getWorkspaceInfoWithDetails returns shaped object; throws on error", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabaseErr: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: null, error: new Error("x") }),
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValueOnce(null);
     await expect(
       mod.getWorkspaceInfoWithDetails({
-        supabaseClient: supabaseErr,
         workspaceId: "w1",
         userId: "u1",
       }),
-    ).rejects.toThrow("x");
+    ).rejects.toMatchObject({ code: "PGRST116" });
 
-    const supabaseOk: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: {
-                  id: "w1",
-                  name: "W",
-                  credits: 0,
-                  workspace_users: [{ role: "admin" }],
-                  campaign: [{ id: 1 }],
-                  workspace_number: [{ id: 1 }],
-                  audience: [{ id: 1 }],
-                },
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValueOnce({
+      id: "w1",
+      name: "W",
+      credits: 0,
+    });
+    tdbMocks.workspace_users.findFirst.mockResolvedValueOnce({
+      id: 1,
+      role: "admin",
+    });
+    tdbMocks.campaign.findMany.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.audience.findMany.mockResolvedValueOnce([{ id: 1 }]);
+
     const out = await mod.getWorkspaceInfoWithDetails({
-      supabaseClient: supabaseOk,
       workspaceId: "w1",
       userId: "u1",
     });
@@ -406,19 +408,14 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     const supabase: any = {
       rpc: async () => ({ data: [{ id: 1 }], error: new Error("x") }),
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: [{ id: 1 }], error: new Error("y") }),
-        }),
-      }),
     };
+    tdbMocks.workspace_number.findMany.mockRejectedValueOnce(new Error("y"));
 
     await mod.getWorkspaceUsers({
       supabaseClient: supabase,
       workspaceId: "w1",
     });
     await mod.getWorkspacePhoneNumbers({
-      supabaseClient: supabase,
       workspaceId: "w1",
     });
     expect(logger.error).toHaveBeenCalled();
@@ -430,18 +427,14 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     const supabase: any = {
       rpc: async () => ({ data: [{ id: 1 }], error: null }),
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: [{ id: 1 }], error: null }),
-        }),
-      }),
     };
+    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([{ id: 1 }]);
+
     await mod.getWorkspaceUsers({
       supabaseClient: supabase,
       workspaceId: "w1",
     });
     await mod.getWorkspacePhoneNumbers({
-      supabaseClient: supabase,
       workspaceId: "w1",
     });
     expect(logger.error).not.toHaveBeenCalled();
@@ -449,21 +442,8 @@ describe("app/lib/database/workspace.server.ts", () => {
 
   test("updateWorkspacePhoneNumber returns {data,error}", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    const supabase: any = {
-      from: () => ({
-        update: () => ({
-          eq: () => ({
-            eq: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 1 }, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    };
+    tdbMocks.workspace_number.update.mockResolvedValueOnce([{ id: 1 }]);
     const res = await mod.updateWorkspacePhoneNumber({
-      supabaseClient: supabase,
       workspaceId: "w1",
       numberId: "n1",
       updates: { type: "rented" } as any,
@@ -475,17 +455,8 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabaseErr: any = {
-      from: () => ({
-        insert: () => ({
-          select: () => ({
-            single: async () => ({ data: null, error: new Error("x") }),
-          }),
-        }),
-      }),
-    };
+    tdbMocks.workspace_users.insert.mockRejectedValueOnce(new Error("x"));
     const r1 = await mod.addUserToWorkspace({
-      supabaseClient: supabaseErr,
       workspaceId: "w1",
       userId: "u1",
       role: "member",
@@ -494,17 +465,8 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(r1.error).toBeTruthy();
     expect(logger.error).toHaveBeenCalled();
 
-    const supabaseOk: any = {
-      from: () => ({
-        insert: () => ({
-          select: () => ({
-            single: async () => ({ data: { id: 1 }, error: null }),
-          }),
-        }),
-      }),
-    };
+    tdbMocks.workspace_users.insert.mockResolvedValueOnce([{ id: 1 }]);
     const r2 = await mod.addUserToWorkspace({
-      supabaseClient: supabaseOk,
       workspaceId: "w1",
       userId: "u1",
       role: "member",
@@ -518,25 +480,13 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     await expect(
       mod.getUserRole({
-        supabaseClient: {} as any,
         user: null as any,
         workspaceId: "w1",
       }),
     ).resolves.toBeNull();
 
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: null, error: new Error("x") }),
-            }),
-          }),
-        }),
-      }),
-    };
+    tdbMocks.workspace_users.findFirst.mockRejectedValueOnce(new Error("x"));
     const role = await mod.getUserRole({
-      supabaseClient: supabase,
       user: { id: "u1" } as any,
       workspaceId: "w1",
     });
@@ -547,39 +497,17 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("requireWorkspaceAccess throws AppError when role missing/forbidden, passes for allowed", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabaseForbidden: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: { role: "invited" }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    };
+    tdbMocks.workspace_users.findFirst.mockResolvedValueOnce({ role: "invited" });
     await expect(
       mod.requireWorkspaceAccess({
-        supabaseClient: supabaseForbidden,
         user: { id: "u1" },
         workspaceId: "w1",
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
 
-    const supabaseAllowed: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: { role: "admin" }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    };
+    tdbMocks.workspace_users.findFirst.mockResolvedValueOnce({ role: "admin" });
     await expect(
       mod.requireWorkspaceAccess({
-        supabaseClient: supabaseAllowed,
         user: { id: "u1" },
         workspaceId: "w1",
       }),
@@ -617,30 +545,18 @@ describe("app/lib/database/workspace.server.ts", () => {
     const headers = new Headers();
     const serverSession: any = { user: { id: "u1" } };
 
-    const supabaseErr: any = {
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: null, error: new Error("x") }),
-        }),
-      }),
-    };
+    adminDbMocks.selectChain.mockRejectedValueOnce(new Error("x"));
     const r1 = await asRouteResponse(await mod.handleExistingUserSession(
-      supabaseErr,
+      {} as any,
       serverSession,
       headers,
     ));
     expect(r1.status).toBe(200);
     expect(await r1.json()).toMatchObject({ invites: [], newSession: null });
 
-    const supabaseOk: any = {
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: [{ id: 1 }], error: null }),
-        }),
-      }),
-    };
+    adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
     const r2 = await asRouteResponse(await mod.handleExistingUserSession(
-      supabaseOk,
+      {} as any,
       serverSession,
       headers,
     ));
@@ -712,12 +628,8 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
         setSession: async () => ({ error: null }),
       },
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: null, error: new Error("inv") }),
-        }),
-      }),
     };
+    adminDbMocks.selectChain.mockRejectedValueOnce(new Error("inv"));
     const r4 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseInviteErr,
       "th",
@@ -734,12 +646,8 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
         setSession: async () => ({ error: null }),
       },
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: [{ id: 1 }], error: null }),
-        }),
-      }),
     };
+    adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
     const r5 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseOk,
       "th",
@@ -751,36 +659,19 @@ describe("app/lib/database/workspace.server.ts", () => {
 
   test("createWorkspaceTwilioInstance throws on query error and returns twilio instance on success", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    const supabaseErr: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: null, error: new Error("x") }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockRejectedValueOnce(new Error("x"));
     await expect(
       mod.createWorkspaceTwilioInstance({
-        supabase: supabaseErr,
         workspace_id: "w1",
       }),
     ).rejects.toThrow("x");
 
-    const supabaseOk: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: { twilio_data: { sid: "AC", authToken: "tok" } },
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValueOnce({
+      twilio_data: { sid: "AC", authToken: "tok" },
+      key: null,
+      token: null,
+    });
     const twilio = await mod.createWorkspaceTwilioInstance({
-      supabase: supabaseOk,
       workspace_id: "w1",
     });
     expect(twilio).toMatchObject({ outgoingCallerIds: expect.any(Function) });
@@ -790,45 +681,18 @@ describe("app/lib/database/workspace.server.ts", () => {
     const mod = await import("../app/lib/database/workspace.server");
     const Twilio = (await import("twilio")).default as any;
 
-    const baseSupabase: any = {
-      from: (table: string) => {
-        if (table === "workspace_number") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: { friendly_name: "FN", phone_number: "+1" },
-                  error: null,
-                }),
-              }),
-            }),
-            delete: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          };
-        }
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: {
-                    twilio_data: { sid: "AC", authToken: "tok" },
-                    key: "k",
-                    token: "t",
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    tdbMocks.workspace_number.findFirst.mockResolvedValue({
+      friendly_name: "FN",
+      phone_number: "+1",
+    });
+    adminDbMocks.workspaceFindFirst.mockResolvedValue({
+      twilio_data: { sid: "AC", authToken: "tok" },
+      key: "k",
+      token: "t",
+    });
+    tdbMocks.workspace_number.delete.mockResolvedValue(undefined);
 
     const ok = await mod.removeWorkspacePhoneNumber({
-      supabaseClient: baseSupabase,
       workspaceId: "w1",
       numberId: 1n as any,
     });
@@ -836,76 +700,29 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(Twilio.__mocks.outgoingList).toHaveBeenCalled();
     expect(Twilio.__mocks.incomingList).toHaveBeenCalled();
 
-    const supabaseNoName: any = {
-      ...baseSupabase,
-      from: (table: string) => {
-        if (table === "workspace_number") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: { friendly_name: "", phone_number: "+1" },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        return baseSupabase.from(table);
-      },
-    };
+    tdbMocks.workspace_number.findFirst.mockResolvedValueOnce({
+      friendly_name: "",
+      phone_number: "+1",
+    });
     const r2 = await mod.removeWorkspacePhoneNumber({
-      supabaseClient: supabaseNoName,
       workspaceId: "w1",
       numberId: 1n as any,
     });
     expect(r2.error).toBeTruthy();
 
-    const supabaseNumberErr: any = {
-      ...baseSupabase,
-      from: (table: string) => {
-        if (table === "workspace_number") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: null, error: new Error("num") }),
-              }),
-            }),
-          };
-        }
-        return baseSupabase.from(table);
-      },
-    };
+    tdbMocks.workspace_number.findFirst.mockResolvedValueOnce(null);
     const r3 = await mod.removeWorkspacePhoneNumber({
-      supabaseClient: supabaseNumberErr,
       workspaceId: "w1",
       numberId: 1n as any,
     });
     expect(r3.error).toBeTruthy();
 
-    const supabaseDeleteErr: any = {
-      ...baseSupabase,
-      from: (table: string) => {
-        if (table === "workspace_number") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: { friendly_name: "FN", phone_number: "+1" },
-                  error: null,
-                }),
-              }),
-            }),
-            delete: () => ({
-              eq: async () => ({ error: new Error("del") }),
-            }),
-          };
-        }
-        return baseSupabase.from(table);
-      },
-    };
+    tdbMocks.workspace_number.findFirst.mockResolvedValueOnce({
+      friendly_name: "FN",
+      phone_number: "+1",
+    });
+    tdbMocks.workspace_number.delete.mockRejectedValueOnce(new Error("del"));
     const r4 = await mod.removeWorkspacePhoneNumber({
-      supabaseClient: supabaseDeleteErr,
       workspaceId: "w1",
       numberId: 1n as any,
     });
@@ -926,21 +743,13 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     ).resolves.toEqual({ error: null });
 
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: { twilio_data: { sid: "AC", authToken: "tok" } },
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    };
+    adminDbMocks.workspaceFindFirst.mockResolvedValue({
+      twilio_data: { sid: "AC", authToken: "tok" },
+      key: null,
+      token: null,
+    });
 
     await mod.updateCallerId({
-      supabaseClient: supabase,
       workspaceId: "w1",
       number: { phone_number: "+1555" } as any,
       friendly_name: "FN",
@@ -949,8 +758,12 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(Twilio.__mocks.incomingUpdate).toHaveBeenCalled();
 
     Twilio.__mocks.outgoingList.mockRejectedValueOnce(new Error("x"));
+    adminDbMocks.workspaceFindFirst.mockResolvedValue({
+      twilio_data: { sid: "AC", authToken: "tok" },
+      key: null,
+      token: null,
+    });
     const res = await mod.updateCallerId({
-      supabaseClient: supabase,
       workspaceId: "w1",
       number: { phone_number: "+1555" } as any,
       friendly_name: "FN",
@@ -964,27 +777,6 @@ describe("app/lib/database/workspace.server.ts", () => {
     const mod = await import("../app/lib/database/workspace.server");
 
     const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  single: async () => ({ data: { id: "w1" }, error: null }),
-                }),
-              }),
-            }),
-          };
-        }
-        if (table === "script") {
-          return {
-            select: () => ({
-              eq: async () => ({ data: [{ id: 1 }], error: new Error("x") }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
       storage: {
         from: () => ({
           createSignedUrl: async (_p: string) => ({
@@ -996,32 +788,21 @@ describe("app/lib/database/workspace.server.ts", () => {
       },
     };
 
-    const w = await mod.fetchWorkspaceData(supabase, "w1");
+    adminDbMocks.workspaceFindFirst.mockResolvedValueOnce({ id: "w1" });
+    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([]);
+    const w = await mod.fetchWorkspaceData("w1");
     expect(w).toMatchObject({ workspace: { id: "w1" } });
 
+    tdbMocks.script.findMany.mockRejectedValueOnce(new Error("x"));
     const scripts = await mod.getWorkspaceScripts({
       workspace: "w1",
-      supabase,
     });
-    expect(scripts).toEqual([{ id: 1 }]);
+    expect(scripts).toBeUndefined();
     expect(logger.error).toHaveBeenCalled();
 
-    const supabaseScriptsOk: any = {
-      ...supabase,
-      from: (table: string) => {
-        if (table === "script") {
-          return {
-            select: () => ({
-              eq: async () => ({ data: [{ id: 1 }], error: null }),
-            }),
-          };
-        }
-        return supabase.from(table);
-      },
-    };
+    tdbMocks.script.findMany.mockResolvedValueOnce([{ id: 1 }]);
     const scriptsOk = await mod.getWorkspaceScripts({
       workspace: "w1",
-      supabase: supabaseScriptsOk,
     });
     expect(scriptsOk).toEqual([{ id: 1 }]);
 
@@ -1091,124 +872,43 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("acceptWorkspaceInvitations aggregates per-invitation errors after batched fetch", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const deletedIds: string[] = [];
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace_invite") {
-          return {
-            select: () => ({
-              in: async () => ({
-                data: [
-                  { id: "i1", workspace: "w1", role: "member" },
-                  { id: "i2", workspace: "w2", role: "member" },
-                ],
-                error: null,
-              }),
-            }),
-            delete: () => ({
-              eq: async (_column: string, id: string) => {
-                deletedIds.push(id);
-                return { error: id === "i1" ? new Error("del") : null };
-              },
-            }),
-          };
-        }
-        if (table === "workspace_users") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: null, error: new Error("join") }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    adminDbMocks.selectChain.mockResolvedValueOnce([
+      { id: "i1", workspace: "w1", role: "member" },
+      { id: "i2", workspace: "w2", role: "member" },
+    ]);
+    tdbMocks.workspace_users.insert.mockRejectedValue(new Error("join"));
+    tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
 
-    const out = await mod.acceptWorkspaceInvitations(
-      supabase,
-      ["i1", "i2"],
-      "u1",
-    );
-    expect(deletedIds.sort()).toEqual(["i1", "i2"]);
+    const out = await mod.acceptWorkspaceInvitations(["i1", "i2"], "u1");
     expect(out.errors).toEqual(
       expect.arrayContaining([
         { invitationId: "i1", type: "workspace" },
         { invitationId: "i2", type: "workspace" },
-        { invitationId: "i1", type: "deletion" },
       ]),
     );
   });
 
   test("acceptWorkspaceInvitations success path has empty errors", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace_invite") {
-          return {
-            select: () => ({
-              in: async () => ({
-                data: [{ id: "i1", workspace: "w1", role: "member" }],
-                error: null,
-              }),
-            }),
-            delete: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          };
-        }
-        if (table === "workspace_users") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 1 }, error: null }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
-    const out = await mod.acceptWorkspaceInvitations(supabase, ["i1"], "u1");
+    adminDbMocks.selectChain.mockResolvedValueOnce([
+      { id: "i1", workspace: "w1", role: "member" },
+    ]);
+    tdbMocks.workspace_users.insert.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
+
+    const out = await mod.acceptWorkspaceInvitations(["i1"], "u1");
     expect(out.errors).toEqual([]);
   });
 
   test("acceptWorkspaceInvitations marks missing invites as invite errors", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace_invite") {
-          return {
-            select: () => ({
-              in: async () => ({
-                data: [{ id: "i1", workspace: "w1", role: "member" }],
-                error: null,
-              }),
-            }),
-            delete: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          };
-        }
-        if (table === "workspace_users") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 1 }, error: null }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    adminDbMocks.selectChain.mockResolvedValueOnce([
+      { id: "i1", workspace: "w1", role: "member" },
+    ]);
+    tdbMocks.workspace_users.insert.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
 
-    const out = await mod.acceptWorkspaceInvitations(
-      supabase,
-      ["i1", "missing"],
-      "u1",
-    );
+    const out = await mod.acceptWorkspaceInvitations(["i1", "missing"], "u1");
     expect(out.errors).toContainEqual({
       invitationId: "missing",
       type: "invite",
@@ -1218,27 +918,11 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("getInvitesByUserId throws on error and returns data on success", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabaseErr: any = {
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: null, error: new Error("x") }),
-        }),
-      }),
-    };
-    await expect(mod.getInvitesByUserId(supabaseErr, "u1")).rejects.toThrow(
-      "x",
-    );
+    adminDbMocks.selectChain.mockRejectedValueOnce(new Error("x"));
+    await expect(mod.getInvitesByUserId("u1")).rejects.toThrow("x");
 
-    const supabaseOk: any = {
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: [{ id: 1 }], error: null }),
-        }),
-      }),
-    };
-    await expect(mod.getInvitesByUserId(supabaseOk, "u1")).resolves.toEqual([
-      { id: 1 },
-    ]);
+    adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
+    await expect(mod.getInvitesByUserId("u1")).resolves.toEqual([{ id: 1 }]);
   });
 
   test("fetchConversationSummary paginates and applies campaign filtering", async () => {

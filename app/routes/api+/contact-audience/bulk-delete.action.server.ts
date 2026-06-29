@@ -44,9 +44,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const contactIds = contactIdsStr.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
 
     const { removed_count, new_total } = await removeContactsFromAudience(
-      supabase,
       audienceId,
-      contactIds
+      contactIds,
     );
 
     return routeData(

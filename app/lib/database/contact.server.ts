@@ -1,10 +1,14 @@
 /**
  * Contact-related database functions
  */
+import { and, eq, ilike, inArray, isNotNull, ne, or, type SQL } from "drizzle-orm";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../database.types";
 import { Contact } from "../types";
 import { logger } from "../logger.server";
+import { contact as contactTable, contact_audience } from "@/db/schema";
+import { db } from "@/server/db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
 function dedupeContactsById(contacts: Contact[]): Contact[] {
   return Array.from(
@@ -62,10 +66,23 @@ function buildPrefixPhoneCandidates(fullNumber: string): string[] {
   return Array.from(candidates);
 }
 
+function phoneLookupFilters(exactPhoneCandidates: string[]): SQL | undefined {
+  if (exactPhoneCandidates.length === 0) {
+    return undefined;
+  }
+
+  return and(
+    inArray(contactTable.phone, exactPhoneCandidates),
+    isNotNull(contactTable.phone),
+    ne(contactTable.phone, ""),
+  );
+}
+
 export const findPotentialContacts = async (
   supabaseClient: SupabaseClient<Database>,
   phoneNumber: string,
   workspaceId: string,
+  tdb?: TenantDb,
 ) => {
   const fullNumber = phoneNumber.replace(/\D/g, "");
   if (!fullNumber) {
@@ -89,38 +106,37 @@ export const findPotentialContacts = async (
     },
   );
 
+  const tenantDb = tdb ?? createTenantDb(workspaceId);
   const exactPhoneCandidates = buildExactPhoneCandidates(fullNumber);
-  if (exactPhoneCandidates.length === 0) {
+  const exactFilter = phoneLookupFilters(exactPhoneCandidates);
+
+  if (!exactFilter) {
     return { data: [], error: null };
   }
 
-  const exactMatchResult = await supabaseClient
-    .from("contact")
-    .select()
-    .eq("workspace", workspaceId)
-    .in("phone", exactPhoneCandidates)
-    .not("phone", "is", null)
-    .neq("phone", "");
+  try {
+    const exactMatches = await tenantDb.contact.findMany({ where: exactFilter });
+    if (exactMatches.length > 0) {
+      return { data: exactMatches, error: null };
+    }
 
-  if (exactMatchResult.error || (exactMatchResult.data?.length ?? 0) > 0) {
-    return exactMatchResult;
+    const prefixCandidates = buildPrefixPhoneCandidates(fullNumber);
+    const prefixFilters = prefixCandidates.map((candidate) =>
+      ilike(contactTable.phone, `${candidate}%`),
+    );
+
+    if (prefixFilters.length === 0) {
+      return { data: exactMatches, error: null };
+    }
+
+    const prefixMatches = await tenantDb.contact.findMany({
+      where: and(or(...prefixFilters), isNotNull(contactTable.phone), ne(contactTable.phone, "")),
+    });
+
+    return { data: prefixMatches, error: null };
+  } catch (error) {
+    return { data: null, error: error as Error };
   }
-
-  const prefixFilters = buildPrefixPhoneCandidates(fullNumber)
-    .map((candidate) => `phone.ilike.${candidate}%`)
-    .join(",");
-
-  if (!prefixFilters) {
-    return exactMatchResult;
-  }
-
-  return supabaseClient
-    .from("contact")
-    .select()
-    .eq("workspace", workspaceId)
-    .or(prefixFilters)
-    .not("phone", "is", null)
-    .neq("phone", "");
 };
 
 export async function fetchContactData(
@@ -128,7 +144,9 @@ export async function fetchContactData(
   workspaceId: string,
   contact_id: number | string | null | undefined,
   contact_number: string,
+  tdb?: TenantDb,
 ) {
+  const tenantDb = tdb ?? createTenantDb(workspaceId);
   const potentialContacts: Contact[] = [];
   let contact: Contact | null = null;
   let contactError: unknown = null;
@@ -138,6 +156,7 @@ export async function fetchContactData(
       supabaseClient,
       contact_number,
       workspaceId,
+      tenantDb,
     );
     const dedupedContacts = dedupeContactsById((contacts || []) as Contact[]);
 
@@ -149,17 +168,12 @@ export async function fetchContactData(
   }
 
   if (contact_id) {
-    const { data: findContact, error: findContactError } = await supabaseClient
-      .from("contact")
-      .select()
-      .eq("workspace", workspaceId)
-      .eq("id", Number(contact_id))
-      .single();
-
-    if (findContactError) {
+    try {
+      contact = (await tenantDb.contact.findFirst({
+        where: eq(contactTable.id, Number(contact_id)),
+      })) as Contact | null;
+    } catch (findContactError) {
       contactError = findContactError;
-    } else {
-      contact = findContact;
     }
   }
 
@@ -167,119 +181,118 @@ export async function fetchContactData(
 }
 
 export const updateContact = async (
-  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
   data: Partial<Contact>,
+  tdb?: TenantDb,
+  /** @deprecated ignored — pass workspaceId */
+  supabaseClient?: SupabaseClient<Database>,
 ) => {
   if (!data.id) {
     throw new Error("Contact ID is required");
   }
+
+  const tenantDb = tdb ?? createTenantDb(workspaceId);
   const sanitizedData = Object.fromEntries(
     Object.entries(data).filter(
       ([key, value]) => key !== "audience_id" && value !== undefined,
     ),
   ) as Partial<Contact>;
 
-  const { data: update, error } = await supabaseClient
-    .from("contact")
-    .update(sanitizedData)
-    .eq("id", data.id)
-    .select();
+  const [updated] = await tenantDb.contact.update({
+    set: sanitizedData,
+    where: eq(contactTable.id, data.id),
+  });
 
-  if (error) throw error;
-  if (!update || update.length === 0) throw new Error("Contact not found");
+  if (!updated) {
+    throw new Error("Contact not found");
+  }
 
-  return update[0];
+  return updated;
 };
 
 export const createContact = async (
-  supabaseClient: SupabaseClient,
   contactData: Partial<Contact>,
   audience_id: string,
   user_id: string,
+  opts?: {
+    tdb?: TenantDb;
+    /** @deprecated ignored */
+    supabaseClient?: SupabaseClient;
+  },
 ) => {
-  const { workspace, firstname, surname, phone, email, address } = contactData;
-  const { data: insert, error } = await supabaseClient
-    .from("contact")
-    .insert({
-      workspace,
-      firstname,
-      surname,
-      phone,
-      email,
-      address,
-      created_by: user_id,
-    })
-    .select();
-
-  if (error) throw error;
-
-  if (audience_id && insert) {
-    const contactAudienceData = insert.map((contact) => ({
-      contact_id: contact.id,
-      audience_id,
-    }));
-    const { error: contactAudienceError } = await supabaseClient
-      .from("contact_audience")
-      .insert(contactAudienceData)
-      .select();
-    if (contactAudienceError) throw contactAudienceError;
+  if (!contactData.workspace) {
+    throw new Error("Workspace is required");
   }
 
-  return insert;
+  const tenantDb = opts?.tdb ?? createTenantDb(contactData.workspace);
+  const { workspace, firstname, surname, phone, email, address } = contactData;
+
+  const [inserted] = await tenantDb.contact.insert({
+    firstname,
+    surname,
+    phone,
+    email,
+    address,
+    created_by: user_id,
+  });
+
+  if (audience_id && inserted) {
+    await db.insert(contact_audience).values({
+      contact_id: inserted.id,
+      audience_id: Number(audience_id),
+    });
+  }
+
+  return [inserted];
 };
 
 export const bulkCreateContacts = async (
-  supabaseClient: SupabaseClient,
   contacts: Partial<Contact>[],
   workspace_id: string,
   audience_id: string,
   user_id: string,
+  opts?: {
+    tdb?: TenantDb;
+    /** @deprecated ignored */
+    supabaseClient?: SupabaseClient;
+  },
 ) => {
+  const tenantDb = opts?.tdb ?? createTenantDb(workspace_id);
   const contactsWithWorkspace = contacts.map((contact) => ({
     ...contact,
     workspace: workspace_id,
     created_by: user_id,
   }));
 
-  const { data: insert, error } = await supabaseClient
-    .from("contact")
-    .insert(contactsWithWorkspace)
-    .select();
+  const insert = await tenantDb.contact.insertMany(contactsWithWorkspace);
 
-  if (error) throw error;
-
-  const audienceMap = insert.map((contact) => ({
-    contact_id: contact.id,
-    audience_id,
+  const audienceMap = insert.map((row) => ({
+    contact_id: row.id,
+    audience_id: Number(audience_id),
   }));
 
-  const { data: audience_insert, error: audience_insert_error } =
-    await supabaseClient.from("contact_audience").insert(audienceMap).select();
+  try {
+    const audience_insert =
+      audienceMap.length > 0 ? await db.insert(contact_audience).values(audienceMap).returning() : [];
 
-  if (audience_insert_error) {
-    const insertedIds = insert.map((contact) => contact.id);
+    return { insert, audience_insert };
+  } catch (audience_insert_error) {
+    const insertedIds = insert.map((row) => row.id);
     if (insertedIds.length > 0) {
-      const { error: rollbackError } = await supabaseClient
-        .from("contact")
-        .delete()
-        .eq("workspace", workspace_id)
-        .in("id", insertedIds);
-
-      if (rollbackError) {
-        logger.error(
-          "Failed to roll back contacts after audience insert failure",
-          {
-            workspace_id,
-            insertedIds,
-            rollbackError,
-            originalError: audience_insert_error,
-          },
-        );
+      try {
+        await tenantDb.contact.delete({
+          where: inArray(contactTable.id, insertedIds),
+        });
+      } catch (rollbackError) {
+        logger.error("Failed to roll back contacts after audience insert failure", {
+          workspace_id,
+          insertedIds,
+          rollbackError,
+          originalError: audience_insert_error,
+        });
       }
     }
 
     throw audience_insert_error;
   }
-
-  return { insert, audience_insert };
 };

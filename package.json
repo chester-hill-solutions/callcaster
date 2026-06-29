@@ -14,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
+    "db:ledger:check": "node scripts/db/check-migration-ledger.mjs",
     "tools:check-file-size": "node scripts/check-app-file-size.mjs",
     "tools:routes:flat-id-to-path": "node scripts/lib/route-flat-id-to-path.mjs --print",
     "tools:routes:folderize": "node scripts/folderize-routes.mjs",

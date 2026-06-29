@@ -2,8 +2,16 @@
  * Workspace-related database functions
  */
 import Twilio from "twilio";
-import { PostgrestError, SupabaseClient, Session } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import { SupabaseClient, Session } from "@supabase/supabase-js";
+import { desc, eq, inArray } from "drizzle-orm";
+import {
+  audience,
+  campaign,
+  workspace,
+  workspace_invite,
+  workspace_number,
+  workspace_users,
+} from "@/db/schema";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -19,6 +27,34 @@ import {
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+
+type DbQueryError = { message: string; code?: string; details?: string };
+
+function toDbError(error: unknown): DbQueryError {
+  if (error instanceof Error) {
+    return { message: error.message, details: error.message };
+  }
+  return { message: String(error) };
+}
+
+function parseTwilioDataColumn(raw: unknown): unknown {
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function notFoundError(message = "Row not found"): Error & { code: string } {
+  const err = new Error(message) as Error & { code: string };
+  err.code = "PGRST116";
+  return err;
+}
 
 export {
   normalizeWorkspaceTwilioOpsConfig,
@@ -37,7 +73,8 @@ export {
 export async function getUserWorkspaces({
   supabaseClient,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  /** Auth session only; workspace rows loaded via adminDb membership join. */
+  supabaseClient: SupabaseClient;
 }) {
   const {
     data: { session },
@@ -46,19 +83,20 @@ export async function getUserWorkspaces({
     return { data: null, error: "No user session found" };
   }
 
-  const workspacesQuery = supabaseClient
-    .from("workspace")
-    .select("*")
-    .order("created_at", { ascending: false });
+  try {
+    const rows = await adminDb
+      .select({ workspace })
+      .from(workspace_users)
+      .innerJoin(workspace, eq(workspace_users.workspace_id, workspace.id))
+      .where(eq(workspace_users.user_id, session.user.id))
+      .orderBy(desc(workspace.created_at));
 
-  const { data, error }: { data: WorkspaceData; error: PostgrestError | null } =
-    await workspacesQuery;
-
-  if (error) {
+    const data = rows.map((row) => row.workspace) as WorkspaceData;
+    return { data, error: null };
+  } catch (error) {
     logger.error("Error on function getUserWorkspaces: ", error);
+    return { data: null, error: toDbError(error) };
   }
-
-  return { data, error };
 }
 
 export async function createKeys({
@@ -137,7 +175,7 @@ export async function createNewWorkspace({
   workspaceName,
   user_id,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient: SupabaseClient;
   workspaceName: string;
   user_id: string;
 }): Promise<{
@@ -161,12 +199,13 @@ export async function createNewWorkspace({
       throw new Error("Workspace creation RPC returned no workspace id");
     }
 
-    workspaceId = insertWorkspaceData;
+    const createdWorkspaceId = insertWorkspaceData;
+    workspaceId = createdWorkspaceId;
 
     let account: Awaited<ReturnType<typeof createSubaccount>> | null = null;
     try {
       account = await createSubaccount({
-        workspace_id: workspaceId,
+        workspace_id: createdWorkspaceId,
       });
       if (!account) {
         provisioningWarnings.push("Twilio subaccount was not created");
@@ -180,7 +219,7 @@ export async function createNewWorkspace({
     if (account) {
       try {
         newKey = await createKeys({
-          workspace_id: workspaceId,
+          workspace_id: createdWorkspaceId,
           sid: account.sid,
           token: account.authToken,
         });
@@ -196,8 +235,7 @@ export async function createNewWorkspace({
     let stripeCustomerId: string | null = null;
     try {
       const newStripeCustomer = await createStripeContact({
-        supabaseClient,
-        workspace_id: workspaceId,
+        workspace_id: createdWorkspaceId,
       });
       stripeCustomerId = newStripeCustomer.id;
     } catch (stripeError) {
@@ -223,15 +261,17 @@ export async function createNewWorkspace({
     );
     seededOnboarding.steps = buildOnboardingStepsForState(seededOnboarding);
 
-    const workspaceUpdate: Database["public"]["Tables"]["workspace"]["Update"] = {
-      twilio_data: account
-        ? ({
-            ...twilioAccountToPersistableJson(account),
-            onboarding: seededOnboarding,
-          } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"])
-        : ({
-            onboarding: seededOnboarding,
-          } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"]),
+    const twilioPayload = account
+      ? { ...twilioAccountToPersistableJson(account), onboarding: seededOnboarding }
+      : { onboarding: seededOnboarding };
+
+    const workspaceUpdate: {
+      twilio_data: string;
+      key?: string;
+      token?: string;
+      stripe_id?: string;
+    } = {
+      twilio_data: JSON.stringify(twilioPayload),
     };
     if (newKey) {
       workspaceUpdate.key = newKey.sid;
@@ -241,11 +281,12 @@ export async function createNewWorkspace({
       workspaceUpdate.stripe_id = stripeCustomerId;
     }
 
-    const { error: insertWorkspaceUsersError } = await supabaseClient
-      .from("workspace")
-      .update(workspaceUpdate)
-      .eq("id", workspaceId);
-    if (insertWorkspaceUsersError) {
+    try {
+      await adminDb
+        .update(workspace)
+        .set(workspaceUpdate)
+        .where(eq(workspace.id, createdWorkspaceId));
+    } catch (insertWorkspaceUsersError) {
       logger.error(
         "Workspace metadata update failed after workspace insert:",
         insertWorkspaceUsersError,
@@ -257,7 +298,7 @@ export async function createNewWorkspace({
       try {
         await ensureWorkspaceTwilioBootstrap({
           supabaseClient,
-          workspaceId,
+          workspaceId: createdWorkspaceId,
           actorUserId: user_id,
         });
       } catch (bootstrapError) {
@@ -297,25 +338,24 @@ export async function createNewWorkspace({
 }
 
 export async function getWorkspaceInfo({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string | undefined;
+  supabaseClient?: SupabaseClient;
 }) {
   if (workspaceId == null) return { error: "No workspace id" };
 
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("name")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    logger.error(`Error on function getWorkspaceInfo: ${error.details}`);
+  try {
+    const data = await adminDb.query.workspace.findFirst({
+      where: eq(workspace.id, workspaceId),
+      columns: { name: true },
+    });
+    return { data: data ?? null, error: null };
+  } catch (error) {
+    const dbError = toDbError(error);
+    logger.error(`Error on function getWorkspaceInfo: ${dbError.details ?? dbError.message}`);
+    return { data: null, error: dbError };
   }
-
-  return { data, error };
 }
 
 export type WorkspaceInfoWithDetails = {
@@ -327,41 +367,65 @@ export type WorkspaceInfoWithDetails = {
 };
 
 export async function getWorkspaceInfoWithDetails({
-  supabaseClient,
   workspaceId,
   userId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }) {
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select(
-      `id, name, credits, 
-        workspace_users(id, role), 
-        campaign(*), 
-        workspace_number(id, phone_number, capabilities), 
-        audience(id, name)`,
-    )
-    .eq("id", workspaceId)
-    .eq("workspace_users.user_id", userId)
-    .single();
-  if (workspaceError) throw workspaceError;
-  const { campaign, workspace_number, audience, ...rest } = workspace;
-  return {
-    workspace: rest,
-    campaigns: campaign,
-    phoneNumbers: workspace_number,
-    audiences: audience,
-  } as unknown as WorkspaceInfoWithDetails;
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+
+  try {
+    const workspaceRow = await adminDb.query.workspace.findFirst({
+      where: eq(workspace.id, workspaceId),
+      columns: { id: true, name: true, credits: true },
+    });
+    if (!workspaceRow) {
+      throw notFoundError();
+    }
+
+    const membership = await tdb.workspace_users.findFirst({
+      where: eq(workspace_users.user_id, userId),
+      columns: { id: true, role: true },
+    });
+    if (!membership) {
+      throw notFoundError();
+    }
+
+    const [campaigns, phoneNumbers, audiences] = await Promise.all([
+      tdb.campaign.findMany(),
+      tdb.workspace_number.findMany({
+        columns: { id: true, phone_number: true, capabilities: true },
+      }),
+      tdb.audience.findMany({
+        columns: { id: true, name: true },
+      }),
+    ]);
+
+    const workspace_users_list = [{ role: membership.role as MemberRole }];
+
+    return {
+      workspace: {
+        ...workspaceRow,
+        workspace_users: workspace_users_list,
+      },
+      campaigns,
+      phoneNumbers,
+      audiences,
+    } as unknown as WorkspaceInfoWithDetails;
+  } catch (error) {
+    throw error;
+  }
 }
 
 export async function getWorkspaceUsers({
   supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient: SupabaseClient;
   workspaceId: string;
 }) {
   const { data, error } = await supabaseClient.rpc("get_workspace_users", {
@@ -375,20 +439,21 @@ export async function getWorkspaceUsers({
 }
 
 export async function getWorkspacePhoneNumbers({
-  supabaseClient,
   workspaceId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace_number")
-    .select()
-    .eq(`workspace`, workspaceId);
-  if (error) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const data = await tdb.workspace_number.findMany();
+    return { data, error: null };
+  } catch (error) {
     logger.error("Error on function getWorkspacePhoneNumbers", error);
+    return { data: null, error: toDbError(error) };
   }
-  return { data, error };
 }
 
 /**
@@ -396,108 +461,117 @@ export async function getWorkspacePhoneNumbers({
  * Used by the handset page to show which number to call.
  */
 export async function getHandsetNumberForWorkspace({
-  supabaseClient,
   workspaceId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }): Promise<{
   data: { id: number; phone_number: string | null } | null;
-  error: PostgrestError | null;
+  error: DbQueryError | null;
 }> {
-  const { data: handset } = await supabaseClient
-    .from("workspace_number")
-    .select("id, phone_number")
-    .eq("workspace", workspaceId)
-    .eq("handset_enabled", true)
-    .limit(1)
-    .maybeSingle();
-  if (handset) return { data: handset, error: null };
-  const { data: first } = await supabaseClient
-    .from("workspace_number")
-    .select("id, phone_number")
-    .eq("workspace", workspaceId)
-    .limit(1)
-    .maybeSingle();
-  return { data: first, error: null };
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const handset = await tdb.workspace_number.findFirst({
+      where: eq(workspace_number.handset_enabled, true),
+      columns: { id: true, phone_number: true },
+    });
+    if (handset) return { data: handset, error: null };
+
+    const first = await tdb.workspace_number.findFirst({
+      columns: { id: true, phone_number: true },
+    });
+    return { data: first ?? null, error: null };
+  } catch (error) {
+    return { data: null, error: toDbError(error) };
+  }
 }
 
 export async function updateWorkspacePhoneNumber({
-  supabaseClient,
   workspaceId,
   numberId,
   updates,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   numberId: string | number;
   updates: Partial<NonNullable<WorkspaceNumbers>>;
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace_number")
-    .update(updates)
-    .eq("id", Number(numberId))
-    .eq("workspace", workspaceId)
-    .select()
-    .single();
-  return { data, error };
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const rows = await tdb.workspace_number.update({
+      set: updates,
+      where: eq(workspace_number.id, Number(numberId)),
+    });
+    const data = rows[0] ?? null;
+    return { data, error: data ? null : toDbError(new Error("Not found")) };
+  } catch (error) {
+    return { data: null, error: toDbError(error) };
+  }
 }
 
 export async function addUserToWorkspace({
-  supabaseClient,
   workspaceId,
   userId,
   role,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
   role: "owner" | "admin" | "caller" | "member";
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace_users")
-    .insert({ workspace_id: workspaceId, user_id: userId, role })
-    .select()
-    .single();
-  if (error) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const rows = await tdb.workspace_users.insert({
+      user_id: userId,
+      role,
+      created_at: new Date().toISOString(),
+    });
+    const data = rows[0] ?? null;
+    if (!data) {
+      return { data: null, error: toDbError(new Error("Insert returned no row")) };
+    }
+    return { data, error: null };
+  } catch (error) {
     logger.error("Failed to join workspace", error);
-    return { data: null, error };
+    return { data: null, error: toDbError(error) };
   }
-  return { data, error: null };
 }
 
 export async function getUserRole({
-  supabaseClient,
   user,
   workspaceId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient;
   user: { id: string } | null;
   workspaceId: string;
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }) {
   if (!user) {
     return null;
   }
 
-  const { data: userRole, error: userRoleError } = await supabaseClient
-    .from("workspace_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("workspace_id", workspaceId)
-    .single();
-  if (userRoleError) {
-    const errorCode = (userRoleError as { code?: string }).code;
-    if (errorCode !== "PGRST116") {
-      logger.error("Failed to load user role for workspace", {
-        workspaceId,
-        userId: user.id,
-        code: errorCode,
-        message: userRoleError.message,
-      });
-    }
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const userRole = await tdb.workspace_users.findFirst({
+      where: eq(workspace_users.user_id, user.id),
+      columns: { role: true },
+    });
+    return userRole ?? null;
+  } catch (error) {
+    logger.error("Failed to load user role for workspace", {
+      workspaceId,
+      userId: user.id,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
-
-  return userRole;
 }
 
 /**
@@ -508,18 +582,19 @@ export async function getUserRole({
  * role-gated access.
  */
 export async function requireWorkspaceAccess({
-  supabaseClient,
   user,
   workspaceId,
+  tdb,
 }: {
-  supabaseClient: SupabaseClient;
   user: { id: string };
   workspaceId: string;
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }): Promise<void> {
   const role = await getUserRole({
-    supabaseClient,
     user,
     workspaceId,
+    tdb,
   });
   if (!role) {
     throw new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND);
@@ -534,18 +609,18 @@ export async function updateUserWorkspaceAccessDate({
   supabaseClient,
 }: {
   workspaceId: string;
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient: SupabaseClient;
 }): Promise<void> {
-  const { data: updatedTime, error: updatedTimeError } =
-    await supabaseClient.rpc("update_user_workspace_last_access_time", {
+  const { error: updatedTimeError } = await supabaseClient.rpc(
+    "update_user_workspace_last_access_time",
+    {
       selected_workspace_id: workspaceId,
-    });
+    },
+  );
 
   if (updatedTimeError) {
     logger.error("Error updating user access time: ", updatedTimeError);
   }
-
-  return;
 }
 
 export async function handleExistingUserSession(
@@ -553,16 +628,18 @@ export async function handleExistingUserSession(
   serverSession: Session,
   headers: Headers,
 ) {
-  const { data: invites, error: inviteError } = await supabaseClient
-    .from("workspace_invite")
-    .select()
-    .eq("user_id", serverSession.user.id);
-  if (inviteError)
+  try {
+    const invites = await adminDb
+      .select()
+      .from(workspace_invite)
+      .where(eq(workspace_invite.user_id, serverSession.user.id));
+    return routeData({ newSession: serverSession, invites, error: null }, { headers });
+  } catch (inviteError) {
     return routeData(
       { error: inviteError, newSession: null, invites: [] },
       { headers },
     );
-  return routeData({ newSession: serverSession, invites, error: null }, { headers });
+  }
 }
 
 export async function handleNewUserOTPVerification(
@@ -594,36 +671,34 @@ export async function handleNewUserOTPVerification(
       await supabaseClient.auth.setSession(newSession);
     if (sessionError) return routeData({ error: sessionError }, { headers });
 
-    const { data: invites, error: inviteError } = await supabaseClient
-      .from("workspace_invite")
-      .select()
-      .eq("user_id", newSession.user.id);
-
-    if (inviteError) return routeData({ error: inviteError }, { headers });
-
-    return routeData({ newSession, invites }, { headers });
+    try {
+      const invites = await adminDb
+        .select()
+        .from(workspace_invite)
+        .where(eq(workspace_invite.user_id, newSession.user.id));
+      return routeData({ newSession, invites }, { headers });
+    } catch (inviteError) {
+      return routeData({ error: inviteError }, { headers });
+    }
   } else {
     return routeData({ error: "Failed to create session" }, { headers });
   }
 }
 
 export async function createWorkspaceTwilioInstance({
-  supabase,
   workspace_id,
 }: {
-  supabase: SupabaseClient;
   workspace_id: string;
+  supabase?: SupabaseClient;
 }) {
-  const { data, error } = await supabase
-    .from("workspace")
-    .select("twilio_data, key, token")
-    .eq("id", workspace_id)
-    .single();
-  if (error) throw error;
+  const data = await adminDb.query.workspace.findFirst({
+    where: eq(workspace.id, workspace_id),
+    columns: { twilio_data: true, key: true, token: true },
+  });
   if (!data) {
     throw new Error("No workspace found");
   }
-  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  const creds = readTwilioWorkspaceCredentials(parseTwilioDataColumn(data.twilio_data));
   if (!creds) {
     throw new Error("Workspace missing Twilio credentials");
   }
@@ -640,24 +715,25 @@ export async function createWorkspaceTwilioInstance({
 }
 
 export async function removeWorkspacePhoneNumber({
-  supabaseClient,
   workspaceId,
   numberId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   numberId: bigint;
+  tdb?: TenantDb;
+  supabaseClient?: SupabaseClient;
 }) {
   const normalizedNumberId = Number(numberId);
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
   try {
-    const { data: number, error: numberError } = await supabaseClient
-      .from("workspace_number")
-      .select()
-      .eq("id", normalizedNumberId)
-      .single();
-    if (numberError) throw numberError;
+    const number = await tdb.workspace_number.findFirst({
+      where: eq(workspace_number.id, normalizedNumberId),
+    });
+    if (!number) {
+      throw new Error("Number not found");
+    }
     const twilio = await createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
       workspace_id: workspaceId,
     });
     if (!number.friendly_name) {
@@ -677,12 +753,9 @@ export async function removeWorkspacePhoneNumber({
         return await twilio.incomingPhoneNumbers(id.sid).remove();
       }),
     ]);
-    const { error: deletionError } = await supabaseClient
-      .from("workspace_number")
-      .delete()
-      .eq("id", normalizedNumberId);
-
-    if (deletionError) throw deletionError;
+    await tdb.workspace_number.delete({
+      where: eq(workspace_number.id, normalizedNumberId),
+    });
     return { error: null };
   } catch (error) {
     return { error };
@@ -690,20 +763,18 @@ export async function removeWorkspacePhoneNumber({
 }
 
 export async function updateCallerId({
-  supabaseClient,
   workspaceId,
   number,
   friendly_name,
 }: {
-  supabaseClient: SupabaseClient;
   workspaceId: string;
   number: WorkspaceNumbers;
   friendly_name: string;
+  supabaseClient?: SupabaseClient;
 }) {
   if (!number || !number.phone_number) return { error: null };
   try {
     const twilio = await createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
       workspace_id: workspaceId,
     });
 
@@ -736,32 +807,44 @@ export async function updateCallerId({
 }
 
 export async function fetchWorkspaceData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
+  tdbIn?: TenantDb,
 ) {
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select(`*, workspace_number(*)`)
-    .eq("id", workspaceId)
-    .eq("workspace_number.type", "rented")
-    .single();
-
-  return { workspace, workspaceError };
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const workspaceRow = await adminDb.query.workspace.findFirst({
+      where: eq(workspace.id, workspaceId),
+    });
+    if (!workspaceRow) {
+      return { workspace: null, workspaceError: toDbError(new Error("Not found")) };
+    }
+    const numbers = await tdb.workspace_number.findMany({
+      where: eq(workspace_number.type, "rented"),
+    });
+    return {
+      workspace: { ...workspaceRow, workspace_number: numbers },
+      workspaceError: null,
+    };
+  } catch (error) {
+    return { workspace: null, workspaceError: toDbError(error) };
+  }
 }
 
 export async function getWorkspaceScripts({
   workspace,
-  supabase,
+  tdb: tdbIn,
 }: {
   workspace: string;
-  supabase: SupabaseClient;
+  tdb?: TenantDb;
+  supabase?: SupabaseClient;
 }) {
-  const { data, error } = await supabase
-    .from("script")
-    .select()
-    .eq("workspace", workspace);
-  if (error) logger.error("Error fetching scripts", error);
-  return data;
+  const tdb = tdbIn ?? createTenantDb(workspace);
+  try {
+    return await tdb.script.findMany();
+  } catch (error) {
+    logger.error("Error fetching scripts", error);
+    return undefined;
+  }
 }
 
 export {
@@ -776,7 +859,6 @@ export {
 } from "./workspace-conversations.server";
 
 export async function acceptWorkspaceInvitations(
-  supabaseClient: SupabaseClient<Database>,
   invitationIds: string[],
   userId: string,
 ) {
@@ -785,12 +867,17 @@ export async function acceptWorkspaceInvitations(
     return { errors };
   }
 
-  const { data: inviteRows, error: inviteQueryError } = await supabaseClient
-    .from("workspace_invite")
-    .select("id, workspace, role")
-    .in("id", invitationIds);
-
-  if (inviteQueryError) {
+  let inviteRows: { id: string; workspace: string; role: string }[];
+  try {
+    inviteRows = await adminDb
+      .select({
+        id: workspace_invite.id,
+        workspace: workspace_invite.workspace,
+        role: workspace_invite.role,
+      })
+      .from(workspace_invite)
+      .where(inArray(workspace_invite.id, invitationIds));
+  } catch {
     return {
       errors: invitationIds.map((invitationId) => ({
         invitationId,
@@ -800,7 +887,7 @@ export async function acceptWorkspaceInvitations(
   }
 
   const invitesById = new Map(
-    (inviteRows ?? []).map((invite) => [String(invite.id), invite]),
+    inviteRows.map((invite) => [String(invite.id), invite]),
   );
 
   const processableInvites = invitationIds
@@ -829,23 +916,23 @@ export async function acceptWorkspaceInvitations(
     processableInvites.map(async ({ invitationId, invite }) => {
       const invitationErrors: Array<{ invitationId: string; type: string }> =
         [];
+      const tdb = createTenantDb(invite.workspace);
 
       const { error: workspaceError } = await addUserToWorkspace({
-        supabaseClient,
         workspaceId: invite.workspace,
         userId,
         role: invite.role,
+        tdb,
       });
       if (workspaceError) {
         invitationErrors.push({ invitationId, type: "workspace" });
       }
 
-      const { error: deletionError } = await supabaseClient
-        .from("workspace_invite")
-        .delete()
-        .eq("id", invitationId);
-
-      if (deletionError) {
+      try {
+        await tdb.workspace_invite.delete({
+          where: eq(workspace_invite.id, invitationId),
+        });
+      } catch {
         invitationErrors.push({ invitationId, type: "deletion" });
       }
 
@@ -860,14 +947,9 @@ export async function acceptWorkspaceInvitations(
   return { errors };
 }
 
-export async function getInvitesByUserId(
-  supabase: SupabaseClient,
-  user_id: string,
-) {
-  const { data, error } = await supabase
-    .from("workspace_invite")
+export async function getInvitesByUserId(user_id: string) {
+  return adminDb
     .select()
-    .eq("user_id", user_id);
-  if (error) throw error;
-  return data;
+    .from(workspace_invite)
+    .where(eq(workspace_invite.user_id, user_id));
 }

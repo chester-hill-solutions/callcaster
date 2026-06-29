@@ -50,3 +50,31 @@
 - `withAppCurrentUser(userId, fn)` runs `fn` inside `db.transaction()` with `app.current_user_id` set (transaction-local) so SECURITY DEFINER plpgsql RPCs see the actor; `fn` receives the tx-bound Drizzle instance — compose with `createTenantDb(wsId, tx)`.
 - **Non-members get a uniform 404, not 403** (`requireWorkspaceAccess`, `requireWorkspaceLoaderContext`, `withWorkspaceApiLoader/Action`) to avoid workspace-id inference. A member with insufficient role for a min-role-gated route still gets 403.
 - No RLS. The last RLS policy (`phone_verification`) is dropped in [`supabase/migrations/20260628130500_adr_0004_drop_phone_verification_rls.sql`](supabase/migrations/20260628130500_adr_0004_drop_phone_verification_rls.sql); `phone_verification` is a global user-scoped table gated in app code by `user_id` (the `verify-audio-session` loader uses the service-role client + explicit `user_id` filter).
+
+## Railway (CallCaster project)
+
+**Default: use the CLI** for deploy, cleanup, env vars, DB ops, and anything that must run non-interactively. Use **MCP for read-only inspection** (status, logs, deployments). Avoid `railway-agent` for multi-step infra unless the CLI cannot do it.
+
+### CLI (prefer `@railway/cli` ≥ 5.x)
+
+- Link context first: `railway environment <env>` → `railway service <name>` → `railway status`.
+- **CallCaster** project (`32b36c6c-5f3d-463b-8c7f-bbcd70351e8f`); **migration/review env** is **`visual-asset-review`** (`18ef9173-4b33-4a62-9b94-9dfc7a36eb05`) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05); see [`docs/railway-review-env.md`](docs/railway-review-env.md).
+- App service **`callcaster-review`**; DB service **`PostgreSQL 18`** (PG 18.4, latest stable template: `railway deploy -t postgres-18`).
+- **Deploy / config:** `railway redeploy --yes`, `railway variables --set 'KEY=value'`, `railway variables --set 'DATABASE_URL=${{PostgreSQL 18.DATABASE_URL}}'`.
+- **Cleanup:** `railway service list --json`, `railway service delete --service <id> --yes`, `railway volume delete -v <name> --yes` (requires CLI 5+; old 4.x has no `service delete` and prompts fail without TTY).
+- **DB from local machine:** `railway run -- bash -lc '…'` and use **`$DATABASE_PUBLIC_URL`** inside the script — plain `railway run psql "$DATABASE_URL"` fails locally because `DATABASE_URL` uses `postgres.railway.internal`.
+- **Templates:** `railway deploy -t postgres-18` (or `postgres-17`); `railway add --database postgres` is interactive-only.
+
+### MCP (`user-Railway`)
+
+- **Good for:** `list-projects`, `list-services`, `get-status`, `list-deployments`, `get-logs` — quick read-only checks without linking cwd.
+- **`accept-deploy`** — commits **all** staged environment changes and deploys; destructive; only when the user explicitly wants deploy.
+- **`railway-agent`** — multi-step ops but unreliable here: truncates service IDs, **`commitStagedChangesTool` often fails**, may **`discardStagedChangesTool`** and revert work, dual-volume PATCH merges instead of replacing. Prefer CLI when agent reports “staged” or “send another message”.
+- MCP **hides secret values** in config; use CLI `railway variables` / `railway run` when you need to run migrations against the DB.
+
+### Postgres on Railway (this repo)
+
+- App **`DATABASE_URL`** should reference the single Postgres service variable (e.g. `${{PostgreSQL 18.DATABASE_URL}}`).
+- Schema/data restore: dump from linked Supabase (`supabase db dump --linked` + **PostgreSQL 17+ `pg_dump`** locally), restore via `psql "$DATABASE_PUBLIC_URL"`, seed `supabase_migrations.schema_migrations`, then `supabase db push --db-url "$DATABASE_PUBLIC_URL" --yes`.
+- **`supabase/config.toml` `major_version`** — keep at **17** until Supabase CLI supports 18; Railway can run PG 18 regardless.
+- One volume per Postgres service; changing major PG version requires a **fresh volume** (cannot reuse PG18 data dir on PG17 image).

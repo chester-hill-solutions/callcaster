@@ -16,7 +16,7 @@ import { data as routeData, redirect } from "react-router";
 import { normalizeCampaignData } from "@/lib/campaign-settings";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
-import { fetchQueueCounts, getCampaignTableKey, parseActionRequest, updateCampaign } from "@/lib/database.server";
+import { fetchQueueCounts, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -74,7 +74,11 @@ async function handleCampaignDuplicate(
 
   const { data: campaign, error } = await supabaseClient
     .from("campaign")
-    .insert({ ...parsedData, workspace: workspace_id })
+    .insert({
+      ...parsedData,
+      workspace: workspace_id,
+      live_questions: parsedData.live_questions ?? parsedData.questions ?? null,
+    })
     .select("id")
     .single();
 
@@ -89,7 +93,6 @@ async function handleCampaignDuplicate(
     const newQueueItems = originalQueue.map((item) => ({
       campaign_id: campaign.id,
       contact_id: item.contact_id,
-      workspace: workspace_id,
     }));
 
     const { error: queueError } = await supabaseClient
@@ -98,23 +101,6 @@ async function handleCampaignDuplicate(
 
     if (queueError) throw queueError;
   }
-
-  await supabaseClient
-    .from(
-      parsedData.type === "live_call"
-        ? "live_campaign"
-        : parsedData.type === "message"
-          ? "message_campaign"
-          : "ivr_campaign",
-    )
-    .insert({
-      campaign_id: campaign.id,
-      workspace: workspace_id,
-      script_id: parsedData.script_id,
-      body_text: parsedData.body_text,
-      message_media: parsedData.message_media,
-      voicedrop_audio: parsedData.voicedrop_audio,
-    });
 
   return { success: true };
 }
@@ -144,14 +130,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
         const nextCampaignData = JSON.parse(campaignDataStr);
         const nextCampaignDetails = JSON.parse(campaignDetailsStr);
-        const previousCampaign = await supabaseClient
-          .from("campaign")
-          .select("type")
-          .eq("id", Number(selected_id))
-          .single();
-
         const result = await updateCampaign({
-          supabase: supabaseClient,
           campaignData: {
             ...nextCampaignData,
             campaign_id: Number(selected_id),
@@ -164,22 +143,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
             workspace: workspace_id,
           },
         });
-
-        if (
-          previousCampaign.data?.type &&
-          previousCampaign.data.type !== nextCampaignData.type
-        ) {
-          const activeTable = getCampaignTableKey(nextCampaignData.type);
-          const tables = ["live_campaign", "message_campaign", "ivr_campaign"] as const;
-
-          await Promise.all(
-            tables
-              .filter((table) => table !== activeTable)
-              .map((table) =>
-                supabaseClient.from(table).delete().eq("campaign_id", Number(selected_id)),
-              ),
-          );
-        }
 
         return routeData({
           success: true,

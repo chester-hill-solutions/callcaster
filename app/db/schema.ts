@@ -83,27 +83,24 @@ export const workspace_number = pgTable("workspace_number", {
   workspace: uuid().notNull(),
 });
 
-export const workspace_permissions = pgTable("workspace_permissions", {
-  id: serial().notNull().primaryKey(),
-  permission: text().notNull(),
-  role: text().notNull(),
-});
-
 // ─── Campaign ──────────────────────────────────────
 
 export const campaign = pgTable("campaign", {
-  call_questions: jsonb(),
+  body_text: text(),
   caller_id: text(),
   created_at: text().notNull(),
   dial_ratio: integer().notNull(),
   dial_type: text(),
+  disposition_options: jsonb(),
   end_date: text(),
   group_household_queue: boolean().notNull(),
   id: serial().notNull().primaryKey(),
   is_active: boolean().notNull(),
+  live_questions: jsonb(),
+  message_media: text().array(),
   next_queue_order: integer().notNull(),
-  phase: text(),
   schedule: jsonb(),
+  script_id: integer(),
   sms_messaging_service_sid: text(),
   sms_send_mode: text(),
   start_date: text(),
@@ -111,6 +108,7 @@ export const campaign = pgTable("campaign", {
   title: text().notNull(),
   type: text(),
   voicemail_file: text(),
+  voicedrop_audio: text(),
   workspace: uuid(),
 });
 
@@ -134,54 +132,9 @@ export const campaign_queue = pgTable("campaign_queue", {
   provider_status: text(),
   queue_order: integer(),
   queue_state: text(),
-  status: text().notNull(),
-  dequeued_by: text(),
+  dequeued_by: uuid(),
   dequeued_at: text(),
   dequeued_reason: text(),
-});
-
-export const campaign_schedule_jobs = pgTable("campaign_schedule_jobs", {
-  campaign_id: serial().notNull(),
-  end_ids: integer().array(),
-  end_job_id: serial(),
-  start_ids: integer().array(),
-  start_job_id: serial(),
-});
-
-export const ivr_campaign = pgTable("ivr_campaign", {
-  campaign_id: serial().notNull(),
-  created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
-  script_id: serial(),
-  workspace: uuid().notNull(),
-});
-
-export const live_campaign = pgTable("live_campaign", {
-  campaign_id: serial(),
-  created_at: text().notNull(),
-  disposition_options: jsonb().notNull(),
-  id: serial().notNull().primaryKey(),
-  questions: jsonb().notNull(),
-  script_id: serial(),
-  voicedrop_audio: text(),
-  workspace: uuid().notNull(),
-});
-
-export const message_campaign = pgTable("message_campaign", {
-  body_text: text(),
-  campaign_id: serial(),
-  created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
-  message_media: text().array(),
-  workspace: uuid().notNull(),
-});
-
-export const email_campaign = pgTable("email_campaign", {
-  campaign_id: serial().notNull(),
-  created_at: text().notNull(),
-  email_id: serial(),
-  id: serial().notNull().primaryKey(),
-  workspace: uuid().notNull(),
 });
 
 export const script = pgTable("script", {
@@ -261,16 +214,6 @@ export const audience_upload = pgTable("audience_upload", {
   error_message: text(),
   header_mapping: jsonb(),
   split_name_column: text(),
-});
-
-export const audience_rule = pgTable("audience_rule", {
-  audience_id: serial().notNull(),
-  conditions: jsonb().notNull(),
-  created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
-  logic: text().notNull(),
-  updated_at: text(),
-  updated_by: text(),
 });
 
 export const households = pgTable("households", {
@@ -377,14 +320,6 @@ export const outreach_attempt = pgTable("outreach_attempt", {
   user_id: uuid(),
   volunteer_interest: text(),
   vote_by_mail: boolean(),
-  workspace: uuid().notNull(),
-});
-
-export const twilio_cancellation_queue = pgTable("twilio_cancellation_queue", {
-  call_sid: text().notNull(),
-  created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
-  processed_at: text(),
   workspace: uuid().notNull(),
 });
 
@@ -534,15 +469,6 @@ export const response_answer = pgTable("response_answer", {
 
 // ─── Auth/Verification ──────────────────────────────────────
 
-export const phone_verification = pgTable("phone_verification", {
-  id: text().notNull().primaryKey(),
-  user_id: uuid().notNull(),
-  phone_number: text().notNull(),
-  pin: text().notNull(),
-  expires_at: text().notNull(),
-  created_at: text().notNull(),
-});
-
 export const verification_session = pgTable("verification_session", {
   id: text().notNull().primaryKey(),
   user_id: uuid().notNull(),
@@ -574,19 +500,6 @@ export const webhook = pgTable("webhook", {
   updated_at: text(),
   updated_by: text(),
   workspace: uuid().notNull(),
-});
-
-// ─── Email ──────────────────────────────────────
-
-export const email = pgTable("email", {
-  created_at: text().notNull(),
-  created_by: uuid(),
-  design: jsonb(),
-  id: serial().notNull().primaryKey(),
-  name: text().notNull(),
-  updated_at: text(),
-  updated_by: text(),
-  workspace: uuid(),
 });
 
 // ─── Relations ──────────────────────────────────────
@@ -643,10 +556,6 @@ export const audience_uploadRelations = relations(audience_upload, ({ one }) => 
   audience: one(audience, { fields: [audience_upload.audience_id], references: [audience.id] }),
 }));
 
-export const audience_ruleRelations = relations(audience_rule, ({ one }) => ({
-  audience: one(audience, { fields: [audience_rule.audience_id], references: [audience.id] }),
-}));
-
 export const survey_pageRelations = relations(survey_page, ({ one }) => ({
   survey: one(survey, { fields: [survey_page.survey_id], references: [survey.id] }),
 }));
@@ -661,10 +570,6 @@ export const question_optionRelations = relations(question_option, ({ one }) => 
 
 export const response_answerRelations = relations(response_answer, ({ one }) => ({
   survey_response: one(survey_response, { fields: [response_answer.response_id], references: [survey_response.id] }),
-}));
-
-export const ivr_campaignRelations = relations(ivr_campaign, ({ one }) => ({
-  script: one(script, { fields: [ivr_campaign.script_id], references: [script.id] }),
 }));
 
 export const inbound_queue_memberRelations = relations(inbound_queue_member, ({ one }) => ({

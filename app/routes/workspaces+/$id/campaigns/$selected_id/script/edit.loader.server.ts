@@ -34,7 +34,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")
-    .select(`*, campaign_audience(*)`)
+    .select(`*, campaign_audience(*), script(*)`)
     .eq("id", parseInt(selected_id))
     .single();
 
@@ -55,43 +55,55 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     mediaNames = files.map(file => file.name);
   }
 
-  switch (campaignData.type) {
-    case "live_call":
-      ({ data: campaignDetails } = await supabaseClient
-        .from("live_campaign")
-        .select(`*, script(*)`)
-        .eq("campaign_id", parseInt(selected_id))
-        .single());
-      break;
+  const campaignRow = campaignData as typeof campaignData & {
+    script_id: number | null;
+    message_media: string[] | null;
+    disposition_options: unknown;
+    live_questions: unknown;
+    voicedrop_audio: string | null;
+    script: Script | Script[] | null;
+  };
 
+  const scriptRow = Array.isArray(campaignRow.script)
+    ? campaignRow.script[0] ?? undefined
+    : campaignRow.script ?? undefined;
+
+  const baseDetails: BaseCampaignDetails = {
+    campaign_id: campaignRow.id,
+    created_at: campaignRow.created_at,
+    id: campaignRow.id,
+    script_id: campaignRow.script_id,
+    workspace: campaignRow.workspace ?? workspace_id,
+    script: scriptRow,
+    message_media: campaignRow.message_media ?? undefined,
+    disposition_options: (campaignRow.disposition_options ?? undefined) as BaseCampaignDetails["disposition_options"],
+    questions: (campaignRow.live_questions ?? undefined) as BaseCampaignDetails["questions"],
+    voicedrop_audio: campaignRow.voicedrop_audio,
+  };
+
+  switch (campaignData.type) {
     case "message":
-      ({ data: campaignDetails } = await supabaseClient
-        .from("message_campaign")
-        .select()
-        .eq("campaign_id", parseInt(selected_id))
-        .single());
-      if (campaignDetails && Array.isArray(campaignDetails.message_media) && campaignDetails.message_media.length > 0) {
+      if (Array.isArray(baseDetails.message_media) && baseDetails.message_media.length > 0) {
         const mediaLinks = await getSignedUrls(
           supabaseClient,
           workspace_id,
-          campaignDetails.message_media
+          baseDetails.message_media
         );
         campaignDetails = {
-          ...campaignDetails,
+          ...baseDetails,
           mediaLinks: mediaLinks as unknown as { [key: string]: string }[]
         };
+      } else {
+        campaignDetails = baseDetails;
       }
       break;
 
+    case "live_call":
     case "robocall":
     case "simple_ivr":
     case "complex_ivr":
-      ({ data: campaignDetails } = await supabaseClient
-        .from("ivr_campaign")
-        .select(`*, script(*)`)
-        .eq("campaign_id", parseInt(selected_id))
-        .single());
-      if (campaignDetails?.script?.steps) {
+      campaignDetails = baseDetails;
+      if (campaignDetails.script?.steps) {
         const fileNames = getScriptRecordingFileNames(campaignDetails.script);
         const mediaLinks = await getMedia(
           fileNames,
@@ -110,27 +122,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Response("Campaign details not found", { status: 404 });
   }
 
-  const typedCampaignDetails: BaseCampaignDetails = {
-    campaign_id: campaignDetails.campaign_id,
-    created_at: campaignDetails.created_at,
-    id: campaignDetails.id,
-    script_id: campaignDetails.script_id,
-    workspace: campaignDetails.workspace,
-    script: campaignDetails.script,
-    mediaLinks: campaignDetails.mediaLinks,
-    message_media: campaignDetails.message_media,
-    disposition_options: campaignDetails.disposition_options ?? undefined,
-    questions: campaignDetails.questions ?? undefined,
-    voicedrop_audio: campaignDetails.voicedrop_audio,
-  };
-
   return routeData({
     workspace_id,
     selected_id,
     data: {
       ...campaignData,
       type: campaignData.type as CampaignType,
-      campaignDetails: typedCampaignDetails
+      campaignDetails,
     },
     mediaNames,
     userRole: userRole?.role ?? "",

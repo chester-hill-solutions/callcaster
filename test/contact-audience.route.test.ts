@@ -63,7 +63,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({ ok: true });
-    expect(mocks.removeContactFromAudience).toHaveBeenCalledWith(supabaseClient, 2, 3);
+    expect(mocks.removeContactFromAudience).toHaveBeenCalledWith(2, 3);
   });
 
   test("DELETE error uses createErrorResponse", async () => {

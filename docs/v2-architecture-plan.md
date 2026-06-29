@@ -1,6 +1,6 @@
-# CallCaster v2 Architecture Plan
+> **Superseded (2026-06-29):** Use [`supabase-postgres-migration-plan.md`](./supabase-postgres-migration-plan.md) and [`docs/adr/`](./adr/) for execution. In-place migration on this repo — not `callcaster-v2` fork.
 
-**Status:** Grilling complete, ADRs pending write. This document is the reference for post-compaction continuation.
+# CallCaster v2 Architecture Plan
 **Date:** 2026-06-27
 **Method:** grill-with-docs skill — interviewed user relentlessly, explored codebase, resolved each branch with recommended answer.
 

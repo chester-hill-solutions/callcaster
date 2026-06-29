@@ -46,10 +46,10 @@ export const action = async ({
       .eq("parent_call_sid", callId as string)
       .single();
     if (callFetchError) throw { call: callFetchError };
-    const { data, error } = await supabaseClient
-      .from("live_campaign")
+    const { data, error } = await supabase
+      .from("campaign")
       .select("voicedrop_audio")
-      .eq("campaign_id", Number(campaignId))
+      .eq("id", Number(campaignId))
       .single();
     if (error) throw { campaign: error };
 

@@ -24,11 +24,7 @@ export async function getCallScreenData(
   ] = await Promise.all([
     supabase.from("workspace").select("*").eq("id", workspaceId).single(),
     supabase.from("campaign").select().eq("id", parseInt(campaignId)).single(),
-    supabase
-      .from("live_campaign")
-      .select(`*, script:script(*)`)
-      .eq("campaign_id", parseInt(campaignId))
-      .single(),
+    supabase.from("campaign").select(`*, script:script(*)`).eq("id", parseInt(campaignId)).single(),
     supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: parseInt(campaignId) }),
     supabase
       .from("campaign_queue")

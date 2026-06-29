@@ -40,6 +40,7 @@ const mocks = vi.hoisted(() => {
     env: {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service-key"),
+      BASE_URL: vi.fn(() => "https://app.example"),
     },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };

@@ -20,20 +20,20 @@ export const action = async ({ request }: { request: Request }) => {
       const campaignData = parseJsonField<Parameters<typeof updateCampaign>[0]["campaignData"]>(data.campaignData);
       const campaignDetails = parseJsonField<Parameters<typeof updateCampaign>[0]["campaignDetails"]>(data.campaignDetails);
       const { campaign, campaignDetails: updatedCampaignDetails } =
-        await updateCampaign({ supabase: supabase, campaignData, campaignDetails });
+        await updateCampaign({ campaignData, campaignDetails });
       return routeData({ campaign, campaignDetails: updatedCampaignDetails }, { headers });
     }
 
     if (request.method === "DELETE") {
       const campaignId = String(data.campaignId ?? "");
-      await deleteCampaign({ supabase: supabase, campaignId });
+      const workspaceId = String(data.workspaceId ?? data.workspace ?? "");
+      await deleteCampaign({ workspaceId, campaignId });
       return routeData({ success: true }, { headers });
     }
 
     if (request.method === "POST") {
       const campaignData = parseJsonField<Parameters<typeof createCampaign>[0]["campaignData"]>(data.campaignData);
       const { campaign, campaignDetails: createdCampaignDetails } = await createCampaign({
-        supabase: supabase,
         campaignData,
       });
       return routeData({ campaign, campaignDetails: createdCampaignDetails }, { headers });

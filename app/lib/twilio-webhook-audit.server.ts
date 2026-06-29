@@ -25,7 +25,7 @@ export type TwilioWebhookAuditResult = {
   driftMessages: string[];
   entries: TwilioWebhookDriftEntry[];
   ivrRuntimeHint: "remix" | "edge" | "mixed" | "unknown";
-  smsStatusCanonical: "edge" | "remix_legacy" | "unknown";
+  smsStatusCanonical: "edge" | "remix" | "remix_legacy" | "unknown";
 };
 
 function normalizeUrl(url: string | null | undefined): string | null {
@@ -55,6 +55,7 @@ export async function auditWorkspaceTwilioWebhooks({
   workspaceId: string;
 }): Promise<TwilioWebhookAuditResult> {
   const baseUrl = env.BASE_URL().replace(/\/$/, "");
+  const expectedSmsStatus = `${baseUrl}/api/sms/status`;
   const edgeSmsStatus = `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/sms-status`;
 
   const twilioData = (await loadWorkspaceTwilioData(
@@ -115,10 +116,25 @@ export async function auditWorkspaceTwilioWebhooks({
       resourceType: "messaging_service",
       resourceSid: serviceSid,
       field: "statusCallback",
-      expected: expected.callerIdStatus,
+      expected: expectedSmsStatus,
       live: service.statusCallback ?? null,
-      severity: "warning",
+      severity: "error",
     });
+  }
+
+  for (const number of numbers) {
+    if (!number.sid) continue;
+    const liveStatus = normalizeUrl(number.statusCallback);
+    if (liveStatus === edgeSmsStatus) {
+      compareField(entries, driftMessages, {
+        resourceType: "phone_number",
+        resourceSid: number.sid,
+        field: "statusCallback (sms)",
+        expected: expectedSmsStatus,
+        live: number.statusCallback ?? null,
+        severity: "error",
+      });
+    }
   }
 
   let remixIvrSignals = 0;
@@ -140,7 +156,7 @@ export async function auditWorkspaceTwilioWebhooks({
     driftMessages,
     entries,
     ivrRuntimeHint,
-    smsStatusCanonical: "edge",
+    smsStatusCanonical: "remix",
   };
 }
 

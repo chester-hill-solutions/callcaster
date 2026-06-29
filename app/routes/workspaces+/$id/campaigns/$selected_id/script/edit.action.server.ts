@@ -26,9 +26,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const { data: campaign, error } = await supabaseClient
-    .from("message_campaign")
+    .from("campaign")
     .select("id, message_media")
-    .eq("campaign_id", parseInt(campaignId))
+    .eq("id", parseInt(campaignId))
     .single();
 
   if (error) {
@@ -37,13 +37,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   const { data: campaignUpdate, error: updateError } = await supabaseClient
-    .from("message_campaign")
+    .from("campaign")
     .update({
       message_media: campaign.message_media?.filter(
         (med) => med !== encodedMediaName,
       ) || [],
     })
-    .eq("campaign_id", parseInt(campaignId))
+    .eq("id", parseInt(campaignId))
     .select();
 
   if (updateError) {

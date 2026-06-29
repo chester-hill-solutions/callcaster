@@ -33,7 +33,7 @@ import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import type { CampaignState } from "@/lib/campaign-home.types";
 export type { CampaignState } from "@/lib/campaign-home.types";
 
-type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
+type CampaignTable = "campaign";
 
 /** Tables whose row changes affect dashboard queue + disposition counts from the loader. */
 const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
@@ -42,19 +42,6 @@ const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
   "call",
   "message",
 ] as const;
-
-const getTable = (
-  campaignType: string | null | undefined,
-): CampaignTable | null => {
-  return campaignType === "live_call"
-    ? "live_campaign"
-    : campaignType === "message"
-      ? "message_campaign"
-      : campaignType &&
-          ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
-        ? "ivr_campaign"
-        : null;
-};
 
 export default function CampaignScreen() {
   const {
@@ -82,7 +69,7 @@ export default function CampaignScreen() {
   const isCampaignParentRoute = route.length === 5;
   const revalidator = useRevalidator();
   const lastRevalidateRef = useRef(0);
-  const realtimeTable = getTable(campaignData?.type) ?? "live_campaign";
+  const realtimeTable: CampaignTable = "campaign";
   const workspaceRouteId = route[2] ?? "";
   const safeQueueCounts = {
     fullCount: queueCounts.fullCount ?? 0,
@@ -92,7 +79,11 @@ export default function CampaignScreen() {
     supabase,
     workspaceRouteId,
     realtimeTable,
-    [initialCampaignDetails],
+    [
+      initialCampaignDetails
+        ? { ...initialCampaignDetails, id: Number(selected_id) }
+        : null,
+    ],
   );
   const campaignDetails = campaignDetailsArray?.[0];
 

@@ -227,7 +227,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     const result = await createCampaign({
-      supabase,
       campaignData,
     });
     campaign = result.campaign as { id: number; [key: string]: unknown };

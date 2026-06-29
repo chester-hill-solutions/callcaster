@@ -179,33 +179,36 @@ export const fetchCampaignDetails = async (
   supabaseClient: SupabaseClient,
   campaignId: string | number,
   workspaceId: string,
-  tableName: CampaignTableKey,
+  _legacyTableName?: CampaignTableKey,
 ) => {
-  const typedClient = supabaseClient as SupabaseClient<any>;
-  const { data, error } = await typedClient
-    .from(tableName)
-    .select()
-    .eq("campaign_id", campaignId)
-    .single();
-  if (error) {
-    if (error.code === "PGRST116") {
-      const { data: newCampaign, error: newCampaignError } =
-        await typedClient
-          .from(tableName)
-          .insert({ campaign_id: campaignId, workspace: workspaceId })
-          .select()
-          .single();
+  const { data: row, error } = await supabaseClient
+    .from("campaign")
+    .select(
+      "id, script_id, body_text, message_media, voicedrop_audio, disposition_options, live_questions, workspace, type",
+    )
+    .eq("id", Number(campaignId))
+    .eq("workspace", workspaceId)
+    .maybeSingle();
 
-      if (newCampaignError) {
-        logger.error(`Error creating new ${tableName}:`, newCampaignError);
-        return null;
-      }
-      return newCampaign;
-    }
-    logger.error(`Error fetching ${tableName}:`, error);
+  if (error) {
+    logger.error("Error fetching campaign details:", error);
     return null;
   }
-  return data;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    campaign_id: row.id,
+    script_id: row.script_id,
+    body_text: row.body_text,
+    message_media: row.message_media,
+    voicedrop_audio: row.voicedrop_audio,
+    disposition_options: row.disposition_options,
+    questions: row.live_questions,
+    workspace: row.workspace,
+  };
 };
 
 export const fetchQueueCounts = async (
@@ -312,58 +315,36 @@ export const fetchCampaignAudience = async (
 export const fetchAdvancedCampaignDetails = async (
   supabaseClient: SupabaseClient<Database>,
   campaignId: string | number,
-  campaignType: "live_call" | "message" | "robocall",
+  campaignType: "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr",
   workspaceId: string,
 ) => {
-  let table: CampaignTableKey;
-  let extraSelect = "";
-  switch (campaignType) {
-    case "live_call":
-    case null:
-      table = "live_campaign";
-      extraSelect = ", script(*)";
-      break;
-    case "message":
-      table = "message_campaign";
-      break;
-    case "robocall":
-      table = "ivr_campaign";
-      extraSelect = ", script(*)";
-      break;
-    default:
-      throw new Error(`Invalid campaign type: ${campaignType}`);
-  }
-
-  const typedClient = supabaseClient as SupabaseClient<any>;
-  const { data: rawData, error } = await typedClient
-    .from(table)
-    .select(`*${extraSelect}`)
-    .eq("campaign_id", campaignId)
+  const { data: row, error } = await supabaseClient
+    .from("campaign")
+    .select("*, script(*)")
+    .eq("id", Number(campaignId))
+    .eq("workspace", workspaceId)
     .single();
-  const data = rawData as
-    | (Database["public"]["Tables"]["message_campaign"]["Row"] & {
-        mediaLinks?: string[];
-      })
-    | (Database["public"]["Tables"]["live_campaign"]["Row"] & { script?: Script | null })
-    | (Database["public"]["Tables"]["ivr_campaign"]["Row"] & { script?: Script | null })
-    | null;
 
   if (error) throw new Error(`Error fetching campaign details: ${error.message}`);
 
-  const messageData =
-    campaignType === "message"
-      ? (data as
-          | (Database["public"]["Tables"]["message_campaign"]["Row"] & {
-              mediaLinks?: string[];
-            })
-          | null)
-      : null;
+  const data = {
+    campaign_id: row.id,
+    script_id: row.script_id,
+    body_text: row.body_text,
+    message_media: row.message_media,
+    voicedrop_audio: row.voicedrop_audio,
+    disposition_options: row.disposition_options,
+    questions: row.live_questions,
+    workspace: row.workspace,
+    script: (Array.isArray(row.script) ? row.script[0] : row.script) as Script | null,
+    mediaLinks: undefined as string[] | undefined,
+  };
 
-  if (messageData?.message_media?.length) {
-    messageData.mediaLinks = await getSignedUrls(
+  if (campaignType === "message" && Array.isArray(data.message_media) && data.message_media.length) {
+    data.mediaLinks = await getSignedUrls(
       supabaseClient,
       workspaceId,
-      messageData.message_media,
+      data.message_media,
     );
   }
 

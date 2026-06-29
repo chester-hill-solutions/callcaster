@@ -14,7 +14,7 @@ import {
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
 import { deepEqual } from "@/lib/utils";
-import { fetchCampaignAudience, fetchCampaignDetails, fetchQueueCounts, getCampaignTableKey, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, parseActionRequest, updateCampaign, type CampaignType } from "@/lib/database.server";
+import { fetchCampaignAudience, fetchCampaignDetails, fetchQueueCounts, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { loadCampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
@@ -94,15 +94,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   };
 
   if (campaignType?.type === "message") {
-    const { data: messageCampaign } = await supabaseClient
-      .from("message_campaign")
-      .select("message_media")
-      .eq("campaign_id", Number(selected_id))
-      .eq("workspace", workspace_id)
-      .maybeSingle();
-
-    if (Array.isArray(messageCampaign?.message_media) && messageCampaign.message_media.length > 0) {
-      mediaLinks = await getSignedUrls(supabaseClient, workspace_id, messageCampaign.message_media);
+    const messageMedia = campaignType.message_media;
+    if (Array.isArray(messageMedia) && messageMedia.length > 0) {
+      mediaLinks = await getSignedUrls(supabaseClient, workspace_id, messageMedia);
     }
   }
 
@@ -124,13 +118,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     | null = null;
   if (campaignType?.type) {
     try {
-      const tableKey = getCampaignTableKey(campaignType.type as CampaignType);
-      campaignDetailsForReadiness = await fetchCampaignDetails(
+      campaignDetailsForReadiness = (await fetchCampaignDetails(
         supabaseClient,
         selected_id,
         workspace_id,
-        tableKey,
-      );
+      )) as LiveCampaign | MessageCampaign | IVRCampaign | null;
     } catch (detailsError) {
       logger.error("Failed to load campaign details for readiness", detailsError);
     }

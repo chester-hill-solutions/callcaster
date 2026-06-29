@@ -14,9 +14,8 @@ import { WORKSPACE_SCOPED_TABLES, type WorkspaceScopedTableName } from "@/db/wor
 // this list against the real registry.
 const SCOPED_TABLE_NAMES = [
   "campaign", "contact", "audience", "audience_upload", "call", "message",
-  "outreach_attempt", "script", "survey", "webhook", "email", "ivr_campaign",
-  "live_campaign", "message_campaign", "email_campaign", "workspace_number",
-  "workspace_invite", "twilio_cancellation_queue", "transaction_history",
+  "outreach_attempt", "script", "survey", "webhook", "workspace_number",
+  "workspace_invite", "transaction_history",
   "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
   "agent_status", "agent_status_event", "handset_session", "workspace_users",
   "workspace_api_key",
@@ -46,9 +45,8 @@ const hoisted = vi.hoisted(() => {
   };
   const TABLES = [
     "campaign", "contact", "audience", "audience_upload", "call", "message",
-    "outreach_attempt", "script", "survey", "webhook", "email", "ivr_campaign",
-    "live_campaign", "message_campaign", "email_campaign", "workspace_number",
-    "workspace_invite", "twilio_cancellation_queue", "transaction_history",
+    "outreach_attempt", "script", "survey", "webhook", "workspace_number",
+    "workspace_invite", "transaction_history",
     "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
     "agent_status", "agent_status_event", "handset_session", "workspace_users",
     "workspace_api_key",
@@ -191,8 +189,8 @@ describe("createTenantDb — registry completeness", () => {
     }
   });
 
-  test("registry covers exactly the 28 workspace-scoped tables", () => {
-    expect(Object.keys(WORKSPACE_SCOPED_TABLES)).toHaveLength(28);
+  test("registry covers exactly the 22 workspace-scoped tables", () => {
+    expect(Object.keys(WORKSPACE_SCOPED_TABLES)).toHaveLength(22);
     const registryNames = Object.keys(WORKSPACE_SCOPED_TABLES).sort();
     const inlineNames = [...SCOPED_TABLE_NAMES].sort();
     expect(registryNames).toEqual(inlineNames);

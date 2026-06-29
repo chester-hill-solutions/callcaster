@@ -103,11 +103,10 @@ export async function handleNewAudience({
     // Add contacts if provided - these are already mapped from the CSV UI
     if (contacts && contacts.length > 0) {
       const { insert } = await bulkCreateContacts(
-        supabaseClient,
         contacts,
         workspaceId,
         createAudienceData.id.toString(),
-        userId
+        userId,
       );
       // Enqueue contacts for campaign when audience is linked to campaign
       if (campaignId && insert?.length) {

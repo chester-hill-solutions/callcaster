@@ -368,18 +368,21 @@ export type Database = {
       };
       campaign: {
         Row: {
-          call_questions: Json | null;
+          body_text: string | null;
           caller_id: string | null;
           created_at: string;
           dial_ratio: number;
           dial_type: Database["public"]["Enums"]["dial_types"] | null;
+          disposition_options: Json | null;
           end_date: string | null;
           group_household_queue: boolean;
           id: number;
           is_active: boolean;
+          live_questions: Json | null;
+          message_media: string[] | null;
           next_queue_order: number;
-          phase: Database["public"]["Enums"]["campaign_phase"] | null;
           schedule: Json | null;
+          script_id: number | null;
           sms_messaging_service_sid: string | null;
           sms_send_mode: string | null;
           start_date: string | null;
@@ -387,21 +390,25 @@ export type Database = {
           title: string;
           type: Database["public"]["Enums"]["campaign_type"] | null;
           voicemail_file: string | null;
+          voicedrop_audio: string | null;
           workspace: string | null;
         };
         Insert: {
-          call_questions?: Json | null;
+          body_text?: string | null;
           caller_id?: string | null;
           created_at?: string;
           dial_ratio?: number;
           dial_type?: Database["public"]["Enums"]["dial_types"] | null;
+          disposition_options?: Json | null;
           end_date?: string | null;
           group_household_queue?: boolean;
           id?: number;
           is_active?: boolean;
+          live_questions?: Json | null;
+          message_media?: string[] | null;
           next_queue_order?: number;
-          phase?: Database["public"]["Enums"]["campaign_phase"] | null;
           schedule?: Json | null;
+          script_id?: number | null;
           sms_messaging_service_sid?: string | null;
           sms_send_mode?: string | null;
           start_date?: string | null;
@@ -409,21 +416,25 @@ export type Database = {
           title?: string;
           type?: Database["public"]["Enums"]["campaign_type"] | null;
           voicemail_file?: string | null;
+          voicedrop_audio?: string | null;
           workspace?: string | null;
         };
         Update: {
-          call_questions?: Json | null;
+          body_text?: string | null;
           caller_id?: string | null;
           created_at?: string;
           dial_ratio?: number;
           dial_type?: Database["public"]["Enums"]["dial_types"] | null;
+          disposition_options?: Json | null;
           end_date?: string | null;
           group_household_queue?: boolean;
           id?: number;
           is_active?: boolean;
+          live_questions?: Json | null;
+          message_media?: string[] | null;
           next_queue_order?: number;
-          phase?: Database["public"]["Enums"]["campaign_phase"] | null;
           schedule?: Json | null;
+          script_id?: number | null;
           sms_messaging_service_sid?: string | null;
           sms_send_mode?: string | null;
           start_date?: string | null;
@@ -431,6 +442,7 @@ export type Database = {
           title?: string;
           type?: Database["public"]["Enums"]["campaign_type"] | null;
           voicemail_file?: string | null;
+          voicedrop_audio?: string | null;
           workspace?: string | null;
         };
         Relationships: [
@@ -491,7 +503,6 @@ export type Database = {
           provider_status: string | null;
           queue_order: number | null;
           queue_state: string | null;
-          status: string;
           dequeued_by: string | null;
           dequeued_at: string | null;
           dequeued_reason: string | null;

@@ -25,7 +25,7 @@ export const action = async ({ request }: { request: Request }) => {
         }
 
         try {
-            response = await removeContactFromAudience(supabase, contactId, audienceId);
+            response = await removeContactFromAudience(contactId, audienceId);
         } catch (updateError) {
             return createErrorResponse(updateError, "Failed to remove contact from audience", 500);
         }

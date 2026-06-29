@@ -196,6 +196,24 @@ describe("api.sms.status webhook behavior", () => {
     expect(supabaseStub._outreachUpdateCalls.length).toBe(0);
   });
 
+  test("accepts MessageStatus when SmsStatus is absent", async () => {
+    const mod = await import("../app/routes/api+/sms/status.route");
+    const fd = new FormData();
+    fd.set("SmsSid", "SM123");
+    fd.set("MessageStatus", "delivered");
+    const req = new Request("http://localhost/api/sms/status", {
+      method: "POST",
+      headers: { "x-twilio-signature": "good" },
+      body: fd,
+    });
+
+    const res = await asRouteResponse(await mod.action({ request: req } as any));
+    expect(res.status).toBe(200);
+    expect(supabaseStub._messageUpdateCalls.at(-1)).toMatchObject({
+      status: "delivered",
+    });
+  });
+
   test("bills only once for duplicate deliveries (same SmsSid)", async () => {
     const mod = await import("../app/routes/api+/sms/status.route");
     const makeReq = () => {

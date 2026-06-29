@@ -355,7 +355,7 @@ export async function releaseAssignedQueueForUser(
 ): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
   const { data: assignedRows, error: assignedRowsError } = await supabaseClient
     .from("campaign_queue")
-    .select("id, status, dequeued_at, assigned_to_user_id")
+    .select("id, dequeued_at, assigned_to_user_id, queue_state")
     .eq("campaign_id", Number(campaignId))
     .is("dequeued_at", null);
 

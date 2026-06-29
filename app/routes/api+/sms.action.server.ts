@@ -44,15 +44,22 @@ const getCampaignData = async ({
   campaign_id: string 
 }): Promise<CampaignData> => {
   const { data, error } = await supabase
-    .from("message_campaign")
-    .select(
-      `*, campaign(end_time, sms_send_mode, sms_messaging_service_sid, caller_id)`,
-    )
-    .eq("campaign_id", campaign_id)
+    .from("campaign")
+    .select("body_text, message_media, end_date, sms_send_mode, sms_messaging_service_sid, caller_id")
+    .eq("id", Number(campaign_id))
     .single();
 
   if (error) throw new Error(`Campaign fetch failed: ${error.message}`);
-  return data;
+  return {
+    body_text: data.body_text ?? "",
+    message_media: data.message_media ?? [],
+    campaign: {
+      end_time: data.end_date ?? "",
+      sms_send_mode: data.sms_send_mode,
+      sms_messaging_service_sid: data.sms_messaging_service_sid,
+      caller_id: data.caller_id,
+    },
+  };
 };
 
 interface SendMessageParams {
@@ -132,7 +139,7 @@ const sendMessage = async ({
             to,
             from,
             media,
-            statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
+            statusCallback: `${env.BASE_URL()}/api/sms/status`,
             portalConfig,
             messageIntent,
             explicitMessagingServiceSid: resolvedMessagingServiceSid,

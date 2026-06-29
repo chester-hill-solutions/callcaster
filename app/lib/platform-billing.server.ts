@@ -49,7 +49,6 @@ async function ensureStripeCustomer(
   if (!stripeCustomerId) {
     try {
       const customer = await createStripeContact({
-        supabaseClient: supabase,
         workspace_id: workspaceId,
       });
       stripeCustomerId = customer.id;

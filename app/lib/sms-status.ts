@@ -20,6 +20,15 @@ const TERMINAL_SMS_STATUSES = new Set<TwilioSmsStatus>(
   TERMINAL_BILLABLE_SMS_STATUSES,
 );
 
+/** Twilio may send `SmsStatus` or `MessageStatus` depending on callback type. */
+export function pickRawTwilioSmsStatus(payload: {
+  SmsStatus?: string | null;
+  MessageStatus?: string | null;
+}): string | null {
+  const raw = payload.SmsStatus || payload.MessageStatus || null;
+  return raw != null && String(raw).trim() !== "" ? String(raw) : null;
+}
+
 export function normalizeSmsStatus(
   status: string | null | undefined,
 ): TwilioSmsStatus | null {

@@ -2,54 +2,56 @@
  * Stripe-related database functions
  */
 import Stripe from "stripe";
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import { eq } from "drizzle-orm";
+import { user, workspace, workspace_users } from "@/db/schema";
 import { env } from "../env.server";
 import { logger } from "../logger.server";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
 export async function createStripeContact({
-  supabaseClient,
   workspace_id,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspace_id: string;
+  tdb?: TenantDb;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select(
-      `
-      name,
-      workspace_users!inner(
-        role,
-        user:user_id(
-          id,
-          username
-        )
-      )
-    `,
-    )
-    .eq("id", workspace_id)
-    .eq("workspace_users.role", "owner")
-    .single();
+  const tdb = tdbIn ?? createTenantDb(workspace_id);
 
-  if (error) {
+  let workspaceRow: { name: string } | undefined;
+  try {
+    workspaceRow = await adminDb.query.workspace.findFirst({
+      where: eq(workspace.id, workspace_id),
+      columns: { name: true },
+    });
+  } catch (error) {
     logger.error("Error fetching workspace data:", error);
     throw error;
   }
 
-  if (!data || !data.workspace_users || data.workspace_users.length === 0) {
+  if (!workspaceRow) {
     throw new Error("No owner found for the workspace");
   }
 
-  const ownerRecord = data.workspace_users[0];
+  const ownerRecord = await tdb.workspace_users.findFirst({
+    where: eq(workspace_users.role, "owner"),
+    columns: { user_id: true },
+  });
+
   if (!ownerRecord) {
-    throw new Error("No owner user found");
+    throw new Error("No owner found for the workspace");
   }
-  const ownerUser = ownerRecord.user;
+
+  const ownerUser = await adminDb.query.user.findFirst({
+    where: eq(user.id, ownerRecord.user_id),
+    columns: { id: true, username: true },
+  });
+
   if (!ownerUser) {
     throw new Error("No owner user found");
   }
-  const ownerEmail = ownerUser?.username;
+
+  const ownerEmail = ownerUser.username;
   if (!ownerEmail) {
     throw new Error("Owner user has no email or username");
   }
@@ -59,38 +61,31 @@ export async function createStripeContact({
   });
 
   return await stripe.customers.create({
-    name: data.name,
+    name: workspaceRow.name,
     email: ownerEmail,
   });
 }
 
 export async function meterEvent({
-  supabaseClient,
   workspace_id,
   amount,
   type,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspace_id: string;
   amount: number;
   type: string;
 }) {
-  const {
-    data,
-    error,
-  } = await supabaseClient
-    .from("workspace")
-    .select("stripe_id")
-    .eq("id", workspace_id)
-    .single();
-  if (error || !data?.stripe_id) return;
+  const workspaceRow = await adminDb.query.workspace.findFirst({
+    where: eq(workspace.id, workspace_id),
+    columns: { stripe_id: true },
+  });
+  if (!workspaceRow?.stripe_id) return;
   const stripe = new Stripe(env.STRIPE_SECRET_KEY());
   return await stripe.billing.meterEvents.create({
     event_name: type,
     payload: {
       value: String(amount),
-      stripe_customer_id: data.stripe_id,
+      stripe_customer_id: workspaceRow.stripe_id,
     },
   });
 }
-

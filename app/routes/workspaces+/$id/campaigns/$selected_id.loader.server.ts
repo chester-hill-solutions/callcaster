@@ -18,29 +18,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
-
 /** Tables whose row changes affect dashboard queue + disposition counts from the loader. */
-
-const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
-  "campaign_queue",
-  "outreach_attempt",
-  "call",
-  "message",
-] as const;
-
-const getTable = (
-  campaignType: string | null | undefined,
-): CampaignTable | null => {
-  return campaignType === "live_call"
-    ? "live_campaign"
-    : campaignType === "message"
-      ? "message_campaign"
-      : campaignType &&
-          ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
-        ? "ivr_campaign"
-        : null;
-};
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
@@ -65,17 +43,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   if (workspace.error) throw workspace.error;
 
-  const campaignTable = getTable(campaignType.data.type);
-  if (!campaignTable) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
-  }
-
-  const campaignDetails = await fetchCampaignDetails(
+  const campaignDetails = (await fetchCampaignDetails(
     supabaseClient,
     selected_id,
     workspace_id,
-    campaignTable,
-  );
+  )) as LiveCampaign | MessageCampaign | IVRCampaign | null;
 
   const resultsPromise = fetchBasicResults(
     supabaseClient,

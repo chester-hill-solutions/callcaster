@@ -7,22 +7,16 @@ import {
   call,
   campaign,
   contact,
-  email,
-  email_campaign,
   handset_session,
   households,
   inbound_queue,
   inbound_queue_entry,
   inbound_queue_member,
-  ivr_campaign,
-  live_campaign,
   message,
-  message_campaign,
   outreach_attempt,
   script,
   survey,
   transaction_history,
-  twilio_cancellation_queue,
   webhook,
   workspace_api_key,
   workspace_invite,
@@ -34,14 +28,8 @@ import {
  * Registry of every table that carries a workspace-tenancy column.
  *
  * `createTenantDb(workspaceId)` auto-scopes each of these tables on every
- * read/update/delete and auto-injects the tenancy column on every insert, so a
- * single forgotten `.where(eq(workspace, id))` can never leak cross-tenant
- * (ADR-0004). Tables without a workspace column (the `workspace` entity itself,
- * global join tables, auth/user tables) are intentionally absent and must be
- * accessed via the admin client or explicit server-side helpers.
- *
- * The registry key matches the exported schema const name, which is also the
- * key under which Drizzle exposes the relational query API (`db.query.<key>`).
+ * read/update/delete and auto-injects the tenancy column on every insert (ADR-0004).
+ * Count: 22 tables after Phase 1 schema transform (vestigial/subtype tables removed).
  */
 export const WORKSPACE_SCOPED_TABLES = {
   campaign: { table: campaign, workspaceColumn: campaign.workspace },
@@ -54,17 +42,8 @@ export const WORKSPACE_SCOPED_TABLES = {
   script: { table: script, workspaceColumn: script.workspace },
   survey: { table: survey, workspaceColumn: survey.workspace },
   webhook: { table: webhook, workspaceColumn: webhook.workspace },
-  email: { table: email, workspaceColumn: email.workspace },
-  ivr_campaign: { table: ivr_campaign, workspaceColumn: ivr_campaign.workspace },
-  live_campaign: { table: live_campaign, workspaceColumn: live_campaign.workspace },
-  message_campaign: { table: message_campaign, workspaceColumn: message_campaign.workspace },
-  email_campaign: { table: email_campaign, workspaceColumn: email_campaign.workspace },
   workspace_number: { table: workspace_number, workspaceColumn: workspace_number.workspace },
   workspace_invite: { table: workspace_invite, workspaceColumn: workspace_invite.workspace },
-  twilio_cancellation_queue: {
-    table: twilio_cancellation_queue,
-    workspaceColumn: twilio_cancellation_queue.workspace,
-  },
   transaction_history: {
     table: transaction_history,
     workspaceColumn: transaction_history.workspace,

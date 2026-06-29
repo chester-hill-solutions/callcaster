@@ -53,20 +53,20 @@ export async function action({ request }: ActionFunctionArgs) {
         }
         if (campaignId) {
             const { data: campaign, error } = await supabase
-                .from('message_campaign')
+                .from('campaign')
                 .select('id, message_media')
-                .eq('campaign_id', campaignId as number)
+                .eq('id', campaignId as number)
                 .single();
             if (error) {
                 logger.error('Campaign Error', error);
                 return routeData({ success: false, error: error }, { headers });
             }
             const { data: campaignUpdate, error: updateError } = await supabase
-                .from('message_campaign')
+                .from('campaign')
                 .update({
                     message_media: [...((campaign?.message_media ?? []) as string[]), safeFileName]
                 })
-                .eq('campaign_id', campaignId as number)
+                .eq('id', campaignId as number)
                 .select()
             if (updateError) {
                 logger.error("Error updating campaign with media:", updateError);
@@ -101,9 +101,9 @@ export async function action({ request }: ActionFunctionArgs) {
         const mediaName = typeof mediaNameRaw === 'string' ? mediaNameRaw : String(mediaNameRaw ?? '');
         const encodedMediaName = encodeURI(mediaName);
         const { data: campaign, error } = await supabase
-            .from("message_campaign")
+            .from("campaign")
             .select("id, message_media")
-            .eq("campaign_id", campaignId as number)
+            .eq("id", campaignId as number)
             .single();
         if (error) {
             logger.error("Campaign Error", error);
@@ -111,13 +111,13 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
         const { data: campaignUpdate, error: updateError } = await supabase
-            .from("message_campaign")
+            .from("campaign")
             .update({
                 message_media: (campaign.message_media ?? []).filter(
                     (med) => med !== encodedMediaName,
                 ),
             })
-            .eq("campaign_id", campaignId as number)
+            .eq("id", campaignId as number)
             .select();
 
         if (updateError) {

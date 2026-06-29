@@ -65,13 +65,13 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
 
   test("DELETE calls deleteCampaign", async () => {
     authSession({ sb: 1 });
-    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: 123 });
+    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: 123, workspaceId: "w1" });
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ supabase: { sb: 1 }, campaignId: "123" });
+    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ workspaceId: "w1", campaignId: "123" });
   });
 
   test("DELETE campaignId fallback covers ?? '' branch", async () => {
@@ -81,7 +81,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     await mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "DELETE" }),
     } as any);
-    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ supabase: { sb: 1 }, campaignId: "" });
+    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ workspaceId: "", campaignId: "" });
   });
 
   test("POST calls createCampaign", async () => {

@@ -15,6 +15,7 @@ import type { Database } from "@/lib/database.types";
 import {
   isTerminalSmsStatus,
   normalizeSmsStatus,
+  pickRawTwilioSmsStatus,
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
@@ -25,9 +26,8 @@ import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.t
 import type { ActionFunctionArgs } from "react-router";
 
 /**
- * Legacy Remix SMS status webhook. Canonical handler: Edge `sms-status`.
- * Kept as a compatibility shim for Twilio resources still pointing at `/api/sms/status`.
- * New outbound sends use `${SUPABASE_URL}/functions/v1/sms-status` — see `chat-sms.server.ts`.
+ * Canonical Twilio outbound SMS status webhook (`POST /api/sms/status`).
+ * Merged from Edge `sms-status`; new sends use `${BASE_URL}/api/sms/status`.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient<Database>(
@@ -41,9 +41,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       previewFormData.entries(),
     ) as Partial<TwilioSmsStatusWebhook>;
     const previewSid = previewPayload.SmsSid;
+    const previewStatus = pickRawTwilioSmsStatus(previewPayload);
 
-    if (!previewSid) {
-      return routeData({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
+    if (!previewSid || !previewStatus) {
+      return routeData(
+        { error: "Missing required fields: SmsSid and SmsStatus or MessageStatus" },
+        { status: 400 },
+      );
     }
 
     const validation = await validateTwilioWebhookForMessageSid({
@@ -57,10 +61,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const payload = validation.params as Partial<TwilioSmsStatusWebhook>;
-    const { SmsSid: sid, SmsStatus: status } = payload;
+    const sid = payload.SmsSid;
+    const rawStatus = pickRawTwilioSmsStatus(payload);
 
-    if (!sid || !status) {
-      return routeData({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
+    if (!sid || !rawStatus) {
+      return routeData(
+        { error: "Missing required fields: SmsSid and SmsStatus or MessageStatus" },
+        { status: 400 },
+      );
     }
 
     const { data: preUpdateMessage, error: messageLookupError } = await supabase
@@ -77,9 +85,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return routeData({ message: preUpdateMessage, outreach: null });
     }
 
-    const messageStatus = normalizeSmsStatus(status) ?? "failed";
-    if (!normalizeSmsStatus(status)) {
-      logger.warn("Unknown SMS status from Twilio webhook", { sid, status });
+    const messageStatus = normalizeSmsStatus(rawStatus) ?? "failed";
+    if (!normalizeSmsStatus(rawStatus)) {
+      logger.warn("Unknown SMS status from Twilio webhook", { sid, status: rawStatus });
     }
 
     const accountSidFromWebhook =

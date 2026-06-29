@@ -1,24 +1,53 @@
 /**
  * Contact–audience relationship operations
  */
+import { and, count, eq, inArray } from "drizzle-orm";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import { audience, contact_audience } from "@/db/schema";
+import { db } from "@/server/db";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+
+async function resolveAudienceWorkspaceId(audienceId: number): Promise<string> {
+  const row = await adminDb.query.audience.findFirst({
+    where: eq(audience.id, audienceId),
+    columns: { workspace: true },
+  });
+  if (!row?.workspace) {
+    throw new Error("Audience not found");
+  }
+  return row.workspace;
+}
 
 /**
  * Remove a single contact from an audience
  */
 export async function removeContactFromAudience(
-  supabaseClient: SupabaseClient<Database>,
   contactId: number,
-  audienceId: number
+  audienceId: number,
+  opts?: {
+    workspaceId?: string;
+    tdb?: TenantDb;
+    /** @deprecated ignored */
+    supabaseClient?: SupabaseClient;
+  },
 ) {
-  const { error } = await supabaseClient
-    .from("contact_audience")
-    .delete()
-    .eq("contact_id", contactId)
-    .eq("audience_id", audienceId);
+  const workspaceId = opts?.workspaceId ?? (await resolveAudienceWorkspaceId(audienceId));
+  const tdb = opts?.tdb ?? createTenantDb(workspaceId);
 
-  if (error) throw error;
+  await tdb.audience.findFirst({
+    where: eq(audience.id, audienceId),
+  });
+
+  await db
+    .delete(contact_audience)
+    .where(
+      and(
+        eq(contact_audience.contact_id, contactId),
+        eq(contact_audience.audience_id, audienceId),
+      ),
+    );
+
   return { success: true };
 }
 
@@ -26,31 +55,42 @@ export async function removeContactFromAudience(
  * Remove multiple contacts from an audience and update audience total_contacts
  */
 export async function removeContactsFromAudience(
-  supabaseClient: SupabaseClient<Database>,
   audienceId: number,
-  contactIds: number[]
+  contactIds: number[],
+  opts?: {
+    workspaceId?: string;
+    tdb?: TenantDb;
+    /** @deprecated ignored */
+    supabaseClient?: SupabaseClient;
+  },
 ) {
-  const { error } = await supabaseClient
-    .from("contact_audience")
-    .delete()
-    .eq("audience_id", audienceId)
-    .in("contact_id", contactIds);
+  const workspaceId = opts?.workspaceId ?? (await resolveAudienceWorkspaceId(audienceId));
+  const tdb = opts?.tdb ?? createTenantDb(workspaceId);
 
-  if (error) throw error;
+  await tdb.audience.findFirst({
+    where: eq(audience.id, audienceId),
+  });
 
-  const { count } = await supabaseClient
-    .from("contact_audience")
-    .select("contact_id", { count: "exact", head: true })
-    .eq("audience_id", audienceId);
+  await db
+    .delete(contact_audience)
+    .where(
+      and(
+        eq(contact_audience.audience_id, audienceId),
+        inArray(contact_audience.contact_id, contactIds),
+      ),
+    );
 
-  const newCount = count ?? 0;
+  const [countRow] = await db
+    .select({ value: count() })
+    .from(contact_audience)
+    .where(eq(contact_audience.audience_id, audienceId));
 
-  const { error: updateError } = await supabaseClient
-    .from("audience")
-    .update({ total_contacts: newCount })
-    .eq("id", audienceId);
+  const newCount = countRow?.value ?? 0;
 
-  if (updateError) throw updateError;
+  await tdb.audience.update({
+    set: { total_contacts: newCount },
+    where: eq(audience.id, audienceId),
+  });
 
   return { removed_count: contactIds.length, new_total: newCount };
 }

@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     parseJsonBodyOrResponse: vi.fn(),
     processTemplateTags: vi.fn((body: string) => body),
-    env: { SUPABASE_URL: vi.fn(() => "http://supabase") },
+    env: { SUPABASE_URL: vi.fn(() => "http://supabase"), BASE_URL: vi.fn(() => "https://app.example") },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });

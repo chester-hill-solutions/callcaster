@@ -168,13 +168,8 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     expect(res.status).toBe(403);
   });
 
-  test("returns 400 when SmsSid or SmsStatus missing", async () => {
+  test("returns 400 when SmsSid or status missing", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase({}));
-    mocks.validateTwilioWebhookForMessageSid.mockResolvedValueOnce({
-      ok: true,
-      params: { SmsSid: "SM1" },
-      authToken: "workspace-token",
-    });
 
     const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(
@@ -183,6 +178,49 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       } as never),
     );
     expect(res.status).toBe(400);
+  });
+
+  test("accepts MessageStatus when SmsStatus is absent", async () => {
+    const supabase = makeSupabase({
+      messagePreload: {
+        data: {
+          workspace: "w1",
+          direction: "outbound-api",
+          sid: "SM1",
+          outreach_attempt_id: null,
+          campaign_id: null,
+        },
+        error: null,
+      },
+      messageUpdate: {
+        data: {
+          sid: "SM1",
+          workspace: "w1",
+          status: "delivered",
+          outreach_attempt_id: null,
+          campaign_id: null,
+        },
+        error: null,
+      },
+    });
+    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.validateTwilioWebhookForMessageSid.mockResolvedValueOnce({
+      ok: true,
+      params: { SmsSid: "SM1", MessageStatus: "delivered" },
+      authToken: "workspace-token",
+    });
+
+    const formData = new FormData();
+    formData.set("SmsSid", "SM1");
+    formData.set("MessageStatus", "delivered");
+
+    const mod = await import("../app/routes/api+/sms/status.route");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: formData }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
   });
 
   test("returns 500 when message lookup fails after validation", async () => {

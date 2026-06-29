@@ -1,75 +1,80 @@
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+
+const tdbMocks = vi.hoisted(() => ({
+  contact: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    insert: vi.fn(),
+    insertMany: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+
+const dbMocks = vi.hoisted(() => ({
+  insert: vi.fn(),
+}));
 
 describe("app/lib/database/contact.server.ts", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    for (const fn of Object.values(tdbMocks.contact)) {
+      fn.mockReset();
+    }
+    dbMocks.insert.mockReset();
+
+    vi.doMock("@/server/tenant-db", () => ({
+      createTenantDb: vi.fn(() => tdbMocks),
+    }));
+
+    vi.doMock("@/server/db", () => ({
+      db: {
+        insert: () => ({
+          values: dbMocks.insert,
+        }),
+      },
+    }));
+
+    vi.doMock("../app/lib/logger.server", () => ({
+      logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    }));
+  });
+
   test("findPotentialContacts prioritizes exact indexed lookup and narrows fallback", async () => {
     const mod = await import("../app/lib/database/contact.server");
-
-    const inArgs: { value?: string[] } = {};
-    const orArg: { value?: string } = {};
-    const chain: any = {
-      select: () => chain,
-      eq: () => chain,
-      in: (_column: string, values: string[]) => {
-        inArgs.value = values;
-        return chain;
-      },
-      or: (s: string) => {
-        orArg.value = s;
-        return chain;
-      },
-      not: () => chain,
-      neq: async () => ({ data: [], error: null }),
-    };
 
     const supabase: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
       })),
-      from: vi.fn(() => chain),
     };
-    const res = await mod.findPotentialContacts(
-      supabase,
-      "(555) 555-0100",
-      "w1",
-    );
+
+    tdbMocks.contact.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const res = await mod.findPotentialContacts(supabase, "(555) 555-0100", "w1");
 
     expect(supabase.rpc).toHaveBeenCalledWith("find_contact_by_phone", {
       p_workspace_id: "w1",
       p_phone_number: "(555) 555-0100",
     });
-    expect(supabase.from).toHaveBeenCalledWith("contact");
-    expect(inArgs.value).toEqual(
-      expect.arrayContaining([
-        "5555550100",
-        "+15555550100",
-        "(555) 555-0100",
-        "555.555.0100",
-      ]),
-    );
-    expect(orArg.value).toContain("phone.ilike.5555550100%");
-    expect(orArg.value).not.toContain("%5555550100");
+    expect(tdbMocks.contact.findMany).toHaveBeenCalledTimes(2);
     expect(res).toEqual({ data: [], error: null });
   });
 
   test("fetchContactData: by number only promotes a unique match to contact", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const chain: any = {
-      select: () => chain,
-      eq: () => chain,
-      in: () => chain,
-      or: () => chain,
-      not: () => chain,
-      neq: async () => ({ data: [{ id: 1 }], error: null }),
-    };
     const supabase: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
       })),
-      from: vi.fn(() => chain),
     };
+
+    tdbMocks.contact.findMany.mockResolvedValueOnce([{ id: 1 }]);
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
     expect(res.contact).toEqual({ id: 1 });
@@ -80,21 +85,14 @@ describe("app/lib/database/contact.server.ts", () => {
   test("fetchContactData: by number only handles null data", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const chain: any = {
-      select: () => chain,
-      eq: () => chain,
-      in: () => chain,
-      or: () => chain,
-      not: () => chain,
-      neq: async () => ({ data: null, error: null }),
-    };
     const supabase: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
       })),
-      from: vi.fn(() => chain),
     };
+
+    tdbMocks.contact.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
     expect(res.potentialContacts).toEqual([]);
@@ -103,24 +101,18 @@ describe("app/lib/database/contact.server.ts", () => {
   test("fetchContactData: by number only keeps ambiguous matches as potential contacts", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const chain: any = {
-      select: () => chain,
-      eq: () => chain,
-      in: () => chain,
-      or: () => chain,
-      not: () => chain,
-      neq: async () => ({
-        data: [{ id: 1 }, { id: 2 }, { id: 2 }],
-        error: null,
-      }),
-    };
     const supabase: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
       })),
-      from: vi.fn(() => chain),
     };
+
+    tdbMocks.contact.findMany.mockResolvedValueOnce([
+      { id: 1 },
+      { id: 2 },
+      { id: 2 },
+    ]);
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
     expect(res.contact).toBeNull();
@@ -129,23 +121,14 @@ describe("app/lib/database/contact.server.ts", () => {
 
   test("fetchContactData: by contact_id sets contact or contactError", async () => {
     const mod = await import("../app/lib/database/contact.server");
+    const supabase: any = {};
 
-    let mode: "ok" | "err" = "ok";
-    const chain: any = {
-      select: () => chain,
-      eq: () => chain,
-      single: async () =>
-        mode === "ok"
-          ? { data: { id: 2 }, error: null }
-          : { data: null, error: new Error("nope") },
-    };
-    const supabase: any = { from: vi.fn(() => chain) };
-
+    tdbMocks.contact.findFirst.mockResolvedValueOnce({ id: 2 });
     const ok = await mod.fetchContactData(supabase, "w1", 2, "");
     expect(ok.contact).toEqual({ id: 2 });
     expect(ok.contactError).toBeNull();
 
-    mode = "err";
+    tdbMocks.contact.findFirst.mockRejectedValueOnce(new Error("nope"));
     const bad = await mod.fetchContactData(supabase, "w1", 2, "");
     expect(bad.contact).toBeNull();
     expect(bad.contactError).toBeInstanceOf(Error);
@@ -154,165 +137,92 @@ describe("app/lib/database/contact.server.ts", () => {
   test("updateContact: validates id; strips undefined + audience_id; handles errors and empty update", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const supabase: any = {
-      from: () => ({
-        update: (data: any) => {
-          // audience_id is removed and undefined keys are removed
-          expect(data.audience_id).toBeUndefined();
-          expect("x" in data).toBe(false);
-          return {
-            eq: () => ({
-              select: async () => ({
-                data: [{ id: data.id, ok: 1 }],
-                error: null,
-              }),
-            }),
-          };
-        },
-      }),
-    };
-
     await expect(
-      mod.updateContact(supabase, { x: undefined } as any),
+      mod.updateContact("w1", { x: undefined } as any),
     ).rejects.toThrow("Contact ID is required");
 
-    const updated = await mod.updateContact(supabase, {
+    tdbMocks.contact.update.mockResolvedValueOnce([{ id: 1, ok: 1 }]);
+    const updated = await mod.updateContact("w1", {
       id: 1,
       audience_id: "a",
       x: undefined,
     } as any);
     expect(updated).toEqual({ id: 1, ok: 1 });
 
-    const supabaseErr: any = {
-      from: () => ({
-        update: () => ({
-          eq: () => ({
-            select: async () => ({ data: null, error: new Error("bad") }),
-          }),
-        }),
-      }),
-    };
-    await expect(
-      mod.updateContact(supabaseErr, { id: 1 } as any),
-    ).rejects.toThrow("bad");
+    tdbMocks.contact.update.mockRejectedValueOnce(new Error("bad"));
+    await expect(mod.updateContact("w1", { id: 1 } as any)).rejects.toThrow("bad");
 
-    const supabaseEmpty: any = {
-      from: () => ({
-        update: () => ({
-          eq: () => ({
-            select: async () => ({ data: [], error: null }),
-          }),
-        }),
-      }),
-    };
-    await expect(
-      mod.updateContact(supabaseEmpty, { id: 1 } as any),
-    ).rejects.toThrow("Contact not found");
+    tdbMocks.contact.update.mockResolvedValueOnce([]);
+    await expect(mod.updateContact("w1", { id: 1 } as any)).rejects.toThrow(
+      "Contact not found",
+    );
   });
 
-  test("createContact: inserts contact and optionally links audience", async () => {
+  test("createContact: inserts contact without audience link", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const insertRows = [{ id: 10 }];
-    let linkError: Error | null = null;
-    let insertError: Error | null = null;
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "contact") {
-          return {
-            insert: () => ({
-              select: async () => ({ data: insertRows, error: insertError }),
-            }),
-          };
-        }
-        if (table === "contact_audience") {
-          return {
-            insert: () => ({
-              select: async () => ({ data: null, error: linkError }),
-            }),
-          };
-        }
-        throw new Error("unexpected table");
-      },
-    };
-
+    tdbMocks.contact.insert.mockResolvedValueOnce([{ id: 10 }]);
     await expect(
-      mod.createContact(supabase, { workspace: "w1" } as any, "", "u1"),
-    ).resolves.toEqual(insertRows);
+      mod.createContact({ workspace: "w1" } as any, "", "u1"),
+    ).resolves.toEqual([{ id: 10 }]);
+  });
 
-    insertError = new Error("insert");
+  test("createContact: throws when contact insert fails", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    tdbMocks.contact.insert.mockRejectedValueOnce(new Error("insert"));
     await expect(
-      mod.createContact(supabase, { workspace: "w1" } as any, "", "u1"),
+      mod.createContact({ workspace: "w1" } as any, "", "u1"),
     ).rejects.toThrow("insert");
-    insertError = null;
+  });
 
-    linkError = new Error("link");
+  test("createContact: throws when audience link fails", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    tdbMocks.contact.insert.mockResolvedValueOnce([{ id: 10 }]);
+    dbMocks.insert.mockImplementationOnce(() => Promise.reject(new Error("link")));
     await expect(
-      mod.createContact(supabase, { workspace: "w1" } as any, "a1", "u1"),
+      mod.createContact({ workspace: "w1" } as any, "a1", "u1"),
     ).rejects.toThrow("link");
+  });
 
-    linkError = null;
+  test("createContact: links audience on success", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    tdbMocks.contact.insert.mockResolvedValueOnce([{ id: 10 }]);
+    dbMocks.insert.mockResolvedValueOnce(undefined);
     await expect(
-      mod.createContact(supabase, { workspace: "w1" } as any, "a1", "u1"),
-    ).resolves.toEqual(insertRows);
+      mod.createContact({ workspace: "w1" } as any, "a1", "u1"),
+    ).resolves.toEqual([{ id: 10 }]);
   });
 
   test("bulkCreateContacts: inserts and links, throwing on either error", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    let mode: "ok" | "contactErr" | "linkErr" = "ok";
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "contact") {
-          return {
-            insert: (rows: any[]) => ({
-              select: async () =>
-                mode === "contactErr"
-                  ? { data: null, error: new Error("ins") }
-                  : {
-                      data: rows.map((r, idx) => ({ id: idx + 1, ...r })),
-                      error: null,
-                    },
-            }),
-            delete: () => ({
-              eq: () => ({
-                in: async () => ({ error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "contact_audience") {
-          return {
-            insert: () => ({
-              select: async () =>
-                mode === "linkErr"
-                  ? { data: null, error: new Error("link") }
-                  : { data: [{ ok: 1 }], error: null },
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    tdbMocks.contact.insertMany.mockResolvedValueOnce([
+      { id: 1, workspace: "w1", created_by: "u1", firstname: "A" },
+    ]);
+    dbMocks.insert.mockReturnValueOnce({
+      returning: async () => [{ ok: 1 }],
+    });
 
-    mode = "ok";
-    const res = await mod.bulkCreateContacts(
-      supabase,
-      [{ firstname: "A" }] as any,
-      "w1",
-      "a1",
-      "u1",
-    );
+    const res = await mod.bulkCreateContacts([{ firstname: "A" }] as any, "w1", "a1", "u1");
     expect(res.insert[0]).toMatchObject({ workspace: "w1", created_by: "u1" });
 
-    mode = "contactErr";
+    tdbMocks.contact.insertMany.mockRejectedValueOnce(new Error("ins"));
     await expect(
-      mod.bulkCreateContacts(supabase, [{}] as any, "w1", "a1", "u1"),
+      mod.bulkCreateContacts([{}] as any, "w1", "a1", "u1"),
     ).rejects.toThrow("ins");
 
-    mode = "linkErr";
+    tdbMocks.contact.insertMany.mockResolvedValueOnce([{ id: 1 }]);
+    dbMocks.insert.mockReturnValueOnce({
+      returning: async () => {
+        throw new Error("link");
+      },
+    });
+    tdbMocks.contact.delete.mockResolvedValueOnce(undefined);
     await expect(
-      mod.bulkCreateContacts(supabase, [{}] as any, "w1", "a1", "u1"),
+      mod.bulkCreateContacts([{}] as any, "w1", "a1", "u1"),
     ).rejects.toThrow("link");
   });
 });

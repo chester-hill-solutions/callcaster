@@ -529,10 +529,10 @@ export function QueueTable({
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
                     <span className="rounded-full bg-muted px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {getQueueDisplayLabel(row.original.status, row.original.dequeued_at)}
+                        {getQueueDisplayLabel(row.original, row.original.dequeued_at)}
                     </span>
                     <StatusDropdown
-                        currentStatus={getQueueDisplayState(row.original.status, row.original.dequeued_at)}
+                        currentStatus={getQueueDisplayState(row.original, row.original.dequeued_at)}
                         onSelect={(status) => handleStatusChangeOptimistic([row.original.id.toString()], status)}
                     />
                 </div>

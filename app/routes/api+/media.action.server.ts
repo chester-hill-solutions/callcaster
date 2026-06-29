@@ -30,7 +30,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
         if (error) throw error;
         const { data: publicUrlData } = await supabase.storage.from('audio').getPublicUrl(data.path);
-        const { error: updateError } = await supabase.from('live_campaign').update({ voicedrop_audio: publicUrlData.publicUrl }).eq('campaign_id', live_campaign_id as number);
+        const { error: updateError } = await supabase
+            .from('campaign')
+            .update({ voicedrop_audio: publicUrlData.publicUrl })
+            .eq('id', live_campaign_id as number);
         if (updateError) throw updateError;
         return routeData(publicUrlData.publicUrl, { status: 201 });
     }

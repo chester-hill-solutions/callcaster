@@ -59,7 +59,7 @@ async function handleAuthenticatedUser(
 
   if (isNewUser) {
     const invites =
-      ((await getInvitesByUserId(client, session.user.id)) as WorkspaceInviteRow[] | null) ??
+      ((await getInvitesByUserId(session.user.id)) as WorkspaceInviteRow[] | null) ??
       [];
     return routeData<LoaderData>(
       {
@@ -131,7 +131,7 @@ async function handleTokenVerification(
 
     if (isNewUser) {
       const invites =
-        ((await getInvitesByUserId(client, sessionData.user.id)) as
+        ((await getInvitesByUserId(sessionData.user.id)) as
           | WorkspaceInviteRow[]
           | null) ?? [];
       return routeData<LoaderData>(
