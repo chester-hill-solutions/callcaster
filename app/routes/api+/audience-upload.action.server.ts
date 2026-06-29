@@ -1,8 +1,12 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { parseCSV } from '@/lib/csv';
-import { processAudienceUpload } from "@/lib/audience-upload-process.server";
-import { resolveDualAuthSession } from "@/lib/api-route-auth.server";
+import {
+  normalizeVoterListSource,
+  processAudienceUpload,
+  type VoterListSource,
+} from "@/lib/audience-upload-process.server";
+import { resolveDualAuthSession } from "@/lib/api-auth.server";
 import type { Database, Tables } from "@/lib/database.types";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
@@ -72,6 +76,10 @@ export const action = async ({
   const contactsFile = formData.get("contacts") as File;
   const headerMapping = formData.get("header_mapping") as string;
   const splitNameColumn = formData.get("split_name_column") as string;
+  const voterListSourceRaw = formData.get("voter_list_source") as string | null;
+  const voterListSource: VoterListSource | null = normalizeVoterListSource(
+    voterListSourceRaw,
+  );
   
   if (!workspaceId) {
     return routeData({ error: "Workspace ID is required" }, { status: 400, headers });
@@ -177,7 +185,9 @@ export const action = async ({
       user.id,
       fileBase64,
       headerMapping ? JSON.parse(headerMapping) : {},
-      splitNameColumn || null
+      splitNameColumn || null,
+      { parseCSV },
+      voterListSource,
     ).catch(error => {
       logger.error("Background processing error:", error);
     });

@@ -105,7 +105,7 @@ export function buildRepliedContactKeys(
   );
 }
 
-function compareByRecentActivity(
+export function compareByRecentActivity(
   left: ConversationSummary,
   right: ConversationSummary,
 ): number {

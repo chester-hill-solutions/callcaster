@@ -1,17 +1,7 @@
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import type { PostgrestError } from "@supabase/supabase-js";
-
-/**
- * Standard error response structure
- */
-export interface ErrorResponse {
-  error: string;
-  message?: string;
-  details?: unknown;
-  code?: string;
-  statusCode: number;
-}
+import type { ErrorPayload } from "./type-safety-utils";
 
 /**
  * Error codes for different error types
@@ -62,7 +52,7 @@ export class AppError extends Error {
     this.name = "AppError";
   }
 
-  toJSON(): ErrorResponse {
+  toJSON(): ErrorPayload {
     return {
       error: this.message,
       code: this.code,
@@ -81,7 +71,7 @@ export function createErrorResponse(
   defaultStatusCode: number = 500,
   options?: { headers?: Headers }
 ): ReturnType<typeof routeData> {
-  let errorResponse: ErrorResponse;
+  let errorResponse: ErrorPayload;
 
   if (error instanceof AppError) {
     errorResponse = {
@@ -232,17 +222,5 @@ export function withErrorHandling<T extends (...args: unknown[]) => Promise<unkn
       );
     }
   }) as T;
-}
-
-/**
- * Safe JSON parse with error handling
- */
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
-  try {
-    return JSON.parse(jsonString) as T;
-  } catch (error) {
-    logger.error("Failed to parse JSON:", error);
-    return fallback;
-  }
 }
 

@@ -24,8 +24,24 @@ export {
   countVerifiedCallerIdNumbers,
   workspaceHasFirstNumber,
   applyOnboardingStepsWithWorkspaceNumbers,
+  WORKSPACE_READINESS_PREDICATES,
+  BUSINESS_PROFILE_REQUIRED_FIELDS,
+  evaluateWorkspaceReadiness,
+  evaluateWorkspaceReadinessByIds,
+  evaluateWorkspaceReadinessForChannels,
+  predicatePassed,
 } from "@/lib/messaging-onboarding/readiness.server";
-export type { BuildOnboardingStepsContext } from "@/lib/messaging-onboarding/readiness.server";
+export type {
+  BuildOnboardingStepsContext,
+  ReadinessResult,
+  WorkspaceReadinessChannel,
+  WorkspaceReadinessContext,
+  WorkspaceReadinessPredicate,
+  WorkspaceReadinessSenderPool,
+  WorkspaceReadinessNumber,
+  ReadinessResultSeverity,
+  EvaluateWorkspaceReadinessOptions,
+} from "@/lib/messaging-onboarding/readiness.server";
 
 export {
   getWorkspaceMessagingOnboardingFromTwilioData,

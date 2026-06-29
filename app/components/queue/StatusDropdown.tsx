@@ -1,27 +1,41 @@
-const STATUS_OPTIONS = ["queued", "dequeued"] as const;
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    QUEUE_SETTABLE_STATUSES,
+    type QueueSettableStatus,
+} from "@/lib/queue-status";
 
 interface StatusDropdownProps {
     currentStatus?: string;
-    onSelect: (status: typeof STATUS_OPTIONS[number]) => void;
+    onSelect: (status: QueueSettableStatus) => void;
 }
 
 export function StatusDropdown({ currentStatus, onSelect }: StatusDropdownProps) {
-    const currentValue = currentStatus && STATUS_OPTIONS.includes(currentStatus as typeof STATUS_OPTIONS[number])
-        ? currentStatus
-        : "";
+    const currentValue =
+        currentStatus && (QUEUE_SETTABLE_STATUSES as readonly string[]).includes(currentStatus)
+            ? (currentStatus as QueueSettableStatus)
+            : undefined;
 
     return (
-        <select 
-            value={currentValue} 
-            onChange={(e) => onSelect(e.target.value as typeof STATUS_OPTIONS[number])}
-            className="h-6 text-xs px-2 rounded border border-gray-200"
+        <Select
+            value={currentValue}
+            onValueChange={(value) => onSelect(value as QueueSettableStatus)}
         >
-            <option value="" disabled>Status</option>
-            {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                    {status}
-                </option>
-            ))}
-        </select>
+            <SelectTrigger className="h-6 text-xs px-2 rounded border border-gray-200">
+                <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+                {QUEUE_SETTABLE_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                        {status}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
     );
 }

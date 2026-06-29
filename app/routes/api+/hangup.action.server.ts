@@ -3,6 +3,7 @@ import { data as routeData } from "react-router";
 import { isAssignedToUser } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
 
 
 export const action = async ({ request }: { request: Request }) => {
@@ -40,7 +41,7 @@ export const action = async ({ request }: { request: Request }) => {
             : null;
         const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: workspaceId});
         try {
-            await twilio.calls(callSid).update({ twiml: `<Response><Hangup/></Response>` });
+            await twilio.calls(callSid).update({ twiml: hangupTwiml() });
         } catch (twilioErr: unknown) {
             const code = (twilioErr as { code?: number })?.code;
             if (code === 21220) {

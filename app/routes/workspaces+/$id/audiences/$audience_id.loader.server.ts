@@ -1,13 +1,15 @@
 import { data as routeData } from "react-router";
 import { Database } from "@/lib/database.types";
-import { verifyAuth } from "@/lib/supabase.server";
+import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 import type { LoaderFunctionArgs } from "react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const result = await requireWorkspaceLoaderContext(request, params.id);
+  if (!result.ok) return result.response;
+  const { supabaseClient, headers, user, workspaceId: workspace_id } = result.ctx;
 
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
@@ -17,7 +19,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const workspace_id = params.id;
   const audience_id = params.audience_id;
 
   if (!audience_id) {

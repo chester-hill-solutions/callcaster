@@ -4,10 +4,12 @@ import {
 } from "../../shared/campaign-billing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { TERMINAL_BILLABLE_SMS_STATUSES } from "@/lib/pricing";
+import { smsKey, callKey, bucketFromIdempotencyKey } from "@/lib/billing-keys";
 
 export type { CampaignBillingSummary };
 
-const TERMINAL_SMS_STATUSES = ["delivered", "failed", "undelivered"] as const;
+const TERMINAL_SMS_STATUSES = TERMINAL_BILLABLE_SMS_STATUSES;
 
 export async function loadCampaignBillingSummary(args: {
   supabaseClient: SupabaseClient<Database>;
@@ -33,9 +35,14 @@ export async function loadCampaignBillingSummary(args: {
       .eq("workspace", args.workspaceId),
   ]);
 
+  // Voice idempotency keys are namespaced by billing kind (call:${sid}:${kind});
+  // include both variants so the ledger lookup catches the debit regardless of kind.
   const idempotencyKeys = [
-    ...(messagesResult.data ?? []).map((row) => `sms:${row.sid}`),
-    ...(callsResult.data ?? []).map((row) => `call:${row.sid}`),
+    ...(messagesResult.data ?? []).map((row) => smsKey(row.sid)),
+    ...(callsResult.data ?? []).flatMap((row) => [
+      callKey(row.sid, "ivr"),
+      callKey(row.sid, "staffed"),
+    ]),
   ];
 
   let smsDebitCredits = 0;
@@ -57,11 +64,11 @@ export async function loadCampaignBillingSummary(args: {
 
     for (const row of debits ?? []) {
       const credits = Math.abs(row.amount);
-      const key = row.idempotency_key ?? "";
-      if (key.startsWith("sms:")) {
+      const bucket = bucketFromIdempotencyKey(row.idempotency_key);
+      if (bucket === "sms") {
         smsDebitCredits += credits;
         smsDebitEvents += 1;
-      } else if (key.startsWith("call:")) {
+      } else if (bucket === "voice") {
         voiceDebitCredits += credits;
         voiceDebitEvents += 1;
       }

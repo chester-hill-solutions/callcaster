@@ -1,7 +1,14 @@
-import { TableHeader } from "@/components/call-list/records/TableHeader";
-import QueueContact from "@/components/call-list/records/participant/CallContact";
+import QueueContact from "@/components/call/CallContact";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/typography";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   callPanelBodyScrollClass,
   callPanelHeaderSecondaryClass,
@@ -98,15 +105,21 @@ const QueueList = ({
       </div>
 
       <div className={callPanelBodyScrollClass}>
-        <table className="w-full border-collapse">
-          <TableHeader keys={["Name", "Number", "Address"]} />
+        <Table className="w-full border-collapse">
+          <TableHeader>
+            <TableRow>
+              <TableHead hidden>Name</TableHead>
+              <TableHead hidden>Number</TableHead>
+              <TableHead hidden>Address</TableHead>
+            </TableRow>
+          </TableHeader>
           {queue.length > 0 ? (
-            <tbody>{renderQueueContacts()}</tbody>
+            <TableBody>{renderQueueContacts()}</TableBody>
           ) : (
-            <tbody>
+            <TableBody>
               {!predictive && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-9 text-center">
+                <TableRow>
+                  <TableCell colSpan={3} className="px-4 py-9 text-center">
                     <Button
                       type="button"
                       variant="outline"
@@ -116,28 +129,28 @@ const QueueList = ({
                     >
                       Load Queue
                     </Button>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
               {!queue.length && count === 0 && completed === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-9 text-center">
+                <TableRow>
+                  <TableCell colSpan={3} className="px-4 py-9 text-center">
                     <Text variant="muted">
                       Check with your administration to ensure your queue is set up.
                     </Text>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
               {!queue.length && completed > 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-9 text-center">
+                <TableRow>
+                  <TableCell colSpan={3} className="px-4 py-9 text-center">
                     <Text variant="muted">You&apos;re all done! Great work.</Text>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
+            </TableBody>
           )}
-        </table>
+        </Table>
       </div>
     </div>
   );

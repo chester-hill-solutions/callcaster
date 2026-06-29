@@ -1,5 +1,5 @@
 import type { Json } from './database.types';
-import { safeString, safeNumber, safeBoolean, isArray, isObject } from './type-utils';
+import { safeString, safeNumber, safeBoolean, isArray, isObject } from './type-safety-utils';
 
 // Type-safe survey question types
 export interface SurveyQuestionData {

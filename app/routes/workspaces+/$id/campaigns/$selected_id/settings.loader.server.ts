@@ -14,7 +14,7 @@ import {
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
 import { deepEqual } from "@/lib/utils";
-import { fetchCampaignAudience, fetchQueueCounts, getCampaignTableKey, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, parseActionRequest, updateCampaign } from "@/lib/database.server";
+import { fetchCampaignAudience, fetchCampaignDetails, fetchQueueCounts, getCampaignTableKey, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, parseActionRequest, updateCampaign, type CampaignType } from "@/lib/database.server";
 import { loadCampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
@@ -29,7 +29,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
   const [
@@ -45,7 +44,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     fetchCampaignAudience(supabaseClient, selected_id, workspace_id),
     supabaseClient
       .from("campaign")
-      .select("type")
+      .select("*")
       .eq("id", Number(selected_id))
       .eq("workspace", workspace_id)
       .single(),
@@ -118,6 +117,39 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return null;
   });
 
+  let campaignDetailsForReadiness:
+    | LiveCampaign
+    | MessageCampaign
+    | IVRCampaign
+    | null = null;
+  if (campaignType?.type) {
+    try {
+      const tableKey = getCampaignTableKey(campaignType.type as CampaignType);
+      campaignDetailsForReadiness = await fetchCampaignDetails(
+        supabaseClient,
+        selected_id,
+        workspace_id,
+        tableKey,
+      );
+    } catch (detailsError) {
+      logger.error("Failed to load campaign details for readiness", detailsError);
+    }
+  }
+
+  const readiness = getCampaignReadiness(
+    campaignType as Campaign | null | undefined,
+    campaignDetailsForReadiness,
+    {
+      queueCount: campaignWithAudience.queue_count ?? 0,
+      smsSenderClass: outboundEstimateInputs.portalConfig.smsSenderClass,
+      smsMessagingServiceSendersReady:
+        campaignType?.type === "message" &&
+        Boolean((campaignType as Campaign | null)?.sms_send_mode === "messaging_service")
+          ? messagingServiceReady
+          : undefined,
+    },
+  );
+
   return routeData({
     workspace_id,
     selected_id,
@@ -141,5 +173,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         onboarding.messagingService.attachedSenderPhoneNumbers,
     },
     campaignBilling,
+    readiness,
   });
 }

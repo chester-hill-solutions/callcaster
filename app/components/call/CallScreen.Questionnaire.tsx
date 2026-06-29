@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import Result from "@/components/call-list/records/participant/Result";
+import Result from "@/components/campaign/settings/script/Result";
 import { Button } from "@/components/ui/button";
 import {
   callPanelHeaderPrimaryClass,

@@ -7,16 +7,17 @@ import {
   insertTransactionHistoryIdempotent,
 } from "../supabase/functions/_shared/ivr-status-logic.ts";
 import {
+  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
 
 describe("ivr-status shared logic", () => {
   test("billingUnitsFromDurationSeconds rounds up per started minute", () => {
-    expect(billingUnitsFromDurationSeconds(0)).toBe(-2);
-    expect(billingUnitsFromDurationSeconds(1)).toBe(-2);
-    expect(billingUnitsFromDurationSeconds(60)).toBe(-2);
-    expect(billingUnitsFromDurationSeconds(61)).toBe(-5);
+    expect(billingUnitsFromDurationSeconds(0, "ivr")).toBe(-2);
+    expect(billingUnitsFromDurationSeconds(1, "ivr")).toBe(-2);
+    expect(billingUnitsFromDurationSeconds(60, "ivr")).toBe(-2);
+    expect(billingUnitsFromDurationSeconds(61, "ivr")).toBe(-5);
   });
 
   test("canTransitionOutreachDisposition blocks terminal -> different", () => {
@@ -104,6 +105,7 @@ describe("ivr-status shared logic", () => {
         if (table !== "transaction_history") throw new Error("unexpected table");
         return makeTransactionHistoryTableStub(rows);
       },
+      rpc: makeApplyLedgerEntryRpcStub(rows),
     };
 
     const r1 = await insertTransactionHistoryIdempotent({
@@ -112,7 +114,7 @@ describe("ivr-status shared logic", () => {
       type: "DEBIT",
       amount: -1,
       note: "IVR Call CA1",
-      idempotencyKey: "call:CA1",
+      idempotencyKey: "call:CA1:ivr",
     });
     const r2 = await insertTransactionHistoryIdempotent({
       supabase,
@@ -120,12 +122,12 @@ describe("ivr-status shared logic", () => {
       type: "DEBIT",
       amount: -1,
       note: "IVR Call CA1",
-      idempotencyKey: "call:CA1",
+      idempotencyKey: "call:CA1:ivr",
     });
     expect(r1.inserted).toBe(true);
     expect(r2.inserted).toBe(false);
     expect(rows.length).toBe(1);
-    expect(rows[0].idempotency_key).toBe("call:CA1");
+    expect(rows[0].idempotency_key).toBe("call:CA1:ivr");
   });
 
   test("insertTransactionHistoryIdempotent serializes concurrent inserts", async () => {
@@ -135,6 +137,7 @@ describe("ivr-status shared logic", () => {
         if (table !== "transaction_history") throw new Error("unexpected table");
         return makeTransactionHistoryTableStub(rows);
       },
+      rpc: makeApplyLedgerEntryRpcStub(rows),
     };
 
     const [r1, r2] = await Promise.all([
@@ -144,7 +147,7 @@ describe("ivr-status shared logic", () => {
         type: "DEBIT",
         amount: -1,
         note: "IVR Call CA1",
-        idempotencyKey: "call:CA1",
+        idempotencyKey: "call:CA1:ivr",
       }),
       insertTransactionHistoryIdempotent({
         supabase,
@@ -152,7 +155,7 @@ describe("ivr-status shared logic", () => {
         type: "DEBIT",
         amount: -1,
         note: "IVR Call CA1",
-        idempotencyKey: "call:CA1",
+        idempotencyKey: "call:CA1:ivr",
       }),
     ]);
 

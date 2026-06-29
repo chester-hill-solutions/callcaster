@@ -292,7 +292,7 @@ describe("twilio A2P service", () => {
         workspaceId: "w1",
         actorUserId: "u1",
       }),
-    ).rejects.toThrow("Workspace is missing Twilio subaccount credentials");
+    ).rejects.toThrow("Workspace missing Twilio credentials");
   });
 
   test("throws when auth token is missing even if sid exists", async () => {
@@ -307,7 +307,7 @@ describe("twilio A2P service", () => {
         supabaseClient: supabase as any,
         workspaceId: "w1",
       }),
-    ).rejects.toThrow("Workspace is missing Twilio subaccount credentials");
+    ).rejects.toThrow("Workspace missing Twilio credentials");
   });
 
   test("throws when workspace twilio_data is null", async () => {
@@ -330,7 +330,7 @@ describe("twilio A2P service", () => {
         supabaseClient: supabase,
         workspaceId: "w1",
       }),
-    ).rejects.toThrow("Workspace is missing Twilio subaccount credentials");
+    ).rejects.toThrow("Workspace missing Twilio credentials");
   });
 
   test("marks onboarding rejected when Twilio throws an Error", async () => {

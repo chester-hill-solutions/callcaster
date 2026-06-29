@@ -180,7 +180,9 @@ describe("api.audiodrop action", () => {
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
     expect(r3).toMatchObject({ success: true });
-    expect(update).toHaveBeenCalledWith({ twiml: `<Response><Play>https://s</Play></Response>` });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Play>https://s</Play>") }),
+    );
   });
 
   test("uses default deps object when deps omitted", async () => {

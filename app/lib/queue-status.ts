@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 
 /**
@@ -21,6 +22,19 @@ export const QUEUE_STATUS_FILTERS = [
   "active",
   "completed",
 ] as const;
+
+/**
+ * Raw `campaign_queue.status` values that can be written back via the queue
+ * UI (re-queue or dequeue). Distinct from {@link QUEUE_STATUS_FILTERS}, which
+ * are derived display/filter states (assigned/active/completed are not writable
+ * status values).
+ */
+export const QUEUE_SETTABLE_STATUSES = [
+  QUEUE_STATUS_QUEUED,
+  QUEUE_STATUS_DEQUEUED,
+] as const;
+
+export type QueueSettableStatus = (typeof QUEUE_SETTABLE_STATUSES)[number];
 
 export type QueueStatusFilter = (typeof QUEUE_STATUS_FILTERS)[number];
 export type QueueDisplayState = QueueStatusFilter;
@@ -118,11 +132,7 @@ export function isQueued(
   value: QueueStateLike | string | null | undefined,
 ): boolean {
   const queue = toQueueStateLike(value);
-  if (queue.queue_state) {
-    return queue.queue_state === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
-  }
-
-  return queue.status === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
+  return queue.queue_state === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
 }
 
 /**
@@ -133,11 +143,7 @@ export function isDequeued(
   dequeuedAt?: string | null | undefined,
 ): boolean {
   const queue = toQueueStateLike(value, dequeuedAt);
-  return (
-    queue.queue_state === QUEUE_STATUS_DEQUEUED ||
-    queue.status === QUEUE_STATUS_DEQUEUED ||
-    Boolean(queue.dequeued_at)
-  );
+  return queue.queue_state === QUEUE_STATUS_DEQUEUED || Boolean(queue.dequeued_at);
 }
 
 /**
@@ -231,27 +237,22 @@ export function applyQueueStatusFilter(
   queueStatus: QueueStatusFilter,
 ): any {
   if (queueStatus === "queued") {
-    return query.eq("status", QUEUE_STATUS_QUEUED).is("dequeued_at", null);
+    return query.eq("queue_state", QUEUE_STATUS_QUEUED).is("dequeued_at", null);
   }
 
   if (queueStatus === "completed") {
-    return query.or(COMPLETED_QUEUE_COUNT_FILTER);
+    return query.or(
+      `queue_state.eq.${QUEUE_STATUS_DEQUEUED},dequeued_at.not.is.null`,
+    );
   }
 
   if (queueStatus === "assigned") {
     return query
-      .like("status", LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN)
+      .eq("queue_state", QUEUE_LIFECYCLE_ASSIGNED)
       .is("dequeued_at", null);
   }
 
-  return query
-    .not(
-      "status",
-      "in",
-      `("${QUEUE_STATUS_QUEUED}","${QUEUE_STATUS_DEQUEUED}")`,
-    )
-    .not("status", "like", LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN)
-    .is("dequeued_at", null);
+  return query.not("provider_status", "is", null).is("dequeued_at", null);
 }
 
 export function buildQueuedQueueUpdate(options?: {
@@ -340,4 +341,45 @@ export function buildDequeuedQueueUpdate(
     provider_status: null,
     queue_state: QUEUE_STATUS_DEQUEUED,
   };
+}
+
+/**
+ * Release every campaign_queue row still assigned to `userId` back to the
+ * queued pool. Collapses the duplicated select → filter → requeue logic that
+ * previously lived inline in the call-screen action and platform-telephony.
+ */
+export async function releaseAssignedQueueForUser(
+  supabaseClient: SupabaseClient<Database>,
+  userId: string,
+  campaignId: string | number,
+): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
+  const { data: assignedRows, error: assignedRowsError } = await supabaseClient
+    .from("campaign_queue")
+    .select("id, status, dequeued_at, assigned_to_user_id")
+    .eq("campaign_id", Number(campaignId))
+    .is("dequeued_at", null);
+
+  if (assignedRowsError) {
+    return { ok: false, error: assignedRowsError.message };
+  }
+
+  const assignedIds = (assignedRows ?? [])
+    .filter((row) => isAssignedToUser(row, userId))
+    .map((row) => row.id);
+
+  if (assignedIds.length === 0) {
+    return { ok: true, released: 0 };
+  }
+
+  const update = await supabaseClient
+    .from("campaign_queue")
+    .update(buildQueuedQueueUpdate({ includeNormalizedFields: true }))
+    .in("id", assignedIds)
+    .select("id");
+
+  if (update.error) {
+    return { ok: false, error: update.error.message };
+  }
+
+  return { ok: true, released: update.data?.length ?? 0 };
 }

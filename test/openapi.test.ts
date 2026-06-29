@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { getPublicOpenApiEntries } from "../app/lib/api-surface";
 import { openApiSpec } from "../app/lib/openapi";
+import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
   INTEGRATOR_API_TAG,
@@ -40,8 +41,17 @@ describe("openapi spec", () => {
   test("matches publicOpenApi inventory entries", () => {
     for (const entry of getPublicOpenApiEntries()) {
       if (entry.duplicate && entry.routeModule.endsWith(".js")) continue;
-      expect(openApiSpec.paths).toHaveProperty(entry.path);
+      expect(openApiSpec.paths).toHaveProperty(toOpenApiPath(entry.path));
     }
+  });
+
+  test("path keys use OpenAPI 3.0 {param} templating, not Express :param", () => {
+    for (const pathKey of Object.keys(openApiSpec.paths)) {
+      expect(pathKey, pathKey).not.toMatch(/:[A-Za-z0-9_]+/);
+    }
+    expect(openApiSpec.paths).toHaveProperty(
+      "/api/workspaces/{workspaceId}/analytics",
+    );
   });
 
   test("documents all integrator API paths with detailed schemas", () => {

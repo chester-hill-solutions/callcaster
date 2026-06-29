@@ -1,14 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type { TwilioAccountData, WorkspaceMessagingOnboardingState } from "@/lib/types";
-import { isRecord } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import { normalizeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding/normalize.server";
 import { mergeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding/merge.server";
 
 export function getWorkspaceMessagingOnboardingFromTwilioData(
   twilioData: TwilioAccountData | unknown,
 ): WorkspaceMessagingOnboardingState {
-  if (!isRecord(twilioData)) {
+  if (!isObject(twilioData)) {
     return normalizeWorkspaceMessagingOnboardingState(null);
   }
 
@@ -58,7 +58,7 @@ export async function updateWorkspaceMessagingOnboardingState({
     throw error;
   }
 
-  const currentTwilioData = isRecord(data?.twilio_data) ? data.twilio_data : {};
+  const currentTwilioData = isObject(data?.twilio_data) ? data.twilio_data : {};
   const currentState = getWorkspaceMessagingOnboardingFromTwilioData(
     (data?.twilio_data ?? null) as TwilioAccountData,
   );

@@ -20,10 +20,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const workspace_id = params.id;
   if (!workspace_id) return { error: "Workspace ID is required" };
 
-  if (!user) {
-    return { error: "Unauthorized" };
-  }
-
   await requireWorkspaceAccess({
     supabaseClient,
     user: { id: user.id },

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { isValidPhoneNumber, normalizePhoneNumber, phoneRegex } from "@/lib/utils/phone";
+import { isValidPhoneNumber, normalizePhoneNumber, phoneRegex } from "@/lib/phone";
 
-describe("app/lib/utils/phone", () => {
+describe("app/lib/phone", () => {
   test("phoneRegex matches common NA formats", () => {
     expect(phoneRegex.test("+15555550100")).toBe(true);
     expect(phoneRegex.test("(555) 555-0100")).toBe(true);

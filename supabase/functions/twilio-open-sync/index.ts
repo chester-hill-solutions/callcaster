@@ -12,7 +12,8 @@ import {
   insertTransactionHistoryIdempotent,
   voiceBillingKindFromCampaignType,
 } from "../_shared/ivr-status-logic.ts";
-import { SMS_SEGMENT_CREDITS } from "../../../shared/pricing.ts";
+import { SMS_SEGMENT_CREDITS, debitAmountFromCredits, TERMINAL_BILLABLE_SMS_STATUSES } from "../../../shared/pricing.ts";
+import { callKey, smsKey } from "../../../shared/billing-keys.ts";
 import {
   cancelQueuedMessages,
   normalizeTwilioSmsStatus,
@@ -206,7 +207,8 @@ async function syncCallRow(
         type: "DEBIT",
         amount,
         note,
-        idempotencyKey: `call:${row.sid}`,
+        idempotencyKey: callKey(row.sid, billingKind),
+        callSid: row.sid,
       });
     }
 
@@ -304,15 +306,20 @@ async function syncMessageRow(
     }
 
     if (
-      (status === "delivered" || status === "failed" || status === "undelivered")
+      TERMINAL_BILLABLE_SMS_STATUSES.includes(status as typeof TERMINAL_BILLABLE_SMS_STATUSES[number])
     ) {
+      const numSegments = Math.max(
+        1,
+        Number.parseInt(String((messageData as any)?.num_segments ?? "1"), 10) || 1,
+      );
       await insertTransactionHistoryIdempotent({
         supabase: supabase as never,
         workspaceId,
         type: "DEBIT",
-        amount: -SMS_SEGMENT_CREDITS,
-        note: `SMS ${row.sid} ${status} (twilio-open-sync)`,
-        idempotencyKey: `sms:${row.sid}`,
+        amount: debitAmountFromCredits(SMS_SEGMENT_CREDITS * numSegments),
+        note: `SMS ${row.sid} ${status} (twilio-open-sync, ${numSegments} segment${numSegments === 1 ? "" : "s"})`,
+        idempotencyKey: smsKey(row.sid),
+        messageSid: row.sid,
       });
     }
 

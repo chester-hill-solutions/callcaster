@@ -262,7 +262,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(sup2._callUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: "<Response><Hangup/></Response>" }),
+      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
     );
 
     // handler catch: outreach update errors -> returns success:false with message

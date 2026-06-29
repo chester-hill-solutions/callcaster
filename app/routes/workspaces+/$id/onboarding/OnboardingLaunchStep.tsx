@@ -6,7 +6,7 @@ import {
   countRentedWorkspaceNumbers,
   countVerifiedCallerIdNumbers,
   workspaceHasFirstNumber,
-} from "@/lib/messaging-onboarding.server";
+} from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingStepProps } from "./types";
 
 function formatPhoneNumberBadge(

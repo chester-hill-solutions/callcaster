@@ -12,6 +12,8 @@ import { getServiceSupabase } from "@/lib/supabase.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { callKey } from "@/lib/billing-keys";
+import { debitAmountFromCredits } from "@/lib/pricing";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -129,9 +131,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         supabase,
         workspaceId: billingWorkspace,
         type: "DEBIT",
-        amount: -billingUnits,
+        amount: debitAmountFromCredits(billingUnits),
         note,
-        idempotencyKey: `call:${updateData.sid}`,
+        idempotencyKey: callKey(updateData.sid, billingKind),
+        callSid: updateData.sid,
+        campaignId: callRow?.campaign_id ?? null,
       });
     }
   }

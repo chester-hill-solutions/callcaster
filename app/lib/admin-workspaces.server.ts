@@ -14,7 +14,8 @@ type UserRecord = Tables<"user">;
 type WorkspaceUserRecord = Tables<"workspace_users">;
 type WorkspaceNumberRecord = Tables<"workspace_number">;
 
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import {
   parsePortalConfigFromTwilioData,
   parsePortalSyncFromTwilioData,

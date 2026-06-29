@@ -1,4 +1,4 @@
-import { requireJsonAuthForOutreachAttempt } from "@/lib/api-route-auth.server";
+import { authForOutreachAttempt } from "@/lib/platform-data.server";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
@@ -15,7 +15,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return routeData({ error: "id must be a number" }, { status: 400 });
   }
 
-  const access = await requireJsonAuthForOutreachAttempt(
+  const access = await authForOutreachAttempt(
     request,
     outreachAttemptId,
   );

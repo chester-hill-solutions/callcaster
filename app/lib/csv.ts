@@ -121,6 +121,40 @@ export function csvResponse(args: {
   return new Response(args.csv, { status: 200, headers });
 }
 
+/**
+ * Sanitize an arbitrary string for use in a download filename.
+ *
+ * NFKD-normalizes (decomposes accents), collapses non-word characters to `_`,
+ * trims leading/trailing underscores, truncates to 80 chars, and falls back to
+ * `fallback` (default `"survey"`) when the result is empty.
+ */
+export function safeFilenamePart(
+  input: string,
+  fallback = "survey",
+): string {
+  return (
+    input
+      .normalize("NFKD")
+      .replace(/[^\w.-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 80) || fallback
+  );
+}
+
+/**
+ * Format an ISO/date string as a UTC date-only string (`YYYY-MM-DD`).
+ *
+ * Returns `"-"` when the value is missing or unparseable, matching the
+ * survey-responses CSV contract.
+ */
+export function formatDateUtc(value: string | null | undefined): string {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toISOString().slice(0, 10);
+}
+
 export type CSVParseResult = {
   contacts: Record<string, string>[];
   headers: string[];

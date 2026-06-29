@@ -35,6 +35,9 @@ export default function CampaignsNew() {
       ? "message"
       : "robocall";
   const [campaignType, setCampaignType] = useState(defaultType);
+  const [campaignPhase, setCampaignPhase] = useState<
+    "identification" | "persuasion" | "gotv"
+  >("identification");
 
   return (
     <section id="form" className={CREATION_SECTION_CLASS}>
@@ -74,6 +77,30 @@ export default function CampaignsNew() {
                       Interactive Voice Recording
                     </SelectItem>
                   ) : null}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField htmlFor="campaign-phase" label="Campaign Phase">
+              <input type="hidden" name="campaign-phase" value={campaignPhase} />
+              <Select
+                value={campaignPhase}
+                onValueChange={(next) =>
+                  setCampaignPhase(
+                    next === "persuasion" || next === "gotv"
+                      ? next
+                      : "identification",
+                  )
+                }
+              >
+                <SelectTrigger id="campaign-phase">
+                  <SelectValue placeholder="Select campaign phase" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="identification">
+                    Identification
+                  </SelectItem>
+                  <SelectItem value="persuasion">Persuasion</SelectItem>
+                  <SelectItem value="gotv">GOTV</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>

@@ -95,7 +95,7 @@ function makeSupabaseStub(args: { currentDisposition: string }) {
     throw new Error(`unexpected table ${table}`);
   };
 
-  return { from, realtime: { channel: () => ({ send: vi.fn() }) }, _outreachUpdateCalls: outreachUpdateCalls };
+  return { from, realtime: { channel: () => ({ send: vi.fn() }) }, rpc: async () => ({ data: { id: 1, inserted: true }, error: null }), _outreachUpdateCalls: outreachUpdateCalls };
 }
 
 let supabaseStub: ReturnType<typeof makeSupabaseStub>;

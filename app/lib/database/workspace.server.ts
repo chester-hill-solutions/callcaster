@@ -501,8 +501,11 @@ export async function getUserRole({
 }
 
 /**
- * Verify that the user has access to the workspace. Throws AppError with 403 if not.
- * Use as defense-in-depth when workspace_id comes from request body.
+ * Verify that the user is a member of the workspace. Non-members get a uniform
+ * 404 (not 403) so a caller cannot infer whether a workspace id exists
+ * (ADR-0004). Use as defense-in-depth when workspace_id comes from a request
+ * body. Use `requireWorkspaceLoaderContext` / `withWorkspaceApi*` for
+ * role-gated access.
  */
 export async function requireWorkspaceAccess({
   supabaseClient,
@@ -518,7 +521,10 @@ export async function requireWorkspaceAccess({
     user,
     workspaceId,
   });
-  if (!role || !["owner", "admin", "member", "caller"].includes(role.role)) {
+  if (!role) {
+    throw new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND);
+  }
+  if (!["owner", "admin", "member", "caller"].includes(role.role)) {
     throw new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN);
   }
 }
@@ -614,11 +620,22 @@ export async function createWorkspaceTwilioInstance({
     .eq("id", workspace_id)
     .single();
   if (error) throw error;
+  if (!data) {
+    throw new Error("No workspace found");
+  }
   const creds = readTwilioWorkspaceCredentials(data.twilio_data);
   if (!creds) {
     throw new Error("Workspace missing Twilio credentials");
   }
-  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
+  // ADR-0011: REST calls use workspace API keys (workspace.key/workspace.token)
+  // when present; auth token is only used for webhook signature validation.
+  // Twilio SDK API-key auth: `new Twilio(apiKey, apiSecret, { accountSid })`.
+  const apiKey = typeof data.key === "string" ? data.key.trim() : "";
+  const apiSecret = typeof data.token === "string" ? data.token.trim() : "";
+  const twilio =
+    apiKey && apiSecret
+      ? new Twilio.Twilio(apiKey, apiSecret, { accountSid: creds.sid })
+      : new Twilio.Twilio(creds.sid, creds.authToken);
   return twilio;
 }
 

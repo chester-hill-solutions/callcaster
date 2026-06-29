@@ -6,6 +6,7 @@ beforeAll(() => {
   process.env.NODE_ENV = "test";
 
   // Satisfy `app/lib/env.server.ts` required getters in tests.
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
   process.env.SUPABASE_URL ??= "http://localhost:54321";
   process.env.SUPABASE_ANON_KEY ??= "test-anon";
   process.env.SUPABASE_SERVICE_KEY ??= "test-service";

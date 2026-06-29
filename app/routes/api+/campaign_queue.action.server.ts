@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { filteredSearch } from "@/lib/queue-filter-search.server";
 import { parseRequestData } from "@/lib/database.server";
-import { safeNumber } from "@/lib/type-utils";
+import { safeNumber } from "@/lib/type-safety-utils";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 
 import type { ActionFunctionArgs } from "react-router";

@@ -34,7 +34,6 @@ import {
   normalizeCampaignData,
 } from "@/lib/campaign-settings";
 import { deepEqual } from "@/lib/utils";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import {
   getCampaignSetupDismissKey,
   getCampaignSetupSteps,
@@ -107,6 +106,7 @@ export default function CampaignSettingsRoute() {
     smsSendContext,
     isFirstDraftCampaign,
     campaignBilling,
+    readiness,
   } = useLoaderData();
 
   const navigate = useNavigate();
@@ -217,34 +217,16 @@ export default function CampaignSettingsRoute() {
       ? "success"
       : null;
 
-  const readiness = useMemo(
-    () =>
-      getCampaignReadiness(draftCampaignData, draftCampaignDetails, {
-        queueCount: queueCount ?? 0,
-        smsSenderClass: outboundEstimateInputs.portalConfig.smsSenderClass,
-        smsMessagingServiceSendersReady:
-          draftCampaignData.type === "message" &&
-          draftCampaignData.sms_send_mode === "messaging_service"
-            ? smsSendContext?.messagingServiceReady
-            : undefined,
-      }),
-    [
-      draftCampaignData,
-      draftCampaignDetails,
-      queueCount,
-      smsSendContext?.messagingServiceReady,
-      outboundEstimateInputs.portalConfig.smsSenderClass,
-    ],
-  );
+  const readinessFromLoader = readiness;
   const startDisabledReason = isChanged
     ? "Save your changes before starting this campaign"
-    : readiness.startDisabledReason;
+    : readinessFromLoader.startDisabledReason;
   const scheduleDisabledReason = isChanged
     ? "Save your changes before scheduling this campaign"
-    : readiness.scheduleDisabledReason;
+    : readinessFromLoader.scheduleDisabledReason;
   const readinessIssues = isChanged
     ? ["Save your changes to refresh campaign readiness."]
-    : readiness.startIssues;
+    : readinessFromLoader.startIssues;
 
   const setupGuideState = useMemo(
     () =>

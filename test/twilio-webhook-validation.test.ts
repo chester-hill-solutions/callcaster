@@ -32,7 +32,7 @@ vi.mock("twilio", () => {
   };
 });
 
-import { sendSms, singleton, validateTwilioWebhook, validateTwilioWebhookParams } from "@/twilio.server";
+import { singleton, validateTwilioWebhook, validateTwilioWebhookParams } from "@/twilio.server";
 
 describe("Twilio webhook validation", () => {
   test("rejects when x-twilio-signature is missing", async () => {
@@ -107,16 +107,6 @@ describe("Twilio webhook validation", () => {
       "http://localhost/x",
       { a: "1" },
     );
-  });
-
-  test("sendSms uses twilio.messages.create", async () => {
-    const res = await sendSms({ from: "+15550001", to: "+15550002", body: "hi" });
-    expect(twilioMocks.messagesCreate).toHaveBeenCalledWith({
-      from: "+15550001",
-      to: "+15550002",
-      body: "hi",
-    });
-    expect(res).toMatchObject({ sid: "SM_TEST" });
   });
 
   test("singleton caches a value by name", () => {

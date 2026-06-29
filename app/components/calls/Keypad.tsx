@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { SOFTPHONE_KEYPAD_KEYS } from "@/components/calls/softphone-constants";
+import { KEYPAD_KEYS } from "@/lib/dtmf";
 
 type KeypadProps = {
   onKeyPress: (key: string) => void;
@@ -8,7 +8,7 @@ type KeypadProps = {
 export function Keypad({ onKeyPress }: KeypadProps) {
   return (
     <div className="mt-3 grid max-w-[140px] grid-cols-3 gap-2">
-      {SOFTPHONE_KEYPAD_KEYS.map((key) => (
+      {KEYPAD_KEYS.map((key) => (
         <Button
           key={key}
           type="button"

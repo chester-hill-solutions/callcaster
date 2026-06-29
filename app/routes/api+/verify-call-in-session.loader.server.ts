@@ -1,8 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
-import { isValidPhoneNumber } from "@/lib/utils/phone";
-import { normalizePhoneNumber } from "@/lib/utils";
+import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
 
 

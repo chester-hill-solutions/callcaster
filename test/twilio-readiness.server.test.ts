@@ -3,9 +3,13 @@ import { describe, expect, test, vi } from "vitest";
 import { WorkspaceSmsNotReadyError, assertWorkspaceCanSendSms } from "../app/lib/twilio-readiness.server";
 import { makePortalConfig } from "./fixtures/workspace-twilio-portal-config";
 
-vi.mock("@/lib/messaging-onboarding.server", () => ({
-  getWorkspaceMessagingOnboardingState: vi.fn(),
-}));
+vi.mock("@/lib/messaging-onboarding.server", async () => {
+  const actual = await vi.importActual("@/lib/messaging-onboarding.server");
+  return {
+    ...actual,
+    getWorkspaceMessagingOnboardingState: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/twilio-sender-pool.server", () => ({
   verifyWorkspaceMessagingSenderPool: vi.fn(),

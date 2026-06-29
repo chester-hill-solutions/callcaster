@@ -246,12 +246,5 @@ describe("errors.server", () => {
       message: "An unexpected error occurred",
     });
   });
-
-  test("safeJsonParse returns fallback on invalid JSON and logs", async () => {
-    const mod = await import("../app/lib/errors.server");
-    expect(mod.safeJsonParse('{"a":1}', { a: 0 })).toEqual({ a: 1 });
-    expect(mod.safeJsonParse("{bad", { a: 0 })).toEqual({ a: 0 });
-    expect(loggerMock.error).toHaveBeenCalled();
-  });
 });
 

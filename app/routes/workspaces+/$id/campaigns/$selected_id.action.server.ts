@@ -10,7 +10,6 @@ import {
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
 import { fetchBasicResults, fetchCampaignData, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } from "@/lib/database.server";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { logger as  loggerServer } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -44,7 +43,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!user) return redirect("/signin");
   const [campaignType, queueCounts, workspace, userRole] = await Promise.all([
     supabaseClient
       .from("campaign")
@@ -99,9 +97,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const { supabaseClient, user } = await verifyAuth(request);
   const rpcClient = supabaseClient as SupabaseClient<any>;
-  if (!user) {
-    return redirect("/signin");
-  }
   const { id: workspace_id, selected_id: campaign_id } = params;
   if (!workspace_id || !campaign_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);

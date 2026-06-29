@@ -247,6 +247,34 @@ export function getAuthSupabaseClient(
   return auth.supabaseClient;
 }
 
+/** Resolve dual-auth (API key or session) + headers + user. Throws Response on auth failure. */
+export async function resolveDualAuthSession(request: Request) {
+  const auth = await requireDualAuth(request);
+  if (auth instanceof Response) {
+    throw auth;
+  }
+  const { headers } = createSupabaseServerClient(request);
+  return {
+    supabaseClient: getDualAuthSupabase(auth),
+    headers,
+    user: getDualAuthUser(auth) ?? undefined,
+  };
+}
+
+/** Resolve JSON auth (bearer or session) + headers + user. Throws Response on auth failure. */
+export async function resolveJsonAuthSession(request: Request) {
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) {
+    throw auth;
+  }
+  const { headers } = createSupabaseServerClient(request);
+  return {
+    supabaseClient: getAuthSupabaseClient(auth),
+    headers,
+    user: auth.user,
+  };
+}
+
 export function hashApiKeyForStorage(key: string): string {
   return hashApiKey(key);
 }

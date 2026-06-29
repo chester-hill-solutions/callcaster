@@ -10,8 +10,8 @@ import { logger } from "@/lib/logger.server";
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
-import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
+import { sendSmsAndPersist } from "@/lib/sms-send.server";
 
 export const sendMessage = async ({
   body,
@@ -56,74 +56,28 @@ export const sendMessage = async ({
   try {
     const processedBody = body;
 
-    const message = await withTwilioRetry(
-      () =>
-        twilio.messages.create(
-          buildTwilioOutboundSmsCreateParams({
-            body: processedBody,
-            to,
-            from,
-            media: mediaData && mediaData.length > 0 ? [...mediaData] : [],
-            statusCallback,
-            portalConfig: resolvedPortalConfig,
-            explicitMessagingServiceSid: messagingServiceSid,
-            messageIntent,
-          }),
-        ),
-      { workspaceId: workspace, operation: "messages.create.chat" },
-    );
-
-    const {
-      sid,
-      body: sentBody,
-      numSegments: num_segments,
-      direction,
-      from: sentFrom,
-      to: sentTo,
-      dateUpdated: date_updated,
-      price = 0,
-      errorMessage: error_message,
-      uri,
-      accountSid: account_sid,
-      numMedia: num_media,
-      status,
-      messagingServiceSid: messaging_service_sid,
-      dateSent: date_sent,
-      dateCreated: date_created,
-      errorCode: error_code,
-      priceUnit: price_unit,
-      apiVersion: api_version,
-      subresourceUris: subresource_uris,
-    } = message;
-
-    const { data, error } = await supabase
-      .from("message")
-      .insert({
-        sid,
-        body: sentBody,
-        num_segments,
-        direction,
-        from: sentFrom,
-        to: sentTo,
-        date_updated,
-        price: price || null,
-        error_message,
-        account_sid,
-        uri,
-        num_media,
-        status,
-        messaging_service_sid,
-        date_sent,
-        date_created,
-        error_code,
-        price_unit,
-        api_version,
-        subresource_uris,
+    const { message, result } = await sendSmsAndPersist({
+      twilio,
+      supabase,
+      createParams: buildTwilioOutboundSmsCreateParams({
+        body: processedBody,
+        to,
+        from,
+        media: mediaData && mediaData.length > 0 ? [...mediaData] : [],
+        statusCallback,
+        portalConfig: resolvedPortalConfig,
+        explicitMessagingServiceSid: messagingServiceSid,
+        messageIntent,
+      }),
+      retryOptions: { workspaceId: workspace, operation: "messages.create.chat" },
+      persistExtras: {
         workspace,
         ...(contact_id && { contact_id }),
         ...(mediaData && mediaData.length > 0 && { outbound_media: [...mediaData] }),
-      })
-      .select();
+      },
+    });
+
+    const { data, error } = result;
 
     if (error) throw { "message_entry_error:": error };
 

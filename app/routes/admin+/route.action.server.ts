@@ -14,10 +14,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const { supabaseClient, user } = await verifyAuth(request);
 
-    if (!user) {
-        throw redirect("/signin");
-    }
-
     const { data: userData } = await supabaseClient
         .from("user")
         .select("*")

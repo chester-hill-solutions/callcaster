@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { NumberRentalCreditsAlert } from "@/components/phone-numbers/NumberRentalCreditsAlert";
 import { hasCreditsForNumberRental } from "@/lib/number-rental";
-import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding.server";
+import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
 import type {
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,

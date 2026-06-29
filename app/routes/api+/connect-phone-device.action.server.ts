@@ -2,8 +2,11 @@ import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { twilio } from "@/twilio.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+  safeParseJson,
+} from "@/lib/database.server";
 
 export const action = async ({ request }: { request: Request }) => {
 
@@ -33,6 +36,10 @@ export const action = async ({ request }: { request: Request }) => {
     });
 
     try {
+        const twilio = await createWorkspaceTwilioInstance({
+            supabase,
+            workspace_id: workspaceId,
+        });
         // Call the user's phone and connect them to the campaign conference
         const call = await twilio.calls.create({
             to: phoneNumber,

@@ -1,4 +1,4 @@
-import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding.server";
+import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
 import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
 import type { WorkspaceOnboardingChannel } from "@/lib/types";
 

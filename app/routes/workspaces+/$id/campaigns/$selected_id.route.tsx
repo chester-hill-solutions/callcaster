@@ -29,7 +29,6 @@ import {
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
 
 import type { CampaignState } from "@/lib/campaign-home.types";
 export type { CampaignState } from "@/lib/campaign-home.types";
@@ -64,6 +63,9 @@ export default function CampaignScreen() {
     results,
     selected_id,
     queueCounts,
+    readiness,
+    joinDisabled,
+    scheduleDisabled,
   } = useLoaderData();
   const { audiences, campaigns, phoneNumbers, workspace, supabase } =
     useOutletContext<{
@@ -109,18 +111,6 @@ export default function CampaignScreen() {
     },
   });
 
-  const readiness = getCampaignReadiness(campaignData, campaignDetails, {
-    queueCount: safeQueueCounts.queuedCount ?? safeQueueCounts.fullCount,
-  });
-  const joinDisabled = readiness.startDisabledReason
-    ? readiness.startDisabledReason
-    : campaignData?.status === "scheduled"
-      ? "Campaign scheduled."
-      : !campaignData?.is_active
-        ? "It is currently outside of the campaign's calling hours"
-        : null;
-
-  const scheduleDisabled = readiness.scheduleDisabledReason;
   return (
     <div className="flex h-full w-full flex-col">
       <CampaignHeader

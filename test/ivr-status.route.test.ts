@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
+  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
@@ -105,7 +106,12 @@ function makeSupabase(opts?: {
       }
       throw new Error("unexpected table");
     },
-    rpc: async () => ({ data: null, error: null }),
+    rpc: async (fn: string, args: any) => {
+      if (fn === "apply_ledger_entry_and_sync_credits") {
+        return makeApplyLedgerEntryRpcStub(transactionRows)(fn, args);
+      }
+      return { data: null, error: null };
+    },
     _updates: updates,
   };
   return supabase;
@@ -189,7 +195,9 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: "<Response><Hangup/></Response>" });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
+    );
 
     // synthetic voicemail page
     callUpdate.mockClear();
@@ -206,7 +214,9 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: `<Response><Pause length="1"/><Say>hi</Say></Response>` });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Pause length=\"1\"/><Say>hi</Say>") }),
+    );
 
     // recorded voicemail page -> play signedUrl
     callUpdate.mockClear();
@@ -224,7 +234,9 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: `<Response><Pause length="1"/><Play>https://signed</Play></Response>` });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Pause length=\"1\"/><Play>https://signed</Play>") }),
+    );
 
     // errors: missing voicemail_file => catch
     supabase = makeSupabase({
@@ -262,7 +274,8 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: null, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: "tok" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
-    await expect(res.json()).resolves.toMatchObject({ success: false });
+    // persistCallStatusFromParams skips outreach update when outreach_attempt_id is null (matches canonical call-status route)
+    await expect(res.json()).resolves.toMatchObject({ success: true });
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: "tok", updateOutreachError: new Error("up") }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
@@ -297,7 +310,9 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: "<Response><Hangup/></Response>" });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
+    );
 
     // recorded: signedUrlError => throws {Status_Error: ...} and caught
     mocks.createClient.mockReturnValueOnce(
@@ -431,6 +446,12 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
           return makeTransactionHistoryTableStub(transactionRows);
         }
         throw new Error("unexpected");
+      },
+      rpc: async (fn: string, args: any) => {
+        if (fn === "apply_ledger_entry_and_sync_credits") {
+          return makeApplyLedgerEntryRpcStub(transactionRows)(fn, args);
+        }
+        return { data: null, error: null };
       },
     };
     mocks.createClient.mockReturnValueOnce(supabase);

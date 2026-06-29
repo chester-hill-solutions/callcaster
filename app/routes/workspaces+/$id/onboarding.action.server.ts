@@ -71,10 +71,6 @@ async function runUiOnboardingAction(
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, user, headers } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin", { headers });
-  }
-
   const wsId = params.id;
   if (!wsId) {
     return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });

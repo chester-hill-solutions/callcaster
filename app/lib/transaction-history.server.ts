@@ -15,15 +15,12 @@ export {
   type BillingEventSource,
 } from "@/lib/transaction-history-display";
 
-import { isUniqueViolation } from "@/lib/parse-utils.server";
-
-export { isUniqueViolation } from "@/lib/parse-utils.server";
-
 /**
- * DB-backed idempotent insert for transaction_history.
+ * DB-backed idempotent insert for transaction_history + atomic credits sync.
  *
- * Uses a deterministic idempotency key stored in the transaction_history table
- * and enforced by a unique DB index/constraint.
+ * Calls the `apply_ledger_entry_and_sync_credits` plpgsql RPC which does
+ * `INSERT ... ON CONFLICT DO NOTHING` + `UPDATE workspace SET credits` in a
+ * single atomic transaction. Replaces the banned Postgres trigger (ADR-0006).
  */
 export async function insertTransactionHistoryIdempotent(args: {
   supabase: SupabaseClient<Database>;
@@ -32,6 +29,9 @@ export async function insertTransactionHistoryIdempotent(args: {
   amount: number;
   note: string;
   idempotencyKey: string;
+  campaignId?: number | null;
+  callSid?: string | null;
+  messageSid?: string | null;
 }): Promise<{ inserted: boolean; existingId?: number }> {
   const idempotencyKey = args.idempotencyKey.trim();
   if (!idempotencyKey) {
@@ -41,66 +41,38 @@ export async function insertTransactionHistoryIdempotent(args: {
   }
 
   try {
-    const { data, error } = await args.supabase
-      .from("transaction_history")
-      .insert({
-        workspace: args.workspaceId,
-        type: args.type,
-        amount: args.amount,
-        note: args.note,
-        idempotency_key: idempotencyKey,
-      })
-      .select("id")
-      .single();
+    const { data, error } = await args.supabase.rpc(
+      "apply_ledger_entry_and_sync_credits",
+      {
+        p_workspace_id: args.workspaceId,
+        p_type: args.type,
+        p_amount: args.amount,
+        p_idempotency_key: idempotencyKey,
+        p_description: args.note,
+        p_campaign_id: args.campaignId ?? null,
+        p_call_sid: args.callSid ?? null,
+        p_message_sid: args.messageSid ?? null,
+      },
+    );
 
-    if (!error) {
-      logger.info("billing.transaction", {
-        workspaceId: args.workspaceId,
-        type: args.type,
-        amount: args.amount,
-        idempotencyKey,
-        inserted: true,
-        source: getBillingEventSource({
-          type: args.type,
-          idempotencyKey,
-        }),
-      });
-      return { inserted: true, existingId: data?.id as number | undefined };
-    }
-
-    if (!isUniqueViolation(error)) {
-      logger.error("transaction_history insert failed", {
+    if (error) {
+      logger.error("transaction_history RPC failed", {
         error,
         workspaceId: args.workspaceId,
         type: args.type,
+        amount: args.amount,
         idempotencyKey,
       });
       throw error;
     }
 
-    const { data: existing, error: existingError } = await args.supabase
-      .from("transaction_history")
-      .select("id")
-      .eq("workspace", args.workspaceId)
-      .eq("type", args.type)
-      .eq("idempotency_key", idempotencyKey)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const row = data as
+      | { id: number; inserted: boolean }
+      | null;
 
-    if (existingError) {
-      logger.error("transaction_history duplicate lookup failed", {
-        error: existingError,
-        workspaceId: args.workspaceId,
-        type: args.type,
-        idempotencyKey,
-      });
-      throw existingError;
-    }
-
-    if (!existing?.id) {
+    if (!row?.id) {
       throw new Error(
-        `transaction_history duplicate insert detected but existing row not found for key ${idempotencyKey}`,
+        `apply_ledger_entry_and_sync_credits returned no row for key ${idempotencyKey}`,
       );
     }
 
@@ -109,16 +81,16 @@ export async function insertTransactionHistoryIdempotent(args: {
       type: args.type,
       amount: args.amount,
       idempotencyKey,
-      inserted: false,
+      inserted: row.inserted,
       source: getBillingEventSource({
         type: args.type,
         idempotencyKey,
       }),
     });
-    return { inserted: false, existingId: existing.id };
+
+    return { inserted: row.inserted, existingId: row.id };
   } catch (e) {
     logger.error("transaction_history idempotent insert error", e);
     throw e;
   }
 }
-

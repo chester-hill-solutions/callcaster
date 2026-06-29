@@ -103,6 +103,42 @@ module.exports = {
         ],
       },
     },
+    // ADR-0004 module boundary: route code must use createTenantDb (@/server/tenant-db)
+    // for tenant data and @/db/schema for column references. The unscoped db and
+    // admin clients are server-internal only — importing them from routes is a
+    // cross-tenant leak hazard.
+    {
+      files: ["app/routes/**/*.{ts,tsx}"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              {
+                name: "@/server/db",
+                message:
+                  "Routes must use createTenantDb from @/server/tenant-db for tenant data. Use @/db/schema for column references.",
+              },
+              {
+                name: "@/server/admin-db",
+                message:
+                  "The admin (unscoped) client is not importable from routes. Use createTenantDb from @/server/tenant-db.",
+              },
+              {
+                name: "./db",
+                message:
+                  "Routes must use createTenantDb from @/server/tenant-db for tenant data.",
+              },
+              {
+                name: "./admin-db",
+                message:
+                  "The admin (unscoped) client is not importable from routes.",
+              },
+            ],
+          },
+        ],
+      },
+    },
     {
       files: ["**/*.{js,jsx,ts,tsx}"],
       rules: {

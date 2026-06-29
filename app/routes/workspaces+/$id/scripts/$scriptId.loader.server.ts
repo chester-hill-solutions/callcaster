@@ -22,9 +22,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw redirect("/workspaces");
   }
   const { supabaseClient, user } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin");
-  }
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")
     .select()

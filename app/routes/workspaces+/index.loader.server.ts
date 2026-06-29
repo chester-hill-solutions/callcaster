@@ -25,10 +25,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
-
   const userId = user.id;
   if (!userId) {
     return redirect("/signin", { headers });

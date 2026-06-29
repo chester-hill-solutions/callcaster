@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, formatTimeShort } from "@/lib/utils";
+import { KEYPAD_KEYS } from "@/lib/dtmf";
 
 interface PhoneKeypadProps {
   onKeyPress: (key: string) => void;
@@ -8,20 +9,12 @@ interface PhoneKeypadProps {
   callDuration: number;
 }
 
-const KEYPAD_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, "*", 0, "#"] as const;
-
 export function PhoneKeypad({
   onKeyPress,
   displayState,
   displayColor,
   callDuration,
 }: PhoneKeypadProps) {
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-  };
-
   return (
     <div
       className="overflow-hidden rounded-lg border-2 border-border"
@@ -33,10 +26,10 @@ export function PhoneKeypad({
       >
         {displayState === "failed" && <span>Call Failed</span>}
         {displayState === "dialing" && (
-          <span>Dialing... {formatTime(callDuration)}</span>
+          <span>Dialing... {formatTimeShort(callDuration)}</span>
         )}
         {displayState === "connected" && (
-          <span>Connected {formatTime(callDuration)}</span>
+          <span>Connected {formatTimeShort(callDuration)}</span>
         )}
         {displayState === "no-answer" && <span>No Answer</span>}
         {displayState === "voicemail" && <span>Voicemail Left</span>}
@@ -46,14 +39,14 @@ export function PhoneKeypad({
       <div className="grid grid-cols-3 gap-2 p-4">
         {KEYPAD_KEYS.map((item) => (
           <Button
-            key={String(item)}
+            key={item}
             type="button"
             variant="outline"
             className={cn(
               "h-10 w-10 min-w-10 p-0 text-base font-semibold",
               "transition-colors duration-150 hover:bg-muted",
             )}
-            onClick={() => onKeyPress(String(item))}
+            onClick={() => onKeyPress(item)}
           >
             {item}
           </Button>

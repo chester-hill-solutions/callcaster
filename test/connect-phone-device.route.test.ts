@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     createSupabaseServerClient: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
+    createWorkspaceTwilioInstance: vi.fn(),
     twilioCreate: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: {
@@ -19,12 +20,15 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
   requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
 }));
 vi.mock("@/lib/supabase.server", () => ({
   createSupabaseServerClient: (...args: any[]) => mocks.createSupabaseServerClient(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   twilio: { calls: { create: (...args: any[]) => mocks.twilioCreate(...args) } },
+  createParentTwilioInstance: () => ({ calls: { create: (...args: any[]) => mocks.twilioCreate(...args) } }),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -35,6 +39,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.safeParseJson.mockReset();
     mocks.createSupabaseServerClient.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
+    mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.twilioCreate.mockReset();
     mocks.logger.error.mockReset();
   });
@@ -73,6 +78,9 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
       campaignId: "c1",
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      calls: { create: (...args: any[]) => mocks.twilioCreate(...args) },
+    });
     mocks.twilioCreate.mockResolvedValueOnce({ sid: "CA1" });
 
     const mod = await import("../app/routes/api+/connect-phone-device");
@@ -109,6 +117,9 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
       campaignId: "c1",
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      calls: { create: (...args: any[]) => mocks.twilioCreate(...args) },
+    });
     mocks.twilioCreate.mockRejectedValueOnce(new Error("twilio"));
 
     const mod = await import("../app/routes/api+/connect-phone-device");

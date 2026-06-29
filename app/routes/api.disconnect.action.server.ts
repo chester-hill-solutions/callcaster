@@ -1,10 +1,9 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
-import twilio from "twilio";
+import { createParentTwilioInstance } from "@/twilio.server";
+import { pauseTwiml } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";
-
-const TWIML_PAUSE_RESPONSE = '<Response><Pause length="60"/></Response>';
 
 type DisconnectRequestBody = {
   call?: {
@@ -44,10 +43,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return routeData({ error: "Missing CallSid parameter." }, { status: 400 });
   }
 
-  const client = twilio(TWILIO_SID, TWILIO_AUTH_TOKEN);
+  const client = createParentTwilioInstance();
 
   try {
-    await client.calls(callSid).update({ twiml: TWIML_PAUSE_RESPONSE });
+    await client.calls(callSid).update({ twiml: pauseTwiml(60) });
     return routeData({ success: true });
   } catch (error) {
     logger.error("Failed to update call status", error);

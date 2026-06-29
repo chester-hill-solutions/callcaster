@@ -1,5 +1,8 @@
 import { Campaign, OutreachAttempt } from "@/lib/types";
-import { cancelQueuedMessagesForCampaign } from "@/lib/database.server";
+import {
+  cancelQueuedMessagesForCampaign,
+  createWorkspaceTwilioInstance,
+} from "@/lib/database.server";
 import { createClient } from "@supabase/supabase-js";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
@@ -8,7 +11,6 @@ import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
 import { logger } from "@/lib/logger.server";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { validateTwilioWebhookForMessageSid } from "@/lib/twilio-webhook.server";
-import Twilio from "twilio";
 import type { Database } from "@/lib/database.types";
 import {
   isTerminalSmsStatus,
@@ -16,7 +18,8 @@ import {
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
-import { SMS_SEGMENT_CREDITS } from "@/lib/pricing";
+import { SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
+import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
 
 import type { ActionFunctionArgs } from "react-router";
@@ -30,11 +33,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
-  );
-  // Main-account REST client for legacy SMS status side effects only; webhook auth uses workspace token.
-  const twilio = new Twilio.Twilio(
-    env.TWILIO_SID(),
-    env.TWILIO_AUTH_TOKEN(),
   );
 
   try {
@@ -107,13 +105,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Debit billing for SMS (campaign, API/chat, or any outbound) when terminal status
     if (messageData?.workspace && isTerminalSmsStatus(messageStatus)) {
       try {
+        const numSegments = Math.max(
+          1,
+          Number.parseInt(String(messageData.num_segments ?? "1"), 10) || 1,
+        );
         await insertTransactionHistoryIdempotent({
           supabase,
           workspaceId: messageData.workspace,
           type: "DEBIT",
-          amount: -SMS_SEGMENT_CREDITS,
-          note: `SMS ${sid} ${messageStatus}`,
-          idempotencyKey: `sms:${sid}`,
+          amount: debitAmountFromCredits(SMS_SEGMENT_CREDITS * numSegments),
+          note: `SMS ${sid} ${messageStatus} (${numSegments} segment${numSegments === 1 ? "" : "s"})`,
+          idempotencyKey: smsKey(sid),
+          messageSid: sid,
         });
       } catch (transactionError) {
         logger.error("Failed to create SMS transaction:", transactionError);
@@ -162,8 +165,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (
         outreachData.campaign?.end_date &&
         now > new Date(outreachData.campaign.end_date) &&
-        typeof messageData?.campaign_id === "number"
+        typeof messageData?.campaign_id === "number" &&
+        messageData?.workspace
       ) {
+        // Use the workspace subaccount client (ADR-0011) instead of the parent account.
+        const twilio = await createWorkspaceTwilioInstance({
+          supabase,
+          workspace_id: messageData.workspace,
+        });
         await cancelQueuedMessagesForCampaign(
           twilio,
           supabase,

@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 interface ExportItem {
@@ -39,15 +39,9 @@ interface LoaderData {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, user } = await verifyAuth(request);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const workspaceId = params["id"];
-  if (!workspaceId) {
-    return routeData({ error: "Missing workspace ID" }, { status: 400 });
-  }
+  const result = await requireWorkspaceLoaderContext(request, params["id"]);
+  if (!result.ok) return result.response;
+  const { supabaseClient, user, workspaceId } = result.ctx;
 
   try {
     // List all files in the workspace's exports directory

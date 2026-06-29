@@ -31,6 +31,7 @@ import {
 import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
 import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
 import { getCallSid } from "@/lib/twilio/twilio-call-adapter.client";
+import { KEYPAD_KEYS } from "@/lib/dtmf";
 import type {
   AppUser,
   LoaderData,
@@ -289,9 +290,7 @@ export function useCallScreen() {
 
   useEffect(() => {
     const handleKeypress = (e: KeyboardEvent) => {
-      ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].includes(
-        e.key,
-      )
+      KEYPAD_KEYS.includes(e.key)
         ? audioControls.handleDTMF(e.key)
         : null;
     };

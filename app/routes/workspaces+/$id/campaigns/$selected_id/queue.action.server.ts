@@ -13,7 +13,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!user) throw redirect("/signin");
   if (!selected_id) throw redirect("../../");
 
   const data = await parseActionRequest(request);

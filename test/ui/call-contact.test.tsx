@@ -16,9 +16,9 @@ function makeHousehold(n: number) {
   return Array.from({ length: n }).map((_, i) => ({ contact: makeContact({ firstname: `H${i}` }) })) as any;
 }
 
-describe("app/components/call-list/records/participant/CallContact.tsx", () => {
+describe("app/components/call/CallContact.tsx", () => {
   test("ungrouped + no household renders address cell and default styles", async () => {
-    const QueueContact = (await import("@/components/call-list/records/participant/CallContact")).default;
+    const QueueContact = (await import("@/components/call/CallContact")).default;
     const { container } = render(
       <table>
         <tbody>
@@ -42,7 +42,7 @@ describe("app/components/call-list/records/participant/CallContact.tsx", () => {
   });
 
   test("grouped first-in-house can be selected/last and styles address cell", async () => {
-    const QueueContact = (await import("@/components/call-list/records/participant/CallContact")).default;
+    const QueueContact = (await import("@/components/call/CallContact")).default;
     const { container } = render(
       <table>
         <tbody>
@@ -74,7 +74,7 @@ describe("app/components/call-list/records/participant/CallContact.tsx", () => {
   });
 
   test("grouped not-first-in-house dims phone and omits address cell", async () => {
-    const QueueContact = (await import("@/components/call-list/records/participant/CallContact")).default;
+    const QueueContact = (await import("@/components/call/CallContact")).default;
     const { container } = render(
       <table>
         <tbody>

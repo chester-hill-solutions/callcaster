@@ -1,15 +1,12 @@
 import { data as routeData } from "react-router";
 import { getWorkspaceBilling } from "@/lib/platform-billing.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (!workspaceId) {
-    throw new Error("Workspace ID is required");
-  }
+  const result = await requireWorkspaceLoaderContext(request, params.id);
+  if (!result.ok) return result.response;
+  const { supabaseClient, user, workspaceId } = result.ctx;
 
   const billing = await getWorkspaceBilling(supabaseClient, user.id, workspaceId);
   if (!billing.ok) {

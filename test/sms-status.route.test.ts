@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   validateTwilioWebhookForMessageSid: vi.fn(),
   insertTransactionHistoryIdempotent: vi.fn(),
   cancelQueuedMessagesForCampaign: vi.fn(),
+  createWorkspaceTwilioInstance: vi.fn(async () => ({})),
   shouldUpdateOutreachDisposition: vi.fn(),
   env: {
     SUPABASE_URL: vi.fn(() => "http://supabase"),
@@ -36,6 +37,8 @@ vi.mock("@/lib/transaction-history.server", () => ({
 vi.mock("@/lib/database.server", () => ({
   cancelQueuedMessagesForCampaign: (...args: unknown[]) =>
     mocks.cancelQueuedMessagesForCampaign(...args),
+  createWorkspaceTwilioInstance: (...args: unknown[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
 }));
 vi.mock("@/lib/outreach-disposition", () => ({
   shouldUpdateOutreachDisposition: (...args: unknown[]) =>
@@ -141,6 +144,8 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     }));
     mocks.insertTransactionHistoryIdempotent.mockReset();
     mocks.cancelQueuedMessagesForCampaign.mockReset();
+    mocks.createWorkspaceTwilioInstance.mockReset();
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({});
     mocks.shouldUpdateOutreachDisposition.mockReset();
     mocks.logger.error.mockReset();
   });

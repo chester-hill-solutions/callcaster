@@ -9,6 +9,7 @@ import {
   getCallWithRetry,
   insertTransactionHistoryIdempotent,
 } from "../_shared/ivr-status-logic.ts";
+import { callKey } from "../../../shared/billing-keys.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
 interface TwilioEventData {
@@ -149,6 +150,7 @@ const handleCallCompletion = async (
       const durationSeconds = Number.parseInt(CallDuration, 10);
       const billingUnits = billingUnitsFromDurationSeconds(
         Number.isFinite(durationSeconds) ? durationSeconds : 0,
+        "ivr",
       );
       await insertTransactionHistoryIdempotent({
         supabase: supabase as any,
@@ -156,7 +158,8 @@ const handleCallCompletion = async (
         type: "DEBIT",
         amount: billingUnits,
         note: `IVR Call ${callData.sid}, Campaign ${callData.campaign.name}, Duration ${CallDuration}s`,
-        idempotencyKey: `call:${callData.sid}`,
+        idempotencyKey: callKey(callData.sid, "ivr"),
+        callSid: callData.sid,
       });
     }
 

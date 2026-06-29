@@ -29,6 +29,8 @@ import { attachPhoneNumberToMessagingService } from "@/lib/twilio-bootstrap.serv
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { normalizeInboundRingCount } from "../../shared/inbound-rings";
+import { debitAmountFromCredits } from "@/lib/pricing";
+import { numberRentalPurchaseKey } from "@/lib/billing-keys";
 import type { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import type { z } from "zod";
 
@@ -250,9 +252,9 @@ export async function purchaseWorkspaceNumber(
       supabase,
       workspaceId,
       type: "DEBIT",
-      amount: -NUMBER_RENTAL_MONTHLY_CREDITS,
+      amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
       note: "Rented number - " + number.friendlyName,
-      idempotencyKey: `number_rent_purchase:${workspaceId}:${number.sid}`,
+      idempotencyKey: numberRentalPurchaseKey(workspaceId, number.sid),
     });
 
     const partialSuccess =

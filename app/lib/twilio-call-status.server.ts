@@ -1,15 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database, TablesInsert } from "@/lib/database.types";
+import type { Database, Tables, TablesInsert } from "@/lib/database.types";
 import {
   voiceBillingKindFromCampaignType,
   voiceCreditsFromDurationSeconds,
+  TERMINAL_BILLABLE_CALL_STATUSES,
   type VoiceBillingKind,
 } from "../../shared/pricing";
 
 export {
   voiceBillingKindFromCampaignType,
   type VoiceBillingKind,
+} from "../../shared/pricing";
+export {
+  TERMINAL_BILLABLE_CALL_STATUSES,
+  TERMINAL_BILLABLE_SMS_STATUSES,
 } from "../../shared/pricing";
 
 export function twilioParamToUnderCase(str: string): string {
@@ -108,14 +113,97 @@ export async function resolveCallOutreachContext(
 
 export function billingUnitsFromCallDurationSeconds(
   duration: number,
-  kind: VoiceBillingKind = "staffed",
+  kind: VoiceBillingKind,
 ): number {
   return voiceCreditsFromDurationSeconds(duration, kind);
 }
 
-export const TERMINAL_CALL_STATUSES = [
-  "completed",
-  "failed",
-  "no-answer",
-  "busy",
-] as const;
+export const TERMINAL_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
+
+/**
+ * Persist a call status update from Twilio status-callback form params.
+ * Routes `ivr/status` and `auto-dial/status` (and any future status callback
+ * route) should route through this so that persistence + disposition use the
+ * same canonical path as `call-status` (fixes the double-debit hazard from
+ * issue #1004 by ensuring all status routes use `twilioParamsToUnderCase`).
+ *
+ * Behavior:
+ * - Updates `call.end_time` / `call.status` / `call.duration` for `callSid`.
+ * - Optionally updates `outreach_attempt.disposition` when provided.
+ *
+ * Returns the row from the call update (so callers can read
+ * `outreach_attempt_id` / `workspace` for billing) when `selectResult` is true.
+ */
+export async function persistCallStatusFromParams(args: {
+  supabase: SupabaseClient<Database>;
+  params: Record<string, string>;
+  disposition?: string | null;
+  outreachAttemptId?: number | null;
+  selectResult?: boolean;
+}): Promise<Tables<"call"> | null> {
+  const underCase = twilioParamsToUnderCase(args.params);
+  const callSid =
+    typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+  if (!callSid) {
+    throw new Error("Missing CallSid in status params");
+  }
+  const timestamp =
+    typeof underCase.timestamp === "string" ? underCase.timestamp : null;
+  const status = args.disposition
+    ? String(args.disposition).toLowerCase()
+    : typeof underCase.call_status === "string"
+      ? String(underCase.call_status).toLowerCase()
+      : null;
+
+  const update: Record<string, unknown> = {};
+  if (timestamp) {
+    update.end_time = new Date(timestamp).toISOString();
+  }
+  if (status) {
+    update.status = status;
+  }
+  const duration = Math.max(
+    Number(underCase.duration) || 0,
+    Number(underCase.call_duration) || 0,
+  );
+  if (duration > 0) {
+    update.duration = String(duration);
+  }
+
+  if (Object.keys(update).length === 0) {
+    return null;
+  }
+
+  let data: Tables<"call"> | null = null;
+  if (args.selectResult) {
+    const result = await args.supabase
+      .from("call")
+      .update(update)
+      .eq("sid", callSid)
+      .select()
+      .single();
+    if (result.error) throw result.error;
+    data = result.data as Tables<"call"> | null;
+  } else {
+    const { error } = await args.supabase
+      .from("call")
+      .update(update)
+      .eq("sid", callSid);
+    if (error) throw error;
+  }
+
+  const outreachAttemptId =
+    args.outreachAttemptId != null
+      ? args.outreachAttemptId
+      : (data as { outreach_attempt_id?: number | null } | null)?.outreach_attempt_id ?? null;
+
+  if (args.disposition && outreachAttemptId != null) {
+    const { error: outreachError } = await args.supabase
+      .from("outreach_attempt")
+      .update({ disposition: args.disposition })
+      .eq("id", outreachAttemptId);
+    if (outreachError) throw outreachError;
+  }
+
+  return data;
+}

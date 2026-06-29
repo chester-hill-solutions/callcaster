@@ -25,10 +25,10 @@ interface WorkspaceRequest {
   update?: WorkspaceUpdate;
 }
 
-import { isRecord } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 
 function sanitizeWorkspaceUpdate(update: unknown): WorkspaceUpdate {
-  if (!isRecord(update)) {
+  if (!isObject(update)) {
     return {};
   }
 
@@ -60,7 +60,7 @@ const updateWorkspace = async ({
     return workspace;
   }
 
-  const existingTwilioData = isRecord(workspace?.twilio_data)
+  const existingTwilioData = isObject(workspace?.twilio_data)
     ? workspace.twilio_data
     : {};
 

@@ -40,9 +40,9 @@ describe("twilio-call-status.server", () => {
   });
 
   test("billingUnitsFromCallDurationSeconds bills staffed Option B rates", () => {
-    expect(billingUnitsFromCallDurationSeconds(0)).toBe(4);
-    expect(billingUnitsFromCallDurationSeconds(60)).toBe(4);
-    expect(billingUnitsFromCallDurationSeconds(61)).toBe(9);
+    expect(billingUnitsFromCallDurationSeconds(0, "staffed")).toBe(4);
+    expect(billingUnitsFromCallDurationSeconds(60, "staffed")).toBe(4);
+    expect(billingUnitsFromCallDurationSeconds(61, "staffed")).toBe(9);
   });
 
   test("billingUnitsFromCallDurationSeconds bills IVR when kind is ivr", () => {

@@ -21,6 +21,7 @@ import {
   shouldValidateTwilioWebhooks,
   validateTwilioWebhookParams,
 } from "@/twilio.server";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
 export type TwilioWebhookValidationResult =
   | { ok: true; params: Record<string, string>; authToken: string }
@@ -106,7 +107,7 @@ export function rejectMissingTwilioSignatureHeader(request: Request): Response |
   return null;
 }
 
-export async function loadWorkspaceTwilioData(
+export async function resolveWorkspaceTwilioData(
   supabase: SupabaseClient<Database>,
   workspaceId: string | null,
   joinedTwilioData: unknown,
@@ -200,16 +201,12 @@ export async function validateTwilioWebhookForWorkspace(args: {
   const url = new URL(args.request.url);
   const params = Object.fromEntries(url.searchParams.entries());
 
-  const { data: workspace } = await args.supabase
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", args.workspaceId)
-    .single();
+  const twilioData = await loadWorkspaceTwilioData(args.supabase, args.workspaceId);
 
   const validation = validateWorkspaceTwilioWebhook({
     request: args.request,
     params,
-    twilioData: workspace?.twilio_data,
+    twilioData,
   });
   if (!validation.ok) {
     return validation;
@@ -248,16 +245,15 @@ export async function validateTwilioWebhookForCallSid(args: {
     });
   }
 
-  const { data: workspace } = await args.supabase
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", existingCall.workspace)
-    .single();
+  const twilioData = await loadWorkspaceTwilioData(
+    args.supabase,
+    existingCall.workspace,
+  );
 
   return validateParamsWithToken({
     request: args.request,
     params,
-    authToken: resolveWorkspaceWebhookAuthToken(workspace?.twilio_data),
+    authToken: resolveWorkspaceWebhookAuthToken(twilioData),
   });
 }
 
@@ -286,16 +282,15 @@ export async function validateTwilioWebhookForMessageSid(args: {
     return { ok: false, response: twilioWebhookForbidden() };
   }
 
-  const { data: workspace } = await args.supabase
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", messageRow.workspace)
-    .single();
+  const twilioData = await loadWorkspaceTwilioData(
+    args.supabase,
+    messageRow.workspace,
+  );
 
   return validateParamsWithToken({
     request: args.request,
     params,
-    authToken: resolveWorkspaceWebhookAuthToken(workspace?.twilio_data),
+    authToken: resolveWorkspaceWebhookAuthToken(twilioData),
   });
 }
 
@@ -391,7 +386,7 @@ export async function resolveTwilioDataForPhoneNumber(
       ? row.workspace.twilio_data
       : null;
 
-  const twilioData = await loadWorkspaceTwilioData(
+  const twilioData = await resolveWorkspaceTwilioData(
     supabase,
     workspaceId,
     joinedTwilioData,

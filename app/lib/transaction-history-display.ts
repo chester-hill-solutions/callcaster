@@ -1,3 +1,5 @@
+import { bucketFromIdempotencyKey } from "../../shared/billing-keys";
+
 export type TransactionType = "DEBIT" | "CREDIT";
 
 export type BillingEventSource =
@@ -8,22 +10,34 @@ export type BillingEventSource =
   | "adjustment"
   | "unknown";
 
+function bucketToEventSource(
+  bucket: ReturnType<typeof bucketFromIdempotencyKey>,
+  type: TransactionType,
+  hasKey: boolean,
+): BillingEventSource {
+  switch (bucket) {
+    case "sms":
+      return "sms";
+    case "voice":
+      return "voice";
+    case "numbers":
+      return "number_rental";
+    case "purchase":
+      return "purchase";
+    case "other":
+      if (type === "CREDIT") return "purchase";
+      if (type === "DEBIT" && !hasKey) return "adjustment";
+      return "unknown";
+  }
+}
+
 export function getBillingEventSource(args: {
   type: TransactionType;
   idempotencyKey?: string | null;
 }): BillingEventSource {
   const key = args.idempotencyKey?.trim() ?? "";
-  if (key.startsWith("sms:")) return "sms";
-  if (key.startsWith("call:")) return "voice";
-  if (key.startsWith("number_rent:") || key.startsWith("number_rent_purchase:")) {
-    return "number_rental";
-  }
-  if (key.startsWith("stripe_evt:") || key.startsWith("stripe_session:")) {
-    return "purchase";
-  }
-  if (args.type === "CREDIT") return "purchase";
-  if (args.type === "DEBIT" && !key) return "adjustment";
-  return "unknown";
+  const bucket = bucketFromIdempotencyKey(key);
+  return bucketToEventSource(bucket, args.type, Boolean(key));
 }
 
 export function getBillingEventSourceLabel(source: BillingEventSource): string {

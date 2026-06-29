@@ -3,7 +3,8 @@ import {
   WORKSPACE_ONBOARDING_CHANNEL_VALUES,
   WORKSPACE_ONBOARDING_STATUS_VALUES,
 } from "@/lib/types";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import {
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
@@ -137,7 +138,7 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
 export function normalizeWorkspaceMessagingOnboardingState(
   value: unknown,
 ): WorkspaceMessagingOnboardingState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     const defaultState = {
       ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => ({ ...step })),

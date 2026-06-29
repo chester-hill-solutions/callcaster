@@ -1,4 +1,4 @@
-import Twilio from "twilio";
+import type Twilio from "twilio";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../database.types";
 import { type TwilioAccountData, type WorkspaceTwilioSyncSnapshot } from "../types";
@@ -12,8 +12,11 @@ import {
   listWorkspaceTollFreeVerificationSummaries,
   tollFreeVerificationBlocksBulkSms,
 } from "@/lib/twilio-toll-free.server";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
-import { mergeWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
+import { mergeWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
 
 async function syncWorkspaceTwilioBootstrapStateSafely(args: {
   supabaseClient: SupabaseClient<Database>;
@@ -47,7 +50,7 @@ export const DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT: WorkspaceTwilioSyncSnapshot
 export function normalizeWorkspaceTwilioSyncSnapshot(
   value: unknown,
 ): WorkspaceTwilioSyncSnapshot {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT };
   }
 
@@ -91,7 +94,7 @@ export function normalizeWorkspaceTwilioSyncSnapshot(
 export function getWorkspaceTwilioSyncSnapshotFromTwilioData(
   twilioData: TwilioAccountData,
 ): WorkspaceTwilioSyncSnapshot {
-  if (!twilioData || !isRecord(twilioData)) {
+  if (!twilioData || !isObject(twilioData)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT };
   }
 
@@ -144,22 +147,11 @@ export async function syncWorkspaceTwilioSnapshot({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  const twilioData = isRecord(workspace?.twilio_data)
-    ? workspace.twilio_data
-    : {};
-  const sid = typeof twilioData.sid === "string" ? twilioData.sid : null;
+  const twilioDataRaw = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const twilioData = (twilioDataRaw ?? {}) as unknown as TwilioAccountData;
+  const sid = typeof twilioData?.sid === "string" ? twilioData.sid : null;
   const authToken =
-    typeof twilioData.authToken === "string" ? twilioData.authToken : null;
+    typeof twilioData?.authToken === "string" ? twilioData.authToken : null;
 
   if (!sid || !authToken) {
     const snapshot = await updateWorkspaceTwilioSyncSnapshot({
@@ -187,11 +179,18 @@ export async function syncWorkspaceTwilioSnapshot({
   }
 
   try {
-    const twilio = new Twilio.Twilio(sid, authToken);
+    const twilio = await createWorkspaceTwilioInstance({
+      supabase: supabaseClient,
+      workspace_id: workspaceId,
+    });
+    const { startDate, endDate } = getTwilioUsageDateRange();
     const [account, numbers, usageRecords] = await Promise.all([
       twilio.api.v2010.accounts(sid).fetch(),
       twilio.incomingPhoneNumbers.list({ limit: 200 }),
-      twilio.usage.records.list(),
+      twilio.usage.records.list({
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      }),
     ]);
 
     const numberTypes = Array.from(

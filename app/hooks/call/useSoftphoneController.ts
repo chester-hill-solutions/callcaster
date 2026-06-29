@@ -3,7 +3,7 @@ import type { Call } from "@twilio/voice-sdk";
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { declineIncomingCall } from "@/components/calls/IncomingCallPanel";
-import { normalizePhoneNumber } from "@/lib/utils/phone";
+import { normalizePhoneNumber } from "@/lib/phone";
 import { sendCallDigits } from "@/lib/twilio/twilio-call-adapter.client";
 
 type UseSoftphoneControllerOptions = {

@@ -21,10 +21,6 @@ type LoaderData = {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin", { headers });
-  }
-
   const workspaceId = params.id;
   if (!workspaceId) {
     throw new Error("No workspace found");

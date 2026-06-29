@@ -43,6 +43,12 @@ vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: vi.fn(() => true),
 }));
 
+vi.mock("@/lib/twilio-twiml.server", () => ({
+  hangupTwiml: () => '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>',
+  pausePlayTwiml: (url: string, seconds = 5) =>
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Pause length="${seconds}"/><Play>${url}</Play></Response>`,
+}));
+
 vi.mock("twilio", () => {
   class VoiceResponse {
     private _dialed: any[] = [];

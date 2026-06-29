@@ -12,7 +12,7 @@ import type {
   WorkspaceOnboardingStatus,
 } from "@/lib/types";
 
-import { isRecord } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 
 export const RCS_ONBOARDING_ENABLED = false;
 
@@ -195,7 +195,7 @@ async function persistWorkspaceRcsState({
   twilioData: TwilioAccountData;
   onboarding: ReturnType<typeof getWorkspaceMessagingOnboardingFromTwilioData>;
 }) {
-  const baseData = isRecord(twilioData) ? twilioData : {};
+  const baseData = isObject(twilioData) ? twilioData : {};
   const { error } = await supabaseClient
     .from("workspace")
     .update({

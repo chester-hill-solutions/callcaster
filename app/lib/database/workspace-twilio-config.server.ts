@@ -22,7 +22,8 @@ import {
   defaultVoiceConcurrentCallLimit,
   defaultVoiceTargetCps,
 } from "@/lib/throughput-config.server";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import { mergeWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
 export const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
@@ -61,7 +62,7 @@ function parseAuditTrail(value: unknown): WorkspaceTwilioOpsAuditEntry[] {
   }
 
   return value
-    .filter(isRecord)
+    .filter(isObject)
     .map((entry) => ({
       changedAt:
         typeof entry.changedAt === "string"
@@ -107,7 +108,7 @@ function mapOnboardingStateToPortalStatus(
 export function normalizeWorkspaceTwilioOpsConfig(
   value: unknown,
 ): WorkspaceTwilioOpsConfig {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
   }
 
@@ -197,7 +198,7 @@ export function normalizeWorkspaceTwilioOpsConfig(
 export function getWorkspaceTwilioPortalConfigFromTwilioData(
   twilioData: TwilioAccountData,
 ): WorkspaceTwilioOpsConfig {
-  if (!twilioData || !isRecord(twilioData)) {
+  if (!twilioData || !isObject(twilioData)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
   }
 
@@ -207,7 +208,7 @@ export function getWorkspaceTwilioPortalConfigFromTwilioData(
 export function getEffectiveWorkspaceTwilioPortalConfig(
   twilioData: TwilioAccountData,
 ): WorkspaceTwilioOpsConfig {
-  if (!twilioData || !isRecord(twilioData)) {
+  if (!twilioData || !isObject(twilioData)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
   }
 
@@ -338,7 +339,7 @@ export async function updateWorkspaceTwilioPortalConfig({
     throw error;
   }
 
-  const currentTwilioData = isRecord(data?.twilio_data) ? data.twilio_data : {};
+  const currentTwilioData = isObject(data?.twilio_data) ? data.twilio_data : {};
   const currentConfig = getWorkspaceTwilioPortalConfigFromTwilioData(
     (data?.twilio_data ?? null) as TwilioAccountData,
   );

@@ -79,7 +79,7 @@ export const action = async ({ request }:ActionFunctionArgs) => {
     // Dequeue
     const { error: dequeueError } = await supabase
       .from("campaign_queue")
-      .update(buildDequeuedQueueUpdate(user_id, "IVR call completed"))
+      .update(buildDequeuedQueueUpdate(user_id, "IVR call completed", { includeNormalizedFields: true }))
       .eq("id", queue_id);
       
     if (dequeueError) throw dequeueError;

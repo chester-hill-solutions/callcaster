@@ -1,3 +1,16 @@
+// Inline bucket classifier to avoid cross-file import incompatibility between Node (extensionless) and Deno (.ts extension).
+// Keep in sync with `shared/billing-keys.ts` `bucketFromIdempotencyKey`.
+function bucketFromIdempotencyKey(
+  idempotencyKey: string | null | undefined,
+): "sms" | "voice" | "numbers" | "purchase" | "other" {
+  const key = idempotencyKey?.trim() ?? "";
+  if (key.startsWith("sms:")) return "sms";
+  if (key.startsWith("call:")) return "voice";
+  if (key.startsWith("number_rent:") || key.startsWith("number_rent_purchase:")) return "numbers";
+  if (key.startsWith("stripe_evt:") || key.startsWith("stripe_session:")) return "purchase";
+  return "other";
+}
+
 export type TwilioUsageRecord = {
   category: string;
   description: string;
@@ -94,23 +107,10 @@ export function categorizeLedgerRow(row: LedgerTransactionRow): {
   const credits = Math.abs(row.amount);
 
   if (row.type === "CREDIT") {
-    if (key.startsWith("stripe_evt:") || key.startsWith("stripe_session:")) {
-      return { bucket: "purchase", credits };
-    }
     return { bucket: "purchase", credits };
   }
 
-  if (key.startsWith("sms:")) {
-    return { bucket: "sms", credits };
-  }
-  if (key.startsWith("call:")) {
-    return { bucket: "voice", credits };
-  }
-  if (key.startsWith("number_rent:") || key.startsWith("number_rent_purchase:")) {
-    return { bucket: "numbers", credits };
-  }
-
-  return { bucket: "other", credits };
+  return { bucket: bucketFromIdempotencyKey(key), credits };
 }
 
 export function filterLedgerRowsInPeriod(

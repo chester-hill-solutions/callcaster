@@ -1,14 +1,15 @@
-import Twilio from "twilio";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 import {
-  buildOnboardingStepsForState,
+  evaluateWorkspaceReadiness,
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
+  type WorkspaceReadinessContext,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import type {
   TwilioAccountData,
   WorkspaceMessagingOnboardingState,
@@ -19,28 +20,18 @@ async function loadWorkspaceTwilioContext(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ) {
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("id, name, twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(
+    supabaseClient,
+    workspaceId,
+  )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
 
-  const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
-  if (!creds) {
-    throw new Error("Workspace is missing Twilio subaccount credentials");
-  }
-
-  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
+  const twilio = await createWorkspaceTwilioInstance({
+    supabase: supabaseClient,
+    workspace_id: workspaceId,
+  });
 
   return {
-    workspace,
     twilioData,
     onboarding,
     twilio,
@@ -74,35 +65,18 @@ async function persistOnboardingState({
 }
 
 export function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {
-  const issues: string[] = [];
-
-  if (!onboarding.businessProfile.legalBusinessName) {
-    issues.push("Legal business name is required.");
-  }
-  if (!onboarding.businessProfile.websiteUrl) {
-    issues.push("Website URL is required.");
-  }
-  if (!onboarding.businessProfile.useCaseSummary) {
-    issues.push("Use case summary is required.");
-  }
-  if (onboarding.businessProfile.sampleMessages.length === 0) {
-    issues.push("At least one sample message is required.");
-  }
-  if (!onboarding.messagingService.serviceSid) {
-    issues.push("Messaging Service must be provisioned first.");
-  }
-  if (!onboarding.a2p10dlc.customerProfileBundleSid) {
-    issues.push(
-      "Customer Profile Bundle SID is required before A2P registration can be submitted.",
-    );
-  }
-  if (!onboarding.a2p10dlc.trustProductSid) {
-    issues.push(
-      "A2P Messaging Profile Bundle SID is required before A2P registration can be submitted.",
-    );
-  }
-
-  return issues;
+  const ctx: WorkspaceReadinessContext = {
+    onboarding,
+    workspaceNumbers: [],
+  };
+  const results = evaluateWorkspaceReadiness(ctx, {
+    forChannel: "a2p10dlc",
+    exclude: ["a2p_approved"],
+    messageOverrides: {
+      messaging_service_not_provisioned: "Messaging Service must be provisioned first.",
+    },
+  });
+  return results.map((result) => result.message);
 }
 
 export async function provisionWorkspaceA2P({
@@ -147,7 +121,6 @@ export async function provisionWorkspaceA2P({
       },
       lastUpdatedBy: actorUserId,
     });
-    blockedState.steps = buildOnboardingStepsForState(blockedState);
     await persistOnboardingState({
       supabaseClient,
       workspaceId,
@@ -214,7 +187,6 @@ export async function provisionWorkspaceA2P({
         status: brandSid ? "in_review" : "submitting",
         lastSyncedAt: new Date().toISOString(),
       },
-      steps: buildOnboardingStepsForState(nextOnboarding),
     });
   } catch (a2pError) {
     logger.error("Error provisioning workspace A2P registration:", a2pError);
@@ -232,7 +204,6 @@ export async function provisionWorkspaceA2P({
           a2pError instanceof Error ? a2pError.message : "Unknown A2P error",
         lastUpdatedAt: new Date().toISOString(),
       },
-      steps: buildOnboardingStepsForState(nextOnboarding),
     });
   }
 
@@ -264,7 +235,6 @@ export async function syncWorkspaceA2PStatus({
       lastSyncedAt: new Date().toISOString(),
     },
   });
-  nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
   await persistOnboardingState({
     supabaseClient,

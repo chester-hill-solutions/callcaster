@@ -16,6 +16,77 @@ export function uniqueViolationError(message = "duplicate"): Error & { code: str
   return error;
 }
 
+/**
+ * Supabase `rpc("apply_ledger_entry_and_sync_credits", ...)` stub.
+ * Simulates the plpgsql RPC: idempotent insert with `inserted` flag.
+ * Shares the same in-memory row array as `makeTransactionHistoryTableStub`
+ * so tests can inspect results via `_transactionRows`.
+ */
+export function makeApplyLedgerEntryRpcStub(transactionRows: TransactionRow[]) {
+  let nextId = 1;
+  return async (
+    fn: string,
+    args: {
+      p_workspace_id: string;
+      p_type: string;
+      p_amount: number;
+      p_idempotency_key: string;
+      p_description?: string | null;
+      p_campaign_id?: number | null;
+      p_call_sid?: string | null;
+      p_message_sid?: string | null;
+    },
+  ): Promise<{
+    data: { id: number; inserted: boolean; amount: number; type: string; idempotency_key: string; workspace: string } | null;
+    error: null;
+  }> => {
+    if (fn !== "apply_ledger_entry_and_sync_credits") {
+      return { data: null, error: null };
+    }
+    const key = args.p_idempotency_key?.trim() ?? "";
+    const existing = transactionRows.find(
+      (r) =>
+        r.workspace === args.p_workspace_id &&
+        r.type === args.p_type &&
+        r.idempotency_key === key,
+    );
+    if (existing) {
+      return {
+        data: {
+          id: existing.id,
+          inserted: false,
+          amount: existing.amount,
+          type: existing.type,
+          idempotency_key: existing.idempotency_key ?? "",
+          workspace: existing.workspace,
+        },
+        error: null,
+      };
+    }
+    const created: TransactionRow = {
+      id: nextId++,
+      workspace: args.p_workspace_id,
+      type: args.p_type as TransactionRow["type"],
+      amount: args.p_amount,
+      note: args.p_description ?? "",
+      idempotency_key: key,
+      created_at: new Date().toISOString(),
+    };
+    transactionRows.push(created);
+    return {
+      data: {
+        id: created.id,
+        inserted: true,
+        amount: created.amount,
+        type: created.type,
+        idempotency_key: created.idempotency_key ?? "",
+        workspace: created.workspace,
+      },
+      error: null,
+    };
+  };
+}
+
 /** Supabase stub for insertTransactionHistoryIdempotent (idempotency_key column). */
 export function makeTransactionHistoryTableStub(transactionRows: TransactionRow[]) {
   let nextId = 1;

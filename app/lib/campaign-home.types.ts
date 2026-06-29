@@ -18,6 +18,7 @@ export type CampaignState = {
     | "simple_ivr"
     | "complex_ivr"
     | "email";
+  phase: "identification" | "persuasion" | "gotv";
   dial_type: "call" | "predictive" | null;
   group_household_queue: boolean;
   start_date: string;

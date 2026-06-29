@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { isRecord } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 
 export type WorkspaceTwilioData = Record<string, unknown>;
 
@@ -18,7 +18,7 @@ export async function loadWorkspaceTwilioData(
     throw error;
   }
 
-  return isRecord(data?.twilio_data) ? data.twilio_data : {};
+  return isObject(data?.twilio_data) ? data.twilio_data : {};
 }
 
 export async function persistWorkspaceTwilioData(

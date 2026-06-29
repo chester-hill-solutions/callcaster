@@ -3,7 +3,7 @@ import { MutableRefObject, useEffect, useState, useCallback } from "react";
 import { useClickOutside } from "@/hooks/utils/useClickOutside";
 import { Contact } from "@/lib/types";
 import { formatMessageTimestamp } from "@/lib/utils";
-import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/utils/phone";
+import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone";
 import { logger } from "@/lib/logger.client";
 
 interface UseContactSearchProps {

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 export type { QueueRecord, TwilioCredentials } from "./acd-utils.ts";
 export { buildAgentBridgeTwiml, buildHoldMusicTwiml, makeQueueName, parseQueueIdFromName } from "./acd-utils.ts";
 import { buildHoldMusicTwiml, makeQueueName, type QueueRecord, type TwilioCredentials } from "./acd-utils.ts";
+import { readTwilioWorkspaceCredentials } from "./twilio-workspace-credentials.ts";
 
 export const INBOUND_OFFER_TIMEOUT_SECONDS = 25;
 export const POLL_INTERVAL_MS = 3000;
@@ -28,12 +29,9 @@ export async function loadWorkspaceTwilioCredentials(
     .eq("id", workspaceId)
     .maybeSingle() as { data: { twilio_data: Record<string, unknown> | null } | null };
 
-  if (!data?.twilio_data) return null;
-  const td = data.twilio_data;
-  const accountSid = String(td.account_sid ?? "");
-  const authToken = String(td.auth_token ?? "");
-  if (!accountSid || !authToken) return null;
-  return { accountSid, authToken };
+  const creds = readTwilioWorkspaceCredentials(data?.twilio_data);
+  if (!creds) return null;
+  return { accountSid: creds.sid, authToken: creds.authToken };
 }
 
 export async function claimAgentForQueue(args: {

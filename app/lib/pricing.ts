@@ -13,5 +13,7 @@ export {
   voiceCreditsFromDurationSeconds,
   startedMinutesFromDurationSeconds,
   debitAmountFromCredits,
+  TERMINAL_BILLABLE_CALL_STATUSES,
+  TERMINAL_BILLABLE_SMS_STATUSES,
   type VoiceBillingKind,
 } from "../../shared/pricing";

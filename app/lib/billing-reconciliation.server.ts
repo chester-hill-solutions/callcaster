@@ -6,17 +6,15 @@ import {
   type TwilioUsageRecord,
 } from "../../shared/billing-reconciliation";
 import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
+import {
+  TERMINAL_BILLABLE_CALL_STATUSES,
+  TERMINAL_BILLABLE_SMS_STATUSES,
+} from "@/lib/pricing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 
-const TERMINAL_SMS_STATUSES = ["delivered", "failed", "undelivered"] as const;
-const BILLABLE_CALL_STATUSES = [
-  "completed",
-  "failed",
-  "busy",
-  "no-answer",
-  "canceled",
-] as const;
+const TERMINAL_SMS_STATUSES = TERMINAL_BILLABLE_SMS_STATUSES;
+const BILLABLE_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
 
 export type { BillingReconciliationReport };
 

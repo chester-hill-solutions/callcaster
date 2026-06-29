@@ -1,9 +1,9 @@
-import type { AppError } from "./type-safety-utils";
+import type { AppErrorShape } from "./type-safety-utils";
 
 // Type-safe API response wrapper
 export interface ApiResponse<T = unknown> {
   data?: T;
-  error?: AppError;
+  error?: AppErrorShape;
   success: boolean;
 }
 

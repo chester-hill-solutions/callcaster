@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
+  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
@@ -181,7 +182,12 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
   return {
     from,
     realtime: { channel: () => ({ send: vi.fn() }) },
-    rpc: vi.fn(async () => ({ data: null, error: rpcDequeueError })),
+    rpc: vi.fn(async (fn: string, rpcArgs: any) => {
+      if (fn === "apply_ledger_entry_and_sync_credits") {
+        return makeApplyLedgerEntryRpcStub(transactionRows)(fn, rpcArgs);
+      }
+      return { data: null, error: rpcDequeueError };
+    }),
     channel: () => ({ send: vi.fn() }),
     removeChannel: vi.fn(),
     _transactionRows: transactionRows,
@@ -268,7 +274,7 @@ describe("api.auto-dial.status", () => {
 
     expect(supabaseStub._transactionRows.length).toBeGreaterThan(0);
     const matching = supabaseStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_DUP",
+      (r) => r.idempotency_key === "call:CA_DUP:staffed",
     );
     expect(matching.length).toBe(1);
   });
@@ -517,7 +523,7 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith("Error updating call:", expect.any(Error));
+    expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
 
   test("rpc dequeue_contact error returns 500", async () => {

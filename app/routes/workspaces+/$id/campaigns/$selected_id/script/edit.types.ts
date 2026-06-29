@@ -1,5 +1,5 @@
 import type { Script } from "@/lib/types";
-import { isObject } from "@/lib/type-utils";
+import { isObject } from "@/lib/type-safety-utils";
 
 export type CampaignType =
   | "live_call"

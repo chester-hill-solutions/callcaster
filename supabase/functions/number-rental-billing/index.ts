@@ -13,6 +13,8 @@ import {
   utcDayStart,
 } from "../_shared/number-rental-billing.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
+import { debitAmountFromCredits } from "../../../shared/pricing.ts";
+import { numberRentalCycleKey } from "../../../shared/billing-keys.ts";
 
 type JsonObject = Record<string, unknown>;
 
@@ -84,7 +86,7 @@ function noticeKey(args: { cycleKey: string; windowKey: NotificationWindowKey })
 }
 
 function chargeIdempotencyKey(numberId: number, cycleKey: string) {
-  return `number_rent:${numberId}:${cycleKey}`;
+  return numberRentalCycleKey(numberId, cycleKey);
 }
 
 function buildReminderSubject(args: {
@@ -208,13 +210,16 @@ async function insertChargeIfEligible(args: {
     `(cycle ${args.cycleKey}, due ${formatDateIsoUtc(args.dueDate)})`,
   ].join(" ");
 
-  const { error } = await args.supabase.from("transaction_history").insert({
-    workspace: args.workspace.id,
-    amount: -RENTED_NUMBER_MONTHLY_CREDITS,
-    type: "DEBIT",
-    note,
-    idempotency_key: chargeIdempotencyKey(args.number.id, args.cycleKey),
-  });
+  const { error } = await args.supabase.rpc(
+    "apply_ledger_entry_and_sync_credits",
+    {
+      p_workspace_id: args.workspace.id,
+      p_type: "DEBIT",
+      p_amount: debitAmountFromCredits(RENTED_NUMBER_MONTHLY_CREDITS),
+      p_idempotency_key: chargeIdempotencyKey(args.number.id, args.cycleKey),
+      p_description: note,
+    },
+  );
   if (error) throw error;
   return { charged: true, reason: "charged" } as const;
 }

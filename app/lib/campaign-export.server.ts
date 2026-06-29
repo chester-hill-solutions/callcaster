@@ -1,5 +1,5 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
-import { CSV_DEFAULT_LINE_ENDING, escapeCsvCell, type CsvCell } from "@/lib/csv";
+import { csvRow } from "@/lib/csv";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 import {
@@ -215,32 +215,37 @@ export async function processMessageCampaignExport(
       // Add matched messages to CSV data
       if (matchedMessages.length > 0) {
         for (const item of matchedMessages) {
-          csvLines.push([
-            escapeExportCell(item.body),
-            escapeExportCell(item.direction),
-            escapeExportCell(item.status),
-            escapeExportCell(item.message_date),
-            escapeExportCell(item.contact.id),
-            escapeExportCell(item.contact.firstname),
-            escapeExportCell(item.contact.surname),
-            escapeExportCell(item.contact.phone),
-            escapeExportCell(item.contact.email),
-            escapeExportCell(item.contact.address),
-            escapeExportCell(item.contact.city),
-            escapeExportCell(item.contact.opt_out ? 'true' : 'false'),
-            escapeExportCell(item.contact.created_at),
-            escapeExportCell(item.contact.workspace),
-            escapeExportCell(item.contact.external_id),
-            escapeExportCell(item.contact.address_id),
-            escapeExportCell(item.contact.postal),
-            escapeExportCell(item.contact.carrier),
-            escapeExportCell(item.contact.province),
-            escapeExportCell(item.contact.country),
-            escapeExportCell(item.contact.cleanPhone),
-            escapeExportCell(campaign.title),
-            escapeExportCell(campaign.start_date),
-            escapeExportCell(campaign.end_date)
-          ].join(','));
+          csvLines.push(
+            csvRow(
+              [
+                item.body,
+                item.direction,
+                item.status,
+                item.message_date,
+                item.contact.id,
+                item.contact.firstname,
+                item.contact.surname,
+                item.contact.phone,
+                item.contact.email,
+                item.contact.address,
+                item.contact.city,
+                item.contact.opt_out ? 'true' : 'false',
+                item.contact.created_at,
+                item.contact.workspace,
+                item.contact.external_id,
+                item.contact.address_id,
+                item.contact.postal,
+                item.contact.carrier,
+                item.contact.province,
+                item.contact.country,
+                item.contact.cleanPhone,
+                campaign.title,
+                campaign.start_date,
+                campaign.end_date,
+              ],
+              { protectFromInjection: true },
+            ),
+          );
         }
       }
 
@@ -419,9 +424,10 @@ export async function processCallCampaignExport(
           "attempt_id,disposition,full_result,attempt_start,call_sid,duration_seconds,answered_by,call_start,call_end,contact_id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,postal,province,country,campaign_name,campaign_start_date,campaign_end_date,campaign_type,campaign_status,credits_used,pages";
 
         // Add a column for each script question
-        const questionColumns = scriptQuestions
-          .map((q) => escapeExportCell(q.title))
-          .join(",");
+        const questionColumns = csvRow(
+          scriptQuestions.map((q) => q.title),
+          { protectFromInjection: true },
+        );
 
         csvLines.push(`${baseHeaders},${questionColumns}`);
         isFirstChunk = false;
@@ -471,44 +477,40 @@ export async function processCallCampaignExport(
           .map((page) => page.title)
           .join("|");
 
-        const baseData = [
-          escapeExportCell(item.id),
-          escapeExportCell(item.disposition || item.call.status || ""),
-          escapeExportCell(JSON.stringify(item.result)),
-          escapeExportCell(item.created_at),
-          escapeExportCell(item.call.sid),
-          escapeExportCell(durationSeconds.toString()),
-          escapeExportCell(item.call.answered_by),
-          escapeExportCell(item.call.start_time || item.call.date_created || ""),
-          escapeExportCell(item.call.end_time || item.call.date_updated || ""),
-          escapeExportCell(item.contact.id),
-          escapeExportCell(item.contact.firstname),
-          escapeExportCell(item.contact.surname),
-          escapeExportCell(item.contact.phone),
-          escapeExportCell(item.contact.email),
-          escapeExportCell(item.contact.address),
-          escapeExportCell(item.contact.city),
-          escapeExportCell(item.contact.opt_out ? "true" : "false"),
-          escapeExportCell(item.contact.created_at),
-          escapeExportCell(item.contact.workspace),
-          escapeExportCell(item.contact.postal),
-          escapeExportCell(item.contact.province),
-          escapeExportCell(item.contact.country),
-          escapeExportCell(campaign.title),
-          escapeExportCell(campaign.start_date),
-          escapeExportCell(campaign.end_date),
-          escapeExportCell(campaign.type),
-          escapeExportCell(campaign.status),
-          escapeExportCell(creditsUsed.toString()),
-          escapeExportCell(pageResponses),
+        const rowData = [
+          item.id,
+          item.disposition || item.call.status || "",
+          JSON.stringify(item.result),
+          item.created_at,
+          item.call.sid,
+          durationSeconds.toString(),
+          item.call.answered_by,
+          item.call.start_time || item.call.date_created || "",
+          item.call.end_time || item.call.date_updated || "",
+          item.contact.id,
+          item.contact.firstname,
+          item.contact.surname,
+          item.contact.phone,
+          item.contact.email,
+          item.contact.address,
+          item.contact.city,
+          item.contact.opt_out ? "true" : "false",
+          item.contact.created_at,
+          item.contact.workspace,
+          item.contact.postal,
+          item.contact.province,
+          item.contact.country,
+          campaign.title,
+          campaign.start_date,
+          campaign.end_date,
+          campaign.type,
+          campaign.status,
+          creditsUsed.toString(),
+          pageResponses,
+          ...scriptQuestions.map((q) => responses[q.id]),
         ];
 
-        // Add a column for each script question's response
-        const questionResponses = scriptQuestions.map((q) =>
-          escapeExportCell(responses[q.id]),
-        );
-
-        csvLines.push([...baseData, ...questionResponses].join(","));
+        csvLines.push(csvRow(rowData, { protectFromInjection: true }));
       }
 
       processedAttempts += attempts.length;
@@ -531,6 +533,3 @@ export async function processCallCampaignExport(
     await writeExportErrorStatus(supabaseClient, workspaceId, exportId, statusData, error);
   }
 }
-
-const escapeExportCell = (value: unknown): string =>
-  escapeCsvCell(value as CsvCell, { protectFromInjection: true });

@@ -124,7 +124,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: workspace_id, selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
   const data = await parseActionRequest(request);

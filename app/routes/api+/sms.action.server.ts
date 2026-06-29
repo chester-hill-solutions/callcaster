@@ -17,6 +17,10 @@ import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types"
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import {
+  persistMessageRecord,
+  twilioMessageToPersistFields,
+} from "@/lib/sms-send.server";
+import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
@@ -152,35 +156,14 @@ const sendMessage = async ({
     throw message.error;
   }
 
+  const messageFields = twilioMessageToPersistFields(
+    { ...message, sid: message.sid || `failed-${to}-${Date.now()}` },
+    { workspace, campaign_id, contact_id },
+  );
+
   await Promise.all([
-    supabase
-      .from("message")
-      .insert({
-        sid: message.sid || `failed-${to}-${Date.now()}`,
-        body: message.body,
-        num_segments: message.numSegments,
-        direction: message.direction,
-        from: message.from,
-        to: message.to,
-        date_updated: message.dateUpdated,
-        price: message.price,
-        error_message: message.errorMessage,
-        account_sid: message.accountSid,
-        uri: message.uri,
-        num_media: message.numMedia,
-        status: message.status,
-        messaging_service_sid: message.messagingServiceSid,
-        date_sent: message.dateSent,
-        error_code: message.errorCode,
-        price_unit: message.priceUnit,
-        api_version: message.apiVersion,
-        subresource_uris: message.subresourceUris,
-        campaign_id,
-        workspace,
-        contact_id,
-      })
-      .select(),
-    
+    persistMessageRecord(supabase, messageFields),
+
     updateOutreach({
       supabase,
       id: outreachAttempt,
@@ -189,7 +172,7 @@ const sendMessage = async ({
 
     supabase
       .from("campaign_queue")
-      .update(buildDequeuedQueueUpdate(user_id, "SMS message sent"))
+      .update(buildDequeuedQueueUpdate(user_id, "SMS message sent", { includeNormalizedFields: true }))
       .eq("id", queue_id)
   ]);
 
@@ -384,6 +367,7 @@ export const action = async ({ request }: { request: Request }) => {
                 buildDequeuedQueueUpdate(
                   effectiveUserId as string,
                   DUPLICATE_SMS_DEQUEUED_REASON,
+                  { includeNormalizedFields: true },
                 ),
               )
               .eq("id", member.id);

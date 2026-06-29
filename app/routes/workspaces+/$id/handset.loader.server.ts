@@ -10,10 +10,6 @@ export type { HandsetLoaderData };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient: supabase, user } = await verifyAuth(request);
-  if (!user) {
-    throw new Response("Unauthorized", { status: 401 });
-  }
-
   const workspaceId = params.id;
   if (!workspaceId) {
     throw new Response("Workspace not found", { status: 404 });

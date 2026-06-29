@@ -31,6 +31,27 @@ vi.mock("@/hooks/utils/useOptimisticMutation", () => ({
   useOptimisticMutation: () => undefined,
 }));
 
+// Bridge Radix Select to a native <select> so existing fireEvent.change tests
+// keep working while production uses the real ui/select primitives. Radix
+// Select.Root accepts `disabled`, so it is passed through here too.
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ value, onValueChange, disabled, children }: any) => (
+    <select
+      value={value ?? ""}
+      disabled={disabled}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: ({ placeholder }: any) => <option value="">{placeholder}</option>,
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ value, children }: any) => (
+    <option value={value}>{children}</option>
+  ),
+}));
+
 describe("app/components/queue/StatusDropdown.tsx", () => {
   test("changes status", async () => {
     const { StatusDropdown } = await import("@/components/queue/StatusDropdown");

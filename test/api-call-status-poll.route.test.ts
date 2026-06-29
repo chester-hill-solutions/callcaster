@@ -164,7 +164,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     const { AppError, ErrorCode } = await import("../app/lib/errors.server");
     mocks.requireWorkspaceAccess.mockRejectedValueOnce(
-      new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN),
+      new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND),
     );
     const svc2 = makeServiceSupabase({
       callSingle: { data: { workspace: "w1", status: null }, error: null },
@@ -173,7 +173,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     const resNoMembership = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
-    expect(resNoMembership.status).toBe(403);
+    expect(resNoMembership.status).toBe(404);
   }, 30000);
 
   test("returns 200 unsupported status when normalizeProviderStatus returns null", async () => {

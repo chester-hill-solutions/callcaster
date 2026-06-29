@@ -39,10 +39,6 @@ export type OnboardingLoaderData = {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, user, headers } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin", { headers });
-  }
-
   const workspaceId = params.id;
   if (!workspaceId) {
     throw redirect("/workspaces", { headers });

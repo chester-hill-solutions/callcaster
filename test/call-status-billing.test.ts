@@ -2,7 +2,7 @@ import { describe, expect, test, vi, beforeEach } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
-  makeTransactionHistoryTableStub,
+  makeApplyLedgerEntryRpcStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
 
@@ -78,13 +78,13 @@ function makeSupabaseStub() {
     }
 
     if (table === "transaction_history") {
-      return makeTransactionHistoryTableStub(transactionRows);
+      return makeApplyLedgerEntryRpcStub(transactionRows) as any;
     }
 
     throw new Error(`unexpected table ${table}`);
   };
 
-  return { realtime, from, _transactionRows: transactionRows };
+  return { realtime, from, rpc: makeApplyLedgerEntryRpcStub(transactionRows), _transactionRows: transactionRows };
 }
 
 let supabaseStub: ReturnType<typeof makeSupabaseStub>;
@@ -176,7 +176,7 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: req.clone() } as any);
 
     const matching = supabaseStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_DUP",
+      (r) => r.idempotency_key === "call:CA_DUP:staffed",
     );
     expect(matching.length).toBe(1);
   });

@@ -14,7 +14,28 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/lib/utils", () => ({
+  cn: (...args: any[]) => args.filter(Boolean).join(" "),
   formatTime: (seconds: number) => `t${seconds}`,
+}));
+
+// Bridge Radix Select to a native <select> so fireEvent.change tests keep
+// working while production uses the real ui/select primitives.
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ value, onValueChange, disabled, children }: any) => (
+    <select
+      value={value ?? ""}
+      disabled={disabled}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: ({ placeholder }: any) => <option value="">{placeholder}</option>,
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ value, children }: any) => (
+    <option value={value}>{children}</option>
+  ),
 }));
 
 function makeRecipient(overrides: Partial<any> = {}) {

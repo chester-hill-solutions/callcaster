@@ -9,7 +9,7 @@ import { data as routeData, redirect } from "react-router";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { parseActionRequest } from "@/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { verifyAuth } from "@/lib/supabase.server";
+import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AppError } from "@/lib/errors.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -83,9 +83,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const pageSize = 50;
     const offset = (page - 1) * pageSize;
 
-    const { supabaseClient, user } = await verifyAuth(request);
+    const result = await requireWorkspaceLoaderContext(request, params.id);
+    if (!result.ok) return result.response;
+    const { supabaseClient, user } = result.ctx;
 
-    if (!user) throw redirect("/signin");
     if (!selected_id) throw redirect("../../");
     const { data: selectedAudiences, error: selectedAudienceError } = await supabaseClient
         .from('campaign_audience')

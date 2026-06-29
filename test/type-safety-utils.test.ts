@@ -25,7 +25,6 @@ import {
   safeAsync,
   safeJsonParse,
   throttle,
-  validateValue,
 } from "@/lib/type-safety-utils";
 
 describe("type-safety-utils", () => {
@@ -94,18 +93,6 @@ describe("type-safety-utils", () => {
   test("safeAsync returns fallback on throw", async () => {
     expect(await safeAsync(async () => 1, 0)).toBe(1);
     expect(await safeAsync(async () => { throw new Error("nope"); }, 0)).toBe(0);
-  });
-
-  test("validateValue returns error messages for failing rules", () => {
-    const res = validateValue("x", [
-      { validate: (v) => v.length > 1, message: "too short" },
-      { validate: (v) => v.startsWith("y"), message: "wrong prefix" },
-    ]);
-    expect(res).toEqual({ isValid: false, errors: ["too short", "wrong prefix"] });
-    expect(validateValue("yy", [{ validate: (v) => v.startsWith("y"), message: "no" }])).toEqual({
-      isValid: true,
-      errors: [],
-    });
   });
 
   test("executeDatabaseOperation: error from execute", async () => {

@@ -1,21 +1,14 @@
 import { Campaign } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, user, headers } = await verifyAuth(request);
-  
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
-
-  const workspaceId = params.id;
-  if (!workspaceId) {
-    return redirect("/workspaces", { headers });
-  }
+  const result = await requireWorkspaceLoaderContext(request, params.id);
+  if (!result.ok) return result.response;
+  const { supabaseClient, headers, workspaceId } = result.ctx;
 
   // Fetch archived campaigns
   const { data: archivedCampaigns, error } = await supabaseClient

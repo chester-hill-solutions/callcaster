@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
+  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
@@ -53,6 +54,7 @@ function makeSupabaseStub() {
       }
       return makeTransactionHistoryTableStub(rows);
     },
+    rpc: makeApplyLedgerEntryRpcStub(rows),
   };
 }
 
@@ -113,6 +115,7 @@ describe("confirm-payment route", () => {
         });
         return builder;
       },
+      rpc: async () => ({ data: null, error: new Error("rpc failed") }),
     };
 
     const mod = await import("../app/routes/confirm-payment");

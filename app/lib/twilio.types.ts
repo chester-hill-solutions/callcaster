@@ -70,9 +70,12 @@ export type OutreachDisposition =
  * Webhook event type
  */
 export interface WebhookEvent {
-  category: "inbound_call" | "outbound_call" | "outbound_sms" | "inbound_sms";
+  category: "inbound_call" | "outbound_call" | "outbound_sms" | "inbound_sms" | "voicemail";
   type: "INSERT" | "UPDATE" | "DELETE";
 }
+
+export type WebhookEventCategory = WebhookEvent["category"];
+export type WebhookEventType = WebhookEvent["type"];
 
 /**
  * Webhook configuration from database

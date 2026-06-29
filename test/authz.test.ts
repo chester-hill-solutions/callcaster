@@ -43,7 +43,7 @@ describe("requireWorkspaceAccess", () => {
     },
   );
 
-  test("rejects when no membership exists", async () => {
+  test("rejects when no membership exists (404, no workspace-id inference)", async () => {
     const supabaseClient = makeSupabaseForRole(null);
     await expect(
       requireWorkspaceAccess({
@@ -53,12 +53,12 @@ describe("requireWorkspaceAccess", () => {
       }),
     ).rejects.toMatchObject({
       name: "AppError",
-      statusCode: 403,
-      code: "FORBIDDEN",
+      statusCode: 404,
+      code: "NOT_FOUND",
     });
   });
 
-  test("rejects unknown role", async () => {
+  test("rejects unknown role (member with invalid role string -> 403)", async () => {
     const supabaseClient = makeSupabaseForRole("viewer");
     await expect(
       requireWorkspaceAccess({

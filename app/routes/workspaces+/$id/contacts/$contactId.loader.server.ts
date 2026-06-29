@@ -34,10 +34,6 @@ export const loader = async ({
   try {
     const { supabaseClient, user } = await verifyAuth(request);
 
-    if (!user) {
-      return redirect("/signin");
-    }
-
     const userRole = await getUserRole({
       supabaseClient: supabaseClient as SupabaseClient,
       user: user,

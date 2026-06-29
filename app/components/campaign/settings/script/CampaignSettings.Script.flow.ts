@@ -1,5 +1,5 @@
 import { Block, Flow, IVRBlock, Script } from "@/lib/types";
-import { isObject, isString } from "@/lib/type-utils";
+import { isObject, isString } from "@/lib/type-safety-utils";
 
 const DEFAULT_SECTION_TITLES = ["Start Here", "Main Questions", "Wrap Up"];
 

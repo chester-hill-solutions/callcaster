@@ -1,15 +1,15 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { createAppError, type AppError } from '@/lib/type-safety-utils';
+import { createAppError, type AppErrorShape } from '@/lib/type-safety-utils';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback?: ReactNode | ((error: AppError) => ReactNode);
-  onError?: (error: AppError, errorInfo: ErrorInfo) => void;
+  fallback?: ReactNode | ((error: AppErrorShape) => ReactNode);
+  onError?: (error: AppErrorShape, errorInfo: ErrorInfo) => void;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
-  error: AppError | null;
+  error: AppErrorShape | null;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -19,8 +19,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    // Convert the error to our AppError type
-    const appError: AppError = createAppError(
+    // Convert the error to our AppErrorShape type
+    const appError: AppErrorShape = createAppError(
       error.message || 'An unexpected error occurred',
       error.name,
       {
@@ -36,8 +36,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Convert the error to our AppError type
-    const appError: AppError = createAppError(
+    // Convert the error to our AppErrorShape type
+    const appError: AppErrorShape = createAppError(
       error.message || 'An unexpected error occurred',
       error.name,
       {
@@ -118,7 +118,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 // Type-safe error boundary hook for functional components
 export function useErrorHandler() {
   const handleError = React.useCallback((error: Error, context?: string) => {
-    const appError: AppError = createAppError(
+    const appError: AppErrorShape = createAppError(
       error.message || 'An unexpected error occurred',
       error.name,
       {

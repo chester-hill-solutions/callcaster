@@ -1,4 +1,8 @@
-import { billingUnitsFromCallDurationSeconds } from "@/lib/twilio-call-status.server";
+import {
+  billingUnitsFromCallDurationSeconds,
+  persistCallStatusFromParams,
+  twilioParamsToUnderCase,
+} from "@/lib/twilio-call-status.server";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
@@ -9,10 +13,14 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/database.types";
-import { Twilio } from "twilio";
+import type Twilio from "twilio";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { callKey } from "@/lib/billing-keys";
+import { debitAmountFromCredits } from "@/lib/pricing";
 import type { ActionFunctionArgs } from "react-router";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+
+type TwilioClient = Twilio.Twilio;
 
 const getSupabase = () => getServiceSupabase();
 
@@ -148,7 +156,7 @@ const triggerAutoDialer = async (callData: Tables<"call">) => {
 const handleCallStatus = async (
   parsedBody: { [x: string]: string },
   dbCall: Tables<"call">,
-  twilio: Twilio,
+  twilio: TwilioClient,
   realtime: RealtimeChannel,
   status: Tables<"call">["status"],
   duration: number
@@ -156,12 +164,18 @@ const handleCallStatus = async (
   const supabase = getSupabase();
   try {
     const callSid = requireValue(parsedBody.CallSid, "CallSid");
-    const timestamp = requireValue(parsedBody.Timestamp, "Timestamp");
-    const callUpdate = await updateCall(callSid, {
-      end_time: new Date(timestamp).toISOString(),
-      status: status?.toLowerCase() as Tables<"call">["status"],
-      duration: duration.toString()
+    const callUpdate = await persistCallStatusFromParams({
+      supabase,
+      params: parsedBody,
+      disposition: status?.toLowerCase(),
+      outreachAttemptId: dbCall.outreach_attempt_id
+        ? Number(dbCall.outreach_attempt_id)
+        : null,
+      selectResult: true,
     });
+    if (!callUpdate) {
+      throw new Error("persistCallStatusFromParams returned no call row");
+    }
     if (!callUpdate.outreach_attempt_id) {
       throw new Error("Missing outreach_attempt_id for auto-dial status update");
     }
@@ -212,32 +226,34 @@ const updateTransaction = async (call: Tables<"call">, duration: number) => {
     });
     return null;
   }
-  const billingUnits = billingUnitsFromCallDurationSeconds(duration);
+  const billingUnits = billingUnitsFromCallDurationSeconds(duration, "staffed");
   await insertTransactionHistoryIdempotent({
     supabase,
     workspaceId: call.workspace,
     type: "DEBIT",
-    amount: -billingUnits,
+    amount: debitAmountFromCredits(billingUnits),
     note: `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`,
-    idempotencyKey: `call:${call.sid}`,
+    idempotencyKey: callKey(call.sid, "staffed"),
+    callSid: call.sid,
   });
   return null;
 }
 
 const handleParticipantLeave = async (
   parsedBody: { [x: string]: string },
-  twilio: Twilio,
+  twilio: TwilioClient,
   realtime: RealtimeChannel,
 ) => {
   const supabase = getSupabase();
+  const underCase = twilioParamsToUnderCase(parsedBody);
 
   try {
-    const callSid = requireValue(parsedBody.CallSid, "CallSid");
-    const timestamp = requireValue(parsedBody.Timestamp, "Timestamp");
+    const callSid = requireValue(typeof underCase.call_sid === "string" ? underCase.call_sid : null, "CallSid");
+    const timestamp = requireValue(typeof underCase.timestamp === "string" ? underCase.timestamp : null, "Timestamp");
     const dbCall = await updateCall(callSid, {
       end_time: new Date(timestamp).toISOString(),
-      duration: Math.max(Number(parsedBody.Duration), Number(parsedBody.CallDuration)).toString(),
-      status: parsedBody?.CallStatus?.toLowerCase() as Tables<"call">["status"]
+      duration: Math.max(Number(underCase.duration), Number(underCase.call_duration)).toString(),
+      status: (typeof underCase.call_status === "string" ? underCase.call_status : "")?.toLowerCase() as Tables<"call">["status"]
     });
     if (!dbCall.outreach_attempt_id) {
       throw new Error("Missing outreach_attempt_id for participant leave");
@@ -261,11 +277,11 @@ const handleParticipantLeave = async (
       },
     });
     const conferences = await twilio.conferences.list({
-      friendlyName: parsedBody.FriendlyName ?? parsedBody.ConferenceSid ?? "",
+      friendlyName: typeof underCase.friendly_name === "string" ? underCase.friendly_name : (typeof underCase.conference_sid === "string" ? underCase.conference_sid : ""),
       status: "in-progress",
     });
     await Promise.all(
-      conferences.map(({ sid }) =>
+      conferences.map(({ sid }: { sid: string }) =>
         twilio.conferences(sid).update({ status: "completed" }),
       ),
     );
@@ -280,12 +296,16 @@ const handleParticipantJoin = async (
   dbCall: Tables<"call">,
   realtime: RealtimeChannel,
 ) => {
+  const underCase = twilioParamsToUnderCase(parsedBody);
   try {
     if (!dbCall.conference_id) {
-      await updateCall(requireValue(parsedBody.CallSid, "CallSid"), {
-        conference_id: requireValue(parsedBody.ConferenceSid, "ConferenceSid"),
-        start_time: new Date(requireValue(parsedBody.Timestamp, "Timestamp")).toISOString(),
-      });
+      await updateCall(
+        requireValue(typeof underCase.call_sid === "string" ? underCase.call_sid : null, "CallSid"),
+        {
+          conference_id: requireValue(typeof underCase.conference_sid === "string" ? underCase.conference_sid : null, "ConferenceSid"),
+          start_time: new Date(requireValue(typeof underCase.timestamp === "string" ? underCase.timestamp : null, "Timestamp")).toISOString(),
+        },
+      );
     }
     if (dbCall.outreach_attempt_id) {
       if (!dbCall.campaign_id) {
@@ -302,7 +322,10 @@ const handleParticipantJoin = async (
       }
       await updateCampaignQueue(outreachStatus.contact_id, dbCall.campaign_id, {
         ...buildProviderStatusQueueUpdate(
-          parsedBody.FriendlyName ?? parsedBody.ConferenceSid ?? "in-progress",
+          (typeof underCase.friendly_name === "string" ? underCase.friendly_name : null) ??
+            (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null) ??
+            "in-progress",
+          { includeNormalizedFields: true },
         ),
       });
 
@@ -329,15 +352,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const parsedBody = params;
+    const underCase = twilioParamsToUnderCase(params);
 
-    if (!parsedBody.CallSid) {
+    const callSidValue =
+      typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+    if (!callSidValue) {
       throw new Error("Missing CallSid");
     }
 
     const validation = await validateTwilioWebhookForCallSid({
       request,
       supabase,
-      callSid: parsedBody.CallSid,
+      callSid: callSidValue,
       params,
     });
     if (!validation.ok) {
@@ -347,7 +373,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { data: dbCall, error: callError } = await supabase
       .from("call")
       .select()
-      .eq("sid", parsedBody.CallSid)
+      .eq("sid", callSidValue)
       .single();
     if (callError) {
       throw new Error("Failed to fetch call data: " + callError.message);
@@ -356,8 +382,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
       workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
-    realtime = supabase.channel(parsedBody.ConferenceSid ?? dbCall.conference_id ?? "default");
-    switch (parsedBody.CallStatus) {
+    realtime = supabase.channel(
+      (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null) ??
+        dbCall.conference_id ??
+        "default",
+    );
+    const callStatusValue =
+      typeof underCase.call_status === "string" ? underCase.call_status : "";
+    switch (callStatusValue) {
       case "failed":
       case "busy":
       case "no-answer":
@@ -367,17 +399,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           dbCall,
           twilio,
           realtime,
-          parsedBody.CallStatus?.toLowerCase() as Tables<"call">["status"],
-          Math.max(Number(parsedBody.CallDuration), Number(parsedBody.Duration))
+          callStatusValue?.toLowerCase() as Tables<"call">["status"],
+          Math.max(
+            Number(underCase.call_duration) || 0,
+            Number(underCase.duration) || 0,
+          )
         );
         break;
       default:
         if (
-          parsedBody.StatusCallbackEvent === "participant-leave" &&
-          parsedBody.ReasonParticipantLeft === "participant_hung_up"
+          (typeof underCase.status_callback_event === "string"
+            ? underCase.status_callback_event
+            : "") === "participant-leave" &&
+          (typeof underCase.reason_participant_left === "string"
+            ? underCase.reason_participant_left
+            : "") === "participant_hung_up"
         ) {
           await handleParticipantLeave(parsedBody, twilio, realtime);
-        } else if (parsedBody.StatusCallbackEvent === "participant-join") {
+        } else if (
+          (typeof underCase.status_callback_event === "string"
+            ? underCase.status_callback_event
+            : "") === "participant-join"
+        ) {
           await handleParticipantJoin(parsedBody, dbCall, realtime);
         }
     }

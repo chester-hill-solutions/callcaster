@@ -1,4 +1,5 @@
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 
 export type PortalConfigView = {
   sendMode: "messaging_service" | "from_number";
@@ -17,7 +18,7 @@ export function parsePortalConfigFromTwilioData(
   twilioData: unknown,
 ): PortalConfigView {
   const config =
-    isRecord(twilioData) && isRecord(twilioData.portalConfig)
+    isObject(twilioData) && isObject(twilioData.portalConfig)
       ? twilioData.portalConfig
       : {};
   const sendMode: PortalConfigView["sendMode"] =
@@ -33,7 +34,7 @@ export function parsePortalConfigFromTwilioData(
 
 export function parsePortalSyncFromTwilioData(twilioData: unknown): PortalSyncView {
   const sync =
-    isRecord(twilioData) && isRecord(twilioData.portalSync)
+    isObject(twilioData) && isObject(twilioData.portalSync)
       ? twilioData.portalSync
       : {};
   const lastSyncStatus: PortalSyncView["lastSyncStatus"] =

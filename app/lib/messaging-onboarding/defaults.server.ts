@@ -1,22 +1,11 @@
 import type { WorkspaceOnboardingStepState } from "@/lib/types";
+export {
+  WIZARD_ONBOARDING_STEP_IDS,
+  isWizardOnboardingStepId,
+  type WizardOnboardingStepId,
+} from "@/lib/messaging-onboarding/wizard-steps";
 
 export const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 2;
-
-/** Steps shown in the guided onboarding wizard (single screen each). */
-export const WIZARD_ONBOARDING_STEP_IDS = [
-  "business_profile",
-  "path_selection",
-  "messaging_service",
-  "first_number",
-  "provider_provisioning",
-  "launch_checks",
-] as const;
-
-export type WizardOnboardingStepId = (typeof WIZARD_ONBOARDING_STEP_IDS)[number];
-
-export function isWizardOnboardingStepId(value: string): value is WizardOnboardingStepId {
-  return (WIZARD_ONBOARDING_STEP_IDS as readonly string[]).includes(value);
-}
 
 export const DEFAULT_WORKSPACE_ONBOARDING_STEPS: WorkspaceOnboardingStepState[] = [
   {
