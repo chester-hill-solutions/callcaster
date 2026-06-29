@@ -91,7 +91,7 @@ export default function Credits() {
       </Heading>
 
       {paymentStatus === "success" ? (
-        <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+        <Alert variant="success">
           <AlertTitle>Payment successful</AlertTitle>
           <AlertDescription>
             Added {formatCredits(creditsAdded)} credits successfully. Your balance
@@ -109,7 +109,7 @@ export default function Credits() {
         </Alert>
       ) : null}
       {paymentStatus === "canceled" ? (
-        <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <Alert variant="warning">
           <AlertTitle>Checkout canceled</AlertTitle>
           <AlertDescription>
             Checkout was canceled. No charge was made.
@@ -286,7 +286,7 @@ export default function Credits() {
                     <TableCell
                       className={`text-right ${
                         transaction.type === "CREDIT"
-                          ? "text-green-600 dark:text-green-400"
+                          ? "text-success"
                           : "text-destructive"
                       }`}
                     >

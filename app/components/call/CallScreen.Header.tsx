@@ -2,11 +2,27 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { FormField } from "@/components/ui/form-field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   Mic,
@@ -52,9 +68,9 @@ interface CampaignHeaderProps {
 }
 
 const creditBadgeClass: Record<CampaignHeaderProps["creditState"], string> = {
-  GOOD: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
-  WARNING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200",
-  BAD: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+  GOOD: "bg-success text-success-foreground",
+  WARNING: "bg-warning text-warning-foreground",
+  BAD: "bg-destructive text-destructive-foreground",
 };
 
 const creditLabel: Record<CampaignHeaderProps["creditState"], string> = {
@@ -151,47 +167,75 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
           </AccordionTrigger>
           <AccordionContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor={microphoneSelectId}
-                  className="flex items-center gap-2 text-sm font-medium text-foreground"
-                >
-                  <Mic size={16} /> Microphone
-                </label>
-                <select
-                  id={microphoneSelectId}
+              <FormField
+                htmlFor={microphoneSelectId}
+                label={
+                  <span className="flex items-center gap-2">
+                    <Mic size={16} /> Microphone
+                  </span>
+                }
+              >
+                <Select
                   defaultValue={defaultMicrophoneId}
-                  onChange={handleMicrophoneChange}
-                  className={deviceSelectClass}
+                  onValueChange={(value) =>
+                    handleMicrophoneChange({
+                      target: { value },
+                    } as React.ChangeEvent<HTMLSelectElement>)
+                  }
                 >
-                  {availableMicrophones.map((microphone) => (
-                    <option key={microphone.deviceId} value={microphone.deviceId}>
-                      {microphone.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <SelectTrigger
+                    id={microphoneSelectId}
+                    className={deviceSelectClass}
+                  >
+                    <SelectValue placeholder="Select microphone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMicrophones.map((microphone) => (
+                      <SelectItem
+                        key={microphone.deviceId}
+                        value={microphone.deviceId}
+                      >
+                        {microphone.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
 
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor={speakerSelectId}
-                  className="flex items-center gap-2 text-sm font-medium text-foreground"
-                >
-                  <Headphones size={16} /> Speaker
-                </label>
-                <select
-                  id={speakerSelectId}
+              <FormField
+                htmlFor={speakerSelectId}
+                label={
+                  <span className="flex items-center gap-2">
+                    <Headphones size={16} /> Speaker
+                  </span>
+                }
+              >
+                <Select
                   defaultValue={defaultSpeakerId}
-                  onChange={handleSpeakerChange}
-                  className={deviceSelectClass}
+                  onValueChange={(value) =>
+                    handleSpeakerChange({
+                      target: { value },
+                    } as React.ChangeEvent<HTMLSelectElement>)
+                  }
                 >
-                  {availableSpeakers.map((speaker) => (
-                    <option key={speaker.deviceId} value={speaker.deviceId}>
-                      {speaker.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <SelectTrigger
+                    id={speakerSelectId}
+                    className={deviceSelectClass}
+                  >
+                    <SelectValue placeholder="Select speaker" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSpeakers.map((speaker) => (
+                      <SelectItem
+                        key={speaker.deviceId}
+                        value={speaker.deviceId}
+                      >
+                        {speaker.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
 
               <div className="flex items-end">
                 <Button
@@ -207,18 +251,24 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
 
             <div className="flex flex-wrap items-center gap-4">
               <div className="relative inline-block">
-                <select
+                <Select
                   value={selectedDevice}
-                  onChange={(e) => onDeviceSelect(e.target.value)}
-                  className={cn(deviceSelectClass, "cursor-pointer pr-8")}
+                  onValueChange={onDeviceSelect}
                 >
-                  <option value="computer">Computer Audio</option>
-                  {verifiedNumbers.map((number) => (
-                    <option key={number} value={number}>
-                      {number}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    className={cn(deviceSelectClass, "cursor-pointer pr-8")}
+                  >
+                    <SelectValue placeholder="Select device" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="computer">Computer Audio</SelectItem>
+                    {verifiedNumbers.map((number) => (
+                      <SelectItem key={number} value={number}>
+                        {number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
                   {selectedDevice === "computer" ? (
                     <Monitor size={16} />
@@ -227,7 +277,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                   )}
                 </div>
                 {phoneStatus === "connecting" ? (
-                  <span className="ml-2 text-amber-600 dark:text-amber-400">
+                  <span className="ml-2 text-warning">
                     Connecting...
                   </span>
                 ) : null}
@@ -247,39 +297,47 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
       </Accordion>
 
       {isAddingNumber ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-md">
-              <Heading level={3} branded={false} className="mb-4">
-                Add Phone Number
-              </Heading>
-              <Text variant="muted" className="mb-4">
+        <Dialog
+          open={isAddingNumber}
+          onOpenChange={(open) => {
+            if (!open) onAddNumberCancel();
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Phone Number</DialogTitle>
+              <DialogDescription>
                 Enter your phone number to verify it for making calls.
-              </Text>
-              <input
-                type="tel"
-                value={newPhoneNumber}
-                onChange={(e) => onNewPhoneNumberChange(e.target.value)}
-                placeholder="+1234567890"
-                className="mb-4 w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-              />
-              <div className="flex gap-3">
-                <Button type="button" className="flex-1" onClick={onVerifyNewNumber}>
-                  Verify Number
-                </Button>
-                <Button type="button" variant="outline" onClick={onAddNumberCancel}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+              </DialogDescription>
+            </DialogHeader>
+            <input
+              type="tel"
+              value={newPhoneNumber}
+              onChange={(e) => onNewPhoneNumberChange(e.target.value)}
+              placeholder="+1234567890"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
+            />
+            <DialogFooter>
+              <Button type="button" className="flex-1" onClick={onVerifyNewNumber}>
+                Verify Number
+              </Button>
+              <Button type="button" variant="outline" onClick={onAddNumberCancel}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
       {pin ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-md">
-              <Text variant="muted">On your phone, enter the PIN: {pin}</Text>
-            </div>
-          </div>
-        ) : null}
+        <Dialog open={Boolean(pin)}>
+          <DialogContent className="max-w-md">
+            <DialogTitle className="sr-only">Phone verification PIN</DialogTitle>
+            <DialogDescription>
+              On your phone, enter the PIN: {pin}
+            </DialogDescription>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 };

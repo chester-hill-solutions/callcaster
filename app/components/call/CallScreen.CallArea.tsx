@@ -1,8 +1,14 @@
 import { Tables } from "@/lib/database.types";
 import { QueueItem } from "@/lib/types";
-import { formatTime } from "@/lib/utils";
+import { formatTime, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   callPanelShellClass,
 } from "@/components/call/call-panel-classes";
@@ -48,7 +54,7 @@ function statusBarClass(displayState: string): string {
     return "bg-primary";
   }
   if (displayState === "connected" || displayState === "dialing") {
-    return "bg-emerald-600";
+    return "bg-success";
   }
   return "bg-muted-foreground";
 }
@@ -161,7 +167,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 (!predictive && !nextRecipient)
               }
               data-testid="call-screen-dial"
-              className="flex-1 rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+              className="flex-1 rounded-full bg-success text-success-foreground hover:bg-success/80"
               title={
                 state === "connected" || state === "dialing" || !nextRecipient
                   ? "Load your queue to get started"
@@ -172,26 +178,32 @@ export const CallArea: React.FC<CallAreaProps> = ({
             </Button>
           </div>
           <div className="flex gap-2 px-4 pb-2">
-            <select
-              disabled={!nextRecipient}
-              onChange={(e) => handleSetDisposition(e.currentTarget.value)}
+            <Select
               value={disposition}
-              data-testid="call-screen-disposition"
-              className="min-w-0 flex-[3] rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground"
+              onValueChange={handleSetDisposition}
+              disabled={!nextRecipient}
             >
-              <option value="idle">Select a disposition</option>
-              {dispositionOptions?.map((option, i) => {
-                const value =
-                  typeof option === "string" ? option : option.value;
-                const label =
-                  typeof option === "string" ? option : option.label;
-                return (
-                  <option value={value} key={i}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
+              <SelectTrigger
+                data-testid="call-screen-disposition"
+                className="min-w-0 flex-[3] rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                <SelectValue placeholder="Select a disposition" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="idle">Select a disposition</SelectItem>
+                {dispositionOptions?.map((option, i) => {
+                  const value =
+                    typeof option === "string" ? option : option.value;
+                  const label =
+                    typeof option === "string" ? option : option.label;
+                  return (
+                    <SelectItem value={value} key={i}>
+                      {label}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
             <Button
               type="button"
               variant="outline"

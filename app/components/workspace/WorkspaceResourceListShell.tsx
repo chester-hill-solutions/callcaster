@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Heading, Text } from "@/components/ui/typography";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type WorkspaceResourceListShellProps = {
   title: string;
@@ -36,31 +37,15 @@ export function WorkspaceResourceListShell({
       </div>
 
       {showError ? (
-        <Heading
-          as="p"
-          level={4}
-          branded={false}
-          className="text-center text-destructive"
-        >
-          {error}
-        </Heading>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
 
       {isEmpty ? (
-        addAction ? (
-          <Text variant="muted" className="py-16 text-center">
-            {emptyMessage}
-          </Text>
-        ) : (
-          <Heading
-            as="p"
-            level={3}
-            branded={false}
-            className="py-16 text-center"
-          >
-            {emptyMessage}
-          </Heading>
-        )
+        <Text variant="muted" className="py-16 text-center">
+          {emptyMessage}
+        </Text>
       ) : (
         children
       )}
