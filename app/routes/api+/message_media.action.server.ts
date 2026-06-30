@@ -1,7 +1,7 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { getDualAuthSupabase, requireDualAuth } from "@/lib/api-auth.server";
+import { requireDualAuth } from "@/lib/api-auth.server";
 import {
   findCampaignMessageMedia,
   updateCampaignMessageMedia,
@@ -25,9 +25,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getDualAuthSupabase(auth);
-    const method = request.method;
+  const { headers } = await getSession(request);    const method = request.method;
     const formData = await request.formData();
     const workspaceId = formData.get('workspaceId')
     if (workspaceId == null) {
@@ -46,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
         const campaignId = campaignIdRaw == null ? null : Number(campaignIdRaw);
         const safeFileName = sanitizeFilename(encodedMediaName);
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await adminDb.storage
             .from("messageMedia")
             .upload(`${workspaceIdStr}/${safeFileName}`, mediaToUpload as any, {
                 cacheControl: "60",
@@ -76,7 +74,7 @@ export async function action({ request }: ActionFunctionArgs) {
               return routeData({ success: false, error }, { headers });
             }
 
-            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+            const { data: signedUrlData, error: signedUrlError } = await adminDb.storage
                 .from("messageMedia")
                 .createSignedUrl(`${workspaceIdStr}/${safeFileName}`, 3600);
 
@@ -93,7 +91,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 url: signedUrlData.signedUrl,
             }, { headers });
         } else {
-            const { data, error: imageError } = await supabase.storage.from('messageMedia').createSignedUrl(`${workspaceIdStr}/${safeFileName}`, 3600);
+            const { data, error: imageError } = await adminDb.storage.from('messageMedia').createSignedUrl(`${workspaceIdStr}/${safeFileName}`, 3600);
             if (imageError) return routeData({ success: false, error: imageError }, { headers });
             return routeData({ success: true, error: null, url: data.signedUrl }, { headers });
         }

@@ -1,4 +1,4 @@
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 import { QueueItem } from "@/lib/types";
 import { formatTime, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

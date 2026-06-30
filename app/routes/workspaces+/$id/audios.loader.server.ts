@@ -10,7 +10,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return access.response;
   }
 
-  const { supabaseClient, headers, user, workspaceId, userRole } = access.ctx;
+  const { headers, user, workspaceId, userRole } = access.ctx;
 
   const workspaceData = await getWorkspaceById(workspaceId);
 
@@ -27,7 +27,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const mediaResult = await listWorkspaceAudiosApi(
-    supabaseClient,
     user.id,
     workspaceId,
   );

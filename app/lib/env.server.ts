@@ -8,10 +8,18 @@
 type EnvConfig = {
   DATABASE_URL: string;
   DATABASE_DIRECT_URL?: string;
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
-  SUPABASE_SERVICE_KEY: string;
-  SUPABASE_PUBLISHABLE_KEY: string;
+  BETTER_AUTH_SECRET: string;
+  BETTER_AUTH_URL?: string;
+  S3_ENDPOINT: string;
+  S3_REGION: string;
+  S3_ACCESS_KEY_ID: string;
+  S3_SECRET_ACCESS_KEY: string;
+  /** Single-bucket mode: logical buckets use `{bucketName}/{objectPath}` keys. */
+  S3_BUCKET: string;
+  /** Optional dedicated buckets (override S3_BUCKET prefix layout). */
+  S3_BUCKET_AUDIO?: string;
+  S3_BUCKET_MEDIA?: string;
+  S3_BUCKET_EXPORTS?: string;
   TWILIO_SID: string;
   TWILIO_AUTH_TOKEN: string;
   TWILIO_APP_SID: string;
@@ -34,6 +42,10 @@ const optionalEnvVars: (keyof EnvConfig)[] = [
   'STRIPE_WEBHOOK_SECRET',
   'TWILIO_VALIDATE_WEBHOOKS',
   'DATABASE_DIRECT_URL',
+  'BETTER_AUTH_URL',
+  'S3_BUCKET_AUDIO',
+  'S3_BUCKET_MEDIA',
+  'S3_BUCKET_EXPORTS',
 ];
 
 /**
@@ -90,10 +102,16 @@ if (typeof window === 'undefined') {
 export const env = {
   DATABASE_URL: () => getEnv('DATABASE_URL'),
   DATABASE_DIRECT_URL: () => getEnv('DATABASE_DIRECT_URL'),
-  SUPABASE_URL: () => getEnv('SUPABASE_URL'),
-  SUPABASE_ANON_KEY: () => getEnv('SUPABASE_ANON_KEY'),
-  SUPABASE_SERVICE_KEY: () => getEnv('SUPABASE_SERVICE_KEY'),
-  SUPABASE_PUBLISHABLE_KEY: () => getEnv('SUPABASE_PUBLISHABLE_KEY'),
+  BETTER_AUTH_SECRET: () => getEnv('BETTER_AUTH_SECRET'),
+  BETTER_AUTH_URL: () => getEnv('BETTER_AUTH_URL') ?? getEnv('BASE_URL'),
+  S3_ENDPOINT: () => getEnv('S3_ENDPOINT'),
+  S3_REGION: () => getEnv('S3_REGION'),
+  S3_ACCESS_KEY_ID: () => getEnv('S3_ACCESS_KEY_ID'),
+  S3_SECRET_ACCESS_KEY: () => getEnv('S3_SECRET_ACCESS_KEY'),
+  S3_BUCKET: () => getEnv('S3_BUCKET'),
+  S3_BUCKET_AUDIO: () => getEnv('S3_BUCKET_AUDIO'),
+  S3_BUCKET_MEDIA: () => getEnv('S3_BUCKET_MEDIA'),
+  S3_BUCKET_EXPORTS: () => getEnv('S3_BUCKET_EXPORTS'),
   TWILIO_SID: () => getEnv('TWILIO_SID'),
   TWILIO_AUTH_TOKEN: () => getEnv('TWILIO_AUTH_TOKEN'),
   TWILIO_APP_SID: () => getEnv('TWILIO_APP_SID'),

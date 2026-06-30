@@ -26,8 +26,7 @@ import {
   WorkspaceData,
   WorkspaceNumbers,
 } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 
 import type { CampaignState } from "@/lib/campaign-home.types";
@@ -54,14 +53,13 @@ export default function CampaignScreen() {
     joinDisabled,
     scheduleDisabled,
   } = useLoaderData();
-  const { audiences, campaigns, phoneNumbers, workspace, supabase } =
+  const { audiences, campaigns, phoneNumbers, workspace, client } =
     useOutletContext<{
       audiences: Audience[];
       campaigns: Campaign[];
       phoneNumbers: WorkspaceNumbers[];
       userRole: MemberRole;
       workspace: WorkspaceData;
-      supabase: SupabaseClient;
     }>();
   const campaignData = campaigns.find((c) => c?.id.toString() === selected_id);
   const location = useLocation();
@@ -76,8 +74,7 @@ export default function CampaignScreen() {
     queuedCount: queueCounts.queuedCount ?? 0,
   };
   const { data: campaignDetailsArray } = useRealtimeData(
-    supabase,
-    workspaceRouteId,
+        workspaceRouteId,
     realtimeTable,
     [
       initialCampaignDetails
@@ -87,11 +84,8 @@ export default function CampaignScreen() {
   );
   const campaignDetails = campaignDetailsArray?.[0];
 
-  useSupabaseRealtimeSubscription({
-    supabase,
-    channelTopic: selected_id
-      ? `campaign-dashboard-counts-${selected_id}`
-      : "campaign-dashboard-counts-none",
+  useWorkspaceEventSubscription({
+    workspaceId: workspaceRouteId,
     table: [...CAMPAIGN_DASHBOARD_COUNT_TABLES],
     filter: selected_id ? `campaign_id=eq.${selected_id}` : "campaign_id=eq.-1",
     onChange: () => {
@@ -160,8 +154,7 @@ export default function CampaignScreen() {
         )}
       <Outlet
         context={{
-          supabase,
-          joinDisabled,
+                    joinDisabled,
           audiences,
           campaignData,
           campaignDetails,

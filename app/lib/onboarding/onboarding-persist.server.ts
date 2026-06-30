@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   getWorkspaceMessagingOnboardingState,
@@ -11,17 +10,16 @@ import { getWorkspacePhoneNumbers } from "@/lib/database.server";
 import { hydrateWorkspaceRcsOnboardingState } from "@/lib/rcs-onboarding.server";
 
 export async function persistWorkspaceOnboardingState(args: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
   updates: Partial<WorkspaceMessagingOnboardingState>;
   hydrateRcs?: boolean;
 }) {
-  const { supabaseClient, workspaceId, actorUserId, updates, hydrateRcs = true } = args;
+  const { workspaceId, actorUserId, updates, hydrateRcs = true } = args;
 
   const [phoneNumbers, current] = await Promise.all([
-    getWorkspacePhoneNumbers({ supabaseClient, workspaceId }),
-    getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
+    getWorkspacePhoneNumbers({ workspaceId }),
+    getWorkspaceMessagingOnboardingState({ workspaceId }),
   ]);
 
   let merged = mergeWorkspaceMessagingOnboardingState(current, updates);
@@ -35,7 +33,6 @@ export async function persistWorkspaceOnboardingState(args: {
   );
 
   return updateWorkspaceMessagingOnboardingState({
-    supabaseClient,
     workspaceId,
     updates: withSteps,
     actorUserId,

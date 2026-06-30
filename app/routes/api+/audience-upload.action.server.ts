@@ -13,8 +13,7 @@ import {
   findAudienceInWorkspace,
   markAudienceUpdating,
 } from "@/lib/audience-upload-db.server";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 interface StorageBucket {
   id: string;
@@ -45,7 +44,6 @@ type AudienceUploadDeps = Partial<{
   verifyAuth: (
     request: Request,
   ) => Promise<{
-    supabaseClient: SupabaseClient<Database>;
     headers: Headers;
     user: User | null;
   }>;
@@ -64,7 +62,7 @@ export const action = async ({
     verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
     processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
   };
-  const { supabaseClient, headers, user } = await d.verifyAuth(request);
+  const { headers, user } = await d.verifyAuth(request);
   
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401, headers });
@@ -152,7 +150,6 @@ export const action = async ({
 
     // Start background processing
     d.processAudienceUpload(
-      supabaseClient,
       uploadId,
       finalAudienceId,
       workspaceId,

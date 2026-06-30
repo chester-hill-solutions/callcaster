@@ -21,7 +21,7 @@ vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...a: any[]) => mocks.safeParseJson(...a),
   requireWorkspaceAccess: (...a: any[]) => mocks.requireWorkspaceAccess(...a),
 }));
-vi.mock("../app/lib/supabase.server", () => ({
+vi.mock("../app/lib/adminDb.server", () => ({
   verifyAuth: (...a: any[]) => mocks.verifyAuth(...a),
 }));
 vi.mock("../app/lib/utils", () => ({
@@ -30,7 +30,7 @@ vi.mock("../app/lib/utils", () => ({
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
-function makeSupabaseClient(rpcImpl: () => Promise<{ data: unknown; error: unknown }>) {
+function makenever(rpcImpl: () => Promise<{ data: unknown; error: unknown }>) {
   return {
     from: (table: string) => {
       if (table !== "campaign") throw new Error(`unexpected table ${table}`);
@@ -68,7 +68,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       workspace_id: WORKSPACE_ID,
     });
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseClient(async () => ({ data: null, error: new Error("rpc") })),
+      null: makenever(async () => ({ data: null, error: new Error("rpc") })),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/initiate-ivr");
@@ -82,7 +82,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       workspace_id: WORKSPACE_ID,
     });
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseClient(async () => ({
+      null: makenever(async () => ({
         data: [{ id: "q1", contact_id: "c1", caller_id: "+1", phone: "555" }],
         error: null,
       })),
@@ -104,7 +104,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       workspace_id: WORKSPACE_ID,
     });
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseClient(async () => ({ data: queue, error: null })),
+      null: makenever(async () => ({ data: queue, error: null })),
       user: { id: "u1" },
     });
     mocks.fetch.mockRejectedValueOnce(new Error("net"));

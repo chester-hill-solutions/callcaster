@@ -16,7 +16,7 @@
 | **0** — Ledger audit & local stack | **Done** | Ledger 34/34 on Railway `PostgreSQL 18` |
 | **1** — Schema transform | **Mostly applied** | 01–05, 08, 08b, 10 on review; baseline dumped; **06/07/09** pending (SSE/worker) |
 | **1D** — Scriptkit packages | Not started | CHS monorepo upstream |
-| **2** — Drizzle port | **In progress** | **9/13** modules done; **46** PostgREST `.from("…")` sites in **31** files remain (hooks/realtime, workspace loaders, storage-signed URL paths); **`app/routes/api+` tenant reads cleared** |
+| **2** — Drizzle port | **G2 tenant reads done** | **0** PostgREST table `.from("…")` in `app/`; storage, auth, RPC, Realtime remain for Phase 3 |
 | **3** — Staging stack (3A–3F) | Not started | **3D partial** — Remix sms-status live; Edge IVR unified `campaign` select |
 | **4** — Staging gate | Blocked | Requires Phases 2–3 |
 | **5** — Prod big-bang | Blocked | Requires Phase 4 |
@@ -101,8 +101,8 @@
 **Remaining (G2 exit):**
 
 - ~**162** `database.types` imports; delete [`database.types.ts`](app/lib/database.types.ts) last
-- **46** PostgREST `.from("…")` call sites across **31** `app/` modules (heavy: hooks/realtime, workspace loaders, storage-signed URL paths)
-- **`app/routes/api+`:** **0** tenant-table PostgREST reads (storage + Phase 3 RPCs only where applicable)
+- **0** PostgREST tenant-table `.from("…")` call sites in `app/` (**G2 tenant-read gate met**)
+- Remaining Supabase in `app/`: **storage** signed URLs, **auth** session, **RPC** (queue/dequeue/billing), **Realtime** subscriptions (Phase 3B SSE)
 - **Server `campaign_queue` reads/writes:** Drizzle via [`campaign-queue-db.server.ts`](app/lib/campaign-queue-db.server.ts) — only [`useSupabaseRealtime.ts`](app/hooks/realtime/useSupabaseRealtime.ts) still PostgREST on `campaign_queue` (Phase 3B SSE)
 - **Enqueue/dequeue RPCs** (`dequeue_contact`, `select_and_update_campaign_contacts`, `enqueueContactsForCampaign`, …) stay Supabase until worker/RPC wrappers land
 - **Survey server PostgREST:** done — [`survey-db.server.ts`](app/lib/survey-db.server.ts)
@@ -270,7 +270,7 @@ Apply via [`scripts/schema-transform/apply-all.sh`](../scripts/schema-transform/
 | 2.12 | Delete `database.types.ts` | Todo — ~162 imports |
 | 2.13 | E2E factories → Drizzle | Todo |
 
-**Metrics:** 9/13 modules done · **46** PostgREST `.from("…")` sites in **31** files · **162** `database.types` imports (not zero)
+**Metrics:** 9/13 modules done · **0** PostgREST table `.from("…")` in `app/` · **162** `database.types` imports (not zero)
 
 ### Sprint 2 telephony + messaging helpers
 

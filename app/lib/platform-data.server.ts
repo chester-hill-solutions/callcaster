@@ -1,7 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import {
-  getDualAuthSupabase,
   requireJsonAuth,
   verifyApiKeyOrSession,
   type VerifyApiKeyOrSessionResult,
@@ -22,7 +20,7 @@ import {
   fetchConversationSummary,
   requireWorkspaceAccess,
 } from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { logger } from "@/lib/logger.server";
 import { jsonError } from "@/lib/platform-api.server";
@@ -90,7 +88,6 @@ function audienceContactSortColumn(sortKey: string) {
 }
 
 export type DataPlaneAuthContext = {
-  supabase: SupabaseClient<Database>;
   userId: string | null;
 };
 
@@ -132,29 +129,25 @@ export async function resolveDataPlaneAuth(
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
   }
-
-  const supabase = getDualAuthSupabase(auth);
-
   if (auth.authType === "api_key") {
     if (workspaceId && auth.workspaceId !== workspaceId) {
       return jsonError("workspaceId does not match API key", 403);
     }
-    return { supabase, userId: null };
+    return { userId: null };
   }
 
   if (workspaceId) {
     await requireWorkspaceAccess({
-      supabaseClient: supabase,
       user: auth.user,
       workspaceId,
     });
   }
 
-  return { supabase, userId: auth.user.id };
+  return { userId: auth.user.id };
 }
 
 async function getCampaignWorkspaceId(
-  _supabase: SupabaseClient<Database>,
+  _,
   campaignId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -166,7 +159,7 @@ async function getCampaignWorkspaceId(
 }
 
 async function getContactWorkspaceId(
-  _supabase: SupabaseClient<Database>,
+  _,
   contactId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -178,7 +171,7 @@ async function getContactWorkspaceId(
 }
 
 async function getScriptWorkspaceId(
-  _supabase: SupabaseClient<Database>,
+  _,
   scriptId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -190,7 +183,7 @@ async function getScriptWorkspaceId(
 }
 
 async function getSurveyWorkspaceId(
-  _supabase: SupabaseClient<Database>,
+  _,
   surveyId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -208,10 +201,7 @@ export async function authForCampaign(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }
-
-  const supabase = getDualAuthSupabase(auth);
-  const workspaceId = await getCampaignWorkspaceId(supabase, campaignId);
+  }  const workspaceId = await getCampaignWorkspaceId(campaignId);
   if (!workspaceId) {
     return jsonError("Campaign not found", 404);
   }
@@ -220,15 +210,14 @@ export async function authForCampaign(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Campaign not found", 404);
     }
-    return { supabase, userId: null, workspaceId };
+    return { userId: null, workspaceId };
   }
 
   await requireWorkspaceAccess({
-    supabaseClient: supabase,
     user: auth.user,
     workspaceId,
   });
-  return { supabase, userId: auth.user.id, workspaceId };
+  return { userId: auth.user.id, workspaceId };
 }
 
 export async function authForContact(
@@ -238,10 +227,7 @@ export async function authForContact(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }
-
-  const supabase = getDualAuthSupabase(auth);
-  const workspaceId = await getContactWorkspaceId(supabase, contactId);
+  }  const workspaceId = await getContactWorkspaceId(contactId);
   if (!workspaceId) {
     return jsonError("Contact not found", 404);
   }
@@ -250,15 +236,14 @@ export async function authForContact(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Contact not found", 404);
     }
-    return { supabase, userId: null, workspaceId };
+    return { userId: null, workspaceId };
   }
 
   await requireWorkspaceAccess({
-    supabaseClient: supabase,
     user: auth.user,
     workspaceId,
   });
-  return { supabase, userId: auth.user.id, workspaceId };
+  return { userId: auth.user.id, workspaceId };
 }
 
 export async function authForScript(
@@ -268,10 +253,7 @@ export async function authForScript(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }
-
-  const supabase = getDualAuthSupabase(auth);
-  const workspaceId = await getScriptWorkspaceId(supabase, scriptId);
+  }  const workspaceId = await getScriptWorkspaceId(scriptId);
   if (!workspaceId) {
     return jsonError("Script not found", 404);
   }
@@ -280,15 +262,14 @@ export async function authForScript(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Script not found", 404);
     }
-    return { supabase, userId: null, workspaceId };
+    return { userId: null, workspaceId };
   }
 
   await requireWorkspaceAccess({
-    supabaseClient: supabase,
     user: auth.user,
     workspaceId,
   });
-  return { supabase, userId: auth.user.id, workspaceId };
+  return { userId: auth.user.id, workspaceId };
 }
 
 export async function authForSurvey(
@@ -298,10 +279,7 @@ export async function authForSurvey(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }
-
-  const supabase = getDualAuthSupabase(auth);
-  const workspaceId = await getSurveyWorkspaceId(supabase, surveyId);
+  }  const workspaceId = await getSurveyWorkspaceId(surveyId);
   if (!workspaceId) {
     return jsonError("Survey not found", 404);
   }
@@ -310,27 +288,23 @@ export async function authForSurvey(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Survey not found", 404);
     }
-    return { supabase, userId: null, workspaceId };
+    return { userId: null, workspaceId };
   }
 
   await requireWorkspaceAccess({
-    supabaseClient: supabase,
     user: auth.user,
     workspaceId,
   });
-  return { supabase, userId: auth.user.id, workspaceId };
+  return { userId: auth.user.id, workspaceId };
 }
 
 /** Auth for outreach attempt: session-only, resolves workspace from the attempt row. */
 export async function authForOutreachAttempt(
   request: Request,
   outreachAttemptId: number,
-): Promise<{ supabase: SupabaseClient<Database>; user: { id: string; email?: string } } | Response> {
+): Promise<{user: { id: string; email?: string } } | Response> {
   const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const supabase = getDualAuthSupabase(auth as VerifyApiKeyOrSessionResult);
-  const rows = await db
+  if (auth instanceof Response) return auth;  const rows = await db
     .select({ workspace: outreachAttemptTable.workspace })
     .from(outreachAttemptTable)
     .where(eq(outreachAttemptTable.id, outreachAttemptId))
@@ -343,7 +317,6 @@ export async function authForOutreachAttempt(
 
   try {
     await requireWorkspaceAccess({
-      supabaseClient: supabase,
       user: (auth as any).user,
       workspaceId: attempt.workspace,
     });
@@ -351,14 +324,13 @@ export async function authForOutreachAttempt(
     return jsonError("Forbidden", 403);
   }
 
-  return { supabase, user: (auth as any).user, workspaceId: attempt.workspace };
+  return { user: (auth as any).user, workspaceId: attempt.workspace };
 }
 
 export async function listWorkspaceCampaignsApi(
-  supabase: SupabaseClient<Database>,
-  workspaceId: string,
+    workspaceId: string,
 ) {
-  const { data, error } = await getWorkspaceCampaigns({ supabaseClient: supabase, workspaceId });
+  const { data, error } = await getWorkspaceCampaigns({ workspaceId });
   if (error) {
     logger.error("listWorkspaceCampaignsApi", error);
     return { ok: false as const, error: error.message, status: 500 };
@@ -367,8 +339,7 @@ export async function listWorkspaceCampaignsApi(
 }
 
 export async function getCampaignDetailApi(
-  supabase: SupabaseClient<Database>,
-  campaignId: string,
+    campaignId: string,
   workspaceId: string,
 ) {
   const campaign = await fetchCampaignData({ workspaceId, campaignId });
@@ -376,7 +347,7 @@ export async function getCampaignDetailApi(
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
-  const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabaseClient: supabase });
+  const queueCounts = await fetchQueueCounts({ workspaceId, campaignId });
   let details: unknown = null;
   if (
     campaign.type &&
@@ -402,8 +373,7 @@ export async function getCampaignDetailApi(
 }
 
 export async function duplicateCampaignApi(
-  supabase: SupabaseClient<Database>,
-  campaignId: string,
+    campaignId: string,
   workspaceId: string,
 ) {
   const campaign = await fetchCampaignData({ workspaceId, campaignId });
@@ -455,7 +425,6 @@ export async function duplicateCampaignApi(
   if (originalQueue.length > 0) {
     try {
       await enqueueContactsForCampaign(
-        supabase,
         newCampaign.id,
         originalQueue.map((item) => item.contact_id),
         { requeue: false },
@@ -484,8 +453,7 @@ export async function duplicateCampaignApi(
 }
 
 export async function transitionCampaignStatusApi(
-  supabase: SupabaseClient<Database>,
-  campaignId: string,
+    campaignId: string,
   workspaceId: string,
   body: CampaignStatusBody,
 ) {
@@ -511,7 +479,7 @@ export async function transitionCampaignStatusApi(
     }
 
     const campaignDetails = await fetchCampaignDetails({ workspaceId, campaignId });
-    const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabaseClient: supabase });
+    const queueCounts = await fetchQueueCounts({ workspaceId, campaignId });
     const readiness = getCampaignReadiness(
       campaignRecord as Campaign,
       campaignDetails,
@@ -558,7 +526,7 @@ export async function transitionCampaignStatusApi(
 }
 
 export async function getCampaignQueueApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   campaignId: string,
   workspaceId: string,
   searchParams: URLSearchParams,
@@ -620,8 +588,7 @@ export async function getCampaignQueueApi(
 }
 
 export async function patchCampaignQueueApi(
-  supabase: SupabaseClient<Database>,
-  campaignId: string,
+    campaignId: string,
   workspaceId: string,
   body: PatchCampaignQueueBody,
 ) {
@@ -646,7 +613,6 @@ export async function patchCampaignQueueApi(
       }
       case "add_contact_ids": {
         await enqueueContactsForCampaign(
-          supabase,
           campaignIdNum,
           body.contact_ids!,
           { requeue: false },
@@ -659,7 +625,6 @@ export async function patchCampaignQueueApi(
           .from(contactAudienceTable)
           .where(eq(contactAudienceTable.audience_id, body.audience_id!));
         await enqueueContactsForCampaign(
-          supabase,
           campaignIdNum,
           contacts.map((row) => row.contact_id),
           { requeue: false },
@@ -689,7 +654,7 @@ export async function patchCampaignQueueApi(
 }
 
 export async function listWorkspaceContactsApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   workspaceId: string,
   searchParams: URLSearchParams,
 ) {
@@ -743,7 +708,7 @@ export async function listWorkspaceContactsApi(
 }
 
 export async function getContactDetailApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   contactId: string,
   workspaceId: string,
 ) {
@@ -806,7 +771,7 @@ export async function getContactDetailApi(
 }
 
 export async function deleteContactApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   contactId: string,
   workspaceId: string,
 ) {
@@ -834,7 +799,7 @@ export async function deleteContactApi(
 }
 
 export async function listWorkspaceAudiencesApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   workspaceId: string,
 ) {
   const tdb = createTenantDb(workspaceId);
@@ -854,7 +819,7 @@ export async function listWorkspaceAudiencesApi(
 }
 
 export async function getAudienceDetailApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   workspaceId: string,
   audienceId: string,
   searchParams: URLSearchParams,
@@ -937,7 +902,7 @@ export async function getAudienceDetailApi(
 }
 
 export async function listWorkspaceScriptsApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   workspaceId: string,
 ) {
   const tdb = createTenantDb(workspaceId);
@@ -957,7 +922,7 @@ export async function listWorkspaceScriptsApi(
 }
 
 export async function getScriptDetailApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   scriptId: string,
   workspaceId: string,
 ) {
@@ -981,7 +946,7 @@ export async function getScriptDetailApi(
 }
 
 export async function listWorkspaceSurveysApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   workspaceId: string,
 ) {
   const tdb = createTenantDb(workspaceId);
@@ -1009,7 +974,7 @@ export async function listWorkspaceSurveysApi(
 }
 
 export async function getSurveyDetailApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   surveyId: string,
   workspaceId: string,
 ) {
@@ -1029,7 +994,7 @@ export async function getSurveyDetailApi(
 }
 
 export async function getSurveyResponsesApi(
-  _supabase: SupabaseClient<Database>,
+  _,
   surveyId: string,
   workspaceId: string,
 ) {
@@ -1037,7 +1002,7 @@ export async function getSurveyResponsesApi(
 }
 
 export async function exportSurveyResponsesCsv(
-  _supabase: SupabaseClient<Database>,
+  _,
   surveyId: string,
   workspaceId: string,
 ): Promise<PlatformResult<Response>> {
@@ -1049,8 +1014,7 @@ export async function exportSurveyResponsesCsv(
 }
 
 export async function listWorkspaceConversationsApi(
-  supabase: SupabaseClient<Database>,
-  workspaceId: string,
+    workspaceId: string,
   searchParams: URLSearchParams,
 ) {
   const campaignId = searchParams.get("campaign_id");
@@ -1061,7 +1025,6 @@ export async function listWorkspaceConversationsApi(
   });
 
   const { chats, chatsError, hasMore } = await fetchConversationSummary(
-    supabase,
     workspaceId,
     campaignId,
     { limit: pageSize, offset, sort: sortBy },
@@ -1083,14 +1046,12 @@ export async function listWorkspaceConversationsApi(
 }
 
 export async function getConversationMessagesApi(
-  supabase: SupabaseClient<Database>,
-  workspaceId: string,
+    workspaceId: string,
   contactNumber: string,
   searchParams: URLSearchParams,
 ) {
   const before = searchParams.get("before");
   const result = await fetchMessagePage({
-    supabaseClient: supabase,
     workspaceId,
     contactFilter: contactNumber,
     before,
@@ -1105,8 +1066,7 @@ export async function getConversationMessagesApi(
 }
 
 export async function getAudienceUploadStatusApi(
-  supabase: SupabaseClient<Database>,
-  workspaceId: string,
+    workspaceId: string,
   uploadId: string,
 ) {
   const parsedUploadId = Number.parseInt(uploadId, 10);
@@ -1133,7 +1093,7 @@ export async function getAudienceUploadStatusApi(
   }
 
   let statusFileData: Record<string, unknown> = {};
-  const { data: statusData, error: statusError } = await supabase.storage
+  const { data: statusData, error: statusError } = await adminDb.storage
     .from("audience-uploads")
     .download(`${workspaceId}/${parsedUploadId}.json`);
 

@@ -1,11 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrPageContext } from "@/lib/inbound-ivr-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -13,9 +12,9 @@ interface Script {
 }
 
 export const action = async ({ params, request }: ActionFunctionArgs) => {
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient<Database>(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
   const twiml = new Twilio.twiml.VoiceResponse();
   const { numberId, pageId } = params as { numberId: string; pageId: string };
@@ -29,7 +28,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    supabase,
+    client,
     callSid,
     params: paramsObj,
   });

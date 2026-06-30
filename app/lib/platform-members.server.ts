@@ -1,11 +1,10 @@
 import { randomBytes } from "crypto";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   API_KEY_PREFIX_LENGTH,
   hashApiKeyForStorage,
 } from "@/lib/api-auth.server";
 import { getUserRole, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
@@ -34,18 +33,15 @@ const KEY_PREFIX = "cc_live_";
 type UpsertWebhookInput = z.infer<typeof upsertWebhookBodySchema>;
 
 async function requireMemberManager(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const userRole = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -80,12 +76,10 @@ function generateApiKey(): { key: string; keyPrefix: string; keyHash: string } {
 }
 
 export async function listWorkspaceMembers(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -112,18 +106,16 @@ export async function listWorkspaceMembers(
 }
 
 export async function inviteWorkspaceMember(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   email: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   const cleanedEmail = email.toLowerCase().trim();
   const { data: users } = await getWorkspaceUsers({
-    supabaseClient,
     workspaceId,
   });
   const existingMember = users?.find((user: { username?: string | null }) => user.username === cleanedEmail);
@@ -148,7 +140,7 @@ export async function inviteWorkspaceMember(
   }
 
   const { data: inviteData, error: inviteUserError } =
-    await supabaseClient.functions.invoke("invite-user-by-email", {
+    await null.functions.invoke("invite-user-by-email", {
       body: {
         workspaceId,
         email: cleanedEmail,
@@ -174,13 +166,12 @@ export async function inviteWorkspaceMember(
 }
 
 export async function updateWorkspaceMemberRole(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   targetUserId: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
@@ -203,12 +194,11 @@ export async function updateWorkspaceMemberRole(
 }
 
 export async function removeWorkspaceMember(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   targetUserId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
@@ -230,12 +220,11 @@ export async function removeWorkspaceMember(
 }
 
 export async function cancelWorkspaceInvite(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   inviteUserId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
@@ -255,11 +244,10 @@ export async function cancelWorkspaceInvite(
 }
 
 export async function getWorkspaceWebhook(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
@@ -275,12 +263,11 @@ export async function getWorkspaceWebhook(
 }
 
 export async function upsertWorkspaceWebhook(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   input: UpsertWebhookInput,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
@@ -364,11 +351,10 @@ export async function testWorkspaceWebhook(
 }
 
 export async function listWorkspaceApiKeys(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
@@ -385,12 +371,11 @@ export async function listWorkspaceApiKeys(
 }
 
 export async function createWorkspaceApiKey(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   name: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   const { key, keyPrefix, keyHash } = generateApiKey();
@@ -428,12 +413,11 @@ export async function createWorkspaceApiKey(
 }
 
 export async function deleteWorkspaceApiKey(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   keyId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {

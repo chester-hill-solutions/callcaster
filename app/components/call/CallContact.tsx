@@ -1,4 +1,4 @@
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

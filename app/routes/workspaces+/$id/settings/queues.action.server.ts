@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
 import {
   addInboundQueueMember,

@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createMockFetcher, createSupabaseRealtimeMock } from "./hooks-test-helpers";
+import { createMockFetcher, createWorkspaceRealtimeMock } from "./hooks-test-helpers";
 
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },

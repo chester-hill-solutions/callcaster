@@ -1,7 +1,6 @@
 import { parseCSV } from "@/lib/csv";
 import { logger } from "@/lib/logger.server";
-import type { Database, Tables } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { uploadObject } from "@/lib/object-storage.server";
 import { eq } from "drizzle-orm";
 import {
   audience as audienceTable,
@@ -10,15 +9,6 @@ import {
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
-
-interface StorageBucket {
-  id: string;
-  name: string;
-  owner: string;
-  created_at: string;
-  updated_at: string;
-  public: boolean;
-}
 
 interface CSVContact {
   [key: string]: string;
@@ -85,9 +75,24 @@ export const generateUniqueId = () => {
   return `${timestamp}-${randomStr}`;
 };
 
+async function writeAudienceUploadStatus(
+  workspaceId: string,
+  uploadId: number,
+  status: Record<string, unknown>,
+): Promise<void> {
+  await uploadObject(
+    "audience-uploads",
+    `${workspaceId}/${uploadId}.json`,
+    JSON.stringify(status),
+    {
+      contentType: "application/json",
+      upsert: true,
+    },
+  );
+}
+
 // Process audience upload in background
 export const processAudienceUpload = async (
-  supabaseClient: SupabaseClient<Database>,
   uploadId: number,
   audienceId: number,
   workspaceId: string,
@@ -112,36 +117,7 @@ export const processAudienceUpload = async (
   const tdb = createTenantDb(workspaceId);
 
   try {
-    // First verify the bucket exists
-    const { data: buckets, error: bucketError } = await supabaseClient.storage
-      .listBuckets();
-    
-    if (bucketError) {
-      throw new Error(`Error listing buckets: ${bucketError.message}`);
-    }
-
-    const audienceUploadsBucket = buckets?.find((b: StorageBucket) => b.name === 'audience-uploads');
-    if (!audienceUploadsBucket) {
-      // Create the bucket if it doesn't exist
-      const { error: createError } = await supabaseClient.storage
-        .createBucket('audience-uploads', { public: false });
-      
-      if (createError) {
-        throw new Error(`Error creating bucket: ${createError.message}`);
-      }
-    }
-
-    // Create initial status file
-    const { error: statusError } = await supabaseClient.storage
-      .from("audience-uploads")
-      .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify(statusData), {
-        contentType: "application/json",
-        upsert: true
-      });
-
-    if (statusError) {
-      throw new Error(`Error creating status file: ${statusError.message}`);
-    }
+    await writeAudienceUploadStatus(workspaceId, uploadId, statusData);
 
     // Parse the CSV content
     const decodedContent = Buffer.from(fileContent, 'base64').toString('utf-8');
@@ -284,14 +260,11 @@ export const processAudienceUpload = async (
       processedCount += chunk.length;
       const progress = Math.round((processedCount / parsedContacts.length) * 100);
 
-      // Update status file
-      await supabaseClient.storage
-        .from("audience-uploads")
-        .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify({
-          ...statusData,
-          progress,
-          stage: `Processing contacts (${processedCount}/${parsedContacts.length})`
-        }), { upsert: true });
+      await writeAudienceUploadStatus(workspaceId, uploadId, {
+        ...statusData,
+        progress,
+        stage: `Processing contacts (${processedCount}/${parsedContacts.length})`,
+      });
 
       // Update upload record
       await tdb.audience_upload.update({
@@ -323,15 +296,12 @@ export const processAudienceUpload = async (
       where: eq(audienceUploadTable.id, uploadId),
     });
 
-    // Update final status file
-    await supabaseClient.storage
-      .from("audience-uploads")
-      .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify({
-        ...statusData,
-        status: "completed",
-        progress: 100,
-        stage: "Upload completed"
-      }), { upsert: true });
+    await writeAudienceUploadStatus(workspaceId, uploadId, {
+      ...statusData,
+      status: "completed",
+      progress: 100,
+      stage: "Upload completed",
+    });
 
   } catch (error) {
     logger.error("Upload processing error:", error);
@@ -353,13 +323,10 @@ export const processAudienceUpload = async (
       where: eq(audienceUploadTable.id, uploadId),
     });
 
-    // Update status file
-    await supabaseClient.storage
-      .from("audience-uploads")
-      .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify({
-        ...statusData,
-        status: "error",
-        error: error instanceof Error ? error.message : "Unknown error"
-      }), { upsert: true });
+    await writeAudienceUploadStatus(workspaceId, uploadId, {
+      ...statusData,
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 };

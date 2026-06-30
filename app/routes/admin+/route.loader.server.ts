@@ -4,8 +4,8 @@ import { requireSudoAdmin } from "./requireSudoAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient, userData } = await requireSudoAdmin(request);
-  const dashboard = await getAdminDashboard(supabaseClient);
+  const { userData } = await requireSudoAdmin(request);
+  const dashboard = await getAdminDashboard(null);
 
   return routeData({
     user: userData,

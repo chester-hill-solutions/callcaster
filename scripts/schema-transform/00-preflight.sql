@@ -1,5 +1,5 @@
 -- Phase 1 schema transform — step 00: preflight
--- Target: Railway review Postgres ONLY. Do NOT run on hosted Supabase prod.
+-- Target: Railway review Postgres ONLY. Do NOT run on hosted Postgres prod.
 -- Idempotent: safe to re-run; read-only checks except session settings.
 
 -- ─── Session settings ───────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ SET statement_timeout = '0'; -- transform scripts manage their own timeouts per 
 -- ─── Environment marker (manual) ──────────────────────────────────────────────
 -- Before running 01+, confirm:
 --   SELECT current_database(), inet_server_addr(), version();
--- Expect Railway review host, NOT Supabase pooler.
+-- Expect Railway review host, NOT Postgres pooler.
 
 DO $$
 BEGIN

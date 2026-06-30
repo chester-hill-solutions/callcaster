@@ -17,14 +17,14 @@ import {
   isRcsOnboardingEnabled,
 } from "@/lib/rcs-onboarding.server";
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import type {
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
 import type { LoaderFunctionArgs } from "react-router";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 export type OnboardingLoaderData = {
   workspaceId: string;
@@ -38,7 +38,7 @@ export type OnboardingLoaderData = {
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, user, headers } = await verifyAuth(request);
+  const { user, headers } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!workspaceId) {
     throw redirect("/workspaces", { headers });
@@ -59,7 +59,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     await Promise.all([
       getWorkspaceInfo({ workspaceId }),
       getWorkspacePhoneNumbers({ workspaceId }),
-      getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
+      getWorkspaceMessagingOnboardingState({ workspaceId }),
       getWorkspaceCredits(workspaceId),
     ]);
   const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(

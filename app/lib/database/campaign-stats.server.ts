@@ -1,11 +1,11 @@
 /**
- * Campaign stats and aggregated reads (tenant-db for scoped tables; Supabase for RPC only).
+ * Campaign stats and aggregated reads (tenant-db for scoped tables; Postgres for RPC only).
  */
 import { and, eq, isNotNull, ne } from "drizzle-orm";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import type { Database } from "@/lib/db-types";
 import { Script } from "../types";
 import { logger } from "../logger.server";
+import { rpcGetCampaignStats } from "@/lib/db-rpc.server";
 import { getSignedUrls } from "./workspace.server";
 import {
   countCampaignQueueRows,
@@ -27,21 +27,20 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 export async function fetchBasicResults({
   workspaceId,
   campaignId,
-  supabaseClient,
   tdb: tdbIn,
 }: {
   workspaceId: string;
   campaignId: string;
-  /** RPC `get_campaign_stats` */
-  supabaseClient: SupabaseClient<Database>;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
 
-  const { data, error } = await supabaseClient.rpc("get_campaign_stats", {
-    campaign_id_param: campaignId,
-  });
-  if (error) logger.error("Error fetching basic results:", error);
+  let data: Awaited<ReturnType<typeof rpcGetCampaignStats>> | null = null;
+  try {
+    data = await rpcGetCampaignStats(db, campaignId);
+  } catch (error) {
+    logger.error("Error fetching basic results:", error);
+  }
   const baseResults =
     (data as
       | {
@@ -151,8 +150,8 @@ export async function fetchCampaignCounts({
 }: {
   workspaceId: string;
   campaignId: string;
-  /** @deprecated Supabase no longer used; kept for call-site compatibility */
-  supabaseClient?: SupabaseClient<Database>;
+  /** @deprecated Postgres no longer used; kept for call-site compatibility */
+  null?: never;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
@@ -273,8 +272,8 @@ export async function fetchQueueCounts({
 }: {
   workspaceId: string;
   campaignId: string;
-  /** @deprecated Supabase no longer used; kept for call-site compatibility */
-  supabaseClient?: SupabaseClient<Database>;
+  /** @deprecated Postgres no longer used; kept for call-site compatibility */
+  null?: never;
 }) {
   const campaignIdNum = Number(campaignId);
   const [fullCount, queuedCount] = await Promise.all([
@@ -295,8 +294,8 @@ export async function fetchCampaignAudience({
 }: {
   workspaceId: string;
   campaignId: string;
-  /** @deprecated Supabase no longer used; kept for call-site compatibility */
-  supabaseClient?: SupabaseClient<Database>;
+  /** @deprecated Postgres no longer used; kept for call-site compatibility */
+  null?: never;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
@@ -323,14 +322,12 @@ export async function fetchAdvancedCampaignDetails({
   workspaceId,
   campaignId,
   campaignType,
-  supabaseClient,
   tdb: tdbIn,
 }: {
   workspaceId: string;
   campaignId: string | number;
   campaignType: "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
   /** Storage signed URLs for message media */
-  supabaseClient: SupabaseClient<Database>;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
@@ -376,7 +373,6 @@ export async function fetchAdvancedCampaignDetails({
 
   if (campaignType === "message" && Array.isArray(data.message_media) && data.message_media.length) {
     data.mediaLinks = await getSignedUrls(
-      supabaseClient,
       workspaceId,
       data.message_media,
     );

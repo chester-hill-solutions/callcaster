@@ -3,7 +3,7 @@
 --
 -- SKETCH — review and flesh out data migration before running on review DB.
 -- Goal: merge live_campaign, ivr_campaign, message_campaign → public.campaign
--- with type-gated nullable columns (see docs/supabase-postgres-migration-plan.md).
+-- with type-gated nullable columns (see docs/client-postgres-migration-plan.md).
 --
 -- App callers to update after this step (code change, not SQL):
 --   app/lib/workspace-selector/WorkspaceSelectedNewUtils.server.ts

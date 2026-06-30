@@ -614,7 +614,7 @@
       "get": {
         "operationId": "getAuth_callback",
         "summary": "GET /api/auth/callback",
-        "description": "Supabase auth callback; sets session cookies and redirects.",
+        "description": "Postgres auth callback; sets session cookies and redirects.",
         "tags": [
           "Public Form",
           "auth"

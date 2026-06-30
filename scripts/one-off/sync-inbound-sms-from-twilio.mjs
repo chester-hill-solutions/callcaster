@@ -10,11 +10,10 @@
  * --merge: upsert on sid (overwrites columns for existing rows; default is insert-new-only)
  * --patch-contacts: only DB pass — set contact_id on inbound rows where null and find_contact_by_phone returns exactly one row
  *
- * Requires: SUPABASE_URL, SUPABASE_SERVICE_KEY, and workspace.twilio_data with sid + authToken.
+ * Requires: BETTER_AUTH_URL, BETTER_AUTH_SERVICE_KEY, and workspace.twilio_data with sid + authToken.
  */
 import "dotenv/config";
 
-import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
 const VALID_SMS_STATUSES = new Set([
@@ -93,13 +92,13 @@ function toIso(d) {
 
 /**
  * Mirrors api.inbound-sms: single unambiguous contact only.
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {import('@client/client-js').never} client
  */
-async function resolveContactIdForFrom(supabase, workspaceId, fromPhone, cache) {
+async function resolveContactIdForFrom(client, workspaceId, fromPhone, cache) {
   if (!fromPhone) return null;
   if (cache.has(fromPhone)) return cache.get(fromPhone);
 
-  const { data, error } = await supabase.rpc("find_contact_by_phone", {
+  const { data, error } = await adminDb.rpc("find_contact_by_phone", {
     p_workspace_id: workspaceId,
     p_phone_number: fromPhone,
   });
@@ -121,15 +120,15 @@ async function main() {
     process.exit(1);
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment.");
+  const postgresUrl = process.env.BASE_URL;
+  const postgresKey = process.env.BETTER_AUTH_SECRET;
+  if (!postgresUrl || !postgresKey) {
+    console.error("Missing BETTER_AUTH_URL or BETTER_AUTH_SERVICE_KEY in environment.");
     process.exit(1);
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  const { data: ws, error: wsErr } = await supabase
+  const client = createClient(postgresUrl, postgresKey);
+  const { data: ws, error: wsErr } = await client
     .from("workspace")
     .select("id, twilio_data")
     .eq("id", args.workspaceId)
@@ -147,7 +146,7 @@ async function main() {
     const MAX_ROWS = 10_000;
     let patched = 0;
     let examined = 0;
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await client
       .from("message")
       .select("sid, from")
       .eq("workspace", workspaceId)
@@ -163,13 +162,13 @@ async function main() {
     for (const row of rows ?? []) {
       examined++;
       const cid = await resolveContactIdForFrom(
-        supabase,
+        client,
         workspaceId,
         row.from,
         contactCache,
       );
       if (cid == null || args.dryRun) continue;
-      const { error: upErr } = await supabase
+      const { error: upErr } = await client
         .from("message")
         .update({ contact_id: cid })
         .eq("sid", row.sid);
@@ -188,7 +187,6 @@ async function main() {
           rowsExamined: examined,
           rowsUpdated: args.dryRun ? 0 : patched,
         },
-        null,
         2,
       ),
     );
@@ -223,7 +221,7 @@ async function main() {
 
     if (!args.merge) {
       const sids = chunk.map((r) => r.sid);
-      const { data: existing, error: exErr } = await supabase
+      const { data: existing, error: exErr } = await client
         .from("message")
         .select("sid")
         .in("sid", sids);
@@ -237,7 +235,7 @@ async function main() {
 
       for (const row of toWrite) {
         const cid = await resolveContactIdForFrom(
-          supabase,
+          client,
           workspaceId,
           row.from,
           contactCache,
@@ -245,14 +243,14 @@ async function main() {
         if (cid != null) row.contact_id = cid;
       }
 
-      const { error } = await supabase.from("message").insert(toWrite);
+      const { error } = await adminDb.from("message").insert(toWrite);
       if (error) return { inserted: 0, skippedExisting, error };
       return { inserted: toWrite.length, skippedExisting, error: null };
     }
 
     for (const row of toWrite) {
       const cid = await resolveContactIdForFrom(
-        supabase,
+        client,
         workspaceId,
         row.from,
         contactCache,
@@ -260,7 +258,7 @@ async function main() {
       if (cid != null) row.contact_id = cid;
     }
 
-    const { error } = await supabase.from("message").upsert(toWrite, {
+    const { error } = await adminDb.from("message").upsert(toWrite, {
       onConflict: "sid",
       ignoreDuplicates: false,
     });
@@ -338,7 +336,6 @@ async function main() {
         rowsSkippedAlreadyInDb: args.dryRun ? 0 : skippedExisting,
         error: lastError ? lastError.message : null,
       },
-      null,
       2,
     ),
   );

@@ -3,7 +3,7 @@
 -- Idempotent: DROP COLUMN IF EXISTS.
 --
 -- Plan: drop fullname, carrier, address_id — compute display name from
--- firstname + surname in app/export (docs/supabase-postgres-migration-plan.md).
+-- firstname + surname in app/export (docs/client-postgres-migration-plan.md).
 --
 -- Pre-check (run manually on review before drop):
 --   SELECT count(*) FROM contact WHERE fullname IS NOT NULL AND fullname <> trim(coalesce(firstname,'') || ' ' || coalesce(surname,''));

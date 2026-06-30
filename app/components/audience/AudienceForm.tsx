@@ -1,7 +1,7 @@
 import { Form } from "react-router";
 import { Button } from "@/components/ui/button";
 import { FormEvent, useState } from "react";
-import { Database } from "@/lib/database.types";
+import { Database } from "@/lib/db-types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 interface AudienceFormProps {

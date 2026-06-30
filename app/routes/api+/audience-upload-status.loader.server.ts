@@ -1,17 +1,15 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getDualAuthSupabase(auth);
-  const user = getDualAuthUser(auth);
+  const { headers } = await getSession(request);  const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
   }
@@ -41,7 +39,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     let statusFileData: Record<string, unknown> = {};
-    const { data: statusData, error: statusError } = await supabase.storage
+    const { data: statusData, error: statusError } = await adminDb.storage
       .from("audience-uploads")
       .download(`${workspaceId}/${uploadId}.json`);
 

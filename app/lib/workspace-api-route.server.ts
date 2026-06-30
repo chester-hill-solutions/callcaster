@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { jsonError } from "@/lib/platform-api.server";
 import {
   resolveDataPlaneAuth,
@@ -6,7 +5,7 @@ import {
 } from "@/lib/platform-data.server";
 import { getUserRole } from "@/lib/database.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import type { LoaderFunctionArgs } from "react-router";
 
 export type WorkspaceApiLoaderContext = DataPlaneAuthContext & {
@@ -38,9 +37,7 @@ export function withWorkspaceApiLoader(
     }
 
     if (options?.minRole && auth.userId) {
-      const role = await getUserRole({
-        supabaseClient: auth.supabase,
-        user: { id: auth.userId },
+      const role = await getUserRole({user: { id: auth.userId },
         workspaceId,
       });
       if (!role || !["owner", "admin", "member", "caller"].includes(role.role)) {
@@ -56,7 +53,7 @@ export function withWorkspaceApiLoader(
 }
 
 export type WorkspaceApiActionHandler = (
-  ctx: WorkspaceApiLoaderContext & { supabase: SupabaseClient<Database> },
+  ctx: WorkspaceApiLoaderContext & { },
   args: LoaderFunctionArgs,
 ) => Promise<Response>;
 
@@ -79,9 +76,7 @@ export function withWorkspaceApiAction(
     }
 
     if (options?.minRole && auth.userId) {
-      const role = await getUserRole({
-        supabaseClient: auth.supabase,
-        user: { id: auth.userId },
+      const role = await getUserRole({user: { id: auth.userId },
         workspaceId,
       });
       if (!role || !["owner", "admin", "member", "caller"].includes(role.role)) {
@@ -92,6 +87,6 @@ export function withWorkspaceApiAction(
       }
     }
 
-    return handler({ ...auth, workspaceId, supabase: auth.supabase }, args);
+    return handler({ ...auth, workspaceId, client: auth.client }, args);
   };
 }

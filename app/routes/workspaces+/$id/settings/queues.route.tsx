@@ -7,7 +7,6 @@ import { Heading } from "@/components/ui/typography";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Queue = {
   id: number;
@@ -45,7 +44,7 @@ type QueueFormData = {
 
 export default function QueueSettings() {
   const { queues, members, numbers, workspaceId } = useLoaderData<LoaderData>();
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
+  const { client } = useOutletContext<{ }>();
   const fetcher = useFetcher();
   const [editing, setEditing] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);

@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { getWorkspaceById, mergeWorkspaceTwilioData } from "@/lib/workspace-members-db.server";
 
 import type { ActionFunctionArgs } from "react-router";
@@ -66,7 +66,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const supabaseClient = getDualAuthSupabase(auth);
   const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -83,7 +82,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     await requireWorkspaceAccess({
-      supabaseClient,
       user,
       workspaceId: workspace_id,
     });

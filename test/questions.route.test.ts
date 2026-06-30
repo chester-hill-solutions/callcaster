@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
-const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
+const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
@@ -11,10 +11,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: supabaseServerMocks.headers,
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: postgresServerMocks.headers,
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -59,13 +57,12 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when recent outreach search errors (non-PGRST116)", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
-    supabaseServerMocks.headers = headers;
+    postgresServerMocks.headers = headers;
     const searchError = { code: "SOMETHING", message: "bad" };
-    const supabaseClient = {
+    const null = {
       from: vi.fn().mockReturnValueOnce(makeSearchBuilder({ data: null, error: searchError })),
     };
     queueJsonAuthSession({
-      supabaseClient,
       headers,
       user: { id: "u1" },
     });
@@ -88,16 +85,16 @@ describe("app/routes/api+/questions/route.tsx", () => {
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({ error: searchError });
     expect(mocks.logger.error).toHaveBeenCalled();
-    expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({ supabaseClient, user: { id: "u1" }, workspaceId: "w1" });
+    expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({ user: { id: "u1" }, workspaceId: "w1" });
   });
 
   test("creates outreach when none recent (PGRST116), coerces rpc id string, and returns updated outreach", async () => {
     const headers = new Headers({ "Set-Cookie": "b=2" });
-    supabaseServerMocks.headers = headers;
+    postgresServerMocks.headers = headers;
     const finalUpdateSpy = vi.fn().mockReturnValue({
       eq: vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: 7, disposition: "done", result: { a: 1 } }], error: null })) })),
     });
-    const supabaseClient = {
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce(makeSearchBuilder({ data: null, error: { code: "PGRST116" } }))
@@ -105,7 +102,6 @@ describe("app/routes/api+/questions/route.tsx", () => {
       rpc: vi.fn().mockResolvedValueOnce({ data: "7", error: null }),
     };
     queueJsonAuthSession({
-      supabaseClient,
       headers,
       user: { id: "u1" },
     });
@@ -127,7 +123,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("b=2");
     await expect(res.json()).resolves.toEqual({ id: 7, disposition: "done", result: { a: 1 } });
-    expect(supabaseClient.rpc).toHaveBeenCalledWith("create_outreach_attempt", {
+    expect(null.rpc).toHaveBeenCalledWith("create_outreach_attempt", {
       con_id: 1,
       cam_id: 2,
       queue_id: 3,
@@ -138,14 +134,13 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when rpc create_outreach_attempt errors", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
+    postgresServerMocks.headers = headers;
     const rpcError = { message: "rpc bad" };
-    const supabaseClient = {
+    const null = {
       from: vi.fn().mockReturnValueOnce(makeSearchBuilder({ data: null, error: { code: "PGRST116" } })),
       rpc: vi.fn().mockResolvedValueOnce({ data: null, error: rpcError }),
     };
     queueJsonAuthSession({
-      supabaseClient,
       headers,
       user: { id: "u1" },
     });
@@ -171,8 +166,8 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("updates existing outreach when recentOutreach exists (update undefined branch)", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce(makeSearchBuilder({ data: { id: 1 }, error: null }))
@@ -192,7 +187,6 @@ describe("app/routes/api+/questions/route.tsx", () => {
         }),
     };
     queueJsonAuthSession({
-      supabaseClient,
       headers,
       user: { id: "u1" },
     });
@@ -217,9 +211,9 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when updating recent outreach attempt errors", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
+    postgresServerMocks.headers = headers;
     const updateError = { message: "update bad" };
-    const supabaseClient = {
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce(makeSearchBuilder({ data: { id: 1 }, error: null }))
@@ -232,7 +226,6 @@ describe("app/routes/api+/questions/route.tsx", () => {
         }),
     };
     queueJsonAuthSession({
-      supabaseClient,
       headers,
       user: { id: "u1" },
     });
@@ -258,8 +251,8 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("covers data[0]?.id ?? null when recent update returns empty data", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce(makeSearchBuilder({ data: { id: 1 }, error: null }))
@@ -279,7 +272,6 @@ describe("app/routes/api+/questions/route.tsx", () => {
         }),
     };
     queueJsonAuthSession({
-      supabaseClient,
       headers,
       user: { id: "u1" },
     });
@@ -304,9 +296,9 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("returns 500 when final outreach update errors", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
+    postgresServerMocks.headers = headers;
     const updateError = { message: "final bad" };
-    const supabaseClient = {
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce(makeSearchBuilder({ data: null, error: { code: "PGRST116" } }))
@@ -320,7 +312,6 @@ describe("app/routes/api+/questions/route.tsx", () => {
       rpc: vi.fn().mockResolvedValueOnce({ data: 9, error: null }),
     };
     queueJsonAuthSession({
-      supabaseClient,
       headers,
       user: { id: "u1" },
     });

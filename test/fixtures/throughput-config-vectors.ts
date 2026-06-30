@@ -1,4 +1,4 @@
-import vectors from "../../supabase/functions/_shared/throughput-config-vectors.json";
+import vectors from "../shared/throughput-config-vectors.json";
 
 export type ThroughputConfigVector = (typeof vectors)[number];
 

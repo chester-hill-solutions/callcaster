@@ -1,11 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { stripeEventKey } from "@/lib/billing-keys";
 import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
@@ -60,9 +59,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return new Response("OK", { status: 200 });
     }
 
-    const supabase = createClient<Database>(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY(),
+    const client = createClient<Database>(
+      env.BASE_URL(),
+      env.BASE_URL(),
     );
 
     const { inserted } = await insertTransactionHistoryIdempotent({

@@ -12,7 +12,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (auth instanceof Response) return auth;
 
   const result = await getScriptDetailApi(
-    auth.supabase,
+    auth.client,
     scriptId,
     auth.workspaceId,
   );

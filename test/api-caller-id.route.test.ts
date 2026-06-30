@@ -27,19 +27,19 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 on workspace query error / missing data / missing twilio_data", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
-      error: "Supabase query error: q",
+      error: "Postgres query error: q",
       status: 500,
     });
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "No workspace data found",
       status: 500,
     });
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "Workspace twilio_data not found",
@@ -55,7 +55,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
 
     const r1 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
     expect(r1.status).toBe(500);
-    await expect(r1.json()).resolves.toMatchObject({ error: "Supabase query error: q" });
+    await expect(r1.json()).resolves.toMatchObject({ error: "Postgres query error: q" });
 
     const r2 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
     expect(r2.status).toBe(500);
@@ -67,7 +67,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 on invalid phone number length", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "Invalid phone number length",
@@ -89,7 +89,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 when Twilio validation request rejects", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "twilio down",
@@ -109,7 +109,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 on workspace_number upsert error", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "Error inserting workspace number: ins",
@@ -131,7 +131,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("happy path returns validationRequest + numberRequest (covers + in middle normalization)", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: true,
       validationRequest: { sid: "VR1" },

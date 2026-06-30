@@ -1,6 +1,6 @@
 # Railway schema transform (Phase 1)
 
-**Run only against Railway review Postgres** ([`visual-asset-review`](../docs/railway-review-env.md)). Do not apply to hosted Supabase prod.
+**Run only against Railway review Postgres** ([`visual-asset-review`](../docs/railway-review-env.md)). Do not apply to hosted Postgres prod.
 
 **Status on review (2026-06-29):** steps 00–05, 01c, 02/02b, 03/03a/03b, 08/08b applied. Sketches 06, 07, 09 pending. Baseline: [`drizzle/0000_baseline.sql`](../../drizzle/0000_baseline.sql).
 
@@ -49,10 +49,10 @@ railway run -- bash -lc 'bash scripts/schema-transform/apply-all.sh'
 ```bash
 railway run -- bash -lc 'bash scripts/schema-transform/dump-baseline.sh'
 drizzle-kit introspect   # regenerate app/db/schema.ts
-mv supabase/migrations/*.sql docs/archive/supabase-migrations/
+mv client/migrations/*.sql docs/archive/client-migrations/
 ```
 
 ## References
 
-- [`docs/supabase-postgres-migration-plan.md`](../../docs/supabase-postgres-migration-plan.md)
+- [`docs/client-postgres-migration-plan.md`](../../docs/client-postgres-migration-plan.md)
 - [`docs/railway-review-env.md`](../../docs/railway-review-env.md)

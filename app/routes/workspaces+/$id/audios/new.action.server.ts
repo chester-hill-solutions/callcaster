@@ -2,12 +2,12 @@ import { AudioUploadError, getSafeMediaBaseName, normalizeUploadedAudio } from "
 import { data as routeData, redirect } from "react-router";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request, params }: ActionFunctionArgs) {
 
-  const { supabaseClient, headers } = await verifyAuth(request);
+  const { headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -29,7 +29,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const safeMediaName = getSafeMediaBaseName(mediaName);
     const normalizedAudio = await normalizeUploadedAudio(mediaToUpload);
-    const { error: uploadError } = await supabaseClient.storage
+    const { error: uploadError } = await null.storage
       .from("workspaceAudio")
       .upload(
         `${workspaceId}/${safeMediaName}.${normalizedAudio.extension}`,

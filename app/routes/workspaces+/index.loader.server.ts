@@ -1,6 +1,6 @@
 import { listUserWorkspaces } from "@/lib/platform-workspace.server";
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 interface Workspace {
@@ -22,14 +22,14 @@ interface LoaderData {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
 
   const userId = user.id;
   if (!userId) {
     return redirect("/signin", { headers });
   }
 
-  const result = await listUserWorkspaces(supabaseClient, userId);
+  const result = await listUserWorkspaces(userId);
 
   if (!result.ok) {
     return { workspaces: null, userId: userId, error: result.error } satisfies LoaderData;

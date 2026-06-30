@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -39,9 +37,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const parsed = await parseJsonBodyOrResponse(request, legacyCallerIdBodySchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await verifyWorkspaceCallerId(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await verifyWorkspaceCallerId(    auth.user.id,
     parsed.workspace_id,
     parsed.phone_number,
     parsed.friendly_name,

@@ -1,8 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient } from "./supabase.server";
-import { env } from "./env.server";
-import type { Database } from "./database.types";
 import { createHash, timingSafeEqual } from "crypto";
+import { getSession, resolveBearerSessionUser } from "./auth.server";
 import { jsonError } from "./platform-api.server";
 import {
   findWorkspaceApiKeyByPrefix,
@@ -38,19 +35,16 @@ function extractBearerToken(request: Request): string | null {
 export type ApiKeyAuthResult = {
   authType: "api_key";
   workspaceId: string;
-  supabase: ReturnType<typeof createClient<Database>>;
 };
 
 export type BearerSessionAuthResult = {
   authType: "bearer";
-  supabaseClient: ReturnType<typeof createClient<Database>>;
   user: { id: string; email?: string };
   accessToken: string;
 };
 
 export type SessionAuthResult = {
   authType: "session";
-  supabaseClient: ReturnType<typeof createClient<Database>>;
   user: { id: string; email?: string };
 };
 
@@ -73,30 +67,14 @@ export type VerifyBearerOrSessionResult =
 async function resolveBearerSession(
   accessToken: string,
 ): Promise<BearerSessionAuthResult | AuthErrorResult> {
-  const supabaseClient = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_PUBLISHABLE_KEY(),
-    {
-      auth: { persistSession: false },
-      global: {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
-    },
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabaseClient.auth.getUser(accessToken);
-
-  if (!user || error) {
+  const user = await resolveBearerSessionUser(accessToken);
+  if (!user) {
     return { error: "Unauthorized", status: 401 };
   }
 
   return {
     authType: "bearer",
-    supabaseClient,
-    user: { id: user.id, email: user.email ?? undefined },
+    user: { id: user.id, email: user.email },
     accessToken,
   };
 }
@@ -104,20 +82,14 @@ async function resolveBearerSession(
 async function resolveCookieSession(
   request: Request,
 ): Promise<SessionAuthResult | AuthErrorResult> {
-  const { supabaseClient } = createSupabaseServerClient(request);
-  const {
-    data: { user },
-    error,
-  } = await supabaseClient.auth.getUser();
-
-  if (!user || error) {
+  const { user } = await getSession(request);
+  if (!user) {
     return { error: "Unauthorized", status: 401 };
   }
 
   return {
     authType: "session",
-    supabaseClient,
-    user: { id: user.id, email: user.email ?? undefined },
+    user: { id: user.id, email: user.email },
   };
 }
 
@@ -132,7 +104,7 @@ export async function verifyBearerOrSession(
 }
 
 export async function verifyApiKeyOrSession(
-  request: Request
+  request: Request,
 ): Promise<VerifyApiKeyOrSessionResult> {
   const authHeader = request.headers.get("Authorization");
   const apiKeyHeader = request.headers.get("X-API-Key");
@@ -154,16 +126,9 @@ export async function verifyApiKeyOrSession(
 
     void Promise.resolve(touchWorkspaceApiKeyLastUsed(row.id)).catch(() => undefined);
 
-    const supabase = createClient<Database>(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY(),
-      { auth: { persistSession: false } },
-    );
-
     return {
       authType: "api_key",
       workspaceId: row.workspace_id,
-      supabase,
     };
   }
 
@@ -200,12 +165,6 @@ export async function requireDualAuth(
   return result;
 }
 
-export function getDualAuthSupabase(
-  auth: ApiKeyAuthResult | BearerSessionAuthResult | SessionAuthResult,
-): ReturnType<typeof createClient<Database>> {
-  return auth.authType === "api_key" ? auth.supabase : auth.supabaseClient;
-}
-
 export function getDualAuthUser(
   auth: ApiKeyAuthResult | BearerSessionAuthResult | SessionAuthResult,
 ): { id: string; email?: string } | null {
@@ -216,29 +175,21 @@ export async function requireSudo(
   request: Request,
 ): Promise<
   | {
-      supabaseClient: ReturnType<typeof createClient<Database>>;
       user: { id: string; email?: string };
-      userData: Database["public"]["Tables"]["user"]["Row"];
+      userData: NonNullable<Awaited<ReturnType<typeof getUserById>>>;
     }
   | Response
 > {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
-  const supabaseClient = getAuthSupabaseClient(auth);
   const userData = await getUserById(auth.user.id);
 
   if (!userData || userData.access_level !== "sudo") {
     return jsonError("Forbidden", 403);
   }
 
-  return { supabaseClient, user: auth.user, userData };
-}
-
-export function getAuthSupabaseClient(
-  auth: BearerSessionAuthResult | SessionAuthResult,
-): ReturnType<typeof createClient<Database>> {
-  return auth.supabaseClient;
+  return { user: auth.user, userData };
 }
 
 /** Resolve dual-auth (API key or session) + headers + user. Throws Response on auth failure. */
@@ -247,9 +198,8 @@ export async function resolveDualAuthSession(request: Request) {
   if (auth instanceof Response) {
     throw auth;
   }
-  const { headers } = createSupabaseServerClient(request);
+  const { headers } = await getSession(request);
   return {
-    supabaseClient: getDualAuthSupabase(auth),
     headers,
     user: getDualAuthUser(auth) ?? undefined,
   };
@@ -261,9 +211,8 @@ export async function resolveJsonAuthSession(request: Request) {
   if (auth instanceof Response) {
     throw auth;
   }
-  const { headers } = createSupabaseServerClient(request);
+  const { headers } = await getSession(request);
   return {
-    supabaseClient: getAuthSupabaseClient(auth),
     headers,
     user: auth.user,
   };

@@ -13,9 +13,8 @@ import { formatDateToLocale } from "@/lib/utils";
 import { downloadBlobPart } from "@/lib/download-blob.client";
 import { useFetcher } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
-import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
 
-import type { Json , Database } from "@/lib/database.types";
+import type { Json , Database } from "@/lib/db-types";
 import type { User } from "@/lib/types";
 
 type ScriptSteps = {

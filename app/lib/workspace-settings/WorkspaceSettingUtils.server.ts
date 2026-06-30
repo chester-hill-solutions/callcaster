@@ -1,6 +1,5 @@
 import { data as routeData, redirect } from "react-router";
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import type { Database } from "@/lib/db-types";
 import { getWorkspaceUsers } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import {
@@ -17,7 +16,6 @@ import {
 export async function handleAddUser(
   formData: FormData,
   workspaceId: string,
-  supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const username = formData.get("username") as string;
@@ -27,7 +25,6 @@ export async function handleAddUser(
   }
   const cleanedName = username.toLowerCase().trim();
   const { data: users } = await getWorkspaceUsers({
-    supabaseClient,
     workspaceId,
   });
   const match = users?.filter((user) => {
@@ -55,7 +52,7 @@ export async function handleAddUser(
   }
 
   const { data: user, error: inviteUserError } =
-    await supabaseClient.functions.invoke("invite-user-by-email", {
+    await null.functions.invoke("invite-user-by-email", {
       body: {
         workspaceId,
         email: cleanedName,
@@ -85,7 +82,6 @@ export async function handleAddUser(
 export async function handleUpdateUser(
   formData: FormData,
   workspaceId: string,
-  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
@@ -111,7 +107,6 @@ export async function handleUpdateUser(
 export async function handleDeleteUser(
   formData: FormData,
   workspaceId: string,
-  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
@@ -135,7 +130,6 @@ export async function handleDeleteUser(
 export async function handleDeleteSelf(
   formData: FormData,
   workspaceId: string,
-  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
@@ -158,7 +152,6 @@ export async function handleDeleteSelf(
 export async function handleTransferWorkspace(
   formData: FormData,
   workspaceId: string,
-  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const currentOwnerUserId = formData.get("workspace_owner_id") as string;
@@ -182,7 +175,6 @@ export async function handleDeleteWorkspace({
   workspaceId,
 }: {
   workspaceId: string;
-  supabaseClient: SupabaseClient<Database>;
   headers: Headers;
 }) {
   try {
@@ -202,7 +194,6 @@ export async function removeInvite({
   formData,
 }: {
   workspaceId: string;
-  supabaseClient: SupabaseClient<Database>;
   formData: FormData;
   headers: Headers;
 }) {
@@ -219,7 +210,6 @@ export async function removeInvite({
 export async function handleUpdateWebhook(
   formData: FormData,
   workspaceId: string,
-  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const webhookId = formData.get("webhookId") as string;

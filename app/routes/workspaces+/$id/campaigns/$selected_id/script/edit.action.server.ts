@@ -4,7 +4,7 @@ import {
   updateCampaignMessageMedia,
 } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {

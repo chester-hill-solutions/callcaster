@@ -44,35 +44,35 @@ describe("auto-dial.server", () => {
   });
 
   test("getNextAutoDialQueueContact returns first record", async () => {
-    const supabase = {
+    const client = {
       rpc: vi.fn().mockResolvedValue({ data: [{ queue_id: 1 }], error: null }),
     };
-    const result = await getNextAutoDialQueueContact(supabase as never, 1, "user-1");
+    const result = await getNextAutoDialQueueContact(client as never, 1, "user-1");
     expect(result).toEqual({ queue_id: 1 });
   });
 
   test("getNextAutoDialQueueContact returns null when empty", async () => {
-    const supabase = {
+    const client = {
       rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     };
-    expect(await getNextAutoDialQueueContact(supabase as never, 1, "user-1")).toBeNull();
+    expect(await getNextAutoDialQueueContact(client as never, 1, "user-1")).toBeNull();
   });
 
   test("getNextAutoDialQueueContact throws on rpc error", async () => {
-    const supabase = {
+    const client = {
       rpc: vi.fn().mockResolvedValue({ data: null, error: new Error("rpc fail") }),
     };
     await expect(
-      getNextAutoDialQueueContact(supabase as never, 1, "user-1"),
+      getNextAutoDialQueueContact(client as never, 1, "user-1"),
     ).rejects.toThrow("rpc fail");
   });
 
   test("createOutreachAttempt calls rpc and returns data", async () => {
-    const supabase = {
+    const client = {
       rpc: vi.fn().mockResolvedValue({ data: { id: 9 }, error: null }),
     };
     const result = await createOutreachAttempt(
-      supabase as never,
+      client as never,
       { queue_id: 1, contact_id: 2, contact_phone: "+15551234567" },
       3,
       "ws-1",

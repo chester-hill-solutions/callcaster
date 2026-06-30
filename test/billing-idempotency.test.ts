@@ -15,10 +15,10 @@ describe("billing idempotency", () => {
   test("inserts a row with deterministic idempotency_key", async () => {
     const rows: TransactionRow[] = [];
     const rpc = makeApplyLedgerEntryRpcStub(rows);
-    const supabase: any = { rpc };
+    const client: any = { rpc };
 
     const res = await insertTransactionHistoryIdempotent({
-      supabase,
+      client,
       workspaceId: "w1",
       type: "DEBIT",
       amount: -2,
@@ -35,10 +35,10 @@ describe("billing idempotency", () => {
   test("returns inserted:false when DB unique constraint reports duplicate", async () => {
     const rows: TransactionRow[] = [];
     const rpc = makeApplyLedgerEntryRpcStub(rows);
-    const supabase: any = { rpc };
+    const client: any = { rpc };
 
     await insertTransactionHistoryIdempotent({
-      supabase,
+      client,
       workspaceId: "w1",
       type: "DEBIT",
       amount: -1,
@@ -46,7 +46,7 @@ describe("billing idempotency", () => {
       idempotencyKey: "sms:abc",
     });
     const res = await insertTransactionHistoryIdempotent({
-      supabase,
+      client,
       workspaceId: "w1",
       type: "DEBIT",
       amount: -1,
@@ -60,11 +60,11 @@ describe("billing idempotency", () => {
 
   test("throws when idempotency key is blank", async () => {
     const rows: TransactionRow[] = [];
-    const supabase: any = { rpc: makeApplyLedgerEntryRpcStub(rows) };
+    const client: any = { rpc: makeApplyLedgerEntryRpcStub(rows) };
 
     await expect(
       insertTransactionHistoryIdempotent({
-        supabase,
+        client,
         workspaceId: "w1",
         type: "DEBIT",
         amount: -1,
@@ -75,13 +75,13 @@ describe("billing idempotency", () => {
   });
 
   test("throws when RPC returns an error", async () => {
-    const supabase: any = {
+    const client: any = {
       rpc: async () => ({ data: null, error: new Error("rpc failed") }),
     };
 
     await expect(
       insertTransactionHistoryIdempotent({
-        supabase,
+        client,
         workspaceId: "w1",
         type: "DEBIT",
         amount: -1,

@@ -3,9 +3,9 @@ import { describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  createSupabaseServerClient: vi.fn(() => ({
+  getSession: vi.fn(() => ({
     headers: new Headers(),
-    supabaseClient: {
+    null: {
       auth: {
         getSession: vi.fn(async () => ({ data: { session: null } })),
       },
@@ -14,8 +14,8 @@ const mocks = vi.hoisted(() => ({
   registerUser: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: mocks.createSupabaseServerClient,
+vi.mock("@/lib/auth.server", () => ({
+  getSession: mocks.getSession,
 }));
 
 vi.mock("@/lib/platform-auth.server", () => ({

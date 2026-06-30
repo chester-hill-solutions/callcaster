@@ -210,7 +210,7 @@ export default function SelectDates({
       }
     }), {} as Record<DayName, ScheduleDay>);
     
-    // Convert to a JSONB-compatible string for Supabase
+    // Convert to a JSONB-compatible string for Postgres
     handleInputChange("schedule", JSON.stringify(cleanSchedule));
     setShowSchedule(false);
   };

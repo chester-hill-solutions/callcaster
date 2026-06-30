@@ -9,15 +9,13 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
-function makeSupabase(opts: { insertResult?: { data: unknown; error: unknown } }) {
+function makeDbClient(opts: { insertResult?: { data: unknown; error: unknown } }) {
   return {
     from: vi.fn((table: string) => {
       if (table === "verification_session") {
@@ -55,7 +53,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
 
   test("loader returns 401 when user missing", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
+      null: makeDbClient({}),
       headers: new Headers(),
       user: null,
     });
@@ -73,7 +71,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
 
   test("loader returns 503 when VERIFICATION_PHONE_NUMBER not configured", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
+      null: makeDbClient({}),
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -93,7 +91,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
 
   test("loader returns 400 when phoneNumber missing", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
+      null: makeDbClient({}),
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -111,7 +109,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
 
   test("loader returns 400 when phoneNumber invalid", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
+      null: makeDbClient({}),
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -127,7 +125,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   });
 
   test("loader success creates session and returns phone number", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       insertResult: {
         data: {
           id: "vs-abc",
@@ -141,7 +139,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
       },
     });
     queueJsonAuthSession({
-      supabaseClient: supabase,
+      null: client,
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -165,11 +163,11 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   });
 
   test("loader returns 500 when insert fails", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       insertResult: { data: null, error: { message: "db error" } },
     });
     queueJsonAuthSession({
-      supabaseClient: supabase,
+      null: client,
       headers: new Headers(),
       user: { id: "u1" },
     });

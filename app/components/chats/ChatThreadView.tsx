@@ -2,10 +2,8 @@ import ChatMessages from "@/components/sms-ui/ChatMessages";
 import { ChatOptOutBanner } from "@/components/chats/ChatOptOutBanner";
 import { useChatThread } from "@/hooks/chats/useChatThread";
 import type { Workspace, WorkspaceNumber } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 type ChatThreadViewProps = {
-  supabase: SupabaseClient;
   workspace: NonNullable<Workspace>;
   registerChatActions?: (
     actions: {
@@ -21,8 +19,7 @@ type ChatThreadViewProps = {
 };
 
 export function ChatThreadView({
-  supabase,
-  workspace,
+    workspace,
   registerChatActions,
   contactOptOut,
 }: ChatThreadViewProps) {
@@ -36,8 +33,7 @@ export function ChatThreadView({
     loadingOlder,
     optedOut,
   } = useChatThread({
-    supabase,
-    workspace,
+        workspace,
     registerChatActions,
     contactOptOut,
   });

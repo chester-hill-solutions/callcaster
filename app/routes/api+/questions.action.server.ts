@@ -1,11 +1,13 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
+import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 
 import type { ActionFunctionArgs } from "react-router";
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 
 interface RequestData {
   update?: Json;
@@ -152,14 +154,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getAuthSupabaseClient(auth);
-  const user = auth.user;
+  const { headers } = await getSession(request);  const user = auth.user;
     const { update, contact_id, campaign_id, workspace, disposition, queue_id }: RequestData = await safeParseJson(request);
-    await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId: workspace });
+    await requireWorkspaceAccess({ user, workspaceId: workspace });
     const typedFields = extractTypedOutreachFields(update);
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const { data: recentOutreach, error: searchError } = await supabase
+    const { data: recentOutreach, error: searchError } = await client
         .from('outreach_attempt')
         .select()
         .eq('contact_id', contact_id)
@@ -177,7 +177,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let outreachAttemptId: number | null = null;
 
     if (recentOutreach) {
-        const { data, error } = await supabase
+        const { data, error } = await client
             .from('outreach_attempt')
             .update({
                 ...(update !== undefined ? { result: update as Json } : {}),
@@ -194,21 +194,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         outreachAttemptId = data[0]?.id ?? null;
     } else {
-        const { data, error } = await supabase.rpc('create_outreach_attempt', {
-            con_id: contact_id,
-            cam_id: campaign_id,
-            queue_id,
-            wks_id: workspace,
-            usr_id: user.id
-        });
-
-        if (error) {
+        try {
+          outreachAttemptId = await rpcCreateOutreachAttempt(db, {
+            contactId: Number(contact_id),
+            campaignId: Number(campaign_id),
+            userId: user.id,
+            workspaceId: workspace,
+            queueId: Number(queue_id),
+          });
+        } catch (error) {
             logger.error("Error creating outreach attempt:", error);
             return routeData({ error }, { status: 500, headers });
         }
-        outreachAttemptId = typeof data === 'number' ? data : Number(data);
     }
-    const { data: updatedOutreach, error: updateError } = await supabase
+    const { data: updatedOutreach, error: updateError } = await client
         .from('outreach_attempt')
         .update({
             ...(update !== undefined ? { result: update as Json } : {}),

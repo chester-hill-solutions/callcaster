@@ -1,8 +1,6 @@
 import { data as routeData } from "react-router";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
@@ -23,15 +21,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  try {
-    const supabase = getAuthSupabaseClient(auth);
-    await requireWorkspaceAccess({ supabaseClient: supabase,
-      user: auth.user,
+  try {    await requireWorkspaceAccess({ user: auth.user,
       workspaceId: workspace,
     });
 
-    const result = await createHandsetAccessToken({ supabaseClient: supabase,
-      workspaceId: workspace,
+    const result = await createHandsetAccessToken({ workspaceId: workspace,
       clientIdentity,
     });
 

@@ -43,7 +43,7 @@ describe("app/lib/database/contact.server.ts", () => {
   test("findPotentialContacts prioritizes exact indexed lookup and narrows fallback", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const supabase: any = {
+    const client: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
@@ -54,9 +54,9 @@ describe("app/lib/database/contact.server.ts", () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
-    const res = await mod.findPotentialContacts(supabase, "(555) 555-0100", "w1");
+    const res = await mod.findPotentialContacts(client, "(555) 555-0100", "w1");
 
-    expect(supabase.rpc).toHaveBeenCalledWith("find_contact_by_phone", {
+    expect(adminDb.rpc).toHaveBeenCalledWith("find_contact_by_phone", {
       p_workspace_id: "w1",
       p_phone_number: "(555) 555-0100",
     });
@@ -67,7 +67,7 @@ describe("app/lib/database/contact.server.ts", () => {
   test("fetchContactData: by number only promotes a unique match to contact", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const supabase: any = {
+    const client: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
@@ -76,7 +76,7 @@ describe("app/lib/database/contact.server.ts", () => {
 
     tdbMocks.contact.findMany.mockResolvedValueOnce([{ id: 1 }]);
 
-    const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
+    const res = await mod.fetchContactData(client, "w1", "", "5555550100");
     expect(res.contact).toEqual({ id: 1 });
     expect(res.contactError).toBeNull();
     expect(res.potentialContacts).toEqual([]);
@@ -85,7 +85,7 @@ describe("app/lib/database/contact.server.ts", () => {
   test("fetchContactData: by number only handles null data", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const supabase: any = {
+    const client: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
@@ -94,14 +94,14 @@ describe("app/lib/database/contact.server.ts", () => {
 
     tdbMocks.contact.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
-    const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
+    const res = await mod.fetchContactData(client, "w1", "", "5555550100");
     expect(res.potentialContacts).toEqual([]);
   });
 
   test("fetchContactData: by number only keeps ambiguous matches as potential contacts", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
-    const supabase: any = {
+    const client: any = {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("rpc unavailable"),
@@ -114,22 +114,22 @@ describe("app/lib/database/contact.server.ts", () => {
       { id: 2 },
     ]);
 
-    const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
+    const res = await mod.fetchContactData(client, "w1", "", "5555550100");
     expect(res.contact).toBeNull();
     expect(res.potentialContacts).toEqual([{ id: 1 }, { id: 2 }]);
   });
 
   test("fetchContactData: by contact_id sets contact or contactError", async () => {
     const mod = await import("../app/lib/database/contact.server");
-    const supabase: any = {};
+    const client: any = {};
 
     tdbMocks.contact.findFirst.mockResolvedValueOnce({ id: 2 });
-    const ok = await mod.fetchContactData(supabase, "w1", 2, "");
+    const ok = await mod.fetchContactData(client, "w1", 2, "");
     expect(ok.contact).toEqual({ id: 2 });
     expect(ok.contactError).toBeNull();
 
     tdbMocks.contact.findFirst.mockRejectedValueOnce(new Error("nope"));
-    const bad = await mod.fetchContactData(supabase, "w1", 2, "");
+    const bad = await mod.fetchContactData(client, "w1", 2, "");
     expect(bad.contact).toBeNull();
     expect(bad.contactError).toBeInstanceOf(Error);
   });

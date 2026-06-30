@@ -1,4 +1,4 @@
-import { requireJsonAuth, getAuthSupabaseClient } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { resetPasswordBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -16,7 +16,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, resetPasswordBodySchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await resetPassword(getAuthSupabaseClient(auth), parsed);
+  const result = await resetPassword(null /* removed */ (auth), parsed);
   if (!result.ok) {
     return jsonError(result.error, result.status);
   }

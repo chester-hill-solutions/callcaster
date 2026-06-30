@@ -1,6 +1,6 @@
 /**
  * CallCaster Option B rate card (hard cut, no grandfathering).
- * Shared by Remix server modules and Supabase Edge functions.
+ * Shared by Remix server modules and Postgres Edge functions.
  */
 
 export const CREDIT_PRICE_CAD = 0.02;

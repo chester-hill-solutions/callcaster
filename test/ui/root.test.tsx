@@ -10,11 +10,11 @@ const mocks = vi.hoisted(() => {
     unsubscribe: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     envUtil: {
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "pk"),
+      BETTER_AUTH_URL: vi.fn(() => "http://client"),
+      BETTER_AUTH_PUBLISHABLE_KEY: vi.fn(() => "pk"),
       BASE_URL: vi.fn(() => "http://base"),
     },
-    createSupabaseServerClient: vi.fn(),
+    getSession: vi.fn(),
     createBrowserClient: vi.fn(),
   };
 });
@@ -34,12 +34,12 @@ vi.mock("@/components/shared/ErrorBoundary", () => ({
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.envUtil }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: (...args: any[]) =>
-    mocks.createSupabaseServerClient(...args),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: (...args: any[]) =>
+    mocks.getSession(...args),
 }));
 
-vi.mock("@supabase/ssr", () => ({
+vi.mock("@client/ssr", () => ({
   createBrowserClient: (...args: any[]) => mocks.createBrowserClient(...args),
 }));
 
@@ -66,10 +66,10 @@ describe("root.tsx", () => {
     mocks.navigate.mockReset();
     mocks.unsubscribe.mockReset();
     mocks.logger.error.mockReset();
-    mocks.envUtil.SUPABASE_URL.mockClear();
-    mocks.envUtil.SUPABASE_PUBLISHABLE_KEY.mockClear();
+    mocks.envUtil.BETTER_AUTH_URL.mockClear();
+    mocks.envUtil.BETTER_AUTH_PUBLISHABLE_KEY.mockClear();
     mocks.envUtil.BASE_URL.mockClear();
-    mocks.createSupabaseServerClient.mockReset();
+    mocks.getSession.mockReset();
     mocks.createBrowserClient.mockReset();
   });
 
@@ -94,15 +94,13 @@ describe("root.tsx", () => {
   });
 
   test("loader does not redirect when decoded q is missing contactId or surveyId", async () => {
-    const supabase = {
+    const client = {
       auth: {
         getSession: vi.fn(async () => ({ data: { session: { access_token: null } } })),
         getUser: vi.fn(async () => ({ data: { user: null } })),
       },
     };
-    mocks.createSupabaseServerClient.mockReturnValueOnce({
-      supabaseClient: supabase,
-      headers: new Headers(),
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers(),
     });
 
     const mod = await import("../../app/root");
@@ -115,15 +113,13 @@ describe("root.tsx", () => {
   });
 
   test("loader logs when q decode fails and continues; no-user returns workspaces null", async () => {
-    const supabase = {
+    const client = {
       auth: {
         getSession: vi.fn(async () => ({ data: { session: { access_token: null } } })),
         getUser: vi.fn(async () => ({ data: { user: null } })),
       },
     };
-    mocks.createSupabaseServerClient.mockReturnValueOnce({
-      supabaseClient: supabase,
-      headers: new Headers({ "Set-Cookie": "a=1" }),
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers({ "Set-Cookie": "a=1" }),
     });
 
     const mod = await import("../../app/root");
@@ -143,7 +139,7 @@ describe("root.tsx", () => {
   });
 
   test("loader with user and no errors does not log errors", async () => {
-    const supabase = {
+    const client = {
       auth: {
         getSession: vi.fn(async () => ({ data: { session: { access_token: "t" } } })),
         getUser: vi.fn(async () => ({ data: { user: { id: "u1" } } })),
@@ -173,9 +169,7 @@ describe("root.tsx", () => {
         throw new Error(`Unexpected table ${table}`);
       }),
     };
-    mocks.createSupabaseServerClient.mockReturnValueOnce({
-      supabaseClient: supabase,
-      headers: new Headers(),
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers(),
     });
 
     const mod = await import("../../app/root");
@@ -191,7 +185,7 @@ describe("root.tsx", () => {
   });
 
   test("loader with user loads user/workspaces and logs when errors present", async () => {
-    const supabase = {
+    const client = {
       auth: {
         getSession: vi.fn(async () => ({ data: { session: { access_token: "t" } } })),
         getUser: vi.fn(async () => ({ data: { user: { id: "u1" } } })),
@@ -221,9 +215,7 @@ describe("root.tsx", () => {
         throw new Error(`Unexpected table ${table}`);
       }),
     };
-    mocks.createSupabaseServerClient.mockReturnValueOnce({
-      supabaseClient: supabase,
-      headers: new Headers(),
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers(),
     });
 
     const mod = await import("../../app/root");
@@ -239,7 +231,7 @@ describe("root.tsx", () => {
     );
   });
 
-  test("App signOut returns error json when supabase signOut fails; covers PASSWORD_RECOVERY branch and cleanup", async () => {
+  test("App signOut returns error json when client signOut fails; covers PASSWORD_RECOVERY branch and cleanup", async () => {
     const auth = {
       signOut: vi.fn(async () => ({ error: { message: "bad" } })),
       onAuthStateChange: vi.fn((cb: any) => {
@@ -249,7 +241,7 @@ describe("root.tsx", () => {
     };
     mocks.createBrowserClient.mockReturnValueOnce({ auth });
     mocks.loaderData = {
-      env: { SUPABASE_URL: "http://supabase", SUPABASE_KEY: "pk", BASE_URL: "http://base" },
+      env: { BETTER_AUTH_URL: "http://client", BETTER_AUTH_KEY: "pk", BASE_URL: "http://base" },
       session: { access_token: "t" },
       workspaces: [],
       user: null,
@@ -281,7 +273,7 @@ describe("root.tsx", () => {
     };
     mocks.createBrowserClient.mockReturnValueOnce({ auth });
     mocks.loaderData = {
-      env: { SUPABASE_URL: "http://supabase", SUPABASE_KEY: "pk", BASE_URL: "http://base" },
+      env: { BETTER_AUTH_URL: "http://client", BETTER_AUTH_KEY: "pk", BASE_URL: "http://base" },
       session: { access_token: null },
       workspaces: null,
       user: { id: "u1" },

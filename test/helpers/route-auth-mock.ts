@@ -2,7 +2,6 @@ import { beforeEach } from "vitest";
 import { getRouteAuthMocks } from "../setup-route-auth-mock";
 
 export type RouteAuthSessionInput = {
-  supabaseClient?: unknown;
   user?: { id: string; email?: string } | null;
   headers?: Headers;
   authType?: "session" | "bearer";
@@ -24,7 +23,6 @@ function buildJsonAuth(session: RouteAuthSessionInput) {
   const authType = session.authType ?? "session";
   return {
     authType,
-    supabaseClient: session.supabaseClient ?? {},
     user: session.user,
     ...(authType === "bearer" ? { accessToken: "test-token" } : {}),
   };
@@ -40,7 +38,6 @@ function buildDualAuth(session: RouteAuthSessionInput) {
   return {
     authType: "api_key" as const,
     workspaceId: "w-test",
-    supabase: session.supabaseClient ?? {},
   };
 }
 
@@ -49,7 +46,6 @@ function buildSudoAuth(session: RouteAuthSessionInput) {
     return forbiddenResponse();
   }
   return {
-    supabaseClient: session.supabaseClient ?? {},
     user: session.user,
     userData: session.userData ?? {
       id: session.user.id,
@@ -80,7 +76,6 @@ export function setDualAuthSession(session: RouteAuthSessionInput): unknown {
     session.user ? buildJsonAuth(session) : unauthorizedResponse(),
   );
   const sessionResult = {
-    supabaseClient: session.supabaseClient ?? {},
     headers: session.headers ?? new Headers(),
     user: session.user ?? undefined,
   };
@@ -104,7 +99,6 @@ export function setJsonAuthSession(session: RouteAuthSessionInput): unknown {
   const auth = buildJsonAuth(session);
   routeAuthMocks.requireJsonAuth.mockResolvedValue(auth);
   routeAuthMocks.resolveJsonAuthSession.mockResolvedValue({
-    supabaseClient: session.supabaseClient ?? {},
     headers: session.headers ?? new Headers(),
     user: session.user ?? undefined,
   });

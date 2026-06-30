@@ -21,7 +21,7 @@ vi.mock("@/twilio.server", () => {
   };
 });
 
-function makeSupabaseStub(args: { currentDisposition: string }) {
+function makeDbClientStub(args: { currentDisposition: string }) {
   const outreachUpdateCalls: any[] = [];
 
   const from = (table: string) => {
@@ -98,14 +98,14 @@ function makeSupabaseStub(args: { currentDisposition: string }) {
   return { from, realtime: { channel: () => ({ send: vi.fn() }) }, rpc: async () => ({ data: { id: 1, inserted: true }, error: null }), _outreachUpdateCalls: outreachUpdateCalls };
 }
 
-let supabaseStub: ReturnType<typeof makeSupabaseStub>;
-const supabaseState = vi.hoisted(() => ({ supabase: null as any }));
+let postgresStub: ReturnType<typeof makeDbClientStub>;
+const clientState = vi.hoisted(() => ({ client: null as any }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => supabaseState.supabase,
+vi.mock("@client/client-js", () => ({
+  createClient: () => clientState.client,
 }));
-vi.mock("@/lib/supabase.server", () => ({
-  getServiceSupabase: () => supabaseState.supabase,
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => clientState.client,
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
   validateTwilioWebhookForCallSid: vi.fn(async () => ({ ok: true as const })),
@@ -118,8 +118,8 @@ describe("outreach disposition transitions", () => {
   });
 
   test("api.call-status does not overwrite terminal disposition with a different value", async () => {
-    supabaseStub = makeSupabaseStub({ currentDisposition: "completed" });
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = makeDbClientStub({ currentDisposition: "completed" });
+    clientState.client = postgresStub as any;
 
     const mod = await import("../app/routes/api+/call-status");
     const fd = new FormData();
@@ -135,7 +135,7 @@ describe("outreach disposition transitions", () => {
 
     const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(200);
-    expect(supabaseStub._outreachUpdateCalls.length).toBe(0);
+    expect(postgresStub._outreachUpdateCalls.length).toBe(0);
   });
 });
 

@@ -21,24 +21,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+      - name: Setup Postgres CLI
+        uses: client/setup-cli@v1
         with:
           version: latest
 
-      - name: Start Supabase
-        run: supabase start
+      - name: Start Postgres
+        run: client start
 
       - name: Reset database
-        run: supabase db reset
+        run: client db reset
 
-      - name: Export Supabase env
+      - name: Export Postgres env
         run: |
-          eval "$(supabase status -o env)"
-          echo "SUPABASE_URL=${API_URL}" >> "$GITHUB_ENV"
-          echo "SUPABASE_ANON_KEY=${ANON_KEY}" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
-          echo "SUPABASE_PUBLISHABLE_KEY=${ANON_KEY}" >> "$GITHUB_ENV"
+          eval "$(client status -o env)"
+          echo "AUTH_URL=${API_URL}" >> "$GITHUB_ENV"
+          echo "AUTH_ANON_KEY=${ANON_KEY}" >> "$GITHUB_ENV"
+          echo "AUTH_SERVICE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
+          echo "AUTH_PUBLISHABLE_KEY=${ANON_KEY}" >> "$GITHUB_ENV"
 
       - name: Seed E2E data
         run: npm run test:e2e:seed
@@ -90,8 +90,8 @@ jobs:
         env:
           CI: "true"
           E2E_BASE_URL: http://localhost:3000
-          SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ env.SUPABASE_SERVICE_KEY }}
+          AUTH_URL: ${{ env.AUTH_URL }}
+          AUTH_SERVICE_KEY: ${{ env.AUTH_SERVICE_KEY }}
 
       - name: Upload Playwright report
         if: failure()

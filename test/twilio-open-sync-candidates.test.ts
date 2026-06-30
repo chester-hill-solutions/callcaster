@@ -6,12 +6,12 @@ import {
   parseTwilioOpenSyncBody,
   staleBeforeIso,
   TWILIO_OPEN_SYNC_MIN_DATE_CREATED,
-} from "../supabase/functions/_shared/twilio-open-sync-candidates.ts";
+} from "../shared/twilio-open-sync-candidates.ts";
 import {
   CALL_STATUSES_BILLABLE_ON_COMPLETION,
   isActiveCallStatusForSync,
   normalizeProviderStatus,
-} from "../supabase/functions/_shared/call-provider-status.ts";
+} from "../shared/call-provider-status.ts";
 
 describe("twilio-open-sync-candidates", () => {
   test("TWILIO_OPEN_SYNC_MIN_DATE_CREATED is Apr 1 2026 (UTC calendar day)", () => {

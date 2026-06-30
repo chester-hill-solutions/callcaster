@@ -1,6 +1,6 @@
 import { data as routeData, redirect } from "react-router";
 import { createEmptyAudience } from "@/lib/audience-upload-db.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request, params }: ActionFunctionArgs) {

@@ -1,9 +1,7 @@
 import { createErrorResponse } from "@/lib/errors.server";
 import { parseActionRequest } from "@/lib/database.server";
 import { purchaseWorkspaceNumber } from "@/lib/platform-workspace-numbers.server";
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { z } from "zod";
@@ -40,9 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const workspaceId = parsed.data.workspace_id;
     const phoneNumber = parsed.data.phone_number ?? parsed.data.phoneNumber!;
 
-    const result = await purchaseWorkspaceNumber(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await purchaseWorkspaceNumber(      auth.user.id,
       workspaceId,
       phoneNumber,
     );

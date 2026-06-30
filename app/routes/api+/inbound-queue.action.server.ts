@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { getUserRole } from "@/lib/database.server";
 import {
@@ -18,17 +16,13 @@ import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const supabaseClient = getAuthSupabaseClient(auth);
-  const body = await request.json().catch(() => ({}));
+  if (auth instanceof Response) return auth;  const body = await request.json().catch(() => ({}));
   const workspaceId = body.workspace_id;
   if (!workspaceId) {
     return jsonError("workspace_id required", 400);
   }
 
   const userRole = await getUserRole({
-    supabaseClient,
     user: { id: auth.user.id },
     workspaceId,
   });

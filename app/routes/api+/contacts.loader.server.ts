@@ -1,16 +1,15 @@
 import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
+import { searchContactsForQueuePicker } from "@/lib/database/contact.server";
 import { getQueuedContactIdsForCampaign } from "@/lib/campaign-queue-db.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-
+export async function searchContactsLoader(request: Request) {
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const supabaseClient = getDualAuthSupabase(auth);
   const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -25,47 +24,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const [
-      { data: contacts, error },
-      { data: phoneContacts, error: phoneError },
-      { data: emailContacts, error: emailError }
-    ] = await Promise.all([
-      supabaseClient
-        .from('contact')
-        .select(`*, contact_audience(audience_id)`)
-        .textSearch('fullname', searchQuery)
-        .eq('workspace', workspaceId)
-        .limit(10),
-      supabaseClient
-        .from('contact')
-        .select('*, contact_audience(audience_id)')
-        .ilike('phone', `%${searchQuery}%`)
-        .eq('workspace', workspaceId)
-        .limit(10),
-      supabaseClient
-        .from('contact')
-        .select('*, contact_audience(audience_id)')
-        .ilike('email', `%${searchQuery}%`)
-        .eq('workspace', workspaceId)
-        .limit(10)
-    ]);
-    if (error || phoneError || emailError) throw error || phoneError || emailError;
-    const allContacts = [...contacts, ...phoneContacts, ...emailContacts].filter(Boolean) as Contact[];
+    const allContacts = await searchContactsForQueuePicker(workspaceId, searchQuery);
     if (allContacts.length === 0) {
       return routeData({ contacts: [] });
-    } else {
-      const queuedContactIds = await getQueuedContactIdsForCampaign({
-        campaignId: Number(campaignId),
-        contactIds: allContacts.map((contact) => contact?.id).filter(Boolean) as number[],
-      });
-      const queuedContactIdSet = new Set(queuedContactIds);
-      const contacts = allContacts.map((contact) => ({
-        ...contact,
-        queued: queuedContactIdSet.has(contact?.id),
-      }));
-      return routeData({ contacts });
     }
+
+    const queuedContactIds = await getQueuedContactIdsForCampaign({
+      campaignId: Number(campaignId),
+      contactIds: allContacts.map((contact) => contact?.id).filter(Boolean) as number[],
+    });
+    const queuedContactIdSet = new Set(queuedContactIds);
+    const contacts = allContacts.map((contact) => ({
+      ...contact,
+      queued: queuedContactIdSet.has(contact?.id),
+    }));
+    return routeData({ contacts });
   } catch (err) {
-    return handleError(err instanceof Error ? err : new Error(String(err)), 'Error searching contacts');
+    return handleError(err instanceof Error ? err : new Error(String(err)), "Error searching contacts");
   }
 }
+
+export const loader = async ({ request }: LoaderFunctionArgs) => searchContactsLoader(request);

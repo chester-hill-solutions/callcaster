@@ -11,9 +11,8 @@ import {
 } from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import type { WorkspaceTwilioPortalSnapshot } from "@/lib/types";
 
@@ -56,7 +55,6 @@ export interface TwilioPageData {
 }
 
 export async function loadTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ): Promise<TwilioPageData> {
 
@@ -69,7 +67,6 @@ export async function loadTwilioData(
   let billingReconciliationSnapshot: BillingReconciliationSnapshot | null = null;
 
   const portalSnapshot = await getWorkspaceTwilioPortalSnapshot({
-    supabaseClient,
     workspaceId,
   }).catch((error): WorkspaceTwilioPortalSnapshot => {
     logger.error("Error fetching Twilio portal snapshot:", error);
@@ -84,9 +81,7 @@ export async function loadTwilioData(
       workspace?.twilio_data,
     );
     if (adminTwilioCreds?.sid) {
-      const twilio = await createWorkspaceTwilioInstance({
-        supabase: supabaseClient,
-        workspace_id: workspaceId,
+      const twilio = await createWorkspaceTwilioInstance({         workspace_id: workspaceId,
       });
       const [account, numbers, usageRecords] = await Promise.all([
         twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch(),
@@ -125,7 +120,6 @@ export async function loadTwilioData(
       }));
 
       billingReconciliation = await loadBillingReconciliationReport({
-        supabaseClient,
         workspaceId,
         twilioUsage,
       }).catch((reconcileError) => {

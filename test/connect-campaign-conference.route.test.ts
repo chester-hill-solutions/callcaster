@@ -4,7 +4,7 @@ import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
   validateTwilioWebhookForWorkspace: vi.fn(),
-  getServiceSupabase: vi.fn(),
+  getAdminDb: vi.fn(),
   findCampaignInWorkspace: vi.fn(),
 }));
 
@@ -26,8 +26,8 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
   findCampaignInWorkspace: (...args: unknown[]) => mocks.findCampaignInWorkspace(...args),
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  getServiceSupabase: () => mocks.getServiceSupabase(),
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => mocks.null /* removed service client */,
 }));
 
 vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
@@ -62,7 +62,7 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
       authToken: "token",
       workspaceId: "w1",
     });
-    mocks.getServiceSupabase.mockReturnValue({});
+    mocks.getAdminDb.mockReturnValue({});
     mocks.findCampaignInWorkspace.mockResolvedValue({ id: 1 });
   });
 

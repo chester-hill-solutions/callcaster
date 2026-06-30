@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => {
     findActiveHandsetSessionClientIdentity: vi.fn(),
     resolveWorkspaceTwilioData: vi.fn(),
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "twilio-auth",
       BASE_URL: () => "https://base.example",
     },
@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...a: any[]) => mocks.createClient(...a),
 }));
 vi.mock("@/lib/utils", () => ({
@@ -138,12 +138,12 @@ function toInboundNumber(number: {
   };
 }
 
-function makeSupabase(opts?: {
+function makeDbClient(opts?: {
   voicemailSignedUrl?: string | null;
   voicemailList?: { id?: string; name: string }[] | null;
   voicemailListSpy?: (...args: unknown[]) => void;
 }) {
-  const supabase: {
+  const client: {
     storage: {
       from: () => {
         list: (...args: unknown[]) => Promise<{ data: unknown[]; error: null }>;
@@ -166,7 +166,7 @@ function makeSupabase(opts?: {
       }),
     },
   };
-  return supabase;
+  return client;
 }
 
 describe("app/routes/api+/inbound/route.tsx", () => {
@@ -188,7 +188,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.findInboundIvrScriptSteps.mockResolvedValue(null);
     mocks.findActiveHandsetSessionClientIdentity.mockResolvedValue(null);
     mocks.resolveWorkspaceTwilioData.mockImplementation(
-      async (_supabase, _workspaceId, twilioData) =>
+      async (_postgres, _workspaceId, twilioData) =>
         twilioData ?? { account_sid: "ac", auth_token: "at" },
     );
     mocks.logger.error.mockReset();
@@ -196,8 +196,8 @@ describe("app/routes/api+/inbound/route.tsx", () => {
   });
 
   test("returns 400 when Called missing", async () => {
-    const supabase = makeSupabase();
-    mocks.createClient.mockReturnValueOnce(supabase);
+    const client = makeDbClient();
+    mocks.createClient.mockReturnValueOnce(client);
     const mod = await import("../app/routes/api+/inbound");
     const res = await asRouteResponse(
       await mod.action({
@@ -212,7 +212,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
 
   test("workspace number not found returns 404", async () => {
     mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(null);
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
@@ -234,7 +234,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         workspace: { id: "w1" },
       }),
     );
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
 
     const mod = await import("../app/routes/api+/inbound");
     const fd = new FormData();
@@ -265,7 +265,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       toInboundNumber(baseNumber),
     );
     mocks.getWorkspaceWebhookRow.mockResolvedValue({ event: ["INSERT"] });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
 
     const fd = new FormData();
     fd.set("Called", "+1");
@@ -289,7 +289,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       }),
     );
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
+      makeDbClient({
         voicemailSignedUrl: "https://signed",
         voicemailList: [{ name: "vm.mp3", id: "vm.mp3" }],
       }),
@@ -313,7 +313,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     );
     const fallbackListSpy = vi.fn();
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
+      makeDbClient({
         voicemailSignedUrl: null,
         voicemailListSpy: fallbackListSpy,
       }),
@@ -335,7 +335,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       toInboundNumber({ ...baseNumber, inbound_action: "noop" }),
     );
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
@@ -352,7 +352,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       }),
     );
     mocks.getWorkspaceWebhookRow.mockResolvedValue({ event: [] });
-    mocks.createClient.mockReturnValue(makeSupabase());
+    mocks.createClient.mockReturnValue(makeDbClient());
     const fd = new FormData();
     fd.set("Called", "+1");
     const mod = await import("../app/routes/api+/inbound");
@@ -388,7 +388,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.isPhoneNumber.mockReturnValue(false);
     mocks.isEmail.mockReturnValue(false);
     mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(null);
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const res = await asRouteResponse(
       await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
@@ -411,7 +411,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       auth_token: "at",
     });
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const response = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
@@ -429,7 +429,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       }),
     );
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["UPDATE"] });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any);
@@ -456,7 +456,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       }),
     );
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
 
     const response = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),

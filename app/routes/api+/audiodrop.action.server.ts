@@ -4,21 +4,19 @@ import { resolveJsonAuthSession } from "@/lib/api-auth.server";
 import { playTwiml } from "@/lib/twilio-twiml.server";
 import { loadCampaignVoicedropAudio } from "@/lib/sms-campaign-db.server";
 import { findCallSidByParentCallSid } from "@/lib/telephony-db.server";
-import type { Database } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import type TwilioSDK from "twilio";
 
-type Supabase = SupabaseClient<Database>;
 type TwilioClient = TwilioSDK.Twilio;
 
 type AudiodropDeps = Partial<{
-  verifyAuth: (request: Request) => Promise<{ supabaseClient: Supabase }>;
+  verifyAuth: typeof resolveJsonAuthSession;
   createWorkspaceTwilioInstance: (args: {
-    supabase: Supabase;
     workspace_id: string;
   }) => Promise<TwilioClient>;
   findCallSidByParentCallSid: typeof findCallSidByParentCallSid;
   loadCampaignVoicedropAudio: typeof loadCampaignVoicedropAudio;
+  createSignedObjectUrl: typeof createSignedObjectUrl;
 }>;
 
 export const action = async ({
@@ -36,16 +34,17 @@ export const action = async ({
       deps?.findCallSidByParentCallSid ?? findCallSidByParentCallSid,
     loadCampaignVoicedropAudio:
       deps?.loadCampaignVoicedropAudio ?? loadCampaignVoicedropAudio,
+    createSignedObjectUrl: deps?.createSignedObjectUrl ?? createSignedObjectUrl,
   };
 
   const formData = await request.formData();
   const callId = formData.get("callId");
   const workspaceId = formData.get("workspaceId");
   const campaignId = formData.get("campaignId");
-  const { supabaseClient } = await d.verifyAuth(request);
+  await d.verifyAuth(request);
+
   try {
     const twilio = await d.createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
       workspace_id: workspaceId as string,
     });
     const childCallSid = await d.findCallSidByParentCallSid(callId as string);
@@ -63,23 +62,27 @@ export const action = async ({
       throw { campaign: error };
     }
 
-    const { data: audio, error: voicemailError } = voicedropAudio
-      ? await supabaseClient.storage
-          .from(`workspaceAudio`)
-          .createSignedUrl(`${workspaceId}/${voicedropAudio}`, 3600)
-      : { data: null, error: null };
-    if (!audio) {
+    let signedUrl: string | null = null;
+    if (voicedropAudio) {
+      try {
+        signedUrl = await d.createSignedObjectUrl(
+          "workspaceAudio",
+          `${workspaceId}/${voicedropAudio}`,
+          3600,
+        );
+      } catch (voicemailError) {
+        throw { voicemail: voicemailError };
+      }
+    }
+
+    if (!signedUrl) {
       logger.error("No audio found for voicemail drop");
       twilio.calls(childCallSid).update({ status: "completed" });
       return { success: false, error: "No audio found" };
     }
-    if (voicemailError) throw { voicemail: voicemailError };
-    if (!audio.signedUrl) {
-      logger.error("No signed URL found for audio");
-      return { success: false, error: "No signed URL found" };
-    }
+
     twilio.calls(childCallSid).update({
-      twiml: playTwiml(audio.signedUrl),
+      twiml: playTwiml(signedUrl),
     });
   } catch (error) {
     logger.error("Error in audiodrop:", error);

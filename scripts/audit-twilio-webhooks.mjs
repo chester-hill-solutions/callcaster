@@ -2,9 +2,8 @@
 /**
  * Read-only Twilio webhook audit for a workspace (local/dev).
  * Usage: node scripts/audit-twilio-webhooks.mjs <workspace_id>
- * Requires SUPABASE_URL, SUPABASE_SERVICE_KEY, TWILIO credentials on workspace row, BASE_URL.
+ * Requires BETTER_AUTH_URL, BETTER_AUTH_SERVICE_KEY, TWILIO credentials on workspace row, BASE_URL.
  */
-import { createClient } from "@supabase/supabase-js";
 
 const workspaceId = process.argv[2];
 if (!workspaceId) {
@@ -12,9 +11,9 @@ if (!workspaceId) {
   process.exit(1);
 }
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY,
+const client = createClient(
+  process.env.BASE_URL,
+  process.env.BETTER_AUTH_SECRET,
 );
 
 const { auditWorkspaceTwilioWebhooks } = await import(
@@ -22,7 +21,7 @@ const { auditWorkspaceTwilioWebhooks } = await import(
 );
 
 const audit = await auditWorkspaceTwilioWebhooks({
-  supabaseClient: supabase,
+  null: client,
   workspaceId,
 });
 

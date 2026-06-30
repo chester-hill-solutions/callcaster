@@ -1,21 +1,21 @@
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
-import { createClient } from "@supabase/supabase-js";
 import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 
+import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-  const userSupabase = getAuthSupabaseClient(auth);
   const user = auth.user;
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  const client = createClient(env.BASE_URL(), env.BASE_URL());
   const formData = await request.formData();
 
   const to_number = formData.get("to_number") as string;
@@ -30,25 +30,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   let outreachAttemptId;
   let call;
-  const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
-    workspace_id,
+  const twilio = await createWorkspaceTwilioInstance({ workspace_id,
   });
 
   try {
-    await requireWorkspaceAccess({ supabaseClient: userSupabase, user, workspaceId: workspace_id });
-    const { data, error: outreachError } = await supabase.rpc(
-      "create_outreach_attempt",
-      {
-        con_id: contact_id,
-        cam_id: campaign_id,
-        wks_id: workspace_id,
-        queue_id: queue_id,
-        usr_id: user_id,
-      },
-    );
-
-    if (outreachError) throw outreachError;
-    outreachAttemptId = data;
+    await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+    outreachAttemptId = await rpcCreateOutreachAttempt(db, {
+      contactId: Number(contact_id),
+      campaignId: Number(campaign_id),
+      userId: user_id,
+      workspaceId: workspace_id,
+      queueId: Number(queue_id),
+    });
 
     call = await withTwilioRetry(
       () =>

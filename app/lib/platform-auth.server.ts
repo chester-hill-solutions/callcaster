@@ -1,13 +1,11 @@
-import type { EmailOtpType, Session, User } from "@supabase/supabase-js";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger.server";
+import { auth } from "@/server/auth-instance";
+import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import {
   acceptWorkspaceInvitations,
   createNewWorkspace,
   getInvitesByUserId,
 } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
-import type { Database } from "@/lib/database.types";
 import { listUserWorkspaceMembershipsForProfile } from "@/lib/workspace-members-db.server";
 import type {
   acceptInvitesBodySchema,
@@ -20,6 +18,7 @@ import type {
   verifyEmailBodySchema,
 } from "@/lib/schemas/api/platform-auth";
 import type { z } from "zod";
+import { getSession } from "@/lib/auth.server";
 
 type RegisterBody = z.infer<typeof registerBodySchema>;
 type TokenBody = z.infer<typeof tokenBodySchema>;
@@ -44,102 +43,148 @@ export type AuthTokensResponse = {
 };
 
 export type PasswordLoginResult =
-  | { ok: true; session: Session; user: User }
+  | { ok: true; token: string; user: AuthTokensResponse["user"]; headers: Headers }
   | { ok: false; error: string };
+
+function splitName(name: string | null | undefined): {
+  first_name: string | null;
+  last_name: string | null;
+} {
+  if (!name?.trim()) {
+    return { first_name: null, last_name: null };
+  }
+  const parts = name.trim().split(/\s+/);
+  return {
+    first_name: parts[0] ?? null,
+    last_name: parts.length > 1 ? parts.slice(1).join(" ") : null,
+  };
+}
+
+function mapUserProfile(user: {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+}): AuthTokensResponse["user"] {
+  const names = splitName(user.name);
+  return {
+    id: user.id,
+    email: user.email ?? undefined,
+    first_name: names.first_name,
+    last_name: names.last_name,
+  };
+}
+
+function mapTokenResponse(args: {
+  token: string;
+  user: AuthTokensResponse["user"];
+  expiresIn?: number;
+}): AuthTokensResponse {
+  return {
+    access_token: args.token,
+    refresh_token: args.token,
+    expires_in: args.expiresIn ?? 3600,
+    token_type: "bearer",
+    user: args.user,
+  };
+}
 
 /** Shared email/password login used by HTML sign-in and JSON token API. */
 export async function loginWithPassword(
-  supabaseClient: SupabaseClient<Database>,
+  request: Request,
   email: string,
   password: string,
 ): Promise<PasswordLoginResult> {
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password,
-  });
+  try {
+    const result = await auth.api.signInEmail({
+      body: { email, password },
+      headers: request.headers,
+      returnHeaders: true,
+    });
 
-  if (error || !data.session || !data.user) {
+    const body = result?.response ?? result;
+    if (!body?.token || !body?.user) {
+      return { ok: false, error: "Invalid credentials" };
+    }
+
+    return {
+      ok: true,
+      token: body.token,
+      user: mapUserProfile(body.user),
+      headers: mergeBetterAuthSetCookieHeaders(result?.headers),
+    };
+  } catch (error) {
+    logger.error("loginWithPassword failed", error);
     return {
       ok: false,
-      error: error?.message ?? "Invalid credentials",
+      error: error instanceof Error ? error.message : "Invalid credentials",
     };
   }
-
-  return { ok: true, session: data.session, user: data.user };
-}
-
-function mapUserProfile(user: User): AuthTokensResponse["user"] {
-  const meta = user.user_metadata ?? {};
-  return {
-    id: user.id,
-    email: user.email,
-    first_name:
-      typeof meta.first_name === "string" ? meta.first_name : null,
-    last_name: typeof meta.last_name === "string" ? meta.last_name : null,
-  };
-}
-
-function mapSessionResponse(session: Session, user: User): AuthTokensResponse {
-  return {
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
-    expires_in: session.expires_in ?? 3600,
-    token_type: "bearer",
-    user: mapUserProfile(user),
-  };
 }
 
 export async function registerUser(
   request: Request,
   body: RegisterBody,
 ): Promise<
-  | { ok: true; data: AuthTokensResponse | { user: AuthTokensResponse["user"]; message: string } }
+  | { ok: true; data: AuthTokensResponse | { user: AuthTokensResponse["user"]; message: string }; headers?: Headers }
   | { ok: false; error: string; status: number }
 > {
-  const { supabaseClient } = createSupabaseServerClient(request);
+  const displayName = [body.first_name, body.last_name].filter(Boolean).join(" ").trim();
 
-  const { data, error } = await supabaseClient.auth.signUp({
-    email: body.email,
-    password: body.password,
-    options: {
-      data: {
-        first_name: body.first_name ?? "",
-        last_name: body.last_name ?? "",
+  try {
+    const result = await auth.api.signUpEmail({
+      body: {
+        email: body.email,
+        password: body.password,
+        name: displayName || body.email,
       },
-    },
-  });
+      headers: request.headers,
+      returnHeaders: true,
+    });
 
-  if (error) {
+    const payload = result?.response ?? result;
+    const headers = mergeBetterAuthSetCookieHeaders(result?.headers);
+
+    if (payload?.token && payload?.user) {
+      return {
+        ok: true,
+        headers,
+        data: mapTokenResponse({
+          token: payload.token,
+          user: mapUserProfile(payload.user),
+        }),
+      };
+    }
+
+    if (payload?.user) {
+      return {
+        ok: true,
+        headers,
+        data: {
+          user: mapUserProfile(payload.user),
+          message: "Registration successful. Verify your email before signing in.",
+        },
+      };
+    }
+
+    return { ok: false, error: "Registration failed", status: 500 };
+  } catch (error) {
     logger.error("registerUser failed", error);
-    return { ok: false, error: error.message, status: 400 };
-  }
-
-  if (data.session && data.user) {
-    return { ok: true, data: mapSessionResponse(data.session, data.user) };
-  }
-
-  if (data.user) {
     return {
-      ok: true,
-      data: {
-        user: mapUserProfile(data.user),
-        message: "Registration successful. Verify your email before signing in.",
-      },
+      ok: false,
+      error: error instanceof Error ? error.message : "Registration failed",
+      status: 400,
     };
   }
-
-  return { ok: false, error: "Registration failed", status: 500 };
 }
 
 export async function tokenLogin(
   request: Request,
   body: TokenBody,
 ): Promise<
-  | { ok: true; data: AuthTokensResponse }
+  | { ok: true; data: AuthTokensResponse; headers: Headers }
   | { ok: false; error: string; status: number }
 > {
-  const { supabaseClient } = createSupabaseServerClient(request);
-  const login = await loginWithPassword(supabaseClient, body.email, body.password);
+  const login = await loginWithPassword(request, body.email, body.password);
 
   if (!login.ok) {
     return { ok: false, error: login.error, status: 401 };
@@ -147,7 +192,8 @@ export async function tokenLogin(
 
   return {
     ok: true,
-    data: mapSessionResponse(login.session, login.user),
+    headers: login.headers,
+    data: mapTokenResponse({ token: login.token, user: login.user }),
   };
 }
 
@@ -158,63 +204,83 @@ export async function refreshTokens(
   | { ok: true; data: AuthTokensResponse }
   | { ok: false; error: string; status: number }
 > {
-  const { supabaseClient } = createSupabaseServerClient(request);
-
-  const { data, error } = await supabaseClient.auth.refreshSession({
-    refresh_token: body.refresh_token,
-  });
-
-  if (error || !data.session || !data.user) {
+  try {
+    const result = await auth.api.refreshToken({
+      body: { refreshToken: body.refresh_token },
+      headers: request.headers,
+    });
+    const payload = result?.response ?? result;
+    if (!payload?.accessToken || !payload?.user) {
+      return { ok: false, error: "Invalid refresh token", status: 401 };
+    }
+    return {
+      ok: true,
+      data: mapTokenResponse({
+        token: payload.accessToken,
+        user: mapUserProfile(payload.user),
+      }),
+    };
+  } catch (error) {
     return {
       ok: false,
-      error: error?.message ?? "Invalid refresh token",
+      error: error instanceof Error ? error.message : "Invalid refresh token",
       status: 401,
     };
   }
-
-  return { ok: true, data: mapSessionResponse(data.session, data.user) };
 }
 
 export async function signOutUser(request: Request): Promise<void> {
-  const { supabaseClient } = createSupabaseServerClient(request);
-  await supabaseClient.auth.signOut();
+  await auth.api.signOut({ headers: request.headers });
 }
 
 export async function forgotPassword(
   request: Request,
   body: ForgotPasswordBody,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
-  const { supabaseClient } = createSupabaseServerClient(request);
   const origin = new URL(request.url).origin;
 
-  const { error } = await supabaseClient.auth.resetPasswordForEmail(body.email, {
-    redirectTo: `${origin}/api/auth/callback?next=/reset-password`,
-  });
-
-  if (error) {
-    return { ok: false, error: error.message, status: 400 };
+  try {
+    await auth.api.requestPasswordReset({
+      body: {
+        email: body.email,
+        redirectTo: `${origin}/reset-password`,
+      },
+      headers: request.headers,
+    });
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Request failed",
+      status: 400,
+    };
   }
-
-  return { ok: true };
 }
 
 export async function resetPassword(
-  supabaseClient: SupabaseClient<Database>,
+  request: Request,
   body: ResetPasswordBody,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   if (body.password !== body.confirm_password) {
     return { ok: false, error: "Passwords do not match", status: 400 };
   }
 
-  const { error } = await supabaseClient.auth.updateUser({
-    password: body.password,
-  });
-
-  if (error) {
-    return { ok: false, error: error.message, status: 400 };
+  try {
+    await auth.api.resetPassword({
+      body: {
+        newPassword: body.password,
+        token: body.token ?? "",
+      },
+      headers: request.headers,
+    });
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Reset failed",
+      status: 400,
+    };
   }
-
-  return { ok: true };
 }
 
 export async function verifyEmailOtp(
@@ -224,33 +290,45 @@ export async function verifyEmailOtp(
   | { ok: true; data: AuthTokensResponse }
   | { ok: false; error: string; status: number }
 > {
-  const { supabaseClient } = createSupabaseServerClient(request);
-
-  const { data, error } = await supabaseClient.auth.verifyOtp({
-    type: body.type as EmailOtpType,
-    token_hash: body.token_hash,
-  });
-
-  if (error || !data.session || !data.user) {
+  try {
+    const result = await auth.api.verifyEmail({
+      query: { token: body.token_hash },
+      headers: request.headers,
+    });
+    const payload = result?.response ?? result;
+    if (!payload?.user) {
+      return { ok: false, error: "Verification failed", status: 400 };
+    }
+    const session = await getSession(request);
+    if (!session.session?.token) {
+      return {
+        ok: true,
+        data: mapTokenResponse({
+          token: "",
+          user: mapUserProfile(payload.user),
+        }),
+      };
+    }
+    return {
+      ok: true,
+      data: mapTokenResponse({
+        token: session.session.token,
+        user: mapUserProfile(payload.user),
+      }),
+    };
+  } catch (error) {
     return {
       ok: false,
-      error: error?.message ?? "Verification failed",
+      error: error instanceof Error ? error.message : "Verification failed",
       status: 400,
     };
   }
-
-  return { ok: true, data: mapSessionResponse(data.session, data.user) };
 }
 
-export async function getMeProfile(
-  supabaseClient: SupabaseClient<Database>,
-  userId: string,
-) {
+export async function getMeProfile(userId: string) {
   const workspaces = await listUserWorkspaceMembershipsForProfile(userId);
-
-  const {
-    data: { user },
-  } = await supabaseClient.auth.getUser();
+  const session = await auth.api.getSession({ headers: new Headers() });
+  const user = session?.user;
 
   return {
     user: user ? mapUserProfile(user) : { id: userId },
@@ -260,49 +338,54 @@ export async function getMeProfile(
 }
 
 export async function updateMeProfile(
-  supabaseClient: SupabaseClient<Database>,
+  request: Request,
   body: UpdateMeBody,
 ): Promise<
   | { ok: true; data: AuthTokensResponse["user"] }
   | { ok: false; error: string; status: number }
 > {
-  const updatePayload: {
-    email?: string;
-    password?: string;
-    data?: Record<string, string>;
-  } = {};
-
-  if (body.email) updatePayload.email = body.email;
-  if (body.password) updatePayload.password = body.password;
+  const updateBody: { name?: string; email?: string } = {};
+  if (body.email) updateBody.email = body.email;
   if (body.first_name || body.last_name) {
-    updatePayload.data = {
-      ...(body.first_name ? { first_name: body.first_name } : {}),
-      ...(body.last_name ? { last_name: body.last_name } : {}),
+    updateBody.name = [body.first_name, body.last_name].filter(Boolean).join(" ");
+  }
+
+  try {
+    const result = await auth.api.updateUser({
+      body: updateBody,
+      headers: request.headers,
+    });
+    const user = result?.user;
+    if (!user) {
+      return { ok: false, error: "Update failed", status: 400 };
+    }
+
+    if (body.password) {
+      await auth.api.changePassword({
+        body: {
+          newPassword: body.password,
+          currentPassword: body.current_password ?? body.password,
+        },
+        headers: request.headers,
+      });
+    }
+
+    return { ok: true, data: mapUserProfile(user) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Update failed",
+      status: 400,
     };
   }
-
-  const { data, error } = await supabaseClient.auth.updateUser(updatePayload);
-
-  if (error || !data.user) {
-    return { ok: false, error: error?.message ?? "Update failed", status: 400 };
-  }
-
-  return { ok: true, data: mapUserProfile(data.user) };
 }
 
-export async function listPendingInvites(
-  supabaseClient: SupabaseClient<Database>,
-  userId: string,
-) {
+export async function listPendingInvites(userId: string) {
   const invites = await getInvitesByUserId(userId);
   return { invites: invites ?? [] };
 }
 
-export async function acceptInvites(
-  supabaseClient: SupabaseClient<Database>,
-  userId: string,
-  body: AcceptInvitesBody,
-) {
+export async function acceptInvites(userId: string, body: AcceptInvitesBody) {
   const result = await acceptWorkspaceInvitations(body.invitation_ids, userId);
   const errors = result?.errors ?? [];
   if (errors.length > 0) {
@@ -311,13 +394,8 @@ export async function acceptInvites(
   return { ok: true as const, accepted: body.invitation_ids.length };
 }
 
-export async function createWorkspaceForUser(
-  supabaseClient: SupabaseClient<Database>,
-  userId: string,
-  name: string,
-) {
+export async function createWorkspaceForUser(userId: string, name: string) {
   return createNewWorkspace({
-    supabaseClient,
     workspaceName: name,
     user_id: userId,
   });

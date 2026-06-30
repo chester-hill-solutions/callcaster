@@ -10,31 +10,31 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     verifyAuth: vi.fn(),
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
+vi.mock("@client/client-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
 vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
   requireWorkspaceAccess: (...a: any[]) => mocks.requireWorkspaceAccess(...a),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/supabase.server", () => ({
+vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
-function makeSupabase(opts?: {
+function makeDbClient(opts?: {
   outreachError?: any;
   insertError?: any;
   dequeueError?: any;
 }) {
-  const supabase: any = {
+  const client: any = {
     rpc: async () => ({ data: 99, error: opts?.outreachError ?? null }),
     from: (table: string) => {
       if (table === "call") {
@@ -54,7 +54,7 @@ function makeSupabase(opts?: {
       throw new Error("unexpected table");
     },
   };
-  return supabase;
+  return client;
 }
 
 describe("app/routes/api+/ivr/tsx.route", () => {
@@ -64,15 +64,13 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.logger.error.mockReset();
-    setJsonAuthSession({
-      supabaseClient: {},
-      user: { id: "u1" },
+    setJsonAuthSession({ user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
   });
 
   test("throws when required form data missing", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
     const mod = await import("../app/routes/api+/ivr");
     const fd = new FormData();
@@ -83,7 +81,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
   });
 
   test("success creates outreach, places call, inserts call, dequeues, returns JSON", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: { create: async (_p: any) => ({ sid: "CA1" }) },
     });
@@ -104,7 +102,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
   });
 
   test("returns 500 on errors (rpc/call insert/dequeue), with unknown error formatting", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ outreachError: new Error("rpc") }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ outreachError: new Error("rpc") }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
     const mod = await import("../app/routes/api+/ivr");
     const fd = new FormData();
@@ -119,12 +117,12 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     expect(res.status).toBe(500);
     expect(await res.text()).toContain("rpc");
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ insertError: new Error("ins") }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ insertError: new Error("ins") }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
     res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ dequeueError: "nope" }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ dequeueError: "nope" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
     res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);

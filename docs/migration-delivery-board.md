@@ -14,7 +14,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 |--------|------:|------|
 | Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
 | `app/lib/database/*.server.ts` on tenant-db | **8 / 13** | G2 |
-| App `supabase.from()` call sites in `app/` | **46** `.from("…")` in **31** files (hooks/realtime/storage; **`api+` tenant reads cleared**) | G2 |
+| App `supabase.from()` call sites in `app/` | **0** tenant-table `.from("…")` (Drizzle + storage/auth/RPC only) | G2 |
 | `database.types` imports in `app/` | **162 files** | G2 (delete at exit) |
 | Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
 | E2E on review URL | Not run | G4 |
@@ -202,11 +202,11 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **WS-B workspace route stragglers** — settings loader (nested joins), campaign settings/actions, chats, archive
-2. **WS-B lib stragglers** — `inbound-sms-context`, `platform-workspace-numbers`, hooks/realtime (Phase 3B)
-3. **WS-B 2.6** — Edge Function transaction-history paths (app paths on Drizzle RPC)
-4. **WS-B 2.8** — Finish `workspace-twilio-sync` module
-5. **WS-B 2.11** — UI/hooks type cleanup; pre-existing typecheck drift in loaders
+1. **WS-C Phase 3B** — Replace Supabase Realtime subscriptions with SSE (`useSupabaseRealtime`, chat/audience hooks)
+2. **WS-C Phase 3E** — Supabase Storage → MinIO/R2 (signed URL paths still on Supabase)
+3. **WS-C Phase 3A** — Auth session off Supabase
+4. **G2 exit** — Delete `database.types.ts` after type cleanup (162 imports remain)
+5. **G4** — 77/77 E2E + Twilio smoke on review URL
 
 ---
 
@@ -235,4 +235,4 @@ gantt
 | 2026-06-30 | agent | **audience-upload** action/status on Drizzle; `audience-upload-process` tenant-db; **sms.action** campaign/dedupe/outreach update on Drizzle; tests **20/20** audience-upload + **21/21** sms; metrics **88** / **59** files |
 | 2026-06-30 | agent | **outreach_attempts/$id**, **caller-id/status**, **audiodrop**, **email-vm**, **ivr page**, **initiate-ivr**, **audiences** action/loader lookup, **scripts**, **workspace**, **chat_sms** on Drizzle; metrics **70** / **48** files |
 | 2026-06-30 | agent | **campaign-export** server on `campaign-export-db.server.ts`; last **4** `api+` routes; export tests **31/31**; workspace loaders (**audiences**, **audios**, **scripts**, **index**); metrics **57** / **38** files (**0** PostgREST in `api+`) |
-| 2026-06-30 | agent | Campaign workspace routes on Drizzle: `$selected_id` loader/action, `settings.action`, `script/edit.*`, `archive`, audiences/new; `campaign-ivr.server` status/duplicate/script-edit helpers; metrics **46** / **31** files |
+| 2026-06-30 | agent | **Phase 2 G2 tenant reads complete**: 4 parallel subagents ported workspace routes, lib stragglers, client hooks→API, `audiences.loader`, `contacts`/`media` API; **0** PostgREST `.from("table")` in `app/`; route baseline **194** paths |

@@ -9,10 +9,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return access.response;
   }
 
-  const { supabaseClient, headers, user, workspaceId } = access.ctx;
+  const { headers, user, workspaceId } = access.ctx;
 
   const mediaResult = await listWorkspaceVoicemailsApi(
-    supabaseClient,
     user.id,
     workspaceId,
   );

@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import {
   evaluateWorkspaceReadiness,
@@ -20,18 +19,13 @@ import type {
 import { parseOptionalString } from "@/lib/parse-utils.server";
 
 async function loadWorkspaceTwilioContext(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ) {
-  const twilioData = (await loadWorkspaceTwilioData(
-    supabaseClient,
-    workspaceId,
+  const twilioData = (await loadWorkspaceTwilioData(workspaceId,
   )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
 
-  const twilio = await createWorkspaceTwilioInstance({
-    supabase: supabaseClient,
-    workspace_id: workspaceId,
+  const twilio = await createWorkspaceTwilioInstance({     workspace_id: workspaceId,
   });
 
   return {
@@ -46,12 +40,12 @@ async function persistOnboardingState({
   twilioData,
   onboarding,
 }: {
-  supabaseClient?: SupabaseClient<Database> | null;
+  null?: never | null;
   workspaceId: string;
   twilioData: TwilioAccountData;
   onboarding: WorkspaceMessagingOnboardingState;
 }) {
-  await persistWorkspaceTwilioData(null, workspaceId, {
+  await persistWorkspaceTwilioData(workspaceId, {
     ...(twilioData as Record<string, unknown>),
     onboarding,
   });
@@ -73,16 +67,13 @@ export function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingS
 }
 
 export async function provisionWorkspaceA2P({
-  supabaseClient,
   workspaceId,
   actorUserId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
 }) {
   const bootstrap = await ensureWorkspaceTwilioBootstrap({
-    supabaseClient,
     workspaceId,
     actorUserId,
   });
@@ -92,9 +83,7 @@ export async function provisionWorkspaceA2P({
     );
   }
 
-  const { twilioData, onboarding, twilio } = await loadWorkspaceTwilioContext(
-    supabaseClient,
-    workspaceId,
+  const { twilioData, onboarding, twilio } = await loadWorkspaceTwilioContext(workspaceId,
   );
 
   const blockingIssues = buildA2pBlockingIssues(onboarding);
@@ -115,7 +104,6 @@ export async function provisionWorkspaceA2P({
       lastUpdatedBy: actorUserId,
     });
     await persistOnboardingState({
-      supabaseClient,
       workspaceId,
       twilioData,
       onboarding: blockedState,
@@ -201,7 +189,6 @@ export async function provisionWorkspaceA2P({
   }
 
   await persistOnboardingState({
-    supabaseClient,
     workspaceId,
     twilioData,
     onboarding: nextOnboarding,
@@ -211,15 +198,11 @@ export async function provisionWorkspaceA2P({
 }
 
 export async function syncWorkspaceA2PStatus({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { twilioData, onboarding } = await loadWorkspaceTwilioContext(
-    supabaseClient,
-    workspaceId,
+  const { twilioData, onboarding } = await loadWorkspaceTwilioContext(workspaceId,
   );
 
   const nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
@@ -230,7 +213,6 @@ export async function syncWorkspaceA2PStatus({
   });
 
   await persistOnboardingState({
-    supabaseClient,
     workspaceId,
     twilioData,
     onboarding: nextOnboarding,

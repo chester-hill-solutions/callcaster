@@ -14,10 +14,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../app/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("../app/lib/adminDb.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -35,8 +33,8 @@ vi.mock("@/lib/platform-telephony.server", () => ({
   resolveContactWorkspaceId: (...args: unknown[]) => mocks.resolveContactWorkspaceId(...args),
 }));
 
-function withQueueActionClient(supabaseClient: { rpc?: ReturnType<typeof vi.fn> }) {
-  return supabaseClient;
+function withQueueActionClient(null: { rpc?: ReturnType<typeof vi.fn> }) {
+  return null;
 }
 
 describe("app/routes/api+/queues/route.tsx", () => {
@@ -55,7 +53,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("loader returns [] when limit is 0", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=0"),
@@ -65,7 +63,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
   test("loader uses default limit when missing", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
-    queueJsonAuthSession({ supabaseClient: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=7"),
@@ -79,7 +77,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
   test("loader returns [] when rpc returns empty", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
-    queueJsonAuthSession({ supabaseClient: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=10"),
@@ -90,7 +88,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   test("loader returns queue items from campaign_queue", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [{ queue_id: 1 }, { queue_id: 2 }] });
     mocks.fetchCampaignQueueRowsByIds.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
-    queueJsonAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
+    queueJsonAuthSession({ null: { rpc }, user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
@@ -107,7 +105,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
   test("action POST returns 500 and logs when rpc errors", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: { message: "rpc fail" } });
-    queueJsonAuthSession({ supabaseClient: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
 
     const mod = await import("../app/routes/api+/queues");
@@ -128,7 +126,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
   test("action POST returns data on success", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: { ok: true }, error: null });
-    queueJsonAuthSession({ supabaseClient: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
     const mod = await import("../app/routes/api+/queues");
@@ -142,7 +140,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
   test("action DELETE returns 500 and logs when update errors", async () => {
     mocks.requeueAllCampaignQueueForCampaign.mockRejectedValueOnce(new Error("update fail"));
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
@@ -156,7 +154,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
   test("action DELETE returns affected_rows on success", async () => {
     mocks.requeueAllCampaignQueueForCampaign.mockResolvedValueOnce([{ id: 1 }, { id: 2 }, { id: 3 }]);
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
@@ -173,7 +171,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("action returns 405 for unsupported method", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/queues", { method: "PUT" }),

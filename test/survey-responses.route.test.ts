@@ -37,14 +37,14 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("returns 405 for non-POST", async () => {
-    queueDualAuthSession({ supabaseClient: {} });
+    queueDualAuthSession({ null: {} });
     const mod = await import("../app/routes/api+/survey-responses");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields and bad JSON", async () => {
-    setDualAuthSession({ supabaseClient: {} });
+    setDualAuthSession({ null: {} });
     const mod = await import("../app/routes/api+/survey-responses");
 
     const r0 = await asRouteResponse(await mod.action({ request: makeReq({ surveyId: "S1" }) } as any));
@@ -64,7 +64,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   test("returns 404 when survey missing and 400 when inactive", async () => {
     const mod = await import("../app/routes/api+/survey-responses");
 
-    queueDualAuthSession({ supabaseClient: {} });
+    queueDualAuthSession({ null: {} });
     surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
       ok: false,
       error: "Survey not found",
@@ -75,7 +75,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
     } as any));
     expect(r1.status).toBe(404);
 
-    queueDualAuthSession({ supabaseClient: {} });
+    queueDualAuthSession({ null: {} });
     surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
       ok: false,
       error: "Survey is not active",
@@ -88,7 +88,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("returns 500 when submit fails", async () => {
-    queueDualAuthSession({ supabaseClient: {} });
+    queueDualAuthSession({ null: {} });
     surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
       ok: false,
       error: "Failed to submit response",
@@ -102,7 +102,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("returns success payload from submitSurveyResponse", async () => {
-    queueDualAuthSession({ supabaseClient: {} });
+    queueDualAuthSession({ null: {} });
     surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
       ok: true,
       response_id: 11,

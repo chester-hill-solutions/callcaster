@@ -1,10 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { createStripeContact } from "@/lib/database/stripe.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import {
   CREDIT_PRICE_CAD,
   MIN_CREDITS,
@@ -74,8 +73,7 @@ async function ensureStripeCustomer(
 }
 
 export async function getWorkspaceBilling(
-  supabase: SupabaseClient<Database>,
-  userId: string,
+    userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
@@ -121,13 +119,12 @@ export async function getWorkspaceBilling(
 }
 
 export async function createBillingCheckoutSession(args: {
-  supabase: SupabaseClient<Database>;
   userId: string;
   workspaceId: string;
   amount: number;
   requestUrl: string;
 }) {
-  const { supabase, userId, workspaceId, amount, requestUrl } = args;
+  const { userId, workspaceId, amount, requestUrl } = args;
 
   await requireWorkspaceAccess({
     user: { id: userId },
@@ -208,12 +205,11 @@ export type BillingSessionPollStatus =
   | "unknown";
 
 export async function pollBillingCheckoutSession(args: {
-  supabase: SupabaseClient<Database>;
   userId: string;
   workspaceId: string;
   sessionId: string;
 }) {
-  const { supabase, userId, workspaceId, sessionId } = args;
+  const { userId, workspaceId, sessionId } = args;
 
   await requireWorkspaceAccess({
     user: { id: userId },
@@ -294,10 +290,9 @@ export async function pollBillingCheckoutSession(args: {
 }
 
 export async function confirmStripeCheckoutSessionForRedirect(args: {
-  supabase: SupabaseClient<Database>;
   sessionId: string;
 }) {
-  const { supabase, sessionId } = args;
+  const { sessionId } = args;
   const stripe = createStripeClient();
   let fallbackWorkspaceId: string | null = null;
 

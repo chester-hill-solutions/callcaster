@@ -2,10 +2,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 function seedRequiredEnv() {
   process.env.NODE_ENV = "test";
-  process.env.SUPABASE_URL = "http://localhost";
-  process.env.SUPABASE_ANON_KEY = "a";
-  process.env.SUPABASE_SERVICE_KEY = "b";
-  process.env.SUPABASE_PUBLISHABLE_KEY = "c";
+  process.env.BASE_URL = "http://localhost";
+  process.env.BETTER_AUTH_SECRET = "a";
+  process.env.BETTER_AUTH_SECRET = "b";
+  process.env.BASE_URL = "c";
   process.env.TWILIO_SID = "d";
   process.env.TWILIO_AUTH_TOKEN = "e";
   process.env.TWILIO_APP_SID = "f";
@@ -23,12 +23,12 @@ describe("env.server", () => {
 
   test("required env getters throw when missing", async () => {
     vi.resetModules();
-    delete process.env.SUPABASE_URL;
+    delete process.env.BASE_URL;
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const mod = await import("../app/lib/env.server");
-      expect(() => mod.env.SUPABASE_URL()).toThrow(
-        /Missing required environment variable: SUPABASE_URL/,
+      expect(() => mod.env.BASE_URL()).toThrow(
+        /Missing required environment variable: AUTH_URL/,
       );
     } finally {
       err.mockRestore();
@@ -48,7 +48,7 @@ describe("env.server", () => {
   test("server import logs validation errors instead of throwing", async () => {
     vi.resetModules();
     process.env.NODE_ENV = "development";
-    delete process.env.SUPABASE_URL;
+    delete process.env.BASE_URL;
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(import("../app/lib/env.server")).resolves.toBeDefined();
@@ -83,10 +83,10 @@ describe("env.server", () => {
 
     const mod = await import("../app/lib/env.server");
 
-    expect(mod.env.SUPABASE_URL()).toBe("http://localhost");
-    expect(mod.env.SUPABASE_ANON_KEY()).toBe("a");
-    expect(mod.env.SUPABASE_SERVICE_KEY()).toBe("b");
-    expect(mod.env.SUPABASE_PUBLISHABLE_KEY()).toBe("c");
+    expect(mod.env.BASE_URL()).toBe("http://localhost");
+    expect(mod.env.BASE_URL()).toBe("a");
+    expect(mod.env.BASE_URL()).toBe("b");
+    expect(mod.env.BASE_URL()).toBe("c");
     expect(mod.env.TWILIO_SID()).toBe("d");
     expect(mod.env.TWILIO_AUTH_TOKEN()).toBe("e");
     expect(mod.env.TWILIO_APP_SID()).toBe("f");
@@ -105,7 +105,7 @@ describe("env.server", () => {
     vi.resetModules();
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal("window", { location: { hostname: "example.com" } } as any);
-    delete process.env.SUPABASE_URL;
+    delete process.env.BASE_URL;
 
     await import("../app/lib/env.server");
     expect(err).not.toHaveBeenCalled();

@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { csvResponse } from "@/lib/csv";
 import { createErrorResponse } from "@/lib/errors.server";
@@ -24,9 +22,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    const result = await exportSurveyResponsesApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await exportSurveyResponsesApi(      auth.user.id,
       workspaceId,
       surveyId,
     );

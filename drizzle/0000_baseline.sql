@@ -34,10 +34,10 @@ CREATE SCHEMA auth;
 
 
 --
--- Name: supabase_migrations; Type: SCHEMA; Schema: -; Owner: -
+-- Name: AUTH_migrations; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA supabase_migrations;
+CREATE SCHEMA AUTH_migrations;
 
 
 --
@@ -464,7 +464,7 @@ CREATE FUNCTION public.call_edge_function() RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 declare
-  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/dequeue_contacts';
+  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/dequeue_contacts';
   api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
 begin
   perform net.http_post(
@@ -487,7 +487,7 @@ CREATE FUNCTION public.call_outreach_webhook() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$DECLARE
   payload jsonb;
-  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/outreach-attempt-hook';
+  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/outreach-attempt-hook';
   api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
   
 BEGIN
@@ -516,7 +516,7 @@ CREATE FUNCTION public.campaign_is_active_change() RETURNS trigger
     LANGUAGE plpgsql
     AS $$DECLARE
   payload jsonb;
-  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/handle_active_change';
+  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/handle_active_change';
   api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
 BEGIN
     IF OLD.is_active IS DISTINCT FROM NEW.is_active THEN
@@ -1139,7 +1139,7 @@ declare
   cron_command text;
   service_jwt text;
   headers jsonb;
-  default_edge constant text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
+  default_edge constant text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1';
 begin
   select exists(
     select 1 from cron.job j where j.jobname = 'twilio_open_sync_every_5m'
@@ -1152,7 +1152,7 @@ begin
   edge_base_url := nullif(trim(both from coalesce(
     nullif(trim(both from p_edge_base_url), ''),
     nullif(trim(both from current_setting('app.settings.edge_functions_base_url', true)), ''),
-    nullif(trim(both from current_setting('app.settings.supabase_functions_url', true)), ''),
+    nullif(trim(both from current_setting('app.settings.AUTH_functions_url', true)), ''),
     default_edge
   )), '');
 
@@ -1160,7 +1160,7 @@ begin
     return 'missing_edge_url';
   end if;
 
-  service_jwt := nullif(trim(both from current_setting('app.settings.supabase_service_role_jwt', true)), '');
+  service_jwt := nullif(trim(both from current_setting('app.settings.AUTH_service_role_jwt', true)), '');
   if service_jwt is null or service_jwt = '' then
     return 'missing_service_role_jwt';
   end if;
@@ -3615,7 +3615,7 @@ CREATE FUNCTION public.notify_campaign_active() RETURNS trigger
     AS $$
 DECLARE
   payload jsonb;
-  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/handle_active_change';
+  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/handle_active_change';
   api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
 BEGIN
   payload := jsonb_build_object(
@@ -3647,7 +3647,7 @@ CREATE FUNCTION public.notify_schedule_change() RETURNS trigger
     AS $$
 DECLARE
   payload jsonb;
-  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/create_schedule_jobs';
+  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/create_schedule_jobs';
   api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
 BEGIN
   payload := jsonb_build_object(
@@ -3705,7 +3705,7 @@ msg pgmq_message;
 max_retries constant int := 3;
 visibility_timeout constant int := 60; -- 1 minute
 batch_size constant int := 10;
-edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
+edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1';
 api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
 retry_count int;
 has_more boolean := true;
@@ -3839,7 +3839,7 @@ declare
   msg pgmq_message;
   max_retries constant int := 3;
   visibility_timeout constant int := 300; -- 5 minutes
-  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-handler';
+  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/ivr-handler';
   api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
   retry_count int;
   has_more boolean := true;
@@ -3973,7 +3973,7 @@ declare
   msg pgmq_message;
   max_retries constant int := 3;
   visibility_timeout constant int := 300; -- 5 minutes
-  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/sms-handler';
+  edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/sms-handler';
   api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
   retry_count int;
   has_more boolean := true;
@@ -5481,10 +5481,10 @@ ALTER TABLE public.workspace_users ALTER COLUMN id ADD GENERATED BY DEFAULT AS I
 
 
 --
--- Name: schema_migrations; Type: TABLE; Schema: supabase_migrations; Owner: -
+-- Name: schema_migrations; Type: TABLE; Schema: AUTH_migrations; Owner: -
 --
 
-CREATE TABLE supabase_migrations.schema_migrations (
+CREATE TABLE AUTH_migrations.schema_migrations (
     version text NOT NULL
 );
 
@@ -5873,10 +5873,10 @@ ALTER TABLE ONLY public.workspace_users
 
 
 --
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: supabase_migrations; Owner: -
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: AUTH_migrations; Owner: -
 --
 
-ALTER TABLE ONLY supabase_migrations.schema_migrations
+ALTER TABLE ONLY AUTH_migrations.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 

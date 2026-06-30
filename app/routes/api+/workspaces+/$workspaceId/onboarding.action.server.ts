@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { patchOnboardingBodySchema } from "@/lib/schemas/api/platform-auth";
@@ -20,9 +18,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const result = await getWorkspaceOnboardingDetail(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await getWorkspaceOnboardingDetail(    auth.user.id,
     workspaceId,
   );
 
@@ -49,9 +45,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, patchOnboardingBodySchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await patchWorkspaceOnboarding(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await patchWorkspaceOnboarding(    auth.user.id,
     workspaceId,
     {
       current_step: parsed.current_step,

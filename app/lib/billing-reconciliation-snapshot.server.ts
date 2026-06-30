@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { patchWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
@@ -71,14 +70,13 @@ export function getWorkspaceBillingReconciliationSnapshot(
 }
 
 export async function persistWorkspaceBillingReconciliationSnapshot(args: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   report: BillingReconciliationReport;
   source: BillingReconciliationSnapshot["lastRunSource"];
 }): Promise<BillingReconciliationSnapshot> {
   const snapshot = buildBillingReconciliationSnapshot(args.report, args.source);
   await patchWorkspaceTwilioData(
-    args.supabaseClient,
+    args.null,
     args.workspaceId,
     {
       billingReconciliationSnapshot: snapshot,

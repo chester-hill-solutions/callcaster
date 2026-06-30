@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
@@ -63,13 +62,11 @@ export async function withTwilioRetry<T>(
 }
 
 export async function createWorkspaceTwilioClient({
-  supabase,
-  workspaceId,
+    workspaceId,
 }: {
-  supabase: SupabaseClient;
   workspaceId: string;
 }): Promise<Twilio.Twilio> {
-  return createWorkspaceTwilioInstance({ supabase, workspace_id: workspaceId });
+  return createWorkspaceTwilioInstance({ workspace_id: workspaceId });
 }
 
 export type MessagingServiceCreateInput = {

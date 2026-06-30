@@ -26,7 +26,7 @@ let userPresent = true;
 let statusJsonText = JSON.stringify({ status: "processing" });
 let downloadThrows: unknown = null;
 
-function buildSupabaseClient() {
+function buildMockDb() {
   return {
     storage: {
       from: () => ({
@@ -56,15 +56,12 @@ function applyDualAuth() {
     return;
   }
   setDualAuthSession({
-    supabaseClient: buildSupabaseClient(),
-    user: { id: "u1" },
+        user: { id: "u1" },
   });
 }
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 

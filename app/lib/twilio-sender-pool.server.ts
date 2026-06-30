@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import {
   getWorkspaceMessagingOnboardingFromTwilioData,
 } from "@/lib/messaging-onboarding.server";
@@ -24,14 +23,11 @@ function normalizePhone(phone: string): string {
 }
 
 export async function verifyWorkspaceMessagingSenderPool({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<SenderPoolVerificationResult> {
   const twilioData = (await loadWorkspaceTwilioData(
-    supabaseClient,
     workspaceId,
   )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
@@ -52,7 +48,7 @@ export async function verifyWorkspaceMessagingSenderPool({
   }
 
   const twilio = await createWorkspaceTwilioClient({
-    supabase: supabaseClient,
+    client: null,
     workspaceId,
   });
 

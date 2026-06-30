@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { requireWorkspaceAccess, updateContact } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { ActionFunctionArgs } from "react-router";
 

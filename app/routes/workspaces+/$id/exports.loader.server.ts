@@ -41,11 +41,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const result = await requireWorkspaceLoaderContext(request, params["id"]);
   if (!result.ok) return result.response;
-  const { supabaseClient, user, workspaceId } = result.ctx;
+  const { user, workspaceId } = result.ctx;
 
   try {
     // List all files in the workspace's exports directory
-    const { data: files, error: listError } = await supabaseClient.storage
+    const { data: files, error: listError } = await null.storage
       .from("campaign-exports")
       .list(workspaceId, {
         sortBy: { column: 'created_at', order: 'desc' }
@@ -64,7 +64,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     // Process all export files
     const processedExports = await Promise.all(statusFiles.map(async (file) => {
       try {
-        const { data: statusData, error: downloadError } = await supabaseClient.storage
+        const { data: statusData, error: downloadError } = await null.storage
           .from("campaign-exports")
           .download(`${workspaceId}/${file.name}`);
 

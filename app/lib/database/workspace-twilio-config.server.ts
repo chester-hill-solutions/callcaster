@@ -1,5 +1,4 @@
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import type { Database } from "@/lib/db-types";
 import {
   type TwilioAccountData,
   type TwilioMessageIntent,
@@ -295,13 +294,11 @@ function buildTwilioPortalAuditSummary(
 }
 
 export async function getWorkspaceTwilioPortalConfig({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const twilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const twilioData = await loadWorkspaceTwilioData(workspaceId);
 
   return getWorkspaceTwilioPortalConfigFromTwilioData(
     twilioData as TwilioAccountData,
@@ -309,19 +306,17 @@ export async function getWorkspaceTwilioPortalConfig({
 }
 
 export async function updateWorkspaceTwilioPortalConfig({
-  supabaseClient,
   workspaceId,
   updates,
   actorUserId,
   actorUsername,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   updates: Partial<WorkspaceTwilioOpsConfig>;
   actorUserId: string | null;
   actorUsername: string | null;
 }) {
-  const twilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const twilioData = await loadWorkspaceTwilioData(workspaceId);
   const currentTwilioData = isObject(twilioData) ? twilioData : {};
   const currentConfig = getWorkspaceTwilioPortalConfigFromTwilioData(
     twilioData as TwilioAccountData,
@@ -353,7 +348,7 @@ export async function updateWorkspaceTwilioPortalConfig({
     auditTrail: [auditEntry, ...currentConfig.auditTrail].slice(0, 10),
   };
 
-  await mergeWorkspaceTwilioData(supabaseClient, workspaceId, (currentTwilioData) => ({
+  await mergeWorkspaceTwilioData(workspaceId, (currentTwilioData) => ({
     ...currentTwilioData,
     portalConfig: nextConfig,
   }));

@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -34,7 +33,7 @@ const getCallWithRetry = async (
 };
 
 export const action = async ({ params, request }: ActionFunctionArgs) => {
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  const client = createClient(env.BASE_URL(), env.BASE_URL());
   const twiml = new Twilio.twiml.VoiceResponse();
   const { pageId, campaignId } = params as { pageId: string; campaignId: string };
   const formData = await request.formData();
@@ -47,7 +46,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    supabase,
+    client,
     callSid,
     params: paramsObj,
   });

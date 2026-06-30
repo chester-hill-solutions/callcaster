@@ -1,7 +1,6 @@
 import { data as routeData } from "react-router";
 import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
 import {
   deleteAudienceById,
@@ -9,8 +8,7 @@ import {
   upsertAudienceById,
 } from "@/lib/audience-upload-db.server";
 
-interface SupabaseResponse {
-  supabaseClient: SupabaseClient;
+interface AuthSessionResponse {
   headers: Headers;
 }
 
@@ -22,14 +20,9 @@ interface AudienceData {
 type AudiencesDeps = {
   verifyAuth: (
     request: Request,
-  ) => Promise<{
-    supabaseClient: SupabaseResponse["supabaseClient"];
-    headers: Headers;
-    user?: { id: string };
-  }>;
+  ) => Promise<{ headers: Headers; user?: { id: string } }>;
   parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
   requireWorkspaceAccess: (args: {
-    supabaseClient: SupabaseClient;
     user?: { id: string };
     workspaceId: string;
   }) => Promise<void>;
@@ -48,7 +41,7 @@ export const action = async ({
     requireWorkspaceAccess:
       deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
   };
-  const { supabaseClient, headers }: SupabaseResponse =
+  const { headers }: AuthSessionResponse =
     await d.verifyAuth(request);
 
   const method = request.method;

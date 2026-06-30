@@ -2,10 +2,11 @@
  * Contact-related database functions
  */
 import { and, eq, ilike, inArray, isNotNull, ne, or, type SQL } from "drizzle-orm";
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import type { Database } from "@/lib/db-types";
 import { Contact } from "../types";
 import { logger } from "../logger.server";
+import { rpcFindContactByPhone } from "@/lib/db-rpc.server";
+import { buildContactSearchWhere } from "@/lib/contacts/search.server";
 import { contact as contactTable, contact_audience } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -117,8 +118,48 @@ export async function findContactsByPhone(
   })) as Contact[];
 }
 
+export async function searchContactsForQueuePicker(
+  workspaceId: string,
+  searchQuery: string,
+): Promise<Contact[]> {
+  const tdb = createTenantDb(workspaceId);
+  const searchWhere = buildContactSearchWhere(searchQuery);
+  if (!searchWhere) {
+    return [];
+  }
+
+  const contacts = (await tdb.contact.findMany({
+    where: searchWhere,
+    limit: 10,
+  })) as Contact[];
+
+  if (contacts.length === 0) {
+    return [];
+  }
+
+  const contactIds = contacts.map((contact) => contact.id);
+  const audienceLinks = await db
+    .select({
+      contact_id: contact_audience.contact_id,
+      audience_id: contact_audience.audience_id,
+    })
+    .from(contact_audience)
+    .where(inArray(contact_audience.contact_id, contactIds));
+
+  const audiencesByContactId = new Map<number, Array<{ audience_id: number }>>();
+  for (const link of audienceLinks) {
+    const existing = audiencesByContactId.get(link.contact_id) ?? [];
+    existing.push({ audience_id: link.audience_id });
+    audiencesByContactId.set(link.contact_id, existing);
+  }
+
+  return contacts.map((contact) => ({
+    ...contact,
+    contact_audience: audiencesByContactId.get(contact.id) ?? [],
+  }));
+}
+
 export const findPotentialContacts = async (
-  supabaseClient: SupabaseClient<Database>,
   phoneNumber: string,
   workspaceId: string,
   tdb?: TenantDb,
@@ -128,33 +169,30 @@ export const findPotentialContacts = async (
     return { data: [], error: null };
   }
 
-  const rpcResult = await supabaseClient.rpc("find_contact_by_phone", {
-    p_workspace_id: workspaceId,
-    p_phone_number: phoneNumber,
-  });
-  if (!rpcResult.error) {
-    return rpcResult;
-  }
-
-  logger.warn(
-    "find_contact_by_phone RPC failed, falling back to legacy search",
-    {
-      workspaceId,
-      message: rpcResult.error.message,
-      code: (rpcResult.error as { code?: string }).code,
-    },
-  );
-
   try {
-    const contacts = await findContactsByPhone(workspaceId, phoneNumber, tdb);
-    return { data: contacts, error: null };
-  } catch (error) {
-    return { data: null, error: error as Error };
+    const data = await rpcFindContactByPhone(workspaceId, phoneNumber);
+    return { data, error: null };
+  } catch (rpcError) {
+    const error =
+      rpcError instanceof Error ? rpcError : new Error(String(rpcError));
+    logger.warn(
+      "find_contact_by_phone RPC failed, falling back to legacy search",
+      {
+        workspaceId,
+        message: error.message,
+      },
+    );
+
+    try {
+      const contacts = await findContactsByPhone(workspaceId, phoneNumber, tdb);
+      return { data: contacts, error: null };
+    } catch (fallbackError) {
+      return { data: null, error: fallbackError as Error };
+    }
   }
 };
 
 export async function fetchContactData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   contact_id: number | string | null | undefined,
   contact_number: string,
@@ -167,7 +205,6 @@ export async function fetchContactData(
 
   if (contact_number && !contact_id) {
     const { data: contacts } = await findPotentialContacts(
-      supabaseClient,
       contact_number,
       workspaceId,
       tenantDb,
@@ -198,8 +235,6 @@ export const updateContact = async (
   workspaceId: string,
   data: Partial<Contact>,
   tdb?: TenantDb,
-  /** @deprecated ignored — pass workspaceId */
-  supabaseClient?: SupabaseClient<Database>,
 ) => {
   if (!data.id) {
     throw new Error("Contact ID is required");
@@ -231,7 +266,7 @@ export const createContact = async (
   opts?: {
     tdb?: TenantDb;
     /** @deprecated ignored */
-    supabaseClient?: SupabaseClient;
+    null?: never;
   },
 ) => {
   if (!contactData.workspace) {
@@ -268,7 +303,7 @@ export const bulkCreateContacts = async (
   opts?: {
     tdb?: TenantDb;
     /** @deprecated ignored */
-    supabaseClient?: SupabaseClient;
+    null?: never;
   },
 ) => {
   const tenantDb = opts?.tdb ?? createTenantDb(workspace_id);

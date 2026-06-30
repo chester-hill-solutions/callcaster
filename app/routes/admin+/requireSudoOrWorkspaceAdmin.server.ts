@@ -1,6 +1,6 @@
 import { data as routeData, redirect } from "react-router";
 
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import {
   findAdminWorkspaceMembership,
   getUserById,
@@ -10,7 +10,7 @@ export async function requireSudoOrWorkspaceAdmin(
   request: Request,
   workspaceId: string,
 ) {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const userData = await getUserById(user.id);
   const membership = await findAdminWorkspaceMembership({
     workspaceId,
@@ -26,7 +26,6 @@ export async function requireSudoOrWorkspaceAdmin(
   }
 
   return {
-    supabaseClient,
     headers,
     user,
     userData,

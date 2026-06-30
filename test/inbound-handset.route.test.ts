@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   validateTwilioWebhookForPhoneNumber: vi.fn(),
   env: {
-    SUPABASE_URL: () => "https://sb.example",
-    SUPABASE_SERVICE_KEY: () => "svc",
+    BETTER_AUTH_URL: () => "https://sb.example",
+    BETTER_AUTH_SERVICE_KEY: () => "svc",
   },
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: unknown[]) => mocks.createClient(...args),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
@@ -45,7 +45,7 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeSupabase(opts?: {
+function makeDbClient(opts?: {
   session?: { client_identity: string } | null;
 }) {
   return {
@@ -103,7 +103,7 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }),
     });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const res = await asRouteResponse(
       await mod.action({ request: makeRequest() } as never),
@@ -118,7 +118,7 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }),
     });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const fd = new FormData();
     const res = await asRouteResponse(
@@ -139,7 +139,7 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }),
     });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const res = await asRouteResponse(
       await mod.action({ request: makeRequest("+19999999999") } as never),
@@ -148,7 +148,7 @@ describe("app/routes/api+/inbound-handset", () => {
   });
 
   test("returns TwiML dialing client on happy path", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");

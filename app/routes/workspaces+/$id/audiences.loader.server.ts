@@ -10,7 +10,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return access.response;
   }
 
-  const { supabaseClient, headers, workspaceId, userRole } = access.ctx;
+  const { headers, workspaceId, userRole } = access.ctx;
 
   const workspaceData = await getWorkspaceById(workspaceId);
 
@@ -21,7 +21,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const audiencesResult = await listWorkspaceAudiencesApi(supabaseClient, workspaceId);
+  const audiencesResult = await listWorkspaceAudiencesApi(workspaceId);
   if (!audiencesResult.ok) {
     return routeData(
       {

@@ -165,7 +165,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     const mod = await import("../app/lib/database/campaign.server");
     await expect(
       mod.updateCampaign({
-        supabase: {} as any,
+        client: {} as any,
         campaignData: { workspace: "w1", title: "T", type: "message" } as any,
         campaignDetails: { campaign_id: "" },
       }),
@@ -349,14 +349,14 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchBasicResults logs on error and returns []", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const supabase: any = {
+    const client: any = {
       rpc: vi.fn(async () => ({ data: null, error: new Error("x") })),
     };
     tdbMocks.campaign.findFirst.mockResolvedValueOnce({ type: "live_call" });
     const out = await mod.fetchBasicResults({
       workspaceId: "w1",
       campaignId: "1",
-      supabaseClient: supabase,
+      null: client,
     });
     expect(out).toEqual([]);
     expect(logger.error).toHaveBeenCalled();
@@ -365,14 +365,14 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchBasicResults success returns data", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const supabase: any = {
+    const client: any = {
       rpc: vi.fn(async () => ({ data: [{ ok: 1 }], error: null })),
     };
     tdbMocks.campaign.findFirst.mockResolvedValueOnce({ type: "live_call" });
     const out = await mod.fetchBasicResults({
       workspaceId: "w1",
       campaignId: "1",
-      supabaseClient: supabase,
+      null: client,
     });
     expect(out).toEqual([{ ok: 1 }]);
     expect(logger.error).not.toHaveBeenCalled();
@@ -382,7 +382,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
 
-    const supabase: any = {
+    const client: any = {
       from: () => ({
         select: (_s: any, _o: any) => ({
           eq: async () => ({ count: 1, error: new Error("a") }),
@@ -393,7 +393,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     const res = await mod.fetchCampaignCounts({
       workspaceId: "w1",
       campaignId: "1",
-      supabaseClient: supabase,
+      null: client,
     });
     expect(res).toEqual({ callCount: 1, completedCount: null });
     expect(logger.error).toHaveBeenCalledTimes(2);
@@ -402,7 +402,7 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchCampaignCounts success does not log", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const supabase: any = {
+    const client: any = {
       from: () => ({
         select: () => ({
           eq: async () => ({ count: 1, error: null }),
@@ -413,7 +413,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     const res = await mod.fetchCampaignCounts({
       workspaceId: "w1",
       campaignId: "1",
-      supabaseClient: supabase,
+      null: client,
     });
     expect(res).toEqual({ callCount: 1, completedCount: 2 });
     expect(logger.error).not.toHaveBeenCalled();
@@ -500,23 +500,23 @@ describe("app/lib/database/campaign.server.ts", () => {
       return chain;
     };
 
-    const supabase: any = { from: () => makeCampaignQueueQuery() };
+    const client: any = { from: () => makeCampaignQueueQuery() };
 
     mode = "fullErr";
     await expect(
-      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", supabaseClient: supabase }),
+      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", null: client }),
     ).rejects.toThrow("Error fetching full count");
 
     mode = "queuedErr";
     await expect(
-      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", supabaseClient: supabase }),
+      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", null: client }),
     ).rejects.toThrow(
       "Error fetching queued count",
     );
 
     // Missing message branches => "Unknown error ..."
     mode = "fullErr";
-    const supabaseNoMsg: any = {
+    const postgresNoMsg: any = {
       from: () => {
         const state = { hasQueueStateFilter: false };
         const chain: any = {
@@ -537,12 +537,12 @@ describe("app/lib/database/campaign.server.ts", () => {
       },
     };
     await expect(
-      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", supabaseClient: supabaseNoMsg }),
+      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", null: postgresNoMsg }),
     ).rejects.toThrow(
       "Unknown error fetching full count",
     );
 
-    const supabaseNoQueuedMsg: any = {
+    const postgresNoQueuedMsg: any = {
       from: () => {
         const state = { hasQueueStateFilter: false };
         const chain: any = {
@@ -566,7 +566,7 @@ describe("app/lib/database/campaign.server.ts", () => {
       mod.fetchQueueCounts({
         workspaceId: "w1",
         campaignId: "1",
-        supabaseClient: supabaseNoQueuedMsg,
+        null: postgresNoQueuedMsg,
       }),
     ).rejects.toThrow(
       "Unknown error fetching queued count",
@@ -576,7 +576,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     const ok = await mod.fetchQueueCounts({
       workspaceId: "w1",
       campaignId: "1",
-      supabaseClient: supabase,
+      null: client,
     });
     expect(ok).toEqual({ fullCount: 10, queuedCount: 3 });
   });
@@ -624,7 +624,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     const ok = await mod.fetchCampaignAudience({
       workspaceId: "w1",
       campaignId: "1",
-      supabaseClient: makeClient(),
+      null: makeClient(),
     });
     expect(ok).toMatchObject({
       campaign_queue: [{ id: 1 }],
@@ -638,21 +638,21 @@ describe("app/lib/database/campaign.server.ts", () => {
       mod.fetchCampaignAudience({
         workspaceId: "w1",
         campaignId: "1",
-        supabaseClient: makeClient({ queue: { message: "q" } }),
+        null: makeClient({ queue: { message: "q" } }),
       }),
     ).rejects.toThrow("Error fetching queue data");
     await expect(
       mod.fetchCampaignAudience({
         workspaceId: "w1",
         campaignId: "1",
-        supabaseClient: makeClient({ queued: { message: "qc" } }),
+        null: makeClient({ queued: { message: "qc" } }),
       }),
     ).rejects.toThrow("Error fetching queued count");
     await expect(
       mod.fetchCampaignAudience({
         workspaceId: "w1",
         campaignId: "1",
-        supabaseClient: makeClient({ dequeued: { message: "dc" } }),
+        null: makeClient({ dequeued: { message: "dc" } }),
       }),
     ).rejects.toThrow("Error fetching dequeued count");
   });
@@ -661,7 +661,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     const { getSignedUrls } = await import("../app/lib/database/workspace.server");
     const mod = await import("../app/lib/database/campaign.server");
 
-    const supabase: any = {};
+    const client: any = {};
 
     tdbMocks.campaign.findFirst.mockResolvedValueOnce({
       id: 1,
@@ -674,7 +674,7 @@ describe("app/lib/database/campaign.server.ts", () => {
         workspaceId: "w1",
         campaignId: 1,
         campaignType: "live_call",
-        supabaseClient: supabase,
+        null: client,
       }),
     ).resolves.toMatchObject({ campaign_id: 1, script: { id: 1 } });
 
@@ -683,7 +683,7 @@ describe("app/lib/database/campaign.server.ts", () => {
       workspaceId: "w1",
       campaignId: 1,
       campaignType: "message",
-      supabaseClient: supabase,
+      null: client,
     });
     expect(msg.mediaLinks).toEqual(["signed-1"]);
     expect(getSignedUrls).toHaveBeenCalled();
@@ -695,7 +695,7 @@ describe("app/lib/database/campaign.server.ts", () => {
         workspaceId: "w1",
         campaignId: 1,
         campaignType: "robocall",
-        supabaseClient: supabase,
+        null: client,
       }),
     ).resolves.toMatchObject({ campaign_id: 1, script: { id: 2 } });
 
@@ -705,7 +705,7 @@ describe("app/lib/database/campaign.server.ts", () => {
         workspaceId: "w1",
         campaignId: 1,
         campaignType: "message",
-        supabaseClient: supabase,
+        null: client,
       }),
     ).rejects.toThrow("Error fetching campaign details: x");
   });
@@ -739,7 +739,7 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("getCampaignQueueById returns data and throws on error", async () => {
     const mod = await import("../app/lib/database/campaign.server");
 
-    const supabaseOk: any = {
+    const postgresOk: any = {
       from: () => ({
         select: () => ({
           eq: async () => ({ data: [{ id: 1 }], error: null }),
@@ -747,10 +747,10 @@ describe("app/lib/database/campaign.server.ts", () => {
       }),
     };
     await expect(
-      mod.getCampaignQueueById({ supabaseClient: supabaseOk, campaign_id: "1" }),
+      mod.getCampaignQueueById({ null: postgresOk, campaign_id: "1" }),
     ).resolves.toEqual([{ id: 1 }]);
 
-    const supabaseErr: any = {
+    const postgresErr: any = {
       from: () => ({
         select: () => ({
           eq: async () => ({ data: null, error: new Error("x") }),
@@ -758,7 +758,7 @@ describe("app/lib/database/campaign.server.ts", () => {
       }),
     };
     await expect(
-      mod.getCampaignQueueById({ supabaseClient: supabaseErr, campaign_id: "1" }),
+      mod.getCampaignQueueById({ null: postgresErr, campaign_id: "1" }),
     ).rejects.toThrow("x");
   });
 

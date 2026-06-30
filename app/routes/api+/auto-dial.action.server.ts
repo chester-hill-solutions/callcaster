@@ -6,61 +6,30 @@ import {
 import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
 import { eq } from "drizzle-orm";
 import { call as callTable } from "@/db/schema";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { insertCallForWorkspace, updateCallBySid } from "@/lib/telephony-db.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
-import type { Database } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type TwilioSDK from "twilio";
 
-type Supabase = SupabaseClient<Database>;
 type TwilioClient = TwilioSDK.Twilio;
 
 type AutoDialDeps = Partial<{
-  createSupabaseServerClient: (
-    request: Request,
-  ) => { supabaseClient: Supabase; headers?: Headers };
+  getSession: typeof getSession;
   safeParseJson: <T>(request: Request) => Promise<T>;
   createWorkspaceTwilioInstance: (args: {
-    supabase: Supabase;
     workspace_id: string;
   }) => Promise<TwilioClient>;
   requireWorkspaceAccess: (args: {
-    supabaseClient: Supabase;
     user: { id: string };
     workspaceId: string;
   }) => Promise<void>;
-  getAuthenticatedUser: (supabase: Supabase) => Promise<{ id: string } | null>;
   env: typeof env;
   logger: typeof logger;
 }>;
-
-async function defaultGetAuthenticatedUser(
-  supabase: Supabase,
-): Promise<{ id: string } | null> {
-  const authClient = (
-    supabase as { auth?: { getUser?: () => Promise<unknown> } }
-  ).auth;
-  if (!authClient?.getUser) {
-    return null;
-  }
-
-  const result = (await authClient.getUser()) as {
-    data?: { user?: { id?: string } | null };
-    error?: unknown;
-  };
-
-  const userId = result.data?.user?.id;
-  if (typeof userId !== "string" || !userId) {
-    return null;
-  }
-
-  return { id: userId };
-}
 
 function buildPendingCallSid(): string {
   const randomSuffix =
@@ -78,21 +47,25 @@ export const action = async ({
   request: Request;
   deps?: AutoDialDeps;
 }) => {
-
   const d = {
-    createSupabaseServerClient:
-      deps?.createSupabaseServerClient ?? createSupabaseServerClient,
+    getSession: deps?.getSession ?? getSession,
     safeParseJson: deps?.safeParseJson ?? safeParseJson,
     createWorkspaceTwilioInstance:
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
     requireWorkspaceAccess:
       deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
-    getAuthenticatedUser:
-      deps?.getAuthenticatedUser ?? defaultGetAuthenticatedUser,
     env: deps?.env ?? env,
     logger: deps?.logger ?? logger,
   };
-  const { supabaseClient: supabase } = d.createSupabaseServerClient(request);
+
+  const { user } = await d.getSession(request);
+  if (!user) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Unauthorized" }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   const {
     user_id: _userIdFromBody,
     caller_id,
@@ -107,14 +80,7 @@ export const action = async ({
     selected_device?: unknown;
   }>(request);
 
-  const authenticatedUser = await d.getAuthenticatedUser(supabase);
-  if (!authenticatedUser) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Unauthorized" }),
-      { status: 401, headers: { "Content-Type": "application/json" } },
-    );
-  }
-
+  const authenticatedUser = user;
   const selectedDevice =
     typeof selected_device === "string" ? selected_device : undefined;
   if (typeof caller_id !== "string" || typeof workspace_id !== "string") {
@@ -128,7 +94,7 @@ export const action = async ({
   }
 
   try {
-    await d.requireWorkspaceAccess({ supabaseClient: supabase,
+    await d.requireWorkspaceAccess({
       user: authenticatedUser,
       workspaceId: workspace_id,
     });
@@ -154,9 +120,7 @@ export const action = async ({
     };
   }
 
-  const twilio = await d.createWorkspaceTwilioInstance({ supabase: supabase,
-    workspace_id,
-  });
+  const twilio = await d.createWorkspaceTwilioInstance({ workspace_id });
   const conferenceName = authenticatedUser.id;
   const targetDevice =
     selectedDevice && selectedDevice !== "computer"
@@ -290,4 +254,4 @@ export const action = async ({
       },
     );
   }
-}
+};

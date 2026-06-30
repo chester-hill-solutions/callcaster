@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from "@/lib/logger.client";
 
 type ContactState = {
@@ -22,14 +21,14 @@ interface RealtimePayload {
 }
 
 /**
- * Hook for real-time data synchronization with Supabase
+ * Hook for real-time data synchronization with Postgres
  * 
- * Subscribes to Supabase realtime changes for a specific table and workspace, automatically
+ * Subscribes to Postgres realtime changes for a specific table and workspace, automatically
  * updating local state when INSERT, UPDATE, or DELETE events occur. Handles initial data
  * fetching if not provided and manages subscription lifecycle.
  * 
  * @template T - Type of data items (must have an `id` property)
- * @param supabase - Supabase client instance
+ * @param client - Postgres client instance
  * @param workspace_id - Workspace ID for filtering data
  * @param table - Table name to subscribe to
  * @param initialData - Optional initial data array (if provided, skips initial fetch)
@@ -52,7 +51,7 @@ interface RealtimePayload {
  *   isSyncing,
  *   error
  * } = useRealtimeData<Contact>(
- *   supabase,
+ *   client,
  *   workspace.id,
  *   'contact',
  *   initialContacts // optional
@@ -75,8 +74,8 @@ interface RealtimePayload {
  * );
  * ```
  */
-export function useRealtimeData<T extends { id: number | string }>(supabase: SupabaseClient, workspace_id: string, table: string, initialData: (T | null)[] | null = null) {
-    const channelRef = useRef<ReturnType<SupabaseClient['channel']> | null>(null);
+export function useRealtimeData<T extends { id: number | string }>(workspace_id: string, table: string, initialData: (T | null)[] | null = null) {
+    const channelRef = useRef<ReturnType<never['channel']> | null>(null);
     const [data, setData] = useState<Record<string, T[]>>(() => ({
         [table]: initialData?.filter((item): item is T => Boolean(item)) || []
     }));
@@ -93,7 +92,7 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
             setState(prev => ({ ...prev, isSyncing: true }));
             const column = workspaceColumn;
             
-            supabase
+            client
                 .from(table)
                 .select('*')
                 .eq(column, workspace_id)
@@ -106,7 +105,7 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
                     setState(prev => ({ ...prev, isSyncing: false }));
                 });
         }
-    }, [supabase, table, workspace_id, initialData, workspaceColumn]);
+    }, [client, table, workspace_id, initialData, workspaceColumn]);
 
     // Memoize filter to avoid recreating on every render
     const filter = useMemo(() => {
@@ -115,7 +114,7 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
 
     useEffect(() => {
         const channelKey = `${workspace_id}-${table}`;
-        const channel = supabase.channel(channelKey);
+        const channel = adminDb.channel(channelKey);
         channelRef.current = channel;
 
         function handlePayload(payload: RealtimePayload) {
@@ -200,11 +199,11 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
 
         return () => {
             if (channelRef.current) {
-                supabase.removeChannel(channelRef.current);
+                adminDb.removeChannel(channelRef.current);
                 channelRef.current = null;
             }
         };
-    }, [supabase, workspace_id, table, filter]);
+    }, [client, workspace_id, table, filter]);
 
     return { data: data[table], ...state };
 }

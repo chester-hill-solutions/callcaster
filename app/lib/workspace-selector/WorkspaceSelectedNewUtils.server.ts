@@ -7,9 +7,8 @@ import {
   getDefaultCampaignDates,
 } from "@/lib/campaign-setup-steps";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { Contact } from "@/lib/types";
-import { Database } from "../database.types";
+import { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { eq } from "drizzle-orm";
 import {
@@ -30,7 +29,6 @@ interface RemoveCampaignAudienceParams {
 }
 
 interface NewAudienceParams {
-  supabaseClient: SupabaseClient<Database>;
   formData: FormData;
   workspaceId: string;
   headers: Headers;
@@ -41,7 +39,6 @@ interface NewAudienceParams {
 }
 
 interface NewCampaignParams {
-  supabaseClient: SupabaseClient<Database>;
   formData: FormData;
   workspaceId: string;
   headers: Headers;
@@ -72,7 +69,6 @@ async function removeCampaignAudience({ id }: RemoveCampaignAudienceParams) {
 }
 
 export async function handleNewAudience({
-  supabaseClient,
   formData,
   workspaceId,
   headers,
@@ -118,7 +114,6 @@ export async function handleNewAudience({
       if (campaignId && insert?.length) {
         const contactIds = insert.map((c) => c.id);
         await enqueueContactsForCampaign(
-          supabaseClient,
           parseInt(campaignId, 10),
           contactIds,
           { requeue: false },
@@ -143,9 +138,7 @@ export async function handleNewAudience({
   }
 }
 
-export async function handleNewCampaign({
-  supabaseClient: _supabaseClient,
-  formData,
+export async function handleNewCampaign({formData,
   workspaceId,
   headers,
 }: NewCampaignParams) {

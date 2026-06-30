@@ -24,7 +24,7 @@ import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-    const { supabaseClient, user, userData } = await requireSudoAdmin(request);
+    const { user, userData } = await requireSudoAdmin(request);
 
     const workspaceId = params.workspaceId;
     if (!workspaceId) {
@@ -37,7 +37,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "sync_twilio_workspace") {
         try {
             await syncWorkspaceTwilioSnapshot({
-                supabaseClient,
                 workspaceId,
             });
             return routeData({ success: "Twilio sync completed for this workspace" });
@@ -53,7 +52,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "bootstrap_workspace_messaging") {
         try {
             const bootstrap = await ensureWorkspaceTwilioBootstrap({
-                supabaseClient,
                 workspaceId,
                 actorUserId: user.id,
             });
@@ -81,10 +79,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "audit_twilio_webhooks") {
         try {
             const audit = await auditWorkspaceTwilioWebhooks({
-              supabaseClient,
               workspaceId,
             });
-            await syncWorkspaceTwilioBootstrapState({ supabaseClient, workspaceId });
+            await syncWorkspaceTwilioBootstrapState({ workspaceId });
             return routeData({
               success:
                 audit.driftMessages.length === 0
@@ -100,7 +97,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "repair_twilio_webhooks") {
         try {
             const { repaired } = await repairWorkspaceTwilioWebhooks({
-              supabaseClient,
               workspaceId,
               actorUserId: user.id,
             });
@@ -128,9 +124,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
               );
             }
 
-            const twilio = await createWorkspaceTwilioInstance({
-              supabase: supabaseClient,
-              workspace_id: workspaceId,
+            const twilio = await createWorkspaceTwilioInstance({               workspace_id: workspaceId,
             });
             const usageRecords = await twilio.usage.records.list();
             const twilioUsage = usageRecords.map((record) => ({
@@ -144,12 +138,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             }));
 
             const report = await loadBillingReconciliationReport({
-              supabaseClient,
               workspaceId,
               twilioUsage,
             });
             const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
-              supabaseClient,
               workspaceId,
               report,
               source: "admin",
@@ -168,7 +160,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (actionName === "trigger_twilio_open_sync") {
         try {
-            const { data, error } = await supabaseClient.functions.invoke(
+            const { data, error } = await null.functions.invoke(
               "twilio-open-sync",
               {
                 body: {
@@ -198,7 +190,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "sync_a2p_status") {
         try {
             await syncWorkspaceA2pStatus({
-              supabaseClient,
               workspaceId,
               actorUserId: user.id,
             });
@@ -212,7 +203,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "verify_sender_pool") {
         try {
             const result = await verifyWorkspaceMessagingSenderPool({
-              supabaseClient,
               workspaceId,
             });
             return routeData({
@@ -229,7 +219,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "provision_workspace_a2p") {
         try {
             await provisionWorkspaceA2P({
-                supabaseClient,
                 workspaceId,
                 actorUserId: user.id,
             });
@@ -247,7 +236,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         try {
             const rcsForm = parseTwilioRcsOnboardingForm(formData);
             await updateWorkspaceRcsOnboarding({
-                supabaseClient,
                 workspaceId,
                 actorUserId: user.id,
                 provider: TWILIO_RCS_PROVIDER,
@@ -285,7 +273,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     try {
         const updates = parseTwilioPortalConfigForm(formData);
         await updateWorkspaceTwilioPortalConfig({
-            supabaseClient,
             workspaceId,
             actorUserId: user.id,
             actorUsername: userData.username ?? null,

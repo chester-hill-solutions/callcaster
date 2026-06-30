@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   validateTwilioWebhookForPhoneNumber: vi.fn(),
   env: {
-    SUPABASE_URL: () => "https://sb.example",
-    SUPABASE_SERVICE_KEY: () => "svc",
+    BETTER_AUTH_URL: () => "https://sb.example",
+    BETTER_AUTH_SERVICE_KEY: () => "svc",
     BASE_URL: () => "https://app.example",
   },
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: unknown[]) => mocks.createClient(...args),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
@@ -46,7 +46,7 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeSupabase(numberRow: {
+function makeDbClient(numberRow: {
   inbound_action: string | null;
   inbound_audio: string | null;
   workspace: string;
@@ -93,7 +93,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
     mocks.createClient.mockReset();
     mocks.validateTwilioWebhookForPhoneNumber.mockReset();
     mocks.createClient.mockReturnValue(
-      makeSupabase({
+      makeDbClient({
         inbound_action: null,
         inbound_audio: null,
         workspace: "w1",
@@ -177,7 +177,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
 
   test("returns voicemail TwiML when handset misses and inbound action is email", async () => {
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
+      makeDbClient({
         inbound_action: "notify@example.com",
         inbound_audio: null,
         workspace: "w1",

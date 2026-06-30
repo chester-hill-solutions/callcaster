@@ -32,7 +32,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
 
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => {
         expect(table).toBe("audience");
         return {
@@ -46,7 +46,6 @@ describe("WorkspaceSelectedNewUtils", () => {
     };
 
     const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -65,7 +64,7 @@ describe("WorkspaceSelectedNewUtils", () => {
 
     bulkCreateContacts.mockResolvedValueOnce({ insert: [{ id: 1 }, { id: 2 }], audience_insert: [] });
 
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => {
         if (table === "audience") {
           return {
@@ -84,7 +83,6 @@ describe("WorkspaceSelectedNewUtils", () => {
     };
 
     const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -95,7 +93,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     }));
     expect(res.status).toBe(302);
     expect(bulkCreateContacts).toHaveBeenCalled();
-    expect(enqueueContactsForCampaign).toHaveBeenCalledWith(supabaseClient, 123, [1, 2], { requeue: false });
+    expect(enqueueContactsForCampaign).toHaveBeenCalledWith(123, [1, 2], { requeue: false });
   });
 
   test("handleNewAudience does not enqueue when insert list is empty", async () => {
@@ -106,7 +104,7 @@ describe("WorkspaceSelectedNewUtils", () => {
 
     bulkCreateContacts.mockResolvedValueOnce({ insert: [], audience_insert: [] });
 
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => {
         if (table === "audience") {
           return {
@@ -125,7 +123,6 @@ describe("WorkspaceSelectedNewUtils", () => {
     };
 
     const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -144,7 +141,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
 
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => {
         if (table === "audience") {
           return {
@@ -166,7 +163,6 @@ describe("WorkspaceSelectedNewUtils", () => {
     };
 
     const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -184,7 +180,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
 
-    const supabaseClientErr: any = {
+    const _unusedClientErr: any = {
       from: () => ({
         insert: () => ({
           select: () => ({
@@ -194,7 +190,7 @@ describe("WorkspaceSelectedNewUtils", () => {
       }),
     };
     const res1 = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient: supabaseClientErr,
+      null: _unusedClientErr,
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -206,7 +202,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     bulkCreateContacts.mockImplementationOnce(async () => {
       throw "boom";
     });
-    const supabaseClientOk: any = {
+    const _unusedClientOk: any = {
       from: (table: string) => {
         if (table === "audience") {
           return {
@@ -221,7 +217,7 @@ describe("WorkspaceSelectedNewUtils", () => {
       },
     };
     const res2 = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient: supabaseClientOk,
+      null: _unusedClientOk,
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -243,7 +239,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     fd.set("campaign-type", "live_call");
 
     const insertSingle = vi.fn();
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => {
         if (table === "campaign") {
           return {
@@ -259,15 +255,15 @@ describe("WorkspaceSelectedNewUtils", () => {
     };
 
     insertSingle.mockResolvedValueOnce({ data: null, error: { code: "23505" } });
-    const r1 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
+    const r1 = await asRouteResponse(await mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect((await r1.json()).error.message).toContain("already a campaign");
 
     insertSingle.mockResolvedValueOnce({ data: null, error: { code: "X", message: "nope" } });
-    const r2 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
+    const r2 = await asRouteResponse(await mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect((await r2.json()).error).toMatchObject({ code: "X", message: "nope" });
 
     insertSingle.mockResolvedValueOnce({ data: { id: 2 }, error: null });
-    const r3 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
+    const r3 = await asRouteResponse(await mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect(r3.status).toBe(302);
     expect(r3.headers.get("Location")).toBe("/workspaces/w1/campaigns/2/settings");
   });
@@ -278,7 +274,7 @@ describe("WorkspaceSelectedNewUtils", () => {
 
     const insertSingle = vi.fn();
     const insertsByTable: string[] = [];
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => {
         if (table === "campaign") {
           return {
@@ -300,14 +296,14 @@ describe("WorkspaceSelectedNewUtils", () => {
     const fdMsg = new FormData();
     fdMsg.set("campaign-name", "C");
     fdMsg.set("campaign-type", "message");
-    const r1 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fdMsg, workspaceId: "w1", headers }));
+    const r1 = await asRouteResponse(await mod.handleNewCampaign({ formData: fdMsg, workspaceId: "w1", headers }));
     expect(r1.status).toBe(302);
 
     insertSingle.mockResolvedValue({ data: { id: 100 }, error: null });
     const fdRobo = new FormData();
     fdRobo.set("campaign-name", "C");
     fdRobo.set("campaign-type", "robocall");
-    const r2 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fdRobo, workspaceId: "w1", headers }));
+    const r2 = await asRouteResponse(await mod.handleNewCampaign({ formData: fdRobo, workspaceId: "w1", headers }));
     expect(r2.status).toBe(302);
 
     expect(insertsByTable).toEqual([]);
@@ -326,7 +322,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     });
 
     let insertedCampaign: Record<string, unknown> | null = null;
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => {
         if (table === "campaign") {
           return {
@@ -345,7 +341,6 @@ describe("WorkspaceSelectedNewUtils", () => {
     };
 
     const res = await asRouteResponse(await mod.handleNewCampaign({
-      supabaseClient,
       formData: fd,
       workspaceId: "w1",
       headers,

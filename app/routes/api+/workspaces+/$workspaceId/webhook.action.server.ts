@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
@@ -24,9 +22,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const result = await getWorkspaceWebhook(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await getWorkspaceWebhook(    auth.user.id,
     workspaceId,
   );
 
@@ -45,15 +41,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
-
-  const supabase = getAuthSupabaseClient(auth);
-
   if (request.method === "PUT") {
     const parsed = await parseJsonBodyOrResponse(request, upsertWebhookBodySchema);
     if (parsed instanceof Response) return parsed;
 
     const result = await upsertWorkspaceWebhook(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       parsed,

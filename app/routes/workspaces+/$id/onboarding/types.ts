@@ -1,4 +1,4 @@
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 import type {
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,

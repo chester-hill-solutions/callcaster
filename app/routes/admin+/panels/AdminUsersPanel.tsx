@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 import type { WorkspaceWithCampaigns } from "../admin.types";
 

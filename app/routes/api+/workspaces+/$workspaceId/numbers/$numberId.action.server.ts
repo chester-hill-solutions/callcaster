@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
@@ -20,15 +18,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!workspaceId || !numberId) {
     return jsonError("workspaceId and numberId are required", 400);
   }
-
-  const supabase = getAuthSupabaseClient(auth);
-
   if (request.method === "PATCH") {
     const parsed = await parseJsonBodyOrResponse(request, patchNumberBodySchema);
     if (parsed instanceof Response) return parsed;
 
     const result = await patchWorkspaceNumber(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       numberId,
@@ -44,7 +39,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (request.method === "DELETE") {
     const result = await deleteWorkspaceNumber(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       numberId,

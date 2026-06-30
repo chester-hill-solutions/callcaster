@@ -1,6 +1,6 @@
 import type { Contact } from "@/lib/types";
 import type { ConversationSummary } from "@/lib/chat-conversation-sort";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 type LatestMessage = Pick<
   Tables<"message">,

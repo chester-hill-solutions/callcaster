@@ -3,15 +3,13 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
-const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
+const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => ({
   safeParseJson: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: supabaseServerMocks.headers,
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: postgresServerMocks.headers,
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -22,15 +20,15 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
-    supabaseServerMocks.headers = new Headers();
+    postgresServerMocks.headers = new Headers();
   });
 
   test("returns json({ error }) when rpc errors", async () => {
-    supabaseServerMocks.headers = new Headers({ "Set-Cookie": "a=1" });
+    postgresServerMocks.headers = new Headers({ "Set-Cookie": "a=1" });
     const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: { message: "nope" } });
     queueJsonAuthSession({
-      supabaseClient: { rpc },
-      headers: supabaseServerMocks.headers,
+      null: { rpc },
+      headers: postgresServerMocks.headers,
       user: { id: "u1" },
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: 1, contact_id: 2, queue_id: 3 });
@@ -52,11 +50,11 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
   });
 
   test("returns data with headers and handles missing user", async () => {
-    supabaseServerMocks.headers = new Headers({ "Set-Cookie": "b=2" });
+    postgresServerMocks.headers = new Headers({ "Set-Cookie": "b=2" });
     const rpc = vi.fn().mockResolvedValueOnce({ data: 123, error: null });
     queueJsonAuthSession({
-      supabaseClient: { rpc },
-      headers: supabaseServerMocks.headers,
+      null: { rpc },
+      headers: postgresServerMocks.headers,
       user: { id: "" },
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: "10", contact_id: "20", queue_id: "30" });

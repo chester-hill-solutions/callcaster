@@ -1,6 +1,4 @@
-import { type SupabaseClient } from "@supabase/supabase-js";
 import { csvRow } from "@/lib/csv";
-import type { Database } from "@/lib/database.types";
 import {
   countExportCampaignMessages,
   countExportOutreachAttempts,
@@ -40,7 +38,6 @@ export function generateCampaignExportId() {
 }
 
 export async function processMessageCampaignExport(
-  supabaseClient: SupabaseClient<Database>,
   campaignId: number,
   workspaceId: string,
   exportId: string,
@@ -56,7 +53,6 @@ export async function processMessageCampaignExport(
 
   try {
     statusData = await writeExportStatus(
-      supabaseClient,
       workspaceId,
       exportId,
       statusData,
@@ -94,7 +90,7 @@ export async function processMessageCampaignExport(
 
       contactDetails = [...contactDetails, ...contactBatch];
 
-      statusData = await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+      statusData = await writeExportStatus(workspaceId, exportId, statusData, {
         progress: Math.round((i / contactIds.length) * 30),
         stage: "Fetching contacts",
       });
@@ -223,7 +219,7 @@ export async function processMessageCampaignExport(
       processedMessages += messages.length;
 
       const progress = 30 + Math.round((processedMessages / totalMessages) * 70);
-      statusData = await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+      statusData = await writeExportStatus(workspaceId, exportId, statusData, {
         progress: Math.min(progress, 99),
         stage: "Processing messages",
         processed: processedMessages,
@@ -236,20 +232,19 @@ export async function processMessageCampaignExport(
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    await finalizeCsvExport(supabaseClient, workspaceId, exportId, statusData, csvLines, {
+    await finalizeCsvExport(workspaceId, exportId, statusData, csvLines, {
       campaignId,
       campaignName: campaign.title,
     });
   } catch (error) {
     logger.error("Export error:", error);
-    await writeExportErrorStatus(supabaseClient, workspaceId, exportId, statusData, error);
+    await writeExportErrorStatus(workspaceId, exportId, statusData, error);
   }
 }
 
 // Process call campaign export in chunks
 
 export async function processCallCampaignExport(
-  supabaseClient: SupabaseClient<Database>,
   campaignId: number,
   workspaceId: string,
   exportId: string,
@@ -264,7 +259,6 @@ export async function processCallCampaignExport(
 
   try {
     statusData = await writeExportStatus(
-      supabaseClient,
       workspaceId,
       exportId,
       statusData,
@@ -438,7 +432,7 @@ export async function processCallCampaignExport(
       processedAttempts += attempts.length;
 
       const progress = Math.round((processedAttempts / totalAttempts) * 100);
-      statusData = await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+      statusData = await writeExportStatus(workspaceId, exportId, statusData, {
         progress: Math.min(progress, 99),
         stage: "Processing call attempts",
         processed: processedAttempts,
@@ -449,9 +443,9 @@ export async function processCallCampaignExport(
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    await finalizeCsvExport(supabaseClient, workspaceId, exportId, statusData, csvLines);
+    await finalizeCsvExport(workspaceId, exportId, statusData, csvLines);
   } catch (error) {
     logger.error("Export error:", error);
-    await writeExportErrorStatus(supabaseClient, workspaceId, exportId, statusData, error);
+    await writeExportErrorStatus(workspaceId, exportId, statusData, error);
   }
 }

@@ -26,9 +26,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, twilioActionSchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await dispatchAdminTwilioAction({
-    supabaseClient: auth.supabaseClient,
-    workspaceId,
+  const result = await dispatchAdminTwilioAction({workspaceId,
     actorUserId: auth.user.id,
     actorUsername: auth.userData.username ?? null,
     actionName: parsed.action,

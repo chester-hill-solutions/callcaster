@@ -1,17 +1,16 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
-let serviceClient: SupabaseClient | null = null;
+let serviceClient: never | null = null;
 
-export function getServiceClient(): SupabaseClient {
+export function getServiceClient(): never {
   if (serviceClient) {
     return serviceClient;
   }
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
+  const url = process.env.BASE_URL;
+  const key = process.env.BETTER_AUTH_SECRET;
   if (!url || !key) {
-    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_KEY required for E2E factories");
+    throw new Error("AUTH_URL and AUTH_SERVICE_KEY required for E2E factories");
   }
   serviceClient = createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },

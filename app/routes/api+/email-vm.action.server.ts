@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -12,7 +11,7 @@ import {
   updateCallRecordingUrlBySid,
 } from "@/lib/telephony-db.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const resend = new Resend(env.RESEND_API_KEY());
@@ -33,14 +32,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Missing or invalid CallSid");
     }
 
-    const supabase = createClient<Database>(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY(),
+    const client = createClient<Database>(
+      env.BASE_URL(),
+      env.BASE_URL(),
     );
 
     const validation = await validateTwilioWebhookForCallSid({
       request,
-      supabase,
+      client,
       callSid,
       params,
     });
@@ -103,7 +102,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const recording = await recordingResponse.blob();
 
     const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await adminDb.storage
       .from("workspaceAudio")
       .upload(fileName, recording, {
         cacheControl: "60",
@@ -112,10 +111,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
 
     if (uploadError) {
-      throw new Error(`Error uploading to Supabase: ${uploadError.message}`);
+      throw new Error(`Error uploading to Postgres: ${uploadError.message}`);
     }
 
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+    const { data: signedUrlData, error: signedUrlError } = await adminDb.storage
       .from("workspaceAudio")
       .createSignedUrl(fileName, 8640000, { download: true });
 
@@ -169,7 +168,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           duration: recordingDuration ? String(recordingDuration) : undefined,
           timestamp: now.toISOString(),
         },
-        supabaseClient: supabase,
       });
     }
 

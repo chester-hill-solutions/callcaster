@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
     callFindFirst: vi.fn(async () => null),
@@ -29,7 +29,7 @@ vi.mock("@/server/tenant-db", () => ({
   })),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
 }));
 
@@ -41,7 +41,7 @@ vi.mock("../app/lib/database.server", () => ({
 vi.mock("../app/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 
-function makeSupabase() {
+function makeDbClient() {
   const channel = vi.fn(() => ({ send: vi.fn() }));
   const removeChannel = vi.fn();
 
@@ -68,9 +68,9 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   });
 
   test("happy path: gets contact, creates attempt + twilio call, dequeues, saves call, returns success", async () => {
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
-    supabase.rpc.mockImplementation(async (fn: string) => {
+    adminDb.rpc.mockImplementation(async (fn: string) => {
       if (fn === "auto_dial_queue") {
         return {
           data: [
@@ -89,11 +89,11 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       throw new Error(`unexpected rpc ${fn}`);
     });
 
-    supabase.from.mockImplementation((table: string) => {
+    adminDb.from.mockImplementation((table: string) => {
       throw new Error(`unexpected table ${table}`);
     });
 
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
       campaign_id: 1,
@@ -121,12 +121,12 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(twilioCallsCreate).toHaveBeenCalled();
     expect(mocks.callInsert).toHaveBeenCalled();
-    expect(supabase.removeChannel).toHaveBeenCalled();
+    expect(adminDb.removeChannel).toHaveBeenCalled();
   });
 
   test("saves call: logs and continues when sid is missing", async () => {
-    const supabase = makeSupabase();
-    supabase.rpc.mockImplementation(async (fn: string) => {
+    const client = makeDbClient();
+    adminDb.rpc.mockImplementation(async (fn: string) => {
       if (fn === "auto_dial_queue") {
         return {
           data: [{ queue_id: 1, contact_id: 2, contact_phone: "5555550100", caller_id: "+1555" }],
@@ -137,10 +137,10 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       if (fn === "dequeue_contact") return { data: {}, error: null };
       throw new Error(`unexpected rpc ${fn}`);
     });
-    supabase.from.mockImplementation(() => {
-      throw new Error("unexpected supabase.from during saveCallToDatabase sid-missing test");
+    adminDb.from.mockImplementation(() => {
+      throw new Error("unexpected adminDb.from during saveCallToDatabase sid-missing test");
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
       campaign_id: 1,
@@ -159,9 +159,9 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   });
 
   test("no queued contacts: completes conferences and returns message", async () => {
-    const supabase = makeSupabase();
-    supabase.rpc.mockResolvedValueOnce({ data: [], error: null }); // auto_dial_queue
-    mocks.createClient.mockReturnValueOnce(supabase);
+    const client = makeDbClient();
+    adminDb.rpc.mockResolvedValueOnce({ data: [], error: null }); // auto_dial_queue
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
       campaign_id: 1,
@@ -184,9 +184,9 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   });
 
   test("returns 500-style JSON response when dequeue_contact rpc errors", async () => {
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
-    supabase.rpc.mockImplementation(async (fn: string) => {
+    adminDb.rpc.mockImplementation(async (fn: string) => {
       if (fn === "auto_dial_queue") {
         return { data: [{ queue_id: 1, contact_id: 2, contact_phone: "5555550100", caller_id: "+1555" }], error: null };
       }
@@ -194,11 +194,11 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       if (fn === "dequeue_contact") return { data: null, error: new Error("dq") };
       throw new Error(`unexpected rpc ${fn}`);
     });
-    supabase.from.mockImplementation((table: string) => {
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") return { upsert: () => ({ select: async () => ({ error: null }) }) };
       throw new Error(`unexpected table ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
       campaign_id: 1,
@@ -217,9 +217,9 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   });
 
   test("error formatting: non-Error thrown becomes Unknown error", async () => {
-    const supabase = makeSupabase();
-    supabase.rpc.mockRejectedValueOnce("nope");
-    mocks.createClient.mockReturnValueOnce(supabase);
+    const client = makeDbClient();
+    adminDb.rpc.mockRejectedValueOnce("nope");
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
       campaign_id: 1,
@@ -234,12 +234,12 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   });
 
   test("normalizePhoneNumber throws invalid length (covered by catch)", async () => {
-    const supabase = makeSupabase();
-    supabase.rpc.mockResolvedValueOnce({
+    const client = makeDbClient();
+    adminDb.rpc.mockResolvedValueOnce({
       data: [{ queue_id: 1, contact_id: 2, contact_phone: "+123", caller_id: "+1555" }],
       error: null,
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
       campaign_id: 1,

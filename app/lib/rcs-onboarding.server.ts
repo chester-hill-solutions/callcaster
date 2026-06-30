@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import {
   buildOnboardingStepsForState,
   getWorkspaceMessagingOnboardingFromTwilioData,
@@ -193,20 +192,19 @@ async function persistWorkspaceRcsState({
   twilioData,
   onboarding,
 }: {
-  supabaseClient?: SupabaseClient<Database> | null;
+  null?: never | null;
   workspaceId: string;
   twilioData: TwilioAccountData;
   onboarding: ReturnType<typeof getWorkspaceMessagingOnboardingFromTwilioData>;
 }) {
   const baseData = isObject(twilioData) ? twilioData : {};
-  await persistWorkspaceTwilioData(null, workspaceId, {
+  await persistWorkspaceTwilioData(workspaceId, {
     ...baseData,
     onboarding,
   });
 }
 
 export async function updateWorkspaceRcsOnboarding({
-  supabaseClient,
   workspaceId,
   actorUserId,
   provider,
@@ -227,7 +225,6 @@ export async function updateWorkspaceRcsOnboarding({
   notes,
   status,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
   provider: string | null;
@@ -248,7 +245,7 @@ export async function updateWorkspaceRcsOnboarding({
   notes: string;
   status: WorkspaceOnboardingStatus;
 }) {
-  const twilioData = (await loadWorkspaceTwilioData(null, workspaceId)) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(workspaceId)) as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const selectedChannels: WorkspaceOnboardingChannel[] = onboarding.selectedChannels.includes("rcs")
     ? onboarding.selectedChannels
@@ -297,7 +294,6 @@ export async function updateWorkspaceRcsOnboarding({
   });
 
   await persistWorkspaceRcsState({
-    supabaseClient,
     workspaceId,
     twilioData,
     onboarding: nextOnboarding,

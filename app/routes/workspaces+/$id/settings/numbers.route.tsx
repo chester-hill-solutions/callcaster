@@ -11,7 +11,7 @@ import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 
 
-import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceRealtime } from "@/hooks/realtime/useWorkspaceRealtime";
 import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
 import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
@@ -20,7 +20,6 @@ import {
   type CallerIdValidationRequest,
 } from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { User, WorkspaceNumbers } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
 
 
 
@@ -80,7 +79,7 @@ const WorkspaceSettings = () => {
     scripts,
     creditsBalance,
   } = useLoaderData<LoaderData>();
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
+  const { client } = useOutletContext<{ }>();
   const actionData = useActionData<CallerIDResponse>();
   const [isDialogOpen, setDialog] = useState<boolean>(
     !!actionData?.validationRequest,
@@ -88,8 +87,7 @@ const WorkspaceSettings = () => {
   const fetcher = useFetcher<NumbersSearchFetcherData>();
   const updateFetcher = useFetcher();
 
-  const { phoneNumbers, setPhoneNumbers } = useSupabaseRealtime({
-    supabase,
+  const { phoneNumbers, setPhoneNumbers } = useWorkspaceRealtime({
     user,
     workspace: workspaceId,
     init: {

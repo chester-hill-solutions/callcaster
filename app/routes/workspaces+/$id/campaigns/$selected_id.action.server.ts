@@ -4,12 +4,15 @@ import {
   MessageCampaign,
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
+import {
+  rpcGetCampaignAttemptsCsv,
+  rpcGetCampaignMessagesCsv,
+} from "@/lib/db-rpc.server";
 import { fetchBasicResults, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } from "@/lib/database.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { logger as loggerServer } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -27,12 +30,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!workspace_id || !selected_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
 
   const [campaignRow, queueCounts, userRole] = await Promise.all([
     findCampaignInWorkspace(workspace_id, selected_id),
-    fetchQueueCounts({ workspaceId: workspace_id, campaignId: selected_id, supabaseClient }),
-    getUserRole({ supabaseClient, user, workspaceId: workspace_id }),
+    fetchQueueCounts({ workspaceId: workspace_id, campaignId: selected_id}),
+    getUserRole({ user, workspaceId: workspace_id }),
   ]);
   if (!campaignRow?.type || !VALID_CAMPAIGN_TYPES.has(campaignRow.type)) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
@@ -46,7 +49,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const resultsPromise = fetchBasicResults({
     workspaceId: workspace_id,
     campaignId: selected_id,
-    supabaseClient,
   }) as unknown as {
     disposition: string;
     count: number;
@@ -69,14 +71,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
 
-  const { supabaseClient, user } = await verifyAuth(request);
-  const rpcClient = supabaseClient as SupabaseClient<any>;
+  await verifyAuth(request);
   const { id: workspace_id, selected_id: campaign_id } = params;
   if (!workspace_id || !campaign_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
   await getWorkspaceUsers({
-    supabaseClient,
     workspaceId: workspace_id,
   });
   const campaignRow = await findCampaignInWorkspace(workspace_id, campaign_id);
@@ -84,43 +84,49 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
   if (campaignRow.type === "message") {
-    const { data, error } = await rpcClient
-      .rpc("get_campaign_messages", {
-        prop_campaign_id: Number(campaign_id),
-        prop_workspace_id: workspace_id,
-      })
-      .csv();
-    if (error || !data) {
+    try {
+      const csvContent = await rpcGetCampaignMessagesCsv(
+        workspace_id,
+        Number(campaign_id),
+      );
+      return routeData({
+        csvContent,
+        filename: `outreach_results_${campaign_id}.csv`,
+      });
+    } catch (error) {
       loggerServer.error("Error fetching campaign messages:", error);
       return routeData(
-        { error: error?.message || "Error fetching campaign messages" },
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Error fetching campaign messages",
+        },
         { status: 500 },
       );
     }
-    return routeData({
-      csvContent: data,
-      filename: `outreach_results_${campaign_id}.csv`,
-    });
   } else if (
     campaignRow.type === "live_call" ||
     campaignRow.type === "robocall"
   ) {
-    const { data, error } = await rpcClient
-      .rpc("get_campaign_attempts", {
-        p_campaign_id: Number(campaign_id),
-      })
-      .csv();
-    if (error || !data) {
+    try {
+      const csvContent = await rpcGetCampaignAttemptsCsv(Number(campaign_id));
+      return routeData({
+        csvContent,
+        filename: `outreach_results_${campaign_id}.csv`,
+      });
+    } catch (error) {
       loggerServer.error("Error fetching campaign attempts:", error);
       return routeData(
-        { error: error?.message || "Error fetching campaign attempts" },
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Error fetching campaign attempts",
+        },
         { status: 500 },
       );
     }
-    return routeData({
-      csvContent: data,
-      filename: `outreach_results_${campaign_id}.csv`,
-    });
   } else {
     return routeData({ error: "Invalid campaign type" }, { status: 400 });
   }

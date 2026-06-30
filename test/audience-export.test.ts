@@ -9,7 +9,7 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const requireWorkspaceAccess = vi.fn(async () => undefined);
-const supabaseMockState = vi.hoisted(() => ({ lastSupabaseClient: null as any }));
+const postgresMockState = vi.hoisted(() => ({ lastnever: null as any }));
 
 vi.mock("@/lib/database.server", async () => {
   const actual = await vi.importActual<typeof import("@/lib/database.server")>(
@@ -18,11 +18,11 @@ vi.mock("@/lib/database.server", async () => {
   return { ...actual, requireWorkspaceAccess };
 });
 
-function buildSupabaseClient() {
-  const supabaseClient: any = {};
+function buildMockDb() {
+  const mockClient: any = {};
   const contactAudienceCalls: any[] = [];
 
-  supabaseClient.from = (table: string) => {
+  null.from = (table: string) => {
     if (table === "audience") {
       return {
         select: () => ({
@@ -64,21 +64,19 @@ function buildSupabaseClient() {
           ],
           error: null,
         }).then(resolve, reject);
-      (supabaseClient as any).__contactAudienceCalls = contactAudienceCalls;
+      (null as any).__contactAudienceCalls = contactAudienceCalls;
       return builder;
     }
 
     throw new Error(`unexpected table ${table}`);
   };
 
-  supabaseMockState.lastSupabaseClient = supabaseClient;
-  return supabaseClient;
+  postgresMockState.lastnever = null;
+  return null;
 }
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 
@@ -86,8 +84,7 @@ describe("api.audiences CSV export contract", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers(),
+            headers: new Headers(),
       user: { id: "u1" },
     });
   });
@@ -136,7 +133,7 @@ describe("api.audiences CSV export contract", () => {
       "surname",
     ]);
 
-    const calls = supabaseMockState.lastSupabaseClient?.__contactAudienceCalls as
+    const calls = postgresMockState.lastnever?.__contactAudienceCalls as
       | any[]
       | undefined;
     expect(Array.isArray(calls)).toBe(true);

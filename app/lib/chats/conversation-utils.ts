@@ -5,7 +5,7 @@ import {
   normalizeConversationPhone,
   type ConversationSummary,
 } from "@/lib/chat-conversation-sort";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 import type { RouteWorkspaceNumber } from "@/lib/chats/types";
 
 export const ALL_CAMPAIGNS_VALUE = "all";

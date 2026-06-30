@@ -4,17 +4,17 @@ import { enqueueContactsForCampaign } from "../app/lib/queue.server";
 
 describe("queue.server", () => {
   test("returns early when no contacts", async () => {
-    const supabase = {
+    const client = {
       rpc: async () => ({ error: null }),
     } as any;
     await expect(
-      enqueueContactsForCampaign(supabase, 1, []),
+      enqueueContactsForCampaign(client, 1, []),
     ).resolves.toBeUndefined();
   });
 
   test("reserves startOrder in DB when not provided", async () => {
     const rpcCalls: any[] = [];
-    const supabase = {
+    const client = {
       rpc: async (fn: string, args: any) => {
         rpcCalls.push({ fn, args });
         if (fn === "reserve_campaign_queue_order_range") {
@@ -24,7 +24,7 @@ describe("queue.server", () => {
       },
     } as any;
 
-    await enqueueContactsForCampaign(supabase, 7, [1, 2], { requeue: true });
+    await enqueueContactsForCampaign(client, 7, [1, 2], { requeue: true });
 
     expect(rpcCalls[0]).toEqual({
       fn: "reserve_campaign_queue_order_range",
@@ -53,18 +53,18 @@ describe("queue.server", () => {
   });
 
   test("throws when startOrder reservation RPC fails", async () => {
-    const supabase = {
+    const client = {
       rpc: async () => ({ data: null, error: new Error("reserve failed") }),
     } as any;
 
-    await expect(enqueueContactsForCampaign(supabase, 1, [1])).rejects.toThrow(
+    await expect(enqueueContactsForCampaign(client, 1, [1])).rejects.toThrow(
       "Failed to reserve queue order range",
     );
   });
 
   test("uses provided startOrder and batches >100 contacts", async () => {
     const calls: any[] = [];
-    const supabase = {
+    const client = {
       rpc: async (fn: string, args: any) => {
         calls.push({ fn, args });
         return { error: null };
@@ -72,7 +72,7 @@ describe("queue.server", () => {
     } as any;
 
     const ids = Array.from({ length: 101 }, (_, i) => i + 1);
-    await enqueueContactsForCampaign(supabase, 9, ids, { startOrder: 5 });
+    await enqueueContactsForCampaign(client, 9, ids, { startOrder: 5 });
 
     expect(calls).toHaveLength(101);
     expect(calls[0]).toMatchObject({
@@ -98,14 +98,14 @@ describe("queue.server", () => {
 
   test("accepts string startOrder values from parsed forms", async () => {
     const calls: any[] = [];
-    const supabase = {
+    const client = {
       rpc: async (fn: string, args: any) => {
         calls.push({ fn, args });
         return { error: null };
       },
     } as any;
 
-    await enqueueContactsForCampaign(supabase, 9, [1, 2], { startOrder: "5" });
+    await enqueueContactsForCampaign(client, 9, [1, 2], { startOrder: "5" });
     expect(calls).toEqual([
       {
         fn: "handle_campaign_queue_entry",
@@ -129,7 +129,7 @@ describe("queue.server", () => {
   });
 
   test("throws when queue-entry RPC returns error", async () => {
-    const supabase = {
+    const client = {
       rpc: async (fn: string) => {
         if (fn === "reserve_campaign_queue_order_range") {
           return { data: 1, error: null };
@@ -137,14 +137,14 @@ describe("queue.server", () => {
         return { error: new Error("rpc") };
       },
     } as any;
-    await expect(enqueueContactsForCampaign(supabase, 1, [1])).rejects.toThrow(
+    await expect(enqueueContactsForCampaign(client, 1, [1])).rejects.toThrow(
       "Failed to enqueue",
     );
   });
 
   test("falls back to reservation when startOrder is non-numeric string", async () => {
     const calls: any[] = [];
-    const supabase = {
+    const client = {
       rpc: async (fn: string, args: any) => {
         calls.push({ fn, args });
         if (fn === "reserve_campaign_queue_order_range") {
@@ -154,7 +154,7 @@ describe("queue.server", () => {
       },
     } as any;
 
-    await enqueueContactsForCampaign(supabase, 8, [11], { startOrder: "abc" });
+    await enqueueContactsForCampaign(client, 8, [11], { startOrder: "abc" });
     expect(calls[1]).toMatchObject({
       fn: "handle_campaign_queue_entry",
       args: { p_queue_order: 4 },

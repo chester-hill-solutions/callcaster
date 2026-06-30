@@ -22,7 +22,6 @@ const clientImports = `import {
 } from "react-router";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { FC } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import {
   handleCall,
@@ -40,9 +39,9 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { CampaignHeader } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
-import { useSupabaseRealtime, useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceRealtime, useWorkspaceRealtimeSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
-import useSupabaseRoom from "@/hooks/call/useSupabaseRoom";
+import useCallRoom from "@/hooks/call/useCallRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";

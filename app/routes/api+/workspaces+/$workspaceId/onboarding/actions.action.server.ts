@@ -1,4 +1,4 @@
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { onboardingActionBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -25,9 +25,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (parsed instanceof Response) return parsed;
 
   const { action: actionName, ...input } = parsed;
-  const result = await runOnboardingAction(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await runOnboardingAction(    auth.user.id,
     workspaceId,
     actionName,
     input,

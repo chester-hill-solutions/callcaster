@@ -1,11 +1,10 @@
 import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { listWorkspaceScriptsApi } from "@/lib/platform-data.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
-import type { Json , Database } from "@/lib/database.types";
+import type { Json , Database } from "@/lib/db-types";
 import type { LoaderFunctionArgs } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "@/lib/types";
 
 type Script = {
@@ -41,7 +40,7 @@ type LoaderData =
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
 
   const workspaceId = params["id"];
   if (workspaceId == null) {
@@ -55,9 +54,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const roleResult = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as User, workspaceId: workspaceId as string });
+  const roleResult = await getUserRole({user: user as User, workspaceId: workspaceId as string });
   const workspace = await getWorkspaceById(workspaceId);
-  const scriptsResult = await listWorkspaceScriptsApi(supabaseClient, workspaceId);
+  const scriptsResult = await listWorkspaceScriptsApi(workspaceId);
 
   if (!scriptsResult.ok || !workspace) {
     const errorMessage = [

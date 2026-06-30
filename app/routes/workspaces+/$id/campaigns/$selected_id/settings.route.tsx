@@ -9,7 +9,6 @@ import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
 
 
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
-import { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   Audience,
@@ -61,7 +60,6 @@ type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
 };
 
 type Context = {
-  supabase: SupabaseClient;
   joinDisabled: string | null;
   audiences: Audience[];
   campaignData: CampaignWithAudiences;

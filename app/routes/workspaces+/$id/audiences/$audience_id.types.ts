@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 export type AudienceDetailLoaderData = {
   contacts: Array<{ contact: Database["public"]["Tables"]["contact"]["Row"] }> | null;

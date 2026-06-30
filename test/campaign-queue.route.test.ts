@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession } from "./helpers/route-auth-mock";
-const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
+const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
     parseRequestData: vi.fn(),
@@ -13,10 +13,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: supabaseServerMocks.headers,
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: postgresServerMocks.headers,
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -51,7 +49,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("redirects to /signin when user missing", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: null });
+    queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(
       await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
@@ -60,22 +58,22 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("POST enqueues contact ids (string->number), with defaults", async () => {
-    const supabaseClient = {};
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+    const null = {};
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: ["1", 2], campaign_id: "10" });
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(supabaseClient, 10, [1, 2], {
+    expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(10, [1, 2], {
       startOrder: 0,
       requeue: false,
     });
   });
 
   test("DELETE with ids deletes in batches and returns aggregated data", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1, 2], campaign_id: 10 });
     mocks.dbDeleteReturning.mockResolvedValueOnce([{ id: 1 }]);
 
@@ -86,7 +84,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("DELETE with ids returns 500 on delete error", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1], campaign_id: 10 });
     mocks.dbDeleteReturning.mockRejectedValueOnce(new Error("bad"));
 
@@ -97,7 +95,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("DELETE without ids uses searchCampaignQueueIds and safeNumber mapping", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.searchCampaignQueueIds.mockResolvedValueOnce([5]);
     mocks.deleteCampaignQueueByIds.mockResolvedValueOnce([{ id: 5 }]);
@@ -109,7 +107,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("DELETE without ids returns empty array when search returns no ids", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.searchCampaignQueueIds.mockResolvedValueOnce([]);
 
@@ -120,7 +118,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("DELETE without ids returns 500 when delete-in-batch errors", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.searchCampaignQueueIds.mockResolvedValueOnce([5]);
     mocks.deleteCampaignQueueByIds.mockRejectedValueOnce(new Error("del bad"));
@@ -132,7 +130,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("DELETE without ids returns 500 on search error", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.searchCampaignQueueIds.mockRejectedValueOnce(new Error("lookup bad"));
 
@@ -143,7 +141,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("returns 405 for unsupported method", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({});
 
     const mod = await import("../app/routes/api+/campaign_queue");

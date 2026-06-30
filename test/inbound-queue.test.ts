@@ -5,7 +5,7 @@ vi.mock("@/lib/env.server", () => {
   return { env: new Proxy({}, handler) };
 });
 
-import { makeQueueName, parseQueueIdFromName, buildHoldMusicTwiml, buildAgentBridgeTwiml } from "../supabase/functions/_shared/acd-utils.ts";
+import { makeQueueName, parseQueueIdFromName, buildHoldMusicTwiml, buildAgentBridgeTwiml } from "../shared/acd-utils.ts";
 
 describe("acd-router queue name helpers", () => {
   test("makeQueueName formats correctly", () => {

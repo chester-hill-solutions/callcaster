@@ -1,4 +1,4 @@
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 
 export type CampaignSmsSendMode = "messaging_service" | "from_number";
 

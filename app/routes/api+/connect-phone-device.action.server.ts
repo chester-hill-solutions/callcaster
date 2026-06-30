@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -10,8 +10,8 @@ import {
 
 export const action = async ({ request }: { request: Request }) => {
 
-    const { supabaseClient: supabase, headers } = await createSupabaseServerClient(request);
-    const { data, error } = await supabase.auth.getUser();
+    const {headers } = await await getSession(request);
+    const { data, error } = await adminDb.auth.getUser();
     const user = data.user;
     if (!user) {
         return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -30,14 +30,13 @@ export const action = async ({ request }: { request: Request }) => {
         return routeData({ error: "Invalid connect phone payload" }, { status: 400, headers });
     }
 
-    await requireWorkspaceAccess({ supabaseClient: supabase,
-        user,
+    await requireWorkspaceAccess({user,
         workspaceId,
     });
 
     try {
         const twilio = await createWorkspaceTwilioInstance({
-            supabase,
+            client,
             workspace_id: workspaceId,
         });
         // Call the user's phone and connect them to the campaign conference

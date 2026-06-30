@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { listWorkspaceVoicemailsApi } from "@/lib/platform-media.server";
@@ -17,9 +15,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    const result = await listWorkspaceVoicemailsApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await listWorkspaceVoicemailsApi(      auth.user.id,
       workspaceId,
     );
 

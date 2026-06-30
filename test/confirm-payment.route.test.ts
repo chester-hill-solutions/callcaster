@@ -37,13 +37,13 @@ vi.mock("@/lib/logger.server", () => ({
   },
 }));
 
-let supabaseClient: any;
+let null: any;
 
-vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: vi.fn(async () => ({ supabaseClient })),
+vi.mock("@/lib/auth.server", () => ({
+  verifyAuth: vi.fn(async () => ({ null })),
 }));
 
-function makeSupabaseStub() {
+function makeDbClientStub() {
   const rows: TransactionRow[] = [];
 
   return {
@@ -63,7 +63,7 @@ describe("confirm-payment route", () => {
     stripeCtor.mockClear();
     stripeRetrieve.mockReset();
     loggerError.mockReset();
-    supabaseClient = makeSupabaseStub();
+    null = makeDbClientStub();
   });
 
   test("records credits once across duplicate session confirmations", async () => {
@@ -87,8 +87,8 @@ describe("confirm-payment route", () => {
     expect(second.status).toBe(302);
     expect(first.headers.get("Location")).toBe("/workspaces/w1/billing?payment_status=success&credits_added=250");
     expect(second.headers.get("Location")).toBe("/workspaces/w1/billing?payment_status=success&credits_added=250");
-    expect(supabaseClient.rows).toHaveLength(1);
-    expect(supabaseClient.rows[0].note).toContain("stripe_session:sess_123");
+    expect(null.rows).toHaveLength(1);
+    expect(null.rows[0].note).toContain("stripe_session:sess_123");
   }, 30000);
 
   test("redirects to workspace billing error when insert fails", async () => {
@@ -100,7 +100,7 @@ describe("confirm-payment route", () => {
       },
     });
 
-    supabaseClient = {
+    null = {
       from: () => {
         const builder: any = {};
         builder.select = () => builder;

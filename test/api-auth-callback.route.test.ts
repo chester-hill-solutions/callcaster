@@ -4,8 +4,8 @@ import { asRouteResponse } from "./helpers/route-result";
 
 vi.mock("@/lib/env.server", () => ({
   env: {
-    SUPABASE_URL: () => "http://supabase.test",
-    SUPABASE_ANON_KEY: () => "anon-key",
+    BETTER_AUTH_URL: () => "http://adminDb.test",
+    BETTER_AUTH_ANON_KEY: () => "anon-key",
   },
 }));
 vi.mock("@/lib/logger.server", () => ({
@@ -34,7 +34,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
       return { auth: { verifyOtp } };
     });
 
-    vi.doMock("@supabase/ssr", () => ({
+    vi.doMock("@client/ssr", () => ({
       createServerClient,
       parse: parseMock,
       serialize: serializeMock,
@@ -59,7 +59,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
 
   test("redirects to auth-code-error on verifyOtp error and logs", async () => {
     const verifyOtp = vi.fn(async () => ({ error: new Error("bad") }));
-    vi.doMock("@supabase/ssr", () => ({
+    vi.doMock("@client/ssr", () => ({
       createServerClient: vi.fn((_url: string, _anon: string, _opts: any) => ({
         auth: { verifyOtp },
       })),
@@ -82,7 +82,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
 
   test("falls back to root for absolute next URLs", async () => {
     const verifyOtp = vi.fn(async () => ({ error: null }));
-    vi.doMock("@supabase/ssr", () => ({
+    vi.doMock("@client/ssr", () => ({
       createServerClient: vi.fn((_url: string, _anon: string, _opts: any) => ({
         auth: { verifyOtp },
       })),
@@ -102,7 +102,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
   });
 
   test("redirects to auth-code-error when token_hash/type missing", async () => {
-    vi.doMock("@supabase/ssr", () => ({
+    vi.doMock("@client/ssr", () => ({
       createServerClient: vi.fn(() => ({ auth: { verifyOtp: vi.fn() } })),
       parse: vi.fn(() => ({})),
       serialize: vi.fn((k: string, v: string) => `${k}=${v}`),

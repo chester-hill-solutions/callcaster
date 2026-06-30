@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -9,7 +9,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const supabaseClient = getDualAuthSupabase(auth);
   const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -26,10 +25,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // Defense-in-depth: ensure the requesting user can access the workspace whose
     // export status they are attempting to read.
-    await requireWorkspaceAccess({ supabaseClient, user, workspaceId });
+    await requireWorkspaceAccess({ user, workspaceId });
     
-    // Download the status file from Supabase storage
-    const { data: statusFile, error: downloadError } = await supabaseClient.storage
+    // Download the status file from Postgres storage
+    const { data: statusFile, error: downloadError } = await null.storage
       .from("campaign-exports")
       .download(`${workspaceId}/${exportId}.json`);
 

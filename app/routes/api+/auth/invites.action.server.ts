@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { acceptInvitesBodySchema } from "@/lib/schemas/api/platform-auth";
@@ -12,9 +10,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
-  const data = await listPendingInvites(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const data = await listPendingInvites(    auth.user.id,
   );
   return jsonResponse(data, 200);
 }
@@ -30,9 +26,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, acceptInvitesBodySchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await acceptInvites(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await acceptInvites(    auth.user.id,
     parsed,
   );
 

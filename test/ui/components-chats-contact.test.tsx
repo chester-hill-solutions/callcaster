@@ -58,7 +58,7 @@ describe("app/components/chats/ChatThreadView.tsx", () => {
     const { ChatThreadView } = await import("@/components/chats/ChatThreadView");
     render(
       <ChatThreadView
-        supabase={{} as never}
+        client={{} as never}
         workspace={{ id: "w1", name: "WS", owner: null, users: [], created_at: "" } as never}
       />,
     );

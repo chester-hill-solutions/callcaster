@@ -12,8 +12,8 @@ const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
     env: {
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
+      BETTER_AUTH_URL: vi.fn(() => "http://client"),
+      BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service"),
     },
     logger: { debug: vi.fn() },
     VoiceResponse,
@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -32,7 +32,7 @@ vi.mock("twilio", () => ({
   default: { twiml: { VoiceResponse: mocks.VoiceResponse } },
 }));
 
-function makeSupabase(opts: {
+function makeDbClient(opts: {
   verification?: { data: any; error: any };
   user?: { data: any; error: any };
   updateError?: any;
@@ -78,8 +78,8 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
-    mocks.env.SUPABASE_URL.mockClear();
-    mocks.env.SUPABASE_SERVICE_KEY.mockClear();
+    mocks.env.BETTER_AUTH_URL.mockClear();
+    mocks.env.BETTER_AUTH_SERVICE_KEY.mockClear();
     mocks.logger.debug.mockReset();
     mocks.VoiceResponse.mockClear();
     mocks.say.mockReset();
@@ -89,8 +89,8 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
   });
 
   test("missing digits/to returns invalid request TwiML", async () => {
-    const supabase = makeSupabase({});
-    mocks.createClient.mockReturnValueOnce(supabase);
+    const client = makeDbClient({});
+    mocks.createClient.mockReturnValueOnce(client);
     const mod = await import("../app/routes/api+/verify-pin-input");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: new FormData() }),
@@ -104,10 +104,10 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
   });
 
   test("invalid verification returns invalid code TwiML", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       verification: { data: null, error: { message: "no" } },
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     const fd = new FormData();
     fd.set("Digits", "123456");
     fd.set("To", "+15551234567");
@@ -122,12 +122,12 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
   });
 
   test("updateError returns error TwiML and does not delete verification", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       verification: { data: { id: 1, user_id: "u1" }, error: null },
       user: { data: null, error: null }, // covers verifiedNumbers default []
       updateError: { message: "bad" },
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     const fd = new FormData();
     fd.set("Digits", "123456");
     fd.set("To", "+15551234567");
@@ -139,15 +139,15 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
     expect(mocks.say).toHaveBeenCalledWith(
       "An error occurred while verifying your number. Please try again later."
     );
-    expect((supabase as any)._spies.delEq).not.toHaveBeenCalled();
+    expect((client as any)._spies.delEq).not.toHaveBeenCalled();
   });
 
   test("success updates user, deletes verification, and returns success TwiML", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       verification: { data: { id: 2, user_id: "u2" }, error: null },
       user: { data: { verified_audio_numbers: ["+1"] }, error: null },
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     const fd = new FormData();
     fd.set("Digits", "654321");
     fd.set("To", "+15551234567");
@@ -156,7 +156,7 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     expect(await res.text()).toBe("<Response />");
-    expect((supabase as any)._spies.delEq).toHaveBeenCalledWith("id", 2);
+    expect((client as any)._spies.delEq).toHaveBeenCalledWith("id", 2);
     expect(mocks.say).toHaveBeenCalledWith(
       "Your phone number has been successfully verified. You may now hang up."
     );

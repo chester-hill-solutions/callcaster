@@ -1,4 +1,4 @@
-import type { Json } from './database.types';
+import type { Json } from '@/lib/db-types';
 import { safeString, safeNumber, safeBoolean, isArray, isObject } from './type-safety-utils';
 
 // Type-safe survey question types

@@ -18,10 +18,8 @@ const mocks = vi.hoisted(() => ({
   env: { TWILIO_APP_SID: vi.fn(() => "AP123") },
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -58,9 +56,7 @@ describe("app/routes/api+/token/route.tsx", () => {
 
   test("loader returns 404 when workspace missing", async () => {
     mocks.getWorkspaceById.mockResolvedValueOnce(null);
-    queueJsonAuthSession({
-      supabaseClient: {},
-      user: { id: "u1" },
+    queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
@@ -71,9 +67,7 @@ describe("app/routes/api+/token/route.tsx", () => {
   });
 
   test("loader rejects missing workspace", async () => {
-    queueJsonAuthSession({
-      supabaseClient: {},
-      user: { id: "u1" },
+    queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
@@ -89,9 +83,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       key: "K",
       token: "S",
     });
-    queueJsonAuthSession({
-      supabaseClient: {},
-      user: { id: "u1" },
+    queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
@@ -116,9 +108,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       key: null,
       token: undefined,
     });
-    queueJsonAuthSession({
-      supabaseClient: {},
-      user: { id: "me" },
+    queueJsonAuthSession({ user: { id: "me" },
     });
     const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
@@ -139,9 +129,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       key: "K",
       token: "S",
     });
-    queueJsonAuthSession({
-      supabaseClient: {},
-      user: { id: "u1" },
+    queueJsonAuthSession({ user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockRejectedValueOnce(new Error("denied"));
     const mod = await import("../app/routes/api+/token");

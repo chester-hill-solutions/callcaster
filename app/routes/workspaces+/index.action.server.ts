@@ -1,12 +1,12 @@
 import { createNewWorkspace } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
 
   const formData = await request.formData();
 
@@ -18,7 +18,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const { data: newWorkspaceId, error, provisioningWarning } = await createNewWorkspace({
-    supabaseClient,
     workspaceName: newWorkspaceName,
     user_id: userId,
   });

@@ -5,13 +5,13 @@ import {
   getWorkspaceUsers,
 } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!user || !workspaceId) {
     return redirect("/signin");
@@ -23,7 +23,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       getWorkspaceUsers({ workspaceId }),
       getWorkspacePhoneNumbers({ workspaceId }),
       getWorkspaceCredits(workspaceId),
-      supabaseClient.storage.from("workspaceAudio").list(workspaceId),
+      null.storage.from("workspaceAudio").list(workspaceId),
       tdb.inbound_queue.findMany({
         columns: { id: true, name: true },
         orderBy: (queue, { asc: ascFn }) => [ascFn(queue.name)],

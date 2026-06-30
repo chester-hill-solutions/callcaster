@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq, gt } from "drizzle-orm";
 import { checkSchedule, getHandsetNumberForWorkspace, getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
 import { findCampaignById } from "@/lib/campaign-audience-db.server";
@@ -17,7 +16,7 @@ import {
   getHandsetLoaderData,
 } from "@/lib/handset/handset-session.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { resolveContactWorkspaceIdFromQueue } from "@/lib/campaign-queue-db.server";
 import { handset_session as handsetSessionTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
@@ -33,7 +32,6 @@ const EMPTY_LISTENING = {
 } as const;
 
 export async function getWorkspaceCallLogApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   requestUrl: string,
@@ -52,7 +50,6 @@ export async function getWorkspaceCallLogApi(
 }
 
 async function loadListeningState(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   userId: string,
 ) {
@@ -80,7 +77,6 @@ async function loadListeningState(
   }
 
   const tokenResult = await createHandsetAccessToken({
-    supabaseClient,
     workspaceId,
     clientIdentity: session.client_identity,
   });
@@ -96,7 +92,6 @@ async function loadListeningState(
 }
 
 export async function startCallListeningApi(
-  supabaseClient: SupabaseClient<Database>,
   user: { id: string },
   workspaceId: string,
 ) {
@@ -106,7 +101,6 @@ export async function startCallListeningApi(
   });
 
   const handset = await getHandsetLoaderData({
-    supabaseClient,
     user,
     workspaceId,
   });
@@ -131,7 +125,6 @@ export async function startCallListeningApi(
 }
 
 export async function stopCallListeningApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
@@ -145,7 +138,6 @@ export async function stopCallListeningApi(
 }
 
 export async function getHandsetSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
@@ -154,7 +146,7 @@ export async function getHandsetSessionApi(
     workspaceId,
   });
 
-  const listening = await loadListeningState(supabaseClient, workspaceId, userId);
+  const listening = await loadListeningState(workspaceId, userId);
   return {
     ok: true as const,
     handset_number: listening.handset_number,
@@ -163,7 +155,6 @@ export async function getHandsetSessionApi(
 }
 
 export async function deleteHandsetSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
@@ -177,7 +168,6 @@ export async function deleteHandsetSessionApi(
 }
 
 export async function getCampaignCallSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   campaignId: string,
 ) {
@@ -201,11 +191,10 @@ export async function getCampaignCallSessionApi(
     queueCount,
     completedCount,
     attempts,
-  } = await getCallScreenData(supabaseClient, campaignId, workspaceId, userId);
+  } = await getCallScreenData(campaignId, workspaceId, userId);
 
   const twilioData = workspaceData.twilio_data as { sid: string };
   const queue = await getQueueByDialType(
-    supabaseClient,
     campaignId,
     campaign.dial_type,
     userId,
@@ -216,9 +205,8 @@ export async function getCampaignCallSessionApi(
     twilioApiSecret: workspaceData.token as string,
     identity: userId,
   });
-  const verifiedNumbers = await getVerifiedNumbers(supabaseClient, userId);
+  const verifiedNumbers = await getVerifiedNumbers(userId);
   const userRole = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -250,11 +238,10 @@ export async function getCampaignCallSessionApi(
 }
 
 export async function releaseCampaignCallSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   campaignId: string,
 ) {
-  const workspaceId = await resolveCampaignWorkspaceId(supabaseClient, campaignId);
+  const workspaceId = await resolveCampaignWorkspaceId(campaignId);
 
   if (!workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
@@ -265,9 +252,7 @@ export async function releaseCampaignCallSessionApi(
     workspaceId,
   });
 
-  const result = await releaseAssignedQueueForUser(
-    supabaseClient,
-    userId,
+  const result = await releaseAssignedQueueForUser(userId,
     campaignId,
   );
 
@@ -280,7 +265,6 @@ export async function releaseCampaignCallSessionApi(
 }
 
 export async function resolveCampaignWorkspaceId(
-  _supabaseClient: SupabaseClient<Database>,
   campaignId: string | number,
 ) {
   const row = await findCampaignById(Number(campaignId));
@@ -288,7 +272,6 @@ export async function resolveCampaignWorkspaceId(
 }
 
 export async function resolveContactWorkspaceId(
-  _supabaseClient: SupabaseClient<Database>,
   contactId: string | number,
 ) {
   return resolveContactWorkspaceIdFromQueue(Number(contactId));

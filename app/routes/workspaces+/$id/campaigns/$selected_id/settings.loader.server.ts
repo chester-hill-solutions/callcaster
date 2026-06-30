@@ -7,7 +7,7 @@ import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
 import { loadActiveSurveysForWorkspace } from "@/lib/survey-db.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, QueueItem, TwilioAccountData } from "@/lib/types";
 import { adminDb } from "@/server/admin-db";
@@ -16,7 +16,7 @@ import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
 
   if (!selected_id || !workspace_id) return redirect("/");
 
@@ -35,13 +35,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     fetchCampaignAudience({
       workspaceId: workspace_id,
       campaignId: selected_id,
-      supabaseClient,
     }),
     tdb.campaign.findFirst({
       where: eq(campaignTable.id, Number(selected_id)),
     }),
     loadActiveSurveysForWorkspace(workspace_id),
-    supabaseClient.storage.from("workspaceAudio").list(`${workspace_id}`),
+    null.storage.from("workspaceAudio").list(`${workspace_id}`),
     adminDb
       .select({ twilio_data: workspaceTable.twilio_data })
       .from(workspaceTable)
@@ -76,7 +75,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (campaignType?.type === "message") {
     const messageMedia = campaignType.message_media;
     if (Array.isArray(messageMedia) && messageMedia.length > 0) {
-      mediaLinks = await getSignedUrls(supabaseClient, workspace_id, messageMedia);
+      mediaLinks = await getSignedUrls(workspace_id, messageMedia);
     }
   }
 

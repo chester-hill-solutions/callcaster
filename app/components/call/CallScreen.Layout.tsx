@@ -12,7 +12,7 @@ import {
 import type { Call } from "@twilio/voice-sdk";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 
 export function CallScreenLayout({
   isBusy,

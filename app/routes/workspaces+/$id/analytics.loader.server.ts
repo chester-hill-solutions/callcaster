@@ -2,7 +2,7 @@ import { getUserRole } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { loadWorkspaceAnalytics } from "@/lib/workspace-analytics.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import {
   getWorkspaceById,
   listWorkspaceMembersEnriched,

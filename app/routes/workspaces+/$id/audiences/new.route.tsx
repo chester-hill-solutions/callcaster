@@ -16,8 +16,7 @@ import { Text } from "@/components/ui/typography";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 export default function AudiencesNew() {
   const actionData = useActionData();
@@ -31,8 +30,8 @@ export default function AudiencesNew() {
   const [currentStep, setCurrentStep] = useState(1);
   const [audienceName, setAudienceName] = useState("");
   
-  // Get the Supabase client from context
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
+  // Get the Postgres client from context
+  const { client } = useOutletContext<{ }>();
 
   const handleCreateAudience = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +145,7 @@ export default function AudiencesNew() {
               <div className="space-y-6">
                 <AudienceUploader 
                   audienceName={audienceName}
-                  supabase={supabase}
+                  client={client}
                 />
                 
                 <div className="flex items-center justify-between gap-4">

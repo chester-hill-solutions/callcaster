@@ -37,7 +37,7 @@ export default mergeConfig(
           "app/lib/form-validation.ts",
           "app/routes/archive/**",
           "app/routes/old.*",
-          "supabase/functions/**",
+          "shared/**",
         ],
       },
     },

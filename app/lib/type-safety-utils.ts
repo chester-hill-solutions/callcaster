@@ -5,7 +5,7 @@
  * These utilities help eliminate `any` types and provide better type safety throughout the app.
  */
 
-import type { Database, Json } from './database.types';
+import type { Database, Json } from '@/lib/db-types';
 import { logger } from '@/lib/logger.client';
 
 // Type-safe error handling
@@ -104,8 +104,8 @@ export function getOptionalEnvVar(key: string): string | undefined {
   return process.env[key];
 }
 
-// Type-safe Supabase client typing
-export type SupabaseClient = import('@supabase/supabase-js').SupabaseClient<Database>;
+// Type-safe Postgres client typing
+export type never = import('@client/client-js').never;
 
 // Type-safe Twilio client typing
 export type TwilioClient = import('twilio').Twilio;

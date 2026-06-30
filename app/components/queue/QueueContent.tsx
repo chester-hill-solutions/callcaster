@@ -1,9 +1,7 @@
 import { Audience, CampaignQueue, Contact, Queue, QueueItem } from "@/lib/types";
 import { QueueHeader } from "./QueueHeader";
 import { QueueTable } from "@/components/queue/QueueTable";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState, useRef } from "react";
-import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 interface QueueContentProps {
   queueValue: {
@@ -37,7 +35,6 @@ interface QueueContentProps {
   setIsAllFilteredSelected: (value: boolean) => void;
   addContactToQueue: (contact: (Contact & { contact_audience: { audience_id: number }[] })[]) => void;
   removeContactsFromQueue: (ids: string[] | 'all') => void;
-  supabase: SupabaseClient;
   selectedAudienceIds: number[];
   campaignId: string;
   queueFetcher: ReturnType<typeof import("react-router").useFetcher>;
@@ -59,8 +56,7 @@ export function QueueContent({
     setIsAllFilteredSelected,
     addContactToQueue,
     removeContactsFromQueue,
-    supabase,
-    selectedAudienceIds,
+        selectedAudienceIds,
     campaignId,
     queueFetcher,
 }: QueueContentProps) {
@@ -82,7 +78,7 @@ export function QueueContent({
         }
     }
 
-    const handleAddRealtimeQueue = async (payload: RealtimePostgresChangesPayload<CampaignQueue>) => {
+    const handleAddRealtimeQueue = async (payload: RealtimeChangePayload<CampaignQueue>) => {
         const campaignIdNum = Number(campaignId);
         if (payload.new && (payload.new as CampaignQueue & { campaign_id?: number }).campaign_id !== campaignIdNum) return;
         if (payload.old && (payload.old as CampaignQueue & { campaign_id?: number }).campaign_id !== campaignIdNum) return;
@@ -109,13 +105,13 @@ export function QueueContent({
     }
 
     useEffect(() => {
-        const channel = supabase.channel(`campaign_queue_${campaignId}`)
+        const channel = adminDb.channel(`campaign_queue_${campaignId}`)
             .on('postgres_changes' as const, {
                 event: '*',
                 schema: 'public',
                 table: 'campaign_queue',
                 filter: `campaign_id=eq.${campaignId}`,
-            }, (payload: RealtimePostgresChangesPayload<CampaignQueue>) => {
+            }, (payload: RealtimeChangePayload<CampaignQueue>) => {
                 setQueueCount(curr => {
                     if (payload.eventType === 'DELETE') {
                         return Math.max(0, curr - 1);
@@ -131,9 +127,9 @@ export function QueueContent({
 
         return () => {
             pendingUpdates.current.clear();
-            supabase.removeChannel(channel);
+            adminDb.removeChannel(channel);
         }
-    }, [campaignId, supabase]);
+    }, [campaignId, client]);
 
     // Update queue data when parent data changes
     useEffect(() => {

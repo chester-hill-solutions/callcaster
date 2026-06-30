@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   createMockFetcher,
-  createSupabaseRealtimeMock,
+  createWorkspaceRealtimeMock,
   installIntersectionObserverMock,
 } from "./hooks-test-helpers";
 
@@ -12,6 +12,11 @@ vi.mock("@/lib/logger.client", () => ({
 
 const messagingMocks = vi.hoisted(() => ({
   markConversationRead: vi.fn().mockResolvedValue(undefined),
+  fetchContactsByPhone: vi.fn(),
+  fetchLatestMessageForPhone: vi.fn(),
+  fetchConversationSummaries: vi.fn(),
+  fetchAudienceUploads: vi.fn(),
+  fetchCampaignQueueItemWithContact: vi.fn(),
 }));
 
 vi.mock("@/lib/chats/messaging-client", () => messagingMocks);
@@ -66,13 +71,13 @@ describe("chats hooks", () => {
   });
 
   test("useChatThread registers actions and exposes messages", async () => {
-    const { supabase } = createSupabaseRealtimeMock();
+    const { client } = createWorkspaceRealtimeMock();
     const { useChatThread } = await import("@/hooks/chats/useChatThread");
     const registerChatActions = vi.fn();
 
     const { result } = renderHook(() =>
       useChatThread({
-        supabase: supabase as never,
+        client: client as never,
         workspace: { id: "ws" } as never,
         registerChatActions,
       }),

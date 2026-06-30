@@ -38,7 +38,7 @@ describe("WorkspaceSettingUtils", () => {
     getWorkspaceUsers.mockResolvedValueOnce({ data: [] });
 
     const invoke = vi.fn();
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: (table: string) => ({
         select: () => ({
           eq: () => ({
@@ -54,11 +54,11 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("new_user_workspace_role", "member");
 
     invoke.mockResolvedValueOnce({ data: null, error: new Error("invite failed") });
-    const resErr = await asRouteResponse(await mod.handleAddUser(fd, "w1", supabaseClient, headers));
+    const resErr = await asRouteResponse(await mod.handleAddUser(fd, "w1",  headers));
     expect(await resErr.json()).toMatchObject({ user: null, error: "invite failed" });
 
     invoke.mockResolvedValueOnce({ data: { ok: 1 }, error: null });
-    const resOk = await asRouteResponse(await mod.handleAddUser(fd, "w1", supabaseClient, headers));
+    const resOk = await asRouteResponse(await mod.handleAddUser(fd, "w1",  headers));
     expect(await resOk.json()).toEqual({ data: { ok: 1 }, error: null, success: true });
   });
 
@@ -66,7 +66,7 @@ describe("WorkspaceSettingUtils", () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const single = vi.fn();
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: () => ({
         update: () => ({
           eq: () => ({
@@ -90,15 +90,15 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("updated_workspace_role", "admin");
 
     single.mockResolvedValueOnce({ data: { id: "u1" }, error: null });
-    const resUpdateOk = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", supabaseClient, headers));
+    const resUpdateOk = await asRouteResponse(await mod.handleUpdateUser(fd, "w1",  headers));
     expect(await resUpdateOk.json()).toEqual({ data: { id: "u1" }, error: undefined });
 
     single.mockResolvedValueOnce({ data: null, error: new Error("nope") });
-    const resUpdateErr = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", supabaseClient, headers));
+    const resUpdateErr = await asRouteResponse(await mod.handleUpdateUser(fd, "w1",  headers));
     expect(await resUpdateErr.json()).toEqual({ data: null, error: "nope" });
 
     single.mockResolvedValueOnce({ data: { id: "u1" }, error: null });
-    const resDeleteOk = await asRouteResponse(await mod.handleDeleteUser(fd, "w1", supabaseClient, headers));
+    const resDeleteOk = await asRouteResponse(await mod.handleDeleteUser(fd, "w1",  headers));
     expect(await resDeleteOk.json()).toEqual({ data: { id: "u1" }, error: undefined });
   });
 
@@ -111,7 +111,7 @@ describe("WorkspaceSettingUtils", () => {
     expect(resMissing.status).toBe(200);
 
     const single = vi.fn();
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: () => ({
         delete: () => ({
           eq: () => ({
@@ -127,12 +127,12 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "u1");
 
     single.mockResolvedValueOnce({ data: null, error: new Error("del") });
-    const errObj = await mod.handleDeleteSelf(fd, "w1", supabaseClient, headers);
+    const errObj = await mod.handleDeleteSelf(fd, "w1",  headers);
     expect(errObj).toEqual({ data: null, error: "del" });
     expect(logger.error).toHaveBeenCalled();
 
     single.mockResolvedValueOnce({ data: { ok: 1 }, error: null });
-    const res = await asRouteResponse(await mod.handleDeleteSelf(fd, "w1", supabaseClient, headers));
+    const res = await asRouteResponse(await mod.handleDeleteSelf(fd, "w1",  headers));
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/workspaces");
   });
@@ -141,7 +141,7 @@ describe("WorkspaceSettingUtils", () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const single = vi.fn();
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: () => ({
         update: () => ({
           eq: () => ({
@@ -158,17 +158,17 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "new");
 
     single.mockResolvedValueOnce({ data: null, error: new Error("new owner failed") });
-    const res1 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers));
+    const res1 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1",  headers));
     expect(await res1.json()).toEqual({ error: "new owner failed" });
 
     single.mockResolvedValueOnce({ data: { id: "new" }, error: null });
     single.mockResolvedValueOnce({ data: null, error: new Error("current failed") });
-    const res2 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers));
+    const res2 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1",  headers));
     expect(await res2.json()).toEqual({ error: "current failed" });
 
     single.mockResolvedValueOnce({ data: { id: "new" }, error: null });
     single.mockResolvedValueOnce({ data: { id: "owner" }, error: null });
-    const res3 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers));
+    const res3 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1",  headers));
     expect(await res3.json()).toEqual({ data: { id: "owner" }, error: null });
   });
 
@@ -176,7 +176,7 @@ describe("WorkspaceSettingUtils", () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
-    const supabaseClientErr: any = {
+    const _unusedClientErr: any = {
       from: () => ({
         delete: () => ({
           eq: () => ({
@@ -185,10 +185,10 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const err = await mod.handleDeleteWorkspace({ workspaceId: "w1", supabaseClient: supabaseClientErr, headers });
+    const err = await mod.handleDeleteWorkspace({ workspaceId: "w1", null: _unusedClientErr, headers });
     expect(err).toEqual({ data: null, error: new Error("del ws") });
 
-    const supabaseClientOk: any = {
+    const _unusedClientOk: any = {
       from: () => ({
         delete: () => ({
           eq: () => ({
@@ -197,7 +197,7 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const res = await asRouteResponse(await mod.handleDeleteWorkspace({ workspaceId: "w1", supabaseClient: supabaseClientOk, headers }));
+    const res = await asRouteResponse(await mod.handleDeleteWorkspace({ workspaceId: "w1", null: _unusedClientOk, headers }));
     expect(res.status).toBe(302);
   });
 
@@ -207,7 +207,7 @@ describe("WorkspaceSettingUtils", () => {
     const fd = new FormData();
     fd.set("userId", "u1");
 
-    const supabaseClientErr: any = {
+    const _unusedClientErr: any = {
       from: () => ({
         delete: () => ({
           eq: () => ({
@@ -216,10 +216,10 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const r1 = await mod.removeInvite({ workspaceId: "w1", supabaseClient: supabaseClientErr, formData: fd, headers });
+    const r1 = await mod.removeInvite({ workspaceId: "w1", null: _unusedClientErr, formData: fd, headers });
     expect(r1.error).toBeTruthy();
 
-    const supabaseClientOk: any = {
+    const _unusedClientOk: any = {
       from: () => ({
         delete: () => ({
           eq: () => ({
@@ -228,7 +228,7 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const r2 = await mod.removeInvite({ workspaceId: "w1", supabaseClient: supabaseClientOk, formData: fd, headers });
+    const r2 = await mod.removeInvite({ workspaceId: "w1", null: _unusedClientOk, formData: fd, headers });
     expect(r2).toEqual({ data: [{ ok: 1 }], error: null });
   });
 
@@ -236,7 +236,7 @@ describe("WorkspaceSettingUtils", () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const select = vi.fn();
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: () => ({
         upsert: () => ({ select }),
       }),
@@ -250,11 +250,11 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("events", JSON.stringify([{ category: "a", type: "INSERT" }]));
 
     select.mockResolvedValueOnce({ data: null, error: new Error("bad") });
-    const resErr = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1", supabaseClient, headers));
+    const resErr = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1",  headers));
     expect(await resErr.json()).toEqual({ data: null, error: "bad" });
 
     select.mockResolvedValueOnce({ data: [{ id: 1 }], error: null });
-    const resOk = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1", supabaseClient, headers));
+    const resOk = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1",  headers));
     expect(await resOk.json()).toEqual({ data: [{ id: 1 }], error: null });
   });
 
@@ -319,7 +319,7 @@ describe("WorkspaceSettingUtils", () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
 
     const single = vi.fn();
-    const supabaseClient: any = {
+    const mockClient: any = {
       from: () => ({
         select: () => ({
           eq: () => ({ single }),
@@ -333,7 +333,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r0.success).toBe(false);
 
@@ -343,7 +342,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r0b).toEqual({ success: false, error: "No webhook configured" });
 
@@ -356,7 +354,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r1).toEqual({ success: false, error: "Event type not enabled for this webhook" });
 
@@ -371,7 +368,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r2.success).toBe(false);
 
@@ -385,7 +381,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r2b).toEqual({ success: true, error: null });
 
@@ -399,7 +394,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "UPDATE",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r3).toEqual({ success: true, error: null });
 
@@ -409,7 +403,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r4.success).toBe(false);
     expect(r4.error).toBe("boom");
@@ -420,7 +413,6 @@ describe("WorkspaceSettingUtils", () => {
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
-      supabaseClient,
     });
     expect(r5).toEqual({ success: false, error: "err2" });
   });

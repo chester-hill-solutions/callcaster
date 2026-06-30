@@ -2,8 +2,7 @@
  * Campaign-related database functions
  */
 import { eq, inArray } from "drizzle-orm";
-import { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json } from "../database.types";
+import type { Database, Json } from "@/lib/db-types";
 import {
   Campaign,
   CampaignSchedule,
@@ -124,7 +123,7 @@ export async function getWorkspaceCampaigns({
   workspaceId: string;
   tdb?: TenantDb;
   /** @deprecated ignored — use workspaceId + tdb */
-  supabaseClient?: SupabaseClient<Database>;
+  null?: never;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
 
@@ -148,7 +147,7 @@ export async function updateCampaign({
   campaignDetails: CampaignDetails;
   tdb?: TenantDb;
   /** @deprecated ignored */
-  supabase?: SupabaseClient;
+  client?: never;
 }) {
   const {
     campaign_id: id,
@@ -197,7 +196,7 @@ export async function deleteCampaign({
   campaignId: string;
   tdb?: TenantDb;
   /** @deprecated ignored */
-  supabase?: SupabaseClient;
+  client?: never;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   await tdb.campaign.delete({
@@ -212,7 +211,7 @@ export async function createCampaign({
   campaignData: CampaignData;
   tdb?: TenantDb;
   /** @deprecated ignored */
-  supabase?: SupabaseClient;
+  client?: never;
 }) {
   const { audiences, ...restCampaignData } = campaignData;
   const workspaceId = campaignData.workspace;
@@ -292,7 +291,7 @@ type ScriptUpdateProps = {
   created_at: string;
   tdb?: TenantDb;
   /** @deprecated ignored */
-  supabase?: SupabaseClient;
+  client?: never;
 };
 
 export async function updateOrCopyScript({
@@ -362,7 +361,7 @@ export async function updateCampaignScript({
   campaignType?: string;
   tdb?: TenantDb;
   /** @deprecated ignored */
-  supabase?: SupabaseClient;
+  client?: never;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   await tdb.campaign.update({
@@ -390,7 +389,7 @@ export async function fetchCampaignsByType({
   type: LegacyCampaignTableKey;
   tdb?: TenantDb;
   /** @deprecated ignored */
-  supabaseClient?: SupabaseClient<Database>;
+  null?: never;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   const campaignTypes = campaignTypesForLegacyTableKey(type);
@@ -410,12 +409,9 @@ export async function fetchCampaignsByType({
   }
 }
 
-export async function getCampaignQueueById({
-  supabaseClient: _supabaseClient,
-  campaign_id,
+export async function getCampaignQueueById({campaign_id,
   onlyQueued = false,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   campaign_id: string;
   onlyQueued?: boolean;
 }) {

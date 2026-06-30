@@ -5,7 +5,7 @@ import {
   callPanelHeaderPrimaryClass,
   callPanelShellClass,
 } from "@/components/call/call-panel-classes";
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 import { CampaignDetails, Block } from "@/lib/types";
 
 type Contact = Tables<"contact">;

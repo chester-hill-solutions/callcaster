@@ -7,7 +7,7 @@ import type { LoaderFunctionArgs } from "react-router";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const result = await requireWorkspaceLoaderContext(request, params.id);
   if (!result.ok) return result.response;
-  const { supabaseClient, headers, workspaceId: workspace_id } = result.ctx;
+  const { headers, workspaceId: workspace_id } = result.ctx;
 
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
@@ -46,7 +46,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   apiSearchParams.set("sort_direction", sortDirection);
 
   const detailResult = await getAudienceDetailApi(
-    supabaseClient,
     workspace_id,
     audience_id,
     apiSearchParams,

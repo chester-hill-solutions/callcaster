@@ -3,15 +3,12 @@ import {
   cancelQueuedMessagesForCampaign,
   createWorkspaceTwilioInstance,
 } from "@/lib/database.server";
-import { createClient } from "@supabase/supabase-js";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
 import { logger } from "@/lib/logger.server";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { validateTwilioWebhookForMessageSid } from "@/lib/twilio-webhook.server";
-import type { Database } from "@/lib/database.types";
 import {
   isTerminalSmsStatus,
   normalizeSmsStatus,
@@ -38,11 +35,6 @@ import type { ActionFunctionArgs } from "react-router";
  * Merged from Edge `sms-status`; new sends use `${BASE_URL}/api/sms/status`.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
-  );
-
   try {
     const previewFormData = await request.formData();
     const previewPayload = Object.fromEntries(
@@ -60,7 +52,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const validation = await validateTwilioWebhookForMessageSid({
       request,
-      supabase,
       smsSid: previewSid,
       params: previewPayload as Record<string, string>,
     });
@@ -180,12 +171,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       ) {
         // Use the workspace subaccount client (ADR-0011) instead of the parent account.
         const twilio = await createWorkspaceTwilioInstance({
-          supabase,
           workspace_id: messageData.workspace,
         });
         await cancelQueuedMessagesForCampaign(
           twilio,
-          supabase,
           messageData.campaign_id,
         );
       }
@@ -194,7 +183,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (messageData.workspace) {
       const webhookResult = await sendWorkspaceWebhookNotification({
-        supabaseClient: supabase,
         workspaceId: messageData.workspace,
         eventCategory: "outbound_sms",
         eventType: "UPDATE",

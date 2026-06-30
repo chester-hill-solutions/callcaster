@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     insertTransactionHistoryIdempotent: vi.fn(async () => null),
     logger: { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
     createClient: vi.fn(),
-    supabase: null as any,
+    client: null as any,
   };
 });
 
@@ -29,15 +29,15 @@ vi.mock("@/lib/transaction-history.server", () => ({
     mocks.insertTransactionHistoryIdempotent(...args),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  getServiceSupabase: () => mocks.supabase,
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => mocks.client,
 }));
 
-function makeSupabase() {
+function makeDbClient() {
   let existingWorkspace: string | null = "w1";
   let wsAuthToken: string | null = "ws-token";
   let upsertError: Error | null = null;
@@ -55,7 +55,7 @@ function makeSupabase() {
   const realtimeSend = vi.fn();
   const realtimeChannel = vi.fn((_id: string) => ({ send: realtimeSend }));
 
-  const supabase: any = {
+  const client: any = {
     realtime: { channel: realtimeChannel },
     from: (table: string) => {
       if (table === "call") {
@@ -127,7 +127,7 @@ function makeSupabase() {
     _realtimeChannel: realtimeChannel,
   };
 
-  return supabase;
+  return client;
 }
 
 function makeReq(params: Record<string, string>) {
@@ -141,7 +141,7 @@ function makeReq(params: Record<string, string>) {
 }
 
 describe("app/routes/api+/call/route-status.tsx", () => {
-  let supabase: any;
+  let client: any;
 
   beforeEach(() => {
     vi.resetModules();
@@ -152,9 +152,9 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     mocks.logger.debug.mockReset();
     mocks.createClient.mockReset();
 
-    supabase = makeSupabase();
-    mocks.supabase = supabase;
-    mocks.createClient.mockReturnValue(supabase);
+    client = makeDbClient();
+    mocks.client = client;
+    mocks.createClient.mockReturnValue(client);
   });
 
   test("rejects invalid Twilio signature", async () => {
@@ -167,7 +167,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("returns 500 when call upsert fails", async () => {
-    supabase._set.upsertError(new Error("upsert"));
+    adminDb._set.upsertError(new Error("upsert"));
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
@@ -193,14 +193,14 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("falls back to parent call workspace/outreach attempt and handles fetch error", async () => {
-    supabase._set.upsertRow({
+    adminDb._set.upsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
       workspace: null,
       parent_call_sid: "CA_PARENT",
     });
-    supabase._set.parentCall({ workspace: "w_parent", outreach_attempt_id: 77 });
-    supabase._set.attemptFetchError(new Error("fetch"));
+    adminDb._set.parentCall({ workspace: "w_parent", outreach_attempt_id: 77 });
+    adminDb._set.attemptFetchError(new Error("fetch"));
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
@@ -211,8 +211,8 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("skips realtime.send when no currentAttempt and still bills with workspaceId", async () => {
-    supabase._set.currentAttempt(null);
-    supabase._set.upsertRow({
+    adminDb._set.currentAttempt(null);
+    adminDb._set.upsertRow({
       sid: "CA1",
       outreach_attempt_id: null,
       workspace: "w1",
@@ -224,7 +224,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Duration: "61", CallDuration: "61" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(supabase._realtimeSend).not.toHaveBeenCalled();
+    expect(adminDb._realtimeSend).not.toHaveBeenCalled();
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: "w1",
@@ -234,7 +234,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("updates disposition when transition allowed; returns 500 on updateError", async () => {
-    supabase._set.attemptUpdateError(new Error("upd"));
+    adminDb._set.attemptUpdateError(new Error("upd"));
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
@@ -244,8 +244,8 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("does not bill when billingWorkspace missing; covers called_via default channel id", async () => {
-    supabase._set.currentAttempt({ disposition: "in-progress", contact_id: 1, workspace: null });
-    supabase._set.upsertRow({ sid: "CA1", outreach_attempt_id: 10, workspace: undefined, parent_call_sid: null });
+    adminDb._set.currentAttempt({ disposition: "in-progress", contact_id: 1, workspace: null });
+    adminDb._set.upsertRow({ sid: "CA1", outreach_attempt_id: 10, workspace: undefined, parent_call_sid: null });
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
@@ -262,7 +262,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers existingCall workspace missing (uses env authToken)", async () => {
-    supabase._set.existingWorkspace(null);
+    adminDb._set.existingWorkspace(null);
     mocks.validateTwilioWebhookParams.mockImplementation((_p: any, _s: any, _u: any, tok: string) => {
       expect(tok).toBe("test");
       return true;
@@ -275,7 +275,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers workspace twilio token missing + calledVia split userId", async () => {
-    supabase._set.wsAuthToken(null);
+    adminDb._set.wsAuthToken(null);
     mocks.validateTwilioWebhookParams.mockImplementation((_p: any, _s: any, _u: any, tok: string) => {
       expect(tok).toBe("test"); // fallback token
       return true;
@@ -286,7 +286,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u1" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(supabase._realtimeChannel).toHaveBeenCalledWith("u1");
+    expect(adminDb._realtimeChannel).toHaveBeenCalledWith("u1");
   });
 
   test("covers lowercase sid/status fallbacks and getString non-string via File", async () => {
@@ -312,13 +312,13 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers disposition transition denied (logs debug)", async () => {
-    supabase._set.upsertRow({
+    adminDb._set.upsertRow({
       sid: "CA1",
       outreach_attempt_id: 10,
       workspace: undefined,
       parent_call_sid: null,
     });
-    supabase._set.currentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
+    adminDb._set.currentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
@@ -333,14 +333,14 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers parentCall null fields -> workspace/outreachAttempt become undefined", async () => {
-    supabase._set.upsertRow({
+    adminDb._set.upsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
       workspace: null,
       parent_call_sid: "CA_PARENT",
     });
-    supabase._set.parentCall({ workspace: null, outreach_attempt_id: null });
-    supabase._set.currentAttempt(null);
+    adminDb._set.parentCall({ workspace: null, outreach_attempt_id: null });
+    adminDb._set.currentAttempt(null);
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
@@ -349,14 +349,14 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers parentCall missing (if parentCall false path)", async () => {
-    supabase._set.upsertRow({
+    adminDb._set.upsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
       workspace: null,
       parent_call_sid: "CA_PARENT",
     });
-    supabase._set.parentCall(null);
-    supabase._set.currentAttempt(null);
+    adminDb._set.parentCall(null);
+    adminDb._set.currentAttempt(null);
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
@@ -365,8 +365,8 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers currentDisposition null when currentAttempt missing", async () => {
-    supabase._set.currentAttempt(null);
-    supabase._set.upsertRow({
+    adminDb._set.currentAttempt(null);
+    adminDb._set.upsertRow({
       sid: "CA1",
       outreach_attempt_id: 10,
       workspace: "w1",

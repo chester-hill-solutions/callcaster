@@ -30,7 +30,7 @@ export async function renderAsyncHook<TProps, TResult>(
 }
 
 // Mock utilities for common dependencies
-export const createMockSupabase = () => ({
+export const createMockPostgres = () => ({
   channel: vi.fn().mockReturnValue({
     on: vi.fn().mockReturnThis(),
     subscribe: vi.fn().mockReturnValue({}),

@@ -10,10 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { Database } from "@/lib/database.types";
+import { Database } from "@/lib/db-types";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 
@@ -21,7 +20,7 @@ export default function AudienceView() {
   const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
     useLoaderData<AudienceDetailLoaderData>();
   const navigate = useNavigate();
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
+  const { client } = useOutletContext<{ }>();
   const [activeTab, setActiveTab] = useState("contacts");
   const revalidator = useRevalidator();
 
@@ -118,7 +117,7 @@ export default function AudienceView() {
             </h2>
             <AudienceUploader
               existingAudienceId={audience_id}
-              supabase={supabase}
+              client={client}
               onUploadComplete={handleUploadComplete}
             />
           </div>
@@ -132,7 +131,7 @@ export default function AudienceView() {
             <AudienceUploadHistory
               audienceId={Number(audience_id)}
               workspaceId={workspace_id}
-              supabase={supabase}
+              client={client}
             />
           </div>
         </TabsContent>

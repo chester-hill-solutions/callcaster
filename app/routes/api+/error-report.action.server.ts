@@ -3,7 +3,7 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { Resend } from "resend";
 import { safeParseJson } from "@/lib/database.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 
 
 export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {

@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import {
   deriveWorkspaceMessagingReadiness,
   evaluateWorkspaceReadinessByIds,
@@ -33,21 +32,18 @@ export class WorkspaceSmsNotReadyError extends Error {
  * predicates (sender pool, toll-free verification) over the same predicate table.
  */
 export async function assertWorkspaceCanSendSms({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<void> {
   const twilioData = (await loadWorkspaceTwilioData(
-    supabaseClient,
     workspaceId,
   )) as unknown as TwilioAccountData;
 
   const [onboarding, portalConfig, senderPool] = await Promise.all([
-    getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
-    getWorkspaceTwilioPortalConfig({ supabaseClient, workspaceId }),
-    verifyWorkspaceMessagingSenderPool({ supabaseClient, workspaceId }),
+    getWorkspaceMessagingOnboardingState({ workspaceId }),
+    getWorkspaceTwilioPortalConfig({ workspaceId }),
+    verifyWorkspaceMessagingSenderPool({ workspaceId }),
   ]);
 
   const syncSnapshot = getWorkspaceTwilioSyncSnapshotFromTwilioData(twilioData);

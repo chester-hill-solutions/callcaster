@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 

@@ -131,12 +131,12 @@ for (const file of walk(ROUTES, (n, p) => n.endsWith(".tsx") && !n.endsWith(".se
 let verifyFixed = 0;
 for (const file of walk(ROUTES, (n) => n.endsWith(".server.tsx"))) {
   let src = fs.readFileSync(file, "utf8");
-  const matches = [...src.matchAll(/^import \{ verifyAuth \} from ["']@\/lib\/supabase\.server["'];?\n/gm)];
+  const matches = [...src.matchAll(/^import \{ verifyAuth \} from ["']@\/lib\/client\.server["'];?\n/gm)];
   if (matches.length <= 1) continue;
   const orig = src;
   let first = true;
   src = src.replace(
-    /^import \{ verifyAuth \} from ["']@\/lib\/supabase\.server["'];?\n/gm,
+    /^import \{ verifyAuth \} from ["']@\/lib\/client\.server["'];?\n/gm,
     (m) => {
       if (first) {
         first = false;

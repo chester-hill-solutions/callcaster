@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { desc, eq } from "drizzle-orm";
 import {
   workspace as workspaceTable,
@@ -13,13 +12,12 @@ import {
   handleDeleteWorkspace,
   handleTransferWorkspace,
 } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { adminDb } from "@/server/admin-db";
 
 export async function listUserWorkspaces(
-  _supabaseClient: SupabaseClient<Database>,
   userId: string,
 ) {
   try {
@@ -51,7 +49,6 @@ export async function listUserWorkspaces(
 }
 
 export async function getWorkspaceDetail(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
@@ -69,7 +66,6 @@ export async function getWorkspaceDetail(
 }
 
 export async function updateWorkspaceName(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   name: string,
@@ -102,13 +98,11 @@ export async function updateWorkspaceName(
 }
 
 export async function deleteWorkspaceApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   headers: Headers,
 ) {
   const role = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -119,7 +113,6 @@ export async function deleteWorkspaceApi(
 
   const result = await handleDeleteWorkspace({
     workspaceId,
-    supabaseClient,
     headers,
   });
 
@@ -131,14 +124,12 @@ export async function deleteWorkspaceApi(
 }
 
 export async function transferWorkspaceOwnershipApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   newOwnerUserId: string,
   headers: Headers,
 ) {
   const role = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -154,7 +145,6 @@ export async function transferWorkspaceOwnershipApi(
   const result = await handleTransferWorkspace(
     formData,
     workspaceId,
-    supabaseClient,
     headers,
   );
 

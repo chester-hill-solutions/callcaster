@@ -7,11 +7,11 @@ vi.hoisted(() => {
     process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
 });
 
-const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
+const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
     requireDualAuth: vi.fn(),
-    getDualAuthSupabase: vi.fn(() => ({})),
+    getDualAuthPostgres: vi.fn(() => ({})),
     parseActionRequest: vi.fn(),
     removeContactFromAudience: vi.fn(),
     createErrorResponse: vi.fn((e: unknown) =>
@@ -22,14 +22,12 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@/lib/api-auth.server", () => ({
   requireDualAuth: (...args: unknown[]) => mocks.requireDualAuth(...args),
-  getDualAuthSupabase: (...args: unknown[]) => mocks.getDualAuthSupabase(...args),
+  getDualAuthPostgres: (...args: unknown[]) => mocks.null /* removed */ (...args),
   getDualAuthUser: vi.fn(),
 }));
 
-vi.mock("../app/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: supabaseServerMocks.headers,
+vi.mock("../app/lib/adminDb.server", () => ({
+  getSession: () => ({ headers: postgresServerMocks.headers,
   }),
 }));
 vi.mock("../app/lib/database.server", () => ({
@@ -50,7 +48,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
   });
 
   test("DELETE returns 400 when ids missing", async () => {
-    supabaseServerMocks.headers = new Headers({ "X-Test": "1" });
+    postgresServerMocks.headers = new Headers({ "X-Test": "1" });
     mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "", audience_id: "" });
     const mod = await import("../app/routes/api+/contact-audience");
@@ -63,7 +61,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
 
   test("DELETE removes contact from audience", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
-    supabaseServerMocks.headers = headers;
+    postgresServerMocks.headers = headers;
     mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockResolvedValueOnce({ ok: true });
@@ -79,7 +77,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
   });
 
   test("DELETE error uses createErrorResponse", async () => {
-    supabaseServerMocks.headers = new Headers();
+    postgresServerMocks.headers = new Headers();
     mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockRejectedValueOnce(new Error("nope"));
@@ -93,7 +91,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
   });
 
   test("non-DELETE returns json(undefined) with headers", async () => {
-    supabaseServerMocks.headers = new Headers({ "X": "1" });
+    postgresServerMocks.headers = new Headers({ "X": "1" });
     mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     const mod = await import("../app/routes/api+/contact-audience");
     const res = await asRouteResponse(await mod.action({

@@ -42,14 +42,14 @@ interface TwilioUsageRecord {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, userData } = await requireSudoAdmin(request);
+  const { userData } = await requireSudoAdmin(request);
   const workspaceId = params.workspaceId;
 
   if (!workspaceId) {
     throw redirect("/admin?tab=workspaces");
   }
 
-  const detail = await getAdminWorkspaceDetail(supabaseClient, workspaceId);
+  const detail = await getAdminWorkspaceDetail(workspaceId);
   if (!detail.ok) {
     throw redirect("/admin?tab=workspaces");
   }
@@ -61,9 +61,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let twilioUsage: TwilioUsageRecord[] = [];
 
   try {
-    const twilio = await createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
-      workspace_id: workspaceId,
+    const twilio = await createWorkspaceTwilioInstance({       workspace_id: workspaceId,
     });
 
     const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace.twilio_data);
@@ -99,7 +97,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const twilioPortalSnapshot = await getWorkspaceTwilioPortalSnapshot({
-    supabaseClient,
     workspaceId,
   }).catch((error) => {
     logger.error("Error fetching Twilio portal snapshot:", error);

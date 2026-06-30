@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   createMockFetcher,
-  createSupabaseRealtimeMock,
+  createWorkspaceRealtimeMock,
 } from "./hooks-test-helpers";
 
 vi.mock("@/lib/logger.client", () => ({
@@ -22,7 +22,7 @@ vi.mock("@/lib/utils", async () => {
   return { ...actual, playTone: vi.fn() };
 });
 
-vi.mock("@/hooks/call/useSupabaseRoom", () => ({
+vi.mock("@/hooks/call/useCallRoom", () => ({
   default: vi.fn(() => ({
     status: "online",
     users: [],
@@ -57,10 +57,10 @@ const routeFetchers = [fetcher, queueFetcher, verifyFetcher];
 
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
-  const { supabase } = createSupabaseRealtimeMock();
+  const { client } = createWorkspaceRealtimeMock();
   return {
     ...actual,
-    useOutletContext: () => ({ supabase }),
+    useOutletContext: () => ({ client }),
     useNavigation: () => ({ state: "idle" }),
     useRevalidator: () => ({ revalidate }),
     useNavigate: () => vi.fn(),

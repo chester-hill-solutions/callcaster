@@ -1,8 +1,6 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
   transferOwnershipBodySchema,
@@ -26,9 +24,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const result = await getWorkspaceDetail(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await getWorkspaceDetail(    auth.user.id,
     workspaceId,
   );
 
@@ -48,9 +44,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getAuthSupabaseClient(auth);
-
+  const { headers } = await getSession(request);
   if (request.method === "PATCH") {
     const parsed = await parseJsonBodyOrResponse(request, updateWorkspaceBodySchema);
     if (parsed instanceof Response) return parsed;
@@ -60,7 +54,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const result = await updateWorkspaceName(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       parsed.name,
@@ -75,7 +69,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (request.method === "DELETE") {
     const result = await deleteWorkspaceApi(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       headers,

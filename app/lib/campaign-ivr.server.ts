@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import type { Script } from "@/lib/types";
 import {
   campaign as campaignTable,
@@ -36,9 +35,7 @@ export function ivrScriptStepsFromCampaign(
   return resolveCampaignScript(campaign)?.steps ?? null;
 }
 
-export async function fetchCampaignWithScript(
-  _supabase: SupabaseClient<Database> | null,
-  campaignId: string | number,
+export async function fetchCampaignWithScript(campaignId: string | number,
 ) {
   const campaign = await adminDb.query.campaign.findFirst({
     where: eq(campaignTable.id, Number(campaignId)),
@@ -127,6 +124,19 @@ export async function updateCampaignMessageMedia(
   const tdb = createTenantDb(workspaceId);
   const [row] = await tdb.campaign.update({
     set: { message_media: messageMedia },
+    where: eq(campaignTable.id, campaignId),
+  });
+  return row ?? null;
+}
+
+export async function updateCampaignVoicedropAudio(
+  workspaceId: string,
+  campaignId: number,
+  voicedropAudio: string,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const [row] = await tdb.campaign.update({
+    set: { voicedrop_audio: voicedropAudio },
     where: eq(campaignTable.id, campaignId),
   });
   return row ?? null;

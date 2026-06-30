@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
+const objectStorageMocks = vi.hoisted(() => ({
+  createSignedObjectUrl: vi.fn(async () => "u"),
+  listObjects: vi.fn(async () => [{ name: "a", id: "a", created_at: "t", updated_at: "t" }]),
+}));
+
+vi.mock("@/lib/object-storage.server", () => ({
+  createSignedObjectUrl: (...args: unknown[]) =>
+    objectStorageMocks.createSignedObjectUrl(...args),
+  listObjects: (...args: unknown[]) => objectStorageMocks.listObjects(...args),
+}));
+
 const adminDbMocks = vi.hoisted(() => ({
   workspaceFindFirst: vi.fn(),
   selectChain: vi.fn(),
@@ -55,6 +66,12 @@ function mockConversationTenantData({
 describe("app/lib/database/workspace.server.ts", () => {
   beforeEach(() => {
     vi.resetModules();
+    objectStorageMocks.createSignedObjectUrl.mockReset();
+    objectStorageMocks.listObjects.mockReset();
+    objectStorageMocks.createSignedObjectUrl.mockResolvedValue("u");
+    objectStorageMocks.listObjects.mockResolvedValue([
+      { name: "a", id: "a", created_at: "t", updated_at: "t" },
+    ]);
 
     adminDbMocks.workspaceFindFirst.mockReset();
     adminDbMocks.selectChain.mockReset();
@@ -177,23 +194,23 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabaseNoSession: any = {
+    const postgresNoSession: any = {
       auth: { getSession: async () => ({ data: { session: null } }) },
     };
     await expect(
-      mod.getUserWorkspaces({ supabaseClient: supabaseNoSession }),
+      mod.getUserWorkspaces({ null: postgresNoSession }),
     ).resolves.toEqual({
       data: null,
       error: "No user session found",
     });
 
-    const supabaseErr: any = {
+    const postgresErr: any = {
       auth: {
         getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
       },
     };
     adminDbMocks.selectChain.mockRejectedValueOnce(new Error("x"));
-    const res = await mod.getUserWorkspaces({ supabaseClient: supabaseErr });
+    const res = await mod.getUserWorkspaces({ null: postgresErr });
     expect(res.data).toBeNull();
     expect(logger.error).toHaveBeenCalled();
   }, 30000);
@@ -202,13 +219,13 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabaseOk: any = {
+    const postgresOk: any = {
       auth: {
         getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
       },
     };
     adminDbMocks.selectChain.mockResolvedValueOnce([{ workspace: { id: 1 } }]);
-    const res = await mod.getUserWorkspaces({ supabaseClient: supabaseOk });
+    const res = await mod.getUserWorkspaces({ null: postgresOk });
     expect(res).toEqual({ data: [{ id: 1 }], error: null });
     expect(logger.error).not.toHaveBeenCalled();
   });
@@ -251,13 +268,13 @@ describe("app/lib/database/workspace.server.ts", () => {
     const stripe = await import("../app/lib/database/stripe.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabase: any = {
+    const client: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: null })),
     };
 
     await expect(
       mod.createNewWorkspace({
-        supabaseClient: supabase,
+        null: client,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -269,12 +286,12 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(stripe.createStripeContact).toHaveBeenCalled();
 
     // rpc error now aborts before any provisioning
-    const supabaseRpcErr: any = {
+    const postgresRpcErr: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: new Error("rpc") })),
     };
     await expect(
       mod.createNewWorkspace({
-        supabaseClient: supabaseRpcErr,
+        null: postgresRpcErr,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -282,13 +299,13 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(logger.error).toHaveBeenCalled();
 
     // metadata update error is non-fatal; workspace is still created with a warning
-    const supabaseUpdateErr: any = {
+    const postgresUpdateErr: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: null })),
     };
     adminDbMocks.updateWhere.mockRejectedValueOnce(new Error("upd"));
     await expect(
       mod.createNewWorkspace({
-        supabaseClient: supabaseUpdateErr,
+        null: postgresUpdateErr,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -306,7 +323,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     Twilio.__mocks.accountsCreate.mockRejectedValueOnce(new Error("nope"));
     await expect(
       mod.createNewWorkspace({
-        supabaseClient: supabase,
+        null: client,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -320,7 +337,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     Twilio.__mocks.newKeysCreate.mockResolvedValueOnce(undefined);
     await expect(
       mod.createNewWorkspace({
-        supabaseClient: supabase,
+        null: client,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -331,14 +348,14 @@ describe("app/lib/database/workspace.server.ts", () => {
     });
 
     // Non-Error throws => generic message branch
-    const supabaseThrows: any = {
+    const postgresThrows: any = {
       rpc: vi.fn(async () => {
         throw "boom";
       }),
     };
     await expect(
       mod.createNewWorkspace({
-        supabaseClient: supabaseThrows,
+        null: postgresThrows,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -426,13 +443,13 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabase: any = {
+    const client: any = {
       rpc: async () => ({ data: [{ id: 1 }], error: new Error("x") }),
     };
     tdbMocks.workspace_number.findMany.mockRejectedValueOnce(new Error("y"));
 
     await mod.getWorkspaceUsers({
-      supabaseClient: supabase,
+      null: client,
       workspaceId: "w1",
     });
     await mod.getWorkspacePhoneNumbers({
@@ -445,13 +462,13 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabase: any = {
+    const client: any = {
       rpc: async () => ({ data: [{ id: 1 }], error: null }),
     };
     tdbMocks.workspace_number.findMany.mockResolvedValueOnce([{ id: 1 }]);
 
     await mod.getWorkspaceUsers({
-      supabaseClient: supabase,
+      null: client,
       workspaceId: "w1",
     });
     await mod.getWorkspacePhoneNumbers({
@@ -537,11 +554,11 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("updateUserWorkspaceAccessDate logs on rpc error", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
-    const supabase: any = {
+    const client: any = {
       rpc: async () => ({ data: null, error: new Error("x") }),
     };
     await mod.updateUserWorkspaceAccessDate({
-      supabaseClient: supabase,
+      null: client,
       workspaceId: "w1",
     });
     expect(logger.error).toHaveBeenCalled();
@@ -550,11 +567,11 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("updateUserWorkspaceAccessDate success does not log", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
-    const supabase: any = {
+    const client: any = {
       rpc: async () => ({ data: { ok: 1 }, error: null }),
     };
     await mod.updateUserWorkspaceAccessDate({
-      supabaseClient: supabase,
+      null: client,
       workspaceId: "w1",
     });
     expect(logger.error).not.toHaveBeenCalled();
@@ -590,40 +607,40 @@ describe("app/lib/database/workspace.server.ts", () => {
     const mod = await import("../app/lib/database/workspace.server");
     const headers = new Headers();
 
-    const supabaseNoHash: any = { auth: {} };
+    const postgresNoHash: any = { auth: {} };
     const r0 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      supabaseNoHash,
+      postgresNoHash,
       "",
       "signup" as any,
       headers,
     ));
     expect(await r0.json()).toEqual({ error: "Invalid invitation link" });
 
-    const supabaseVerifyErr: any = {
+    const postgresVerifyErr: any = {
       auth: { verifyOtp: async () => ({ data: null, error: new Error("x") }) },
     };
     const r1 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      supabaseVerifyErr,
+      postgresVerifyErr,
       "th",
       "signup" as any,
       headers,
     ));
     expect(((await r1.json()) as any).error).toBeTruthy();
 
-    const supabaseNoSession: any = {
+    const postgresNoSession: any = {
       auth: {
         verifyOtp: async () => ({ data: { session: null }, error: null }),
       },
     };
     const r2 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      supabaseNoSession,
+      postgresNoSession,
       "th",
       "signup" as any,
       headers,
     ));
     expect(await r2.json()).toEqual({ error: "Failed to create session" });
 
-    const supabaseSessionErr: any = {
+    const postgresSessionErr: any = {
       auth: {
         verifyOtp: async () => ({
           data: { session: { user: { id: "u1" } } },
@@ -633,14 +650,14 @@ describe("app/lib/database/workspace.server.ts", () => {
       },
     };
     const r3 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      supabaseSessionErr,
+      postgresSessionErr,
       "th",
       "signup" as any,
       headers,
     ));
     expect(((await r3.json()) as any).error).toBeTruthy();
 
-    const supabaseInviteErr: any = {
+    const postgresInviteErr: any = {
       auth: {
         verifyOtp: async () => ({
           data: { session: { user: { id: "u1" } } },
@@ -651,14 +668,14 @@ describe("app/lib/database/workspace.server.ts", () => {
     };
     adminDbMocks.selectChain.mockRejectedValueOnce(new Error("inv"));
     const r4 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      supabaseInviteErr,
+      postgresInviteErr,
       "th",
       "signup" as any,
       headers,
     ));
     expect(((await r4.json()) as any).error).toBeTruthy();
 
-    const supabaseOk: any = {
+    const postgresOk: any = {
       auth: {
         verifyOtp: async () => ({
           data: { session: { user: { id: "u1" } } },
@@ -669,7 +686,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     };
     adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
     const r5 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      supabaseOk,
+      postgresOk,
       "th",
       "signup" as any,
       headers,
@@ -756,7 +773,7 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     await expect(
       mod.updateCallerId({
-        supabaseClient: {} as any,
+        null: {} as any,
         workspaceId: "w1",
         number: null as any,
         friendly_name: "X",
@@ -796,18 +813,6 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const supabase: any = {
-      storage: {
-        from: () => ({
-          createSignedUrl: async (_p: string) => ({
-            data: { signedUrl: "u" },
-            error: null,
-          }),
-          list: async () => ({ data: [{ name: "a" }], error: new Error("x") }),
-        }),
-      },
-    };
-
     adminDbMocks.workspaceFindFirst.mockResolvedValueOnce({ id: "w1" });
     tdbMocks.workspace_number.findMany.mockResolvedValueOnce([]);
     const w = await mod.fetchWorkspaceData("w1");
@@ -842,50 +847,30 @@ describe("app/lib/database/workspace.server.ts", () => {
       ]),
     ).toEqual([]);
 
-    await expect(mod.getMedia(["a.wav"], supabase, "w1")).resolves.toEqual([
+    await expect(mod.getMedia(["a.wav"], "w1")).resolves.toEqual([
       { "a.wav": "u" },
     ]);
-    const supabaseMediaErr: any = {
-      ...supabase,
-      storage: {
-        from: () => ({
-          createSignedUrl: async () => ({ data: null, error: new Error("x") }),
-        }),
-      },
-    };
+    objectStorageMocks.createSignedObjectUrl.mockRejectedValueOnce(new Error("x"));
     await expect(
-      mod.getMedia(["a.wav"], supabaseMediaErr, "w1"),
+      mod.getMedia(["a.wav"], "w1"),
     ).rejects.toThrow("x");
 
-    await expect(mod.listMedia(supabase, "w1")).resolves.toEqual([
-      { name: "a" },
-    ]);
+    objectStorageMocks.listObjects.mockRejectedValueOnce(new Error("x"));
+    await expect(mod.listMedia("w1")).resolves.toEqual(null);
     expect(logger.error).toHaveBeenCalled();
-    const supabaseListOk: any = {
-      ...supabase,
-      storage: {
-        from: () => ({
-          list: async () => ({ data: [{ name: "a" }], error: null }),
-        }),
-      },
-    };
-    await expect(mod.listMedia(supabaseListOk, "w1")).resolves.toEqual([
-      { name: "a" },
+    objectStorageMocks.listObjects.mockResolvedValueOnce([
+      { name: "a", id: "a", created_at: "t", updated_at: "t" },
+    ]);
+    await expect(mod.listMedia("w1")).resolves.toEqual([
+      { name: "a", id: "a", created_at: "t", updated_at: "t" },
     ]);
 
-    await expect(mod.getSignedUrls(supabase, "w1", ["m.png"])).resolves.toEqual(
+    await expect(mod.getSignedUrls("w1", ["m.png"])).resolves.toEqual(
       ["u"],
     );
-    const supabaseSignedErr: any = {
-      ...supabase,
-      storage: {
-        from: () => ({
-          createSignedUrl: async () => ({ data: null, error: new Error("x") }),
-        }),
-      },
-    };
+    objectStorageMocks.createSignedObjectUrl.mockRejectedValueOnce(new Error("x"));
     await expect(
-      mod.getSignedUrls(supabaseSignedErr, "w1", ["m.png"]),
+      mod.getSignedUrls("w1", ["m.png"]),
     ).rejects.toThrow("x");
   });
 
@@ -1151,7 +1136,6 @@ describe("app/lib/database/workspace.server.ts", () => {
     const result = await mod.fetchConversationSummary(
       { rpc: vi.fn(async () => ({ data: [], error: null })) } as any,
       "w1",
-      null,
       {
         limit: 20,
         offset: 0,

@@ -13,10 +13,10 @@ const roomCallRow = vi.hoisted(() => ({
   } as Record<string, unknown>,
 }));
 
-const roomSupabaseState = vi.hoisted(() => ({ supabase: null as any }));
+const roomClientState = vi.hoisted(() => ({ client: null as any }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  getServiceSupabase: () => roomSupabaseState.supabase,
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => roomClientState.client,
 }));
 
 function setRoomCallRow(row: Record<string, unknown>) {
@@ -24,10 +24,10 @@ function setRoomCallRow(row: Record<string, unknown>) {
   configureTelephonyStub({ callRow: row });
 }
 
-function useRoomSupabase(supabase: ReturnType<typeof makeSupabase>) {
-  roomSupabaseState.supabase = supabase;
-  mocks.createClient.mockReturnValueOnce(supabase);
-  return supabase;
+function useRoomPostgres(client: ReturnType<typeof makeDbClient>) {
+  roomClientState.client = client;
+  mocks.createClient.mockReturnValueOnce(client);
+  return client;
 }
 
 const mocks = vi.hoisted(() => {
@@ -49,7 +49,7 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
     mocks.fetchCampaignByIdForWorkspace(...args),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
 }));
 
@@ -59,8 +59,8 @@ vi.mock("../app/lib/database.server", () => ({
 
 vi.mock("../app/lib/env.server", () => ({
   env: {
-    SUPABASE_URL: () => "https://sb.example",
-    SUPABASE_SERVICE_KEY: () => "svc",
+    BETTER_AUTH_URL: () => "https://sb.example",
+    BETTER_AUTH_SERVICE_KEY: () => "svc",
     BASE_URL: () => "https://base.example",
   },
 }));
@@ -136,8 +136,8 @@ vi.mock("twilio", () => {
   };
 });
 
-function makeSupabase(overrides: Partial<any>) {
-  const supabase: any = {
+function makeDbClient(overrides: Partial<any>) {
+  const client: any = {
     from: vi.fn(),
     rpc: vi.fn(),
     storage: { from: vi.fn() },
@@ -145,7 +145,7 @@ function makeSupabase(overrides: Partial<any>) {
     removeChannel: vi.fn(),
     ...overrides,
   };
-  return supabase;
+  return client;
 }
 
 describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
@@ -176,9 +176,9 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("device-check path: verified device joins conference and triggers dialer", async () => {
-    const supabase = makeSupabase({});
+    const client = makeDbClient({});
 
-    supabase.from.mockImplementation((table: string) => {
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -236,7 +236,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       throw new Error(`unexpected table ${table}`);
     });
 
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -267,8 +267,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     };
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -335,12 +335,12 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       throw new Error(`unexpected table ${table}`);
     });
 
-    supabase.storage.from.mockReturnValueOnce({
+    adminDb.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    supabase.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
+    adminDb.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
 
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -358,7 +358,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
     );
     expect(mocks.fetch).toHaveBeenCalled();
-    expect(supabase.removeChannel).toHaveBeenCalled();
+    expect(adminDb.removeChannel).toHaveBeenCalled();
   });
 
   test("machine answer with no voicemail signedUrl returns Hangup response", async () => {
@@ -367,8 +367,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -419,7 +419,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected table ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -451,8 +451,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     };
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -521,10 +521,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected table ${table}`);
     });
-    supabase.storage.from.mockReturnValueOnce({
+    adminDb.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -547,8 +547,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -563,11 +563,11 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    supabase.storage.from.mockReturnValueOnce({
+    adminDb.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    supabase.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
-    useRoomSupabase(supabase);
+    adminDb.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -588,8 +588,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -604,10 +604,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    supabase.storage.from.mockReturnValueOnce({
+    adminDb.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -624,8 +624,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
   test("user device lookup error is caught", async () => {
     roomDbMocks.getUserVerifiedAudioNumbers.mockRejectedValueOnce(new Error("user"));
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 1, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -634,7 +634,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -655,8 +655,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -674,7 +674,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -700,8 +700,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     };
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -728,11 +728,11 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    supabase.storage.from.mockReturnValueOnce({
+    adminDb.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    supabase.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
-    useRoomSupabase(supabase);
+    adminDb.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -758,8 +758,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any);
 
     const outreachSelect = vi.fn(async () => ({ data: [{ ok: 1 }], error: null }));
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -804,7 +804,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected table ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -822,14 +822,14 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("errors are caught and return Hangup response", async () => {
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: new Error("call") }) }) }) };
       }
       throw new Error("unexpected");
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -846,8 +846,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("device-check: called equals campaign caller_id", async () => {
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -877,7 +877,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -893,8 +893,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("device-check: no contactId but verified_audio_numbers includes called", async () => {
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -915,7 +915,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -937,8 +937,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -950,7 +950,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -971,8 +971,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -987,10 +987,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    supabase.storage.from.mockReturnValueOnce({
+    adminDb.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: null, error: new Error("storage") }),
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -1017,8 +1017,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any);
 
     roomDbMocks.dequeueCampaignQueueByContact.mockRejectedValueOnce(new Error("q"));
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -1030,10 +1030,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    supabase.storage.from.mockReturnValueOnce({
+    adminDb.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -1055,8 +1055,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any);
 
     const outreachSelect = vi.fn(async () => ({ data: [{ ok: 1 }], error: null }));
-    const supabase = makeSupabase({});
-    supabase.from.mockImplementation((table: string) => {
+    const client = makeDbClient({});
+    adminDb.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -1074,7 +1074,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    useRoomSupabase(supabase);
+    useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();

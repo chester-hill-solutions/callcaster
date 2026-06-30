@@ -1,5 +1,4 @@
 import { authForOutreachAttempt } from "@/lib/platform-data.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
@@ -23,7 +22,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   );
   if (access instanceof Response) return access;
 
-  const { headers } = createSupabaseServerClient(request);
+  const { headers } = await getSession(request);
   const { update } = await safeParseJson<{ update: Record<string, unknown> }>(
     request,
   );

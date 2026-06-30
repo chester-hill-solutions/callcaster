@@ -1,6 +1,6 @@
-import { SupabaseClient } from "@supabase/supabase-js";
 import { and, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
-import type { Database } from "../database.types";
+import type { Database } from "@/lib/db-types";
+import { rpcFindContactsByPhones } from "@/lib/db-rpc.server";
 import { message as messageTable, contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "../logger.server";
@@ -79,7 +79,6 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 export async function fetchConversationSummary(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   campaign_id?: string | null,
   options: FetchConversationSummaryOptions = {},
@@ -307,62 +306,60 @@ export async function fetchConversationSummary(
     }
   }
 
-  if (typeof supabaseClient.rpc === "function") {
-    const phonesMissingNames = Array.from(
-      new Set(
-        Array.from(conversationMap.values())
-          .filter((conversation) =>
-            conversationNeedsPhoneMatchedContact(conversation),
-          )
-          .map((conversation) => conversation.contact_phone)
-          .filter((phone): phone is string => Boolean(phone)),
+  const phonesMissingNames = Array.from(
+    new Set(
+      Array.from(conversationMap.values())
+        .filter((conversation) =>
+          conversationNeedsPhoneMatchedContact(conversation),
+        )
+        .map((conversation) => conversation.contact_phone)
+        .filter((phone): phone is string => Boolean(phone)),
+    ),
+  );
+
+  if (phonesMissingNames.length > 0) {
+    const phoneMatchedContacts = new Map<string, PhoneMatchedContactRow>();
+    const phoneBatches = chunk(phonesMissingNames, PHONES_BATCH_SIZE);
+    const rpcResults = await Promise.all(
+      phoneBatches.map((phones) =>
+        rpcFindContactsByPhones(workspaceId, phones).then(
+          (data) => ({ data, error: null as null }),
+          (error) => ({ data: null as null, error }),
+        ),
       ),
     );
-
-    if (phonesMissingNames.length > 0) {
-      const phoneMatchedContacts = new Map<string, PhoneMatchedContactRow>();
-      const phoneBatches = chunk(phonesMissingNames, PHONES_BATCH_SIZE);
-      const rpcResults = await Promise.all(
-        phoneBatches.map((phones) =>
-          supabaseClient.rpc("find_contacts_by_phones", {
-            p_workspace_id: workspaceId,
-            p_phone_numbers: phones,
-          }),
-        ),
-      );
-      for (const { data, error } of rpcResults) {
-        if (error) {
-          logger.error("Error loading contacts by phones for conversations", {
-            error,
-            workspaceId,
-            phoneCount: phonesMissingNames.length,
-          });
-        } else if (data?.length) {
-          for (const row of data) {
-            const key = getConversationPhoneKey(row.phone) ?? row.phone;
-            if (key) phoneMatchedContacts.set(key, row);
-          }
+    for (const { data, error } of rpcResults) {
+      if (error) {
+        logger.error("Error loading contacts by phones for conversations", {
+          error,
+          workspaceId,
+          phoneCount: phonesMissingNames.length,
+        });
+      } else if (data?.length) {
+        for (const row of data) {
+          const key = getConversationPhoneKey(row.phone as string) ?? (row.phone as string);
+          if (key) phoneMatchedContacts.set(key, row as PhoneMatchedContactRow);
         }
       }
+    }
 
-      for (const conversation of conversationMap.values()) {
-        if (!conversationNeedsPhoneMatchedContact(conversation)) {
-          continue;
-        }
-
-        const lookupKey =
-          getConversationPhoneKey(conversation.contact_phone) ??
-          conversation.contact_phone;
-        const matchedContact = lookupKey
-          ? phoneMatchedContacts.get(lookupKey)
-          : undefined;
-        if (!matchedContact) {
-          continue;
-        }
-
-        conversation.contact_firstname = matchedContact.firstname;
-        conversation.contact_surname = matchedContact.surname;
+    for (const conversation of conversationMap.values()) {
+      if (!conversationNeedsPhoneMatchedContact(conversation)) {
+        continue;
       }
+
+      const lookupKey =
+        getConversationPhoneKey(conversation.contact_phone) ??
+        conversation.contact_phone;
+      const matchedContact = lookupKey
+        ? phoneMatchedContacts.get(lookupKey)
+        : undefined;
+      if (!matchedContact) {
+        continue;
+      }
+
+      conversation.contact_firstname = matchedContact.firstname;
+      conversation.contact_surname = matchedContact.surname;
     }
   }
 

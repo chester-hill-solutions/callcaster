@@ -24,7 +24,7 @@ import {
   validateTwilioWebhookForPhoneNumber,
 } from "@/lib/twilio-webhook.server";
 
-function makeSupabase(opts?: {
+function makeDbClient(opts?: {
   callWorkspace?: string | null;
   workspaceTwilioData?: unknown;
   numberRow?: {
@@ -105,12 +105,12 @@ describe("twilio-webhook.server", () => {
   });
 
   test("resolveWorkspaceTwilioData fetches workspace twilio_data when join lacks token", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       workspaceTwilioData: { sid: "AC1", authToken: "fetched-token" },
     });
 
     const result = await resolveWorkspaceTwilioData(
-      supabase as never,
+      client as never,
       "w1",
       { sid: "AC1" },
       mocks.logger,
@@ -124,10 +124,10 @@ describe("twilio-webhook.server", () => {
   });
 
   test("validateTwilioWebhookForPhoneNumber rejects empty phone", async () => {
-    const supabase = makeSupabase();
+    const client = makeDbClient();
     const result = await validateTwilioWebhookForPhoneNumber({
       request: makeRequest(),
-      supabase: supabase as never,
+      client: client as never,
       phoneNumber: "   ",
       params: { Called: "   " },
     });
@@ -142,14 +142,14 @@ describe("twilio-webhook.server", () => {
   });
 
   test("validateTwilioWebhookForCallSid uses dev auth token when call row missing", async () => {
-    const supabase = makeSupabase({ callWorkspace: null });
+    const client = makeDbClient({ callWorkspace: null });
     mocks.validateTwilioWebhookParams.mockImplementation(
       (_params, _sig, _url, token: string) => token === "main-dev-token",
     );
 
     const result = await validateTwilioWebhookForCallSid({
       request: makeRequest(),
-      supabase: supabase as never,
+      client: client as never,
       callSid: "CA_UNKNOWN",
       params: { CallSid: "CA_UNKNOWN" },
     });
@@ -162,11 +162,11 @@ describe("twilio-webhook.server", () => {
 
   test("validateTwilioWebhookForCallSid rejects unknown call in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    const supabase = makeSupabase({ callWorkspace: null });
+    const client = makeDbClient({ callWorkspace: null });
 
     const result = await validateTwilioWebhookForCallSid({
       request: makeRequest(),
-      supabase: supabase as never,
+      client: client as never,
       callSid: "CA_UNKNOWN",
       params: { CallSid: "CA_UNKNOWN" },
     });
@@ -178,7 +178,7 @@ describe("twilio-webhook.server", () => {
   });
 
   test("validateTwilioWebhookForPhoneNumber returns numberRow with handset_enabled", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       numberRow: {
         workspace: { id: "w1", twilio_data: { sid: "AC1", authToken: "tok" } },
         handset_enabled: true,
@@ -187,7 +187,7 @@ describe("twilio-webhook.server", () => {
 
     const result = await validateTwilioWebhookForPhoneNumber({
       request: makeRequest("http://localhost/api/inbound-handset"),
-      supabase: supabase as never,
+      client: client as never,
       phoneNumber: "+15551234567",
       params: { Called: "+15551234567" },
     });

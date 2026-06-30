@@ -10,7 +10,7 @@ import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { parseActionRequest } from "@/lib/database.server";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { contact_audience as contactAudienceTable } from "@/db/schema";
 import { db } from "@/server/db";
 import type { Contact } from "@/lib/types";
@@ -27,7 +27,7 @@ const EMPTY_FILTERS: QueueSearchFilters = {
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { selected_id } = params;
-  const { supabaseClient } = await verifyAuth(request);
+  await verifyAuth(request);
 
   if (!selected_id) throw redirect("../../");
 
@@ -83,7 +83,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         .where(eq(contactAudienceTable.audience_id, audienceId));
 
       await enqueueContactsForCampaign(
-        supabaseClient,
         campaignIdNum,
         contacts.map((contact) => contact.contact_id),
         { requeue: false },
@@ -107,7 +106,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     try {
       await enqueueContactsForCampaign(
-        supabaseClient,
         campaignIdNum,
         contacts.map((contact) => contact.id),
         { requeue: false },

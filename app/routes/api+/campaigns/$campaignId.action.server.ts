@@ -19,7 +19,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (auth instanceof Response) return auth;
 
   const result = await getCampaignDetailApi(
-    auth.supabase,
+    auth.client,
     campaignId,
     auth.workspaceId,
   );
@@ -44,7 +44,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (request.method === "POST" && operation === "duplicate") {
     const result = await duplicateCampaignApi(
-      auth.supabase,
+      auth.client,
       campaignId,
       auth.workspaceId,
     );
@@ -59,7 +59,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (parsed instanceof Response) return parsed;
 
     const result = await transitionCampaignStatusApi(
-      auth.supabase,
+      auth.client,
       campaignId,
       auth.workspaceId,
       parsed,

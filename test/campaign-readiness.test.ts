@@ -153,7 +153,6 @@ describe("app/lib/campaign-readiness.ts", () => {
         end_date: "also-bad",
         schedule: "{bad",
       } as any,
-      null,
       { queueCount: 0 },
     );
 

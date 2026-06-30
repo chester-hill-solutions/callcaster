@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { createErrorResponse } from "@/lib/errors.server";
@@ -22,9 +20,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    const result = await listWorkspaceExportsApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await listWorkspaceExportsApi(      auth.user.id,
       workspaceId,
     );
 
@@ -55,9 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (parsed instanceof Response) return parsed;
 
   try {
-    const result = await startCampaignExportApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await startCampaignExportApi(      auth.user.id,
       workspaceId,
       parsed.campaign_id,
     );

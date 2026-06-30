@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { getWorkspaceBilling } from "@/lib/platform-billing.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -15,9 +13,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const result = await getWorkspaceBilling(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await getWorkspaceBilling(    auth.user.id,
     workspaceId,
   );
 

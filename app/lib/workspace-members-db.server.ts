@@ -9,7 +9,7 @@ import {
   workspace_number as workspaceNumberTable,
   workspace_users as workspaceUsersTable,
 } from "@/db/schema";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 

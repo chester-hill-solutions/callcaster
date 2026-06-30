@@ -25,10 +25,10 @@ type UploadRecord = {
 };
 let uploads: UploadRecord[] = [];
 
-function buildSupabaseClient() {
-  const supabaseClient: any = {};
+function buildMockDb() {
+  const mockClient: any = {};
 
-  supabaseClient.storage = {
+  null.storage = {
     from: () => ({
       upload: async (path: string, data: any, opts?: any) => {
         if (path.endsWith(".csv")) {
@@ -89,7 +89,7 @@ function buildSupabaseClient() {
     workspace: "w1",
   };
 
-  supabaseClient.from = (table: string) => {
+  null.from = (table: string) => {
     if (table === "campaign") {
       const builder: any = {};
       builder.select = () => builder;
@@ -137,13 +137,11 @@ function buildSupabaseClient() {
     throw new Error(`unexpected table ${table}`);
   };
 
-  return supabaseClient;
+  return null;
 }
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 
@@ -159,8 +157,7 @@ describe("api.campaign-export CSV contract checks", () => {
     uploads = [];
     requireWorkspaceAccess.mockClear();
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      user: { id: "u1" },
+            user: { id: "u1" },
     });
     vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: any) => {
       if (typeof fn === "function") fn();

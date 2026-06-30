@@ -1,11 +1,11 @@
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request }: LoaderFunctionArgs) {
 
-  const { supabaseClient } = await verifyAuth(request);
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  await verifyAuth(request);
+  const { data: { session } } = await request.getSession();
   if (!session) return redirect("/remember");
   return routeData({});
 }

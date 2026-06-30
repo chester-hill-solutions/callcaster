@@ -26,9 +26,7 @@ describe("app/routes/admin+.tsx action", () => {
     mocks.requireSudoAdmin.mockReset();
     mocks.syncWorkspaceTwilio.mockReset();
     mocks.toggleWorkspaceStatus.mockReset();
-    mocks.requireSudoAdmin.mockResolvedValue({
-      supabaseClient: {},
-      user: { id: "u1" },
+    mocks.requireSudoAdmin.mockResolvedValue({ user: { id: "u1" },
       userData: { id: "u1", access_level: "sudo" },
     });
   });

@@ -5,7 +5,6 @@ import {
   twilioWebhookNotFound,
   validateWorkspaceTwilioWebhook,
 } from "@/lib/twilio-webhook.server";
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { isEmail, isPhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
@@ -26,7 +25,7 @@ import Twilio from "twilio";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
 import type { TwilioInboundCallWebhook } from "@/lib/twilio.types";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 function dispatchInboundCallWebhookNotification(args: {
   workspaceId: string;
@@ -38,7 +37,6 @@ function dispatchInboundCallWebhookNotification(args: {
     direction: string | null;
     start_time: string | null;
   };
-  supabaseClient: ReturnType<typeof createClient<Database>>;
   sendWebhookNotification: typeof sendWebhookNotification;
   logger: Pick<typeof logger, "warn">;
 }) {
@@ -55,7 +53,6 @@ function dispatchInboundCallWebhookNotification(args: {
         direction: args.call.direction,
         timestamp: args.call.start_time,
       },
-      supabaseClient: args.supabaseClient,
     }),
   ).catch((error: unknown) => {
     args.logger.warn("Failed to send inbound call webhook notification", {
@@ -68,9 +65,9 @@ function dispatchInboundCallWebhookNotification(args: {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient<Database>(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
   const formData = await request.formData();
   const data = Object.fromEntries(
@@ -89,9 +86,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const workspaceId = number.workspaceId;
 
   const twilioData = (await resolveWorkspaceTwilioData(
-    supabase,
-    workspaceId,
-    null,
+    client,
+    workspaceId, 
     logger,
   )) as Record<string, unknown> | null | undefined;
 
@@ -125,7 +121,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     number.inbound_ring_count ?? null,
   );
   const voicemail = await resolveInboundVoicemailAudio({
-    supabase,
+    client,
     workspaceId,
     inboundAudio: number.inbound_audio ?? null,
   });
@@ -169,7 +165,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         direction: call.direction,
         start_time: call.start_time,
       },
-      supabaseClient: supabase,
       sendWebhookNotification,
       logger,
     });
@@ -207,8 +202,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (number.inbound_queue_id) {
-    const supabaseUrl = env.SUPABASE_URL().replace(/\/$/, "");
-    const acdUrl = `${supabaseUrl}/functions/v1/acd-router`;
+    const baseUrl = env.BASE_URL().replace(/\/$/, "");
+    const acdUrl = `${baseUrl}/api/acd-router`;
     const queueName = `inbound_q_${number.inbound_queue_id}`;
     logger.info("api.inbound routing to queue", {
       workspaceId,

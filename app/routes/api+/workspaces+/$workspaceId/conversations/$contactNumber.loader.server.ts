@@ -35,7 +35,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await getConversationMessagesApi(
-    auth.supabase,
+    auth.client,
     workspaceId,
     decodedContactNumber,
     url.searchParams,

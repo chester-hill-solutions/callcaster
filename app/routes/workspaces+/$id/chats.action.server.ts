@@ -6,16 +6,12 @@ import {
   sortConversationSummaries,
   type ConversationSummary,
 } from "@/lib/chat-conversation-sort";
-import {
-  RealtimePostgresChangesPayload,
-  SupabaseClient,
-} from "@supabase/supabase-js";
 import { data as routeData, redirect } from "react-router";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { sendMessage } from "@/lib/chat-sms.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type {
   User,
   Contact,
@@ -24,11 +20,11 @@ import type {
   WorkspaceNumber,
 } from "@/lib/types";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database, Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/db-types";
 
 export async function action({ request, params }: ActionFunctionArgs) {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
 
   const workspaceId = params["id"];
   const formData = await request.formData();
@@ -42,7 +38,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     to: contact_number as string,
     from: data["from"] as string,
     media: data["media"] as string,
-    supabase: supabaseClient,
+    client: null,
     workspace: workspaceId as string,
     contact_id: data.contact_id as string,
     user: user as unknown as BaseUser,

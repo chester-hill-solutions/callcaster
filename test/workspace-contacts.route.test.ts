@@ -14,10 +14,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
@@ -87,7 +85,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     const contactsQuery = new ContactQueryBuilder({ data: [], error: null });
     let contactQueryCount = 0;
 
-    const supabaseClient = {
+    const null = {
       from: vi.fn((table: string) => {
         if (table === "contact") {
           contactQueryCount += 1;
@@ -115,7 +113,6 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -142,7 +139,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     const contactsQuery = new ContactQueryBuilder({ data: [], error: null });
     let contactQueryCount = 0;
 
-    const supabaseClient = {
+    const null = {
       from: vi.fn((table: string) => {
         if (table === "contact") {
           contactQueryCount += 1;
@@ -170,7 +167,6 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -194,7 +190,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     const contactsQuery = new ContactQueryBuilder({ data: [], error: null });
     let contactQueryCount = 0;
 
-    const supabaseClient = {
+    const null = {
       from: vi.fn((table: string) => {
         if (table === "contact") {
           contactQueryCount += 1;
@@ -222,7 +218,6 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       headers: new Headers(),
       user: { id: "u1" },
     });

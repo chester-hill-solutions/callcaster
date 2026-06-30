@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import {
   completeAllConferences,
   createOutreachAttempt,
@@ -11,7 +10,9 @@ import { createWorkspaceTwilioInstance, safeParseJson } from "@/lib/database.ser
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import type { Call } from "@/lib/types";
-import type { Database } from "@/lib/database.types";
+import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
+import type { Database } from "@/lib/db-types";
 
 export {
   completeAllConferences,
@@ -24,9 +25,9 @@ export {
 } from "@/lib/auto-dial.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient<Database>(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
   const body = await safeParseJson<{
     user_id: string;
@@ -35,14 +36,12 @@ export const action = async ({ request }: { request: Request }) => {
     selected_device: string;
   }>(request);
   const { user_id, campaign_id, workspace_id, selected_device } = body;
-  const twilioClient = await createWorkspaceTwilioInstance({ supabase: supabase,
-    workspace_id,
+  const twilioClient = await createWorkspaceTwilioInstance({ workspace_id,
   });
-  const realtime = supabase.channel(user_id);
+  const realtime = adminDb.channel(user_id);
 
   try {
     const contactRecord = await getNextAutoDialQueueContact(
-      supabase,
       campaign_id,
       user_id,
     );
@@ -51,7 +50,6 @@ export const action = async ({ request }: { request: Request }) => {
       const toNumber = normalizePhoneNumber(contactRecord.contact_phone);
 
       const outreach_attempt_id = await createOutreachAttempt(
-        supabase,
         contactRecord,
         campaign_id,
         workspace_id,
@@ -66,16 +64,12 @@ export const action = async ({ request }: { request: Request }) => {
         selected_device,
       );
 
-      const { error } = await supabase.rpc("dequeue_contact", {
-        passed_contact_id: contactRecord.contact_id,
-        group_on_household: true,
-        dequeued_by_id: user_id,
-        dequeued_reason_text: "Predictive Dialer called contact",
+      await rpcDequeueContact(db, {
+        contactId: contactRecord.contact_id,
+        groupOnHousehold: true,
+        dequeuedById: user_id,
+        dequeuedReasonText: "Predictive Dialer called contact",
       });
-      if (error) {
-        logger.error("Error dequeing contact", error);
-        throw error;
-      }
       realtime.send({
         type: "broadcast",
         event: "message",
@@ -110,7 +104,7 @@ export const action = async ({ request }: { request: Request }) => {
       };
 
       await saveCallToDatabase(workspace_id, callData as unknown as Partial<Call>);
-      supabase.removeChannel(realtime);
+      adminDb.removeChannel(realtime);
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
       });

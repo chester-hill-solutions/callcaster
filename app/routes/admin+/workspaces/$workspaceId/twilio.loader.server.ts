@@ -4,7 +4,7 @@ import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-    const { supabaseClient } = await requireSudoAdmin(request);
+    await requireSudoAdmin(request);
 
     const workspaceId = params.workspaceId;
     if (!workspaceId) {
@@ -12,6 +12,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
 
     return routeData({
-        twilioData: loadTwilioData(supabaseClient, workspaceId),
+        twilioData: loadTwilioData(workspaceId),
     });
 };

@@ -1,13 +1,12 @@
-import { SupabaseClient, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Message } from "@/lib/types";
-import type { Database, Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/db-types";
 import { compareByRecentActivity } from "@/lib/chat-conversation-sort";
 import {
   fetchConversationSummaries,
   markConversationRead,
 } from "@/lib/chats/messaging-client";
-import { useSupabaseRealtimeSubscription } from "./useSupabaseRealtime";
+import { useWorkspaceEventSubscription } from "./useWorkspaceEventSubscription";
 import { logger } from "@/lib/logger.client";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
@@ -42,7 +41,7 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
 /**
  * Hook for managing real-time chat messages
  * 
- * Subscribes to Supabase realtime changes for messages in a workspace, automatically
+ * Subscribes to Postgres realtime changes for messages in a workspace, automatically
  * updating the messages list when new messages are inserted. Filters messages by
  * workspace and optionally by contact number. Prevents duplicate messages using
  * message SID tracking.
@@ -54,7 +53,7 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
  * - Failed message filtering
  * 
  * @param params - Configuration object
- * @param params.supabase - Supabase client instance
+ * @param params.client - Postgres client instance
  * @param params.initial - Initial list of messages
  * @param params.workspace - Workspace ID to filter messages
  * @param params.contact_number - Optional contact phone number to filter messages
@@ -66,20 +65,17 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
  * @example
  * ```tsx
  * const { messages } = useChatRealTime({
- *   supabase,
- *   initial: initialMessages,
+ *    *   initial: initialMessages,
  *   workspace: workspaceId,
  *   contact_number: contactPhone,
  * });
  * ```
  */
 export const useChatRealTime = ({
-  supabase,
-  initial,
+    initial,
   workspace,
   contact_number,
 }: {
-  supabase: SupabaseClient<Database>;
   initial: Message[];
   workspace: string;
   contact_number?: string;
@@ -100,8 +96,8 @@ export const useChatRealTime = ({
     contactNumberRef.current = contact_number;
   }, [contact_number]);
 
-  const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-    const typedPayload = payload as RealtimePostgresChangesPayload<Tables<"message">>;
+  const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
+    const typedPayload = payload as RealtimeChangePayload<Tables<"message">>;
     const newRow = typedPayload.new as Tables<"message"> | null;
     if (!newRow?.workspace || newRow.workspace !== workspace) return;
 
@@ -160,11 +156,11 @@ export const useChatRealTime = ({
     [workspace]
   );
 
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId: workspace,
     table: "message",
     filter: `workspace=eq.${workspace}`,
-    onChange: handleMessageChange as (p: RealtimePostgresChangesPayload<Record<string, unknown>>) => void
+    onChange: handleMessageChange as (p: RealtimeChangePayload<Record<string, unknown>>) => void
   });
 
   return { messages, setMessages, addOptimisticMessage };
@@ -173,7 +169,7 @@ export const useChatRealTime = ({
 /**
  * Hook for managing real-time conversation summaries
  * 
- * Subscribes to Supabase realtime changes for messages and automatically updates
+ * Subscribes to Postgres realtime changes for messages and automatically updates
  * conversation summaries including unread counts, message counts, and last update times.
  * Handles debounced fetching of conversation summaries to prevent excessive API calls.
  * Tracks active conversation to mark messages as read.
@@ -187,7 +183,7 @@ export const useChatRealTime = ({
  * - Automatic sorting by most recent conversation
  * 
  * @param params - Configuration object
- * @param params.supabase - Supabase client instance
+ * @param params.client - Postgres client instance
  * @param params.initial - Initial list of conversation summaries
  * @param params.workspace - Workspace ID to filter messages
  * @param params.activeContactNumber - Optional active contact phone number (marks as read)
@@ -200,8 +196,7 @@ export const useChatRealTime = ({
  * @example
  * ```tsx
  * const { conversations, fetchConversationSummary } = useConversationSummaryRealTime({
- *   supabase,
- *   initial: initialConversations,
+ *    *   initial: initialConversations,
  *   workspace: workspaceId,
  *   activeContactNumber: currentContact?.phone,
  * });
@@ -211,12 +206,10 @@ export const useChatRealTime = ({
  * ```
  */
 export const useConversationSummaryRealTime = ({
-  supabase,
-  initial,
+    initial,
   workspace,
   activeContactNumber,
 }: {
-  supabase: SupabaseClient<Database>;
   initial: ConversationSummary[];
   workspace: string;
   activeContactNumber?: string; // Add this to track the active conversation
@@ -288,8 +281,8 @@ export const useConversationSummaryRealTime = ({
   }, [initial, conversations.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle new messages and message status changes
-  const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-    const typedPayload = payload as RealtimePostgresChangesPayload<Tables<"message">>;
+  const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
+    const typedPayload = payload as RealtimeChangePayload<Tables<"message">>;
     if (typedPayload.eventType === 'INSERT' && typedPayload.new?.workspace === workspace) {
       // For new messages, we need to update unread counts
       if (typedPayload.new.status === "received") {
@@ -402,8 +395,8 @@ export const useConversationSummaryRealTime = ({
   }, [workspace, fetchConversationSummary]);
 
   // Subscribe to message changes
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId: workspace,
     table: "message",
     filter: `workspace=eq.${workspace}`,
     onChange: handleMessageChange,

@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
 import { eq } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
@@ -8,7 +6,6 @@ import { isObject } from "@/lib/type-safety-utils";
 export type WorkspaceTwilioData = Record<string, unknown>;
 
 export async function loadWorkspaceTwilioData(
-  _supabaseClient: SupabaseClient<Database> | null,
   workspaceId: string,
 ): Promise<WorkspaceTwilioData> {
   const [row] = await adminDb
@@ -25,7 +22,6 @@ export async function loadWorkspaceTwilioData(
 }
 
 export async function persistWorkspaceTwilioData(
-  _supabaseClient: SupabaseClient<Database> | null,
   workspaceId: string,
   twilioData: WorkspaceTwilioData,
 ): Promise<void> {
@@ -36,22 +32,20 @@ export async function persistWorkspaceTwilioData(
 }
 
 export async function mergeWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   updater: (current: WorkspaceTwilioData) => WorkspaceTwilioData,
 ): Promise<WorkspaceTwilioData> {
-  const current = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const current = await loadWorkspaceTwilioData(workspaceId);
   const next = updater(current);
-  await persistWorkspaceTwilioData(supabaseClient, workspaceId, next);
+  await persistWorkspaceTwilioData(workspaceId, next);
   return next;
 }
 
 export async function patchWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   patch: WorkspaceTwilioData,
 ): Promise<WorkspaceTwilioData> {
-  return mergeWorkspaceTwilioData(supabaseClient, workspaceId, (current) => ({
+  return mergeWorkspaceTwilioData(workspaceId, (current) => ({
     ...current,
     ...patch,
   }));

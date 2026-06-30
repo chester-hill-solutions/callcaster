@@ -10,8 +10,8 @@ import {
   isAssignedToUser,
   isQueued,
 } from "@/lib/queue-status";
-import { SupabaseClient } from "@supabase/supabase-js";
 import type { OutreachAttempt, QueueItem } from "@/lib/types";
+import { rpcGetAudiencesByCampaign } from "@/lib/db-rpc.server";
 import { logger } from "@/lib/logger.server";
 import { fetchCampaignWithScriptForWorkspace } from "@/lib/campaign-ivr.server";
 import {
@@ -22,7 +22,6 @@ import { createTenantDb } from "@/server/tenant-db";
 import { getUserById } from "@/lib/workspace-members-db.server";
 
 export async function getCallScreenData(
-  supabase: SupabaseClient,
   campaignId: string,
   workspaceId: string,
   userId: string,
@@ -46,7 +45,7 @@ export async function getCallScreenData(
       logger.error("Error fetching campaign data:", error);
       return null;
     }),
-    supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: campaignIdNum }),
+    rpcGetAudiencesByCampaign(campaignIdNum),
     countCampaignQueueRows(campaignIdNum),
     countCompletedCampaignQueueRows(campaignIdNum),
     tdb.outreach_attempt.findMany({
@@ -92,7 +91,7 @@ export async function getCallScreenData(
   };
 }
 
-export async function getVerifiedNumbers(_supabase: SupabaseClient, userId: string) {
+export async function getVerifiedNumbers(userId: string) {
   const user = await getUserById(userId);
   if (!user) {
     throw new Error("User not found");
@@ -101,7 +100,6 @@ export async function getVerifiedNumbers(_supabase: SupabaseClient, userId: stri
 }
 
 export async function getQueueByDialType(
-  _supabase: SupabaseClient,
   campaignId: string,
   dialType: string,
   userId: string,

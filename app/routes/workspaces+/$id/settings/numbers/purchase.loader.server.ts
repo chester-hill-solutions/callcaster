@@ -1,7 +1,7 @@
 import { data as routeData, redirect } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 

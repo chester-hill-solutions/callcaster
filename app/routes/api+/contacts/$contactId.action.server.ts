@@ -16,7 +16,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (auth instanceof Response) return auth;
 
   const result = await getContactDetailApi(
-    auth.supabase,
+    auth.client,
     contactId,
     auth.workspaceId,
   );
@@ -41,7 +41,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (auth instanceof Response) return auth;
 
   const result = await deleteContactApi(
-    auth.supabase,
+    auth.client,
     contactId,
     auth.workspaceId,
   );

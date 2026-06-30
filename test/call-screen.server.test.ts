@@ -165,10 +165,10 @@ describe("call-screen.server", () => {
   test("getCallScreenData throws when any query errors", async () => {
     tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockRejectedValue(new Error("boom"));
     tenantDbMocks.outreachFindMany.mockResolvedValue([]);
-    const supabase = {
+    const client = {
       rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     };
-    await expect(getCallScreenData(supabase as never, "1", "ws-1", "user-1")).rejects.toThrow(
+    await expect(getCallScreenData(client as never, "1", "ws-1", "user-1")).rejects.toThrow(
       "Error fetching campaign data",
     );
   });
@@ -184,11 +184,11 @@ describe("call-screen.server", () => {
     queueSearchMocks.countCampaignQueueRows.mockResolvedValue(10);
     queueSearchMocks.countCompletedCampaignQueueRows.mockResolvedValue(4);
 
-    const supabase = {
+    const client = {
       rpc: vi.fn().mockResolvedValue({ data: [{ id: "aud-1" }], error: null }),
     };
 
-    const result = await getCallScreenData(supabase as never, "1", "ws-1", "user-1");
+    const result = await getCallScreenData(client as never, "1", "ws-1", "user-1");
     expect(result.workspaceData).toEqual({ id: "ws-1" });
     expect(result.campaign).toEqual({ id: 1, script: null });
     expect(result.audiences).toEqual([{ id: "aud-1" }]);

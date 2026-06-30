@@ -7,15 +7,14 @@ import {
   useOutletContext,
   useRevalidator,
 } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import {
   handleCall,
   handleConference,
 } from "@/lib/callscreenActions";
-import { useSupabaseRealtime, useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceRealtime, useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
-import useSupabaseRoom from "@/hooks/call/useSupabaseRoom";
+import useCallRoom from "@/hooks/call/useCallRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
@@ -36,11 +35,11 @@ import type {
   AppUser,
   LoaderData,
   QueueItem,
-  UseSupabaseRealtimeProps,
+  UseWorkspaceRealtimeProps,
 } from "@/lib/types";
 
 export function useCallScreen() {
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
+  const { client } = useOutletContext<{ }>();
   const { state: navState } = useNavigation();
   const isBusy = navState !== "idle";
   const {
@@ -64,8 +63,8 @@ export function useCallScreen() {
     verifiedNumbers,
   } = useLoaderData<LoaderData>();
   const revalidator = useRevalidator();
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId,
     table: "campaign",
     filter: campaign?.id ? `id=eq.${campaign.id}` : "id=eq.-1",
     onChange: () => revalidator.revalidate(),
@@ -118,8 +117,8 @@ export function useCallScreen() {
     status: liveStatus,
     users: onlineUsers,
     predictiveState,
-  } = useSupabaseRoom({
-    supabase,
+  } = useCallRoom({
+    client,
     workspace: workspaceId,
     campaign: campaign?.id,
     userId: user.id,
@@ -140,9 +139,8 @@ export function useCallScreen() {
     householdMap,
     nextRecipient,
     setNextRecipient,
-  } = useSupabaseRealtime({
+  } = useWorkspaceRealtime({
     user: user as unknown as AppUser,
-    supabase,
     init: {
       predictiveQueue: campaign?.dial_type === "predictive" ? initialQueue : [],
       queue: campaign?.dial_type === "call" ? initialQueue : [],
@@ -158,7 +156,8 @@ export function useCallScreen() {
     predictive: campaign?.dial_type === "predictive",
     setCallDuration,
     setUpdate,
-  } as UseSupabaseRealtimeProps);
+    workspace: workspaceId,
+  } as UseWorkspaceRealtimeProps);
 
   const callSid = getCallSid(activeCall) ?? recentCall?.sid ?? null;
 

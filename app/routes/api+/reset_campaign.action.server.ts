@@ -1,5 +1,7 @@
 import { logger } from "@/lib/logger.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { rpcResetCampaign } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -7,8 +9,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-  const supabaseClient = getAuthSupabaseClient(auth);
-  const user = auth.user;
     const formData = await request.formData();
     const campaign_id = formData.get("campaign_id");
     
@@ -21,13 +21,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return { error: 'Invalid campaign_id' };
     }
 
-    const rpcClient = supabaseClient as unknown as {
-        rpc: (
-            fn: string,
-            args?: Record<string, unknown>,
-        ) => Promise<{ error: unknown }>;
-    };
-    const { error } = await rpcClient.rpc("reset_campaign", { campaign_id_prop: campaignIdNum });
-    if (error) { logger.error("Error resetting campaign:", error); throw error; }
+    try {
+      await rpcResetCampaign(db, campaignIdNum);
+    } catch (error) {
+      logger.error("Error resetting campaign:", error);
+      throw error;
+    }
     return { success: true }
 }

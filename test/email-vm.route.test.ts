@@ -11,14 +11,14 @@ const mocks = vi.hoisted(() => {
     fetch: vi.fn(),
     env: {
       RESEND_API_KEY: () => "rk",
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -42,7 +42,7 @@ vi.mock("resend", () => {
   return { Resend };
 });
 
-function makeSupabase(overrides?: {
+function makeDbClient(overrides?: {
   callError?: { message: string } | null;
   numberError?: { message: string } | null;
   workspace?: any;
@@ -79,7 +79,7 @@ function makeSupabase(overrides?: {
     error: overrides?.signedUrlError ?? null,
   }));
 
-  const supabase: any = {
+  const client: any = {
     from: (table: string) => {
       if (table === "call") {
         return {
@@ -128,7 +128,7 @@ function makeSupabase(overrides?: {
     _numberRow: numberRow,
   };
 
-  return supabase;
+  return client;
 }
 
 function makeReq(fields: Record<string, any>) {
@@ -159,7 +159,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         status: 403,
       }),
     });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(
       await mod.action({
@@ -177,7 +177,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("success path sends email and (optionally) webhook", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       workspace: {
         id: "w1",
         name: "W",
@@ -188,7 +188,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         ],
       },
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
@@ -223,7 +223,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("success path with no matching webhook does not call sendWebhookNotification", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       workspace: {
         id: "w1",
         name: "W",
@@ -231,7 +231,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         webhook: [{ events: [{ category: "other" }] }],
       },
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
@@ -254,7 +254,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("covers webhook events fallback, to:'' fallback, and duration undefined branch", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       workspace: {
         id: "w1",
         name: "W",
@@ -266,8 +266,8 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       },
     });
     // inbound_action null => action?.toString() || ''
-    supabase._numberRow.inbound_action = null;
-    mocks.createClient.mockReturnValueOnce(supabase);
+    adminDb._numberRow.inbound_action = null;
+    mocks.createClient.mockReturnValueOnce(client);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
@@ -299,7 +299,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
 
   test("validates required fields and returns 500 on failures", async () => {
     const mod = await import("../app/routes/api+/email-vm");
-    mocks.createClient.mockReturnValue(makeSupabase());
+    mocks.createClient.mockReturnValue(makeDbClient());
     mocks.fetch.mockResolvedValue({
       ok: true,
       statusText: "OK",
@@ -342,11 +342,11 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
-  test("covers supabase and fetch error branches (callError, numberError, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
+  test("covers client and fetch error branches (callError, numberError, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
     const mod = await import("../app/routes/api+/email-vm");
 
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ callError: { message: "call" } }),
+      makeDbClient({ callError: { message: "call" } }),
     );
     let res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
@@ -355,7 +355,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ numberError: { message: "num" } }),
+      makeDbClient({ numberError: { message: "num" } }),
     );
     res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
@@ -363,7 +363,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any));
     expect(res.status).toBe(500);
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ workspace: null }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ workspace: null }));
     res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
@@ -371,7 +371,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ workspace: { id: "w1", name: "W", twilio_data: null, webhook: [] } }),
+      makeDbClient({ workspace: { id: "w1", name: "W", twilio_data: null, webhook: [] } }),
     );
     res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
@@ -379,7 +379,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any));
     expect(res.status).toBe(500);
 
-    const supOk = makeSupabase();
+    const supOk = makeDbClient();
     mocks.createClient.mockReturnValueOnce(supOk);
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
     res = await asRouteResponse(await mod.action({
@@ -388,7 +388,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any));
     expect(res.status).toBe(500);
 
-    const supUploadErr = makeSupabase({ uploadError: { message: "up" } });
+    const supUploadErr = makeDbClient({ uploadError: { message: "up" } });
     mocks.createClient.mockReturnValueOnce(supUploadErr);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
@@ -401,7 +401,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any));
     expect(res.status).toBe(500);
 
-    const supSignedErr = makeSupabase({ signedUrlError: { message: "sig" } });
+    const supSignedErr = makeDbClient({ signedUrlError: { message: "sig" } });
     mocks.createClient.mockReturnValueOnce(supSignedErr);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,

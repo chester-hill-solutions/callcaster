@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 /**
  * Provider (Twilio) call status normalization and state machine mapping

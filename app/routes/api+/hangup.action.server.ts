@@ -6,16 +6,16 @@ import {
 } from "@/lib/telephony-db.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
+import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 
 
 export const action = async ({ request }: { request: Request }) => {
 
     const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const supabase = getAuthSupabaseClient(auth);
-  const user = auth.user;
+  if (auth instanceof Response) return auth;  const user = auth.user;
     const data = await parseActionRequest(request);
     const conferenceId =
         typeof data.conference_id === "string" ? data.conference_id : null;
@@ -35,9 +35,9 @@ export const action = async ({ request }: { request: Request }) => {
         }
 
         const realtime = resolvedConferenceId
-            ? supabase.realtime.channel(resolvedConferenceId)
+            ? adminDb.realtime.channel(resolvedConferenceId)
             : null;
-        const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: workspaceId});
+        const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
         try {
             await twilio.calls(callSid).update({ twiml: hangupTwiml() });
         } catch (twilioErr: unknown) {
@@ -56,13 +56,12 @@ export const action = async ({ request }: { request: Request }) => {
         });
         const queue = await findActiveAssignedQueueForUser(user.id);
         if (queue) {
-            const { error } = await supabase.rpc('dequeue_contact', {
-                passed_contact_id: queue.contact_id,
-                group_on_household: queue.group_household_queue,
-                dequeued_by_id: user.id,
-                dequeued_reason_text: "Call completed"
+            await rpcDequeueContact(db, {
+                contactId: queue.contact_id,
+                groupOnHousehold: queue.group_household_queue,
+                dequeuedById: user.id,
+                dequeuedReasonText: "Call completed",
             });
-            if (error) throw error;
             await updateOutreachDispositionByContactId(
                 workspaceId,
                 queue.contact_id,
@@ -70,7 +69,7 @@ export const action = async ({ request }: { request: Request }) => {
             );
         }
         if (realtime) {
-            supabase.removeChannel(realtime);
+            adminDb.removeChannel(realtime);
         }
         return routeData({ success: true });
    

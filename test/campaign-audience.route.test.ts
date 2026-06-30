@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession } from "./helpers/route-auth-mock";
-const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
+const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
@@ -11,10 +11,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: supabaseServerMocks.headers,
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: postgresServerMocks.headers,
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -36,8 +34,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("POST returns message when audience already linked", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi.fn().mockReturnValueOnce({
         select: () => ({
           eq: () => ({
@@ -48,7 +46,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
         }),
       }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -68,8 +66,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("POST inserts link and enqueues when contacts found", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         // existing check
@@ -107,7 +105,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -124,7 +122,6 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       enqueued: 2,
     });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
-      supabaseClient,
       20,
       [1, 2],
       { requeue: false },
@@ -133,8 +130,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("POST skips enqueue when no contacts found", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce({
@@ -156,7 +153,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -177,8 +174,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("POST treats null contact lookup data as empty list", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce({
@@ -200,7 +197,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -221,8 +218,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("POST returns 500 with Error.message when insert fails (addError)", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce({
@@ -241,7 +238,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           insert: async () => ({ error: new Error("add boom") }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -258,8 +255,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("POST returns 500 when contact lookup errors (contactsError)", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce({
@@ -281,7 +278,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -298,8 +295,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("DELETE removes audience and queued contacts (when any)", async () => {
     const headers = new Headers({ "Set-Cookie": "b=2" });
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         // delete campaign_audience
@@ -341,7 +338,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -358,8 +355,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("DELETE returns success when no contacts to remove", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce({
@@ -380,7 +377,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -395,8 +392,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("DELETE returns 500 when delete link errors", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi.fn().mockReturnValueOnce({
         delete: () => ({
           eq: () => ({
@@ -405,7 +402,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
         }),
       }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -420,8 +417,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("DELETE covers campaignAudiences null fallback and contacts lookup error", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce({
@@ -445,7 +442,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -460,8 +457,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("DELETE returns 500 when removing queued contacts errors (removeError)", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi
         .fn()
         .mockReturnValueOnce({
@@ -498,7 +495,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
           }),
         }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -513,8 +510,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("returns 405 on unsupported method", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    queueDualAuthSession({ supabaseClient: {}, headers });
+    postgresServerMocks.headers = headers;
+    queueDualAuthSession({ null: {}, headers });
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "PUT" }),
@@ -524,8 +521,8 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
 
   test("catch returns 500 and logs (Error vs non-Error)", async () => {
     const headers = new Headers();
-    supabaseServerMocks.headers = headers;
-    const supabaseClient = {
+    postgresServerMocks.headers = headers;
+    const null = {
       from: vi.fn().mockReturnValueOnce({
         select: () => ({
           eq: () => ({
@@ -539,7 +536,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
         }),
       }),
     };
-    queueDualAuthSession({ supabaseClient, headers });
+    queueDualAuthSession({ headers });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,

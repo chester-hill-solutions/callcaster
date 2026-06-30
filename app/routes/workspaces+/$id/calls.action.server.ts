@@ -2,12 +2,12 @@ import {
   endHandsetSession,
   getHandsetLoaderData,
 } from "@/lib/handset/handset-session.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
 
   if (!workspaceId || !user) {
@@ -19,7 +19,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (intent === "start_listening") {
     const handset = await getHandsetLoaderData({
-      supabaseClient,
       user,
       workspaceId,
     });

@@ -1,10 +1,8 @@
 import Twilio from "twilio";
 import { env } from "@/lib/env.server";
-import type { Database } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/db-types";
 
 export async function resolveInboundVoicemailAudio(args: {
-  supabase: SupabaseClient<Database>;
   workspaceId: string;
   inboundAudio: string | null;
 }): Promise<{ signedUrl: string } | null> {
@@ -12,7 +10,7 @@ export async function resolveInboundVoicemailAudio(args: {
     return null;
   }
 
-  const { data: signedByPath } = await args.supabase.storage
+  const { data: signedByPath } = await args.adminDb.storage
     .from("workspaceAudio")
     .createSignedUrl(`${args.workspaceId}/${args.inboundAudio}`, 3600);
 
@@ -20,7 +18,7 @@ export async function resolveInboundVoicemailAudio(args: {
     return { signedUrl: signedByPath.signedUrl };
   }
 
-  const { data: files } = await args.supabase.storage
+  const { data: files } = await args.adminDb.storage
     .from("workspaceAudio")
     .list(args.workspaceId, {
       search: args.inboundAudio,
@@ -38,7 +36,7 @@ export async function resolveInboundVoicemailAudio(args: {
     return null;
   }
 
-  const { data: signed } = await args.supabase.storage
+  const { data: signed } = await args.adminDb.storage
     .from("workspaceAudio")
     .createSignedUrl(`${args.workspaceId}/${file.name}`, 3600);
 

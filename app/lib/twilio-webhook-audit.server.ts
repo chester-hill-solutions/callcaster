@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import {
   getWorkspaceMessagingOnboardingFromTwilioData,
@@ -48,18 +47,15 @@ function compareField(
 }
 
 export async function auditWorkspaceTwilioWebhooks({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<TwilioWebhookAuditResult> {
   const baseUrl = env.BASE_URL().replace(/\/$/, "");
   const expectedSmsStatus = `${baseUrl}/api/sms/status`;
-  const edgeSmsStatus = `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/sms-status`;
+  const edgeSmsStatus = `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/sms-status`;
 
   const twilioData = (await loadWorkspaceTwilioData(
-    supabaseClient,
     workspaceId,
   )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
@@ -68,15 +64,15 @@ export async function auditWorkspaceTwilioWebhooks({
     inboundSms: `${baseUrl}/api/inbound-sms`,
     callerIdStatus: `${baseUrl}/api/caller-id/status`,
     ivrRemixStatus: `${baseUrl}/api/ivr/status`,
-    ivrEdgeFlow: `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/ivr-flow`,
-    ivrEdgeStatus: `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/ivr-status`,
+    ivrEdgeFlow: `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/ivr-flow`,
+    ivrEdgeStatus: `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/ivr-status`,
   };
 
   const entries: TwilioWebhookDriftEntry[] = [];
   const driftMessages: string[] = [];
 
   const twilio = await createWorkspaceTwilioClient({
-    supabase: supabaseClient,
+    client: null,
     workspaceId,
   });
 

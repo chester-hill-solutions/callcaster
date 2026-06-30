@@ -1,23 +1,20 @@
-import { createClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from "twilio";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 
 export const loader = async ({ request }: { request: Request }) => {
 
     const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getAuthSupabaseClient(auth);
-  const user = auth.user;
+  const { headers } = await getSession(request);  const user = auth.user;
     const url = new URL(request.url);
     const workspace_id = url.searchParams.get('workspace_id') as string;
-    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id });
+    const twilio = await createWorkspaceTwilioInstance({ workspace_id });
     
     const twiml = new Twilio.twiml.VoiceResponse();
     const phoneNumber = normalizePhoneNumber(url.searchParams.get('phoneNumber') as string)
@@ -28,14 +25,14 @@ export const loader = async ({ request }: { request: Request }) => {
     // phone_verification is a global, user-scoped table with no workspace
     // column; access is gated in the app layer by user_id (ADR-0004 — no RLS),
     // so use the service-role client rather than the RLS-dependant auth client.
-    const serviceSupabase = createClient(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY(),
+    const servicePostgres = createClient(
+      env.BASE_URL(),
+      env.BASE_URL(),
       { auth: { persistSession: false } },
     );
     
     // Store the PIN temporarily for verification
-    const { data: verificationData, error: verificationError } = await serviceSupabase
+    const { data: verificationData, error: verificationError } = await servicePostgres
         .from('phone_verification')
         .insert({
             user_id: user.id,
@@ -68,7 +65,7 @@ export const loader = async ({ request }: { request: Request }) => {
         logger.error('Error initiating verification call:', error);
         
         // Clean up the verification record if call fails (scoped to this user)
-        await serviceSupabase
+        await servicePostgres
             .from('phone_verification')
             .delete()
             .eq('id', verificationData.id)

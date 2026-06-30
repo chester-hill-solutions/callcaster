@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceSettingsPageData } from "@/lib/workspace-settings-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 

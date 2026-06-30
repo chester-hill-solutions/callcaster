@@ -2,28 +2,27 @@ import {
   normalizeProviderStatus,
   type CallStatusEnum,
 } from "@/lib/call-status";
-import { createClient } from "@supabase/supabase-js";
 import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { getSession } from "@/lib/auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import {
   findCallBySid,
   updateCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
-  const { headers } = createSupabaseServerClient(request);
-  const userSupabase = getAuthSupabaseClient(auth);
+  const { headers } = await getSession(request);
+  const userPostgres = null /* removed */ (auth);
   const user = auth.user;
 
   const url = new URL(request.url);
@@ -37,9 +36,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  const serviceSupabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const servicePostgres = createClient<Database>(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
 
   const dbCall = await findCallBySid(callSid);
@@ -57,14 +56,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    await requireWorkspaceAccess({
-      supabaseClient: userSupabase,
-      user,
+    await requireWorkspaceAccess({ user,
       workspaceId,
     });
 
-    const twilio = await createWorkspaceTwilioInstance({
-      supabase: serviceSupabase,
+    const twilio = await createWorkspaceTwilioInstance({ servicePostgres,
       workspace_id: dbCall.workspace,
     });
 

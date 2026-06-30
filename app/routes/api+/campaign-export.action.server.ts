@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { findCampaignExportMeta } from "@/lib/campaign-ivr.server";
 import {
   generateCampaignExportId,
@@ -14,7 +14,6 @@ import type { ActionFunctionArgs } from "react-router";
 export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const supabaseClient = getDualAuthSupabase(auth);
   const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -30,7 +29,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     await requireWorkspaceAccess({
-      supabaseClient,
       user,
       workspaceId: workspaceId.toString(),
     });
@@ -47,7 +45,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (campaignRow.type === "message") {
       void processMessageCampaignExport(
-        supabaseClient,
         Number(campaignId),
         workspaceId.toString(),
         exportId,
@@ -55,7 +52,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
       void processCallCampaignExport(
-        supabaseClient,
         Number(campaignId),
         workspaceId.toString(),
         exportId,

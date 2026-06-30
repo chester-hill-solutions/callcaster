@@ -14,7 +14,6 @@ import { DataTable } from "@/components/workspace/tables/DataTable";
 import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
 
-import type { FileObject } from "@supabase/storage-js";
 
 type LoaderData = {
   audioMedia: FileObject[] | null;

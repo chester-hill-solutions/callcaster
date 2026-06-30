@@ -83,7 +83,7 @@ module.exports = {
       ],
     },
     {
-      files: ["supabase/functions/**/*.{ts,tsx}"],
+      files: ["client/functions/**/*.{ts,tsx}"],
       rules: {
         "import/no-unresolved": "off",
       },

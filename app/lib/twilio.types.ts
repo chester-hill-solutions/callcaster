@@ -2,7 +2,7 @@
  * Type definitions for Twilio webhook payloads and API responses
  */
 
-import type { Database } from "./database.types";
+import type { Database } from "@/lib/db-types";
 
 /**
  * Twilio SMS status webhook payload

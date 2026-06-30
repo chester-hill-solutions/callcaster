@@ -1,15 +1,11 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Tables } from "./database.types";
+import type { Database, Tables } from "@/lib/db-types";
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
 
 export type ENV = {
-  SUPABASE_URL: string | undefined;
-  SUPABASE_KEY: string | undefined;
   BASE_URL: string | undefined;
 };
 
 export type ContextType = {
-  supabase: SupabaseClient;
   env: ENV;
 };
 
@@ -730,9 +726,8 @@ export interface ActiveCall extends Call {
   sendDigits: (digits: string) => void;
 }
 
-export interface UseSupabaseRealtimeProps {
+export interface UseWorkspaceRealtimeProps {
   user: AppUser;
-  supabase: SupabaseClient<Database>;
   init: {
     predictiveQueue: QueueItem[];
     queue: QueueItem[];
@@ -744,12 +739,16 @@ export interface UseSupabaseRealtimeProps {
     credits: number;
   };
   campaign_id: string;
-  activeCall: ActiveCall | null;
+  activeCall?: ActiveCall | null;
   setQuestionContact: (contact: QueueItem | null) => void;
   predictive: boolean;
+  workspace: string;
   setCallDuration: (duration: number) => void;
   setUpdate: (update: Record<string, unknown> | null) => void;
 }
+
+/** @deprecated Use UseWorkspaceRealtimeProps */
+export type UseWorkspaceRealtimePropsAlias = UseWorkspaceRealtimeProps;
 
 // Utility function to generate survey links
 export function generateSurveyLink(contactId: number, surveyId: string, baseUrl: string): string {

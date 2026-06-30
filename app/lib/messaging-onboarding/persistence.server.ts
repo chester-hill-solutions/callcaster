@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import type { TwilioAccountData, WorkspaceMessagingOnboardingState } from "@/lib/types";
 import { isObject } from "@/lib/type-safety-utils";
 import { normalizeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding/normalize.server";
@@ -19,29 +18,25 @@ export function getWorkspaceMessagingOnboardingFromTwilioData(
   return normalizeWorkspaceMessagingOnboardingState(twilioData.onboarding);
 }
 
-export async function getWorkspaceMessagingOnboardingState({
-  supabaseClient: _supabaseClient,
-  workspaceId,
+export async function getWorkspaceMessagingOnboardingState({workspaceId,
 }: {
-  supabaseClient?: SupabaseClient<Database> | null;
+  null?: never | null;
   workspaceId: string;
 }) {
-  const twilioData = await loadWorkspaceTwilioData(_supabaseClient ?? null, workspaceId);
+  const twilioData = await loadWorkspaceTwilioData(workspaceId);
   return getWorkspaceMessagingOnboardingFromTwilioData(twilioData as TwilioAccountData);
 }
 
-export async function updateWorkspaceMessagingOnboardingState({
-  supabaseClient: _supabaseClient,
-  workspaceId,
+export async function updateWorkspaceMessagingOnboardingState({workspaceId,
   updates,
   actorUserId,
 }: {
-  supabaseClient?: SupabaseClient<Database> | null;
+  null?: never | null;
   workspaceId: string;
   updates: Partial<WorkspaceMessagingOnboardingState>;
   actorUserId: string | null;
 }) {
-  const currentTwilioData = await loadWorkspaceTwilioData(_supabaseClient ?? null, workspaceId);
+  const currentTwilioData = await loadWorkspaceTwilioData(workspaceId);
   const currentState = getWorkspaceMessagingOnboardingFromTwilioData(
     currentTwilioData as TwilioAccountData,
   );
@@ -56,7 +51,7 @@ export async function updateWorkspaceMessagingOnboardingState({
     onboarding: nextState,
   };
 
-  await persistWorkspaceTwilioData(_supabaseClient ?? null, workspaceId, nextTwilioData);
+  await persistWorkspaceTwilioData(workspaceId, nextTwilioData);
 
   return nextState;
 }

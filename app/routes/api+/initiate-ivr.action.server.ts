@@ -1,10 +1,12 @@
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { initiateIvrBodySchema } from "@/lib/schemas/api/common";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { rpcGetCampaignQueue } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -16,12 +18,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { campaign_id, user_id, workspace_id } = parsed.data;
   const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const supabase = getAuthSupabaseClient(auth);
-  const user = auth.user;
+  if (auth instanceof Response) return auth;  const user = auth.user;
 
-  await requireWorkspaceAccess({ supabaseClient: supabase,
-    user,
+  await requireWorkspaceAccess({ user,
     workspaceId: workspace_id,
   });
 
@@ -31,10 +30,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "Campaign not found in workspace" };
   }
 
-  const { data, error } = await supabase.rpc("get_campaign_queue", {
-    campaign_id_pro: campaign_id,
-  });
-  if (error) throw error;
+  let data;
+  try {
+    data = await rpcGetCampaignQueue(db, campaign_id);
+  } catch (error) {
+    throw error;
+  }
 
   logger.debug("Campaign queue data:", data);
   for (let i = 0; i < (data?.length ?? 0); i++) {

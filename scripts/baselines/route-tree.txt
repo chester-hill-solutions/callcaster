@@ -23,10 +23,13 @@
 accept-invite
 actions
 admin
+agent-bridge
+agent-status
 all
 analytics
 analytics
 api-keys
+api/acd-router
 api/admin/dashboard
 api/admin/users/:userId
 api/admin/workspaces/:workspaceId/twilio
@@ -120,6 +123,7 @@ campaigns
 campaigns
 chats
 checkout-session
+complete
 confirm-payment
 contacts
 contacts
@@ -130,6 +134,7 @@ dialer
 docs
 edit
 end
+events
 export
 export
 exports
@@ -182,6 +187,7 @@ surveys
 surveys
 transfer-ownership
 twilio
+uploads
 users
 users/:userId/edit
 users/:userId/workspaces

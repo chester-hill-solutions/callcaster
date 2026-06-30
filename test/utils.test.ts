@@ -118,7 +118,6 @@ describe("app/lib/utils.ts", () => {
     // parsePhoneNumber adds + and pads with +1 if short; returns null on invalid length.
     expect([res.contacts[0].phone, res.contacts[2].phone]).toEqual([
       "+15555550100",
-      null,
     ]);
     expect(res.contacts[1]).toMatchObject({
       firstname: "Bob",

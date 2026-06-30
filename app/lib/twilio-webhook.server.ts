@@ -10,9 +10,8 @@
  *   fails closed (403). Inbound SMS must attribute workspace before persisting the
  *   message, so there is no dev fallback for unknown MessageSid.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { findMessageBySid } from "@/lib/message-db.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { findWorkspaceNumberByPhoneNumber } from "@/lib/inbound-call-db.server";
@@ -112,8 +111,7 @@ export function rejectMissingTwilioSignatureHeader(request: Request): Response |
 }
 
 export async function resolveWorkspaceTwilioData(
-  supabase: SupabaseClient<Database>,
-  workspaceId: string | null,
+    workspaceId: string | null,
   joinedTwilioData: unknown,
   logger?: { info: (message: string, ...args: unknown[]) => void },
 ): Promise<unknown> {
@@ -186,7 +184,6 @@ export function validateTwilioWebhookForPhoneCandidates(args: {
 
 export async function validateTwilioWebhookForWorkspace(args: {
   request: Request;
-  supabase: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<
   | ({ ok: true; params: Record<string, string>; authToken: string } & { workspaceId: string })
@@ -200,7 +197,7 @@ export async function validateTwilioWebhookForWorkspace(args: {
   const url = new URL(args.request.url);
   const params = Object.fromEntries(url.searchParams.entries());
 
-  const twilioData = await loadWorkspaceTwilioData(args.supabase, args.workspaceId);
+  const twilioData = await loadWorkspaceTwilioData(args.workspaceId);
 
   const validation = validateWorkspaceTwilioWebhook({
     request: args.request,
@@ -216,7 +213,6 @@ export async function validateTwilioWebhookForWorkspace(args: {
 
 export async function validateTwilioWebhookForCallSid(args: {
   request: Request;
-  supabase: SupabaseClient<Database>;
   callSid: string;
   params?: Record<string, string>;
 }): Promise<TwilioWebhookValidationResult> {
@@ -241,8 +237,7 @@ export async function validateTwilioWebhookForCallSid(args: {
   }
 
   const twilioData = await loadWorkspaceTwilioData(
-    args.supabase,
-    existingCall.workspace,
+        existingCall.workspace,
   );
 
   return validateParamsWithToken({
@@ -254,7 +249,6 @@ export async function validateTwilioWebhookForCallSid(args: {
 
 export async function validateTwilioWebhookForMessageSid(args: {
   request: Request;
-  supabase: SupabaseClient<Database>;
   smsSid: string;
   params?: Record<string, string>;
 }): Promise<TwilioWebhookValidationResult> {
@@ -274,7 +268,6 @@ export async function validateTwilioWebhookForMessageSid(args: {
   }
 
   const twilioData = await loadWorkspaceTwilioData(
-    args.supabase,
     messageRow.workspace,
   );
 
@@ -298,7 +291,6 @@ export type TwilioWebhookPhoneValidationResult =
 
 export async function validateTwilioWebhookForPhoneNumber(args: {
   request: Request;
-  supabase: SupabaseClient<Database>;
   phoneNumber: string;
   params: Record<string, string>;
   logger?: { info: (message: string, ...args: unknown[]) => void };
@@ -314,8 +306,7 @@ export async function validateTwilioWebhookForPhoneNumber(args: {
   }
 
   const resolved = await resolveTwilioDataForPhoneNumber(
-    args.supabase,
-    phoneNumber,
+        phoneNumber,
     args.logger,
   );
   if (!resolved) {
@@ -342,8 +333,7 @@ export async function validateTwilioWebhookForPhoneNumber(args: {
 }
 
 export async function resolveTwilioDataForPhoneNumber(
-  supabase: SupabaseClient<Database>,
-  phoneNumber: string,
+    phoneNumber: string,
   logger?: { info: (message: string, ...args: unknown[]) => void },
 ): Promise<{ workspaceId: string; twilioData: unknown; numberRow: TwilioWebhookNumberRow } | null> {
   const numberRow = await findWorkspaceNumberByPhoneNumber(phoneNumber);
@@ -356,8 +346,7 @@ export async function resolveTwilioDataForPhoneNumber(
   const joinedTwilioData = workspace?.twilio_data ?? null;
 
   const twilioData = await resolveWorkspaceTwilioData(
-    supabase,
-    workspaceId,
+        workspaceId,
     joinedTwilioData,
     logger,
   );

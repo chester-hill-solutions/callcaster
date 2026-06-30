@@ -1,41 +1,30 @@
-import { env } from "@/lib/env.server";
 import { redirect, type LoaderFunctionArgs } from "react-router";
-import { createServerClient, parse, serialize } from "@supabase/ssr";
-import type { EmailOtpType } from "@supabase/supabase-js";
+import { auth } from "@/server/auth-instance";
+import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-    const requestUrl = new URL(request.url);
-    const token_hash = requestUrl.searchParams.get('token_hash');
-    const type = requestUrl.searchParams.get('type');
-    const next = requestUrl.searchParams.get('next') || '/';
-    const headers = new Headers();
+  const requestUrl = new URL(request.url);
+  const token_hash = requestUrl.searchParams.get("token_hash");
+  const type = requestUrl.searchParams.get("type");
+  const next = requestUrl.searchParams.get("next") || "/";
 
-    if (token_hash && type) {
-        const cookies = parse(request.headers.get('Cookie') ?? '')
+  if (token_hash && type) {
+    try {
+      const result = await auth.api.verifyEmail({
+        query: { token: token_hash },
+        headers: request.headers,
+        returnHeaders: true,
+      });
+      const headers = mergeBetterAuthSetCookieHeaders(result?.headers);
+      const payload = result?.response ?? result;
 
-        const supabase = createServerClient(env.SUPABASE_URL(), env.SUPABASE_ANON_KEY(), {
-            cookies: {
-                get(key) {
-                    return cookies[key]
-                },
-                set(key, value, options) {
-                    headers.append('Set-Cookie', serialize(key, value, options))
-                },
-                remove(key, options) {
-                    headers.append('Set-Cookie', serialize(key, '', options))
-                },
-            },
-        })
-
-        const { error } = await supabase.auth.verifyOtp({
-            type: type as EmailOtpType,
-            token_hash,
-        })
-
-        if (!error) {
-            return redirect(next, { headers })
-        }
+      if (payload?.user) {
+        return redirect(next, { headers });
+      }
+    } catch {
+      // fall through to error redirect
     }
-    
-    return redirect('/auth/auth-code-error', { headers })
+  }
+
+  return redirect("/auth/auth-code-error");
 }

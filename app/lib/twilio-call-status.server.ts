@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database, Tables, TablesInsert } from "@/lib/database.types";
+import type { Database, Tables, TablesInsert } from "@/lib/db-types";
 import {
   findCallBySid,
   updateCallBySid,
@@ -91,8 +90,7 @@ export type CallOutreachContext = {
 
 /** Resolve outreach attempt + workspace from call row, falling back to parent call leg. */
 export async function resolveCallOutreachContext(
-  supabase: SupabaseClient<Database>,
-  callRow: {
+    callRow: {
     outreach_attempt_id?: number | null;
     workspace?: string | null;
     parent_call_sid?: string | null;
@@ -136,7 +134,6 @@ export const TERMINAL_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
  * `outreach_attempt_id` / `workspace` for billing) when `selectResult` is true.
  */
 export async function persistCallStatusFromParams(args: {
-  supabase: SupabaseClient<Database>;
   params: Record<string, string>;
   disposition?: string | null;
   outreachAttemptId?: number | null;

@@ -1,8 +1,7 @@
 import { data as routeData, redirect, type LoaderFunctionArgs } from "react-router";
 import type { Params } from "react-router";
-import type { Session } from "@supabase/supabase-js";
 
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { env as envUtil } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import {
@@ -13,7 +12,7 @@ import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 
 export type RootLoaderData = {
   env: ENV;
-  session: Session | null;
+  session: { token: string } | null;
   workspaces: WorkspaceData[] | null;
   user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
   params: Params<string>;
@@ -21,8 +20,6 @@ export type RootLoaderData = {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const env: ENV = {
-    SUPABASE_URL: envUtil.SUPABASE_URL(),
-    SUPABASE_KEY: envUtil.SUPABASE_PUBLISHABLE_KEY(),
     BASE_URL: envUtil.BASE_URL(),
   };
 
@@ -42,17 +39,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
   }
 
-  const { supabaseClient: supabase, headers } =
-    createSupabaseServerClient(request);
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) {
+  const { session, user: authUser, headers } = await getSession(request);
+  if (!authUser) {
     return routeData(
       {
         env,
-        session,
+        session: null,
         workspaces: null,
         user: null,
         params,
@@ -60,13 +52,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       { headers },
     );
   }
-  const userData = await loadUserWithInvites(user.data.user.id);
-  const workspaces = await listUserWorkspaceSummaries(user.data.user.id);
+  const userData = await loadUserWithInvites(authUser.id);
+  const workspaces = await listUserWorkspaceSummaries(authUser.id);
 
   return routeData(
     {
       env,
-      session,
+      session: session ? { token: session.token } : null,
       workspaces: workspaces as WorkspaceData[] | null,
       user: userData as (User & { workspace_invite: WorkspaceInvite[] }) | null,
       params,

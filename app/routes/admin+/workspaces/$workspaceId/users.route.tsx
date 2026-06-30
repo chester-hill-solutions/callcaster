@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 type WorkspaceUserRow = Tables<"workspace_users"> & {
   user?: Tables<"user"> | null;

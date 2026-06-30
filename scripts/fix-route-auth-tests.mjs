@@ -67,8 +67,8 @@ function patchFile(filePath) {
 
   if (isJsonAuthOnly) {
     content = content.replace(
-      /mocks\.createSupabaseServerClient\.mockReturnValue(?:Once)?\(\{ supabaseClient: ([^,}]+)[^}]*\}\);/g,
-      (match, supabaseExpr) => {
+      /mocks\.getSession\.mockReturnValue(?:Once)?\(\{ null: ([^,}]+)[^}]*\}\);/g,
+      (match, postgresExpr) => {
         return match;
       },
     );

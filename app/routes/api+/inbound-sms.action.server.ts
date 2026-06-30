@@ -7,7 +7,6 @@ import {
   rejectMissingTwilioSignatureHeader,
   validateWorkspaceTwilioWebhook,
 } from "@/lib/twilio-webhook.server";
-import { createClient } from "@supabase/supabase-js";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -25,9 +24,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return missingHeader;
   }
 
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient<Database>(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
 
   const formData = await request.formData();
@@ -112,7 +111,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const newMedia = await mediaResponse.blob();
       const fileName = `${workspaceNumber.workspace}/sms-${messageSid}-${i}-${now.toISOString()}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await adminDb.storage
         .from("messageMedia")
         .upload(fileName, newMedia, {
           cacheControl: "60",
@@ -133,7 +132,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const matchingContactIds = await findMatchingContactIds(
-    supabase,
+    client,
     workspaceNumber.workspace,
     fromNumber,
   );
@@ -207,7 +206,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         media_urls: media.length > 0 ? media : null,
         timestamp: now.toISOString(),
       },
-      supabaseClient: supabase,
     });
   }
 

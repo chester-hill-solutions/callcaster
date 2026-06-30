@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 /**
  * Queue status semantics for campaign_queue.status.
@@ -61,7 +60,7 @@ export const LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN =
   "________-____-____-____-____________";
 
 /**
- * Supabase OR filter for rows that should count as "completed" in queue progress.
+ * Postgres OR filter for rows that should count as "completed" in queue progress.
  * `status` is not reliable on its own because Twilio/webhook updates can overwrite it,
  * while `dequeued_at` remains the durable marker that queue work is finished.
  */

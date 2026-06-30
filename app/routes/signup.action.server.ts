@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { registerBodySchema } from "@/lib/schemas/api/platform-auth";
 import { registerUser } from "@/lib/platform-auth.server";
@@ -9,8 +9,8 @@ import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
-  const { data: serverSession } = await supabaseClient.auth.getSession();
+  const { headers } = await getSession(request);
+  const { data: serverSession } = await request.getSession();
 
   if (serverSession?.session) {
     return redirect("/workspaces", { headers });
@@ -37,7 +37,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse(result.data, 201);
   }
 
-  const { headers } = createSupabaseServerClient(request);
+  const { headers } = await getSession(request);
   const formData = await request.formData();
   const email = formData.get("email");
   const password = formData.get("password");

@@ -74,8 +74,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -98,8 +98,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({ user_id: "u1", caller_id: "+1555" }),
       },
     } as any));
@@ -124,8 +124,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         }),
         deps: {
           ...authDeps,
-          createSupabaseServerClient: () =>
-            ({ supabaseClient: {}, headers: new Headers() }) as any,
+          getSession: () =>
+            ({ headers: new Headers() }) as any,
           safeParseJson: async () => ({
             user_id: "u1",
             caller_id: "+1555",
@@ -161,8 +161,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -212,8 +212,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -244,8 +244,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -275,8 +275,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       deps: {
         ...authDeps,
         logger: logger as any,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -310,9 +310,9 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     const callsCreate = vi.fn(async () => ({ sid: "CA1" }));
     const callsUpdate = vi.fn(async () => ({}));
 
-    vi.doMock("../app/lib/supabase.server", () => ({
-      createSupabaseServerClient: () => ({
-        supabaseClient: {
+    vi.doMock("../app/lib/adminDb.server", () => ({
+      getSession: () => ({
+        null: {
           auth: {
             getUser: async () => ({ data: { user: { id: "u1" } }, error: null }),
           },
@@ -366,8 +366,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         getAuthenticatedUser: async () => null,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -393,8 +393,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
           throw new Error("forbidden");
         },
         logger: { warn: vi.fn(), error: vi.fn() , info: vi.fn(), debug: vi.fn()} as any,
-        createSupabaseServerClient: () =>
-          ({ supabaseClient: {}, headers: new Headers() }) as any,
+        getSession: () =>
+          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",

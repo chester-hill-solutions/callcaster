@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
 import { fetchCampaignForScriptEdit } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
 import {
@@ -22,11 +22,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Response("Missing required parameters", { status: 400 });
   }
 
-  const { supabaseClient, user } = await verifyAuth(request);
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId: workspace_id });
+  const { user } = await verifyAuth(request);
+  const userRole = await getUserRole({ user, workspaceId: workspace_id });
   const scripts = await getWorkspaceScripts({
     workspace: workspace_id,
-    supabase: supabaseClient,
+    client: null,
   }) || [];
 
   const campaignData = await fetchCampaignForScriptEdit(workspace_id, parseInt(selected_id, 10));
@@ -43,7 +43,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let campaignDetails: BaseCampaignDetails | null = null;
   let mediaNames: string[] = [];
 
-  const files = await listMedia(supabaseClient, workspace_id);
+  const files = await listMedia(workspace_id);
   if (files) {
     mediaNames = files.map(file => file.name);
   }
@@ -78,7 +78,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     case "message":
       if (Array.isArray(baseDetails.message_media) && baseDetails.message_media.length > 0) {
         const mediaLinks = await getSignedUrls(
-          supabaseClient,
           workspace_id,
           baseDetails.message_media
         );
@@ -100,7 +99,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         const fileNames = getScriptRecordingFileNames(campaignDetails.script);
         const mediaLinks = await getMedia(
           fileNames,
-          supabaseClient,
           workspace_id
         ) || [];
         campaignDetails = {

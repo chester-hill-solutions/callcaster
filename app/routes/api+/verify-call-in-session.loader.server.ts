@@ -1,8 +1,7 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { insertVerificationSession } from "@/lib/verification-db.server";
 
 const SESSION_EXPIRY_MINUTES = 10;
@@ -10,7 +9,7 @@ const SESSION_EXPIRY_MINUTES = 10;
 export const loader = async ({ request }: { request: Request }) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
+  const { headers } = await getSession(request);
   const user = auth.user;
 
   const verificationNumber = env.VERIFICATION_PHONE_NUMBER();

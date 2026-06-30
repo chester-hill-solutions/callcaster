@@ -52,9 +52,7 @@ export const action = async ({ request }: { request: Request }) => {
       );
     }
   } else {
-    await requireWorkspaceAccess({
-      supabaseClient: authResult.supabaseClient,
-      user: authResult.user,
+    await requireWorkspaceAccess({user: authResult.user,
       workspaceId: workspace_id,
     });
   }
@@ -72,14 +70,12 @@ export const action = async ({ request }: { request: Request }) => {
     });
   }
 
-  const supabase =
+  const client =
     authResult.authType === "api_key"
-      ? authResult.supabase
-      : authResult.supabaseClient;
+      ? authResult.client
+      : authResult.null;
   const user = authResult.authType === "session" ? authResult.user : null;
-  const portalConfig = await getWorkspaceTwilioPortalConfig({
-    supabaseClient: supabase,
-    workspaceId: workspace_id,
+  const portalConfig = await getWorkspaceTwilioPortalConfig({workspaceId: workspace_id,
   });
   const messageIntent =
     typeof message_intent === "string" && message_intent.trim()
@@ -105,7 +101,7 @@ export const action = async ({ request }: { request: Request }) => {
       media: media ?? "",
       to,
       from: caller_id,
-      supabase,
+      client,
       workspace: workspace_id,
       contact_id: contact_id ?? "",
       user,

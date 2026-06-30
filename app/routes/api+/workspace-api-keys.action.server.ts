@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
@@ -34,9 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return jsonError("workspace_id is required", 400);
   }
 
-  const result = await listWorkspaceApiKeys(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await listWorkspaceApiKeys(    auth.user.id,
     workspaceId,
   );
 
@@ -50,15 +46,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-
-  const supabase = getAuthSupabaseClient(auth);
-
   if (request.method === "POST") {
     const parsed = await parseJsonBodyOrResponse(request, legacyCreateApiKeySchema);
     if (parsed instanceof Response) return parsed;
 
     const result = await createWorkspaceApiKey(
-      supabase,
+      client,
       auth.user.id,
       parsed.workspace_id,
       parsed.name,
@@ -85,7 +78,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (parsed instanceof Response) return parsed;
 
     const result = await deleteWorkspaceApiKey(
-      supabase,
+      client,
       auth.user.id,
       parsed.workspace_id,
       parsed.id,

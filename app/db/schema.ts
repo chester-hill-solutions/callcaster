@@ -1,5 +1,4 @@
-// Generated from app/lib/database.types.ts + supabase/migrations/*.sql
-// Hand-maintained — update when schema changes
+// Hand-maintained Drizzle schema — update when client/migrations/*.sql changes
 
 import {
   pgTable, text, integer, boolean, timestamp, jsonb, uuid, serial, smallint, pgEnum,
@@ -382,6 +381,14 @@ export const agent_status_event = pgTable("agent_status_event", {
   created_at: text().notNull(),
 });
 
+export const workspace_events = pgTable("workspace_events", {
+  id: serial().notNull().primaryKey(),
+  workspace_id: uuid().notNull(),
+  event_type: text().notNull(),
+  payload: jsonb().notNull(),
+  created_at: text().notNull(),
+});
+
 export const handset_session = pgTable("handset_session", {
   id: text().notNull().primaryKey(),
   user_id: uuid().notNull(),
@@ -501,6 +508,23 @@ export const webhook = pgTable("webhook", {
   updated_at: text(),
   updated_by: text(),
   workspace: uuid().notNull(),
+});
+
+// ─── Background jobs (ADR-0007) ──────────────────────────────────────
+
+export const job = pgTable("job", {
+  id: serial().notNull().primaryKey(),
+  type: text().notNull(),
+  status: text().notNull().default("queued"),
+  params: jsonb().notNull().default({}),
+  workspace_id: uuid(),
+  user_id: uuid(),
+  idempotency_key: text(),
+  error: text(),
+  result: jsonb(),
+  claimed_until: timestamp({ withTimezone: true, mode: "string" }),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  updated_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
 });
 
 // ─── Relations ──────────────────────────────────────

@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   createWorkspaceTwilioInstance,
   getUserRole,
@@ -9,7 +8,7 @@ import {
   updateCallerId,
   updateWorkspacePhoneNumber,
 } from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
 import { logger } from "@/lib/logger.server";
@@ -64,7 +63,6 @@ async function requireNumbersManager(
 }
 
 export async function listWorkspaceNumbers(
-  _supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
@@ -86,7 +84,7 @@ export async function listWorkspaceNumbers(
 }
 
 export async function purchaseWorkspaceNumber(
-  _userSupabase: SupabaseClient<Database>,
+  _userPostgres: never,
   userId: string,
   workspaceId: string,
   phoneNumber: string,
@@ -98,7 +96,6 @@ export async function purchaseWorkspaceNumber(
 
   try {
     const { data: users, error: usersError } = await getWorkspaceUsers({
-      supabaseClient: _userSupabase,
       workspaceId,
     });
     if (usersError) throw usersError;
@@ -264,7 +261,6 @@ export async function purchaseWorkspaceNumber(
 }
 
 export async function patchWorkspaceNumber(
-  _supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   numberId: string,
@@ -327,7 +323,6 @@ export async function patchWorkspaceNumber(
 }
 
 export async function deleteWorkspaceNumber(
-  _supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   numberId: string,
@@ -352,7 +347,6 @@ export async function deleteWorkspaceNumber(
 }
 
 export async function verifyWorkspaceCallerId(
-  _supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   phoneNumber: string,

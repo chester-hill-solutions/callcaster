@@ -1,5 +1,5 @@
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getUserRole } from "@/lib/database.server";
 import { loadInboundQueueSettings } from "@/lib/inbound-queue-db.server";
 import { MemberRole } from "@/lib/member-role";

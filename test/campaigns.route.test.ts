@@ -13,10 +13,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers({ "X": "1" }),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers({ "X": "1" }),
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -29,9 +27,8 @@ vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
 }));
 
-function authSession(supabaseClient: unknown, headers = new Headers()) {
+function authSession(null: unknown, headers = new Headers()) {
   return queueDualAuthSession({
-    supabaseClient,
     headers,
     user: { id: "u1" },
   });

@@ -2,7 +2,7 @@ import { NavLink } from "react-router";
 import { Megaphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Heading } from "@/components/ui/typography";
-import { Enums } from "@/lib/database.types";
+import { Enums } from "@/lib/db-types";
 
 type HeaderProps = {
   title: string;

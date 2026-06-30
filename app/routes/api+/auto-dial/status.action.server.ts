@@ -9,11 +9,12 @@ import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
-import { getServiceSupabase } from "@/lib/supabase.server";
+import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 import type Twilio from "twilio";
 import {
   findCallBySid,
@@ -24,11 +25,10 @@ import {
 import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import type { ActionFunctionArgs } from "react-router";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 
 type TwilioClient = Twilio.Twilio;
 
-const getSupabase = () => getServiceSupabase();
+const getAdmin = () => null /* removed service client */;
 
 const updateCall = async (sid: string, workspaceId: string, update: Partial<Tables<"call">>) => {
   try {
@@ -124,11 +124,11 @@ const handleCallStatus = async (
   status: Tables<"call">["status"],
   duration: number
 ) => {
-  const supabase = getSupabase();
+  const client = getAdmin();
   try {
     const callSid = requireValue(parsedBody.CallSid, "CallSid");
     const callUpdate = await persistCallStatusFromParams({
-      supabase,
+      client,
       params: parsedBody,
       disposition: status?.toLowerCase(),
       outreachAttemptId: dbCall.outreach_attempt_id
@@ -154,16 +154,12 @@ const handleCallStatus = async (
     }
     await updateTransaction(callUpdate, duration);
 
-    const { error } = await supabase.rpc("dequeue_contact", {
-      passed_contact_id: outreachStatus.contact_id,
-      group_on_household: true,
-      dequeued_by_id: callUpdate.conference_id ?? "",
-      dequeued_reason_text: `Call ${status?.toLowerCase()}`
+    await rpcDequeueContact(db, {
+      contactId: outreachStatus.contact_id,
+      groupOnHousehold: true,
+      dequeuedById: callUpdate.conference_id ?? "",
+      dequeuedReasonText: `Call ${status?.toLowerCase()}`,
     });
-    if (error) {
-      logger.error("Error dequeing contact", error);
-      throw error;
-    }
     realtime.send({
       type: "broadcast",
       event: "message",
@@ -183,7 +179,7 @@ const handleCallStatus = async (
 };
 
 const updateTransaction = async (call: Tables<"call">, duration: number) => {
-  const supabase = getSupabase();
+  const client = getAdmin();
   if (!call.workspace) {
     logger.error("Skipping transaction update because call workspace is missing", {
       callSid: call.sid,
@@ -207,7 +203,7 @@ const handleParticipantLeave = async (
   twilio: TwilioClient,
   realtime: RealtimeChannel,
 ) => {
-  const supabase = getSupabase();
+  const client = getAdmin();
   const underCase = twilioParamsToUnderCase(parsedBody);
 
   try {
@@ -313,7 +309,7 @@ const handleParticipantJoin = async (
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const supabase = getSupabase();
+  const client = getAdmin();
 
   let realtime;
   try {
@@ -330,7 +326,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const validation = await validateTwilioWebhookForCallSid({
       request,
-      supabase,
+      client,
       callSid: callSidValue,
       params,
     });
@@ -343,10 +339,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Failed to fetch call data");
     }
 
-    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
-      workspace_id: requireValue(dbCall.workspace, "workspace"),
+    const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
-    realtime = supabase.channel(
+    realtime = adminDb.channel(
       (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null) ??
         dbCall.conference_id ??
         "default",
@@ -398,7 +393,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   } finally {
     if (realtime) {
-      supabase.removeChannel(realtime);
+      adminDb.removeChannel(realtime);
     }
   }
 };

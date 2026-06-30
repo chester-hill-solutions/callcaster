@@ -48,8 +48,8 @@ export type ImageFetcherData = {
 };
 
 export type ChatsWorkspaceContextType = {
-  supabase: import("@supabase/supabase-js").SupabaseClient<
-    import("@/lib/database.types").Database
+  client: import("@client/client-js").never<
+    import("@/lib/db-types").Database
   >;
   workspace: {
     id: string;

@@ -11,7 +11,6 @@ import { FormField } from "@/components/ui/form-field";
 import { NavLink } from "react-router";
 import { MdAdd } from "react-icons/md";
 import { MessageSettings } from "@/components/campaign/settings/MessageSettings";
-import { FileObject } from "@supabase/storage-js";
 import SelectVoicemail from "./CampaignDetailed.Voicemail";
 import SelectScript from "./CampaignDetailed.SelectScript";
 import ActivateButtons from "./CampaignDetailed.ActivateButtons";
@@ -32,7 +31,7 @@ import {
   WorkspaceTwilioSyncSnapshot,
 } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 import {
   estimateIvrCampaignOutbound,
   estimateMessageCampaignOutbound,

@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
 import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
-import { getAuthSupabaseClient, getDualAuthSupabase, getDualAuthUser, requireDualAuth, requireJsonAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth, requireJsonAuth } from "@/lib/api-auth.server";
 
 
 import type { ActionFunctionArgs } from "react-router";

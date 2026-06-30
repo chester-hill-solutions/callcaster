@@ -1,4 +1,3 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
@@ -9,7 +8,7 @@ import {
 } from "@/lib/inbound-voicemail-twiml.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -74,8 +73,7 @@ const renderTerminalTarget = async (
   target: string,
   numberId: string,
   workspace: string,
-  supabase: SupabaseClient<Database>,
-  baseUrl: string,
+    baseUrl: string,
 ) => {
   if (target === "hangup") {
     twiml.hangup();
@@ -97,7 +95,7 @@ const renderTerminalTarget = async (
 
   if (target.startsWith("voicemail:")) {
     const voicemail = await resolveInboundVoicemailAudio({
-      supabase,
+      client,
       workspaceId: workspace,
       inboundAudio: null,
     });
@@ -127,7 +125,7 @@ const renderTerminalTarget = async (
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const baseUrl = env.BASE_URL();
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  const client = createClient(env.BASE_URL(), env.BASE_URL());
   const twiml = new Twilio.twiml.VoiceResponse();
 
   const pageId = params.pageId;
@@ -158,7 +156,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    supabase,
+    client,
     callSid,
     params: formParams,
   });
@@ -184,7 +182,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       nextStep,
       numberId,
       number.workspaceId,
-      supabase,
+      client,
       baseUrl,
     );
   } catch (e) {

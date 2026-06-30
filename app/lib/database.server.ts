@@ -169,27 +169,27 @@ export const handleError = (error: Error, message: string, status = 500) => {
 
 // Legacy functions that need to be kept for now
 import type Twilio from "twilio";
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "./database.types";
+import type { Database } from "@/lib/db-types";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { createWorkspaceTwilioInstance } from "./database/workspace.server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { call as callTable, message as messageTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
+import { db } from "@/server/db";
+import {
+  rpcCancelMessages,
+  rpcCancelOutreachAttemptsByCallIds,
+} from "@/lib/db-rpc.server";
 
 // Marked for deprecation
 export async function endConferenceByUser({
   user_id,
-  supabaseClient,
   workspace_id,
 }: {
   workspace_id: string;
   user_id: string;
-  supabaseClient: SupabaseClient;
 }) {
-  const twilio = await createWorkspaceTwilioInstance({
-    supabase: supabaseClient,
-    workspace_id,
+  const twilio = await createWorkspaceTwilioInstance({     workspace_id,
   });
   if (!user_id) {
     throw new Error("User ID is required");
@@ -249,19 +249,32 @@ async function fetchQueuedMessages(twilio: Twilio.Twilio, batchSize: number) {
   });
 }
 
+async function lookupCallIdBySid(sid: string): Promise<number | null> {
+  const rows = (await adminDb.execute(
+    sql`select id from call where sid = ${sid} limit 1`,
+  )) as { id: number }[];
+  return rows[0]?.id ?? null;
+}
+
+async function lookupMessageIdBySid(sid: string): Promise<string | null> {
+  const rows = (await adminDb.execute(
+    sql`select id from message where sid = ${sid} limit 1`,
+  )) as { id: string }[];
+  return rows[0]?.id ?? null;
+}
+
 async function cancelCallAndUpdateDB(
   twilio: Twilio.Twilio,
-  supabase: SupabaseClient<Database>,
   call: { sid: string },
 ) {
   try {
     const canceledCall = await twilio
       .calls(call.sid)
       .update({ status: "canceled" });
-    const rpcClient = supabase as SupabaseClient<any>;
-    await rpcClient.rpc("cancel_outreach_attempts", {
-      in_call_sid: canceledCall.sid,
-    });
+    const callId = await lookupCallIdBySid(canceledCall.sid);
+    if (callId != null) {
+      await rpcCancelOutreachAttemptsByCallIds(db, [callId]);
+    }
     return canceledCall.sid;
   } catch (error) {
     throw new Error(
@@ -272,17 +285,16 @@ async function cancelCallAndUpdateDB(
 
 async function cancelMessageAndUpdateDB(
   twilio: Twilio.Twilio,
-  supabase: SupabaseClient<Database>,
   message: { sid: string },
 ) {
   try {
     const cancelledMessage = await twilio
       .messages(message.sid)
       .update({ status: "canceled" });
-    const rpcClient = supabase as SupabaseClient<any>;
-    await rpcClient.rpc("cancel_messages", {
-      message_ids: cancelledMessage.sid,
-    });
+    const messageId = await lookupMessageIdBySid(cancelledMessage.sid);
+    if (messageId) {
+      await rpcCancelMessages(db, [messageId]);
+    }
     return cancelledMessage.sid;
   } catch (error) {
     throw new Error(
@@ -291,9 +303,9 @@ async function cancelMessageAndUpdateDB(
   }
 }
 
-async function processBatchCancellation(twilio: Twilio.Twilio, supabase: SupabaseClient<Database>, calls: { sid: string }[]) {
+async function processBatchCancellation(twilio: Twilio.Twilio, calls: { sid: string }[]) {
   const results = await Promise.allSettled(
-    calls.map((call) => cancelCallAndUpdateDB(twilio, supabase, call)),
+    calls.map((call) => cancelCallAndUpdateDB(twilio, call)),
   );
 
   return results.reduce(
@@ -311,12 +323,11 @@ async function processBatchCancellation(twilio: Twilio.Twilio, supabase: Supabas
 
 async function processBatchMessageCancellation(
   twilio: Twilio.Twilio,
-  supabase: SupabaseClient<Database>,
   messages: { sid: string }[],
 ) {
   const results = await Promise.allSettled(
     messages.map((message) =>
-      cancelMessageAndUpdateDB(twilio, supabase, message),
+      cancelMessageAndUpdateDB(twilio, message),
     ),
   );
 
@@ -335,7 +346,6 @@ async function processBatchMessageCancellation(
 
 export async function cancelQueuedCalls(
   twilio: Twilio.Twilio,
-  supabase: SupabaseClient<Database>,
   batchSize = 100,
 ) {
   let allCanceledCalls = [] as string[];
@@ -353,7 +363,6 @@ export async function cancelQueuedCalls(
 
       const { canceledCalls, errors } = await processBatchCancellation(
         twilio,
-        supabase,
         calls,
       );
 
@@ -376,7 +385,6 @@ export async function cancelQueuedCalls(
 
 export async function cancelQueuedMessages(
   twilio: Twilio.Twilio,
-  supabase: SupabaseClient<Database>,
   batchSize = 100,
 ) {
   let allCanceledMessages = [] as string[];
@@ -394,7 +402,6 @@ export async function cancelQueuedMessages(
 
       const { cancelledMessages, errors } = await processBatchMessageCancellation(
         twilio,
-        supabase,
         messages,
       );
 
@@ -416,7 +423,6 @@ export async function cancelQueuedMessages(
 
 export async function cancelQueuedMessagesForCampaign(
   twilio: Twilio.Twilio,
-  supabase: SupabaseClient<Database>,
   campaignId: number,
   batchSize = 100,
 ) {
@@ -449,7 +455,6 @@ export async function cancelQueuedMessagesForCampaign(
 
       const { cancelledMessages, errors } = await processBatchMessageCancellation(
         twilio,
-        supabase,
         messages,
       );
 

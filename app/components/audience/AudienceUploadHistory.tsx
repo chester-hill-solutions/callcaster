@@ -1,16 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import { fetchAudienceUploads } from "@/lib/chats/messaging-client";
 import { Loader2 } from "lucide-react";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/database.types";
+import { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 interface AudienceUploadHistoryProps {
   audienceId: number;
   workspaceId: string;
-  supabase: SupabaseClient<Database>;
 }
 
 interface AudienceUpload {
@@ -29,8 +27,7 @@ interface AudienceUpload {
 export default function AudienceUploadHistory({
   audienceId,
   workspaceId,
-  supabase,
-}: AudienceUploadHistoryProps) {
+  }: AudienceUploadHistoryProps) {
   const [uploads, setUploads] = useState<AudienceUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,9 +52,9 @@ export default function AudienceUploadHistory({
     fetchUploads();
   }, [fetchUploads]);
 
-  // Phase 3B: Supabase Realtime subscription for live upload progress updates.
-  useSupabaseRealtimeSubscription({
-    supabase,
+  // Phase 3B: Postgres Realtime subscription for live upload progress updates.
+  useWorkspaceEventSubscription({
+    workspaceId,
     table: "audience_upload",
     filter: `audience_id=eq.${audienceId}`,
     onChange: (payload) => {

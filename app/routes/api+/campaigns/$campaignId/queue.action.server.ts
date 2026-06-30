@@ -47,7 +47,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await getCampaignQueueApi(
-    auth.supabase,
+    auth.client,
     campaignId,
     auth.workspaceId,
     url.searchParams,
@@ -76,7 +76,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (parsed instanceof Response) return parsed;
 
   const result = await patchCampaignQueueApi(
-    auth.supabase,
+    auth.client,
     campaignId,
     auth.workspaceId,
     parsed,

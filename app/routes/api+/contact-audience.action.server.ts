@@ -1,17 +1,15 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
 import { parseActionRequest, removeContactFromAudience } from "@/lib/database.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 
 
 export const action = async ({ request }: { request: Request }) => {
 
     const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getDualAuthSupabase(auth);
-
+  const { headers } = await getSession(request);
     const method = request.method;
 
     let response;

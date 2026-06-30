@@ -1,6 +1,5 @@
-import { User } from "@supabase/supabase-js";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
 import { Contact, QueueItem } from "@/lib/types";
 import { logger } from "@/lib/logger.client";

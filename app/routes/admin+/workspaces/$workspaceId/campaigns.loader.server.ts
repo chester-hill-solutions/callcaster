@@ -4,14 +4,14 @@ import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient } = await requireSudoAdmin(request);
+  await requireSudoAdmin(request);
   const workspaceId = params.workspaceId;
 
   if (!workspaceId) {
     throw redirect("/admin?tab=workspaces");
   }
 
-  const result = await getAdminWorkspaceDetail(supabaseClient, workspaceId);
+  const result = await getAdminWorkspaceDetail(workspaceId);
   if (!result.ok) {
     throw redirect("/admin?tab=workspaces");
   }

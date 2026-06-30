@@ -20,8 +20,8 @@ vi.mock("date-fns", () => ({
   formatDistanceToNow: (...args: any[]) => mocks.formatDistanceToNow(...args),
 }));
 
-vi.mock("@/hooks/realtime/useSupabaseRealtime", () => ({
-  useSupabaseRealtimeSubscription: (opts: any) => {
+vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", () => ({
+  useWorkspaceEventSubscription: (opts: unknown) => {
     mocks.realtimeOpts = opts;
     return undefined;
   },
@@ -33,7 +33,7 @@ vi.mock("lucide-react", () => ({
   Loader2: (props: any) => <div {...props}>loader</div>,
 }));
 
-const supabaseStub = { channel: vi.fn() } as const;
+const postgresStub = { channel: vi.fn() } as const;
 
 function renderHistory(props: {
   audienceId: number;
@@ -43,7 +43,7 @@ function renderHistory(props: {
     <AudienceUploadHistory
       audienceId={props.audienceId}
       workspaceId={props.workspaceId ?? "ws-1"}
-      supabase={supabaseStub as never}
+      client={postgresStub as never}
     />,
   );
 }

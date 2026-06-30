@@ -18,11 +18,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Survey ID is required", { status: 400 });
   }
 
-  const { supabaseClient, user, userRole } = access.ctx;
+  const { user, userRole } = access.ctx;
 
   const [surveyResult, responsesResult] = await Promise.all([
-    getSurveyDetailApi(supabaseClient, surveyId, access.ctx.workspaceId),
-    getSurveyResponsesApi(supabaseClient, surveyId, access.ctx.workspaceId),
+    getSurveyDetailApi(surveyId, access.ctx.workspaceId),
+    getSurveyResponsesApi(surveyId, access.ctx.workspaceId),
   ]);
 
   if (!surveyResult.ok) {

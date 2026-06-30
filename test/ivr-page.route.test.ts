@@ -7,15 +7,15 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     validateTwilioWebhookForCallSid: vi.fn(),
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "tok",
     },
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
+vi.mock("@client/client-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
   validateTwilioWebhookForCallSid: (...a: unknown[]) =>
     mocks.validateTwilioWebhookForCallSid(...a),
@@ -42,7 +42,7 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeSupabase(sequence: Array<{ data: unknown; error: unknown }>) {
+function makeDbClient(sequence: Array<{ data: unknown; error: unknown }>) {
   let i = 0;
   return {
     from: (table: string) => {
@@ -78,7 +78,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   });
 
   test("returns 400 when required params missing", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: null, error: null }]));
+    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: null, error: null }]));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const res = await asRouteResponse(await mod.action({
       params: {},
@@ -95,7 +95,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       }),
     });
     const callData = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }]));
+    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData, error: null }]));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -111,7 +111,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // success
     const callData = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }]));
+    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData, error: null }]));
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     let res = await mod.action({
@@ -122,7 +122,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // page missing blocks => say+hangup
     const callData2 = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: [] } } } } } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData2, error: null }]));
+    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData2, error: null }]));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -131,7 +131,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // invalid script => catch
     const callData3 = { workspace: "w1", campaign: { script: { steps: null } } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData3, error: null }]));
+    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData3, error: null }]));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -140,7 +140,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // retry failure without waiting (fake timers)
     vi.useFakeTimers();
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: null, error: new Error("no") }]));
+    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: null, error: new Error("no") }]));
     const p = mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),

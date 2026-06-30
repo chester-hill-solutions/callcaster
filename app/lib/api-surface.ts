@@ -184,7 +184,7 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "publicUnauthenticated",
     docsGuide: GUIDE.auth,
     operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-    notes: "Supabase auth callback; sets session cookies and redirects.",
+    notes: "Postgres auth callback; sets session cookies and redirects.",
   }),
   seed({
     path: "/api/auto-dial",

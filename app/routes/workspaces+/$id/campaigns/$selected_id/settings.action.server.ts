@@ -27,7 +27,7 @@ import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -67,7 +67,6 @@ async function handleCampaignDuplicate(
   selected_id: string,
   workspace_id: string,
   campaignData: string,
-  supabaseClient: Parameters<typeof enqueueContactsForCampaign>[0],
 ) {
   const parsedData = JSON.parse(campaignData);
 
@@ -80,7 +79,6 @@ async function handleCampaignDuplicate(
 
   if (originalContactIds.length > 0) {
     await enqueueContactsForCampaign(
-      supabaseClient,
       campaign.id,
       originalContactIds,
       { requeue: false },
@@ -93,7 +91,7 @@ async function handleCampaignDuplicate(
 export async function action({ request, params }: ActionFunctionArgs) {
 
   const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
 
   if (!selected_id || !workspace_id) return redirect("/");
 
@@ -182,7 +180,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
           const queueCounts = await fetchQueueCounts({
             workspaceId: workspace_id,
             campaignId: selected_id,
-            supabaseClient,
           });
           const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as CampaignDetails, {
             queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
@@ -221,7 +218,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     case "duplicate": {
       try {
         const campaignData = data.campaignData != null ? String(data.campaignData) : "";
-        await handleCampaignDuplicate(selected_id, workspace_id, campaignData, supabaseClient);
+        await handleCampaignDuplicate(selected_id, workspace_id, campaignData);
         return routeData({ success: true, actionType: "duplicate" as const });
       } catch (error) {
         logger.error("Error duplicating campaign", error);

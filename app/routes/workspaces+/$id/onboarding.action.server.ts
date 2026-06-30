@@ -3,7 +3,7 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database.server";
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 import {
   isOnboardingActionName,
@@ -31,13 +31,10 @@ async function runUiOnboardingAction(
   workspaceId: string,
   headers: Headers,
   userId: string,
-  supabaseClient: Awaited<ReturnType<typeof verifyAuth>>["supabaseClient"],
   actionName: OnboardingActionName,
   input: FormData,
 ): Promise<ReturnType<typeof routeData<OnboardingActionData>> | never> {
-  const outcome = await runOnboardingAction(
-    supabaseClient,
-    userId,
+  const outcome = await runOnboardingAction(userId,
     workspaceId,
     actionName,
     input,
@@ -70,19 +67,18 @@ async function runUiOnboardingAction(
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient, user, headers } = await verifyAuth(request);
+  const { user, headers } = await verifyAuth(request);
   const wsId = params.id;
   if (!wsId) {
     return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });
   }
 
   await requireWorkspaceAccess({
-    supabaseClient,
     user,
     workspaceId: wsId,
   });
 
-  const role = (await getUserRole({ supabaseClient, user, workspaceId: wsId }))?.role;
+  const role = (await getUserRole({ user, workspaceId: wsId }))?.role;
 
   if (role !== "owner" && role !== "admin") {
     return routeData<OnboardingActionData>(
@@ -102,8 +98,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return await runUiOnboardingAction(
       wsId,
       headers,
-      user.id,
-      supabaseClient,
+      user.id, 
       actionName,
       formData,
     );

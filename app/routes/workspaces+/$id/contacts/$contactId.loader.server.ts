@@ -2,7 +2,7 @@ import { data as routeData, redirect } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import {
   campaign as campaignTable,

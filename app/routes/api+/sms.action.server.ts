@@ -7,7 +7,6 @@ import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { countCampaignMessagesToPhone } from "@/lib/message-db.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -27,6 +26,8 @@ import {
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
 import { parseOptionalString } from "@/lib/parse-utils.server";
+import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
 
@@ -35,7 +36,6 @@ interface SendMessageParams {
   to: string;
   from: string;
   media: string[];
-  supabase: SupabaseClient;
   campaign_id: string;
   workspace: string;
   contact_id: string | number;
@@ -70,8 +70,7 @@ const sendMessage = async ({
   to,
   from,
   media,
-  supabase,
-  campaign_id,
+    campaign_id,
   workspace,
   contact_id,
   queue_id,
@@ -82,10 +81,9 @@ const sendMessage = async ({
   campaignSmsRow,
 }: SendMessageParams) => {
 
-  await assertWorkspaceCanSendSms({ supabaseClient: supabase, workspaceId: workspace });
+  await assertWorkspaceCanSendSms({workspaceId: workspace });
 
-  const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
-    workspace_id: workspace,
+  const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspace,
   });
 
   const processedBody = body;
@@ -117,7 +115,6 @@ const sendMessage = async ({
       { workspaceId: workspace, operation: "messages.create.campaign" },
     ).catch((e) => ({ error: e })),
     createOutreachAttempt({
-      supabase,
       contact_id,
       campaign_id,
       queue_id,
@@ -157,35 +154,30 @@ const sendMessage = async ({
 };
 
 const createOutreachAttempt = async ({
-  supabase,
   contact_id,
   campaign_id,
   queue_id,
   workspace,
   user_id,
 }: {
-  supabase: SupabaseClient;
   contact_id: string | number;
   campaign_id: string | number;
   queue_id: string | number;
   workspace: string;
   user_id: string;
 }) => {
-  const { data: outreachAttempt, error: outreachError } = await supabase.rpc(
-    "create_outreach_attempt",
-    {
-      con_id: contact_id,
-      cam_id: campaign_id,
-      queue_id,
-      wks_id: workspace,
-      usr_id: user_id,
-    },
-  );
-  if (outreachError) {
+  try {
+    return await rpcCreateOutreachAttempt(db, {
+      contactId: Number(contact_id),
+      campaignId: Number(campaign_id),
+      userId: user_id,
+      workspaceId: workspace,
+      queueId: Number(queue_id),
+    });
+  } catch (outreachError) {
     logger.error("Error creating outreach attempt:", outreachError);
     throw outreachError;
   }
-  return outreachAttempt;
 };
 
 export const action = async ({ request }: { request: Request }) => {
@@ -198,9 +190,9 @@ export const action = async ({ request }: { request: Request }) => {
     });
   }
 
-  const supabase = createClient(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
 
   try {
@@ -255,23 +247,17 @@ export const action = async ({ request }: { request: Request }) => {
         );
       }
     } else {
-      await requireWorkspaceAccess({
-        supabaseClient: authResult.supabaseClient,
-        user: authResult.user,
+      await requireWorkspaceAccess({user: authResult.user,
         workspaceId: workspace_id,
       });
     }
     
     const [campaign, audience, portalConfig] = await Promise.all([
       loadCampaignSmsDispatchData(workspace_id, campaign_id),
-      getCampaignQueueById({
-        supabaseClient: supabase,
-        campaign_id,
+      getCampaignQueueById({campaign_id,
         onlyQueued: true,
       }),
-      getWorkspaceTwilioPortalConfig({
-        supabaseClient: supabase,
-        workspaceId: workspace_id,
+      getWorkspaceTwilioPortalConfig({workspaceId: workspace_id,
       }),
     ]);
 
@@ -291,7 +277,7 @@ export const action = async ({ request }: { request: Request }) => {
     const media = campaign.message_media?.length 
       ? await Promise.all(
           campaign.message_media.map(mediaItem =>
-            supabase.storage
+            adminDb.storage
               .from("messageMedia")
               .createSignedUrl(`${workspace_id}/${mediaItem}`, 3600)
               .then(({ data }) => data?.signedUrl)
@@ -353,8 +339,7 @@ export const action = async ({ request }: { request: Request }) => {
             from:
               callerIdStr ||
               String(campaign.campaign?.caller_id ?? "").trim(),
-            supabase,
-            campaign_id,
+                        campaign_id,
             workspace: workspace_id,
             contact_id: member.contact_id,
             queue_id: member.id,

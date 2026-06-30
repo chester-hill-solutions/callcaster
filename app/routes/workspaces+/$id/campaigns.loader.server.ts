@@ -5,8 +5,7 @@ import {
   Campaign,
 } from "@/lib/types";
 import { redirect } from "react-router";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

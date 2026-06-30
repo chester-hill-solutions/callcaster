@@ -3,7 +3,7 @@ import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { SurveyFormData } from "@/lib/types";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import {
   createSurveyWithStructure,
   deleteSurveyByPublicId,
@@ -17,7 +17,6 @@ import type { ActionFunctionArgs } from "react-router";
 async function handleCreateSurvey(
   request: Request,
   user: { id: string },
-  supabaseClient: ReturnType<typeof getDualAuthSupabase>,
 ) {
   const formData = await request.formData();
   const surveyDataRaw = formData.get("surveyData") as string | null;
@@ -42,7 +41,6 @@ async function handleCreateSurvey(
   }
 
   const userRole = await getUserRole({
-    supabaseClient,
     user: dbUser,
     workspaceId,
   });
@@ -62,7 +60,6 @@ async function handleCreateSurvey(
 async function handleUpdateSurvey(
   request: Request,
   user: { id: string },
-  supabaseClient: ReturnType<typeof getDualAuthSupabase>,
 ) {
   try {
     const formData = await request.formData();
@@ -88,7 +85,6 @@ async function handleUpdateSurvey(
     }
 
     const userRole = await getUserRole({
-      supabaseClient,
       user,
       workspaceId,
     });
@@ -119,7 +115,6 @@ async function handleUpdateSurvey(
 async function handleDeleteSurvey(
   request: Request,
   user: { id: string },
-  supabaseClient: ReturnType<typeof getDualAuthSupabase>,
 ) {
   try {
     const formData = await request.formData();
@@ -135,7 +130,6 @@ async function handleDeleteSurvey(
     }
 
     const userRole = await getUserRole({
-      supabaseClient,
       user,
       workspaceId,
     });
@@ -155,21 +149,19 @@ async function handleDeleteSurvey(
 export async function action({ request }: ActionFunctionArgs) {
   try {
     const auth = await requireDualAuth(request);
-    if (auth instanceof Response) return auth;
-    const supabaseClient = getDualAuthSupabase(auth);
-    const user = getDualAuthUser(auth);
+    if (auth instanceof Response) return auth;    const user = getDualAuthUser(auth);
     if (!user) {
       return routeData({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (request.method === "POST") {
-      return await handleCreateSurvey(request, user, supabaseClient);
+      return await handleCreateSurvey(request, user);
     }
     if (request.method === "PATCH") {
-      return await handleUpdateSurvey(request, user, supabaseClient);
+      return await handleUpdateSurvey(request, user);
     }
     if (request.method === "DELETE") {
-      return await handleDeleteSurvey(request, user, supabaseClient);
+      return await handleDeleteSurvey(request, user);
     }
 
     throw new AppError("Method not allowed", 405, ErrorCode.INVALID_OPERATION);

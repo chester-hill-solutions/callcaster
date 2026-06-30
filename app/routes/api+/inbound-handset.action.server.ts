@@ -1,21 +1,17 @@
 import { findActiveHandsetSessionClientIdentity } from "@/lib/handset/handset-session.server";
 import { logger } from "@/lib/logger.server";
-import { getServiceSupabase } from "@/lib/supabase.server";
 import { validateTwilioWebhookForPhoneNumber } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
-  const supabase = getServiceSupabase();
-
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
   const called = params.Called?.trim() ?? "";
 
   const validation = await validateTwilioWebhookForPhoneNumber({
     request,
-    supabase,
     phoneNumber: called,
     params,
     logger,

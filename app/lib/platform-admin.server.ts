@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database.server";
 import {
   deleteAdminWorkspaceMember,
@@ -26,10 +25,9 @@ import {
   updateUserProfile,
 } from "@/lib/workspace-members-db.server";
 
-type Supabase = SupabaseClient<Database>;
 type UserRow = Database["public"]["Tables"]["user"]["Row"];
 
-export async function getAdminDashboard(_supabaseClient: Supabase) {
+export async function getAdminDashboard(_unusedClient: Postgres) {
   const [workspaces, users, workspaceUsers, workspaceNumbers, allCampaigns] =
     await Promise.all([
       listAllWorkspacesOrdered(),
@@ -76,7 +74,7 @@ export async function getAdminDashboard(_supabaseClient: Supabase) {
 }
 
 export async function toggleWorkspaceStatus(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   workspaceId: string,
   disabled: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -95,9 +93,8 @@ export async function toggleWorkspaceStatus(
 }
 
 export async function syncAllWorkspacesTwilio(
-  supabaseClient: Supabase,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { error } = await supabaseClient.functions.invoke(
+  const { error } = await null.functions.invoke(
     "workspace-twilio-sync",
     { body: {} },
   );
@@ -109,11 +106,10 @@ export async function syncAllWorkspacesTwilio(
 }
 
 export async function syncWorkspaceTwilio(
-  supabaseClient: Supabase,
   workspaceId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await syncWorkspaceTwilioSnapshot({ supabaseClient, workspaceId });
+    await syncWorkspaceTwilioSnapshot({ workspaceId });
     return { ok: true };
   } catch (error) {
     return {
@@ -124,7 +120,7 @@ export async function syncWorkspaceTwilio(
 }
 
 export async function disableUser(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   userId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
@@ -142,7 +138,7 @@ export async function disableUser(
 }
 
 export async function getAdminUser(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   userId: string,
 ): Promise<
   | { ok: true; user: UserRow }
@@ -157,7 +153,7 @@ export async function getAdminUser(
 }
 
 export async function updateAdminUser(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   userId: string,
   updates: {
     first_name?: string | null;
@@ -181,10 +177,9 @@ export async function updateAdminUser(
 }
 
 export async function getAdminUserWorkspaces(
-  supabaseClient: Supabase,
   userId: string,
 ) {
-  const userResult = await getAdminUser(supabaseClient, userId);
+  const userResult = await getAdminUser(userId);
   if (!userResult.ok) {
     return userResult;
   }
@@ -211,7 +206,7 @@ export async function getAdminUserWorkspaces(
 }
 
 export async function addUserToWorkspaceAdmin(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   userId: string,
   workspaceId: string,
   role: "owner" | "member" | "caller" | "admin",
@@ -237,7 +232,7 @@ export async function addUserToWorkspaceAdmin(
 }
 
 export async function updateUserWorkspaceRoleAdmin(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   userId: string,
   workspaceId: string,
   role: "owner" | "member" | "caller" | "admin",
@@ -261,7 +256,7 @@ export async function updateUserWorkspaceRoleAdmin(
 }
 
 export async function removeUserFromWorkspaceAdmin(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   userId: string,
   workspaceId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -277,7 +272,7 @@ export async function removeUserFromWorkspaceAdmin(
 }
 
 export async function cancelWorkspaceInviteAdmin(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   inviteId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
@@ -292,7 +287,7 @@ export async function cancelWorkspaceInviteAdmin(
 }
 
 export async function getAdminWorkspaceDetail(
-  _supabaseClient: Supabase,
+  _unusedClient: Postgres,
   workspaceId: string,
 ) {
   const workspace = await getWorkspaceWithCampaigns(workspaceId);

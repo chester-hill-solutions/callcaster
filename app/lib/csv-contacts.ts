@@ -1,5 +1,5 @@
 import { parse } from "csv-parse/sync";
-import type { Json } from "./database.types";
+import type { Json } from "@/lib/db-types";
 import type { Contact } from "./types";
 import { parsePhoneNumber } from "./phone";
 

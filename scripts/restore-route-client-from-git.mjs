@@ -8,7 +8,7 @@ const PATH_MAP = path.join(ROOT, "scripts/manifests/path-map.json");
 const ROUTES = path.join(ROOT, "app/routes");
 
 const SERVER_MODULE_RE =
-  /from ["']@\/lib\/(database|supabase|logger|messaging-onboarding|rcs-onboarding)[^"']*\.server["']|from ["'][^"']*\.server["']/;
+  /from ["']@\/lib\/(database|client|logger|messaging-onboarding|rcs-onboarding)[^"']*\.server["']|from ["'][^"']*\.server["']/;
 
 const targets = process.argv.slice(2);
 const pathMap = JSON.parse(fs.readFileSync(PATH_MAP, "utf8"));

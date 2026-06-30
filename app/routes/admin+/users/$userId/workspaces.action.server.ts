@@ -20,7 +20,7 @@ function parseWorkspaceRole(value: FormDataEntryValue | null): WorkspaceRole | n
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient } = await requireSudoAdmin(request);
+  await requireSudoAdmin(request);
   const userId = params.userId;
 
   if (!userId) {
@@ -42,7 +42,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return routeData({ error: "Role is required" });
     }
 
-    const result = await addUserToWorkspaceAdmin(supabaseClient, userId, workspaceId, role);
+    const result = await addUserToWorkspaceAdmin(userId, workspaceId, role);
     if (!result.ok) {
       return routeData({ error: result.error });
     }
@@ -58,9 +58,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return routeData({ error: "Workspace and role are required" });
     }
 
-    const result = await updateUserWorkspaceRoleAdmin(
-      supabaseClient,
-      userId,
+    const result = await updateUserWorkspaceRoleAdmin(userId,
       workspaceId,
       role,
     );
@@ -78,7 +76,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return routeData({ error: "Workspace ID is required" });
     }
 
-    const result = await removeUserFromWorkspaceAdmin(supabaseClient, userId, workspaceId);
+    const result = await removeUserFromWorkspaceAdmin(userId, workspaceId);
     if (!result.ok) {
       return routeData({ error: result.error });
     }
@@ -93,7 +91,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return routeData({ error: "Invite ID is required" });
     }
 
-    const result = await cancelWorkspaceInviteAdmin(supabaseClient, inviteId);
+    const result = await cancelWorkspaceInviteAdmin(inviteId);
     if (!result.ok) {
       return routeData({ error: result.error });
     }

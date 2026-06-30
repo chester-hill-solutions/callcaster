@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { createWorkspaceBodySchema } from "@/lib/schemas/api/platform-auth";
@@ -14,9 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
-  const result = await listUserWorkspaces(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await listUserWorkspaces(    auth.user.id,
   );
 
   if (!result.ok) {
@@ -39,9 +35,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   return withIdempotency(request, "workspaces:create", async () => {
     const { data: workspaceId, error, provisioningWarning } =
-      await createWorkspaceForUser(
-        getAuthSupabaseClient(auth),
-        auth.user.id,
+      await createWorkspaceForUser(        auth.user.id,
         parsed.name,
       );
 

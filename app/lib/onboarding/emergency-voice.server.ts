@@ -6,27 +6,23 @@ import {
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { hasVoiceCapability } from "@/lib/onboarding/voice-capabilities";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import type Twilio from "twilio";
 import type { OnboardingActionData } from "@/lib/onboarding-actions.server";
 import { data as routeData } from "react-router";
 import { persistWorkspaceOnboardingState } from "@/lib/onboarding/onboarding-persist.server";
 
 export async function reviewWorkspaceEmergencyVoice(args: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
 }) {
-  const { supabaseClient, workspaceId, actorUserId } = args;
+  const { workspaceId, actorUserId } = args;
 
   const [current, workspacePhoneNumbers] = await Promise.all([
     getWorkspaceMessagingOnboardingState({
-      supabaseClient,
       workspaceId,
     }),
     getWorkspacePhoneNumbers({
-      supabaseClient,
       workspaceId,
     }),
   ]);
@@ -50,9 +46,7 @@ export async function reviewWorkspaceEmergencyVoice(args: {
   }
 
   try {
-    const twilio = (await createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
-      workspace_id: workspaceId,
+    const twilio = (await createWorkspaceTwilioInstance({       workspace_id: workspaceId,
     })) as Twilio.Twilio;
 
     const addressPayload = {
@@ -91,7 +85,6 @@ export async function reviewWorkspaceEmergencyVoice(args: {
         ineligibleCallerIds.push(phoneNumber);
         if (workspaceNumber?.id != null) {
           await updateWorkspacePhoneNumber({
-            supabaseClient,
             workspaceId,
             numberId: workspaceNumber.id,
             updates: {
@@ -128,7 +121,6 @@ export async function reviewWorkspaceEmergencyVoice(args: {
 
       if (workspaceNumber?.id != null) {
         await updateWorkspacePhoneNumber({
-          supabaseClient,
           workspaceId,
           numberId: workspaceNumber.id,
           updates: {
@@ -147,7 +139,6 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     }
 
     await persistWorkspaceOnboardingState({
-      supabaseClient,
       workspaceId,
       actorUserId,
       updates: {
@@ -188,7 +179,6 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     });
   } catch (error) {
     await persistWorkspaceOnboardingState({
-      supabaseClient,
       workspaceId,
       actorUserId,
       updates: {

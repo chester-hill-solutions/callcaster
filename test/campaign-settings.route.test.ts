@@ -27,10 +27,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
@@ -76,7 +74,7 @@ vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: unknown[]) => mocks.enqueueContactsForCampaign(...args),
 }));
 
-function makeSupabaseForSettingsRoute(options?: {
+function makeDbClientForSettingsRoute(options?: {
   campaign?: any;
   details?: any;
   statusUpdateError?: Error | null;
@@ -113,9 +111,9 @@ function makeSupabaseForSettingsRoute(options?: {
     return { id: 123 };
   });
 
-  const supabaseClient = {};
+  const null = {};
 
-  return supabaseClient;
+  return null;
 }
 
 describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
@@ -142,9 +140,8 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("blocks invalid start requests with the shared readiness message", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute();
+    const null = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -169,9 +166,8 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("updates status when the campaign is ready", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute();
+    const null = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -193,9 +189,8 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("returns a save-specific error when save payload is incomplete", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute();
+    const null = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -217,11 +212,10 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("returns a duplicate-specific error when cloning fails", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute({
+    const null = makeDbClientForSettingsRoute({
       duplicateInsertError: new Error("duplicate failed"),
     });
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({

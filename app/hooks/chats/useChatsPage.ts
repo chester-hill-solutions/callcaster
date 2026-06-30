@@ -8,14 +8,11 @@ import {
   useParams,
   useSearchParams,
 } from "react-router";
-import {
-  RealtimePostgresChangesPayload,
-} from "@supabase/supabase-js";
 import { isOptOutMessage } from "@/lib/chat-opt-out";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import { useContactSearch } from "@/hooks/contact/useContactSearch";
-import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import {
   getConversationParticipantPhones,
   getChatSortOption,
@@ -24,7 +21,8 @@ import {
 import { useImageHandling } from "@/hooks/chats/useImageHandling";
 import { markConversationRead } from "@/lib/chats/messaging-client";
 import type { Contact, Workspace } from "@/lib/types";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
+import type { RealtimeChangePayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.client";
 import {
   ALL_CAMPAIGNS_VALUE,
@@ -41,7 +39,7 @@ import type {
 } from "@/lib/chats/types";
 
 export function useChatsPage() {
-  const { supabase, workspace } = useOutletContext<ChatsWorkspaceContextType>();
+  const { client, workspace } = useOutletContext<ChatsWorkspaceContextType>();
   const {
     chats,
     chatsError,
@@ -188,12 +186,12 @@ export function useChatsPage() {
     );
   }, []);
 
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId: workspace.id,
     table: "message",
     filter: `workspace=eq.${workspace.id}`,
     onChange: (payload) => {
-      const typedPayload = payload as RealtimePostgresChangesPayload<
+      const typedPayload = payload as RealtimeChangePayload<
         Tables<"message">
       >;
       const selectedCampaignId = searchParams.get("campaign_id");
@@ -432,7 +430,7 @@ export function useChatsPage() {
   } as const;
 
   return {
-    supabase,
+    client,
     workspace,
     workspaceNumbers,
     registerChatActions,

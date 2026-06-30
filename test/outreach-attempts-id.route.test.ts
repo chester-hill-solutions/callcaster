@@ -13,10 +13,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers({ "Set-Cookie": "x=1" }),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers({ "Set-Cookie": "x=1" }),
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -38,14 +36,14 @@ describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
     mocks.authForOutreachAttempt.mockReset();
     mocks.updateOutreachAttemptForWorkspace.mockReset();
     mocks.authForOutreachAttempt.mockResolvedValue({
-      supabase: {},
+      client: {},
       user: { id: "u1" },
       workspaceId: "w1",
     });
   });
 
   test("returns json({ error }) when update errors", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ update: { a: 1 } });
     mocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(
       new Response("Error updating outreach attempt: bad", { status: 500 }),
@@ -62,7 +60,7 @@ describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
   });
 
   test("returns data with headers on success", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ update: { disposition: "completed" } });
     mocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce({ id: 1 });
 

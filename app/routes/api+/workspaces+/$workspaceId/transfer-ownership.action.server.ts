@@ -1,8 +1,5 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { transferOwnershipBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -28,10 +25,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   );
   if (parsed instanceof Response) return parsed;
 
-  const { headers } = createSupabaseServerClient(request);
-  const result = await transferWorkspaceOwnershipApi(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const { headers } = await getSession(request);
+  const result = await transferWorkspaceOwnershipApi(    auth.user.id,
     workspaceId,
     parsed.new_owner_user_id,
     headers,

@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
+vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -22,8 +22,8 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
   });
 
   test("returns error when campaign_id missing or not string", async () => {
-    const supabaseClient = { rpc: vi.fn() };
-    setDualAuthSession({ supabaseClient, user: { id: "u1" } });
+    const null = { rpc: vi.fn() };
+    setDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/reset_campaign");
 
     const r1 = await asRouteResponse(await mod.action({
@@ -40,8 +40,8 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
   }, 30000);
 
   test("returns error when campaign_id is not a number", async () => {
-    const supabaseClient = { rpc: vi.fn() };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+    const null = { rpc: vi.fn() };
+    queueDualAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "nope");
     const mod = await import("../app/routes/api+/reset_campaign");
@@ -51,9 +51,9 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "Invalid campaign_id" });
   }, 30000);
 
-  test("throws when supabase rpc errors", async () => {
+  test("throws when client rpc errors", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ error: { message: "bad" } });
-    queueDualAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
@@ -65,7 +65,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
 
   test("returns success true when rpc succeeds", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ error: null });
-    queueDualAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");

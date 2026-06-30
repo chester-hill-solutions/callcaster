@@ -7,12 +7,12 @@ const mocks = vi.hoisted(() => ({
   validateTwilioWebhookForCallSid: vi.fn(),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   env: {
-    SUPABASE_URL: () => "https://sb.example",
-    SUPABASE_SERVICE_KEY: () => "svc",
+    BETTER_AUTH_URL: () => "https://sb.example",
+    BETTER_AUTH_SERVICE_KEY: () => "svc",
   },
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: unknown[]) => mocks.createClient(...args),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({

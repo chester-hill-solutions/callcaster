@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /* eslint-env node */
 import "dotenv/config";
-import { createClient } from "@supabase/supabase-js";
 import {
   ALL_DAY_SCHEDULE,
   API_KEY,
@@ -126,8 +125,8 @@ async function upsertMembership(db, workspaceId, userId, role) {
 }
 
 async function seed() {
-  const url = requireEnv("SUPABASE_URL", "API_URL");
-  const serviceKey = requireEnv("SUPABASE_SERVICE_KEY", "SERVICE_ROLE_KEY");
+  const url = requireEnv("AUTH_URL", "API_URL");
+  const serviceKey = requireEnv("AUTH_SERVICE_KEY", "SERVICE_ROLE_KEY");
   const admin = createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });

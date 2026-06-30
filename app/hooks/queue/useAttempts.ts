@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
 import { isRecent, updateAttemptWithCall } from "@/lib/utils";
-import { User } from "@supabase/supabase-js";
 import { Call, OutreachAttempt, QueueItem } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 

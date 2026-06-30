@@ -4,7 +4,7 @@ import {
   getWorkspacePhoneNumbers,
   requireWorkspaceAccess,
 } from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   applyWorkspaceOnboardingChannelPolicy,
@@ -37,8 +37,7 @@ import type {
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 export type OnboardingHandlerResult =
   | {
@@ -55,7 +54,6 @@ export type OnboardingHandlerResult =
 export type OnboardingActionContext = {
   input: FormData | Record<string, unknown>;
   workspaceId: string;
-  supabaseClient: SupabaseClient<Database>;
   user: { id: string };
   actorUserId: string | null;
 };
@@ -120,12 +118,11 @@ function adaptRouteDataResult(result: unknown): OnboardingHandlerResult {
 }
 
 async function hydrateWorkspaceOnboarding(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ) {
   const [{ data: phoneNumbers }, onboarding] = await Promise.all([
-    getWorkspacePhoneNumbers({ supabaseClient, workspaceId }),
-    getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
+    getWorkspacePhoneNumbers({ workspaceId }),
+    getWorkspaceMessagingOnboardingState({ workspaceId }),
   ]);
 
   const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
@@ -137,19 +134,16 @@ async function hydrateWorkspaceOnboarding(
 }
 
 export async function requireOnboardingAdmin(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const role = (
     await getUserRole({
-      supabaseClient,
       user: { id: userId },
       workspaceId,
     })
@@ -167,7 +161,6 @@ export async function requireOnboardingAdmin(
 }
 
 export async function getWorkspaceOnboardingDetail(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ): Promise<
@@ -180,7 +173,7 @@ export async function getWorkspaceOnboardingDetail(
   });
 
   const [{ onboarding, phoneNumbers }, credits] = await Promise.all([
-    hydrateWorkspaceOnboarding(supabaseClient, workspaceId),
+    hydrateWorkspaceOnboarding(workspaceId),
     getWorkspaceCredits(workspaceId),
   ]);
 
@@ -213,7 +206,6 @@ export async function getWorkspaceOnboardingDetail(
 }
 
 export async function patchWorkspaceOnboarding(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   updates: {
@@ -225,7 +217,7 @@ export async function patchWorkspaceOnboarding(
   | { ok: true; detail: WorkspaceOnboardingDetail }
   | { ok: false; error: string; status: number }
 > {
-  const admin = await requireOnboardingAdmin(supabaseClient, userId, workspaceId);
+  const admin = await requireOnboardingAdmin(userId, workspaceId);
   if (!admin.ok) {
     return admin;
   }
@@ -252,13 +244,12 @@ export async function patchWorkspaceOnboarding(
   }
 
   await persistWorkspaceOnboardingState({
-    supabaseClient,
     workspaceId,
     actorUserId: userId,
     updates: persistUpdates,
   });
 
-  const detail = await getWorkspaceOnboardingDetail(supabaseClient, userId, workspaceId);
+  const detail = await getWorkspaceOnboardingDetail(userId, workspaceId);
   if (!detail.ok) {
     return detail;
   }
@@ -275,9 +266,7 @@ async function handleAdvanceStep(ctx: OnboardingActionContext): Promise<Onboardi
       status: 400,
     };
   }
-  await persistWorkspaceOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: targetStep },
   });
@@ -285,9 +274,7 @@ async function handleAdvanceStep(ctx: OnboardingActionContext): Promise<Onboardi
 }
 
 async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
-  await persistWorkspaceOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: "provider_provisioning" },
   });
@@ -309,9 +296,7 @@ async function handleVerifyCallerId(ctx: OnboardingActionContext): Promise<Onboa
       status: 400,
     };
   }
-  const { validationRequest } = await startWorkspaceCallerIdVerification({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  const { validationRequest } = await startWorkspaceCallerIdVerification({workspaceId: ctx.workspaceId,
     phoneNumber,
     friendlyName,
   });
@@ -326,15 +311,11 @@ async function handleVerifyCallerId(ctx: OnboardingActionContext): Promise<Onboa
 
 async function handleSaveChannels(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
   const formData = resolveOnboardingInput(ctx.input);
-  const current = await getWorkspaceMessagingOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  const current = await getWorkspaceMessagingOnboardingState({workspaceId: ctx.workspaceId,
   });
   const selectedChannels = stripDisabledRcsChannel(readSelectedChannels(formData));
 
-  await persistWorkspaceOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: {
       selectedChannels,
@@ -354,16 +335,12 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
 async function handleBootstrapMessagingService(
   ctx: OnboardingActionContext,
 ): Promise<OnboardingHandlerResult> {
-  const bootstrap = await ensureWorkspaceTwilioBootstrap({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  const bootstrap = await ensureWorkspaceTwilioBootstrap({workspaceId: ctx.workspaceId,
     actorUserId: ctx.user.id,
   });
 
   if (bootstrap.serviceSid) {
-    await persistWorkspaceOnboardingState({
-      supabaseClient: ctx.supabaseClient,
-      workspaceId: ctx.workspaceId,
+    await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
       actorUserId: ctx.actorUserId,
       updates: { currentStep: "first_number" },
     });
@@ -421,9 +398,7 @@ async function handleSaveBusinessProfile(
   ctx: OnboardingActionContext,
 ): Promise<OnboardingHandlerResult> {
   const formData = resolveOnboardingInput(ctx.input);
-  const current = await getWorkspaceMessagingOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  const current = await getWorkspaceMessagingOnboardingState({workspaceId: ctx.workspaceId,
   });
   const businessProfile = buildBusinessProfile(formData);
   const addressStreet = String(formData.get("addressStreet") ?? formData.get("address_street") ?? "");
@@ -442,9 +417,7 @@ async function handleSaveBusinessProfile(
       addressPostalCode.trim(),
   );
 
-  await persistWorkspaceOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: {
       businessProfile,
@@ -479,23 +452,17 @@ async function handleSaveBusinessProfile(
 async function handleReviewEmergencyVoice(
   ctx: OnboardingActionContext,
 ): Promise<OnboardingHandlerResult> {
-  const result = await reviewWorkspaceEmergencyVoice({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  const result = await reviewWorkspaceEmergencyVoice({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
   });
   return adaptRouteDataResult(result);
 }
 
 async function handleProvisionA2p(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
-  const nextState = await provisionWorkspaceA2P({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  const nextState = await provisionWorkspaceA2P({workspaceId: ctx.workspaceId,
     actorUserId: ctx.user.id,
   });
-  await persistWorkspaceOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: "launch_checks" },
   });
@@ -536,9 +503,7 @@ async function handleSaveRcs(ctx: OnboardingActionContext): Promise<OnboardingHa
 
   const formData = resolveOnboardingInput(ctx.input);
 
-  await updateWorkspaceRcsOnboarding({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  await updateWorkspaceRcsOnboarding({workspaceId: ctx.workspaceId,
     actorUserId: ctx.user.id,
     provider: TWILIO_RCS_PROVIDER,
     displayName: String(formData.get("rcsDisplayName") ?? formData.get("rcs_display_name") ?? ""),
@@ -581,9 +546,7 @@ async function handleSaveRcs(ctx: OnboardingActionContext): Promise<OnboardingHa
       formData.get("rcsStatus") ?? formData.get("rcs_status"),
     ),
   });
-  await persistWorkspaceOnboardingState({
-    supabaseClient: ctx.supabaseClient,
-    workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: "launch_checks" },
   });
@@ -606,7 +569,6 @@ const ONBOARDING_ACTION_HANDLERS = {
 } satisfies Record<OnboardingActionName, (ctx: OnboardingActionContext) => Promise<OnboardingHandlerResult>>;
 
 export async function runOnboardingAction(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   actionName: string,
@@ -623,22 +585,21 @@ export async function runOnboardingAction(
     return { ok: false, error: "Unknown onboarding action.", status: 400 };
   }
 
-  const admin = await requireOnboardingAdmin(supabaseClient, userId, workspaceId);
+  const admin = await requireOnboardingAdmin(userId, workspaceId);
   if (!admin.ok) {
     return admin;
   }
 
   const ctx: OnboardingActionContext = {
     input,
-    workspaceId,
-    supabaseClient,
+    workspaceId, 
     user: { id: userId },
     actorUserId: userId,
   };
 
   try {
     const result = await ONBOARDING_ACTION_HANDLERS[actionName](ctx);
-    const detail = await getWorkspaceOnboardingDetail(supabaseClient, userId, workspaceId);
+    const detail = await getWorkspaceOnboardingDetail(userId, workspaceId);
     if (!detail.ok) {
       return detail;
     }

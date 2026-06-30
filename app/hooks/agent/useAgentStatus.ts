@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { Database, Tables } from "@/lib/database.types";
+import { Database, Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 type AgentState = Database["public"]["Enums"]["agent_state"];
 
 interface UseAgentStatusOptions {
-  supabase: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
 }
@@ -21,8 +19,7 @@ interface UseAgentStatusReturn {
 }
 
 export function useAgentStatus({
-  supabase,
-  workspaceId,
+    workspaceId,
   userId,
 }: UseAgentStatusOptions): UseAgentStatusReturn {
   const [agentStatus, setAgentStatus] = useState<Tables<"agent_status"> | null>(null);
@@ -30,7 +27,7 @@ export function useAgentStatus({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef = useRef<ReturnType<SupabaseClient<Database>["channel"]> | null>(null);
+  const channelRef = useRef<ReturnType<never["channel"]> | null>(null);
   const currentStatusRef = useRef<string>("offline");
 
   const refreshStatus = useCallback(async () => {
@@ -84,7 +81,7 @@ export function useAgentStatus({
     if (!workspaceId || !userId) return;
     refreshStatus();
 
-    const channel = supabase.channel(`agent-status:${workspaceId}`);
+    const channel = adminDb.channel(`agent-status:${workspaceId}`);
     channelRef.current = channel;
 
     channel
@@ -123,7 +120,7 @@ export function useAgentStatus({
 
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        adminDb.removeChannel(channelRef.current);
         channelRef.current = null;
       }
       if (heartbeatRef.current) {
@@ -131,7 +128,7 @@ export function useAgentStatus({
         heartbeatRef.current = null;
       }
     };
-  }, [workspaceId, userId, supabase, refreshStatus]);
+  }, [workspaceId, userId, refreshStatus]);
 
   return {
     agentStatus,

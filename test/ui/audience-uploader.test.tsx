@@ -29,8 +29,8 @@ vi.mock("react-router", () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/hooks/realtime/useSupabaseRealtime", () => ({
-  useSupabaseRealtimeSubscription: (opts: any) => {
+vi.mock("@/hooks/realtime/useWorkspaceRealtime", () => ({
+  useWorkspaceEventSubscription: (opts: any) => {
     mocks.realtimeOpts = opts;
     return undefined;
   },
@@ -74,7 +74,7 @@ vi.mock("react-icons/md", () => ({
   MdCheck: () => <span>check</span>,
 }));
 
-function makeSupabase() {
+function makeDbClient() {
   return {} as any;
 }
 
@@ -107,7 +107,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("renders with default audienceName", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} />);
+    render(<AudienceUploader client={makeDbClient()} />);
     expect(
       screen.getByText("Upload contacts (.csv file):"),
     ).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime ignores non-UPDATE events and missing payload.new", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -135,10 +135,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("file selection parses CSV, shows mapping table + preview, supports mapping edits + split-name toggle, confirm/reset, and remove file", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -200,10 +200,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("file selection infers split from 'Full Name' header", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -227,10 +227,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("file selection with empty file contents is a no-op", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -250,11 +250,11 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("upload flow: submits to /api/audience-upload, enables polling, and completes via polling (calls onUploadComplete)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
       <AudienceUploader
-        supabase={supabase}
+        client={client}
         audienceName="A1"
         onUploadComplete={mocks.onUploadComplete}
       />,
@@ -317,10 +317,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     vi.useFakeTimers();
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
     const fileInput = container.querySelector(
       'input[type="file"]#contacts',
@@ -381,11 +381,11 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     vi.useFakeTimers();
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     render(
       <AudienceUploader
-        supabase={supabase}
+        client={client}
         audienceName="A1"
         existingAudienceId="777"
       />,
@@ -413,9 +413,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("upload error response shows error, Try Again clears status/error, and polling error shows warning", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -464,10 +464,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE handles error status and progress calculation", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
     render(
       <AudienceUploader
-        supabase={supabase}
+        client={client}
         audienceName="A1"
         onUploadComplete={mocks.onUploadComplete}
       />,
@@ -499,7 +499,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE with missing status sets uploadStatus to null", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -517,7 +517,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE error without error_message uses fallback", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -534,7 +534,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE with total_contacts negative does not compute progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -555,7 +555,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE with processed_contacts undefined does not compute progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -572,10 +572,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE completed calls onUploadComplete", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
     render(
       <AudienceUploader
-        supabase={supabase}
+        client={client}
         audienceName="A1"
         onUploadComplete={mocks.onUploadComplete}
       />,
@@ -602,7 +602,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("unknown uploadStatus renders as Preparing...", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -622,7 +622,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling callback returns early when no uploadId", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     (globalThis as any).fetch = vi.fn(async () => {
       return {
@@ -646,7 +646,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     expect(
       screen.getByRole("button", { name: "Start Upload" }),
@@ -659,7 +659,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     expect(screen.queryByText("boom")).toBeNull();
     expect(
@@ -673,7 +673,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     expect(
       screen.getByRole("button", { name: "Start Upload" }),
@@ -687,7 +687,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
+    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
 
     expect(
       screen.getByRole("button", { name: "Start Upload" }),
@@ -698,11 +698,11 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("upload with existingAudienceId appends audience_id (not audience_name)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
       <AudienceUploader
-        supabase={supabase}
+        client={client}
         existingAudienceId="777"
         audienceName="ignored"
       />,
@@ -749,10 +749,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("upload POST throws non-Error -> shows generic unexpected error", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -787,10 +787,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling throws -> shows warning and logs error", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -842,10 +842,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling status=processing updates counts and progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -905,10 +905,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling status=error sets uploadStatus error + message and stops polling", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -966,10 +966,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling status=error without error_message uses fallback", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(
@@ -1025,10 +1025,10 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling status=processing with total_contacts=0 does not update progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const supabase = makeSupabase();
+    const client = makeDbClient();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} audienceName="A1" />,
+      <AudienceUploader client={client} audienceName="A1" />,
     );
 
     const fileInput = container.querySelector(

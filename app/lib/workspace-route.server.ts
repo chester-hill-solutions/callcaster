@@ -1,11 +1,8 @@
 import { data as routeData } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUserRole } from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 
 export type WorkspaceLoaderContext = {
-  supabaseClient: SupabaseClient<Database>;
   headers: Headers;
   user: { id: string };
   workspaceId: string;
@@ -41,7 +38,7 @@ export async function requireWorkspaceLoaderContext(
   workspaceId: string | undefined,
   options?: { minRole?: string },
 ): Promise<WorkspaceLoaderResult> {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
 
   if (!workspaceId) {
     return {
@@ -50,7 +47,7 @@ export async function requireWorkspaceLoaderContext(
     };
   }
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
+  const userRole = await getUserRole({ user, workspaceId });
   if (!userRole) {
     return {
       ok: false,
@@ -83,6 +80,6 @@ export async function requireWorkspaceLoaderContext(
 
   return {
     ok: true,
-    ctx: { supabaseClient, headers, user, workspaceId, userRole },
+    ctx: { headers, user, workspaceId, userRole },
   };
 }

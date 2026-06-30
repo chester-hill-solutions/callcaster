@@ -25,7 +25,7 @@ import {
 } from "@/lib/database.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { logger } from "@/lib/logger.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import type {
@@ -38,7 +38,6 @@ import type {
   IVRCampaign,
   Script,
 } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
   script?: Script;
@@ -63,7 +62,6 @@ const client = `export { loader, action } from "./workspaces_.$id.campaigns.$sel
 
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "react-router";
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   Audience,
   Campaign,

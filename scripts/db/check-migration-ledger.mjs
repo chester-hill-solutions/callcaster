@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Compare in-repo supabase/migrations/*.sql versions against
- * supabase_migrations.schema_migrations when DATABASE_URL is set.
+ * Compare in-repo client/migrations/*.sql versions against
+ * AUTH_migrations.schema_migrations when DATABASE_URL is set.
  *
  * Usage:
  *   node scripts/db/check-migration-ledger.mjs
@@ -13,7 +13,7 @@ import { join } from "node:path";
 import postgres from "postgres";
 
 const ROOT = join(import.meta.dirname, "../..");
-const MIGRATIONS_DIR = join(ROOT, "supabase/migrations");
+const MIGRATIONS_DIR = join(ROOT, "client/migrations");
 
 /** Ledger version = numeric prefix before the first `_` in the filename. */
 function versionFromFilename(name) {
@@ -41,7 +41,7 @@ async function loadDbVersions(databaseUrl) {
   try {
     const rows = await sql`
       select version
-      from supabase_migrations.schema_migrations
+      from AUTH_migrations.schema_migrations
       order by version
     `;
     const byVersion = new Map(rows.map((r) => [r.version, ""]));
@@ -92,7 +92,7 @@ function reportDiff(label, repoVersions, dbVersions) {
 
 async function main() {
   const { files, byVersion: repoVersions } = loadRepoVersions();
-  console.log(`Found ${files.length} migration files in supabase/migrations/`);
+  console.log(`Found ${files.length} migration files in client/migrations/`);
 
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -109,7 +109,7 @@ async function main() {
   try {
     dbVersions = await loadDbVersions(databaseUrl);
   } catch (err) {
-    console.error("\nFailed to query supabase_migrations.schema_migrations:");
+    console.error("\nFailed to query AUTH_migrations.schema_migrations:");
     console.error(err instanceof Error ? err.message : err);
     process.exit(2);
   }

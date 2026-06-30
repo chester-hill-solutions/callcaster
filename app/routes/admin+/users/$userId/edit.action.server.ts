@@ -4,7 +4,7 @@ import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient } = await requireSudoAdmin(request);
+  await requireSudoAdmin(request);
   const userId = params.userId;
 
   if (!userId) {
@@ -24,7 +24,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return routeData({ error: "Username is required" });
     }
 
-    const result = await updateAdminUser(supabaseClient, userId, {
+    const result = await updateAdminUser(userId, {
       first_name: firstName || null,
       last_name: lastName || null,
       username,

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clipboard, ChevronDown } from 'lucide-react';
 import type { Contact, OutreachAttempt } from '@/lib/types';
-import type { Json } from '@/lib/database.types';
+import type { Json } from '@/lib/db-types';
 import { safeString, formatDate, isObject, isArray } from '@/lib/type-safety-utils';
 import { logger } from '@/lib/logger.client';
 

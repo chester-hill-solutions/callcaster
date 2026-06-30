@@ -4,26 +4,19 @@ import { logger } from "@/lib/logger.server";
 import { resolveJsonAuthSession } from "@/lib/api-auth.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database, Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/db-types";
 import {
   findCallsByConferenceId,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type TwilioSDK from "twilio";
 
-type Supabase = SupabaseClient<Database>;
 type TwilioClient = TwilioSDK.Twilio;
 
 type AutoDialEndDeps = Partial<{
-  verifyAuth: (
-    request: Request,
-  ) => Promise<{ supabaseClient: Supabase; user: User }>;
+  verifyAuth: typeof resolveJsonAuthSession;
   safeParseJson: <T>(request: Request) => Promise<T>;
-  createWorkspaceTwilioInstance: (args: {
-    supabase: Supabase;
-    workspace_id: string;
-  }) => Promise<TwilioClient>;
+  createWorkspaceTwilioInstance: (args: { workspace_id: string }) => Promise<TwilioClient>;
   logger: typeof logger;
 }>;
 
@@ -39,15 +32,12 @@ export const action = async ({
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
     logger: deps?.logger ?? logger,
   };
-  const { supabaseClient, user } = await d.verifyAuth(request);
+  const { user } = await d.verifyAuth(request);
   const { workspaceId: workspace_id } = await d.safeParseJson<{ workspaceId?: string }>(request);
   if (typeof workspace_id !== "string") {
     return routeData({ error: "Missing workspaceId" }, { status: 400 });
   }
-  const twilio = await d.createWorkspaceTwilioInstance({
-    supabase: supabaseClient,
-    workspace_id,
-  });
+  const twilio = await d.createWorkspaceTwilioInstance({ workspace_id });
 
   const updateOutreachAttempt = async (
     id: string,

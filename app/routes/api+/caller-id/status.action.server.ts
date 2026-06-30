@@ -15,7 +15,6 @@ import {
   updateMessagingServiceSenders,
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 
 interface FormData {
@@ -47,9 +46,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
-  const supabase = createClient(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
 
   try {
@@ -97,13 +96,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const workspaceId = updatedNumber.workspace;
         if (workspaceId) {
           const [current, phoneNumbersResult] = await Promise.all([
-            getWorkspaceMessagingOnboardingState({
-              supabaseClient: supabase,
-              workspaceId,
+            getWorkspaceMessagingOnboardingState({workspaceId,
             }),
-            getWorkspacePhoneNumbers({
-              supabaseClient: supabase,
-              workspaceId,
+            getWorkspacePhoneNumbers({workspaceId,
             }),
           ]);
           let nextState = updateMessagingServiceSenders(current, parsedBody.To);
@@ -111,9 +106,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             nextState,
             phoneNumbersResult.data ?? [],
           );
-          await updateWorkspaceMessagingOnboardingState({
-            supabaseClient: supabase,
-            workspaceId,
+          await updateWorkspaceMessagingOnboardingState({workspaceId,
             updates: nextState,
             actorUserId: null,
           });

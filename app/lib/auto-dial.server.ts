@@ -1,4 +1,3 @@
-import { type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
@@ -7,43 +6,36 @@ import type TwilioSDK from "twilio";
 import { call as callTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
+import {
+  rpcAutoDialQueue,
+  rpcCreateOutreachAttempt,
+} from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 
 type TwilioClient = TwilioSDK.Twilio;
 
 export const normalizePhoneNumber = sharedNormalizePhoneNumber;
 
 export async function getNextAutoDialQueueContact(
-  supabase: SupabaseClient,
   campaign_id: number,
   user_id: string,
 ) {
-  const { data: record, error } = await supabase.rpc("auto_dial_queue", {
-    campaign_id_variable: campaign_id,
-    user_id_variable: user_id,
-  });
-  if (error) throw error;
-  return record.length > 0 ? record[0] : null;
+  return rpcAutoDialQueue(db, { campaignId: campaign_id, userId: user_id });
 }
 
 export async function createOutreachAttempt(
-  supabase: SupabaseClient,
   contactRecord: { queue_id: number, contact_id: number, contact_phone: string }, 
   campaign_id: number,
   workspace_id: string,
   user_id: string,
 ) {
-  const { data: outreachAttempt, error } = await supabase.rpc(
-    "create_outreach_attempt",
-    {
-      con_id: contactRecord.contact_id,
-      cam_id: campaign_id,
-      queue_id: contactRecord.queue_id,
-      wks_id: workspace_id,
-      usr_id: user_id,
-    },
-  );
-  if (error) throw error;
-  return outreachAttempt;
+  return rpcCreateOutreachAttempt(db, {
+    contactId: contactRecord.contact_id,
+    campaignId: campaign_id,
+    userId: user_id,
+    workspaceId: workspace_id,
+    queueId: contactRecord.queue_id,
+  });
 }
 
 export async function createTwilioCall(

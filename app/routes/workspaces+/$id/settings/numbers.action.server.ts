@@ -6,11 +6,11 @@ import {
 import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { normalizeInboundRingCount } from "../../../../../shared/inbound-rings";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
 
   const data = Object.fromEntries(await request.formData()) as Record<
     string,
@@ -21,13 +21,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!workspace_id) return { error: "Workspace ID is required" };
 
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: user.id },
     workspaceId: workspace_id,
   });
 
   const userRole = await getUserRole({
-    supabaseClient,
     user: { id: user.id },
     workspaceId: workspace_id,
   });
@@ -39,7 +37,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const friendlyName = String(data.friendlyName ?? data.friendly_name ?? "");
     const phoneNumber = String(data.phoneNumber ?? data.phone_number ?? "");
     const result = await verifyWorkspaceCallerId(
-      supabaseClient,
       user.id,
       workspace_id,
       phoneNumber,
@@ -55,7 +52,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (formName === "remove-number") {
     const numberId = String(data.numberId || "0");
     const result = await deleteWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       numberId,
@@ -66,7 +62,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (formName === "update-incoming-activity") {
     const result = await patchWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       String(data.numberId),
@@ -78,7 +73,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (formName === "update-incoming-voice-message") {
     const result = await patchWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       String(data.numberId),
@@ -90,7 +84,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (formName === "update-inbound-ring-count") {
     const result = await patchWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       String(data.numberId),
@@ -103,7 +96,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (formName === "update-inbound-queue") {
     const inboundQueueId = data.inboundQueueId;
     const result = await patchWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       String(data.numberId),
@@ -118,7 +110,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (formName === "update-inbound-script") {
     const inboundScriptId = data.inboundScriptId;
     const result = await patchWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       String(data.numberId),
@@ -132,7 +123,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (formName === "update-handset") {
     const result = await patchWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       String(data.numberId),
@@ -144,7 +134,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (formName === "update-caller-id") {
     const result = await patchWorkspaceNumber(
-      supabaseClient,
       user.id,
       workspace_id,
       String(data.numberId),

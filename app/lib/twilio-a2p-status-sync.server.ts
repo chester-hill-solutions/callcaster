@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import {
   getWorkspaceMessagingOnboardingFromTwilioData,
@@ -21,16 +20,13 @@ function mapBrandStatus(raw: string | undefined): WorkspaceOnboardingStatus {
 }
 
 export async function syncWorkspaceA2pStatus({
-  supabaseClient,
   workspaceId,
   actorUserId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
 }) {
   const twilioData = (await loadWorkspaceTwilioData(
-    supabaseClient,
     workspaceId,
   )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
@@ -42,7 +38,7 @@ export async function syncWorkspaceA2pStatus({
   }
 
   const twilio = await createWorkspaceTwilioClient({
-    supabase: supabaseClient,
+    client: null,
     workspaceId,
   });
 
@@ -89,7 +85,7 @@ export async function syncWorkspaceA2pStatus({
     lastUpdatedBy: actorUserId,
   });
 
-  await patchWorkspaceTwilioData(supabaseClient, workspaceId, {
+  await patchWorkspaceTwilioData(workspaceId, {
     onboarding: nextOnboarding,
   });
 

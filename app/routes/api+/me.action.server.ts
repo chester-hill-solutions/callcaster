@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
@@ -20,9 +18,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
-  const profile = await getMeProfile(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const profile = await getMeProfile(    auth.user.id,
   );
   return jsonResponse(profile, 200);
 }
@@ -30,14 +26,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-
-  const supabase = getAuthSupabaseClient(auth);
-
   if (request.method === "PATCH") {
     const parsed = await parseJsonBodyOrResponse(request, updateMeBodySchema);
     if (parsed instanceof Response) return parsed;
 
-    const result = await updateMeProfile(supabase, parsed);
+    const result = await updateMeProfile(client, parsed);
     if (!result.ok) {
       return jsonError(result.error, result.status);
     }

@@ -12,8 +12,8 @@ const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
     env: {
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
+      BETTER_AUTH_URL: vi.fn(() => "http://client"),
+      BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service"),
     },
     logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     VoiceResponse,
@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: unknown[]) => mocks.createClient(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -32,7 +32,7 @@ vi.mock("twilio", () => ({
   default: { twiml: { VoiceResponse: mocks.VoiceResponse } },
 }));
 
-function makeSupabase(opts: {
+function makeDbClient(opts: {
   session?: { data: unknown; error: unknown } | null;
   user?: { data: unknown; error: unknown };
   updateError?: unknown;
@@ -103,7 +103,7 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
 
   test("action returns error TwiML when From missing", async () => {
     mocks.createClient.mockReturnValue(
-      makeSupabase({ session: { data: null, error: null } })
+      makeDbClient({ session: { data: null, error: null } })
     );
     const formData = new FormData();
     const mod = await import("../app/routes/api+/inbound-verification");
@@ -120,10 +120,10 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
   });
 
   test("action returns error TwiML when no matching session", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       session: { data: null, error: null },
     });
-    mocks.createClient.mockReturnValue(supabase);
+    mocks.createClient.mockReturnValue(client);
     const formData = new FormData();
     formData.set("From", "+15551234567");
     const mod = await import("../app/routes/api+/inbound-verification");
@@ -140,7 +140,7 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
 
   test("action success updates user and returns success TwiML", async () => {
     const updateEq = vi.fn(async () => ({ error: null }));
-    const supabase: ReturnType<typeof makeSupabase> = makeSupabase({
+    const client: ReturnType<typeof makeDbClient> = makeDbClient({
       session: {
         data: {
           id: "vs-1",
@@ -154,9 +154,9 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
         error: null,
       },
     });
-    (supabase as { _spies?: { updateEq: ReturnType<typeof vi.fn> } })._spies =
+    (client as { _spies?: { updateEq: ReturnType<typeof vi.fn> } })._spies =
       { updateEq };
-    mocks.createClient.mockReturnValue(supabase);
+    mocks.createClient.mockReturnValue(client);
 
     const formData = new FormData();
     formData.set("From", "+15551234567");
@@ -175,7 +175,7 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
   });
 
   test("action handles already-verified number", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       session: {
         data: {
           id: "vs-1",
@@ -189,7 +189,7 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
         error: null,
       },
     });
-    mocks.createClient.mockReturnValue(supabase);
+    mocks.createClient.mockReturnValue(client);
 
     const formData = new FormData();
     formData.set("From", "+15551234567");

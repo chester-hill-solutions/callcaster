@@ -24,7 +24,7 @@ vi.mock("@/twilio.server", () => {
   };
 });
 
-function makeSupabaseStub() {
+function makeDbClientStub() {
   const transactionRows: TransactionRow[] = [];
 
   const realtime = {
@@ -87,25 +87,25 @@ function makeSupabaseStub() {
   return { realtime, from, rpc: makeApplyLedgerEntryRpcStub(transactionRows), _transactionRows: transactionRows };
 }
 
-let supabaseStub: ReturnType<typeof makeSupabaseStub>;
+let postgresStub: ReturnType<typeof makeDbClientStub>;
 
-const supabaseState = vi.hoisted(() => {
-  return { supabase: null as any };
+const clientState = vi.hoisted(() => {
+  return { client: null as any };
 });
-vi.mock("@/lib/supabase.server", () => ({
-  getServiceSupabase: () => supabaseState.supabase,
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => clientState.client,
 }));
-vi.mock("@supabase/supabase-js", () => {
+vi.mock("@client/client-js", () => {
   return {
-    createClient: () => supabaseState.supabase,
+    createClient: () => clientState.client,
   };
 });
 
 describe("api.call-status billing + idempotency", () => {
   beforeEach(() => {
     vi.resetModules();
-    supabaseStub = makeSupabaseStub();
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = makeDbClientStub();
+    clientState.client = postgresStub as any;
     twilioMocks.validateTwilioWebhookParams.mockReset();
     twilioMocks.validateTwilioWebhookParams.mockReturnValue(true);
   });
@@ -152,7 +152,7 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: makeReq("CA60", "60") } as any);
     await mod.action({ request: makeReq("CA61", "61") } as any);
 
-    const amounts = supabaseStub._transactionRows.map((r) => r.amount);
+    const amounts = postgresStub._transactionRows.map((r) => r.amount);
     expect(amounts).toEqual([-4, -4, -9]);
   });
 
@@ -175,7 +175,7 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: req.clone() } as any);
     await mod.action({ request: req.clone() } as any);
 
-    const matching = supabaseStub._transactionRows.filter(
+    const matching = postgresStub._transactionRows.filter(
       (r) => r.idempotency_key === "call:CA_DUP:staffed",
     );
     expect(matching.length).toBe(1);

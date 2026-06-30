@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
+vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("../app/lib/database.server", () => ({
@@ -23,7 +23,7 @@ vi.mock("../app/lib/database.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-function makeSupabase(options?: {
+function makeDbClient(options?: {
   queueError?: any;
   rpcError?: any;
   outreachError?: any;
@@ -34,7 +34,7 @@ function makeSupabase(options?: {
   const removeChannel = vi.fn();
   const channelObj = { send: realtimeSend };
 
-  const supabase: any = {
+  const client: any = {
     realtime: { channel: (_id: string) => channelObj },
     removeChannel,
     from: (table: string) => {
@@ -92,7 +92,7 @@ function makeSupabase(options?: {
     }),
   };
 
-  return { supabase, realtimeSend, removeChannel };
+  return { client, realtimeSend, removeChannel };
 }
 
 describe("app/routes/api+/hangup/route.tsx", () => {
@@ -105,8 +105,8 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   });
 
   test("hangs up, broadcasts idle, dequeues, updates outreach, removes channel", async () => {
-    const { supabase, realtimeSend, removeChannel } = makeSupabase();
-    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
+    const { client, realtimeSend, removeChannel } = makeDbClient();
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({
       conference_id: "conf",
       workspaceId: "w1",
@@ -125,8 +125,8 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   });
 
   test("returns 200 when Twilio returns 21220 (call already ended)", async () => {
-    const { supabase, realtimeSend } = makeSupabase();
-    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
+    const { client, realtimeSend } = makeDbClient();
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     const err21220 = new Error("Call is not in-progress. Cannot redirect.") as Error & { code: number };
     err21220.code = 21220;
@@ -147,8 +147,8 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   });
 
   test("returns 500 when Twilio throws non-21220", async () => {
-    const { supabase } = makeSupabase();
-    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
+    const { client } = makeDbClient();
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({
@@ -164,8 +164,8 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   });
 
   test("returns 200 when no queue entry (handset mode)", async () => {
-    const { supabase } = makeSupabase({ queueRows: [] });
-    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
+    const { client } = makeDbClient({ queueRows: [] });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "conf", workspaceId: "w1", callSid: "CA1" });
     const callUpdate = vi.fn(async () => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
@@ -176,8 +176,8 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   });
 
   test("outreach update error is thrown and returns 500", async () => {
-    const { supabase } = makeSupabase({ outreachError: new Error("outreach") });
-    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
+    const { client } = makeDbClient({ outreachError: new Error("outreach") });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     const mod = await import("../app/routes/api+/hangup");

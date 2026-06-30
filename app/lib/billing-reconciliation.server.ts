@@ -10,8 +10,7 @@ import {
   TERMINAL_BILLABLE_CALL_STATUSES,
   TERMINAL_BILLABLE_SMS_STATUSES,
 } from "@/lib/pricing";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { and, gte, inArray, like, lte, ne, eq } from "drizzle-orm";
 import {
   call as callTable,
@@ -26,7 +25,7 @@ const BILLABLE_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
 export type { BillingReconciliationReport };
 
 export async function loadBillingEntityAudit(args: {
-  supabaseClient?: SupabaseClient<Database>;
+  null?: never;
   workspaceId: string;
   period: { startDate: string; endDate: string };
 }): Promise<BillingEntityAudit> {
@@ -77,7 +76,7 @@ export async function loadBillingEntityAudit(args: {
 }
 
 export async function loadBillingReconciliationReport(args: {
-  supabaseClient?: SupabaseClient<Database>;
+  null?: never;
   workspaceId: string;
   twilioUsage: TwilioUsageRecord[];
   referenceDate?: Date;

@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
@@ -27,9 +25,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const result = await listWorkspaceMembers(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await listWorkspaceMembers(    auth.user.id,
     workspaceId,
   );
 
@@ -54,15 +50,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
-
-  const supabase = getAuthSupabaseClient(auth);
-
   if (request.method === "POST") {
     const parsed = await parseJsonBodyOrResponse(request, inviteMemberBodySchema);
     if (parsed instanceof Response) return parsed;
 
     const result = await inviteWorkspaceMember(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       parsed.email,
@@ -88,7 +81,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (parsed instanceof Response) return parsed;
 
     const result = await updateWorkspaceMemberRole(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       parsed.user_id,
@@ -108,7 +101,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (parsed.target === "invite") {
       const inviteResult = await cancelWorkspaceInvite(
-        supabase,
+        client,
         auth.user.id,
         workspaceId,
         parsed.user_id,
@@ -120,7 +113,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const removeResult = await removeWorkspaceMember(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       parsed.user_id,
@@ -130,7 +123,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const inviteResult = await cancelWorkspaceInvite(
-      supabase,
+      client,
       auth.user.id,
       workspaceId,
       parsed.user_id,

@@ -10,7 +10,7 @@ import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { compareMembersByRole } from "@/lib/workspace-members";
 import { capitalize } from "@/lib/utils";
-import type { Database, Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/db-types";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 

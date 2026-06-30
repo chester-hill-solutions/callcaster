@@ -1,10 +1,9 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from "twilio";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 
 export const action = async ({ request }: { request: Request }) => {
 

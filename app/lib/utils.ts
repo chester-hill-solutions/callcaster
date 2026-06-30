@@ -5,8 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDateToLocale(dateFromSupabase: string) {
-  const formattedDateTime = new Date(dateFromSupabase).toLocaleString();
+export function formatDateToLocale(dateFromPostgres: string) {
+  const formattedDateTime = new Date(dateFromPostgres).toLocaleString();
   return formattedDateTime;
 }
 

@@ -1,5 +1,8 @@
-import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "../logger.server";
+import {
+  createSignedObjectUrl,
+  listObjects,
+} from "@/lib/object-storage.server";
 
 export function getRecordingFileNames(stepData: unknown) {
   if (!Array.isArray(stepData)) {
@@ -26,45 +29,44 @@ export function getRecordingFileNames(stepData: unknown) {
 
 export async function getMedia(
   fileNames: Array<string>,
-  supabaseClient: SupabaseClient,
   workspace_id: string,
 ) {
   const media = await Promise.all(
     fileNames.map(async (mediaName) => {
-      const { data, error } = await supabaseClient.storage
-        .from("workspaceAudio")
-        .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-      if (error) throw error;
-      return { [mediaName]: data.signedUrl };
+      const signedUrl = await createSignedObjectUrl(
+        "workspaceAudio",
+        `${workspace_id}/${mediaName}`,
+        3600,
+      );
+      return { [mediaName]: signedUrl };
     }),
   );
 
   return media;
 }
 
-export async function listMedia(
-  supabaseClient: SupabaseClient,
-  workspace: string,
-) {
-  const { data, error } = await supabaseClient.storage
-    .from(`workspaceAudio`)
-    .list(workspace);
-  if (error) logger.error("Error listing workspace media", error);
-  return data;
+export async function listMedia(workspace: string) {
+  try {
+    return await listObjects("workspaceAudio", workspace, {
+      sortBy: { column: "created_at", order: "desc" },
+    });
+  } catch (error) {
+    logger.error("Error listing workspace media", error);
+    return null;
+  }
 }
 
 export async function getSignedUrls(
-  supabaseClient: SupabaseClient,
   workspace_id: string,
   mediaNames: string[],
 ) {
   return Promise.all(
-    mediaNames.map(async (mediaName) => {
-      const { data, error } = await supabaseClient.storage
-        .from("messageMedia")
-        .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-      if (error) throw error;
-      return data.signedUrl;
-    }),
+    mediaNames.map(async (mediaName) =>
+      createSignedObjectUrl(
+        "messageMedia",
+        `${workspace_id}/${mediaName}`,
+        3600,
+      ),
+    ),
   );
 }

@@ -1,7 +1,6 @@
 import { Link, useLoaderData, useNavigate, useFetcher, useOutletContext } from "react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BellOff } from "lucide-react";
-import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
 import { BrandedCard as Card } from "@/components/shared/BrandedCard";
@@ -17,12 +16,11 @@ import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { useAgentStatus } from "@/hooks/agent/useAgentStatus";
 import { useSoftphoneController } from "@/hooks/call/useSoftphoneController";
 import { useSoftphoneAudioDevices } from "@/hooks/call/useSoftphoneAudioDevices";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 type AgentState = Database["public"]["Enums"]["agent_state"];
 type OutletContext = {
-  supabase: SupabaseClient<Database>;
-  env: { SUPABASE_URL: string; SUPABASE_KEY: string; BASE_URL: string };
+  env: { BASE_URL: string };
 };
 
 const STATUS_OPTIONS: { value: AgentState; label: string; color: string }[] = [
@@ -38,7 +36,7 @@ const STATUS_REASONS: Record<string, string[]> = {
 
 export default function AgentDesktop() {
   const loaderData = useLoaderData<HandsetLoaderData>();
-  const { supabase } = useOutletContext<OutletContext>();
+  const { client } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const sessionEndedRef = useRef(false);
@@ -60,8 +58,7 @@ export default function AgentDesktop() {
     loading: statusLoading,
     error: statusError,
   } = useAgentStatus({
-    supabase,
-    workspaceId,
+        workspaceId,
     userId,
   });
 

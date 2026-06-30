@@ -10,20 +10,18 @@ import {
   Campaign,
 } from "@/lib/types";
 
-import { SupabaseClient } from "@supabase/supabase-js";
 
 
 
 export default function WorkspaceCampaignsPage() {
   const outlet = useOutlet();
-  const { audiences, campaigns, phoneNumbers, userRole, workspace, supabase } =
+  const { audiences, campaigns, phoneNumbers, userRole, workspace, client } =
     useOutletContext<{
       audiences: Audience[];
       campaigns: Campaign[];
       phoneNumbers: WorkspaceNumbers[];
       userRole: MemberRole;
       workspace: WorkspaceData;
-      supabase: SupabaseClient;
     }>();
 
   return (
@@ -41,8 +39,7 @@ export default function WorkspaceCampaignsPage() {
             phoneNumbers,
             userRole,
             workspace,
-            supabase,
-          }}
+                      }}
         />
       )}
     </div>

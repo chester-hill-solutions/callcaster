@@ -4,7 +4,7 @@ import {
   callPanelShellClass,
 } from "@/components/call/call-panel-classes";
 import { cn } from "@/lib/utils";
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 
 type ContactRow = Tables<"contact">;
 type QueueItemRow = Tables<"campaign_queue"> & { contact: ContactRow };

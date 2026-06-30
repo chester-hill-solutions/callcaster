@@ -43,7 +43,7 @@ export async function action({ request }: ActionFunctionArgs) {
   switch (parsed.action) {
     case "toggle_workspace_status": {
       const result = await toggleWorkspaceStatus(
-        auth.supabaseClient,
+        auth.null,
         parsed.workspace_id,
         parsed.disabled,
       );
@@ -55,14 +55,14 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     case "sync_workspace_twilio": {
       const result = await syncWorkspaceTwilio(
-        auth.supabaseClient,
+        auth.null,
         parsed.workspace_id,
       );
       if (!result.ok) return jsonError(result.error, 500);
       return jsonResponse({ success: true, message: "Workspace Twilio sync completed" });
     }
     case "sync_all_workspaces_twilio": {
-      const result = await syncAllWorkspacesTwilio(auth.supabaseClient);
+      const result = await syncAllWorkspacesTwilio(auth.null);
       if (!result.ok) return jsonError(result.error, 500);
       return jsonResponse({
         success: true,
@@ -70,7 +70,7 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
     case "toggle_user_status": {
-      const result = await disableUser(auth.supabaseClient, parsed.user_id);
+      const result = await disableUser(auth.null, parsed.user_id);
       if (!result.ok) return jsonError(result.error, 500);
       return jsonResponse({ success: true, message: "User disabled successfully" });
     }

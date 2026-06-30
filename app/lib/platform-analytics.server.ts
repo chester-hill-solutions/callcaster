@@ -11,10 +11,9 @@ import {
 } from "@/lib/campaign-export.server";
 import { loadWorkspaceAnalytics } from "@/lib/workspace-analytics.server";
 import { buildSurveyResponsesCsv as buildSurveyResponsesCsvFromDb } from "@/lib/survey-db.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { campaign as campaignTable } from "@/db/schema";
 import { db } from "@/server/db";
@@ -36,19 +35,16 @@ export type SerializedExportItem = {
 };
 
 export async function getWorkspaceAnalyticsApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   requestUrl: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const role = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -59,7 +55,6 @@ export async function getWorkspaceAnalyticsApi(
     role?.role === MemberRole.Member;
 
   const analytics = await loadWorkspaceAnalytics({
-    supabaseClient,
     workspaceId,
     requestUrl,
     currentUserId: userId,
@@ -70,7 +65,6 @@ export async function getWorkspaceAnalyticsApi(
 }
 
 export async function getCampaignResultsApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   campaignId: string,
 ) {
@@ -91,14 +85,13 @@ export async function getCampaignResultsApi(
 
   const workspaceId = campaign.workspace;
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const [results, queueCounts] = await Promise.all([
-    fetchBasicResults({ workspaceId, campaignId, supabaseClient }),
-    fetchQueueCounts({ workspaceId, campaignId, supabaseClient }),
+    fetchBasicResults({ workspaceId, campaignId }),
+    fetchQueueCounts({ workspaceId, campaignId}),
   ]);
 
   return {
@@ -115,17 +108,15 @@ export async function getCampaignResultsApi(
 }
 
 export async function listWorkspaceExportsApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
-  const { data: files, error: listError } = await supabaseClient.storage
+  const { data: files, error: listError } = await null.storage
     .from("campaign-exports")
     .list(workspaceId, {
       sortBy: { column: "created_at", order: "desc" },
@@ -142,7 +133,7 @@ export async function listWorkspaceExportsApi(
   const processedExports = await Promise.all(
     statusFiles.map(async (file) => {
       try {
-        const { data: statusData, error: downloadError } = await supabaseClient.storage
+        const { data: statusData, error: downloadError } = await null.storage
           .from("campaign-exports")
           .download(`${workspaceId}/${file.name}`);
 
@@ -187,13 +178,11 @@ export async function listWorkspaceExportsApi(
 }
 
 export async function startCampaignExportApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   campaignId: number,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -216,7 +205,6 @@ export async function startCampaignExportApi(
 
   if (campaignRow.type === "message") {
     void processMessageCampaignExport(
-      supabaseClient,
       campaignId,
       workspaceId,
       exportId,
@@ -224,7 +212,6 @@ export async function startCampaignExportApi(
     );
   } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
     void processCallCampaignExport(
-      supabaseClient,
       campaignId,
       workspaceId,
       exportId,
@@ -250,13 +237,11 @@ export async function buildSurveyResponsesCsv(args: {
 }
 
 export async function exportSurveyResponsesApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   surveyId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });

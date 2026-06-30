@@ -1,4 +1,3 @@
-import { getServiceSupabase } from "@/lib/supabase.server";
 import {
   twilioWebhookForbidden,
   validateTwilioWebhookForWorkspace,
@@ -12,12 +11,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const campaignId = params.campaignId;
   if (!workspaceId || !campaignId) {
     return twilioWebhookForbidden("Missing workspace or campaign");
-  }
-
-  const supabase = getServiceSupabase();
-  const validation = await validateTwilioWebhookForWorkspace({
+  }  const validation = await validateTwilioWebhookForWorkspace({
     request,
-    supabase,
+    client,
     workspaceId,
   });
   if (!validation.ok) {

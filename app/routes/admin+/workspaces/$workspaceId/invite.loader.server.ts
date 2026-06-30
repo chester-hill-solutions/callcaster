@@ -3,7 +3,7 @@ import { loadAdminWorkspaceInvitePage } from "@/lib/platform-admin.server";
 import { MemberRole } from "@/lib/member-role";
 import { requireSudoOrWorkspaceAdmin } from "../../requireSudoOrWorkspaceAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 type MemberUser = Pick<
   Tables<"user">,

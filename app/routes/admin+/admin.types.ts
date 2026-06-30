@@ -1,4 +1,4 @@
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 import type { WorkspaceAdminRow } from "@/lib/admin-workspaces";
 
 export type WorkspaceWithCampaigns = Tables<"workspace"> & {

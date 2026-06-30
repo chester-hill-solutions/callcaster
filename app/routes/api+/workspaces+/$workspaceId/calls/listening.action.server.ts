@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
@@ -18,13 +16,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
-
-  const supabase = getAuthSupabaseClient(auth);
-
   try {
     if (request.method === "POST") {
       const result = await startCallListeningApi(
-        supabase,
+        client,
         auth.user,
         workspaceId,
       );
@@ -47,7 +42,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (request.method === "DELETE") {
       const result = await stopCallListeningApi(
-        supabase,
+        client,
         auth.user.id,
         workspaceId,
       );

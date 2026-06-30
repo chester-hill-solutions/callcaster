@@ -1,8 +1,6 @@
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
@@ -18,11 +16,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const workspaceId = url.searchParams.get("workspace_id");
     if (!workspaceId) {
       return routeData({ error: "workspace_id is required" }, { status: 400 });
-    }
-
-    const supabase = getAuthSupabaseClient(auth);
-    await requireWorkspaceAccess({ supabaseClient: supabase,
-      user: auth.user,
+    }    await requireWorkspaceAccess({ user: auth.user,
       workspaceId,
     });
 

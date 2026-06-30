@@ -5,7 +5,7 @@ import { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspac
 import { compareMembersByRole } from "@/lib/workspace-members";
 import { MemberRole } from "@/lib/member-role";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 type UserWithRole = Partial<User> & { role: string };
@@ -13,7 +13,7 @@ type UserWithRole = Partial<User> & { role: string };
 export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const workspaceId = params.id;
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
 
   if (workspaceId == null) {
     return routeData({ error: "No workspace_id found!" }, { headers });
@@ -24,36 +24,34 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   switch (formName) {
     case "addUser": {
-      return handleAddUser(formData, workspaceId, supabaseClient, headers);
+      return handleAddUser(formData, workspaceId,  headers);
     }
     case "updateUser": {
-      return handleUpdateUser(formData, workspaceId, supabaseClient, headers);
+      return handleUpdateUser(formData, workspaceId,  headers);
     }
     case "deleteUser": {
-      return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
+      return handleDeleteUser(formData, workspaceId,  headers);
     }
     case "deleteSelf": {
-      return handleDeleteSelf(formData, workspaceId, supabaseClient, headers);
+      return handleDeleteSelf(formData, workspaceId,  headers);
     }
     case "transferWorkspaceOwnership": {
       return handleTransferWorkspace(
         formData,
         workspaceId,
-        supabaseClient,
         headers,
       );
     }
     case "deleteWorkspace": {
-      return handleDeleteWorkspace({ workspaceId, supabaseClient, headers });
+      return handleDeleteWorkspace({ workspaceId,  headers });
     }
     case "cancelInvite": {
-      return removeInvite({ workspaceId, supabaseClient, formData, headers });
+      return removeInvite({ workspaceId,  formData, headers });
     }
     case "updateWebhook": {
       return handleUpdateWebhook(
         formData,
         workspaceId,
-        supabaseClient,
         headers,
       );
     }

@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import {
   createWorkspaceTwilioInstance,
   getWorkspaceTwilioPortalConfig,
@@ -18,8 +17,7 @@ export const sendMessage = async ({
   to,
   from,
   media,
-  supabase,
-  workspace,
+    workspace,
   contact_id,
   user,
   portalConfig,
@@ -30,7 +28,6 @@ export const sendMessage = async ({
   to: string;
   from: string;
   media: string;
-  supabase: SupabaseClient<Database>;
   workspace: string;
   contact_id: string;
   user: { id: string } | null;
@@ -41,15 +38,12 @@ export const sendMessage = async ({
   const mediaData = media && JSON.parse(media);
   const resolvedPortalConfig =
     portalConfig ??
-    (await getWorkspaceTwilioPortalConfig({
-      supabaseClient: supabase,
-      workspaceId: workspace,
+    (await getWorkspaceTwilioPortalConfig({workspaceId: workspace,
     }));
-  await assertWorkspaceCanSendSms({ supabaseClient: supabase, workspaceId: workspace });
+  await assertWorkspaceCanSendSms({workspaceId: workspace });
 
   const twilio = await createWorkspaceTwilioInstance({
-    supabase,
-    workspace_id: workspace,
+        workspace_id: workspace,
   });
   const statusCallback = `${env.BASE_URL()}/api/sms/status`;
 
@@ -80,9 +74,7 @@ export const sendMessage = async ({
 
     if (error) throw { "message_entry_error:": error };
 
-    const webhookResult = await sendWorkspaceWebhookNotification({
-      supabaseClient: supabase,
-      workspaceId: workspace,
+    const webhookResult = await sendWorkspaceWebhookNotification({workspaceId: workspace,
       eventCategory: "outbound_sms",
       eventType: "INSERT",
       payload: { type: "outbound_sms", record: message, old_record: null },

@@ -8,7 +8,7 @@ vi.mock("@/lib/env.server", () => {
 
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 
-function makeSupabaseForRole(role: string | null) {
+function makeDbClientForRole(role: string | null) {
   return {
     from: (table: string) => {
       if (table !== "workspace_users") throw new Error("unexpected table");
@@ -32,10 +32,9 @@ describe("requireWorkspaceAccess", () => {
   test.each(["owner", "admin", "member", "caller"])(
     "permits role %s",
     async (role) => {
-      const supabaseClient = makeSupabaseForRole(role);
+      const null = makeDbClientForRole(role);
       await expect(
         requireWorkspaceAccess({
-          supabaseClient,
           user: { id: "u1" },
           workspaceId: "w1",
         }),
@@ -44,10 +43,9 @@ describe("requireWorkspaceAccess", () => {
   );
 
   test("rejects when no membership exists (404, no workspace-id inference)", async () => {
-    const supabaseClient = makeSupabaseForRole(null);
+    const null = makeDbClientForRole(null);
     await expect(
       requireWorkspaceAccess({
-        supabaseClient,
         user: { id: "u1" },
         workspaceId: "w1",
       }),
@@ -59,10 +57,9 @@ describe("requireWorkspaceAccess", () => {
   });
 
   test("rejects unknown role (member with invalid role string -> 403)", async () => {
-    const supabaseClient = makeSupabaseForRole("viewer");
+    const null = makeDbClientForRole("viewer");
     await expect(
       requireWorkspaceAccess({
-        supabaseClient,
         user: { id: "u1" },
         workspaceId: "w1",
       }),

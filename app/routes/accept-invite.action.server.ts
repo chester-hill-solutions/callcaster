@@ -1,14 +1,13 @@
 import { acceptWorkspaceInvitations, getInvitesByUserId } from "@/lib/database.server";
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+import { getSession, verifyAuth } from "@/lib/auth.server";
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import type { ActionData } from "./accept-invite.types";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { Database } from "@/lib/db-types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const { headers } = await getSession(request);
   const formData = await request.formData();
   const actionType = formData.get("actionType");
 
@@ -39,7 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
       }
 
-      const { data: userData, error: updateError } = await supabaseClient.auth.updateUser({
+      const { data: userData, error: updateError } = await request.updateUser({
         email: emailValue,
         password: passwordValue,
         data: { first_name: firstNameValue, last_name: lastNameValue },
@@ -69,7 +68,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (actionType === "acceptInvitations") {
     const authContext = (await verifyAuth(request)) as {
-      supabaseClient: SupabaseClient<Database>;
       headers: Headers;
       user: User;
     };

@@ -12,7 +12,7 @@
     "public/build",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "supabase/functions/**",
+    "client/functions/**",
     "archive/deprecated/twilio-serverless/**",
     "app/routes/archive/**",
     "app/routes/old*",

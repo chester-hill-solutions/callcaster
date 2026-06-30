@@ -1,12 +1,12 @@
 import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
   const workspaceId = params.id;
 
   if (!workspaceId) {
@@ -14,9 +14,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   // Get user role for this workspace
-  const userRole = await getUserRole({ 
-    supabaseClient, 
-    user: user, 
+  const userRole = await getUserRole({ user: user, 
     workspaceId 
   });
 

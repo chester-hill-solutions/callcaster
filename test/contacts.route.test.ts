@@ -1,21 +1,22 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession } from "./helpers/route-auth-mock";
-const mocks = vi.hoisted(() => {
-  return {
-    parseRequestData: vi.fn(),
-    updateContact: vi.fn(),
-    bulkCreateContacts: vi.fn(),
-    createContact: vi.fn(),
-    handleError: vi.fn((_e: any, msg?: string) => new Response(msg ?? "err", { status: 500 })),
-  };
+import { queueDualAuthSession, setDualAuthSession } from "./helpers/route-auth-mock";
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 });
 
-vi.mock("../app/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+const mocks = vi.hoisted(() => ({
+  parseRequestData: vi.fn(),
+  updateContact: vi.fn(),
+  bulkCreateContacts: vi.fn(),
+  createContact: vi.fn(),
+  handleError: vi.fn((_e: any, msg?: string) => new Response(msg ?? "err", { status: 500 })),
+}));
+
+vi.mock("../app/lib/adminDb.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 vi.mock("../app/lib/database.server", () => ({
@@ -25,6 +26,29 @@ vi.mock("../app/lib/database.server", () => ({
   createContact: (...args: any[]) => mocks.createContact(...args),
   handleError: (...args: any[]) => mocks.handleError(...args),
 }));
+
+const contactSearchMocks = vi.hoisted(() => ({
+  searchContactsForQueuePicker: vi.fn(async () => []),
+  getQueuedContactIdsForCampaign: vi.fn(async () => []),
+}));
+
+vi.mock("@/lib/database/contact.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database/contact.server")>();
+  return {
+    ...actual,
+    searchContactsForQueuePicker: (...args: unknown[]) =>
+      contactSearchMocks.searchContactsForQueuePicker(...args),
+  };
+});
+
+vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-queue-db.server")>();
+  return {
+    ...actual,
+    getQueuedContactIdsForCampaign: (...args: unknown[]) =>
+      contactSearchMocks.getQueuedContactIdsForCampaign(...args),
+  };
+});
 
 function makeContactQuery(result: { data: any[]; error: any }) {
   const b: any = {};
@@ -47,9 +71,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action PATCH updates contact", async () => {
-    queueDualAuthSession({
-      supabaseClient: {},
-      headers: new Headers(),
+    queueDualAuthSession({ headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.parseRequestData.mockResolvedValueOnce({ id: 1 });
@@ -64,9 +86,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action POST bulk vs single", async () => {
-    queueDualAuthSession({
-      supabaseClient: {},
-      headers: new Headers(),
+    queueDualAuthSession({ headers: new Headers(),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/contacts");
@@ -84,9 +104,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
 
     mocks.parseRequestData.mockResolvedValueOnce({ firstname: "a", audience_id: 2 });
     mocks.createContact.mockResolvedValueOnce({ id: 9 });
-    queueDualAuthSession({
-      supabaseClient: {},
-      headers: new Headers(),
+    queueDualAuthSession({ headers: new Headers(),
       user: { id: "u1" },
     });
     res = await asRouteResponse(await mod.action({
@@ -96,7 +114,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action default unsupported method", async () => {
-    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({});
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -106,7 +124,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action returns 415 for unsupported content type error", async () => {
-    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("Unsupported content type"));
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -116,7 +134,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action other errors go through handleError (non-Error)", async () => {
-    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -127,7 +145,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("action errors go through handleError (Error instance)", async () => {
-    queueDualAuthSession({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
+    queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.action({
@@ -138,7 +156,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   });
 
   test("loader returns [] when q missing", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/contacts"),
@@ -149,47 +167,13 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   test("loader aggregates results, marks queued, and handles errors", async () => {
     const contactA = { id: 1, firstname: "a" };
     const contactB = { id: 2, firstname: "b" };
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "contact") {
-          // called 3 times with different query methods, but we can return same builder shape
-          return makeContactQuery({ data: [contactA], error: null });
-        }
-        if (table === "campaign_queue") {
-          return {
-            select: () => ({
-              eq: () => ({
-                in: async () => ({ data: [{ contact_id: 2 }], error: null }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
 
-    // Override second/third Promise.all results by swapping from() behavior mid-call:
-    const q1 = makeContactQuery({ data: [contactA], error: null });
-    const q2 = makeContactQuery({ data: [contactB], error: null });
-    const q3 = makeContactQuery({ data: [], error: null });
-    let n = 0;
-    supabaseClient.from = (table: string) => {
-      if (table === "contact") {
-        n += 1;
-        return n === 1 ? q1 : n === 2 ? q2 : q3;
-      }
-      if (table === "campaign_queue") {
-        return {
-          select: () => ({
-            eq: () => ({
-              in: async () => ({ data: [{ contact_id: 2 }], error: null }),
-            }),
-          }),
-        };
-      }
-      throw new Error("unexpected");
-    };
+    contactSearchMocks.searchContactsForQueuePicker.mockResolvedValueOnce([
+      contactA,
+      contactB,
+    ] as any);
+    contactSearchMocks.getQueuedContactIdsForCampaign.mockResolvedValueOnce([2]);
+    setDualAuthSession({ user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/contacts");
     const res = await asRouteResponse(await mod.loader({
@@ -199,118 +183,26 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     expect(body.contacts).toHaveLength(2);
     expect(body.contacts.find((c: any) => c.id === 2).queued).toBe(true);
 
-    // allContacts empty => returns contacts:[]
-    queueDualAuthSession({
-      supabaseClient: {
-        from: (table: string) => {
-          if (table === "contact") return makeContactQuery({ data: [], error: null });
-          throw new Error("unexpected");
-        },
-      },
-      user: { id: "u1" },
-    });
+    contactSearchMocks.searchContactsForQueuePicker.mockResolvedValueOnce([]);
     const rEmpty = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any));
     await expect(rEmpty.json()).resolves.toEqual({ contacts: [] });
 
-    // queuedError => handleError
-    queueDualAuthSession({
-      supabaseClient: {
-        from: (table: string) => {
-          if (table === "contact") return makeContactQuery({ data: [contactA], error: null });
-          if (table === "campaign_queue") {
-            return {
-              select: () => ({
-                eq: () => ({
-                  in: async () => ({ data: null, error: new Error("queued") }),
-                }),
-              }),
-            };
-          }
-          throw new Error("unexpected");
-        },
-      },
-      user: { id: "u1" },
-    });
+    contactSearchMocks.searchContactsForQueuePicker.mockResolvedValueOnce([contactA] as any);
+    contactSearchMocks.getQueuedContactIdsForCampaign.mockRejectedValueOnce(new Error("queued"));
     const rQueuedErr = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any));
     expect(rQueuedErr.status).toBe(500);
     expect(mocks.handleError).toHaveBeenCalled();
 
-    // Error path: one of the contact queries errors -> handleError
-    queueDualAuthSession({
-      supabaseClient: {
-        from: (table: string) => {
-          if (table === "contact") return makeContactQuery({ data: [], error: new Error("q") });
-          throw new Error("unexpected");
-        },
-      },
-      user: { id: "u1" },
-    });
+    contactSearchMocks.searchContactsForQueuePicker.mockRejectedValueOnce(new Error("q"));
     const resErr = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any));
     expect(resErr.status).toBe(500);
-    expect(mocks.handleError).toHaveBeenCalled();
-
-    // phoneError/emailError branches + non-Error throw wrapping
-    const qOk = makeContactQuery({ data: [contactA], error: null });
-    const qPhoneErr = makeContactQuery({ data: [], error: new Error("phone") });
-    const qEmailErr = makeContactQuery({ data: [], error: new Error("email") });
-    let i = 0;
-    queueDualAuthSession({
-      supabaseClient: {
-        from: (table: string) => {
-          if (table !== "contact") throw "nope";
-          i += 1;
-          return i === 1 ? qOk : i === 2 ? qPhoneErr : qEmailErr;
-        },
-      },
-      user: { id: "u1" },
-    });
-    const rPhone = await asRouteResponse(await mod.loader({
-      request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
-    } as any));
-    expect(rPhone.status).toBe(500);
     expect(mocks.handleError).toHaveBeenCalledWith(expect.any(Error), "Error searching contacts");
-
-    // emailError branch (3rd query error)
-    const qOk2 = makeContactQuery({ data: [contactA], error: null });
-    const qOk3 = makeContactQuery({ data: [contactB], error: null });
-    const qEmailOnlyErr = makeContactQuery({ data: [], error: new Error("email") });
-    let j = 0;
-    queueDualAuthSession({
-      supabaseClient: {
-        from: (table: string) => {
-          if (table !== "contact") throw new Error("unexpected");
-          j += 1;
-          return j === 1 ? qOk2 : j === 2 ? qOk3 : qEmailOnlyErr;
-        },
-      },
-      user: { id: "u1" },
-    });
-    const rEmail = await asRouteResponse(await mod.loader({
-      request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
-    } as any));
-    expect(rEmail.status).toBe(500);
-
-    // non-Error throw inside try -> catch wraps into Error(String(err))
-    queueDualAuthSession({
-      supabaseClient: {
-        from: (table: string) => {
-          if (table === "contact") return makeContactQuery({ data: [contactA], error: null });
-          if (table === "campaign_queue") throw "nope";
-          throw new Error("unexpected");
-        },
-      },
-      user: { id: "u1" },
-    });
-    const rNonErr = await asRouteResponse(await mod.loader({
-      request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
-    } as any));
-    expect(rNonErr.status).toBe(500);
   });
 });
 

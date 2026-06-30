@@ -13,14 +13,13 @@ import { checkSchedule, getUserRole } from "@/lib/database.server";
 import { generateToken } from "@/lib/twilio-token.server";
 import { playTone } from "@/lib/utils";
 import { redirect } from "react-router";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { Tables } from "@/lib/database.types";
-import { verifyAuth } from "@/lib/supabase.server";
+import { Tables } from "@/lib/db-types";
+import { verifyAuth } from "@/lib/auth.server";
 import type {
   LoaderData,
   QueueItem,
   OutreachAttempt,
-  UseSupabaseRealtimeProps,
+  UseWorkspaceRealtimePropsAlias,
   AppUser,
   BaseUser,
   ActiveCall,
@@ -33,12 +32,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const { campaign_id } = params;
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   if (!user || !campaign_id) {
     throw redirect("/signin");
   }
   const result = await releaseAssignedQueueForUser(
-    supabaseClient,
     user.id,
     campaign_id,
   );

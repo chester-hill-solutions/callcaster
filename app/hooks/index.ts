@@ -12,8 +12,8 @@ export { useContactSearch } from "./contact";
 export { usePhoneNumbers } from "./phone";
 export { useQueue, useAttempts, useCalls } from "./queue";
 export {
-  useSupabaseRealtime,
-  useSupabaseRealtimeSubscription,
+  useWorkspaceRealtime,
+  useWorkspaceEventSubscription,
   useRealtimeData,
   useChatRealTime,
   useConversationSummaryRealTime,

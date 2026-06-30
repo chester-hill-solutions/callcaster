@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
@@ -16,16 +16,14 @@ import {
 } from "@/lib/campaign-audience-db.server";
 import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
-import { getDualAuthSupabase, requireDualAuth } from "@/lib/api-auth.server";
+import { requireDualAuth } from "@/lib/api-auth.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getDualAuthSupabase(auth);
-  const method = request.method;
+  const { headers } = await getSession(request);  const method = request.method;
 
   try {
     if (method === "POST") {
@@ -80,7 +78,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         try {
-          await enqueueContactsForCampaign(supabase, campaignId, contactIds, { requeue: false });
+          await enqueueContactsForCampaign(campaignId, contactIds, { requeue: false });
           enqueued = contactIds.length;
         } catch (enqueueError) {
           logger.error("Audience linked but queue enqueue failed:", enqueueError);

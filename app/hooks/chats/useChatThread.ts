@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFetcher, useLoaderData, useLocation, useParams } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
-import { useInfiniteScroll } from "@/hooks";
+import { useInfiniteScroll } from "@/hooks/useIntersectionObserver";
 import { markConversationRead } from "@/lib/chats/messaging-client";
 import { isOptOutMessage } from "@/lib/chat-opt-out";
 import { logger } from "@/lib/logger.client";
@@ -16,7 +15,6 @@ type ChatThreadLoaderData = {
 };
 
 type ChatThreadOutletContext = {
-  supabase: SupabaseClient;
   workspace: NonNullable<Workspace>;
   workspaceNumbers: WorkspaceNumber[];
   registerChatActions?: (
@@ -33,11 +31,10 @@ type ChatThreadOutletContext = {
 };
 
 export function useChatThread({
-  supabase,
-  workspace,
+    workspace,
   registerChatActions,
   contactOptOut = false,
-}: Pick<ChatThreadOutletContext, "supabase" | "workspace" | "registerChatActions"> & {
+}: Pick<ChatThreadOutletContext, "client" | "workspace" | "registerChatActions"> & {
   contactOptOut?: boolean;
 }) {
   const {
@@ -64,8 +61,7 @@ export function useChatThread({
   const olderFetcher = useFetcher<ChatThreadLoaderData>();
 
   const { messages, setMessages, addOptimisticMessage } = useChatRealTime({
-    supabase,
-    initial: initialMessages,
+        initial: initialMessages,
     workspace: workspace.id,
     contact_number,
   });

@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import type { Database } from "@/lib/db-types";
 import { desc, eq } from "drizzle-orm";
 import {
   message as messageTable,
@@ -81,11 +80,8 @@ export function buildDefaultWorkspaceTwilioPortalSnapshot(): WorkspaceTwilioPort
   };
 }
 
-export async function getWorkspaceTwilioPortalSnapshot({
-  supabaseClient: _supabaseClient,
-  workspaceId,
+export async function getWorkspaceTwilioPortalSnapshot({workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
   const tdb = createTenantDb(workspaceId);

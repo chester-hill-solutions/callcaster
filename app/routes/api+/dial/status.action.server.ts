@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
@@ -13,9 +12,9 @@ import {
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const supabase = createClient(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
@@ -34,7 +33,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const validation = await validateTwilioWebhookForCallSid({
       request,
-      supabase,
+      client,
       callSid,
       params,
     });
@@ -48,7 +47,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const twilio = await createWorkspaceTwilioInstance({
-      supabase,
+      client,
       workspace_id: dbCall.workspace,
     });
     const campaign = await fetchCampaignByIdForWorkspace(
@@ -57,7 +56,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
 
     const { data: voicemailData, error: voicemailError } = campaign.voicemail_file
-      ? await supabase.storage
+      ? await adminDb.storage
           .from(`workspaceAudio`)
           .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600)
       : { data: null, error: null };

@@ -3,7 +3,6 @@
 
 import "dotenv/config";
 
-import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
 const LOCAL_APP_URL = process.env.LOCAL_APP_URL ?? "http://127.0.0.1:3000";
@@ -237,26 +236,26 @@ async function syncWorkspaceTargets({ allWorkspaces, workspaceIds, baseUrl }) {
     return [];
   }
 
-  const supabase = createClient(
-    requireEnv("SUPABASE_URL"),
-    requireEnv("SUPABASE_SERVICE_KEY"),
+  const client = createClient(
+    requireEnv("BETTER_AUTH_URL"),
+    requireEnv("BETTER_AUTH_SERVICE_KEY"),
   );
   const workspaces = await loadWorkspaces({
     allWorkspaces,
-    supabase,
+    client,
     workspaceIds,
   });
   const results = [];
 
   for (const workspace of workspaces) {
-    results.push(await syncWorkspace({ baseUrl, supabase, workspace }));
+    results.push(await syncWorkspace({ baseUrl, client, workspace }));
   }
 
   return results;
 }
 
-async function loadWorkspaces({ allWorkspaces, supabase, workspaceIds }) {
-  const query = supabase.from("workspace").select("id, name, twilio_data");
+async function loadWorkspaces({ allWorkspaces, client, workspaceIds }) {
+  const query = adminDb.from("workspace").select("id, name, twilio_data");
   const response = allWorkspaces
     ? await query
     : await query.in("id", workspaceIds);
@@ -311,7 +310,7 @@ function hasTwilioCredentials(twilioData) {
   );
 }
 
-async function syncWorkspace({ baseUrl, supabase, workspace }) {
+async function syncWorkspace({ baseUrl, client, workspace }) {
   const result = {
     errors: [],
     id: workspace.id,
@@ -325,7 +324,7 @@ async function syncWorkspace({ baseUrl, supabase, workspace }) {
       workspace.twilioData.sid,
       workspace.twilioData.authToken,
     );
-    const { data: workspaceNumbers, error } = await supabase
+    const { data: workspaceNumbers, error } = await client
       .from("workspace_number")
       .select("phone_number")
       .eq("workspace", workspace.id);
@@ -367,7 +366,7 @@ async function syncWorkspace({ baseUrl, supabase, workspace }) {
 
     await updateWorkspaceOnboardingMetadata({
       baseUrl,
-      supabase,
+      client,
       workspace,
     });
   } catch (error) {
@@ -377,7 +376,7 @@ async function syncWorkspace({ baseUrl, supabase, workspace }) {
   return result;
 }
 
-async function updateWorkspaceOnboardingMetadata({ baseUrl, supabase, workspace }) {
+async function updateWorkspaceOnboardingMetadata({ baseUrl, client, workspace }) {
   const currentTwilioData = workspace.twilioData;
   const onboarding = asRecord(currentTwilioData.onboarding);
   const subaccountBootstrap = asRecord(onboarding.subaccountBootstrap);
@@ -397,7 +396,7 @@ async function updateWorkspaceOnboardingMetadata({ baseUrl, supabase, workspace 
     },
   };
 
-  const { error } = await supabase
+  const { error } = await client
     .from("workspace")
     .update({ twilio_data: nextTwilioData })
     .eq("id", workspace.id);

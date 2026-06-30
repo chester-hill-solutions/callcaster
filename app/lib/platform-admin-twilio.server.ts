@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   createWorkspaceTwilioInstance,
   syncWorkspaceTwilioSnapshot,
@@ -6,7 +5,7 @@ import {
 } from "@/lib/database.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import {
   parseTwilioPortalConfigForm,
@@ -29,7 +28,6 @@ import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
-type Supabase = SupabaseClient<Database>;
 
 export type AdminTwilioActionResult =
   | { ok: true; message: string }
@@ -51,17 +49,15 @@ function recordToFormData(body: Record<string, unknown>): FormData {
 }
 
 export async function dispatchAdminTwilioAction({
-  supabaseClient,
   workspaceId,
   actorUserId,
   actorUsername,
   actionName,
   payload = {},
 }: {
-  supabaseClient: Supabase;
   workspaceId: string;
   actorUserId: string;
-  actorUsername: string | null;
+  actorUsername: string;
   actionName: string;
   payload?: Record<string, unknown>;
 }): Promise<AdminTwilioActionResult> {
@@ -70,7 +66,7 @@ export async function dispatchAdminTwilioAction({
   switch (actionName) {
     case "sync_twilio_workspace":
       try {
-        await syncWorkspaceTwilioSnapshot({ supabaseClient, workspaceId });
+        await syncWorkspaceTwilioSnapshot({ workspaceId });
         return { ok: true, message: "Twilio sync completed for this workspace" };
       } catch (error) {
         logger.error("Error syncing Twilio workspace snapshot:", error);
@@ -87,7 +83,6 @@ export async function dispatchAdminTwilioAction({
     case "bootstrap_workspace_messaging":
       try {
         const bootstrap = await ensureWorkspaceTwilioBootstrap({
-          supabaseClient,
           workspaceId,
           actorUserId,
         });
@@ -113,10 +108,9 @@ export async function dispatchAdminTwilioAction({
     case "audit_twilio_webhooks":
       try {
         const audit = await auditWorkspaceTwilioWebhooks({
-          supabaseClient,
           workspaceId,
         });
-        await syncWorkspaceTwilioBootstrapState({ supabaseClient, workspaceId });
+        await syncWorkspaceTwilioBootstrapState({ workspaceId });
         return {
           ok: true,
           message:
@@ -132,7 +126,6 @@ export async function dispatchAdminTwilioAction({
     case "repair_twilio_webhooks":
       try {
         const { repaired } = await repairWorkspaceTwilioWebhooks({
-          supabaseClient,
           workspaceId,
           actorUserId,
         });
@@ -150,7 +143,7 @@ export async function dispatchAdminTwilioAction({
 
     case "run_billing_reconciliation":
       try {
-        const twilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+        const twilioData = await loadWorkspaceTwilioData(workspaceId);
         const creds = readTwilioWorkspaceCredentials(twilioData);
         if (!creds?.sid) {
           return {
@@ -160,9 +153,7 @@ export async function dispatchAdminTwilioAction({
           };
         }
 
-        const twilio = await createWorkspaceTwilioInstance({
-          supabase: supabaseClient,
-          workspace_id: workspaceId,
+        const twilio = await createWorkspaceTwilioInstance({           workspace_id: workspaceId,
         });
         const usageRecords = await twilio.usage.records.list();
         const twilioUsage = usageRecords.map((record) => ({
@@ -176,12 +167,10 @@ export async function dispatchAdminTwilioAction({
         }));
 
         const report = await loadBillingReconciliationReport({
-          supabaseClient,
           workspaceId,
           twilioUsage,
         });
         const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
-          supabaseClient,
           workspaceId,
           report,
           source: "admin",
@@ -200,7 +189,7 @@ export async function dispatchAdminTwilioAction({
 
     case "trigger_twilio_open_sync":
       try {
-        const { data, error } = await supabaseClient.functions.invoke(
+        const { data, error } = await null.functions.invoke(
           "twilio-open-sync",
           {
             body: {
@@ -229,7 +218,6 @@ export async function dispatchAdminTwilioAction({
     case "sync_a2p_status":
       try {
         await syncWorkspaceA2pStatus({
-          supabaseClient,
           workspaceId,
           actorUserId,
         });
@@ -242,7 +230,6 @@ export async function dispatchAdminTwilioAction({
     case "verify_sender_pool":
       try {
         const result = await verifyWorkspaceMessagingSenderPool({
-          supabaseClient,
           workspaceId,
         });
         return {
@@ -259,7 +246,6 @@ export async function dispatchAdminTwilioAction({
     case "provision_workspace_a2p":
       try {
         await provisionWorkspaceA2P({
-          supabaseClient,
           workspaceId,
           actorUserId,
         });
@@ -280,7 +266,6 @@ export async function dispatchAdminTwilioAction({
       try {
         const rcsForm = parseTwilioRcsOnboardingForm(formData);
         await updateWorkspaceRcsOnboarding({
-          supabaseClient,
           workspaceId,
           actorUserId,
           provider: TWILIO_RCS_PROVIDER,
@@ -318,7 +303,6 @@ export async function dispatchAdminTwilioAction({
       try {
         const updates = parseTwilioPortalConfigForm(formData);
         await updateWorkspaceTwilioPortalConfig({
-          supabaseClient,
           workspaceId,
           actorUserId,
           actorUsername,

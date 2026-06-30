@@ -2,13 +2,14 @@ import { csvResponse, toCsvString, type CsvCell } from "@/lib/csv";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import {
+  listAudienceContactsForExport,
+  listAudienceContactsJson,
+} from "@/lib/database/contact-audience.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 
-interface SupabaseResponse {
-    supabaseClient: SupabaseClient;
+interface AuthSessionResponse {
     headers: Headers;
 }
 
@@ -17,16 +18,42 @@ interface OtherDataItem {
     value: string | number | boolean;
 }
 
-interface AudienceData {
-    id: number;
-    [key: string]: string | number | boolean | null | undefined;
-}
-
 type AudiencesDeps = {
-  verifyAuth: (request: Request) => Promise<{ supabaseClient: SupabaseResponse["supabaseClient"]; headers: Headers; user?: any }>;
+  verifyAuth: (request: Request) => Promise<{ user: { id: string }; headers: Headers }>;
   parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
   requireWorkspaceAccess: (args: unknown) => Promise<void>;
 };
+
+const AUDIENCE_CONTACT_SORT_KEYS = new Set([
+  "id",
+  "firstname",
+  "surname",
+  "phone",
+  "email",
+  "address",
+  "city",
+  "province",
+  "postal",
+  "country",
+  "created_at",
+]);
+
+function flattenAudienceExportRows(rawData: Array<Record<string, unknown>>) {
+  return rawData.map((row) => {
+    const flatRow: Record<string, unknown> = { ...row };
+    if (row.other_data && Array.isArray(row.other_data) && row.other_data.length > 0) {
+      const otherData = row.other_data as unknown as OtherDataItem[];
+      otherData.forEach((item) => {
+        if (item && typeof item === "object" && "key" in item && "value" in item) {
+          flatRow[item.key] = item.value;
+        }
+      });
+    }
+    delete flatRow.other_data;
+    delete flatRow.contact;
+    return flatRow;
+  });
+}
 
 export const loader = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {
 
@@ -35,7 +62,7 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
       parseActionRequest: deps?.parseActionRequest ?? parseActionRequest,
       requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
     };
-    const { supabaseClient, headers, user } = await d.verifyAuth(request);
+    const { headers, user } = await d.verifyAuth(request);
     const url = new URL(request.url);
     const audienceId = url.searchParams.get('audienceId');
     const returnType = url.searchParams.get('returnType');
@@ -60,69 +87,17 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
           return routeData({ error: "Audience not found" }, { status: 404, headers });
         }
         await d.requireWorkspaceAccess({
-          supabaseClient,
           user,
           workspaceId: audienceWorkspace,
         });
 
-        let query = supabaseClient
-          .from('contact_audience')
-          .select(`*,...contact!inner(*)`)
-          .eq('audience_id', id);
-
-        // Search parity: mirror UI's search over contact fields.
-        if (q) {
-          const pattern = `%${q}%`;
-          query = query.or(
-            [
-              `contact.firstname.ilike.${pattern}`,
-              `contact.surname.ilike.${pattern}`,
-              `contact.email.ilike.${pattern}`,
-              `contact.phone.ilike.${pattern}`,
-            ].join(","),
-          );
-        }
-
-        // Sorting parity: mirror UI ordering by embedded contact fields when applicable.
-        const allowedContactSortKeys = new Set([
-          "id",
-          "firstname",
-          "surname",
-          "phone",
-          "email",
-          "address",
-          "city",
-          "province",
-          "postal",
-          "country",
-          "created_at",
-        ]);
-        if (allowedContactSortKeys.has(sortKey)) {
-          query = query.order(`contact(${sortKey})`, {
-            ascending: sortDirection === "asc",
-          });
-        }
-
-        const { data: rawData, error } = await query;
-        if (error) {
-            logger.error("Error fetching contact audience data:", error);
-            throw error;
-        }
-
-        // Process the raw data to flatten nested objects
-        const processedData = rawData?.map((row) => {
-            const flatRow: Record<string, unknown> = { ...row };
-            if (row.other_data && Array.isArray(row.other_data) && row.other_data.length > 0) {
-                const otherData = row.other_data as unknown as OtherDataItem[];
-                otherData.forEach((item) => {
-                    if (item && typeof item === 'object' && 'key' in item && 'value' in item) {
-                        flatRow[item.key] = item.value;
-                    }
-                });
-            }
-            delete flatRow.other_data;
-            return flatRow;
+        const rawData = await listAudienceContactsForExport(audienceWorkspace, id, {
+          q: q || undefined,
+          sortKey: AUDIENCE_CONTACT_SORT_KEYS.has(sortKey) ? sortKey : undefined,
+          sortDirection,
         });
+
+        const processedData = flattenAudienceExportRows(rawData);
 
         // Deterministic headers: stable ordering across runs.
         const firstProcessedRow =
@@ -143,19 +118,19 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
         });
     }
     // Handle regular JSON response
-    const query = supabaseClient.from('contact_audience').select(`*,...contact!inner(*)`);
+    let parsedAudienceId: number | undefined;
     if (audienceId) {
         const id = parseInt(audienceId, 10);
         if (!isNaN(id)) {
-            query.eq('audience_id', id);
+            parsedAudienceId = id;
         }
     }
 
-    const { data, error } = await query;
-    if (error) {
-        logger.error("Error fetching contact audience data:", error);
-        throw error;
+    try {
+      const data = await listAudienceContactsJson(parsedAudienceId);
+      return routeData({ data }, { headers });
+    } catch (error) {
+      logger.error("Error fetching contact audience data:", error);
+      throw error;
     }
-
-    return routeData({ data }, { headers });
 }

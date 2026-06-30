@@ -8,14 +8,14 @@ import {
 } from "@/lib/database.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const { id: workspaceId } = params;
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
@@ -64,7 +64,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }),
     contact_number
       ? fetchContactData(
-          supabaseClient,
           workspaceId,
           contact_id,
           contact_number,
@@ -113,7 +112,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const { chats, chatsError, hasMore } = await fetchConversationSummary(
-    supabaseClient,
     workspaceId,
     campaign_id,
     {

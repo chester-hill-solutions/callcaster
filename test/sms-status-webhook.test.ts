@@ -24,7 +24,7 @@ vi.mock("twilio", () => {
   };
 });
 
-function makeSupabaseStub(args?: { currentOutreachDisposition?: string }) {
+function makeDbClientStub(args?: { currentOutreachDisposition?: string }) {
   const transactionRows: TransactionRow[] = [];
   const outreachUpdateCalls: any[] = [];
   const messageUpdateCalls: any[] = [];
@@ -128,16 +128,16 @@ function makeSupabaseStub(args?: { currentOutreachDisposition?: string }) {
   };
 }
 
-let supabaseStub: ReturnType<typeof makeSupabaseStub>;
-vi.mock("@supabase/supabase-js", () => {
+let postgresStub: ReturnType<typeof makeDbClientStub>;
+vi.mock("@client/client-js", () => {
   return {
-    createClient: () => supabaseStub as any,
+    createClient: () => postgresStub as any,
   };
 });
 
 describe("api.sms.status webhook behavior", () => {
   beforeEach(() => {
-    supabaseStub = makeSupabaseStub({ currentOutreachDisposition: "delivered" });
+    postgresStub = makeDbClientStub({ currentOutreachDisposition: "delivered" });
     twilioValidateRequest.mockReset();
     twilioValidateRequest.mockReturnValue(true);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
@@ -174,7 +174,7 @@ describe("api.sms.status webhook behavior", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.message.status).toBe("failed");
-    expect(supabaseStub._messageUpdateCalls.at(-1)).toMatchObject({
+    expect(postgresStub._messageUpdateCalls.at(-1)).toMatchObject({
       status: "failed",
     });
   });
@@ -193,7 +193,7 @@ describe("api.sms.status webhook behavior", () => {
 
     const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(200);
-    expect(supabaseStub._outreachUpdateCalls.length).toBe(0);
+    expect(postgresStub._outreachUpdateCalls.length).toBe(0);
   });
 
   test("accepts MessageStatus when SmsStatus is absent", async () => {
@@ -209,7 +209,7 @@ describe("api.sms.status webhook behavior", () => {
 
     const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(200);
-    expect(supabaseStub._messageUpdateCalls.at(-1)).toMatchObject({
+    expect(postgresStub._messageUpdateCalls.at(-1)).toMatchObject({
       status: "delivered",
     });
   });
@@ -230,7 +230,7 @@ describe("api.sms.status webhook behavior", () => {
     await mod.action({ request: makeReq() } as any);
     await mod.action({ request: makeReq() } as any);
 
-    const matching = supabaseStub._transactionRows.filter((r) =>
+    const matching = postgresStub._transactionRows.filter((r) =>
       r.idempotency_key === "sms:SM_DUP",
     );
     expect(matching.length).toBe(1);

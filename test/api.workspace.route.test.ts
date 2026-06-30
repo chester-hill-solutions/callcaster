@@ -16,15 +16,15 @@ const mocks = vi.hoisted(() => ({
   ),
   logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   env: {
-    SUPABASE_URL: () => "https://sb.example",
-    SUPABASE_SERVICE_KEY: () => "svc",
+    BETTER_AUTH_URL: () => "https://sb.example",
+    BETTER_AUTH_SERVICE_KEY: () => "svc",
   },
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: mocks.createClient,
 }));
-vi.mock("@/lib/supabase.server", () => ({
+vi.mock("@/lib/auth.server", () => ({
   verifyAuth: mocks.verifyAuth,
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -46,9 +46,7 @@ describe("app/routes/api+/workspace/route.tsx", () => {
     mocks.createErrorResponse.mockClear();
     mocks.logger.error.mockReset();
 
-    setDualAuthSession({
-      supabaseClient: {},
-      user: { id: "u1" },
+    setDualAuthSession({ user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
   });

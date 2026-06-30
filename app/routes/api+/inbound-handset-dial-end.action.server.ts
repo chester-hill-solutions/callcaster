@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { isEmail } from "@/lib/utils";
 import {
@@ -9,16 +8,16 @@ import { findWorkspaceNumberInboundFallbackByPhone } from "@/lib/inbound-call-db
 import { validateTwilioWebhookForPhoneNumber } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
-    return new Response(null, { status: 405 });
+    return new Response({ status: 405 });
   }
 
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
+  const client = createClient<Database>(
+    env.BASE_URL(),
+    env.BASE_URL(),
   );
 
   const formData = await request.formData();
@@ -28,7 +27,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForPhoneNumber({
     request,
-    supabase,
+    client,
     phoneNumber: called,
     params,
   });
@@ -45,7 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (workspaceId && inboundAction && isEmail(inboundAction)) {
       const voicemail = await resolveInboundVoicemailAudio({
-        supabase,
+        client,
         workspaceId,
         inboundAudio: number?.inbound_audio ?? null,
       });

@@ -9,10 +9,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
@@ -40,7 +38,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("add_from_audience routes contacts through enqueue helper", async () => {
-    const supabaseClient = {
+    const null = {
       from: vi.fn((table: string) => {
         if (table !== "contact_audience") {
           throw new Error(`unexpected table ${table}`);
@@ -57,7 +55,6 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -76,7 +73,6 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
-      supabaseClient,
       99,
       [11, 12],
       { requeue: false },
@@ -84,14 +80,13 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("add_contacts routes direct contacts through enqueue helper", async () => {
-    const supabaseClient = {
+    const null = {
       from: vi.fn(() => {
         throw new Error("unexpected from()");
       }),
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -110,7 +105,6 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
-      supabaseClient,
       77,
       [21, 22],
       { requeue: false },
@@ -118,7 +112,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("add_from_audience returns contact lookup errors before enqueueing", async () => {
-    const supabaseClient = {
+    const null = {
       from: vi.fn(() => ({
         select: () => ({
           eq: async () => ({
@@ -130,7 +124,6 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -175,7 +168,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       then: (resolve: (value: typeof queueQueryResult) => unknown) =>
         Promise.resolve(resolve(queueQueryResult)),
     };
-    const supabaseClient = {
+    const null = {
       from: vi.fn((table: string) => {
         if (table === "campaign_audience") {
           return {
@@ -197,7 +190,6 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
 
@@ -241,7 +233,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
         in: updateIn,
       }),
     };
-    const supabaseClient = {
+    const null = {
       from: vi.fn((table: string) => {
         if (table === "campaign_queue") {
           return queueChain;
@@ -252,7 +244,6 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({

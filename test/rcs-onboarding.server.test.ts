@@ -185,11 +185,10 @@ describe("RCS onboarding helpers", () => {
         },
       ),
     };
-    const supabase = configureTwilioData(starting);
+    const client = configureTwilioData(starting);
 
     const result = await updateWorkspaceRcsOnboarding({
-      supabaseClient: supabase as any,
-      workspaceId: "w1",
+            workspaceId: "w1",
       actorUserId: "u1",
       provider: null,
       displayName: "Acme Alerts",
@@ -224,8 +223,7 @@ describe("RCS onboarding helpers", () => {
 
     await expect(
       updateWorkspaceRcsOnboarding({
-        supabaseClient: configureTwilioData({}, { selectError }) as any,
-        workspaceId: "w1",
+                workspaceId: "w1",
         actorUserId: null,
         provider: null,
         displayName: "",
@@ -249,8 +247,7 @@ describe("RCS onboarding helpers", () => {
 
     await expect(
       updateWorkspaceRcsOnboarding({
-        supabaseClient: configureTwilioData({}, { updateError }) as any,
-        workspaceId: "w1",
+                workspaceId: "w1",
         actorUserId: null,
         provider: null,
         displayName: "",

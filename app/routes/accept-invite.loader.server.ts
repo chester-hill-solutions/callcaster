@@ -1,14 +1,11 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { getInvitesByUserId } from "@/lib/database.server";
 import { listUserInvitesWithWorkspace } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
-import type {
-  EmailOtpType,
-  Session,
-  SupabaseClient,
-  VerifyTokenHashParams,
-} from "@supabase/supabase-js";
+import { auth } from "@/server/auth-instance";
+import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
+import { getUserById } from "@/lib/workspace-members-db.server";
 import type {
   ExistingUserInvite,
   LoaderData,
@@ -20,19 +17,26 @@ async function fetchInvitesWithWorkspace(userId: string): Promise<ExistingUserIn
   return listUserInvitesWithWorkspace(userId);
 }
 
+function isDefaultNewUserProfile(user: {
+  first_name?: string | null;
+  last_name?: string | null;
+}): boolean {
+  return user.first_name === "New" && user.last_name === "Caller";
+}
+
 async function handleAuthenticatedUser(
-  client: SupabaseClient<Database>,
-  session: Session,
+  userId: string,
+  email: string,
   headers: Headers,
 ) {
-  const email = session.user.email ?? "";
-  const isNewUser =
-    session.user.user_metadata.first_name === "New" &&
-    session.user.user_metadata.last_name === "Caller";
+  const profile = await getUserById(userId);
+  const isNewUser = profile
+    ? isDefaultNewUserProfile(profile)
+    : false;
 
   if (isNewUser) {
     const invites =
-      ((await getInvitesByUserId(session.user.id)) as WorkspaceInviteRow[] | null) ??
+      ((await getInvitesByUserId(userId)) as WorkspaceInviteRow[] | null) ??
       [];
     return routeData<LoaderData>(
       {
@@ -44,7 +48,7 @@ async function handleAuthenticatedUser(
     );
   }
 
-  const invites = await fetchInvitesWithWorkspace(session.user.id);
+  const invites = await fetchInvitesWithWorkspace(userId);
 
   return routeData<LoaderData>(
     {
@@ -57,54 +61,39 @@ async function handleAuthenticatedUser(
 }
 
 async function handleTokenVerification(
-  client: SupabaseClient<Database>,
-  token_hash: VerifyTokenHashParams["token_hash"],
-  type: VerifyTokenHashParams["type"],
+  request: Request,
+  token_hash: string,
   email: string,
   headers: Headers,
 ) {
   try {
-    const { data: verifyData, error: verifyError } = await client.auth.verifyOtp({
-      token_hash,
-      type,
+    const result = await auth.api.verifyEmail({
+      query: { token: token_hash },
+      headers: request.headers,
+      returnHeaders: true,
     });
+    const mergedHeaders = mergeBetterAuthSetCookieHeaders(result?.headers, headers);
+    const payload = result?.response ?? result;
 
-    if (verifyError || !verifyData.session) {
-      if (
-        (verifyError &&
-          verifyError.message.includes("Email link is invalid or has expired")) ||
-        !verifyData.session
-      ) {
-        return routeData<LoaderData>(
-          {
-            status: "invalid_link",
-            error:
-              "The invitation link is invalid or has expired. Please request a new invitation.",
-          },
-          { headers },
-        );
-      }
-      throw verifyError;
+    if (!payload?.user) {
+      return routeData<LoaderData>(
+        {
+          status: "invalid_link",
+          error:
+            "The invitation link is invalid or has expired. Please request a new invitation.",
+        },
+        { headers: mergedHeaders },
+      );
     }
 
-    const { data: sessionData, error: setSessionError } = await client.auth.setSession({
-      access_token: verifyData.session.access_token,
-      refresh_token: verifyData.session.refresh_token,
-    });
-
-    if (setSessionError || !sessionData.session || !sessionData.user) {
-      throw setSessionError ?? new Error("Unable to establish session");
-    }
-
-    await client.auth.refreshSession(sessionData.session);
-
-    const isNewUser =
-      sessionData.user.user_metadata.first_name === "New" &&
-      sessionData.user.user_metadata.last_name === "Caller";
+    const profile = await getUserById(payload.user.id);
+    const isNewUser = profile
+      ? isDefaultNewUserProfile(profile)
+      : false;
 
     if (isNewUser) {
       const invites =
-        ((await getInvitesByUserId(sessionData.user.id)) as
+        ((await getInvitesByUserId(payload.user.id)) as
           | WorkspaceInviteRow[]
           | null) ?? [];
       return routeData<LoaderData>(
@@ -113,11 +102,11 @@ async function handleTokenVerification(
           email,
           invites,
         },
-        { headers },
+        { headers: mergedHeaders },
       );
     }
 
-    const invites = await fetchInvitesWithWorkspace(sessionData.user.id);
+    const invites = await fetchInvitesWithWorkspace(payload.user.id);
 
     return routeData<LoaderData>(
       {
@@ -125,7 +114,7 @@ async function handleTokenVerification(
         email,
         invites,
       },
-      { headers },
+      { headers: mergedHeaders },
     );
   } catch (error) {
     logger.error("Unhandled error during token verification", error);
@@ -142,27 +131,19 @@ async function handleTokenVerification(
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
-  const {
-    data: { session },
-  } = await supabaseClient.auth.getSession();
+  const { user, headers } = await getSession(request);
   const url = new URL(request.url);
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type");
   const email = url.searchParams.get("email");
-  if (session) {
-    return handleAuthenticatedUser(supabaseClient, session, headers);
+
+  if (user) {
+    return handleAuthenticatedUser(user.id, user.email ?? "", headers);
   }
 
   if (token_hash && type) {
     if (!email) throw new Error("No email address found.");
-    return handleTokenVerification(
-      supabaseClient,
-      token_hash,
-      type as EmailOtpType,
-      email,
-      headers,
-    );
+    return handleTokenVerification(request, token_hash, email, headers);
   }
 
   return routeData<LoaderData>({ status: "not_signed_in" }, { headers });

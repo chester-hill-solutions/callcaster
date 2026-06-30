@@ -6,9 +6,8 @@ import {
 import { data as routeData, redirect } from "react-router";
 import { deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { getUserRole, getWorkspaceInfoWithDetails, getWorkspacePhoneNumbers } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 import type { User } from "@/lib/types";
 
@@ -20,16 +19,14 @@ type LoaderData = {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!workspaceId) {
     throw new Error("No workspace found");
   }
 
   const userRole = (
-    await getUserRole({
-      supabaseClient: supabaseClient as SupabaseClient,
-      user: user,
+    await getUserRole({user: user,
       workspaceId: workspaceId as string,
     })
   )?.role;
@@ -37,11 +34,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const pathname = new URL(request.url).pathname;
     const [onboarding, phoneNumbersResult] = await Promise.all([
       getWorkspaceMessagingOnboardingState({
-        supabaseClient,
         workspaceId: workspaceId as string,
       }),
       getWorkspacePhoneNumbers({
-        supabaseClient,
         workspaceId: workspaceId as string,
       }),
     ]);
@@ -63,7 +58,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
 
     const workspacePromise = getWorkspaceInfoWithDetails({
-      supabaseClient,
       workspaceId,
       userId: user.id,
     });

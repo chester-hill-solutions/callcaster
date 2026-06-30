@@ -19,9 +19,9 @@ const mocks = vi.hoisted(() => {
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
     env: {
       BASE_URL: vi.fn(() => "http://base"),
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
-      SUPABASE_SERVICE_KEY: vi.fn(() => "service-key"),
+      BETTER_AUTH_URL: vi.fn(() => "http://client"),
+      BETTER_AUTH_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
+      BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service-key"),
     },
     VoiceResponse,
     say,
@@ -33,13 +33,11 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: mocks.createClient,
 }));
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers({ "Set-Cookie": "a=1" }),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers({ "Set-Cookie": "a=1" }),
   }),
 }));
 vi.mock("@/lib/database.server", () => ({
@@ -52,7 +50,7 @@ vi.mock("twilio", () => ({
   default: { twiml: { VoiceResponse: mocks.VoiceResponse } },
 }));
 
-function makeSupabase(opts: {
+function makeDbClient(opts: {
   insertResult?: { data: any; error: any };
   deleteSpy?: any;
 }) {
@@ -99,7 +97,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
 
   test("loader returns 401 when user missing", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
+      null: makeDbClient({}),
       headers: new Headers(),
       user: null,
     });
@@ -113,7 +111,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
 
   test("loader throws for invalid phone normalization length", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
+      null: makeDbClient({}),
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -130,12 +128,12 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
   });
 
   test("loader returns 500 when verification insert errors", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       insertResult: { data: null, error: { message: "ins" } },
     });
-    mocks.serviceClientHolder.value = supabase;
+    mocks.serviceClientHolder.value = client;
     queueJsonAuthSession({
-      supabaseClient: supabase,
+      null: client,
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -150,11 +148,11 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
 
   test("loader success calls twilio and returns verification info with headers", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       insertResult: { data: { id: 9, pin: "123456" }, error: null },
     });
-    mocks.serviceClientHolder.value = supabase;
-    queueJsonAuthSession({ supabaseClient: supabase, headers, user: { id: "u1" } });
+    mocks.serviceClientHolder.value = client;
+    queueJsonAuthSession({ null: client, headers, user: { id: "u1" } });
     const create = vi.fn(async () => ({ sid: "CA1" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create } });
 
@@ -179,12 +177,12 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
   });
 
   test("loader normalizes numbers (plus not at start, adds +1) and succeeds", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       insertResult: { data: { id: 3, pin: "222222" }, error: null },
     });
-    mocks.serviceClientHolder.value = supabase;
+    mocks.serviceClientHolder.value = client;
     queueJsonAuthSession({
-      supabaseClient: supabase,
+      null: client,
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -202,12 +200,12 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
   });
 
   test("loader keeps leading '+' when already present", async () => {
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       insertResult: { data: { id: 4, pin: "333333" }, error: null },
     });
-    mocks.serviceClientHolder.value = supabase;
+    mocks.serviceClientHolder.value = client;
     queueJsonAuthSession({
-      supabaseClient: supabase,
+      null: client,
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -226,13 +224,13 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
 
   test("loader twilio create failure deletes verification record and returns 500", async () => {
     const delEq = vi.fn(async () => ({}));
-    const supabase = makeSupabase({
+    const client = makeDbClient({
       insertResult: { data: { id: 2, pin: "999999" }, error: null },
       deleteSpy: delEq,
     });
-    mocks.serviceClientHolder.value = supabase;
+    mocks.serviceClientHolder.value = client;
     queueJsonAuthSession({
-      supabaseClient: supabase,
+      null: client,
       headers: new Headers(),
       user: { id: "u1" },
     });

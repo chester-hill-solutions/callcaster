@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { createBillingCheckoutSession } from "@/lib/platform-billing.server";
@@ -30,7 +28,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     `billing:checkout:${workspaceId}`,
     async () => {
       const result = await createBillingCheckoutSession({
-        supabase: getAuthSupabaseClient(auth),
+        client: null /* removed */ (auth),
         userId: auth.user.id,
         workspaceId,
         amount: parsed.amount,

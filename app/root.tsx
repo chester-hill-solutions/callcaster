@@ -10,14 +10,12 @@ import {
   useRouteError,
 } from "react-router";
 import type { LinksFunction } from "react-router";
-import { createBrowserClient } from "@supabase/ssr";
-import { useEffect, useMemo } from "react";
+import { useCallback } from "react";
 import { Toaster } from "sonner";
 
 import Navbar from "@/components/layout/Navbar";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import stylesheet from "@/tailwind.css?url";
-import { Database } from "./lib/database.types";
 
 import type { RootLoaderData } from "./root.loader.server";
 
@@ -44,39 +42,25 @@ export default function App() {
   const { env, session, workspaces, user, params } =
     useLoaderData<RootLoaderData>();
 
-  const supabase = useMemo(
-    () =>
-      createBrowserClient<Database>(env.SUPABASE_URL!, env.SUPABASE_KEY!),
-    [env.SUPABASE_KEY, env.SUPABASE_URL],
-  );
-
-  const serverAccessToken = session?.access_token ?? null;
+  const isSignedIn = session?.token != null;
   const navigate = useNavigate();
 
-  async function signOut(): Promise<{
+  const signOut = useCallback(async (): Promise<{
     success: string | null;
     error: string | null;
-  }> {
-    const { error: signOutError } = await supabase.auth.signOut();
-
-    if (signOutError) {
-      return { success: null, error: signOutError.message };
-    }
-    navigate("/");
-    return { success: "Sign off successful", error: null };
-  }
-
-  useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        navigate("/reset");
-      }
+  }> => {
+    const response = await fetch("/api/auth/sign-out", {
+      method: "POST",
+      credentials: "include",
     });
 
-    return () => {
-      data.subscription.unsubscribe();
-    };
-  }, [navigate, serverAccessToken, supabase]);
+    if (!response.ok) {
+      return { success: null, error: "Sign out failed" };
+    }
+
+    navigate("/");
+    return { success: "Sign off successful", error: null };
+  }, [navigate]);
 
   return (
     <html lang="en">
@@ -102,11 +86,11 @@ export default function App() {
             className="bg-brand-secondary"
             handleSignOut={signOut}
             workspaces={workspaces}
-            isSignedIn={serverAccessToken != null}
+            isSignedIn={isSignedIn}
             user={user ?? null}
             params={params}
           />
-          <Outlet context={{ env, supabase }} />
+          <Outlet context={{ env }} />
           <Toaster position="top-right" richColors visibleToasts={3} />
           <ScrollRestoration />
           <Scripts />
@@ -118,30 +102,35 @@ export default function App() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
-  const message = isRouteErrorResponse(error)
-    ? `${error.status} ${error.statusText}`
-    : error instanceof Error
-      ? error.message
-      : "An unexpected error occurred";
+
+  if (isRouteErrorResponse(error)) {
+    return (
+      <html lang="en">
+        <head>
+          <title>{error.status}</title>
+          <Meta />
+          <Links />
+        </head>
+        <body>
+          <h1>
+            {error.status} {error.statusText}
+          </h1>
+          <p>{error.data}</p>
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang="en">
+      <head>
+        <title>Unexpected Error</title>
+        <Meta />
+        <Links />
+      </head>
       <body>
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
-            <h3 className="text-lg font-medium text-gray-900">
-              Something went wrong
-            </h3>
-            <p className="mt-2 text-sm text-gray-500">{message}</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-4 inline-flex items-center px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
-            >
-              Reload Page
-            </button>
-          </div>
-        </div>
+        <h1>Unexpected Error</h1>
+        <p>{error instanceof Error ? error.message : "Unknown error"}</p>
       </body>
     </html>
   );

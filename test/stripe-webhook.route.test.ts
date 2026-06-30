@@ -6,8 +6,8 @@ vi.mock("@/lib/env.server", () => ({
   env: {
     STRIPE_SECRET_KEY: () => "sk_test",
     STRIPE_WEBHOOK_SECRET: () => "",
-    SUPABASE_URL: () => "http://supabase.test",
-    SUPABASE_SERVICE_KEY: () => "service-key",
+    BETTER_AUTH_URL: () => "http://adminDb.test",
+    BETTER_AUTH_SERVICE_KEY: () => "service-key",
   },
 }));
 

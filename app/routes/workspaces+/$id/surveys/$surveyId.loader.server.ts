@@ -2,11 +2,11 @@ import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { getSurveyDetailApi } from "@/lib/platform-data.server";
 import { loadRecentSurveyResponses } from "@/lib/survey-db.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;
 
   if (!workspaceId || !surveyId) {
@@ -14,7 +14,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const userRole = await getUserRole({
-    supabaseClient,
     user,
     workspaceId,
   });
@@ -23,7 +22,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Unauthorized", { status: 403 });
   }
 
-  const result = await getSurveyDetailApi(supabaseClient, surveyId, workspaceId);
+  const result = await getSurveyDetailApi(surveyId, workspaceId);
   if (!result.ok) {
     throw new Response(result.error, { status: result.status });
   }

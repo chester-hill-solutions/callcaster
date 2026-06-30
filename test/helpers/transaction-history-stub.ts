@@ -17,7 +17,7 @@ export function uniqueViolationError(message = "duplicate"): Error & { code: str
 }
 
 /**
- * Supabase `rpc("apply_ledger_entry_and_sync_credits", ...)` stub.
+ * Postgres `rpc("apply_ledger_entry_and_sync_credits", ...)` stub.
  * Simulates the plpgsql RPC: idempotent insert with `inserted` flag.
  * Shares the same in-memory row array as `makeTransactionHistoryTableStub`
  * so tests can inspect results via `_transactionRows`.
@@ -87,7 +87,7 @@ export function makeApplyLedgerEntryRpcStub(transactionRows: TransactionRow[]) {
   };
 }
 
-/** Supabase stub for insertTransactionHistoryIdempotent (idempotency_key column). */
+/** Postgres stub for insertTransactionHistoryIdempotent (idempotency_key column). */
 export function makeTransactionHistoryTableStub(transactionRows: TransactionRow[]) {
   let nextId = 1;
   const q: {

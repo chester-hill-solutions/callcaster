@@ -34,16 +34,14 @@ vi.mock("@/lib/audio.server", () => ({
   getSafeMediaBaseName: (...args: unknown[]) => mocks.getSafeMediaBaseName(...args),
   normalizeUploadedAudio: (...args: unknown[]) => mocks.normalizeUploadedAudio(...args),
 }));
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-function makeSupabase(opts?: { uploadError?: unknown }) {
+function makeDbClient(opts?: { uploadError?: unknown }) {
   const upload = vi.fn(async () => ({
     data: opts?.uploadError ? null : { path: "workspaceAudio/w1/greeting.mp3" },
     error: opts?.uploadError ?? null,
@@ -71,9 +69,9 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
   });
 
   test("normalizes the upload before storing a canonical mp3", async () => {
-    const supabase = makeSupabase();
+    const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient: supabase.client,
+      null: adminDb.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockResolvedValueOnce({
@@ -102,7 +100,7 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     expect(response.headers.get("Location")).toBe("../audios?uploaded=1");
     expect(mocks.normalizeUploadedAudio).toHaveBeenCalledTimes(1);
     expect(mocks.getSafeMediaBaseName).toHaveBeenCalledWith(" Greeting ");
-    expect(supabase.upload).toHaveBeenCalledWith(
+    expect(adminDb.upload).toHaveBeenCalledWith(
       "w1/Greeting.mp3",
       Buffer.from("normalized-audio"),
       {
@@ -114,9 +112,9 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
   });
 
   test("returns a validation error when no file is provided", async () => {
-    const supabase = makeSupabase();
+    const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient: supabase.client,
+      null: adminDb.client,
       headers: new Headers(),
     });
 
@@ -138,13 +136,13 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Please choose an audio file to upload.",
     });
     expect(mocks.normalizeUploadedAudio).not.toHaveBeenCalled();
-    expect(supabase.upload).not.toHaveBeenCalled();
+    expect(adminDb.upload).not.toHaveBeenCalled();
   });
 
   test("returns helper failures without uploading invalid audio", async () => {
-    const supabase = makeSupabase();
+    const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient: supabase.client,
+      null: adminDb.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockRejectedValueOnce(
@@ -173,6 +171,6 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Unsupported audio format.",
     });
     expect(mocks.logger.error).toHaveBeenCalled();
-    expect(supabase.upload).not.toHaveBeenCalled();
+    expect(adminDb.upload).not.toHaveBeenCalled();
   });
 });

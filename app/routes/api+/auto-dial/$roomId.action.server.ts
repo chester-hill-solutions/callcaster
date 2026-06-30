@@ -1,9 +1,10 @@
 import { Call } from "@/lib/types";
 import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
-import { Database, Tables } from "@/lib/database.types";
+import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
-import { getServiceSupabase } from "@/lib/supabase.server";
+import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 import { logger } from "@/lib/logger.server";
 import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
@@ -16,7 +17,7 @@ import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import Twilio from "twilio";
 
-const getSupabase = () => getServiceSupabase();
+const getAdmin = () => null /* removed service client */;
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
   const row = await findCallBySid(callSid);
@@ -36,9 +37,9 @@ const fetchCampaignData = async (campaignId: string, workspaceId: string) => {
 };
 
 const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) => {
-  const supabase = getSupabase();
+  const client = getAdmin();
     if (!voicemailFile) return null;
-    const { data, error } = await supabase.storage.from('workspaceAudio').createSignedUrl(`${workspace}/${voicemailFile}`, 3600);
+    const { data, error } = await adminDb.storage.from('workspaceAudio').createSignedUrl(`${workspace}/${voicemailFile}`, 3600);
     if (error) throw new Error(`Error fetching voicemail file: ${error.message}`);
     return data.signedUrl;
 };
@@ -49,16 +50,13 @@ const dequeueContact = async (
   userId: string,
   campaignId?: number | null,
 ) => {
-  const supabase = getSupabase();
     if (groupOnHousehold) {
-        const { data, error } = await supabase.rpc('dequeue_contact', {
-            passed_contact_id: Number(contactId),
-            group_on_household: groupOnHousehold,
-            dequeued_by_id: userId,
-            dequeued_reason_text: "Auto-dial completed"
+        return await rpcDequeueContact(db, {
+            contactId: Number(contactId),
+            groupOnHousehold,
+            dequeuedById: userId,
+            dequeuedReasonText: "Auto-dial completed",
         });
-        if (error) throw new Error(`Error dequeueing household: ${error.message}`);
-        return data;
     }
 
     try {
@@ -186,10 +184,10 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
 }
 
 export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
-  const supabase = getSupabase();
+  const client = getAdmin();
 
     const conferenceName = params.roomId;
-    const realtime = supabase.realtime.channel(conferenceName)
+    const realtime = adminDb.realtime.channel(conferenceName)
     const formData = await request.formData();
     const parsedBody = Object.fromEntries(formData) as Record<string, string>;
     const callSid = formData.get('CallSid') as string;
@@ -202,7 +200,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
     try {
         const validation = await validateTwilioWebhookForCallSid({
             request,
-            supabase,
+            client,
             callSid,
             params: parsedBody,
         });
@@ -219,7 +217,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
             return await handleDeviceCheck(dbCall);
         } else {
             //This is a non-client device (outbound call)
-            const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: dbCall.workspace ?? '' });
+            const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace ?? '' });
             const call: CallContext = twilio.calls(callSid);
             realtime.send({
                 type: "broadcast", event: "message", payload: {
@@ -237,7 +235,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
                   dbCall.workspace?.toString() ?? "",
                   { disposition: "voicemail" },
                 );
-                supabase.removeChannel(realtime);
+                adminDb.removeChannel(realtime);
                 if (signedUrl) {
                     response = await handleMachineAnswer(call, twilio, dbCall, campaign, signedUrl, outreachStatus);
                 } else {

@@ -2,7 +2,7 @@ import { env } from "@/lib/env.server";
 
 /**
  * Parse workspace.twilio_data JSON for Twilio REST clients and webhook validation.
- * Matches Edge helper `supabase/functions/_shared/twilio-workspace-credentials.ts`.
+ * Ported from Postgres Edge `_shared/twilio-workspace-credentials.ts`.
  */
 export type TwilioWorkspaceCredentials = {
   sid: string;

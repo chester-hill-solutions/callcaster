@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { pollBillingCheckoutSession } from "@/lib/platform-billing.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -22,7 +20,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await pollBillingCheckoutSession({
-    supabase: getAuthSupabaseClient(auth),
+    client: null /* removed */ (auth),
     userId: auth.user.id,
     workspaceId,
     sessionId,

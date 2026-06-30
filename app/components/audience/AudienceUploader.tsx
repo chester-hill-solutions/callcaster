@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import { Contact } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { useInterval } from "@/hooks/utils/useInterval";
 
 export const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
@@ -55,15 +54,13 @@ export const parseCSVData = (records: CSVRecord[], headers: string[]) => {
 type AudienceUploaderProps = {
   audienceName?: string;
   existingAudienceId?: string;
-  supabase: SupabaseClient<Database>;
   onUploadComplete?: (audienceId: string) => void;
 };
 
 export default function AudienceUploader({ 
   audienceName = "", 
   existingAudienceId,
-  supabase,
-  onUploadComplete 
+    onUploadComplete 
 }: AudienceUploaderProps) {
   const params = useParams();
   const workspaceId = params["id"];
@@ -136,8 +133,8 @@ export default function AudienceUploader({
   };
 
   // Listen for changes to the upload record so the UI follows audience_upload directly.
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId: workspaceId ?? "",
     table: "audience_upload",
     ...(currentUploadId ? { filter: `id=eq.${currentUploadId}` } : {}),
     onChange: (payload) => {

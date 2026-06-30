@@ -1,13 +1,12 @@
 import { data as routeData } from "react-router";
 import { eq, or, sql } from "drizzle-orm";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   webhook as webhookTable,
   workspace as workspaceTable,
   workspace_number as workspaceNumberTable,
 } from "@/db/schema";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { findPotentialContacts } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
@@ -97,13 +96,10 @@ async function findWorkspacesByMessagingServiceSid(msSid: string) {
     );
 }
 
-export async function findMatchingContactIds(
-  supabase: SupabaseClient<Database> | null,
-  workspaceId: string,
+export async function findMatchingContactIds(workspaceId: string,
   phoneNumber: string,
 ): Promise<number[]> {
   const { data: contacts, error } = await findPotentialContacts(
-    supabase as SupabaseClient<Database>,
     phoneNumber,
     workspaceId,
   );

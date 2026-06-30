@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsEdge,
   resolveTwilioWebhookAuthToken as resolveTwilioWebhookAuthTokenEdge,
-} from "../supabase/functions/_shared/twilio-workspace-credentials.ts";
+} from "../app/lib/twilio-workspace-credentials.ts";
 import {
   readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsApp,
   resolveTwilioWebhookAuthToken,

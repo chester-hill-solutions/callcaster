@@ -2,7 +2,7 @@ import { loadCallLogPage } from "@/lib/call-log.server";
 import { getHandsetNumberForWorkspace, getUserRole } from "@/lib/database.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import type { User } from "@/lib/types";
@@ -17,11 +17,7 @@ const EMPTY_LISTENING = {
   tokenError: null,
 } as const;
 
-async function loadIncomingListeningState(args: {
-  supabaseClient: Parameters<typeof createHandsetAccessToken>[0]["supabaseClient"];
-  workspaceId: string;
-  userId: string;
-}) {
+async function loadIncomingListeningState(args: {}) {
   const tdb = createTenantDb(args.workspaceId);
   const { data: handsetData } = await getHandsetNumberForWorkspace({
     workspaceId: args.workspaceId,
@@ -45,9 +41,7 @@ async function loadIncomingListeningState(args: {
     };
   }
 
-  const tokenResult = await createHandsetAccessToken({
-    supabaseClient: args.supabaseClient,
-    workspaceId: args.workspaceId,
+  const tokenResult = await createHandsetAccessToken({workspaceId: args.workspaceId,
     clientIdentity: session.client_identity,
   });
 
@@ -75,7 +69,7 @@ export type CallLogLoaderData = Awaited<ReturnType<typeof loadCallLogPage>> & {
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
 
   if (!workspaceId) {
@@ -108,7 +102,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const userRole = await getUserRole({
-    supabaseClient,
     user: user,
     workspaceId,
   });
@@ -199,7 +192,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       }),
       user
         ? loadIncomingListeningState({
-            supabaseClient,
             workspaceId,
             userId: user.id,
           })

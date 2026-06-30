@@ -5,7 +5,7 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
-    createSupabaseServerClient: vi.fn(),
+    getSession: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     twilioCreate: vi.fn(),
@@ -23,8 +23,8 @@ vi.mock("@/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
 }));
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: (...args: any[]) => mocks.createSupabaseServerClient(...args),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: (...args: any[]) => mocks.getSession(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   twilio: { calls: { create: (...args: any[]) => mocks.twilioCreate(...args) } },
@@ -37,7 +37,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
-    mocks.createSupabaseServerClient.mockReset();
+    mocks.getSession.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.twilioCreate.mockReset();
@@ -45,8 +45,8 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
   });
 
   test("returns 401 when no user", async () => {
-    mocks.createSupabaseServerClient.mockResolvedValueOnce({
-      supabaseClient: { auth: { getUser: async () => ({ data: { user: null }, error: null }) } },
+    mocks.getSession.mockResolvedValueOnce({
+      null: { auth: { getUser: async () => ({ data: { user: null }, error: null }) } },
       headers: new Headers({ "X-Test": "1" }),
     });
     mocks.safeParseJson.mockResolvedValueOnce({
@@ -68,8 +68,8 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
 
   test("creates call and returns callSid with headers", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
-    mocks.createSupabaseServerClient.mockResolvedValueOnce({
-      supabaseClient: { auth: { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) } },
+    mocks.getSession.mockResolvedValueOnce({
+      null: { auth: { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) } },
       headers,
     });
     mocks.safeParseJson.mockResolvedValueOnce({
@@ -92,7 +92,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({ success: true, callSid: "CA1" });
     expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({
-      supabaseClient: expect.anything(),
+      null: expect.anything(),
       user: { id: "u1" },
       workspaceId: "w1",
     });
@@ -107,8 +107,8 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
   });
 
   test("returns 500 when Twilio call create throws", async () => {
-    mocks.createSupabaseServerClient.mockResolvedValueOnce({
-      supabaseClient: { auth: { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) } },
+    mocks.getSession.mockResolvedValueOnce({
+      null: { auth: { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) } },
       headers: new Headers(),
     });
     mocks.safeParseJson.mockResolvedValueOnce({

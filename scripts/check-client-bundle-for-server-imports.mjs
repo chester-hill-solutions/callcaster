@@ -8,7 +8,7 @@ import path from "node:path";
 
 const BUILD_CLIENT = path.join(process.cwd(), "build", "client");
 const FORBIDDEN = [
-  "SUPABASE_SERVICE_KEY",
+  "AUTH_SERVICE_KEY",
   "env.server",
   "twilio-webhook.server",
   "throughput-config.server",

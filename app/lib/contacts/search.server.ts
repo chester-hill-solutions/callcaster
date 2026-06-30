@@ -12,7 +12,7 @@ export function escapeIlikeTerm(raw: string): string {
     .trim();
 }
 
-/** PostgREST `.or()` filter string for legacy Supabase queries. */
+/** PostgREST `.or()` filter string for legacy Postgres queries. */
 export function buildContactSearchFilter(rawSearchQuery: string): string {
   const escapedQuery = escapeIlikeTerm(rawSearchQuery);
   if (!escapedQuery) {

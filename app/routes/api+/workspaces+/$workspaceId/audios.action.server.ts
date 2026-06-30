@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
@@ -20,9 +18,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    const result = await listWorkspaceAudiosApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await listWorkspaceAudiosApi(      auth.user.id,
       workspaceId,
     );
 
@@ -62,9 +58,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await uploadWorkspaceAudioApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await uploadWorkspaceAudioApi(      auth.user.id,
       workspaceId,
       mediaName,
       file,

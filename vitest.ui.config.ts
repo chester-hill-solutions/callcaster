@@ -34,7 +34,7 @@ export default mergeConfig(
           "app/lib/type-utils.ts",
           "app/lib/type-safety-utils.ts",
           "app/routes/**/*.{ts,tsx,js,jsx}",
-          "supabase/functions/**",
+          "shared/**",
           "twilio-serverless/**",
         ],
       },

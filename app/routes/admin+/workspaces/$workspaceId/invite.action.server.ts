@@ -20,25 +20,25 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return access;
   }
 
-  const { supabaseClient, headers } = access;
+  const { headers } = access;
   const formData = await request.formData();
   const formName = formData.get("formName");
 
   switch (formName) {
     case "addUser": {
-      return handleAddUser(formData, workspaceId, supabaseClient, headers);
+      return handleAddUser(formData, workspaceId,  headers);
     }
     case "updateUser": {
-      return handleUpdateUser(formData, workspaceId, supabaseClient, headers);
+      return handleUpdateUser(formData, workspaceId,  headers);
     }
     case "deleteUser": {
-      return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
+      return handleDeleteUser(formData, workspaceId,  headers);
     }
     case "deleteSelf": {
-      return handleDeleteSelf(formData, workspaceId, supabaseClient, headers);
+      return handleDeleteSelf(formData, workspaceId,  headers);
     }
     case "cancelInvite": {
-      return removeInvite({ workspaceId, supabaseClient, formData, headers });
+      return removeInvite({ workspaceId,  formData, headers });
     }
     default: {
       break;

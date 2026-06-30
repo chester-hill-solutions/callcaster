@@ -3,7 +3,7 @@ import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -38,7 +38,7 @@ function errorPayload(
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
-    const { supabaseClient, headers, user } = await verifyAuth(request);
+    const { headers, user } = await verifyAuth(request);
     const url = new URL(request.url);
     const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
 
@@ -98,7 +98,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         columns: { id: true, title: true, status: true },
         orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
       }),
-      listWorkspaceContactsApi(supabaseClient, workspaceId, url.searchParams),
+      listWorkspaceContactsApi(workspaceId, url.searchParams),
     ]);
 
     const userRole = userRoleResult?.role || null;

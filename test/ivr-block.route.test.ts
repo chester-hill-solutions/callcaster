@@ -7,15 +7,15 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     validateTwilioWebhookForCallSid: vi.fn(),
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
+vi.mock("@client/client-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
@@ -49,12 +49,12 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeSupabase(opts?: {
+function makeDbClient(opts?: {
   campaignData?: any;
   campaignError?: any;
   signedUrlError?: any;
 }) {
-  const supabase: any = {
+  const client: any = {
     storage: {
       from: () => ({
         createSignedUrl: async () => ({
@@ -76,7 +76,7 @@ function makeSupabase(opts?: {
       throw new Error("unexpected table");
     },
   };
-  return supabase;
+  return client;
 }
 
 function ivrBlockRequest(callSid = "CA123") {
@@ -106,7 +106,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       ok: false,
       response: new Response("Invalid", { status: 403 }),
     });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(
       await mod.action({
@@ -118,7 +118,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   });
 
   test("returns 400 when CallSid missing", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const fd = new FormData();
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(
@@ -135,7 +135,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   });
 
   test("returns 400 when required params missing", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(await mod.action({ params: {}, request: new Request("http://x") } as any));
     expect(res.status).toBe(400);
@@ -149,7 +149,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       },
     };
     const campaignData = { workspace: "w1", script: { steps: script } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignData }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -173,28 +173,28 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     const campaignData = { workspace: "w1", script: { steps: script } };
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignData }));
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_1/b2");
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignData }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b2" },
       request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_2/b3");
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignData }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_2", blockId: "b3" },
       request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("hangup");
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignData }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "missing" },
       request: ivrBlockRequest(),
@@ -203,7 +203,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   });
 
   test("catch logs and says generic error on invalid script or signed url error", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", script: { steps: null } } }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignData: { workspace: "w1", script: { steps: null } } }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -215,7 +215,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       pages: { page_1: { blocks: ["b1"] } },
       blocks: { b1: { id: "b1", type: "recorded", audioFile: "a.mp3" } },
     };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", script: { steps: script } }, signedUrlError: new Error("sig") }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignData: { workspace: "w1", script: { steps: script } }, signedUrlError: new Error("sig") }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
@@ -225,7 +225,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   });
 
   test("covers getCampaignData error branch", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignError: new Error("db") }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ campaignError: new Error("db") }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },

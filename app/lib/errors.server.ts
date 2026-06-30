@@ -1,6 +1,5 @@
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
-import type { PostgrestError } from "@supabase/supabase-js";
 import type { ErrorPayload } from "./type-safety-utils";
 
 /**
@@ -27,7 +26,7 @@ export enum ErrorCode {
   // External Services
   EXTERNAL_SERVICE_ERROR = "EXTERNAL_SERVICE_ERROR",
   TWILIO_ERROR = "TWILIO_ERROR",
-  SUPABASE_ERROR = "SUPABASE_ERROR",
+  AUTH_ERROR = "AUTH_ERROR",
   
   // Server
   INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR",

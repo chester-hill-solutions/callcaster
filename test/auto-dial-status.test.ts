@@ -84,7 +84,7 @@ vi.mock("../app/lib/database.server", async () => {
   };
 });
 
-function makeSupabaseStub(args?: { outreachDisposition?: string }) {
+function makeDbClientStub(args?: { outreachDisposition?: string }) {
   const transactionRows: TransactionRow[] = [];
   const outreachUpdateCalls: any[] = [];
   let lastCallSid: string = "CA1";
@@ -221,27 +221,27 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
   };
 }
 
-let supabaseStub: ReturnType<typeof makeSupabaseStub>;
-const supabaseState = vi.hoisted(() => ({ supabase: null as any }));
+let postgresStub: ReturnType<typeof makeDbClientStub>;
+const clientState = vi.hoisted(() => ({ client: null as any }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  getServiceSupabase: () => supabaseState.supabase,
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => clientState.client,
 }));
 
-async function useSupabaseStub(args?: Parameters<typeof makeSupabaseStub>[0]) {
-  supabaseStub = makeSupabaseStub(args);
-  supabaseState.supabase = supabaseStub as any;
+async function usePostgresStub(args?: Parameters<typeof makeDbClientStub>[0]) {
+  postgresStub = makeDbClientStub(args);
+  clientState.client = postgresStub as any;
   const { configureTelephonyStub } = await import("./helpers/telephony-db-stub");
-  configureTelephonyStub(supabaseStub._telephonyConfig);
-  return supabaseStub;
+  configureTelephonyStub(postgresStub._telephonyConfig);
+  return postgresStub;
 }
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => supabaseState.supabase,
+vi.mock("@client/client-js", () => ({
+  createClient: () => clientState.client,
 }));
 
 describe("api.auto-dial.status", () => {
   beforeEach(async () => {
-    await useSupabaseStub();
+    await usePostgresStub();
     twilioValidation.validateTwilioWebhookParams.mockReset();
     twilioValidation.validateTwilioWebhookParams.mockReturnValue(true);
     twilioValidation.validateTwilioWebhookForCallSid.mockReset();
@@ -309,15 +309,15 @@ describe("api.auto-dial.status", () => {
     const r2 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(200);
 
-    expect(supabaseStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = supabaseStub._transactionRows.filter(
+    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
+    const matching = postgresStub._transactionRows.filter(
       (r) => r.idempotency_key === "call:CA_DUP:staffed",
     );
     expect(matching.length).toBe(1);
   });
 
   test("does not overwrite terminal disposition (completed -> busy)", async () => {
-    supabaseStub = await useSupabaseStub({ outreachDisposition: "completed" });
+    postgresStub = await usePostgresStub({ outreachDisposition: "completed" });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -336,13 +336,13 @@ describe("api.auto-dial.status", () => {
 
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
-    expect(supabaseStub.rpc).toHaveBeenCalledWith("dequeue_contact", expect.objectContaining({
+    expect(postgresStub.rpc).toHaveBeenCalledWith("dequeue_contact", expect.objectContaining({
       passed_contact_id: 1,
     }));
   });
 
   test("returns 500 when call lookup fails", async () => {
-    supabaseStub = await useSupabaseStub({ callSelectError: new Error("no call") } as any);
+    postgresStub = await usePostgresStub({ callSelectError: new Error("no call") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -363,7 +363,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("uses env TWILIO_AUTH_TOKEN when workspace has no twilio_data", async () => {
-    supabaseStub = await useSupabaseStub({ workspaceAuthToken: null } as any);
+    postgresStub = await usePostgresStub({ workspaceAuthToken: null } as any);
     twilioValidation.validateTwilioWebhookParams.mockImplementation(
       (_params: any, _sig: any, _url: any, authToken: string) => {
         expect(authToken).toBe("test");
@@ -390,7 +390,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join updates conference_id/start_time and updates queue + outreach attempt", async () => {
-    supabaseStub = await useSupabaseStub({
+    postgresStub = await usePostgresStub({
       dbCall: {
         sid: "CA1",
         workspace: "w1",
@@ -489,7 +489,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateOutreachAttempt catch path returns Response (still returns success)", async () => {
-    supabaseStub = await useSupabaseStub({
+    postgresStub = await usePostgresStub({
       outreachFetchError: new Error("fetch"),
       outreachUpdateError: new Error("oa"),
     } as any);
@@ -522,7 +522,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateOutreachAttempt catch formats non-Error as Unknown error", async () => {
-    supabaseStub = await useSupabaseStub({ outreachUpdateThrows: "nope" } as any);
+    postgresStub = await usePostgresStub({ outreachUpdateThrows: "nope" } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.action.server");
     const res = (await mod.updateOutreachAttempt("1", "w1", {
       answered_at: new Date().toISOString(),
@@ -533,7 +533,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateCall error path returns 500", async () => {
-    supabaseStub = await useSupabaseStub({ callUpdateError: new Error("up") } as any);
+    postgresStub = await usePostgresStub({ callUpdateError: new Error("up") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -554,7 +554,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rpc dequeue_contact error returns 500", async () => {
-    supabaseStub = await useSupabaseStub({ rpcDequeueError: new Error("dq") } as any);
+    postgresStub = await usePostgresStub({ rpcDequeueError: new Error("dq") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -575,7 +575,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-leave outreach fetch error returns 500", async () => {
-    supabaseStub = await useSupabaseStub({ outreachFetchError: new Error("out") } as any);
+    postgresStub = await usePostgresStub({ outreachFetchError: new Error("out") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -625,7 +625,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join does nothing when conference_id exists and no outreach_attempt_id", async () => {
-    supabaseStub = await useSupabaseStub({
+    postgresStub = await usePostgresStub({
       dbCall: {
         sid: "CA1",
         workspace: "w1",
@@ -714,7 +714,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join campaign_queue update error hits updateCampaignQueue + join catch branches", async () => {
-    supabaseStub = await useSupabaseStub({ campaignQueueUpdateError: new Error("cq") } as any);
+    postgresStub = await usePostgresStub({ campaignQueueUpdateError: new Error("cq") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();

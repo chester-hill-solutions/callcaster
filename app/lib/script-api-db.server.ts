@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { script as scriptTable } from "@/db/schema";
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 import { createTenantDb } from "@/server/tenant-db";
 
 type ScriptRow = typeof scriptTable.$inferSelect;

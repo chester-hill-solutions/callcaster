@@ -6,9 +6,9 @@ import type { LoaderFunctionArgs } from "react-router";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const result = await requireWorkspaceLoaderContext(request, params.id);
   if (!result.ok) return result.response;
-  const { supabaseClient, user, workspaceId } = result.ctx;
+  const { user, workspaceId } = result.ctx;
 
-  const billing = await getWorkspaceBilling(supabaseClient, user.id, workspaceId);
+  const billing = await getWorkspaceBilling(user.id, workspaceId);
   if (!billing.ok) {
     throw new Error(billing.error);
   }

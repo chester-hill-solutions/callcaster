@@ -2,7 +2,7 @@
 -- Target: Railway review Postgres ONLY.
 --
 -- PREREQUISITE: Phase 3B SSE + agent_status heartbeats wired on staging.
--- Do NOT run until useSupabaseRoom / user.activity writes are removed from app.
+-- Do NOT run until useCallRoom / user.activity writes are removed from app.
 
 BEGIN;
 

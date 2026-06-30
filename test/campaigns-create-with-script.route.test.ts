@@ -10,11 +10,10 @@ type VerifyError = { error: string; status: number };
 type VerifyApiKey = {
   authType: "api_key";
   workspaceId: string;
-  supabase: any;
+  client: any;
 };
 type VerifySession = {
   authType: "session";
-  supabaseClient: any;
   user: { id: string } | null;
 };
 
@@ -60,7 +59,7 @@ vi.mock("@/lib/queue.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-function makeSupabaseForValidations(opts: {
+function makeDbClientForValidations(opts: {
   callerNumbers?: string[];
   numbersError?: any;
   audiences?: number[];
@@ -175,7 +174,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("returns 400 on invalid JSON body", async () => {
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: {} } as any);
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} } as any);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
@@ -189,10 +188,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("session auth requires workspace_id", async () => {
-    const supabaseClient = makeSupabaseForValidations({});
+    const null = makeDbClientForValidations({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -210,8 +208,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("api_key auth rejects mismatched workspace_id", async () => {
-    const supabase = makeSupabaseForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    const client = makeDbClientForValidations({});
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID_ALT,
       title: "t",
@@ -226,8 +224,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("validates title/type/caller_id/script requirements", async () => {
-    const supabase = makeSupabaseForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    const client = makeDbClientForValidations({});
+    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client });
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
         "@/lib/api-parse.server",
@@ -301,7 +299,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -325,7 +323,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -348,7 +346,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -373,7 +371,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -394,7 +392,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -417,7 +415,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -444,7 +442,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -471,7 +469,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -495,7 +493,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.createScriptForCampaign.mockResolvedValueOnce({
       ok: false,
@@ -516,7 +514,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.createScriptForCampaign.mockResolvedValueOnce({
       ok: false,
@@ -539,7 +537,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.createScriptForCampaign.mockResolvedValueOnce({
       ok: true,
@@ -579,7 +577,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
@@ -596,7 +594,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
@@ -615,11 +613,10 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     const caller_id = "+1555";
     const audience_ids = [1, 2, 3, 4, 5, 6];
     const campaignId = 777;
-    const supabaseClient = {};
+    const null = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -652,7 +649,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     expect(body.audiences_linked).toBe(3);
     expect(body.contacts_enqueued).toBe(1);
     expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
-      supabase: supabaseClient,
+      client: null,
       campaignId,
       audienceIds: audience_ids,
       enqueueAudienceContacts: true,
@@ -665,7 +662,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId,
-      supabase: {},
+      client: {},
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: workspaceId,
@@ -693,11 +690,10 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   test("passes enqueue flag through to linkAudiencesToNewCampaign", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const supabaseClient = {};
+    const null = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -726,7 +722,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     expect(body.audiences_linked).toBe(1);
     expect(body.contacts_enqueued).toBe(1);
     expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
-      supabase: supabaseClient,
+      client: null,
       campaignId: 7,
       audienceIds: [1],
       enqueueAudienceContacts: true,
@@ -736,11 +732,10 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   test("skips enqueue when enqueue_audience_contacts is false", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const supabaseClient = {};
+    const null = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -770,7 +765,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       contacts_enqueued: 0,
     });
     expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
-      supabase: supabaseClient,
+      client: null,
       campaignId: 7,
       audienceIds: [1],
       enqueueAudienceContacts: false,
@@ -780,11 +775,10 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   test("returns linkAudiencesToNewCampaign counts in response", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const supabaseClient = {};
+    const null = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({

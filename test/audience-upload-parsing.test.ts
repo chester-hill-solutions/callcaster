@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildContactsFromRecords,
   parseCsvRecords,
-} from "../supabase/functions/_shared/audience-upload.ts";
+} from "../shared/audience-upload.ts";
 
 describe("audience upload CSV parsing + mapping", () => {
   test("parses quoted fields containing commas and embedded newlines", () => {

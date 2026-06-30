@@ -1,14 +1,12 @@
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { updateAgentStatus } from "@/lib/agent-status.server";
 import { logger } from "@/lib/logger.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 type AgentState = Database["public"]["Enums"]["agent_state"];
 
@@ -24,8 +22,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     const body = await safeParseJson<UpdateStatusBody>(request);
-    const supabase = getAuthSupabaseClient(auth);
-    await requireWorkspaceAccess({ supabaseClient: supabase,
+    await requireWorkspaceAccess({
       user: auth.user,
       workspaceId: body.workspace_id,
     });

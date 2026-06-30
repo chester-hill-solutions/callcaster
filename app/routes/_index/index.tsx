@@ -184,7 +184,7 @@ const WhyPhoneCalls = () => (
 const PersonImage = () => (
   <div className="flex flex-auto items-center">
     <img
-      src="https://nolrdvpusfcsjihzhnlp.supabase.co/storage/v1/object/public/images/person-calling.png"
+      src="https://nolrdvpusfcsjihzhnlp.adminDb.co/storage/v1/object/public/images/person-calling.png"
       alt="Person dialing using CallCaster"
     />
   </div>

@@ -24,11 +24,11 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   test("returns 500 with message when conference listing throws", async () => {
     const mod = await import("../app/routes/api+/auto-dial/end.route");
 
-    const supabaseClient: any = {};
+    const mockClient: any = {};
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
-        verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
+        verifyAuth: async () => ({ user: { id: "u1" } } as any),
         safeParseJson: async () => ({ workspaceId: "w1" }),
         createWorkspaceTwilioInstance: async () =>
           ({
@@ -54,7 +54,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
 
     const mod = await import("../app/routes/api+/auto-dial/end.route");
 
-    const supabaseClient: any = {};
+    const mockClient: any = {};
 
     const confUpdate = vi.fn(async () => ({}));
     const callUpdate = vi.fn().mockRejectedValueOnce(new Error("hangup"));
@@ -65,7 +65,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         logger: logger as any,
-        verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
+        verifyAuth: async () => ({ user: { id: "u1" } } as any),
         safeParseJson: async () => ({ workspaceId: "w1" }),
         createWorkspaceTwilioInstance: async () =>
           ({
@@ -86,11 +86,11 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
 
   test("returns success when there are no in-progress conferences", async () => {
     const mod = await import("../app/routes/api+/auto-dial/end.route");
-    const supabaseClient: any = {};
+    const mockClient: any = {};
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
-        verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
+        verifyAuth: async () => ({ user: { id: "u1" } } as any),
         safeParseJson: async () => ({ workspaceId: "w1" }),
         createWorkspaceTwilioInstance: async () =>
           ({
@@ -114,7 +114,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
       return [{ sid: "CA1", outreach_attempt_id: null, contact_id: 1 }];
     });
 
-    const supabaseClient: any = {};
+    const mockClient: any = {};
 
     const conferencesList = vi
       .fn()
@@ -145,7 +145,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
         request: makeReq(),
         deps: {
           logger: logger as any,
-          verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
+          verifyAuth: async () => ({ user: { id: "u1" } } as any),
           safeParseJson: async () => ({ workspaceId: "w1" }),
           createWorkspaceTwilioInstance: async () => twilio,
         },
@@ -158,7 +158,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
       request: makeReq(),
       deps: {
         logger: logger as any,
-        verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
+        verifyAuth: async () => ({ user: { id: "u1" } } as any),
         safeParseJson: async () => ({ workspaceId: "w1" }),
         createWorkspaceTwilioInstance: async () => twilio,
       },
@@ -170,7 +170,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
       request: makeReq(),
       deps: {
         logger: logger as any,
-        verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
+        verifyAuth: async () => ({ user: { id: "u1" } } as any),
         safeParseJson: async () => ({ workspaceId: "w1" }),
         createWorkspaceTwilioInstance: async () => twilio,
       },
@@ -182,7 +182,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
       request: makeReq(),
       deps: {
         logger: logger as any,
-        verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
+        verifyAuth: async () => ({ user: { id: "u1" } } as any),
         safeParseJson: async () => ({ workspaceId: "w1" }),
         createWorkspaceTwilioInstance: async () => twilio,
       },
@@ -194,7 +194,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   test("covers resolveDeps fallbacks and non-Error outer catch message", async () => {
     vi.resetModules();
 
-    setJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    setJsonAuthSession({ user: { id: "u1" } });
     vi.doMock("../app/lib/database.server", () => ({
       safeParseJson: async () => ({ workspaceId: "w1" }),
       createWorkspaceTwilioInstance: async () => ({

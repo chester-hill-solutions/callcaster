@@ -3,7 +3,7 @@ import {
   audience as audienceTable,
   audience_upload as audienceUploadTable,
 } from "@/db/schema";
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 import { createTenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 

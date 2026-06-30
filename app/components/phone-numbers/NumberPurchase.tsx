@@ -38,7 +38,6 @@ export const NumberPurchase = ({
   const [filterVoice, setFilterVoice] = useState(false);
   const [filterSms, setFilterSms] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(
-    null,
   );
   const [lastQuery, setLastQuery] = useState("");
 

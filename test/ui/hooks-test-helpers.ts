@@ -29,7 +29,60 @@ export function createMockFetcher<T = unknown>(overrides: Partial<{
 type ChannelHandler = (payload: unknown) => void;
 type StatusHandler = (status: string) => void;
 
-export function createSupabaseRealtimeMock() {
+export function createWorkspaceEventSourceMock() {
+  const listeners: Record<string, Array<(event: MessageEvent<string>) => void>> = [];
+  let lastInstance: MockEventSource | null = null;
+
+  class MockEventSource {
+    readonly url: string;
+    readyState = 1;
+    onerror: ((event: Event) => void) | null = null;
+    onopen: ((event: Event) => void) | null = null;
+
+    constructor(url: string) {
+      this.url = url;
+      lastInstance = this;
+      queueMicrotask(() => this.onopen?.(new Event("open")));
+    }
+
+    addEventListener(type: string, handler: (event: MessageEvent<string>) => void) {
+      listeners[type] ??= [];
+      listeners[type].push(handler);
+    }
+
+    removeEventListener(type: string, handler: (event: MessageEvent<string>) => void) {
+      listeners[type] = (listeners[type] ?? []).filter((entry) => entry !== handler);
+    }
+
+    close = vi.fn();
+  }
+
+  vi.stubGlobal("EventSource", MockEventSource);
+
+  const emitWorkspaceEvent = (
+    payload: Record<string, unknown>,
+    options?: { id?: number; eventType?: string; workspaceId?: string },
+  ) => {
+    const record = {
+      id: options?.id ?? 1,
+      workspace_id: options?.workspaceId ?? "ws",
+      event_type: options?.eventType ?? "postgres_change",
+      payload,
+      created_at: new Date().toISOString(),
+    };
+    const event = { data: JSON.stringify(record) } as MessageEvent<string>;
+    for (const handler of listeners.workspace_event ?? []) {
+      handler(event);
+    }
+  };
+
+  return {
+    emitWorkspaceEvent,
+    getLastInstance: () => lastInstance,
+  };
+}
+
+export function createWorkspaceRealtimeMock() {
   const handlers: ChannelHandler[] = [];
   const statusHandlers: StatusHandler[] = [];
 
@@ -46,7 +99,7 @@ export function createSupabaseRealtimeMock() {
     unsubscribe: vi.fn(),
   };
 
-  const supabase = {
+  const client = {
     channel: vi.fn(() => channel),
     removeChannel: vi.fn(),
     from: vi.fn(() => ({
@@ -73,7 +126,7 @@ export function createSupabaseRealtimeMock() {
   };
 
   return {
-    supabase,
+    client,
     channel,
     emitPayload: (payload: unknown) => {
       for (const h of handlers) h(payload);

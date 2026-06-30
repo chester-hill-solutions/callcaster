@@ -1,5 +1,4 @@
 import { FetcherWithComponents, Form } from "react-router";
-import { FileObject } from "@supabase/storage-js";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +18,6 @@ import {
   WorkspaceTwilioOpsConfig,
   WorkspaceTwilioSyncSnapshot,
 } from "@/lib/types";
-import { User } from "@supabase/supabase-js";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
 import { SaveBar } from "@/components/shared/SaveBar";
@@ -30,7 +28,7 @@ import { CampaignCostPanel } from "./CampaignCostPanel";
 import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { formatCredits, formatCurrency } from "@/lib/billing-format";
 import { CREDIT_PRICE_CAD } from "@/lib/billing-format";
-import { Tables } from "@/lib/database.types";
+import { Tables } from "@/lib/db-types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

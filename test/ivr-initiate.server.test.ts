@@ -11,8 +11,8 @@ vi.mock("@/lib/database.server", () => ({
 
 vi.mock("@/lib/env.server", () => ({
   env: {
-    SUPABASE_URL: () => "https://example.supabase.co",
-    SUPABASE_SERVICE_KEY: () => "service-key",
+    BETTER_AUTH_URL: () => "https://example.adminDb.co",
+    BETTER_AUTH_SERVICE_KEY: () => "service-key",
     BASE_URL: () => "https://app.example.com",
   },
 }));
@@ -26,7 +26,7 @@ vi.mock("@/lib/twilio-ivr-runtime.server", () => ({
   })),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: vi.fn(() => ({
     rpc: vi.fn().mockResolvedValue({ data: 99, error: null }),
     from: vi.fn((table: string) => {
@@ -54,7 +54,7 @@ describe("initiateIvrCall", () => {
   test("returns call SID when Twilio and RPC succeed", async () => {
     const { initiateIvrCall } = await import("@/lib/ivr-initiate.server");
     const result = await initiateIvrCall({
-      userSupabase: {} as never,
+      userPostgres: {} as never,
       user: { id: "user-1" },
       workspace_id: "ws-1",
       campaign_id: 1,

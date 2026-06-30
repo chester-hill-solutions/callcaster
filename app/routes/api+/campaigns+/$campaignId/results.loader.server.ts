@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { getCampaignResultsApi } from "@/lib/platform-analytics.server";
@@ -17,9 +15,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    const result = await getCampaignResultsApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await getCampaignResultsApi(      auth.user.id,
       campaignId,
     );
 

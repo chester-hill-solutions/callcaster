@@ -29,7 +29,7 @@ import {
 import { useState } from "react";
 import { downloadBlobPart } from "@/lib/download-blob.client";
 import { Label } from "@/components/ui/label";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 type SurveyPageWithQuestions = {
   survey_question?: Array<{

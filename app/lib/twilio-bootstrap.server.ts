@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { eq } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
@@ -98,11 +97,9 @@ function resolveBootstrapOutcome(
 }
 
 export async function ensureWorkspaceTwilioBootstrap({
-  supabaseClient,
   workspaceId,
   actorUserId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
 }): Promise<WorkspaceTwilioBootstrapResult> {
@@ -122,7 +119,7 @@ export async function ensureWorkspaceTwilioBootstrap({
 
   const currentTwilioData = isObject(workspace.twilio_data)
     ? workspace.twilio_data
-    : await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+    : await loadWorkspaceTwilioData(workspaceId);
   const twilioData = (workspace.twilio_data ?? null) as TwilioAccountData;
   const accountSid = parseOptionalString(currentTwilioData.sid);
   const authToken = parseOptionalString(currentTwilioData.authToken);
@@ -152,7 +149,7 @@ export async function ensureWorkspaceTwilioBootstrap({
   });
 
   const twilio = await createWorkspaceTwilioClient({
-    supabase: supabaseClient,
+    client: null,
     workspaceId,
   });
 
@@ -270,7 +267,7 @@ export async function ensureWorkspaceTwilioBootstrap({
 
   const outcome = resolveBootstrapOutcome(nextOnboarding, bootstrapThrew);
 
-  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+  await saveWorkspaceTwilioData(workspaceId, {
     ...currentTwilioData,
     onboarding: nextOnboarding,
   });
@@ -288,13 +285,11 @@ export async function ensureWorkspaceTwilioBootstrap({
 }
 
 export async function syncWorkspaceTwilioBootstrapState({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const currentTwilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const currentTwilioData = await loadWorkspaceTwilioData(workspaceId);
   const twilioData = currentTwilioData as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
 
@@ -304,7 +299,6 @@ export async function syncWorkspaceTwilioBootstrapState({
 
   try {
     const audit = await auditWorkspaceTwilioWebhooks({
-      supabaseClient,
       workspaceId,
     });
     driftMessages = [...new Set([...driftMessages, ...audit.driftMessages])];
@@ -332,7 +326,7 @@ export async function syncWorkspaceTwilioBootstrapState({
   });
   nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
-  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+  await saveWorkspaceTwilioData(workspaceId, {
     ...currentTwilioData,
     onboarding: nextOnboarding,
   });
@@ -341,15 +335,13 @@ export async function syncWorkspaceTwilioBootstrapState({
 }
 
 export async function repairWorkspaceTwilioWebhooks({
-  supabaseClient,
   workspaceId,
   actorUserId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
 }) {
-  const currentTwilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const currentTwilioData = await loadWorkspaceTwilioData(workspaceId);
   const twilioData = currentTwilioData as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const serviceSid = onboarding.messagingService.serviceSid;
@@ -357,7 +349,7 @@ export async function repairWorkspaceTwilioWebhooks({
   const urls = buildBootstrapUrls(baseUrl);
 
   const twilio = await createWorkspaceTwilioClient({
-    supabase: supabaseClient,
+    client: null,
     workspaceId,
   });
 
@@ -399,7 +391,7 @@ export async function repairWorkspaceTwilioWebhooks({
   });
   nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
-  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+  await saveWorkspaceTwilioData(workspaceId, {
     ...currentTwilioData,
     onboarding: nextOnboarding,
   });

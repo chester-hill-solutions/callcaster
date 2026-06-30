@@ -52,7 +52,6 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type {
   Contact,
@@ -60,7 +59,7 @@ import type {
 } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import { sendMessage } from "./api.chat_sms";
-import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceRealtimeSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import {
   getConversationParticipantPhones,
   getChatSortOption,

@@ -59,7 +59,7 @@ const twilioMocks = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: vi.fn(() => ({})),
 }));
 
@@ -69,8 +69,8 @@ vi.mock("@/lib/env.server", () => {
       {},
       {
         get: (_t, prop: string) => {
-          if (prop === "SUPABASE_URL") return () => "https://sb.example";
-          if (prop === "SUPABASE_SERVICE_KEY") return () => "svc";
+          if (prop === "BETTER_AUTH_URL") return () => "https://sb.example";
+          if (prop === "BETTER_AUTH_SERVICE_KEY") return () => "svc";
           return () => "test";
         },
       },

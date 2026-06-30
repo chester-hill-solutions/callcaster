@@ -1,4 +1,3 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import {
   findCallBySid,
@@ -11,7 +10,7 @@ import { redirect } from "react-router";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 const getOutreach = async (workspaceId: string, outreachId: number) => {
   const row = await findOutreachAttemptById(workspaceId, outreachId);
@@ -108,9 +107,9 @@ const handleNextStep = (
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const baseUrl = env.BASE_URL();
 
-  const supabase = createClient(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY()
+  const client = createClient(
+    env.BASE_URL(),
+    env.BASE_URL()
   );
   const twiml = new Twilio.twiml.VoiceResponse();
 
@@ -142,7 +141,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    supabase,
+    client,
     callSid,
     params: formParams,
   });
@@ -153,7 +152,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   try {
     const [call, campaignData] = await Promise.all([
       findCallBySid(callSid),
-      fetchCampaignWithScript(supabase, campaignId),
+      fetchCampaignWithScript(client, campaignId),
     ]);
 
     if (!call?.workspace) {

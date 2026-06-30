@@ -6,7 +6,7 @@ Version 1
 
 - **[Docs index](docs/README.md)** - Central index for active docs and archived root notes.
 - **[Archive index](archive/README.md)** - Location and purpose of deprecated/legacy files moved out of root.
-- **[Local development](docs/local-development.md)** - Run the app locally, including Supabase, Localtunnel, and Twilio calling setup.
+- **[Local development](docs/local-development.md)** - Run the app locally, including Postgres, Localtunnel, and Twilio calling setup.
 - **[Script structure](docs/script-structure.md)** – How campaign scripts are stored (`steps`), pages vs blocks, and IVR navigation.
 - **[Script JSON format](docs/script-json-format.md)** – Script structure for campaigns (pages, blocks); field reference and examples.
 - **[API overview](docs/api-overview.md)** – Public integrator API boundary, auth, and endpoint list.

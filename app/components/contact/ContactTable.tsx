@@ -7,7 +7,7 @@ import { AudienceContactRow } from "@/components/AudienceContactRow";
 import { Button } from "@/components/ui/button";
 import { ContactForm } from "./ContactForm";
 import type { Contact } from "@/lib/types";
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions

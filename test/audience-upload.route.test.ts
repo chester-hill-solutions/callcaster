@@ -39,6 +39,19 @@ const processDbMocks = vi.hoisted(() => ({
   insertValues: vi.fn(async () => undefined),
 }));
 
+const objectStorageMocks = vi.hoisted(() => ({
+  uploads: [] as Array<{ bucket: string; path: string; body: string }>,
+  uploadObject: vi.fn(
+    async (bucket: string, path: string, body: string) => {
+      objectStorageMocks.uploads.push({ bucket, path, body });
+    },
+  ),
+}));
+
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: (...args: unknown[]) => objectStorageMocks.uploadObject(...args),
+}));
+
 vi.mock("@/lib/logger.server", () => ({ logger }));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => processTdbMocks),
@@ -70,6 +83,13 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     processTdbMocks.audience_upload.update.mockReset();
     processTdbMocks.audience.update.mockReset();
     processDbMocks.insertValues.mockReset();
+    objectStorageMocks.uploads.length = 0;
+    objectStorageMocks.uploadObject.mockReset();
+    objectStorageMocks.uploadObject.mockImplementation(
+      async (bucket: string, path: string, body: string) => {
+        objectStorageMocks.uploads.push({ bucket, path, body });
+      },
+    );
     dbMocks.findAudienceInWorkspace.mockResolvedValue({ id: 1 });
     dbMocks.markAudienceUpdating.mockResolvedValue(undefined);
     dbMocks.createAudienceForUpload.mockResolvedValue({ id: 1 });
@@ -101,7 +121,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient: {} as any,
+      null: {} as any,
       headers: new Headers(),
       user: null,
     }));
@@ -113,7 +133,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     expect(res401.status).toBe(401);
 
     const verifyAuthUser = vi.fn(async () => ({
-      supabaseClient: {} as any,
+      null: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
@@ -151,7 +171,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     const processAudienceUpload = vi.fn(async () => {});
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient: {} as any,
+      null: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
@@ -179,7 +199,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient: {} as any,
+      null: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
@@ -199,7 +219,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const verifyAuth = vi.fn(async () => ({
       headers: new Headers(),
       user: { id: "u1" },
-      supabaseClient: {} as any,
+      null: {} as any,
     }));
 
     dbMocks.createAudienceForUpload.mockResolvedValueOnce(null);
@@ -235,7 +255,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       throw new Error("bg");
     });
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient: {} as any,
+      null: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
@@ -262,9 +282,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
   test("action: calling without deps hits verifyAuth fallback", async () => {
     vi.resetModules();
-    setDualAuthSession({
-      supabaseClient: {},
-      headers: new Headers(),
+    setDualAuthSession({ headers: new Headers(),
       user: { id: "u1" },
     });
 
@@ -281,7 +299,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient: {} as any,
+      null: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
@@ -299,20 +317,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/audience-upload");
 
-    const uploads: any[] = [];
-
-    const supabaseClient: any = {
-      storage: {
-        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-        createBucket: async () => ({ error: null }),
-        from: () => ({
-          upload: async (path: string, body: string) => {
-            uploads.push({ path, body });
-            return { error: null };
-          },
-        }),
-      },
-    };
+    const uploads = objectStorageMocks.uploads;
 
     const parseCSVMock = vi.fn(() => ({
       headers: ["Name", "Email"],
@@ -320,7 +325,6 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     }));
 
     const uploadPromise = mod.processAudienceUpload(
-      supabaseClient,
       1,
       2,
       "w1",
@@ -349,30 +353,16 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
   test("processAudienceUpload: header mismatch and insert errors go through catch and write error status", async () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
-    const uploads: any[] = [];
-    const supabaseClient: any = {
-      storage: {
-        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-        createBucket: async () => ({ error: null }),
-        from: () => ({
-          upload: async (path: string, body: string) => {
-            uploads.push({ path, body });
-            return { error: null };
-          },
-        }),
-      },
-    };
+    const uploads = objectStorageMocks.uploads;
 
     // Missing headers -> error
     await mod.processAudienceUpload(
-      supabaseClient,
       1,
       2,
       "w1",
       "u1",
       Buffer.from("csv", "utf-8").toString("base64"),
       { Missing: "email" },
-      null,
       { parseCSV: vi.fn(() => ({ headers: ["Email"], contacts: [] })) as any },
     );
     expect(uploads.some((u) => u.body.includes('"status":"error"'))).toBe(true);
@@ -380,97 +370,35 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     // Insert error -> error path
     processTdbMocks.contact.insertMany.mockResolvedValueOnce([]);
     await mod.processAudienceUpload(
-      supabaseClient,
       1,
       2,
       "w1",
       "u1",
       Buffer.from("csv", "utf-8").toString("base64"),
       { Email: "email" },
-      null,
       { parseCSV: vi.fn(() => ({ headers: ["Email"], contacts: [{ Email: "a@b.co" }] })) as any },
     );
     expect(uploads.some((u) => u.body.includes("Error inserting contacts"))).toBe(true);
   }, 30000);
 
-  test("processAudienceUpload covers bucket/status/link errors and default deps branch", async () => {
+  test("processAudienceUpload covers status/link errors and default deps branch", async () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
-    const storageOnly = (storage: Record<string, unknown>) => ({ storage }) as any;
-
-    // bucketError
+    // statusError on initial write
+    objectStorageMocks.uploadObject.mockRejectedValueOnce(new Error("s"));
     await mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => ({ data: null, error: { message: "b" } }),
-        from: () => ({ upload: async () => ({ error: null }) }),
-      }),
       1,
       2,
       "w1",
       "u1",
       Buffer.from("csv", "utf-8").toString("base64"),
       {},
-      null,
-      { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
-    );
-
-    // missing bucket + createBucket error
-    await mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => ({ data: [], error: null }),
-        createBucket: async () => ({ error: { message: "c" } }),
-        from: () => ({ upload: async () => ({ error: null }) }),
-      }),
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      {},
-      null,
-      { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
-    );
-
-    // missing bucket + createBucket success (covers else path for createError)
-    await mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => ({ data: [], error: null }),
-        createBucket: async () => ({ error: null }),
-        from: () => ({ upload: async () => ({ error: null }) }),
-      }),
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      {},
-      null,
-      { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
-    );
-
-    // statusError
-    await mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-        from: () => ({ upload: async () => ({ error: { message: "s" } }) }),
-      }),
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      {},
-      null,
       { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
     );
 
     // mapping warn branch via empty-string header + link insert failure
     processDbMocks.insertValues.mockRejectedValueOnce(new Error("link"));
     await mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-        from: () => ({ upload: async () => ({ error: null }) }),
-      }),
       1,
       2,
       "w1",
@@ -488,10 +416,6 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     // other_data mapping branch with defined value + splitNameColumn actualHeader present (and empty name => '' fallbacks)
     await mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-        from: () => ({ upload: async () => ({ error: null }) }),
-      }),
       1,
       2,
       "w1",
@@ -508,20 +432,14 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     );
 
     // Cover "Unknown error" branches in catch (non-Error throw)
+    objectStorageMocks.uploadObject.mockRejectedValueOnce("boom");
     await mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => {
-          throw "boom";
-        },
-        from: () => ({ upload: async () => ({ error: null }) }),
-      }),
       1,
       2,
       "w1",
       "u1",
       Buffer.from("csv", "utf-8").toString("base64"),
       {},
-      null,
       { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
     );
 
@@ -529,17 +447,12 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     vi.useFakeTimers();
     const csv = "Email\nx@y.co\n";
     const defaultDepsPromise = mod.processAudienceUpload(
-      storageOnly({
-        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-        from: () => ({ upload: async () => ({ error: null }) }),
-      }),
       1,
       2,
       "w1",
       "u1",
       Buffer.from(csv, "utf-8").toString("base64"),
       { Email: "email" },
-      null,
     );
     await vi.runAllTimersAsync();
     await defaultDepsPromise;
@@ -550,13 +463,6 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/audience-upload");
 
-    const supabaseClient: any = {
-      storage: {
-        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-        from: () => ({ upload: async () => ({ error: null }) }),
-      },
-    };
-
     const contacts = Array.from({ length: 101 }, (_v, i) => {
       if (i === 0) return { Name: "Ada Lovelace", Email: "a@b.co" };
       if (i === 1) return { Name: "No Email", Email: undefined, Custom: "x" };
@@ -564,7 +470,6 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     });
 
     const uploadPromise = mod.processAudienceUpload(
-      supabaseClient,
       1,
       2,
       "w1",

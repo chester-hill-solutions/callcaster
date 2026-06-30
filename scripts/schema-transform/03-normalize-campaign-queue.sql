@@ -4,7 +4,7 @@
 --
 -- Plan: drop campaign_queue.status; canonical columns are queue_state,
 -- assigned_to_user_id, provider_status (+ existing dequeue metadata).
--- Mirrors backfill in supabase/migrations/20260521140000_queue_state_and_claim.sql.
+-- Mirrors backfill in client/migrations/20260521140000_queue_state_and_claim.sql.
 --
 -- Follow-up (app + RPC, not this file):
 --   Rewrite get_campaign_queue, claim_campaign_queue_contacts, dequeue_contact

@@ -10,17 +10,17 @@ import {
   getVerifiedNumbers,
 } from "@/lib/call-screen.server";
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { BaseUser } from "@/lib/types";
 import type { LoaderFunctionArgs } from "react-router";
 import { MemberRole } from "@/lib/member-role";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { campaign_id: id, id: workspaceId } = params;
-  const { supabaseClient: supabase, user } = await verifyAuth(request);
+  const {user } = await verifyAuth(request);
   if (!user || !workspaceId || !id) throw redirect("/signin");
 
-  const verifiedNumbers = await getVerifiedNumbers(supabase, user.id);
+  const verifiedNumbers = await getVerifiedNumbers(user.id);
   const {
     workspaceData,
     campaign,
@@ -29,9 +29,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     queueCount,
     completedCount,
     attempts,
-  } = await getCallScreenData(supabase, id, workspaceId, user.id);
+  } = await getCallScreenData(id, workspaceId, user.id);
   const twilioData = workspaceData.twilio_data as { sid: string };
-  const queue = await getQueueByDialType(supabase, id, campaign.dial_type, user.id);
+  const queue = await getQueueByDialType(id, campaign.dial_type, user.id);
   const token = await generateToken({
     twilioAccountSid: twilioData.sid,
     twilioApiKey: workspaceData.key as string,
@@ -43,9 +43,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const initialRecentCall = getInitialRecentCall(attempts || []);
   const initialRecentAttempt = getInitialRecentAttempt(attempts || []);
 
-  const userRole = await getUserRole({
-    supabaseClient: supabase,
-    user: user as unknown as BaseUser,
+  const userRole = await getUserRole({user: user as unknown as BaseUser,
     workspaceId,
   });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole);

@@ -1,11 +1,10 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -18,15 +17,14 @@ interface Script {
 }
 
 const handleAudio = async (
-  supabase: SupabaseClient<Database>,
-  twiml: Twilio.twiml.VoiceResponse,
+    twiml: Twilio.twiml.VoiceResponse,
   block: { type: string; audioFile: string },
   workspace: string,
 ) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
     const { data: signedUrlData, error: signedUrlError } =
-      await supabase.storage
+      await adminDb.storage
         .from("workspaceAudio")
         .createSignedUrl(`${workspace}/${audioFile}`, 3600);
     if (signedUrlError) throw signedUrlError;
@@ -97,8 +95,7 @@ const handleOptions = (
 };
 
 const handleBlock = async (
-  supabase: SupabaseClient<Database>,
-  twiml: Twilio.twiml.VoiceResponse,
+    twiml: Twilio.twiml.VoiceResponse,
   block: { type: string; audioFile: string; options?: Array<{ value: string; next?: string }> },
   numberId: string,
   pageId: string,
@@ -107,13 +104,13 @@ const handleBlock = async (
   workspace: string,
   baseUrl: string,
 ) => {
-  await handleAudio(supabase, twiml, block, workspace);
+  await handleAudio(client, twiml, block, workspace);
   handleOptions(twiml, block, numberId, pageId, blockId, script, baseUrl);
 };
 
 export const action = async ({ params, request }: ActionFunctionArgs) => {
   const baseUrl = env.BASE_URL();
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  const client = createClient(env.BASE_URL(), env.BASE_URL());
   const twiml = new Twilio.twiml.VoiceResponse();
   const { pageId, blockId, numberId } = params as {
     pageId: string;
@@ -135,7 +132,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    supabase,
+    client,
     callSid,
     params: formParams,
   });
@@ -154,7 +151,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
     if (currentBlock) {
       await handleBlock(
-        supabase,
+        client,
         twiml,
         currentBlock,
         numberId,

@@ -43,7 +43,7 @@ export async function startWorkspaceCallerIdVerification({
   friendlyName,
 }: {
   /** @deprecated Drizzle path — ignored. */
-  supabaseClient?: unknown;
+  null?: unknown;
   workspaceId: string;
   phoneNumber: string;
   friendlyName: string;

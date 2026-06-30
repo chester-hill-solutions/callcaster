@@ -1,7 +1,9 @@
-import { type SupabaseClient } from "@supabase/supabase-js";
 import { CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM } from "@/lib/csv";
-import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
+import {
+  createSignedObjectUrl,
+  uploadObject,
+} from "@/lib/object-storage.server";
 import type { ExportScript } from "@/lib/campaign-export-types.server";
 
 export type CampaignExportStatus = {
@@ -39,29 +41,26 @@ export function createInitialExportStatus(args: {
 }
 
 export async function writeExportStatus(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   exportId: string,
   statusData: CampaignExportStatus,
   patch: Partial<CampaignExportStatus>,
 ): Promise<CampaignExportStatus> {
   const nextStatus = { ...statusData, ...patch };
-  const { error } = await supabaseClient.storage
-    .from("campaign-exports")
-    .upload(`${workspaceId}/${exportId}.json`, JSON.stringify(nextStatus), {
+  await uploadObject(
+    "campaign-exports",
+    `${workspaceId}/${exportId}.json`,
+    JSON.stringify(nextStatus),
+    {
       contentType: "application/json",
       upsert: true,
-    });
-
-  if (error) {
-    throw new Error(`Error updating export status: ${error.message}`);
-  }
+    },
+  );
 
   return nextStatus;
 }
 
 export async function finalizeCsvExport(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   exportId: string,
   statusData: CampaignExportStatus,
@@ -70,43 +69,39 @@ export async function finalizeCsvExport(
 ): Promise<CampaignExportStatus> {
   const csvData = `${CSV_UTF8_BOM}${csvLines.join(CSV_DEFAULT_LINE_ENDING)}${CSV_DEFAULT_LINE_ENDING}`;
 
-  const { error: csvError } = await supabaseClient.storage
-    .from("campaign-exports")
-    .upload(`${workspaceId}/${exportId}.csv`, new Blob([csvData], { type: "text/csv" }), {
+  await uploadObject(
+    "campaign-exports",
+    `${workspaceId}/${exportId}.csv`,
+    csvData,
+    {
       contentType: "text/csv",
       upsert: true,
-    });
+    },
+  );
 
-  if (csvError) {
-    throw new Error(`Error uploading CSV file: ${csvError.message}`);
-  }
+  const signedUrl = await createSignedObjectUrl(
+    "campaign-exports",
+    `${workspaceId}/${exportId}.csv`,
+    24 * 60 * 60,
+  );
 
-  const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
-    .from("campaign-exports")
-    .createSignedUrl(`${workspaceId}/${exportId}.csv`, 24 * 60 * 60);
-
-  if (signedUrlError) {
-    throw new Error(`Error creating signed URL: ${signedUrlError.message}`);
-  }
-
-  return writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+  return writeExportStatus(workspaceId, exportId, statusData, {
     status: "completed",
     progress: 100,
-    downloadUrl: signedUrlData.signedUrl,
+    downloadUrl: signedUrl,
     stage: "Export completed",
     ...completionPatch,
   });
 }
 
 export async function writeExportErrorStatus(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   exportId: string,
   statusData: CampaignExportStatus,
   error: unknown,
 ): Promise<void> {
   try {
-    await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+    await writeExportStatus(workspaceId, exportId, statusData, {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error",
       exportId,

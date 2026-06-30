@@ -1,5 +1,5 @@
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { confirmStripeCheckoutSessionForRedirect } from "@/lib/platform-billing.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -25,10 +25,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const nextUrl = url.pathname + (url.search ?? "");
-  const { supabaseClient } = await verifyAuth(request, nextUrl);
+  await verifyAuth(request, nextUrl);
 
   const result = await confirmStripeCheckoutSessionForRedirect({
-    supabase: supabaseClient,
+    client: null,
     sessionId,
   });
 

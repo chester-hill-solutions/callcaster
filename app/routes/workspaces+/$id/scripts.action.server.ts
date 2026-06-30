@@ -32,7 +32,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return routeData({ error: "Script not found" }, { status: 404, headers });
   }
 
-  const scriptJson = JSON.stringify(script.steps, null, 2);
+  const scriptJson = JSON.stringify(script.steps,  2);
 
   const fileName = script.name
     ? `${script.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`

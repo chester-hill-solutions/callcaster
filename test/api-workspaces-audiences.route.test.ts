@@ -33,7 +33,7 @@ describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
 
   test("lists audiences for an authorized workspace", async () => {
     mocks.resolveDataPlaneAuth.mockResolvedValueOnce({
-      supabase: { from: vi.fn() },
+      client: { from: vi.fn() },
       userId: "u1",
     });
     mocks.listWorkspaceAudiencesApi.mockResolvedValueOnce({

@@ -1,7 +1,7 @@
 /**
  * Idempotency-key builders and bucket classifier for billing ledger entries.
  *
- * Shared by Remix server modules and Supabase Edge functions so that every
+ * Shared by Remix server modules and Postgres Edge functions so that every
  * billing site constructs keys the same way and both the display mapper
  * (`getBillingEventSource`) and the reconciliation mapper
  * (`categorizeLedgerRow`) classify rows through a single `bucketFromIdempotencyKey`.

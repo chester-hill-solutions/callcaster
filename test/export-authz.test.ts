@@ -26,6 +26,15 @@ vi.mock("@/lib/audience-upload-db.server", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/database/contact-audience.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database/contact-audience.server")>();
+  return {
+    ...actual,
+    listAudienceContactsForExport: vi.fn(async () => []),
+    listAudienceContactsJson: vi.fn(async () => []),
+  };
+});
+
 vi.mock("@/lib/env.server", () => {
   const handler = {
     get: () => () => "test",
@@ -43,8 +52,8 @@ vi.mock("@/lib/database.server", async () => {
   };
 });
 
-function buildSupabaseClient() {
-  const supabaseClient: any = {
+function buildMockDb() {
+  const mockClient: any = {
     storage: {
       from: () => ({
         download: async () => ({
@@ -57,7 +66,7 @@ function buildSupabaseClient() {
     },
   };
 
-  supabaseClient.from = (table: string) => {
+  null.from = (table: string) => {
     if (table === "audience") {
       return {
         select: () => ({
@@ -104,13 +113,11 @@ function buildSupabaseClient() {
     };
   };
 
-  return supabaseClient;
+  return null;
 }
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 
@@ -118,8 +125,7 @@ describe("export endpoints authz", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers(),
+            headers: new Headers(),
       user: { id: "u1" },
     });
   });

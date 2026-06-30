@@ -18,7 +18,7 @@ vi.mock("@/lib/database.server", () => ({
 vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   testWebhook: (...args: any[]) => mocks.testWebhook(...args),
 }));
-vi.mock("@/lib/supabase.server", () => ({
+vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));

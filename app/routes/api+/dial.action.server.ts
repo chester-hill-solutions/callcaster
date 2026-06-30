@@ -1,3 +1,4 @@
+import { createOutreachAttempt } from "@/lib/auto-dial.server";
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { saveCallToDatabase } from "@/lib/auto-dial.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
@@ -11,7 +12,7 @@ import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 
 interface DialRequest {
   to_number: string;
@@ -27,10 +28,7 @@ interface DialRequest {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const auth = await requireJsonAuth(request);
-    if (auth instanceof Response) return auth;
-
-    const supabase = getAuthSupabaseClient(auth);
-    const user = auth.user;
+    if (auth instanceof Response) return auth;    const user = auth.user;
     const raw = await parseActionRequest(request) as Partial<DialRequest>;
     const {
         to_number,
@@ -54,7 +52,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ) {
         throw new Response("Invalid dial payload", { status: 400 });
     }
-    await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId: workspace_id });
+    await requireWorkspaceAccess({ user, workspaceId: workspace_id });
 
     const credits = await getWorkspaceCreditsBalance(workspace_id);
     if (credits === null) {
@@ -71,7 +69,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             where: eq(workspaceNumberTable.phone_number, caller_id),
         }),
         getWorkspaceMessagingOnboardingState({
-            supabaseClient: supabase,
             workspaceId: workspace_id,
         }),
     ]);
@@ -90,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     }
     const to = normalizePhoneNumber(to_number)
-    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id });
+    const twilio = await createWorkspaceTwilioInstance({ workspace_id });
     const twiml = new Twilio.twiml.VoiceResponse();
     try {
         const call = await withTwilioRetry(
@@ -110,16 +107,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const contactId = parseInt(contact_id, 10);
         const queueId = parseInt(queue_id, 10);
         if (!outreach_id) {
-            const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt',
+            outreach_attempt_id = await createOutreachAttempt(
                 {
-                    con_id: contactId,
-                    cam_id: campaignId,
                     queue_id: queueId,
-                    wks_id: workspace_id,
-                    usr_id: user_id
-                });
-            if (outreachError) throw outreachError;
-            outreach_attempt_id = typeof outreachAttempt === "number" ? outreachAttempt : Number(outreachAttempt);
+                    contact_id: contactId,
+                    contact_phone: to_number,
+                },
+                campaignId,
+                workspace_id,
+                user_id,
+            );
         } else {
             outreach_attempt_id = Number(outreach_id)
         }

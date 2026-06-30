@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     parseJsonBodyOrResponse: vi.fn(),
     processTemplateTags: vi.fn((body: string) => body),
-    env: { SUPABASE_URL: vi.fn(() => "http://supabase"), BASE_URL: vi.fn(() => "https://app.example") },
+    env: { BETTER_AUTH_URL: vi.fn(() => "http://client"), BASE_URL: vi.fn(() => "https://app.example") },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
@@ -58,7 +58,7 @@ vi.mock("@/lib/twilio-client.server", () => ({
   withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
-function makeSupabaseStub(opts: {
+function makeDbClientStub(opts: {
   messageInsertError?: any;
   webhookRows?: any[];
   webhookError?: any;
@@ -124,7 +124,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockReset();
     mocks.parseJsonBodyOrResponse.mockReset();
     mocks.processTemplateTags.mockClear();
-    mocks.env.SUPABASE_URL.mockClear();
+    mocks.env.BETTER_AUTH_URL.mockClear();
     mocks.logger.error.mockReset();
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
       trafficClass: "unknown",
@@ -159,7 +159,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const supabase = makeSupabaseStub({
+    const client = makeDbClientStub({
       webhookRows: [
         {
           destination_url: "http://hook",
@@ -200,7 +200,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       to: "+15551234567",
       from: "+15550000000",
       media: JSON.stringify(["http://img"]),
-      supabase: supabase as any,
+      client: client as any,
       workspace: "w1",
       contact_id: "1",
       user: { id: "u1" },
@@ -233,7 +233,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       auditTrail: [],
     });
 
-    const supabase = makeSupabaseStub({ webhookRows: [] });
+    const client = makeDbClientStub({ webhookRows: [] });
     const create = vi.fn(async (args: any) => ({
       sid: "SM1",
       body: args.body,
@@ -266,7 +266,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       to: "+15551234567",
       from: "+15550000000",
       media: "[]",
-      supabase: supabase as any,
+      client: client as any,
       workspace: "w1",
       contact_id: "1",
       user: { id: "u1" },
@@ -303,7 +303,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       auditTrail: [],
     });
 
-    const supabase = makeSupabaseStub({ webhookRows: [] });
+    const client = makeDbClientStub({ webhookRows: [] });
     const create = vi.fn(async (args: any) => ({
       sid: "SM1",
       body: args.body,
@@ -336,7 +336,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       to: "+15551234567",
       from: "+15550000000",
       media: "[]",
-      supabase: supabase as any,
+      client: client as any,
       workspace: "w1",
       contact_id: "",
       user: null,
@@ -349,7 +349,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("sendMessage throws when message insert fails", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const supabase = makeSupabaseStub({ messageInsertError: { message: "db" }, webhookRows: [] });
+    const client = makeDbClientStub({ messageInsertError: { message: "db" }, webhookRows: [] });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
@@ -360,7 +360,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         to: "+15551234567",
         from: "+15550000000",
         media: "[]",
-        supabase: supabase as any,
+        client: client as any,
         workspace: "w1",
         contact_id: "",
         user: null,
@@ -372,7 +372,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   test("sendMessage logs webhook failures but still returns when webhook delivery fails", async () => {
     // webhook query error
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const supabase1 = makeSupabaseStub({ webhookError: { message: "wh" } });
+    const postgres1 = makeDbClientStub({ webhookError: { message: "wh" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
@@ -383,7 +383,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         to: "+15551234567",
         from: "+15550000000",
         media: "[]",
-        supabase: supabase1 as any,
+        client: postgres1 as any,
         workspace: "w1",
         contact_id: "",
         user: null,
@@ -399,7 +399,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     // webhook post not ok
     const fetchMock = vi.fn(async () => ({ ok: false, status: 500, statusText: "NO" } as any));
     vi.stubGlobal("fetch", fetchMock);
-    const supabase2 = makeSupabaseStub({
+    const postgres2 = makeDbClientStub({
       webhookRows: [
         {
           destination_url: "http://hook",
@@ -416,7 +416,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         to: "+15551234567",
         from: "+15550000000",
         media: "[]",
-        supabase: supabase2 as any,
+        client: postgres2 as any,
         workspace: "w1",
         contact_id: "",
         user: null,
@@ -434,7 +434,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       vi.fn(async () => ({ ok: true, status: 200, statusText: "OK" } as any)),
     );
 
-    const supabase = makeSupabaseStub({ webhookRows: [] });
+    const client = makeDbClientStub({ webhookRows: [] });
     const create = vi.fn(async (args: any) => ({ sid: "SM1", body: args.body }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create },
@@ -445,7 +445,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       to: "+15551234567",
       from: "+15550000000",
       media: "[]",
-      supabase: supabase as any,
+      client: client as any,
       workspace: "w1",
       contact_id: "",
       user: null,
@@ -458,7 +458,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("sendMessage handles webhook array with null first element (webhook_data falsy)", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const supabase = makeSupabaseStub({ webhookRows: [null] });
+    const client = makeDbClientStub({ webhookRows: [null] });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async (args: any) => ({ sid: "SM1", body: args.body })) },
     });
@@ -468,7 +468,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       to: "+15551234567",
       from: "+15550000000",
       media: "[]",
-      supabase: supabase as any,
+      client: client as any,
       workspace: "w1",
       contact_id: "",
       user: null,
@@ -485,7 +485,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("action api_key rejects workspace mismatch", async () => {
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: {} });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "15551234567",
       workspace_id: TEST_WORKSPACE_ID_ALT,
@@ -499,9 +499,9 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     expect(res.status).toBe(403);
   });
 
-  test("action api_key success path uses authResult.supabase and user null; covers '+' not at start normalization", async () => {
-    const supabase = makeSupabaseStub({ webhookRows: [] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+  test("action api_key success path uses authResult.client and user null; covers '+' not at start normalization", async () => {
+    const client = makeDbClientStub({ webhookRows: [] });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "1+5551234567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -519,8 +519,8 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("action session requires workspace access and returns 404 on invalid phone number", async () => {
-    const supabaseClient = makeSupabaseStub({});
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
+    const null = makeDbClientStub({});
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "123",
       workspace_id: TEST_WORKSPACE_ID,
@@ -538,12 +538,12 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action skips template processing when contact lookup errors", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const supabaseClient = makeSupabaseStub({
+    const null = makeDbClientStub({
       contactRow: null,
       contactError: { message: "nope" },
       webhookRows: [],
     });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -565,11 +565,11 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action processes template tags when contact found and returns 201", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const supabaseClient = makeSupabaseStub({
+    const null = makeDbClientStub({
       contactRow: { firstname: "A" },
       webhookRows: [],
     });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+1 (555) 123-4567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -593,7 +593,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action uses messaging service mode and message intent overrides", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const supabaseClient = makeSupabaseStub({
+    const null = makeDbClientStub({
       contactRow: { firstname: "A" },
       webhookRows: [],
     });
@@ -616,7 +616,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       apiVersion: "2010-04-01",
       subresourceUris: {},
     }));
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -659,8 +659,8 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("action returns 500 when createWorkspaceTwilioInstance throws", async () => {
-    const supabaseClient = makeSupabaseStub({});
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
+    const null = makeDbClientStub({});
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -682,7 +682,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
-      supabase: {},
+      client: {},
     });
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(

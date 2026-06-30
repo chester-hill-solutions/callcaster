@@ -7,7 +7,7 @@ This directory contains all React hooks organized by domain/feature for better m
 ```
 app/hooks/
 ├── call/           # Call-related hooks (Twilio, call state, conference)
-├── realtime/       # Realtime data synchronization hooks (Supabase)
+├── realtime/       # Realtime data synchronization hooks (Postgres)
 ├── queue/          # Queue management hooks
 ├── campaign/       # Campaign settings and script hooks
 ├── contact/        # Contact search and management hooks
@@ -39,12 +39,12 @@ import { useCallState, useTwilioDevice } from "@/hooks/call";
 - `useCallHandling` - Call operations (makeCall, hangUp, answer)
 - `useCallDuration` - Call duration tracking
 - `useStartConferenceAndDial` - Conference and dialing functionality
-- `useSupabaseRoom` - Supabase room management for calls
+- `useCallRoom` - Postgres room management for calls
 
 #### Realtime Hooks (`realtime/`)
 
-- `useSupabaseRealtime` - Main realtime data synchronization
-- `useSupabaseRealtimeSubscription` - Reusable subscription hook
+- `useWorkspaceRealtime` - Main realtime data synchronization
+- `useWorkspaceRealtimeSubscription` - Reusable subscription hook
 - `useRealtimeData` - Workspace contacts realtime updates
 - `useChatRealtime` - Chat message realtime updates
 - `useConversationSummaryRealTime` - Conversation summary updates
@@ -81,7 +81,7 @@ import { useCallState, useTwilioDevice } from "@/hooks/call";
 
 Some hooks have internal dependencies:
 
-- `useSupabaseRealtime` depends on `useQueue`, `useAttempts`, `useCalls`, and `usePhoneNumbers`
+- `useWorkspaceRealtime` depends on `useQueue`, `useAttempts`, `useCalls`, and `usePhoneNumbers`
 - `useTwilioDevice` depends on `useTwilioConnection`, `useCallHandling`, and `useCallDuration`
 - `useDebouncedSave` depends on `useDebounce`
 

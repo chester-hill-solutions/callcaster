@@ -30,7 +30,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await listWorkspaceContactsApi(
-    auth.supabase,
+    auth.client,
     workspaceId,
     url.searchParams,
   );

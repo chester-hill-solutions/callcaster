@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { handset_session as handsetSessionTable } from "@/db/schema";
 import { getHandsetNumberForWorkspace } from "@/lib/database.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
@@ -24,11 +23,9 @@ export type HandsetLoaderData = {
 };
 
 export async function getHandsetLoaderData({
-  supabaseClient,
   user,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   user: { id: string };
   workspaceId: string;
 }): Promise<HandsetLoaderData> {
@@ -68,7 +65,6 @@ export async function getHandsetLoaderData({
   });
 
   const tokenResult = await createHandsetAccessToken({
-    supabaseClient,
     workspaceId,
     clientIdentity,
   });

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { FaPlus, FaTrash } from "react-icons/fa";
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions

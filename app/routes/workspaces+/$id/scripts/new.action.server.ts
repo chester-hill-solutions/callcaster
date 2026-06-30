@@ -1,7 +1,7 @@
 import { data as routeData, redirect } from "react-router";
 import { updateCampaignScriptId } from "@/lib/campaign-ivr.server";
 import { createWorkspaceScript } from "@/lib/script-api-db.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request, params }: ActionFunctionArgs) {

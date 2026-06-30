@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { releaseCampaignCallSessionApi } from "@/lib/platform-telephony.server";
@@ -21,9 +19,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await releaseCampaignCallSessionApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await releaseCampaignCallSessionApi(      auth.user.id,
       campaignId,
     );
 

@@ -8,7 +8,6 @@ import {
 } from "@/lib/twilio-call-status.server";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { data as routeData } from "react-router";
-import { getServiceSupabase } from "@/lib/supabase.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
@@ -19,6 +18,7 @@ import {
   updateOutreachAttemptForWorkspace,
   upsertCallBySid,
 } from "@/lib/telephony-db.server";
+import { insertPredictiveBroadcast } from "@/lib/workspace-events.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -29,10 +29,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return routeData({ error: "Missing CallSid" }, { status: 400 });
   }
 
-  const supabase = getServiceSupabase();
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    supabase,
     callSid: callSidRaw,
     params,
   });
@@ -40,9 +38,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return validation.response;
   }
 
-  const calledVia = params.CalledVia ?? params.called_via;
-  const userId = calledVia ? calledVia.split(":")[1] : "";
-  const realtime = supabase.realtime.channel(userId || "default");
   const underCaseData = twilioParamsToUnderCase(params);
   const updateData = buildCallUpsertFromTwilioParams(params);
 
@@ -52,10 +47,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return routeData({ success: false, error: "Failed to update call" }, { status: 500 });
   }
 
-  const { outreachAttemptId, workspaceId } = await resolveCallOutreachContext(
-    supabase,
-    callRow,
-  );
+  const { outreachAttemptId, workspaceId } = await resolveCallOutreachContext(callRow);
 
   const currentAttempt =
     outreachAttemptId != null && workspaceId
@@ -63,14 +55,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       : null;
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
-  if (currentAttempt) {
-    realtime.send({
-      type: "broadcast",
-      event: "message",
-      payload: {
-        contact_id: currentAttempt.contact_id,
-        status: underCaseData.call_status,
-      },
+  if (currentAttempt && workspaceId) {
+    await insertPredictiveBroadcast(workspaceId, {
+      contact_id: currentAttempt.contact_id,
+      status: String(underCaseData.call_status ?? ""),
     });
   }
 

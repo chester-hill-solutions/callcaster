@@ -48,7 +48,7 @@ vi.mock("@/lib/audience-upload-db.server", () => ({
   findAudienceUploadById: (...args: unknown[]) => findAudienceUploadById(...args),
 }));
 
-function buildSupabaseClient() {
+function buildMockDb() {
   const storageDownload = async () => {
     if (downloadMode.kind === "throw") throw downloadMode.value;
     if (downloadMode.kind === "error")
@@ -66,10 +66,8 @@ function buildSupabaseClient() {
   };
 }
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers({ "set-cookie": "x=y" }),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers({ "set-cookie": "x=y" }),
   }),
 }));
 
@@ -99,8 +97,7 @@ describe("api.audience-upload-status loader", () => {
 
     if (user) {
       setDualAuthSession({
-        supabaseClient: buildSupabaseClient(),
-        headers: new Headers({ "set-cookie": "x=y" }),
+                headers: new Headers({ "set-cookie": "x=y" }),
         user,
       });
     } else {
@@ -138,8 +135,7 @@ describe("api.audience-upload-status loader", () => {
   test("returns 500 when storage download errors", async () => {
     downloadMode = { kind: "error", message: "nope" };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
@@ -159,8 +155,7 @@ describe("api.audience-upload-status loader", () => {
   test("returns 500 when upload record query errors", async () => {
     uploadMode = { kind: "throw", value: new Error("db") };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
@@ -189,8 +184,7 @@ describe("api.audience-upload-status loader", () => {
       },
     };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
@@ -219,8 +213,7 @@ describe("api.audience-upload-status loader", () => {
   test("returns 500 with Unknown error when thrown value is not Error", async () => {
     downloadMode = { kind: "throw", value: "boom" };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
@@ -236,8 +229,7 @@ describe("api.audience-upload-status loader", () => {
   test("returns 500 with error.message when thrown value is Error", async () => {
     downloadMode = { kind: "throw", value: new Error("boom") };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");

@@ -8,20 +8,20 @@ import {
   SurveyQuestion,
   SurveyQuestionType,
 } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;
 
   if (!workspaceId || !surveyId) {
     throw new Response("Missing required parameters", { status: 400 });
   }
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
+  const userRole = await getUserRole({ user, workspaceId });
 
-  const result = await getSurveyDetailApi(supabaseClient, surveyId, workspaceId);
+  const result = await getSurveyDetailApi(surveyId, workspaceId);
   if (!result.ok) {
     throw new Response(result.error, { status: result.status });
   }

@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { createTenantDb } from "@/server/tenant-db";
 import { withTwilioRetry, type TwilioClientCallOptions } from "@/lib/twilio-client.server";
 
@@ -175,7 +175,7 @@ function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
 /**
  * Insert a persisted SMS record into the `message` table via tenant-db.
  *
- * Returns a Supabase-shaped `{ data, error }` tuple so existing callers can
+ * Returns a Postgres-shaped `{ data, error }` tuple so existing callers can
  * compose it inside `Promise.all` without API churn.
  */
 export async function persistMessageRecord(

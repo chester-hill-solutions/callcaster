@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
@@ -20,9 +18,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    const result = await getHandsetSessionApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await getHandsetSessionApi(      auth.user.id,
       workspaceId,
     );
 
@@ -52,9 +48,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await deleteHandsetSessionApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
+    const result = await deleteHandsetSessionApi(      auth.user.id,
       workspaceId,
     );
 

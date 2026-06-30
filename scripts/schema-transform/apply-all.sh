@@ -12,7 +12,7 @@ if [[ -z "$URL" ]]; then
 fi
 
 echo "Target: ${URL%%@*}@***"
-echo "Confirm this is Railway visual-asset-review, not hosted Supabase prod. Abort in 5s..."
+echo "Confirm this is Railway visual-asset-review, not hosted Postgres prod. Abort in 5s..."
 sleep 5
 
 STEPS=(

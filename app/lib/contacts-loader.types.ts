@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import type { MemberRole } from "@/lib/member-role";
 
 export type ContactsPagination = {

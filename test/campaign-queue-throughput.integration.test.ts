@@ -2,15 +2,15 @@ import { describe, expect, test } from "vitest";
 
 /**
  * Documents the SQL integration harness for queue throughput RPCs.
- * Execute against local Supabase:
- *   psql "$DATABASE_URL" -f supabase/tests/campaign_queue_throughput.sql
+ * Execute against local Postgres:
+ *   psql "$DATABASE_URL" -f client/tests/campaign_queue_throughput.sql
  */
 describe("campaign queue throughput SQL harness", () => {
   test("harness file exists for claim/requeue/fail/complete RPCs", async () => {
     const { readFile } = await import("node:fs/promises");
     const { resolve } = await import("node:path");
     const sql = await readFile(
-      resolve(process.cwd(), "supabase/tests/campaign_queue_throughput.sql"),
+      resolve(process.cwd(), "client/tests/campaign_queue_throughput.sql"),
       "utf8",
     );
 

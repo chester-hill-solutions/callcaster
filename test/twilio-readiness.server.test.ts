@@ -48,7 +48,7 @@ describe("twilio-readiness.server", () => {
       livePhoneNumbers: ["+18885551212"],
     } as never);
 
-    const supabaseClient = {
+    const null = {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
@@ -80,7 +80,7 @@ describe("twilio-readiness.server", () => {
 
     await expect(
       assertWorkspaceCanSendSms({
-        supabaseClient: supabaseClient as never,
+        null: null as never,
         workspaceId: "w1",
       }),
     ).rejects.toBeInstanceOf(WorkspaceSmsNotReadyError);

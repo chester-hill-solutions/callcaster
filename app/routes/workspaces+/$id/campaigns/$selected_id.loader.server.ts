@@ -8,7 +8,7 @@ import { fetchBasicResults, fetchCampaignDetails, fetchQueueCounts, getUserRole 
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -17,12 +17,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!workspace_id || !selected_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user } = await verifyAuth(request);
 
   const [campaignRow, queueCounts, userRole] = await Promise.all([
     findCampaignInWorkspace(workspace_id, selected_id),
-    fetchQueueCounts({ workspaceId: workspace_id, campaignId: selected_id, supabaseClient }),
-    getUserRole({ supabaseClient, user, workspaceId: workspace_id }),
+    fetchQueueCounts({ workspaceId: workspace_id, campaignId: selected_id}),
+    getUserRole({ user, workspaceId: workspace_id }),
   ]);
   if (!campaignRow?.type) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
@@ -36,7 +36,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const resultsPromise = fetchBasicResults({
     workspaceId: workspace_id,
     campaignId: selected_id,
-    supabaseClient,
   }) as unknown as {
     disposition: string;
     count: number;

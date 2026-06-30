@@ -1,14 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { handleQueueSyncEvent } from "../supabase/functions/_shared/queue-sync.ts";
+import { handleQueueSyncEvent } from "../shared/queue-sync.ts";
 
-function makeSupabaseStub(args: {
+function makeDbClientStub(args: {
   audienceToContacts: Record<number, number[]>;
   existingQueue: Array<{ campaign_id: number; contact_id: number }>;
 }) {
   const queue = [...args.existingQueue];
   let nextQueueId = queue.length + 1;
 
-  const supabase = {
+  const client = {
     rpc: async (fn: string, params: { p_contact_id: number; p_campaign_id: number; p_requeue?: boolean }) => {
       if (fn !== "handle_campaign_queue_entry") {
         throw new Error(`unexpected rpc ${fn}`);
@@ -63,25 +63,25 @@ function makeSupabaseStub(args: {
     _queue: queue,
   };
 
-  return supabase as any;
+  return client as any;
 }
 
 describe("audience → campaign queue sync", () => {
   test("INSERT requeues every audience contact through the RPC helper", async () => {
-    const supabase = makeSupabaseStub({
+    const client = makeDbClientStub({
       audienceToContacts: { 10: [1, 2] },
       existingQueue: [{ campaign_id: 99, contact_id: 1 }],
     });
 
     const res = await handleQueueSyncEvent({
-      supabase,
+      client,
       type: "INSERT",
       record: { audience_id: 10, campaign_id: 99 },
       old_record: null,
     });
 
     expect(res).toEqual([2, 3]);
-    expect(supabase._queue).toEqual([
+    expect(adminDb._queue).toEqual([
       { campaign_id: 99, contact_id: 1 },
       { campaign_id: 99, contact_id: 1 },
       { campaign_id: 99, contact_id: 2 },
@@ -89,7 +89,7 @@ describe("audience → campaign queue sync", () => {
   });
 
   test("DELETE removes campaign_queue rows for contacts in audience", async () => {
-    const supabase = makeSupabaseStub({
+    const client = makeDbClientStub({
       audienceToContacts: { 10: [1, 2] },
       existingQueue: [
         { campaign_id: 99, contact_id: 1 },
@@ -99,13 +99,13 @@ describe("audience → campaign queue sync", () => {
     });
 
     await handleQueueSyncEvent({
-      supabase,
+      client,
       type: "DELETE",
       record: null,
       old_record: { audience_id: 10, campaign_id: 99 },
     });
 
-    expect(supabase._queue).toEqual([{ campaign_id: 99, contact_id: 3 }]);
+    expect(adminDb._queue).toEqual([{ campaign_id: 99, contact_id: 3 }]);
   });
 });
 

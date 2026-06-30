@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createSupabaseRealtimeMock } from "./hooks-test-helpers";
+import { createWorkspaceRealtimeMock, createWorkspaceEventSourceMock } from "./hooks-test-helpers";
 
 const messagingMocks = vi.hoisted(() => ({
   fetchConversationSummaries: vi.fn(),
@@ -12,37 +12,86 @@ vi.mock("@/lib/chats/messaging-client", () => messagingMocks);
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
+vi.mock("@/hooks/queue/useQueue", () => ({
+  useQueue: () => ({
+    queue: [],
+    setQueue: vi.fn(),
+    predictiveQueue: [],
+    updateQueue: vi.fn(),
+    householdMap: new Map(),
+    nextRecipient: null,
+    setNextRecipient: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/queue/useAttempts", async () => {
+  const React = await import("react");
+  return {
+    useAttempts: (
+      attempts: unknown,
+      recentAttemptInit: unknown,
+    ) => {
+      const [recentAttempt, setRecentAttempt] = React.useState(recentAttemptInit);
+      return {
+        attemptList: attempts,
+        recentAttempt,
+        setRecentAttempt,
+        updateAttempts: vi.fn(),
+      };
+    },
+  };
+});
+vi.mock("@/hooks/queue/useCalls", () => ({
+  useCalls: () => ({
+    callsList: [],
+    recentCall: null,
+    updateCalls: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/phone/usePhoneNumbers", () => ({
+  usePhoneNumbers: () => ({
+    phoneNumbers: [],
+    setPhoneNumbers: vi.fn(),
+    updateWorkspaceNumbers: vi.fn(),
+  }),
+}));
 
 describe("realtime hooks", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   test("phoneNumbersMatch normalizes numbers", async () => {
     const { phoneNumbersMatch } = await import("@/hooks/realtime/useChatRealtime");
     expect(phoneNumbersMatch("+1 (555) 123-4567", "5551234567")).toBe(true);
     expect(phoneNumbersMatch(null, "+1")).toBe(false);
   });
 
-  test("useSupabaseRealtimeSubscription forwards payloads", async () => {
-    const { useSupabaseRealtimeSubscription } = await import(
-      "@/hooks/realtime/useSupabaseRealtime"
+  test("useWorkspaceEventSubscription forwards payloads", async () => {
+    const { useWorkspaceEventSubscription } = await import(
+      "@/hooks/realtime/useWorkspaceEventSubscription"
     );
-    const { supabase, emitPayload } = createSupabaseRealtimeMock();
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
     const onChange = vi.fn();
 
     renderHook(() =>
-      useSupabaseRealtimeSubscription({
-        supabase: supabase as any,
+      useWorkspaceEventSubscription({
+        workspaceId: "ws",
         table: ["call", "campaign_queue"],
         filter: "campaign_id=eq.1",
         onChange,
       }),
     );
 
-    emitPayload({ eventType: "INSERT", table: "call", new: { sid: "CA1" } });
+    emitWorkspaceEvent(
+      { eventType: "INSERT", table: "call", new: { sid: "CA1", campaign_id: 1 }, old: null },
+      { workspaceId: "ws" },
+    );
     expect(onChange).toHaveBeenCalled();
   });
 
   test("useRealtimeData fetch and postgres handlers", async () => {
     const { useRealtimeData } = await import("@/hooks/realtime/useRealtimeData");
-    const { supabase, emitPayload, emitStatus } = createSupabaseRealtimeMock();
+    const { client, emitPayload, emitStatus } = createWorkspaceRealtimeMock();
 
     const select = vi.fn(() => ({
       eq: vi.fn().mockResolvedValue({
@@ -50,15 +99,15 @@ describe("realtime hooks", () => {
         error: null,
       }),
     }));
-    supabase.from = vi.fn(() => ({ select }));
+    adminDb.from = vi.fn(() => ({ select }));
 
     const withInitial = renderHook(() =>
-      useRealtimeData(supabase as any, "ws", "contact", [{ id: 1 } as any]),
+      useRealtimeData(client as any, "ws", "contact", [{ id: 1 } as any]),
     );
     expect(withInitial.result.current.data).toHaveLength(1);
 
     const withoutInitial = renderHook(() =>
-      useRealtimeData(supabase as any, "ws", "workspace_users", null),
+      useRealtimeData(client as any, "ws", "workspace_users", null),
     );
     await act(async () => {
       await Promise.resolve();
@@ -80,7 +129,7 @@ describe("realtime hooks", () => {
 
   test("useChatRealTime inserts and dedupes messages", async () => {
     const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
-    const { supabase, emitPayload } = createSupabaseRealtimeMock();
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
 
     const initial = [
       {
@@ -95,7 +144,7 @@ describe("realtime hooks", () => {
 
     const { result } = renderHook(() =>
       useChatRealTime({
-        supabase: supabase as any,
+        client: {} as any,
         initial,
         workspace: "ws",
         contact_number: "+15551111111",
@@ -103,8 +152,9 @@ describe("realtime hooks", () => {
     );
 
     act(() => {
-      emitPayload({
+      emitWorkspaceEvent({
         eventType: "INSERT",
+        table: "message",
         new: {
           sid: "SM1",
           body: "hi",
@@ -113,14 +163,19 @@ describe("realtime hooks", () => {
           workspace: "ws",
           status: "delivered",
         },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         eventType: "INSERT",
+        table: "message",
         new: { sid: "SM1", workspace: "ws", status: "failed" },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         eventType: "UPDATE",
+        table: "message",
         new: { sid: "pending-1", body: "hi", workspace: "ws", status: "sent" },
+        old: null,
       });
     });
 
@@ -152,7 +207,7 @@ describe("realtime hooks", () => {
     const { useConversationSummaryRealTime } = await import(
       "@/hooks/realtime/useChatRealtime"
     );
-    const { supabase, emitPayload } = createSupabaseRealtimeMock();
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
 
     const initial = [
       {
@@ -169,7 +224,7 @@ describe("realtime hooks", () => {
 
     const { result } = renderHook(() =>
       useConversationSummaryRealTime({
-        supabase: supabase as any,
+        client: {} as any,
         initial,
         workspace: "ws",
         activeContactNumber: "+15551111111",
@@ -182,8 +237,9 @@ describe("realtime hooks", () => {
     expect(messagingMocks.fetchConversationSummaries).toHaveBeenCalled();
 
     act(() => {
-      emitPayload({
+      emitWorkspaceEvent({
         eventType: "INSERT",
+        table: "message",
         new: {
           workspace: "ws",
           status: "received",
@@ -192,9 +248,11 @@ describe("realtime hooks", () => {
           to: "+15550000000",
           date_created: new Date().toISOString(),
         },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         eventType: "INSERT",
+        table: "message",
         new: {
           workspace: "ws",
           status: "delivered",
@@ -203,6 +261,7 @@ describe("realtime hooks", () => {
           to: "+15559999999",
           date_created: new Date().toISOString(),
         },
+        old: null,
       });
     });
 
@@ -214,15 +273,15 @@ describe("realtime hooks", () => {
     });
   });
 
-  test("useSupabaseRealtime routes table events", async () => {
+  test("useWorkspaceRealtime routes table events", async () => {
     messagingMocks.fetchCampaignQueueItemWithContact.mockResolvedValue({
       id: 9,
       campaign_id: 1,
       contact: { id: 9, phone: "+1" },
     });
 
-    const { useSupabaseRealtime } = await import("@/hooks/realtime/useSupabaseRealtime");
-    const { supabase, emitPayload, emitStatus } = createSupabaseRealtimeMock();
+    const { useWorkspaceRealtime } = await import("@/hooks/realtime/useWorkspaceRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
 
     const user = { id: "user-1" };
     const init = {
@@ -250,9 +309,8 @@ describe("realtime hooks", () => {
     const setUpdate = vi.fn();
 
     const { result } = renderHook(() =>
-      useSupabaseRealtime({
+      useWorkspaceRealtime({
         user,
-        supabase: supabase as any,
         init,
         campaign_id: 1,
         predictive: false,
@@ -264,38 +322,42 @@ describe("realtime hooks", () => {
     );
 
     act(() => {
-      emitPayload({
+      emitWorkspaceEvent({
         table: "outreach_attempt",
         eventType: "INSERT",
         new: { id: 1, user_id: user.id, campaign_id: 1, contact_id: 1, created_at: new Date().toISOString() },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         table: "call",
         eventType: "INSERT",
         new: { sid: "CA1", campaign_id: 1, contact_id: 1, outreach_attempt_id: 1 },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         table: "campaign_queue",
         eventType: "INSERT",
         new: { id: 2, campaign_id: 1, contact_id: 2, status: user.id, contact: { id: 2, phone: "+2" } },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         table: "campaign_queue",
         eventType: "INSERT",
         new: { id: 9, campaign_id: 1, contact_id: 9, status: user.id },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         table: "workspace_number",
         eventType: "INSERT",
         new: { id: 3, workspace: "ws" },
+        old: null,
       });
-      emitPayload({
+      emitWorkspaceEvent({
         table: "transaction_history",
         eventType: "INSERT",
         new: { amount: 5, workspace: "ws" },
+        old: null,
       });
-      emitStatus("CHANNEL_ERROR");
-      emitStatus("TIMED_OUT");
     });
     await waitFor(() => expect(messagingMocks.fetchCampaignQueueItemWithContact).toHaveBeenCalled());
 

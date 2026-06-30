@@ -11,7 +11,7 @@ const twilioMocks = vi.hoisted(() => {
   };
 });
 
-const supabaseMocks = vi.hoisted(() => {
+const postgresMocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
     logger: { warn: vi.fn() },
@@ -54,13 +54,13 @@ vi.mock("@/lib/env.server", () => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: any[]) => supabaseMocks.createClient(...args),
+vi.mock("@client/client-js", () => ({
+  createClient: (...args: any[]) => postgresMocks.createClient(...args),
 }));
 
-vi.mock("@/lib/logger.server", () => ({ logger: supabaseMocks.logger }));
+vi.mock("@/lib/logger.server", () => ({ logger: postgresMocks.logger }));
 
-function makeSupabase(options?: {
+function makeDbClient(options?: {
   activeSession?: boolean;
   handsetNumber?: string | null;
   fallbackNumber?: string | null;
@@ -126,8 +126,8 @@ describe("app/routes/api+/call/route.tsx", () => {
     twilioMocks.say.mockReset();
     twilioMocks.dial.mockReset();
     twilioMocks.toString.mockClear();
-    supabaseMocks.createClient.mockReset();
-    supabaseMocks.logger.warn.mockReset();
+    postgresMocks.createClient.mockReset();
+    postgresMocks.logger.warn.mockReset();
     vi.resetModules();
   });
 
@@ -176,8 +176,8 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("handset flow rejects when no active handset session", async () => {
-    supabaseMocks.createClient.mockReturnValue(
-      makeSupabase({ activeSession: false, handsetNumber: "+15551230000" }),
+    postgresMocks.createClient.mockReturnValue(
+      makeDbClient({ activeSession: false, handsetNumber: "+15551230000" }),
     );
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
@@ -196,12 +196,12 @@ describe("app/routes/api+/call/route.tsx", () => {
       "Your handset session has expired. Please refresh the page.",
     );
     expect(twilioMocks.dial).not.toHaveBeenCalled();
-    expect(supabaseMocks.logger.warn).toHaveBeenCalled();
+    expect(postgresMocks.logger.warn).toHaveBeenCalled();
   });
 
   test("handset flow dials with workspace caller id and normalized destination", async () => {
-    supabaseMocks.createClient.mockReturnValue(
-      makeSupabase({
+    postgresMocks.createClient.mockReturnValue(
+      makeDbClient({
         activeSession: true,
         handsetNumber: "+15559876543",
       }),
@@ -235,8 +235,8 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("handset flow says no caller id when workspace has no valid number", async () => {
-    supabaseMocks.createClient.mockReturnValue(
-      makeSupabase({
+    postgresMocks.createClient.mockReturnValue(
+      makeDbClient({
         activeSession: true,
         handsetNumber: null,
         fallbackNumber: "bad",

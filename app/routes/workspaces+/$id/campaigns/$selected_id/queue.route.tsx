@@ -10,7 +10,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Audience, QueueItem, Contact } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
 import type { AppError } from "@/lib/errors.server";
 
@@ -137,8 +136,7 @@ function QueueResolvedContent({
     campaignId,
     selectedAudienceIds,
     audiences,
-    supabase,
-    campaignWorkspace,
+        campaignWorkspace,
     isSelectingAudience,
     selectedAudience,
     setIsSelectingAudience,
@@ -152,7 +150,6 @@ function QueueResolvedContent({
     campaignId: string;
     selectedAudienceIds: number[];
     audiences: NonNullable<Audience>[];
-    supabase: SupabaseClient;
     campaignWorkspace: string;
     isSelectingAudience: boolean;
     selectedAudience: number | null;
@@ -212,7 +209,7 @@ function QueueResolvedContent({
                 setIsAllFilteredSelected={setIsAllFilteredSelected}
                 selectedAudienceIds={selectedAudienceIds}
                 campaignId={campaignId}
-                supabase={supabase}
+                client={client}
                 handleFilterChange={queueActions.handleFilterChange}
                 clearFilter={queueActions.clearFilter}
                 addContactToQueue={queueActions.handleAddContactToQueue}
@@ -224,12 +221,11 @@ function QueueResolvedContent({
 }
 
 export default function Queue() {
-    const { campaignData, campaignDetails, audiences, supabase } = useOutletContext<{
+    const { campaignData, campaignDetails, audiences, client } = useOutletContext<{
         campaignData: NonNullable<Campaign> & { workspace: string },
         campaignDetails: IVRCampaign | MessageCampaign | LiveCampaign,
         audiences: NonNullable<Audience>[],
-        supabase: SupabaseClient
-    }>();
+            }>();
     const { queuePromise, campaignId, selectedAudienceIds } = useLoaderData<LoaderData>();
     const [isAllFilteredSelected, setIsAllFilteredSelected] = useState(false);
     const [isSelectingAudience, setIsSelectingAudience] = useState(false);
@@ -246,7 +242,7 @@ export default function Queue() {
                             campaignId={campaignId}
                             selectedAudienceIds={selectedAudienceIds}
                             audiences={audiences}
-                            supabase={supabase}
+                            client={client}
                             campaignWorkspace={campaignData.workspace}
                             isSelectingAudience={isSelectingAudience}
                             selectedAudience={selectedAudience}

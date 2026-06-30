@@ -16,7 +16,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const url = new URL(request.url);
   const result = await listWorkspaceConversationsApi(
-    auth.supabase,
+    auth.client,
     workspaceId,
     url.searchParams,
   );

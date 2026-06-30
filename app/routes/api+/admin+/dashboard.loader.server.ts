@@ -7,6 +7,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const auth = await requireSudo(request);
   if (auth instanceof Response) return auth;
 
-  const dashboard = await getAdminDashboard(auth.supabaseClient);
+  const dashboard = await getAdminDashboard(auth.null);
   return jsonResponse(dashboard, 200);
 }

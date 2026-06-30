@@ -44,7 +44,6 @@ describe("app/lib/message-db.server.ts", () => {
     const result = await mod.fetchMessagePageForContact(
       "w1",
       "+15550001111",
-      null,
       { pageSize: 2 },
     );
 
@@ -80,7 +79,7 @@ describe("app/lib/chats/fetch-message-page.server.ts", () => {
     }));
   });
 
-  test("fetchMessagePage reverses rows chronologically and skips media without supabase", async () => {
+  test("fetchMessagePage reverses rows chronologically and skips media without client", async () => {
     messageDbMocks.fetchMessagePageForContact.mockResolvedValueOnce({
       messages: [
         { sid: "m2", date_created: "2026-03-02T00:00:00.000Z" },

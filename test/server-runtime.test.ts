@@ -112,7 +112,7 @@ describe("server runtime", () => {
   });
 
   test("fails fast when required env vars are missing", () => {
-    expect(() => validateEnvironment({ SUPABASE_URL: "http://localhost" })).toThrow(
+    expect(() => validateEnvironment({ AUTH_URL: "http://localhost" })).toThrow(
       "Missing required environment variables:",
     );
   });

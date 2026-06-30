@@ -1,6 +1,4 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { purchaseNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
@@ -24,9 +22,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, purchaseNumberBodySchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await purchaseWorkspaceNumber(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
+  const result = await purchaseWorkspaceNumber(    auth.user.id,
     workspaceId,
     parsed.phone_number,
   );
