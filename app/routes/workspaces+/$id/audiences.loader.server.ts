@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { listWorkspaceAudiencesApi } from "@/lib/platform-data.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -11,16 +12,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const { supabaseClient, headers, workspaceId, userRole } = access.ctx;
 
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
+  const workspaceData = await getWorkspaceById(workspaceId);
 
-  if (workspaceError) {
+  if (!workspaceData) {
     return routeData(
-      { workspace: null, error: workspaceError.message, userRole },
-      { headers },
+      { workspace: null, error: "Workspace not found", userRole },
+      { headers, status: 404 },
     );
   }
 

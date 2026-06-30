@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -11,21 +12,17 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const { supabaseClient, headers, user, workspaceId, userRole } = access.ctx;
 
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
+  const workspaceData = await getWorkspaceById(workspaceId);
 
-  if (workspaceError) {
+  if (!workspaceData) {
     return routeData(
       {
         audioMedia: null,
         workspace: null,
-        error: workspaceError.message,
+        error: "Workspace not found",
         userRole,
       },
-      { headers },
+      { headers, status: 404 },
     );
   }
 

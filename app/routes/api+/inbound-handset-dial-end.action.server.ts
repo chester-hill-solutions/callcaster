@@ -5,6 +5,7 @@ import {
   appendInboundVoicemailTwiml,
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
+import { findWorkspaceNumberInboundFallbackByPhone } from "@/lib/inbound-call-db.server";
 import { validateTwilioWebhookForPhoneNumber } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
@@ -38,16 +39,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
 
   if (dialCallStatus === "no-answer" || dialCallStatus === "busy" || dialCallStatus === "failed") {
-    const { data: number } = await supabase
-      .from("workspace_number")
-      .select("inbound_action, inbound_audio, workspace")
-      .eq("phone_number", called)
-      .maybeSingle();
-
-    const workspaceId =
-      number && typeof number.workspace === "string" ? number.workspace : null;
-    const inboundAction =
-      number && typeof number.inbound_action === "string" ? number.inbound_action : null;
+    const number = await findWorkspaceNumberInboundFallbackByPhone(called);
+    const workspaceId = number?.workspaceId ?? null;
+    const inboundAction = number?.inbound_action ?? null;
 
     if (workspaceId && inboundAction && isEmail(inboundAction)) {
       const voicemail = await resolveInboundVoicemailAudio({

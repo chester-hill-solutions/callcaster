@@ -7,8 +7,14 @@ import {
   type VoterListSource,
 } from "@/lib/audience-upload-process.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
-import type { Database, Tables } from "@/lib/database.types";
+import {
+  createAudienceForUpload,
+  createAudienceUploadRecord,
+  findAudienceInWorkspace,
+  markAudienceUpdating,
+} from "@/lib/audience-upload-db.server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 interface StorageBucket {
   id: string;
@@ -99,42 +105,18 @@ export const action = async ({
     
     if (audienceIdStr) {
       const audienceId = parseInt(audienceIdStr, 10);
-      
-      // Verify the audience exists and belongs to the workspace
-      const { data: existingAudience, error: audienceCheckError } = await supabaseClient
-        .from("audience")
-        .select("id")
-        .eq("id", audienceId)
-        .eq("workspace", workspaceId)
-        .single();
-        
-      if (audienceCheckError || !existingAudience) {
+
+      const existingAudience = await findAudienceInWorkspace(workspaceId, audienceId);
+      if (!existingAudience) {
         return routeData({ error: "Audience not found or not accessible" }, { status: 404, headers });
       }
-      
-      finalAudienceId = audienceId;
-      
-      // Update the audience status to indicate it's being updated
-      await supabaseClient
-        .from("audience")
-        .update({
-          status: "updating"
-        })
-        .eq("id", finalAudienceId);
-    } else {
-      // Create a new audience
-      const { data: audienceData, error: audienceError } = await supabaseClient
-        .from("audience")
-        .insert({
-          name: audienceName,
-          workspace: workspaceId,
-          status: "pending"
-        })
-        .select()
-        .single();
 
-      if (audienceError) {
-        return routeData({ error: audienceError.message }, { status: 500, headers });
+      finalAudienceId = audienceId;
+      await markAudienceUpdating(workspaceId, finalAudienceId);
+    } else {
+      const audienceData = await createAudienceForUpload(workspaceId, audienceName);
+      if (!audienceData) {
+        return routeData({ error: "Failed to create audience" }, { status: 500, headers });
       }
 
       finalAudienceId = audienceData.id;
@@ -152,26 +134,18 @@ export const action = async ({
     // Convert the UTF-8 bytes to base64
     const fileBase64 = Buffer.from(utf8Bytes).toString('base64');
 
-    // Create an upload record
-    const { data: uploadData, error: uploadError } = await supabaseClient
-      .from("audience_upload")
-      .insert({
-        audience_id: finalAudienceId,
-        workspace: workspaceId,
-        created_by: user.id,
-        status: "pending",
-        file_name: contactsFile.name,
-        file_size: contactsFile.size,
-        total_contacts: 0,
-        processed_contacts: 0,
-        header_mapping: headerMapping ? JSON.parse(headerMapping) : {},
-        split_name_column: splitNameColumn || null
-      })
-      .select()
-      .single();
+    const uploadData = await createAudienceUploadRecord({
+      workspaceId,
+      audienceId: finalAudienceId,
+      createdBy: user.id,
+      fileName: contactsFile.name,
+      fileSize: contactsFile.size,
+      headerMapping: headerMapping ? JSON.parse(headerMapping) : {},
+      splitNameColumn: splitNameColumn || null,
+    });
 
-    if (uploadError) {
-      return routeData({ error: uploadError.message }, { status: 500, headers });
+    if (!uploadData) {
+      return routeData({ error: "Failed to create upload record" }, { status: 500, headers });
     }
 
     const uploadId = uploadData.id;

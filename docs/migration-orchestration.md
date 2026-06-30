@@ -24,7 +24,7 @@ Railway-first schema cleanup and full v2 stack on staging; single big-bang produ
 | 0 — Audit & compose | **Done** | — |
 | 1 — Schema transform | **Mostly applied** | Transforms 06/07/09; introspect blocked |
 | 1D — Scriptkit packages | Not started | CHS monorepo upstream |
-| 2 — Drizzle port | **In progress** | 9/13 modules; **153** PostgREST sites in **81** files; **admin/** complete on Drizzle |
+| 2 — Drizzle port | **In progress** | 9/13 modules; **46** PostgREST sites in **31** files; **`api+` tenant reads done** |
 | 3A–3F — Staging stack | Not started | 3D partial (Remix sms-status; Edge IVR unified campaign) |
 | 4 — Staging gate | Blocked | Phases 2–3 |
 | 5 — Prod cutover | Blocked | Phase 4 |

@@ -1,10 +1,9 @@
 import { data as routeData } from "react-router";
-import { createClient } from "@supabase/supabase-js";
 import { createErrorResponse } from "@/lib/errors.server";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getWorkspaceById, mergeWorkspaceTwilioData } from "@/lib/workspace-members-db.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -47,31 +46,19 @@ const updateWorkspace = async ({
   workspace_id,
   update,
 }: UpdateWorkspaceParams) => {
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspace")
-    .select()
-    .eq("id", workspace_id)
-    .single();
-
-  if (workspaceError) throw { workspace_error: workspaceError };
+  const workspace = await getWorkspaceById(workspace_id);
+  if (!workspace) {
+    throw { workspace_error: new Error("Workspace not found") };
+  }
 
   if (Object.keys(update).length === 0) {
     return workspace;
   }
 
-  const existingTwilioData = isObject(workspace?.twilio_data)
-    ? workspace.twilio_data
-    : {};
-
-  const { data, error } = await supabase
-    .from("workspace")
-    .update({ twilio_data: { ...existingTwilioData, ...update } })
-    .eq("id", workspace_id)
-    .select()
-    .single();
-
-  if (error) throw { workspace_error: error };
+  const data = await mergeWorkspaceTwilioData(workspace_id, update);
+  if (!data) {
+    throw { workspace_error: new Error("Failed to update workspace") };
+  }
   return data;
 };
 

@@ -2,6 +2,7 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { findCampaignExportMeta } from "@/lib/campaign-ivr.server";
 import {
   generateCampaignExportId,
   processCallCampaignExport,
@@ -17,9 +18,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!user) {
-    return new Response("Unauthorized", { status: 401 });
   }
 
   try {
@@ -37,16 +35,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       workspaceId: workspaceId.toString(),
     });
 
-    const { data: campaignRow, error: campaignRowError } = await supabaseClient
-      .from("campaign")
-      .select("id, type, title, workspace")
-      .eq("id", Number(campaignId))
-      .single();
-    if (campaignRowError || !campaignRow) {
+    const campaignRow = await findCampaignExportMeta(
+      workspaceId.toString(),
+      Number(campaignId),
+    );
+    if (!campaignRow) {
       return new Response("Campaign not found", { status: 404 });
-    }
-    if (campaignRow.workspace !== workspaceId.toString()) {
-      return new Response("Forbidden", { status: 403 });
     }
 
     const exportId = generateCampaignExportId();

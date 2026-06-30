@@ -6,7 +6,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 **Orchestration:** [`migration-orchestration.md`](./migration-orchestration.md)  
 **Branch:** `feat/supabase-postgres-migration`  
 **Railway:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
-**Last updated:** 2026-06-29
+**Last updated:** 2026-06-30
 
 ### Snapshot (rolling)
 
@@ -14,7 +14,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 |--------|------:|------|
 | Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
 | `app/lib/database/*.server.ts` on tenant-db | **8 / 13** | G2 |
-| App `supabase.from()` call sites in `app/` | **153** `.from("…")` in **81** files (telephony API, hooks/realtime, create-with-script; **admin/** fully on Drizzle) | G2 |
+| App `supabase.from()` call sites in `app/` | **46** `.from("…")` in **31** files (hooks/realtime/storage; **`api+` tenant reads cleared**) | G2 |
 | `database.types` imports in `app/` | **162 files** | G2 (delete at exit) |
 | Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
 | E2E on review URL | Not run | G4 |
@@ -102,7 +102,7 @@ Inventory: [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventor
 | 2.12 | Delete `database.types.ts` | Todo | ~162 imports remain |
 | 2.13 | E2E factories → Drizzle | Todo | `e2e/fixtures/factories.ts` still references subtype tables |
 
-**Progress:** **9 done** · **3 in progress** · 1 todo (of 13 modules) · 162 `database.types` imports · **153** PostgREST `.from("…")` sites remain
+**Progress:** **9 done** · **3 in progress** · 1 todo (of 13 modules) · 162 `database.types` imports · **110** PostgREST `.from("…")` sites remain
 
 ---
 
@@ -202,8 +202,8 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **WS-B telephony API** — `create-with-script`, `inbound*`, `sms/status`, `call.action` (largest remaining counts)
-2. **WS-B workspace route stragglers** — contacts, analytics, settings/numbers loaders
+1. **WS-B workspace route stragglers** — settings loader (nested joins), campaign settings/actions, chats, archive
+2. **WS-B lib stragglers** — `inbound-sms-context`, `platform-workspace-numbers`, hooks/realtime (Phase 3B)
 3. **WS-B 2.6** — Edge Function transaction-history paths (app paths on Drizzle RPC)
 4. **WS-B 2.8** — Finish `workspace-twilio-sync` module
 5. **WS-B 2.11** — UI/hooks type cleanup; pre-existing typecheck drift in loaders
@@ -230,3 +230,9 @@ gantt
 | 2026-06-29 | agent | Call-log + billing + onboarding persistence on Drizzle; `root.loader` + accept-invite on `workspace-members-db`; metrics **200** / **97** files |
 | 2026-06-29 | agent | `admin+/route` loader/action + `requireSudoAdmin` → `platform-admin` / `getUserById`; metrics **190** / **94** files |
 | 2026-06-29 | agent | Full **admin/** tree on Drizzle; `campaign-audience-db`, `campaign_audience` API, `platform-telephony` handset/campaign reads; metrics **153** / **81** files |
+| 2026-06-30 | agent | `create-with-script.server`, verification routes, contacts/numbers loaders; `message-db.server`; **sms/status** + **call.action** + webhook message lookup on Drizzle; create-with-script tests **21/21**; metrics **126** / **74** files |
+| 2026-06-30 | agent | **inbound.action**, **call-status**, **analytics** + **contacts/$contactId** loaders; `inbound-call-db.server`; twilio webhook call lookup; inbound tests **7/7**; metrics **110** / **69** files |
+| 2026-06-30 | agent | **audience-upload** action/status on Drizzle; `audience-upload-process` tenant-db; **sms.action** campaign/dedupe/outreach update on Drizzle; tests **20/20** audience-upload + **21/21** sms; metrics **88** / **59** files |
+| 2026-06-30 | agent | **outreach_attempts/$id**, **caller-id/status**, **audiodrop**, **email-vm**, **ivr page**, **initiate-ivr**, **audiences** action/loader lookup, **scripts**, **workspace**, **chat_sms** on Drizzle; metrics **70** / **48** files |
+| 2026-06-30 | agent | **campaign-export** server on `campaign-export-db.server.ts`; last **4** `api+` routes; export tests **31/31**; workspace loaders (**audiences**, **audios**, **scripts**, **index**); metrics **57** / **38** files (**0** PostgREST in `api+`) |
+| 2026-06-30 | agent | Campaign workspace routes on Drizzle: `$selected_id` loader/action, `settings.action`, `script/edit.*`, `archive`, audiences/new; `campaign-ivr.server` status/duplicate/script-edit helpers; metrics **46** / **31** files |

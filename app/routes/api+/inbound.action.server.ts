@@ -14,35 +14,19 @@ import {
   appendInboundVoicemailTwiml,
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
+import {
+  findInboundIvrScriptSteps,
+  findWorkspaceNumberByPhoneNumber,
+  upsertInboundCallRecord,
+  workspaceWebhookHasInboundCallInsert,
+} from "@/lib/inbound-call-db.server";
+import { findActiveHandsetSessionClientIdentity } from "@/lib/handset/handset-session.server";
+import { getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
 import Twilio from "twilio";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
-import type {
-  TwilioInboundCallWebhook,
-  WebhookEvent,
-} from "@/lib/twilio.types";
+import type { TwilioInboundCallWebhook } from "@/lib/twilio.types";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
-
-interface WorkspaceNumberData {
-  id: number;
-  handset_enabled: boolean | null;
-  inbound_action: string | null;
-  inbound_audio: string | null;
-  inbound_queue_id: number | null;
-  inbound_script_id: number | null;
-  inbound_ring_count: number | null;
-  type: string | null;
-  workspace: {
-    id: string;
-    twilio_data: {
-      account_sid: string;
-      auth_token: string;
-    } | null;
-    webhook: Array<{
-      events: WebhookEvent[];
-    }>;
-  } | null;
-}
 
 function dispatchInboundCallWebhookNotification(args: {
   workspaceId: string;
@@ -97,50 +81,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return twilioWebhookBadRequest("Missing Called parameter");
   }
 
-  const { data: number, error: numberError } = (await supabase
-    .from("workspace_number")
-    .select(
-      `
-      id,
-      handset_enabled,
-      inbound_action,
-      inbound_audio,
-      inbound_queue_id,
-      inbound_script_id,
-      inbound_ring_count,
-      type,
-      workspace,
-      ...workspace!inner(id, twilio_data, webhook(*))`,
-    )
-    .eq("phone_number", data.Called)
-    .single()) as {
-    data: WorkspaceNumberData | null;
-    error: Error | null;
-  };
+  const number = await findWorkspaceNumberByPhoneNumber(data.Called);
   if (!number) {
     return twilioWebhookNotFound();
   }
-  if (numberError) {
-    logger.error("Error on function getWorkspacePhoneNumbers", numberError);
-    return twilioWebhookInternalError();
-  }
 
-  let twilioData = number.workspace?.twilio_data as
-    | Record<string, unknown>
-    | null
-    | undefined;
+  const workspaceId = number.workspaceId;
 
-  const workspaceIdFromNumber =
-    number.workspace && typeof number.workspace === "object" && "id" in number.workspace
-      ? (number.workspace as { id: string }).id
-      : typeof number.workspace === "string"
-        ? number.workspace
-        : null;
-
-  twilioData = (await resolveWorkspaceTwilioData(
+  const twilioData = (await resolveWorkspaceTwilioData(
     supabase,
-    workspaceIdFromNumber,
-    twilioData,
+    workspaceId,
+    null,
     logger,
   )) as Record<string, unknown> | null | undefined;
 
@@ -155,7 +106,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   logger.info("api.inbound webhook received", {
     Called: data.Called,
     CallSid: data.CallSid,
-    workspaceId: workspaceIdFromNumber,
+    workspaceId,
     authTokenSource,
     hasSignature: Boolean(request.headers.get("x-twilio-signature")),
     requestUrl: new URL(request.url).href,
@@ -165,60 +116,51 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     logger.warn("api.inbound Twilio signature validation failed", {
       Called: data.Called,
       CallSid: data.CallSid,
-      workspaceId: workspaceIdFromNumber,
+      workspaceId,
     });
     return validation.response;
   }
 
-  const workspaceId = workspaceIdFromNumber ?? null;
   const dialTimeout = inboundRingCountToDialTimeoutSeconds(
-    number?.inbound_ring_count ?? null,
+    number.inbound_ring_count ?? null,
   );
-  const voicemail = workspaceId
-    ? await resolveInboundVoicemailAudio({
-        supabase,
-        workspaceId,
-        inboundAudio: number?.inbound_audio ?? null,
-      })
-    : null;
+  const voicemail = await resolveInboundVoicemailAudio({
+    supabase,
+    workspaceId,
+    inboundAudio: number.inbound_audio ?? null,
+  });
 
-  // Insert call record
   if (!data.CallSid || typeof data.CallSid !== "string") {
     return twilioWebhookBadRequest("Missing CallSid");
   }
 
-  const { data: call, error: callError } = await supabase
-    .from("call")
-    .upsert({
-      sid: data.CallSid,
+  const call = await upsertInboundCallRecord({
+    workspaceId,
+    sid: data.CallSid,
+    values: {
       account_sid: data.AccountSid || null,
       to: data.To || null,
       from: data.From || null,
-      status: "completed" as const,
+      status: "completed",
       start_time: new Date().toISOString(),
       direction: data.Direction || null,
       api_version: data.ApiVersion || null,
-      workspace: number.workspace?.id || null,
+      workspace: workspaceId,
       duration: String(
         Math.max(Number(data.Duration || 0), Number(data.CallDuration || 0)),
       ),
-    } as Database["public"]["Tables"]["call"]["Insert"])
-    .select()
-    .single();
+    },
+  });
 
-  if (callError) {
-    logger.error("Error on function insert call", callError);
+  if (!call) {
+    logger.error("Error on function insert call", { sid: data.CallSid, workspaceId });
     return twilioWebhookInternalError();
   }
 
-  // Send webhook notification for inbound call
-  const callWebhook =
-    number.workspace?.webhook?.flatMap((webhook) =>
-      webhook.events.filter((event) => event.category === "inbound_call"),
-    ) || [];
-  if (callWebhook.length > 0) {
+  const webhookRow = await getWorkspaceWebhookRow(workspaceId);
+  if (workspaceWebhookHasInboundCallInsert(webhookRow)) {
     dispatchInboundCallWebhookNotification({
-      workspaceId: number.workspace?.id || "",
+      workspaceId,
       call: {
         sid: call.sid,
         from: call.from,
@@ -233,16 +175,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  // Priority 1: Inbound IVR script (before queue routing)
-  if (number?.inbound_script_id && workspaceId) {
-    const { data: ivrScript } = await supabase
-      .from("script")
-      .select("steps")
-      .eq("id", number.inbound_script_id)
-      .eq("workspace", workspaceId)
-      .single();
-
-    const steps = ivrScript?.steps as Record<string, unknown> | null | undefined;
+  if (number.inbound_script_id) {
+    const steps = await findInboundIvrScriptSteps({
+      workspaceId,
+      scriptId: number.inbound_script_id,
+    });
     const pages = steps?.pages as Record<string, { blocks: string[] }> | undefined;
     if (pages) {
       const pageIds = Object.keys(pages);
@@ -269,8 +206,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  // Priority 2: Queue routing (if number is assigned to an inbound queue)
-  if (number?.inbound_queue_id && workspaceId) {
+  if (number.inbound_queue_id) {
     const supabaseUrl = env.SUPABASE_URL().replace(/\/$/, "");
     const acdUrl = `${supabaseUrl}/functions/v1/acd-router`;
     const queueName = `inbound_q_${number.inbound_queue_id}`;
@@ -289,33 +225,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  if (number?.handset_enabled && workspaceId) {
-    const now = new Date().toISOString();
-    const { data: session, error: sessionError } = await (
-      supabase as import("@supabase/supabase-js").SupabaseClient<
-        Record<string, unknown>
-      >
-    )
-      .from("handset_session")
-      .select("client_identity")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "active")
-      .gt("expires_at", now)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (sessionError) {
-      logger.warn("Handset session lookup failed", {
-        workspaceId,
-        error: sessionError.message,
-      });
-    }
-    const clientIdentity =
-      session && typeof session === "object" && "client_identity" in session
-        ? (session as { client_identity: string }).client_identity
-        : null;
-    if (!clientIdentity && number.handset_enabled) {
+  if (number.handset_enabled) {
+    const clientIdentity = await findActiveHandsetSessionClientIdentity(workspaceId);
+    if (!clientIdentity) {
       logger.debug("Handset enabled but no active session", {
         workspaceId,
         Called: data.Called,
@@ -340,10 +252,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  if (
-    typeof number?.inbound_action === "string" &&
-    isPhoneNumber(number.inbound_action)
-  ) {
+  if (typeof number.inbound_action === "string" && isPhoneNumber(number.inbound_action)) {
     logger.info("api.inbound routing to phone", {
       workspaceId,
       CallSid: data.CallSid,
@@ -357,10 +266,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         "Content-Type": "text/xml",
       },
     });
-  } else if (
-    typeof number?.inbound_action === "string" &&
-    isEmail(number.inbound_action)
-  ) {
+  }
+
+  if (typeof number.inbound_action === "string" && isEmail(number.inbound_action)) {
     logger.info("api.inbound routing to voicemail", {
       workspaceId,
       CallSid: data.CallSid,
@@ -376,19 +284,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         "Content-Type": "text/xml",
       },
     });
-  } else {
-    logger.info("api.inbound default fallback (say + hangup)", {
-      workspaceId,
-      CallSid: data.CallSid,
-    });
-    const phoneNumber = data.Called;
-    twiml.say(
-      `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please try again later.`,
-    );
-    return new Response(twiml.toString(), {
-      headers: {
-        "Content-Type": "text/xml",
-      },
-    });
   }
+
+  logger.info("api.inbound default fallback (say + hangup)", {
+    workspaceId,
+    CallSid: data.CallSid,
+  });
+  const phoneNumber = data.Called;
+  twiml.say(
+    `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please try again later.`,
+  );
+  return new Response(twiml.toString(), {
+    headers: {
+      "Content-Type": "text/xml",
+    },
+  });
 };

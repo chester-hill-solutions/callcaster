@@ -15,17 +15,38 @@ let downloadMode:
   kind: "ok",
   statusJson: { state: "processing" },
 };
-let uploadMode: { kind: "ok"; row: any } | { kind: "error"; message: string } =
-  {
-    kind: "ok",
-    row: {
-      file_name: "f.csv",
-      file_size: 1,
-      total_contacts: 2,
-      processed_contacts: 1,
-      error_message: null,
-    },
-  };
+let uploadMode:
+  | { kind: "ok"; row: Record<string, unknown> }
+  | { kind: "missing" }
+  | { kind: "throw"; value: unknown } = {
+  kind: "ok",
+  row: {
+    id: 1,
+    audience_id: 2,
+    status: "pending",
+    file_name: "f.csv",
+    file_size: 1,
+    total_contacts: 2,
+    processed_contacts: 1,
+    error_message: null,
+  },
+};
+
+const findAudienceUploadById = vi.hoisted(() =>
+  vi.fn(async (_workspaceId: string, uploadId: number) => {
+    if (uploadMode.kind === "missing") {
+      return null;
+    }
+    if (uploadMode.kind === "throw") {
+      throw uploadMode.value;
+    }
+    return { ...uploadMode.row, id: uploadId };
+  }),
+);
+
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceUploadById: (...args: unknown[]) => findAudienceUploadById(...args),
+}));
 
 function buildSupabaseClient() {
   const storageDownload = async () => {
@@ -40,21 +61,8 @@ function buildSupabaseClient() {
     };
   };
 
-  const uploadSingle = async () => {
-    if (uploadMode.kind === "error")
-      return { data: null, error: new Error(uploadMode.message) };
-    return { data: uploadMode.row, error: null };
-  };
-
   return {
     storage: { from: () => ({ download: storageDownload }) },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: uploadSingle,
-        }),
-      }),
-    }),
   };
 }
 
@@ -78,6 +86,9 @@ describe("api.audience-upload-status loader", () => {
     uploadMode = {
       kind: "ok",
       row: {
+        id: 1,
+        audience_id: 2,
+        status: "pending",
         file_name: "f.csv",
         file_size: 1,
         total_contacts: 2,
@@ -146,7 +157,7 @@ describe("api.audience-upload-status loader", () => {
   });
 
   test("returns 500 when upload record query errors", async () => {
-    uploadMode = { kind: "error", message: "db" };
+    uploadMode = { kind: "throw", value: new Error("db") };
     setDualAuthSession({
       supabaseClient: buildSupabaseClient(),
       headers: new Headers({ "set-cookie": "x=y" }),
@@ -167,6 +178,9 @@ describe("api.audience-upload-status loader", () => {
     uploadMode = {
       kind: "ok",
       row: {
+        id: 2,
+        audience_id: 2,
+        status: "pending",
         file_name: "a.csv",
         file_size: 10,
         total_contacts: 5,
@@ -191,6 +205,9 @@ describe("api.audience-upload-status loader", () => {
       state: "done",
       ok: true,
       stage: "Processing contacts",
+      uploadId: 2,
+      audience_id: 2,
+      status: "pending",
       file_name: "a.csv",
       file_size: 10,
       total_contacts: 5,

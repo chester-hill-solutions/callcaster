@@ -10,7 +10,12 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
-import type { Database, Tables } from "@/lib/database.types";
+import {
+  findCallBySid,
+  updateCallBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
+import type { Database } from "@/lib/database.types";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -28,30 +33,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!callSid || !workspaceId) {
     return routeData(
       { error: "Missing callSid or workspaceId" },
-      { status: 400, headers }
+      { status: 400, headers },
     );
   }
 
   const serviceSupabase = createClient<Database>(
     env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY()
+    env.SUPABASE_SERVICE_KEY(),
   );
 
-  const { data: dbCall, error: callError } = await serviceSupabase
-    .from("call")
-    .select("sid, workspace, outreach_attempt_id, status")
-    .eq("sid", callSid)
-    .single();
+  const dbCall = await findCallBySid(callSid);
 
-  if (callError || !dbCall) {
-    logger.debug("Call not found for poll", { callSid, error: callError?.message });
+  if (!dbCall?.workspace) {
+    logger.debug("Call not found for poll", { callSid });
     return routeData({ error: "Call not found" }, { status: 404, headers });
   }
 
   if (dbCall.workspace !== workspaceId) {
     return routeData(
       { error: "Call does not belong to this workspace" },
-      { status: 403, headers }
+      { status: 403, headers },
     );
   }
 
@@ -74,48 +75,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (normalizedStatus == null) {
       return routeData(
         { status: rawStatus ?? undefined, error: "Unsupported status" },
-        { status: 200, headers }
+        { status: 200, headers },
       );
     }
 
     const currentDbStatus = (dbCall.status ?? null) as CallStatusEnum | null;
-    const statusChanged =
-      currentDbStatus !== normalizedStatus;
+    const statusChanged = currentDbStatus !== normalizedStatus;
 
     if (statusChanged) {
       const now = new Date().toISOString();
-      const { error: updateCallError } = await serviceSupabase
-        .from("call")
-        .update({
-          status: normalizedStatus,
-          date_updated: now,
-          ...(twilioCall.endTime
-            ? { end_time: new Date(twilioCall.endTime).toISOString() }
-            : {}),
-          ...(twilioCall.duration != null
-            ? { duration: String(twilioCall.duration) }
-            : {}),
-        } as Partial<Tables<"call">>)
-        .eq("sid", callSid);
+      const updatedCall = await updateCallBySid(dbCall.workspace, callSid, {
+        status: normalizedStatus,
+        date_updated: now,
+        ...(twilioCall.endTime
+          ? { end_time: new Date(twilioCall.endTime).toISOString() }
+          : {}),
+        ...(twilioCall.duration != null
+          ? { duration: String(twilioCall.duration) }
+          : {}),
+      });
 
-      if (updateCallError) {
-        logger.error("Error updating call status from poll", updateCallError);
+      if (!updatedCall) {
+        logger.error("Error updating call status from poll", { callSid });
         return routeData(
           { status: normalizedStatus, error: "Failed to sync call" },
-          { status: 500, headers }
+          { status: 500, headers },
         );
       }
 
       if (dbCall.outreach_attempt_id != null) {
-        const { error: updateAttemptError } = await serviceSupabase
-          .from("outreach_attempt")
-          .update({ disposition: normalizedStatus })
-          .eq("id", dbCall.outreach_attempt_id);
-
-        if (updateAttemptError) {
+        const result = await updateOutreachAttemptForWorkspace(
+          dbCall.workspace,
+          dbCall.outreach_attempt_id,
+          { disposition: normalizedStatus },
+        );
+        if (result instanceof Response) {
           logger.error(
             "Error updating outreach_attempt disposition from poll",
-            updateAttemptError
+            result.statusText,
           );
         }
       }
@@ -126,4 +123,4 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     logger.error("Error polling call status", err);
     return createErrorResponse(err, "Failed to fetch call status", 500, { headers });
   }
-}
+};

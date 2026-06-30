@@ -1,6 +1,7 @@
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { initiateIvrBodySchema } from "@/lib/schemas/api/common";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -24,14 +25,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     workspaceId: workspace_id,
   });
 
-  const { data: campaign } = await supabase
-    .from("campaign")
-    .select("id")
-    .eq("id", campaign_id)
-    .eq("workspace", workspace_id)
-    .maybeSingle();
-
-  if (!campaign) {
+  try {
+    await fetchCampaignByIdForWorkspace(workspace_id, campaign_id);
+  } catch {
     return { error: "Campaign not found in workspace" };
   }
 

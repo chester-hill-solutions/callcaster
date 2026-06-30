@@ -524,6 +524,31 @@ export async function getWorkspaceById(workspaceId: string) {
   return row ?? null;
 }
 
+export async function mergeWorkspaceTwilioData(
+  workspaceId: string,
+  patch: Record<string, unknown>,
+) {
+  const workspace = await getWorkspaceById(workspaceId);
+  if (!workspace) {
+    throw new Error("Workspace not found");
+  }
+
+  const existingTwilioData =
+    workspace.twilio_data &&
+    typeof workspace.twilio_data === "object" &&
+    !Array.isArray(workspace.twilio_data)
+      ? (workspace.twilio_data as Record<string, unknown>)
+      : {};
+
+  const [updated] = await adminDb
+    .update(workspaceTable)
+    .set({ twilio_data: { ...existingTwilioData, ...patch } })
+    .where(eq(workspaceTable.id, workspaceId))
+    .returning();
+
+  return updated ?? null;
+}
+
 export async function getWorkspaceWithCampaigns(workspaceId: string) {
   const workspace = await getWorkspaceById(workspaceId);
   if (!workspace) {

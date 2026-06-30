@@ -1,12 +1,12 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CALL_WITH_CAMPAIGN_SCRIPT_SELECT, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
+import { createClient } from "@supabase/supabase-js";
+import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { redirect } from "react-router";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200;
@@ -17,20 +17,15 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 type IvrScriptSteps = { pages: Record<string, { blocks: string[] }> };
 
 const getCallWithRetry = async (
-  supabase: SupabaseClient<Database>,
   callSid: string,
   retries = 0,
 ) => {
-  const { data, error } = await supabase
-    .from("call")
-    .select(CALL_WITH_CAMPAIGN_SCRIPT_SELECT)
-    .eq("sid", callSid)
-    .single();
+  const data = await findCallWithCampaignScriptBySid(callSid);
 
-  if (error || !data) {
+  if (!data) {
     if (retries < MAX_RETRIES) {
       await sleep(RETRY_DELAY);
-      return getCallWithRetry(supabase, callSid, retries + 1);
+      return getCallWithRetry(callSid, retries + 1);
     }
     throw new Error("Failed to retrieve call after multiple attempts");
   }
@@ -61,7 +56,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   }
 
   try {
-    const callData = await getCallWithRetry(supabase, callSid);
+    const callData = await getCallWithRetry(callSid);
     const script = ivrScriptStepsFromCampaign(callData.campaign) as
       | IvrScriptSteps
       | null

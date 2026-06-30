@@ -13,6 +13,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
+import { findMessageBySid } from "@/lib/message-db.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
+import { findWorkspaceNumberByPhoneNumber } from "@/lib/inbound-call-db.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import {
   readTwilioWorkspaceCredentials,
   resolveTwilioWebhookAuthToken,
@@ -129,13 +133,8 @@ export async function resolveWorkspaceTwilioData(
     return joinedTwilioData;
   }
 
-  const { data: workspaceRow } = await supabase
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  const fetched = workspaceRow?.twilio_data ?? null;
+  const workspace = await getWorkspaceById(workspaceId);
+  const fetched = workspace?.twilio_data ?? null;
   const fetchedRecord =
     fetched && typeof fetched === "object" && !Array.isArray(fetched)
       ? (fetched as Record<string, unknown>)
@@ -230,11 +229,7 @@ export async function validateTwilioWebhookForCallSid(args: {
     args.params ??
     (Object.fromEntries((await args.request.formData()).entries()) as Record<string, string>);
 
-  const { data: existingCall } = await args.supabase
-    .from("call")
-    .select("workspace")
-    .eq("sid", args.callSid)
-    .single();
+  const existingCall = await findCallBySid(args.callSid);
 
   if (!existingCall?.workspace) {
     const authToken = resolveWorkspaceWebhookAuthToken(null);
@@ -272,11 +267,7 @@ export async function validateTwilioWebhookForMessageSid(args: {
     args.params ??
     (Object.fromEntries((await args.request.formData()).entries()) as Record<string, string>);
 
-  const { data: messageRow } = await args.supabase
-    .from("message")
-    .select("workspace")
-    .eq("sid", args.smsSid)
-    .single();
+  const messageRow = await findMessageBySid(args.smsSid);
 
   if (!messageRow?.workspace) {
     return { ok: false, response: twilioWebhookForbidden() };
@@ -355,36 +346,14 @@ export async function resolveTwilioDataForPhoneNumber(
   phoneNumber: string,
   logger?: { info: (message: string, ...args: unknown[]) => void },
 ): Promise<{ workspaceId: string; twilioData: unknown; numberRow: TwilioWebhookNumberRow } | null> {
-  const { data: numberRow, error } = await supabase
-    .from("workspace_number")
-    .select(
-      `
-        workspace,
-        handset_enabled,
-        ...workspace!inner(id, twilio_data)`,
-    )
-    .eq("phone_number", phoneNumber)
-    .maybeSingle();
-
-  if (error || !numberRow) {
+  const numberRow = await findWorkspaceNumberByPhoneNumber(phoneNumber);
+  if (!numberRow) {
     return null;
   }
 
-  const row = numberRow as {
-    workspace?: string | { id: string; twilio_data?: unknown };
-    handset_enabled?: boolean;
-  };
-  const workspaceId =
-    row.workspace && typeof row.workspace === "object" && "id" in row.workspace
-      ? row.workspace.id
-      : typeof row.workspace === "string"
-        ? row.workspace
-        : null;
-
-  const joinedTwilioData =
-    row.workspace && typeof row.workspace === "object" && "twilio_data" in row.workspace
-      ? row.workspace.twilio_data
-      : null;
+  const workspaceId = numberRow.workspaceId;
+  const workspace = await getWorkspaceById(workspaceId);
+  const joinedTwilioData = workspace?.twilio_data ?? null;
 
   const twilioData = await resolveWorkspaceTwilioData(
     supabase,
@@ -393,16 +362,12 @@ export async function resolveTwilioDataForPhoneNumber(
     logger,
   );
 
-  if (!workspaceId) {
-    return null;
-  }
-
   return {
     workspaceId,
     twilioData,
     numberRow: {
       workspace: workspaceId,
-      handset_enabled: Boolean(row.handset_enabled),
+      handset_enabled: Boolean(numberRow.handset_enabled),
     },
   };
 }

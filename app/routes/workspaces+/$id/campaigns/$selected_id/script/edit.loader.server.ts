@@ -1,9 +1,7 @@
-import { data as routeData, redirect } from "react-router";
-import { deepEqual } from "@/lib/utils";
+import { data as routeData } from "react-router";
 import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
-import { isObject } from "@/lib/type-safety-utils";
+import { fetchCampaignForScriptEdit } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
@@ -15,7 +13,6 @@ import {
 } from "./edit.types";
 
 type LoaderData = ScriptEditLoaderData;
-type PageData = LoaderData["data"];
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
@@ -32,14 +29,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabase: supabaseClient,
   }) || [];
 
-  const { data: campaignData, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select(`*, campaign_audience(*), script(*)`)
-    .eq("id", parseInt(selected_id))
-    .single();
+  const campaignData = await fetchCampaignForScriptEdit(workspace_id, parseInt(selected_id, 10));
 
-  if (campaignError) {
-    logger.error("Error fetching campaign data", campaignError);
+  if (!campaignData) {
+    logger.error("Error fetching campaign data", new Error("Campaign not found"));
     throw new Response("Error fetching campaign data", { status: 500 });
   }
 

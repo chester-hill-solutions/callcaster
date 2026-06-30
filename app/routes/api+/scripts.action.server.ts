@@ -1,19 +1,17 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-
-import type { TablesInsert } from "@/lib/database.types";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import {
+  insertScriptForWorkspace,
+  updateScriptForWorkspace,
+} from "@/lib/script-api-db.server";
 
 export const action = async ({ request }: { request: Request }) => {
 
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const supabase = getDualAuthSupabase(auth);
   const user = getDualAuthUser(auth);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
   }
@@ -35,45 +33,40 @@ export const action = async ({ request }: { request: Request }) => {
       return routeData({ error: "Invalid script payload" }, { status: 400 });
     }
 
-    const scriptData: TablesInsert<"script"> = {
-      name,
-      steps: (steps ?? null) as TablesInsert<"script">["steps"],
-      updated_at: new Date().toISOString(),
-      updated_by: user.id,
-      workspace,
-    };
-
-    let scriptOperation;
+    let updatedScript;
     if (saveAsCopy || !id) {
-      scriptOperation = supabase
-        .from("script")
-        .insert({...scriptData, name: saveAsCopy ? `${name} (Copy)` : name})
-        .select();
+      updatedScript = await insertScriptForWorkspace({
+        workspaceId: workspace,
+        name: saveAsCopy ? `${name} (Copy)` : name,
+        steps: steps ?? null,
+        updatedBy: user.id,
+      });
     } else {
       const scriptId = typeof id === "number" ? id : Number(id);
-      scriptOperation = supabase
-        .from("script")
-        .update(scriptData)
-        .eq("id", scriptId)
-        .select();
+      updatedScript = await updateScriptForWorkspace({
+        workspaceId: workspace,
+        scriptId,
+        name,
+        steps: steps ?? null,
+        updatedBy: user.id,
+      });
     }
 
-    const { data: updatedScript, error: scriptError } = await scriptOperation;
-
-    if (scriptError) {
-      if (scriptError.code === "23505") {
-        return routeData(
-          { error: "A script with this name already exists in the workspace" },
-          { status: 400 }
-        );
-      }
-      throw scriptError;
+    if (!updatedScript) {
+      return routeData({ error: "Script not found" }, { status: 404 });
     }
 
-    return routeData({ script: updatedScript[0] });
+    return routeData({ script: updatedScript });
 
   } catch (error) {
     logger.error("Error updating/creating script:", error);
-    return routeData({ error: (error as Error).message }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("duplicate key") || message.includes("23505")) {
+      return routeData(
+        { error: "A script with this name already exists in the workspace" },
+        { status: 400 }
+      );
+    }
+    return routeData({ error: message }, { status: 500 });
   }
 }

@@ -1,17 +1,17 @@
 import { data as routeData } from "react-router";
-import { deepEqual } from "@/lib/utils";
-import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
-import { isObject } from "@/lib/type-safety-utils";
+import {
+  findCampaignMessageMedia,
+  updateCampaignMessageMedia,
+} from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Script } from "@/lib/types";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const campaignId = params.selected_id;
-  if (!campaignId) {
+  const workspaceId = params.id;
+  if (!campaignId || !workspaceId) {
     throw new Response("Campaign ID is required", { status: 400 });
   }
 
@@ -23,31 +23,23 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return routeData({ success: false, error: "File name is required" });
   }
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers } = await verifyAuth(request);
 
-  const { data: campaign, error } = await supabaseClient
-    .from("campaign")
-    .select("id, message_media")
-    .eq("id", parseInt(campaignId))
-    .single();
+  const campaign = await findCampaignMessageMedia(workspaceId, parseInt(campaignId, 10));
 
-  if (error) {
-    logger.error("Campaign Error", error);
-    return routeData({ success: false, error: error }, { headers });
+  if (!campaign) {
+    logger.error("Campaign Error", new Error("Campaign not found"));
+    return routeData({ success: false, error: "Campaign not found" }, { headers });
   }
 
-  const { data: campaignUpdate, error: updateError } = await supabaseClient
-    .from("campaign")
-    .update({
-      message_media: campaign.message_media?.filter(
-        (med) => med !== encodedMediaName,
-      ) || [],
-    })
-    .eq("id", parseInt(campaignId))
-    .select();
+  const campaignUpdate = await updateCampaignMessageMedia(
+    workspaceId,
+    parseInt(campaignId, 10),
+    campaign.message_media?.filter((med) => med !== encodedMediaName) || [],
+  );
 
-  if (updateError) {
-    return routeData({ success: false, error: updateError }, { headers });
+  if (!campaignUpdate) {
+    return routeData({ success: false, error: "Campaign update failed" }, { headers });
   }
-  return routeData({ success: true, data: campaignUpdate }, { headers });
+  return routeData({ success: true, data: [campaignUpdate] }, { headers });
 }

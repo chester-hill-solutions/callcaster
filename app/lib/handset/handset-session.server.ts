@@ -6,7 +6,7 @@ import { getHandsetNumberForWorkspace } from "@/lib/database.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { getAgentStatus } from "@/lib/agent-status.server";
 import { createTenantDb } from "@/server/tenant-db";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gt, gte } from "drizzle-orm";
 import { db } from "@/server/db";
 
 export const SESSION_EXPIRY_MINUTES = 60;
@@ -102,6 +102,23 @@ export async function findActiveHandsetSessionClientIdentity(
     .limit(1);
 
   return session?.client_identity ?? null;
+}
+
+export async function findActiveHandsetSession(args: {
+  workspaceId: string;
+  clientIdentity: string;
+}): Promise<{ workspace_id: string } | null> {
+  const tdb = createTenantDb(args.workspaceId);
+  const now = new Date().toISOString();
+  const session = await tdb.handset_session.findFirst({
+    where: and(
+      eq(handsetSessionTable.client_identity, args.clientIdentity),
+      eq(handsetSessionTable.status, "active"),
+      gt(handsetSessionTable.expires_at, now),
+    ),
+    columns: { workspace_id: true },
+  });
+  return session ?? null;
 }
 
 export async function endHandsetSession({

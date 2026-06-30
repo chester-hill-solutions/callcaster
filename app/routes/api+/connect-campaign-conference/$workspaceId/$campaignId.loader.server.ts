@@ -3,6 +3,7 @@ import {
   twilioWebhookForbidden,
   validateTwilioWebhookForWorkspace,
 } from "@/lib/twilio-webhook.server";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import type { LoaderFunctionArgs } from "react-router";
 import VoiceResponse from "twilio/lib/twiml/VoiceResponse.js";
 
@@ -23,12 +24,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return validation.response;
   }
 
-  const { data: campaign } = await supabase
-    .from("campaign")
-    .select("id")
-    .eq("id", Number(campaignId))
-    .eq("workspace", workspaceId)
-    .maybeSingle();
+  const campaign = await findCampaignInWorkspace(workspaceId, Number(campaignId));
 
   if (!campaign) {
     return twilioWebhookForbidden("Campaign not found");

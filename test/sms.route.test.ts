@@ -42,6 +42,9 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     processTemplateTags: vi.fn((text: string) => text),
     dequeueCampaignQueueById: vi.fn(async () => []),
+    loadCampaignSmsDispatchData: vi.fn(),
+    countCampaignMessagesToPhone: vi.fn(),
+    updateOutreachAttemptForWorkspace: vi.fn(),
     env: {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service-key"),
@@ -101,6 +104,28 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
   dequeueCampaignQueueById: (...args: unknown[]) => mocks.dequeueCampaignQueueById(...args),
 }));
 
+vi.mock("@/lib/sms-campaign-db.server", () => ({
+  loadCampaignSmsDispatchData: (...args: unknown[]) => mocks.loadCampaignSmsDispatchData(...args),
+}));
+
+vi.mock("@/lib/message-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/message-db.server")>();
+  return {
+    ...actual,
+    countCampaignMessagesToPhone: (...args: unknown[]) =>
+      mocks.countCampaignMessagesToPhone(...args),
+  };
+});
+
+vi.mock("@/lib/telephony-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony-db.server")>();
+  return {
+    ...actual,
+    updateOutreachAttemptForWorkspace: (...args: unknown[]) =>
+      mocks.updateOutreachAttemptForWorkspace(...args),
+  };
+});
+
 vi.mock("@/lib/workspace-credits.server", () => ({
   getWorkspaceCreditsBalance: vi.fn(async () => 100),
 }));
@@ -134,6 +159,20 @@ function campaignRowFromOpts(opts?: { campaign?: any }) {
   };
 }
 
+function dispatchDataFromOpts(opts?: { campaign?: any }) {
+  const row = campaignRowFromOpts(opts);
+  return {
+    body_text: row.body_text,
+    message_media: row.message_media,
+    campaign: {
+      end_time: row.end_date,
+      sms_send_mode: row.sms_send_mode,
+      sms_messaging_service_sid: row.sms_messaging_service_sid,
+      caller_id: row.caller_id,
+    },
+  };
+}
+
 function makeSupabase(opts: {
   campaign?: any;
   campaignError?: any;
@@ -150,6 +189,26 @@ function makeSupabase(opts: {
         ? new Error(String(opts.messageInsert.error.message ?? opts.messageInsert.error))
         : null,
   });
+
+  if (opts.campaignError) {
+    mocks.loadCampaignSmsDispatchData.mockRejectedValue(
+      new Error(`Campaign fetch failed: ${opts.campaignError.message}`),
+    );
+  } else {
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(dispatchDataFromOpts(opts));
+  }
+  mocks.countCampaignMessagesToPhone.mockResolvedValue(opts.messageCount ?? 0);
+  if (opts.outreachUpdate?.error) {
+    mocks.updateOutreachAttemptForWorkspace.mockResolvedValue(
+      new Response(
+        `Error updating outreach attempt: ${opts.outreachUpdate.error.message}`,
+        { status: 500 },
+      ),
+    );
+  } else {
+    mocks.updateOutreachAttemptForWorkspace.mockResolvedValue({ id: "oa1" });
+  }
+
   const signedUrls = opts.signedUrls ?? [];
   let signedUrlIdx = 0;
 
@@ -163,42 +222,6 @@ function makeSupabase(opts: {
       })),
     },
     rpc: vi.fn(async () => opts.rpcResult ?? { data: "oa1", error: null }),
-    from: vi.fn((table: string) => {
-      if (table === "campaign") {
-        const single = vi.fn(async () => ({
-          data: campaignRowFromOpts(opts),
-          error: opts.campaignError ?? null,
-        }));
-        const q: any = {
-          select: () => q,
-          eq: () => q,
-          single,
-        };
-        return q;
-      }
-      if (table === "outreach_attempt") {
-        return {
-          update: () => ({
-            eq: vi.fn(async () => opts.outreachUpdate ?? { data: [], error: null }),
-          }),
-        };
-      }
-      if (table === "message") {
-        const dedupeQuery: any = {
-          select: () => dedupeQuery,
-          eq: () => dedupeQuery,
-          then: (resolve: (value: any) => any) =>
-            resolve({ count: opts.messageCount ?? 0, error: null }),
-        };
-        return {
-          select: () => dedupeQuery,
-          insert: () => ({
-            select: vi.fn(async () => opts.messageInsert ?? ({ data: [], error: null } as any)),
-          }),
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    }),
   };
 }
 
@@ -214,6 +237,9 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockReset();
     mocks.processTemplateTags.mockReset();
     mocks.dequeueCampaignQueueById.mockReset();
+    mocks.loadCampaignSmsDispatchData.mockReset();
+    mocks.countCampaignMessagesToPhone.mockReset();
+    mocks.updateOutreachAttemptForWorkspace.mockReset();
     mocks.logger.error.mockReset();
     mocks.createClient.mockClear();
     mocks.verifyApiKeyOrSession.mockResolvedValue({
@@ -467,7 +493,9 @@ describe("app/routes/api+/sms/route.tsx", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["5"].success).toBe(false);
-    expect(body.responses[0]["5"].error).toBe("update-bad");
+    expect(body.responses[0]["5"].error).toBe(
+      "Error updating outreach attempt: update-bad",
+    );
   });
 
   test("preserves URLs in body for from-number sends (Twilio shortening uses Messaging Service)", async () => {

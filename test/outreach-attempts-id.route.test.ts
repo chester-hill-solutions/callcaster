@@ -3,9 +3,15 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
-const mocks = vi.hoisted(() => ({
-  safeParseJson: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+  return {
+    safeParseJson: vi.fn(),
+    authForOutreachAttempt: vi.fn(),
+    updateOutreachAttemptForWorkspace: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/supabase.server", () => ({
   createSupabaseServerClient: () => ({
@@ -17,41 +23,33 @@ vi.mock("@/lib/database.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
   safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
 }));
-
-function makeSupabase(updateResult: { data: unknown; error: { message: string } | null }) {
-  return {
-    from: vi.fn((table: string) => {
-      if (table === "outreach_attempt") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: vi.fn(async () => ({ data: { workspace: "w1" }, error: null })),
-            })),
-          })),
-          update: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              select: vi.fn(() => ({
-                single: vi.fn(async () => updateResult),
-              })),
-            })),
-          })),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    }),
-  };
-}
+vi.mock("@/lib/platform-data.server", () => ({
+  authForOutreachAttempt: (...args: unknown[]) => mocks.authForOutreachAttempt(...args),
+}));
+vi.mock("@/lib/telephony-db.server", () => ({
+  updateOutreachAttemptForWorkspace: (...args: unknown[]) =>
+    mocks.updateOutreachAttemptForWorkspace(...args),
+}));
 
 describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
+    mocks.authForOutreachAttempt.mockReset();
+    mocks.updateOutreachAttemptForWorkspace.mockReset();
+    mocks.authForOutreachAttempt.mockResolvedValue({
+      supabase: {},
+      user: { id: "u1" },
+      workspaceId: "w1",
+    });
   });
 
   test("returns json({ error }) when update errors", async () => {
-    const supabase = makeSupabase({ data: null, error: { message: "bad" } });
-    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ update: { a: 1 } });
+    mocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(
+      new Response("Error updating outreach attempt: bad", { status: 500 }),
+    );
 
     const mod = await import("../app/routes/api+/outreach_attempts/$id.route");
     const res = await asRouteResponse(await mod.action({
@@ -64,9 +62,9 @@ describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
   });
 
   test("returns data with headers on success", async () => {
-    const supabase = makeSupabase({ data: { id: 1 }, error: null });
-    queueJsonAuthSession({ supabaseClient: supabase, user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ update: { disposition: "completed" } });
+    mocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce({ id: 1 });
 
     const mod = await import("../app/routes/api+/outreach_attempts/$id.route");
     const res = await asRouteResponse(await mod.action({

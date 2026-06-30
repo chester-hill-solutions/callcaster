@@ -2,7 +2,9 @@ import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
 
 const ITEMS_PER_PAGE = 20;
@@ -82,40 +84,25 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const pageParam = url.searchParams.get("page");
     const page = Math.max(1, parseInt(pageParam || "1", 10));
 
+    const tdb = createTenantDb(workspaceId);
+
     const [
       userRoleResult,
-      workspaceResult,
-      flagsResult,
-      campaignsResult,
+      workspace,
+      campaigns,
       contactsResult,
     ] = await Promise.all([
-      getUserRole({ supabaseClient, user, workspaceId }),
-      supabaseClient
-        .from("workspace")
-        .select("id, name, credits, feature_flags")
-        .eq("id", workspaceId)
-        .single(),
-      supabaseClient
-        .from("workspace")
-        .select("feature_flags")
-        .eq("id", workspaceId)
-        .single(),
-      supabaseClient
-        .from("campaign")
-        .select("id, title, status")
-        .eq("workspace", workspaceId)
-        .order("created_at", { ascending: false }),
+      getUserRole({ user, workspaceId }),
+      getWorkspaceById(workspaceId),
+      tdb.campaign.findMany({
+        columns: { id: true, title: true, status: true },
+        orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
+      }),
       listWorkspaceContactsApi(supabaseClient, workspaceId, url.searchParams),
     ]);
 
     const userRole = userRoleResult?.role || null;
-    const { data: workspace, error: workspaceError } = workspaceResult;
-    const { data: flags, error: flagsError } = flagsResult;
-    const { data: navCampaigns, error: campaignsError } = campaignsResult;
-    if (campaignsError) {
-      logger.error("Failed to load campaigns for workspace nav:", campaignsError);
-    }
-    const campaigns = navCampaigns ?? [];
+    const flags = workspace ? { feature_flags: workspace.feature_flags } : null;
 
     if (!userRole) {
       return routeData(
@@ -140,7 +127,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       );
     }
 
-    if (workspaceError || !workspace) {
+    if (!workspace) {
       return routeData(
         errorPayload(
           {
@@ -187,8 +174,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       );
     }
 
-    if (flagsError) {
-      logger.error("Database errors:", flagsError);
+    if (flags == null) {
+      logger.error("Database errors: workspace feature_flags missing");
     }
 
     const { contacts, pagination, search_query: searchQuery } = contactsResult;

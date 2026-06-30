@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { setDualAuthSession, setDualAuthUnauthorized } from "./helpers/route-auth-mock";
 
@@ -15,6 +20,66 @@ vi.mock("@/lib/database.server", async () => {
     "@/lib/database.server",
   );
   return { ...actual, requireWorkspaceAccess };
+});
+
+const campaignIvrMocks = vi.hoisted(() => ({
+  findCampaignExportMeta: vi.fn(),
+}));
+
+const queueMocks = vi.hoisted(() => ({
+  getCampaignQueueContactIds: vi.fn(),
+}));
+
+const exportDbMocks = vi.hoisted(() => ({
+  findCampaignForMessageExport: vi.fn(),
+  findCampaignWithScriptForExport: vi.fn(),
+  findExportContactsByIds: vi.fn(),
+  countExportCampaignMessages: vi.fn(),
+  listExportCampaignMessages: vi.fn(),
+  countExportOutreachAttempts: vi.fn(),
+  listExportOutreachAttempts: vi.fn(),
+  findExportCallsByOutreachAttemptIds: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-export-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-export-db.server")>();
+  return {
+    ...actual,
+    findCampaignForMessageExport: (...args: unknown[]) =>
+      exportDbMocks.findCampaignForMessageExport(...args),
+    findCampaignWithScriptForExport: (...args: unknown[]) =>
+      exportDbMocks.findCampaignWithScriptForExport(...args),
+    findExportContactsByIds: (...args: unknown[]) =>
+      exportDbMocks.findExportContactsByIds(...args),
+    countExportCampaignMessages: (...args: unknown[]) =>
+      exportDbMocks.countExportCampaignMessages(...args),
+    listExportCampaignMessages: (...args: unknown[]) =>
+      exportDbMocks.listExportCampaignMessages(...args),
+    countExportOutreachAttempts: (...args: unknown[]) =>
+      exportDbMocks.countExportOutreachAttempts(...args),
+    listExportOutreachAttempts: (...args: unknown[]) =>
+      exportDbMocks.listExportOutreachAttempts(...args),
+    findExportCallsByOutreachAttemptIds: (...args: unknown[]) =>
+      exportDbMocks.findExportCallsByOutreachAttemptIds(...args),
+  };
+});
+
+vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-queue-db.server")>();
+  return {
+    ...actual,
+    getCampaignQueueContactIds: (...args: unknown[]) =>
+      queueMocks.getCampaignQueueContactIds(...args),
+  };
+});
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignExportMeta: (...args: unknown[]) =>
+      campaignIvrMocks.findCampaignExportMeta(...args),
+  };
 });
 
 const loggerError = vi.fn();
@@ -123,6 +188,127 @@ class QueryBuilder {
 }
 
 function makeSupabase(config: ExportSupabaseConfig) {
+  campaignIvrMocks.findCampaignExportMeta.mockImplementation(
+    async (workspaceId: string, campaignId: number) => {
+      if (config.campaignError) {
+        return null;
+      }
+      const campaign = config.campaign;
+      if (campaignId !== campaign.id || campaign.workspace !== workspaceId) {
+        return null;
+      }
+      return {
+        id: campaign.id,
+        type: campaign.type,
+        title: campaign.title ?? "",
+        workspace: campaign.workspace,
+      };
+    },
+  );
+
+  queueMocks.getCampaignQueueContactIds.mockImplementation(
+    async () => config.campaignQueueContactIds ?? [],
+  );
+
+  exportDbMocks.findCampaignForMessageExport.mockImplementation(
+    async (_workspaceId: string, campaignId: number) => {
+      if (config.campaignError) {
+        return null;
+      }
+      const campaign = config.campaign;
+      if (campaignId !== campaign.id) {
+        return null;
+      }
+      return campaign;
+    },
+  );
+
+  exportDbMocks.findCampaignWithScriptForExport.mockImplementation(
+    async (_workspaceId: string, campaignId: number) => {
+      if (config.campaignExportError) {
+        throw new Error(config.campaignExportError);
+      }
+      if (config.campaignExportMissing) {
+        return null;
+      }
+      const campaign = config.campaign;
+      if (campaignId !== campaign.id) {
+        return null;
+      }
+      if (config.scriptError != null) {
+        throw new Error(config.scriptError);
+      }
+      return {
+        ...campaign,
+        script:
+          config.script === undefined
+            ? { steps: { pages: {}, blocks: {} } }
+            : config.script,
+      };
+    },
+  );
+
+  exportDbMocks.findExportContactsByIds.mockImplementation(async () => {
+    if (config.contactsError != null) {
+      throw new Error(config.contactsError);
+    }
+    return config.contacts ?? [];
+  });
+
+  exportDbMocks.countExportCampaignMessages.mockImplementation(async () => {
+    if (config.messageCountError != null) {
+      throw new Error(config.messageCountError);
+    }
+    return config.messageCount ?? (config.messages ?? []).length;
+  });
+
+  exportDbMocks.listExportCampaignMessages.mockImplementation(
+    async (
+      _workspaceId: string,
+      campaignId: number,
+      _startDate: string,
+      _endDate: string,
+      offset: number,
+      limit: number,
+    ) => {
+      if (config.messagesError != null) {
+        throw new Error(config.messagesError);
+      }
+      const filteredMessages = (config.messages ?? []).filter(
+        (message) => message.campaign_id === campaignId,
+      );
+      return filteredMessages.slice(offset, offset + limit);
+    },
+  );
+
+  exportDbMocks.countExportOutreachAttempts.mockImplementation(async () => {
+    if (config.outreachAttemptCountError != null) {
+      throw new Error(config.outreachAttemptCountError);
+    }
+    return config.outreachAttemptCount ?? 0;
+  });
+
+  exportDbMocks.listExportOutreachAttempts.mockImplementation(
+    async (
+      _workspaceId: string,
+      _campaignId: number,
+      offset: number,
+      limit: number,
+    ) => {
+      if (config.outreachAttemptsError != null) {
+        throw new Error(config.outreachAttemptsError);
+      }
+      return (config.outreachAttempts ?? []).slice(offset, offset + limit);
+    },
+  );
+
+  exportDbMocks.findExportCallsByOutreachAttemptIds.mockImplementation(async () => {
+    if (config.callsError != null) {
+      throw new Error(config.callsError);
+    }
+    return config.calls ?? [];
+  });
+
   const uploads: Array<{ path: string; body: any; opts?: any }> = [];
   let uploadCallIdx = 0;
 
@@ -367,7 +553,7 @@ describe("api.campaign-export", () => {
     expect(res.status).toBe(404);
   });
 
-  test("returns 403 when campaign belongs to different workspace", async () => {
+  test("returns 404 when campaign belongs to different workspace", async () => {
     const { supabaseClient } = makeSupabase({
       campaign: { id: 1, workspace: "w2", type: "message", title: "T" },
     });
@@ -377,7 +563,7 @@ describe("api.campaign-export", () => {
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
   });
 

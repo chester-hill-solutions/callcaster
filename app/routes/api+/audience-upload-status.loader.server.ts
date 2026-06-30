@@ -1,8 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -34,14 +34,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const { data: uploadData, error: uploadError } = await supabase
-      .from("audience_upload")
-      .select("*")
-      .eq("id", uploadId)
-      .single();
+    const uploadData = await findAudienceUploadById(workspaceId, uploadId);
 
-    if (uploadError) {
-      return routeData({ error: uploadError.message }, { status: 500, headers });
+    if (!uploadData) {
+      return routeData({ error: "Upload not found" }, { status: 404, headers });
     }
 
     let statusFileData: Record<string, unknown> = {};

@@ -3,10 +3,16 @@ import { MemberRole } from "@/lib/member-role";
 import { loadWorkspaceAnalytics } from "@/lib/workspace-analytics.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import {
+  getWorkspaceById,
+  listWorkspaceMembersEnriched,
+} from "@/lib/workspace-members-db.server";
 import { defaultAnalyticsRange } from "../../../../shared/workspace-analytics";
+import { campaign as campaignTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
+import { desc } from "drizzle-orm";
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import type { User } from "@/lib/types";
 import type { WorkspaceAnalyticsResult } from "../../../../shared/workspace-analytics";
 
 export type WorkspaceAnalyticsLoaderData = {
@@ -39,7 +45,7 @@ function emptyAnalytics(): WorkspaceAnalyticsResult {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
 
   if (!workspaceId || !user) {
@@ -58,8 +64,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const userRole = await getUserRole({
-    supabaseClient,
-    user: user,
+    user,
     workspaceId,
   });
 
@@ -78,30 +83,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
   }
 
-  const [{ data: workspace, error: workspaceError }, { data: campaigns, error: campaignsError }] =
-    await Promise.all([
-      supabaseClient
-        .from("workspace")
-        .select("id, name, credits")
-        .eq("id", workspaceId)
-        .single(),
-      supabaseClient
-        .from("campaign")
-        .select("id, title, status")
-        .eq("workspace", workspaceId)
-        .order("created_at", { ascending: false }),
-    ]);
+  const workspace = await getWorkspaceById(workspaceId);
+  const tdb = createTenantDb(workspaceId);
+  const campaigns = await tdb.campaign.findMany({
+    columns: { id: true, title: true, status: true },
+    orderBy: [desc(campaignTable.created_at)],
+  });
 
-  if (campaignsError) {
-    logger.error("Failed to load campaigns for analytics nav:", campaignsError);
-  }
-
-  if (workspaceError || !workspace) {
+  if (!workspace) {
     return routeData(
       {
         workspace: null,
         userRole: userRole.role,
-        campaigns: campaigns ?? [],
+        campaigns,
         analytics: emptyAnalytics(),
         workspaceUsers: [],
         currentUserId: user.id,
@@ -117,13 +111,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     userRole.role === MemberRole.Member;
 
   try {
-    const [{ data: workspaceUsersRows }, analytics] = await Promise.all([
-      supabaseClient
-        .from("workspace_users")
-        .select("user_id, user:user_id(id, username, first_name)")
-        .eq("workspace_id", workspaceId),
+    const [memberRows, analytics] = await Promise.all([
+      listWorkspaceMembersEnriched(workspaceId),
       loadWorkspaceAnalytics({
-        supabaseClient,
         workspaceId,
         requestUrl: request.url,
         currentUserId: user.id,
@@ -131,29 +121,24 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       }),
     ]);
 
-    const workspaceUsers = (workspaceUsersRows ?? [])
+    const workspaceUsers = memberRows
       .map((entry) => {
-        const workspaceUser = entry.user as {
-          id: string;
-          username: string;
-          first_name: string | null;
-        } | null;
-        if (!workspaceUser) return null;
-        return {
-          id: workspaceUser.id,
-          label: workspaceUser.first_name
-            ? `${workspaceUser.first_name} (${workspaceUser.username})`
-            : workspaceUser.username,
-        };
+        const label = entry.first_name
+          ? `${entry.first_name} (${entry.username})`
+          : entry.username;
+        return { id: entry.user_id, label };
       })
-      .filter((entry): entry is { id: string; label: string } => Boolean(entry))
       .sort((left, right) => left.label.localeCompare(right.label));
 
     return routeData(
       {
-        workspace,
+        workspace: {
+          id: workspace.id,
+          name: workspace.name,
+          credits: workspace.credits,
+        },
         userRole: userRole.role,
-        campaigns: campaigns ?? [],
+        campaigns,
         analytics,
         workspaceUsers,
         currentUserId: user.id,
@@ -165,9 +150,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     logger.error("Failed to load workspace analytics:", error);
     return routeData(
       {
-        workspace,
+        workspace: {
+          id: workspace.id,
+          name: workspace.name,
+          credits: workspace.credits,
+        },
         userRole: userRole.role,
-        campaigns: campaigns ?? [],
+        campaigns,
         analytics: emptyAnalytics(),
         workspaceUsers: [],
         currentUserId: user.id,

@@ -10,7 +10,50 @@ const logger = vi.hoisted(() => ({
   debug: vi.fn(),
 }));
 
+const dbMocks = vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+  return {
+    findAudienceInWorkspace: vi.fn(),
+    markAudienceUpdating: vi.fn(),
+    createAudienceForUpload: vi.fn(),
+    createAudienceUploadRecord: vi.fn(),
+  };
+});
+
+const processTdbMocks = vi.hoisted(() => ({
+  contact: {
+    insertMany: vi.fn(async (rows: unknown[]) =>
+      (rows as Record<string, unknown>[]).map((_, i) => ({ id: i + 1 })),
+    ),
+  },
+  audience_upload: {
+    update: vi.fn(async () => []),
+  },
+  audience: {
+    update: vi.fn(async () => []),
+  },
+}));
+
+const processDbMocks = vi.hoisted(() => ({
+  insertValues: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/lib/logger.server", () => ({ logger }));
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => processTdbMocks),
+}));
+vi.mock("@/server/db", () => ({
+  db: {
+    insert: () => ({ values: processDbMocks.insertValues }),
+  },
+}));
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceInWorkspace: (...args: unknown[]) => dbMocks.findAudienceInWorkspace(...args),
+  markAudienceUpdating: (...args: unknown[]) => dbMocks.markAudienceUpdating(...args),
+  createAudienceForUpload: (...args: unknown[]) => dbMocks.createAudienceForUpload(...args),
+  createAudienceUploadRecord: (...args: unknown[]) => dbMocks.createAudienceUploadRecord(...args),
+}));
 
 describe("app/routes/api+/audience-upload/route.tsx", () => {
   beforeEach(() => {
@@ -19,6 +62,24 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     logger.warn.mockReset();
     logger.info.mockReset();
     logger.debug.mockReset();
+    dbMocks.findAudienceInWorkspace.mockReset();
+    dbMocks.markAudienceUpdating.mockReset();
+    dbMocks.createAudienceForUpload.mockReset();
+    dbMocks.createAudienceUploadRecord.mockReset();
+    processTdbMocks.contact.insertMany.mockReset();
+    processTdbMocks.audience_upload.update.mockReset();
+    processTdbMocks.audience.update.mockReset();
+    processDbMocks.insertValues.mockReset();
+    dbMocks.findAudienceInWorkspace.mockResolvedValue({ id: 1 });
+    dbMocks.markAudienceUpdating.mockResolvedValue(undefined);
+    dbMocks.createAudienceForUpload.mockResolvedValue({ id: 1 });
+    dbMocks.createAudienceUploadRecord.mockResolvedValue({ id: 99 });
+    processTdbMocks.contact.insertMany.mockImplementation(async (rows: unknown[]) =>
+      (rows as Record<string, unknown>[]).map((_, i) => ({ id: i + 1 })),
+    );
+    processTdbMocks.audience_upload.update.mockResolvedValue([]);
+    processTdbMocks.audience.update.mockResolvedValue([]);
+    processDbMocks.insertValues.mockResolvedValue(undefined);
   });
 
   const makeReq = (fd: FormData, method = "POST") =>
@@ -89,37 +150,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
     const processAudienceUpload = vi.fn(async () => {});
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  single: async () => ({ data: { id: 1 }, error: null }),
-                }),
-              }),
-            }),
-            update: () => ({
-              eq: async () => ({ data: null, error: null }),
-            }),
-          };
-        }
-        if (table === "audience_upload") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 99 }, error: null }),
-              }),
-            }),
-          };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    };
-
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient,
+      supabaseClient: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
@@ -146,27 +178,12 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
   test("action: audienceId path returns 404 when audience missing", async () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  single: async () => ({ data: null, error: null }),
-                }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient,
+      supabaseClient: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
+    dbMocks.findAudienceInWorkspace.mockResolvedValueOnce(null);
 
     const fd = new FormData();
     fd.set("workspace_id", "w1");
@@ -182,22 +199,10 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const verifyAuth = vi.fn(async () => ({
       headers: new Headers(),
       user: { id: "u1" },
-      supabaseClient: {
-        from: (table: string) => {
-          if (table === "audience") {
-            return {
-              insert: () => ({
-                select: () => ({
-                  single: async () => ({ data: null, error: { message: "aud" } }),
-                }),
-              }),
-            };
-          }
-          throw new Error("unexpected");
-        },
-      },
+      supabaseClient: {} as any,
     }));
 
+    dbMocks.createAudienceForUpload.mockResolvedValueOnce(null);
     const fd1 = new FormData();
     fd1.set("workspace_id", "w1");
     fd1.set("audience_name", "A");
@@ -205,40 +210,12 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const r1 = await asRouteResponse(await mod.action({ request: makeReq(fd1), deps: { verifyAuth } } as any));
     expect(r1.status).toBe(500);
 
-    const supabaseUploadErr: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 1 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "audience_upload") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: null, error: { message: "up" } }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
-    const verifyAuth2 = vi.fn(async () => ({
-      headers: new Headers(),
-      user: { id: "u1" },
-      supabaseClient: supabaseUploadErr,
-    }));
-
+    dbMocks.createAudienceUploadRecord.mockResolvedValueOnce(null);
     const fd2 = new FormData();
     fd2.set("workspace_id", "w1");
     fd2.set("audience_name", "A");
     fd2.set("contacts", new File(["x"], "c.csv"));
-    const r2 = await asRouteResponse(await mod.action({ request: makeReq(fd2), deps: { verifyAuth: verifyAuth2 } } as any));
+    const r2 = await asRouteResponse(await mod.action({ request: makeReq(fd2), deps: { verifyAuth } } as any));
     expect(r2.status).toBe(500);
 
     const fdBadJson = new FormData();
@@ -246,7 +223,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fdBadJson.set("audience_name", "A");
     fdBadJson.set("contacts", new File(["x"], "c.csv"));
     fdBadJson.set("header_mapping", "{");
-    const r3 = await asRouteResponse(await mod.action({ request: makeReq(fdBadJson), deps: { verifyAuth: verifyAuth2 } } as any));
+    const r3 = await asRouteResponse(await mod.action({ request: makeReq(fdBadJson), deps: { verifyAuth } } as any));
     expect(r3.status).toBe(500);
   }, 30000);
 
@@ -257,31 +234,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const processAudienceUpload = vi.fn(async () => {
       throw new Error("bg");
     });
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 1 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "audience_upload") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 99 }, error: null }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient,
+      supabaseClient: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
@@ -308,17 +262,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
   test("action: calling without deps hits verifyAuth fallback", async () => {
     vi.resetModules();
-    const supabaseClient = {
-      from: () => ({
-        insert: () => ({
-          select: () => ({
-            single: async () => ({ data: { id: 1 }, error: null }),
-          }),
-        }),
-      }),
-    };
     setDualAuthSession({
-      supabaseClient,
+      supabaseClient: {},
       headers: new Headers(),
       user: { id: "u1" },
     });
@@ -336,14 +281,11 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
-      supabaseClient: {
-        from: () => {
-          throw "boom";
-        },
-      },
+      supabaseClient: {} as any,
       headers: new Headers(),
       user: { id: "u1" },
     }));
+    dbMocks.findAudienceInWorkspace.mockRejectedValueOnce("boom");
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
@@ -354,11 +296,10 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload: happy path maps contacts, writes progress, and completes", async () => {
+    vi.useFakeTimers();
     const mod = await import("../app/routes/api+/audience-upload");
 
     const uploads: any[] = [];
-    const updates: any[] = [];
-    const inserts: any[] = [];
 
     const supabaseClient: any = {
       storage: {
@@ -371,39 +312,6 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
           },
         }),
       },
-      from: (table: string) => {
-        if (table === "audience_upload") {
-          return {
-            update: (data: any) => ({
-              eq: async () => {
-                updates.push({ table, data });
-                return { data: null, error: null };
-              },
-            }),
-          };
-        }
-        if (table === "contact") {
-          return {
-            insert: (rows: any[]) => ({
-              select: async () => {
-                inserts.push({ table, rows });
-                return { data: rows.map((_, i) => ({ id: i + 1 })), error: null };
-              },
-            }),
-          };
-        }
-        if (table === "contact_audience") {
-          return {
-            insert: async (_rows: any[]) => ({ error: null }),
-          };
-        }
-        if (table === "audience") {
-          return {
-            update: (_d: any) => ({ eq: async () => ({ data: null, error: null }) }),
-          };
-        }
-        throw new Error(`unexpected ${table}`);
-      },
     };
 
     const parseCSVMock = vi.fn(() => ({
@@ -411,7 +319,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       contacts: [{ Name: "Ada Lovelace", Email: "a@b.co" }],
     }));
 
-    await mod.processAudienceUpload(
+    const uploadPromise = mod.processAudienceUpload(
       supabaseClient,
       1,
       2,
@@ -422,10 +330,13 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       "Name",
       { parseCSV: parseCSVMock as any },
     );
+    await vi.runAllTimersAsync();
+    await uploadPromise;
+    vi.useRealTimers();
 
     expect(parseCSVMock).toHaveBeenCalled();
     expect(uploads.length).toBeGreaterThan(0);
-    expect(inserts[0].rows[0]).toMatchObject({
+    expect(processTdbMocks.contact.insertMany.mock.calls[0][0][0]).toMatchObject({
       workspace: "w1",
       created_by: "u1",
       firstname: "Ada",
@@ -450,19 +361,6 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
           },
         }),
       },
-      from: (table: string) => {
-        if (table === "audience") return { update: () => ({ eq: async () => ({}) }) };
-        if (table === "audience_upload") return { update: () => ({ eq: async () => ({}) }) };
-        if (table === "contact") {
-          return {
-            insert: () => ({
-              select: async () => ({ data: null, error: { message: "ins" } }),
-            }),
-          };
-        }
-        if (table === "contact_audience") return { insert: async () => ({ error: null }) };
-        throw new Error("unexpected");
-      },
     };
 
     // Missing headers -> error
@@ -480,6 +378,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     expect(uploads.some((u) => u.body.includes('"status":"error"'))).toBe(true);
 
     // Insert error -> error path
+    processTdbMocks.contact.insertMany.mockResolvedValueOnce([]);
     await mod.processAudienceUpload(
       supabaseClient,
       1,
@@ -497,15 +396,14 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
   test("processAudienceUpload covers bucket/status/link errors and default deps branch", async () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
+    const storageOnly = (storage: Record<string, unknown>) => ({ storage }) as any;
+
     // bucketError
     await mod.processAudienceUpload(
-      {
-        storage: {
-          listBuckets: async () => ({ data: null, error: { message: "b" } }),
-          from: () => ({ upload: async () => ({ error: null }) }),
-        },
-        from: () => ({ update: () => ({ eq: async () => ({}) }) }),
-      } as any,
+      storageOnly({
+        listBuckets: async () => ({ data: null, error: { message: "b" } }),
+        from: () => ({ upload: async () => ({ error: null }) }),
+      }),
       1,
       2,
       "w1",
@@ -518,14 +416,11 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     // missing bucket + createBucket error
     await mod.processAudienceUpload(
-      {
-        storage: {
-          listBuckets: async () => ({ data: [], error: null }),
-          createBucket: async () => ({ error: { message: "c" } }),
-          from: () => ({ upload: async () => ({ error: null }) }),
-        },
-        from: () => ({ update: () => ({ eq: async () => ({}) }) }),
-      } as any,
+      storageOnly({
+        listBuckets: async () => ({ data: [], error: null }),
+        createBucket: async () => ({ error: { message: "c" } }),
+        from: () => ({ upload: async () => ({ error: null }) }),
+      }),
       1,
       2,
       "w1",
@@ -538,20 +433,11 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     // missing bucket + createBucket success (covers else path for createError)
     await mod.processAudienceUpload(
-      {
-        storage: {
-          listBuckets: async () => ({ data: [], error: null }),
-          createBucket: async () => ({ error: null }),
-          from: () => ({ upload: async () => ({ error: null }) }),
-        },
-        from: (t: string) => {
-          if (t === "audience_upload") return { update: () => ({ eq: async () => ({}) }) };
-          if (t === "audience") return { update: () => ({ eq: async () => ({}) }) };
-          if (t === "contact") return { insert: () => ({ select: async () => ({ data: [], error: null }) }) };
-          if (t === "contact_audience") return { insert: async () => ({ error: null }) };
-          throw new Error("unexpected");
-        },
-      } as any,
+      storageOnly({
+        listBuckets: async () => ({ data: [], error: null }),
+        createBucket: async () => ({ error: null }),
+        from: () => ({ upload: async () => ({ error: null }) }),
+      }),
       1,
       2,
       "w1",
@@ -564,13 +450,10 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     // statusError
     await mod.processAudienceUpload(
-      {
-        storage: {
-          listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-          from: () => ({ upload: async () => ({ error: { message: "s" } }) }),
-        },
-        from: () => ({ update: () => ({ eq: async () => ({}) }) }),
-      } as any,
+      storageOnly({
+        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
+        from: () => ({ upload: async () => ({ error: { message: "s" } }) }),
+      }),
       1,
       2,
       "w1",
@@ -581,21 +464,13 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
     );
 
-    // mapping warn branch via empty-string header
+    // mapping warn branch via empty-string header + link insert failure
+    processDbMocks.insertValues.mockRejectedValueOnce(new Error("link"));
     await mod.processAudienceUpload(
-      {
-        storage: {
-          listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-          from: () => ({ upload: async () => ({ error: null }) }),
-        },
-        from: (t: string) => {
-          if (t === "audience_upload") return { update: () => ({ eq: async () => ({}) }) };
-          if (t === "contact") return { insert: () => ({ select: async () => ({ data: [{ id: 1 }], error: null }) }) };
-          if (t === "contact_audience") return { insert: async () => ({ error: { message: "link" } }) };
-          if (t === "audience") return { update: () => ({ eq: async () => ({}) }) };
-          throw new Error("unexpected");
-        },
-      } as any,
+      storageOnly({
+        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
+        from: () => ({ upload: async () => ({ error: null }) }),
+      }),
       1,
       2,
       "w1",
@@ -613,24 +488,10 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     // other_data mapping branch with defined value + splitNameColumn actualHeader present (and empty name => '' fallbacks)
     await mod.processAudienceUpload(
-      {
-        storage: {
-          listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
-          from: () => ({ upload: async () => ({ error: null }) }),
-        },
-        from: (t: string) => {
-          if (t === "audience_upload") return { update: () => ({ eq: async () => ({}) }) };
-          if (t === "audience") return { update: () => ({ eq: async () => ({}) }) };
-          if (t === "contact")
-            return {
-              insert: (_rows: any[]) => ({
-                select: async () => ({ data: [{ id: 1 }], error: null }),
-              }),
-            };
-          if (t === "contact_audience") return { insert: async () => ({ error: null }) };
-          throw new Error("unexpected");
-        },
-      } as any,
+      storageOnly({
+        listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
+        from: () => ({ upload: async () => ({ error: null }) }),
+      }),
       1,
       2,
       "w1",
@@ -648,15 +509,12 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     // Cover "Unknown error" branches in catch (non-Error throw)
     await mod.processAudienceUpload(
-      {
-        storage: {
-          listBuckets: async () => {
-            throw "boom";
-          },
-          from: () => ({ upload: async () => ({ error: null }) }),
+      storageOnly({
+        listBuckets: async () => {
+          throw "boom";
         },
-        from: () => ({ update: () => ({ eq: async () => ({}) }) }),
-      } as any,
+        from: () => ({ upload: async () => ({ error: null }) }),
+      }),
       1,
       2,
       "w1",
@@ -668,22 +526,13 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     );
 
     // default deps branch (no deps arg)
-    const supabaseOk: any = {
-      storage: {
+    vi.useFakeTimers();
+    const csv = "Email\nx@y.co\n";
+    const defaultDepsPromise = mod.processAudienceUpload(
+      storageOnly({
         listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
         from: () => ({ upload: async () => ({ error: null }) }),
-      },
-      from: (t: string) => {
-        if (t === "audience_upload") return { update: () => ({ eq: async () => ({}) }) };
-        if (t === "contact") return { insert: () => ({ select: async () => ({ data: [{ id: 1 }], error: null }) }) };
-        if (t === "contact_audience") return { insert: async () => ({ error: null }) };
-        if (t === "audience") return { update: () => ({ eq: async () => ({}) }) };
-        throw new Error("unexpected");
-      },
-    };
-    const csv = "Email\nx@y.co\n";
-    await mod.processAudienceUpload(
-      supabaseOk,
+      }),
       1,
       2,
       "w1",
@@ -692,31 +541,19 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       { Email: "email" },
       null,
     );
+    await vi.runAllTimersAsync();
+    await defaultDepsPromise;
+    vi.useRealTimers();
   }, 30000);
 
   test("processAudienceUpload covers remaining else-branches (splitNameColumn missing header, undefined values, and i!==0)", async () => {
+    vi.useFakeTimers();
     const mod = await import("../app/routes/api+/audience-upload");
 
     const supabaseClient: any = {
       storage: {
         listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
         from: () => ({ upload: async () => ({ error: null }) }),
-      },
-      from: (t: string) => {
-        if (t === "audience_upload") return { update: () => ({ eq: async () => ({}) }) };
-        if (t === "audience") return { update: () => ({ eq: async () => ({}) }) };
-        if (t === "contact") {
-          return {
-            insert: (rows: any[]) => ({
-              select: async () => ({
-                data: rows.map((_: any, i: number) => ({ id: i + 1 })),
-                error: null,
-              }),
-            }),
-          };
-        }
-        if (t === "contact_audience") return { insert: async () => ({ error: null }) };
-        throw new Error("unexpected");
       },
     };
 
@@ -726,7 +563,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       return { Name: "N", Email: "x@y.co", Custom: undefined };
     });
 
-    await mod.processAudienceUpload(
+    const uploadPromise = mod.processAudienceUpload(
       supabaseClient,
       1,
       2,
@@ -737,6 +574,9 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       "Nope", // splitNameColumn not present in headers
       { parseCSV: vi.fn(() => ({ headers: ["Name", "Email", "Custom"], contacts })) as any },
     );
+    await vi.runAllTimersAsync();
+    await uploadPromise;
+    vi.useRealTimers();
   }, 30000);
 });
 

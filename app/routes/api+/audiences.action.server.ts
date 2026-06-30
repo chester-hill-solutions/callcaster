@@ -1,14 +1,16 @@
 import { data as routeData } from "react-router";
-import { logger } from "@/lib/logger.server";
 import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
-
-import type { Database } from "@/lib/database.types";
+import {
+  deleteAudienceById,
+  findAudienceWorkspaceById,
+  upsertAudienceById,
+} from "@/lib/audience-upload-db.server";
 
 interface SupabaseResponse {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient: SupabaseClient;
   headers: Headers;
 }
 
@@ -27,7 +29,7 @@ type AudiencesDeps = {
   }>;
   parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
   requireWorkspaceAccess: (args: {
-    supabaseClient: SupabaseClient<Database>;
+    supabaseClient: SupabaseClient;
     user?: { id: string };
     workspaceId: string;
   }) => Promise<void>;
@@ -68,12 +70,12 @@ export const action = async ({
       return routeData({ error: "Missing id" }, { status: 400, headers });
     }
 
-    const { data: update, error } = await supabaseClient
-      .from("audience")
-      .upsert(data as Database["public"]["Tables"]["audience"]["Update"])
-      .eq("id", data.id)
-      .select();
-    response = update || null;
+    const { id: _id, ...updateValues } = data;
+    const update = await upsertAudienceById(data.id, updateValues);
+    if (!update) {
+      return routeData({ error: "Audience not found" }, { status: 404, headers });
+    }
+    response = [update];
   }
 
   if (method === "DELETE") {
@@ -87,12 +89,9 @@ export const action = async ({
       return routeData({ error: "Invalid id" }, { status: 400, headers });
     }
 
-    const { error } = await supabaseClient
-      .from("audience")
-      .delete()
-      .eq("id", id);
-    if (error) {
-      logger.error("Error deleting audience:", error);
+    const deleted = await deleteAudienceById(id);
+    if (!deleted) {
+      return routeData({ error: "Audience not found" }, { status: 404, headers });
     }
     response = { success: true };
   }

@@ -5,11 +5,10 @@ import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.serve
 import { SupabaseClient } from "@supabase/supabase-js";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
-
-import type { Database } from "@/lib/database.types";
+import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 
 interface SupabaseResponse {
-    supabaseClient: SupabaseClient<Database>;
+    supabaseClient: SupabaseClient;
     headers: Headers;
 }
 
@@ -56,18 +55,14 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
         }
 
         // Defense-in-depth: verify the audience belongs to a workspace the user can access.
-        const { data: audienceRow, error: audienceError } = await supabaseClient
-          .from("audience")
-          .select("workspace")
-          .eq("id", id)
-          .single();
-        if (audienceError || !audienceRow?.workspace) {
+        const audienceWorkspace = await findAudienceWorkspaceById(id);
+        if (!audienceWorkspace) {
           return routeData({ error: "Audience not found" }, { status: 404, headers });
         }
         await d.requireWorkspaceAccess({
           supabaseClient,
           user,
-          workspaceId: audienceRow.workspace,
+          workspaceId: audienceWorkspace,
         });
 
         let query = supabaseClient

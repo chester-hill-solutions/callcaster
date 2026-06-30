@@ -1,5 +1,4 @@
-import { createNewWorkspace } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
+import { listUserWorkspaces } from "@/lib/platform-workspace.server";
 import { redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
@@ -30,14 +29,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect("/signin", { headers });
   }
 
-  const { data: workspaces, error: workspacesError } = await supabaseClient
-    .from("workspace_users")
-    .select("last_accessed, role, workspace(id, name)")
-    .eq("user_id", userId)
-    .order("last_accessed", { ascending: false });
+  const result = await listUserWorkspaces(supabaseClient, userId);
 
-  if (workspacesError) {
-    return { workspaces: null, userId: userId, error: workspacesError }
+  if (!result.ok) {
+    return { workspaces: null, userId: userId, error: result.error } satisfies LoaderData;
   }
-  return { workspaces: workspaces, userId: userId, error: null };
+  return {
+    workspaces: result.workspaces as WorkspaceUser[],
+    userId: userId,
+    error: null,
+  } satisfies LoaderData;
 }

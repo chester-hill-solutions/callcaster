@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
@@ -15,26 +16,6 @@ interface Script {
     options?: Array<{ value: string; next?: string }>;
   }>;
 }
-
-const getWorkspaceNumberData = async (
-  supabase: SupabaseClient<Database>,
-  numberId: string,
-) => {
-  const { data: number } = await supabase
-    .from("workspace_number")
-    .select("id, inbound_script_id, workspace")
-    .eq("id", Number(numberId))
-    .single();
-  if (!number?.inbound_script_id) throw new Error("Number has no inbound script");
-  const { data: script } = await supabase
-    .from("script")
-    .select("steps")
-    .eq("id", number.inbound_script_id)
-    .single();
-  const steps = script?.steps as Script | null | undefined;
-  if (!steps?.blocks || !steps?.pages) throw new Error("Invalid script structure");
-  return { number, script: steps, workspace: number.workspace };
-};
 
 const handleAudio = async (
   supabase: SupabaseClient<Database>,
@@ -163,11 +144,26 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   }
 
   try {
-    const { script, workspace } = await getWorkspaceNumberData(supabase, numberId);
-    const currentBlock = script.blocks[blockId];
+    const context = await loadInboundIvrBlockContext(Number(numberId));
+    if (!context) {
+      throw new Error("Number has no inbound script");
+    }
+
+    const { script, number } = context;
+    const currentBlock = script.blocks[blockId] as Script["blocks"][string] | undefined;
 
     if (currentBlock) {
-      await handleBlock(supabase, twiml, currentBlock, numberId, pageId, blockId, script, workspace, baseUrl);
+      await handleBlock(
+        supabase,
+        twiml,
+        currentBlock,
+        numberId,
+        pageId,
+        blockId,
+        script as Script,
+        number.workspaceId,
+        baseUrl,
+      );
     } else {
       twiml.say("There was an error in the IVR flow. Goodbye.");
       twiml.hangup();

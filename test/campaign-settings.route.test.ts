@@ -45,6 +45,25 @@ vi.mock("@/lib/database.server", () => ({
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
 }));
 
+const campaignIvrMocks = vi.hoisted(() => ({
+  findCampaignInWorkspace: vi.fn(),
+  updateCampaignStatusInWorkspace: vi.fn(),
+  insertCampaignForWorkspace: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignInWorkspace: (...args: unknown[]) =>
+      campaignIvrMocks.findCampaignInWorkspace(...args),
+    updateCampaignStatusInWorkspace: (...args: unknown[]) =>
+      campaignIvrMocks.updateCampaignStatusInWorkspace(...args),
+    insertCampaignForWorkspace: (...args: unknown[]) =>
+      campaignIvrMocks.insertCampaignForWorkspace(...args),
+  };
+});
+
 vi.mock("@/lib/survey-db.server", () => ({
   loadActiveSurveysForWorkspace: vi.fn(async () => []),
 }));
@@ -60,8 +79,8 @@ vi.mock("@/lib/queue.server", () => ({
 function makeSupabaseForSettingsRoute(options?: {
   campaign?: any;
   details?: any;
-  statusUpdateError?: any;
-  duplicateInsertError?: any;
+  statusUpdateError?: Error | null;
+  duplicateInsertError?: Error | null;
 }) {
   const campaign =
     options?.campaign ??
@@ -79,42 +98,22 @@ function makeSupabaseForSettingsRoute(options?: {
         },
       },
     } as any);
-  const details = options?.details ?? ({ body_text: "Hello there", message_media: [] } as any);
-  const statusUpdate = vi.fn(async () => ({ error: options?.statusUpdateError ?? null }));
-  const duplicateInsertSingle = vi.fn(async () => ({
-    data: options?.duplicateInsertError ? null : { id: 123 },
-    error: options?.duplicateInsertError ?? null,
-  }));
 
-  const supabaseClient = {
-    from: vi.fn((table: string) => {
-      if (table === "campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                single: async () => ({ data: campaign, error: null }),
-              }),
-            }),
-          }),
-          update: () => ({
-            eq: () => ({
-              eq: statusUpdate,
-            }),
-          }),
-          insert: () => ({
-            select: () => ({
-              single: duplicateInsertSingle,
-            }),
-          }),
-        };
-      }
+  campaignIvrMocks.findCampaignInWorkspace.mockImplementation(async () => campaign);
+  campaignIvrMocks.updateCampaignStatusInWorkspace.mockImplementation(async () => {
+    if (options?.statusUpdateError) {
+      throw options.statusUpdateError;
+    }
+    return campaign;
+  });
+  campaignIvrMocks.insertCampaignForWorkspace.mockImplementation(async () => {
+    if (options?.duplicateInsertError) {
+      throw options.duplicateInsertError;
+    }
+    return { id: 123 };
+  });
 
-      throw new Error(`unexpected table ${table}`);
-    }),
-    statusUpdate,
-    duplicateInsertSingle,
-  };
+  const supabaseClient = {};
 
   return supabaseClient;
 }
@@ -130,6 +129,9 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.getSignedUrls.mockReset();
     mocks.getCampaignQueueContactIds.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
+    campaignIvrMocks.findCampaignInWorkspace.mockReset();
+    campaignIvrMocks.updateCampaignStatusInWorkspace.mockReset();
+    campaignIvrMocks.insertCampaignForWorkspace.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
     mocks.fetchCampaignDetails.mockResolvedValue({
@@ -163,7 +165,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       actionType: "status",
       error: "Add at least one contact before starting or scheduling",
     });
-    expect(supabaseClient.statusUpdate).not.toHaveBeenCalled();
+    expect(campaignIvrMocks.updateCampaignStatusInWorkspace).not.toHaveBeenCalled();
   });
 
   test("updates status when the campaign is ready", async () => {
@@ -187,7 +189,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, actionType: "status", status: "running" });
-    expect(supabaseClient.statusUpdate).toHaveBeenCalled();
+    expect(campaignIvrMocks.updateCampaignStatusInWorkspace).toHaveBeenCalled();
   });
 
   test("returns a save-specific error when save payload is incomplete", async () => {

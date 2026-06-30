@@ -22,6 +22,14 @@ import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.serve
 import { SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
+import { campaign as campaignTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { findMessageBySid, updateMessageBySid } from "@/lib/message-db.server";
+import {
+  findOutreachAttemptById,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -71,13 +79,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    const { data: preUpdateMessage, error: messageLookupError } = await supabase
-      .from("message")
-      .select("*")
-      .eq("sid", sid)
-      .single();
+    const preUpdateMessage = await findMessageBySid(sid);
 
-    if (messageLookupError || !preUpdateMessage) {
+    if (!preUpdateMessage?.workspace) {
       throw new Error("Failed to find message workspace for SMS status webhook");
     }
 
@@ -95,23 +99,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ? payload.AccountSid.trim()
         : null;
 
-    const { data: messageData, error: messageError } = await supabase
-      .from("message")
-      .update({
-        status: messageStatus,
-        ...(accountSidFromWebhook ? { account_sid: accountSidFromWebhook } : {}),
-      })
-      .eq("sid", sid)
-      .select()
-      .single();
+    const messageData = await updateMessageBySid(preUpdateMessage.workspace, sid, {
+      status: messageStatus,
+      ...(accountSidFromWebhook ? { account_sid: accountSidFromWebhook } : {}),
+    });
 
-    if (messageError) {
-      logger.error("Error updating message:", messageError);
+    if (!messageData) {
+      logger.error("Error updating message for sid", { sid });
       return routeData({ error: "Failed to update message" }, { status: 500 });
     }
 
     // Debit billing for SMS (campaign, API/chat, or any outbound) when terminal status
-    if (messageData?.workspace && isTerminalSmsStatus(messageStatus)) {
+    if (messageData.workspace && isTerminalSmsStatus(messageStatus)) {
       try {
         const numSegments = Math.max(
           1,
@@ -134,37 +133,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let outreachData:
       | (OutreachAttempt & { campaign: Partial<Campaign> })
       | null = null;
-    if (messageData?.outreach_attempt_id) {
-      // Use message status as disposition for SMS outreach attempts
+    if (messageData.outreach_attempt_id && messageData.workspace) {
       const disposition: OutreachDisposition =
         smsStatusToOutreachDisposition(messageStatus);
 
-      const { data: currentAttempt } = await supabase
-        .from("outreach_attempt")
-        .select("disposition")
-        .eq("id", messageData.outreach_attempt_id)
-        .single();
+      const currentAttempt = await findOutreachAttemptById(
+        messageData.workspace,
+        messageData.outreach_attempt_id,
+      );
       const shouldSkip = !shouldUpdateOutreachDisposition({
         currentDisposition: currentAttempt?.disposition ?? null,
         nextDisposition: disposition,
       });
 
-      const outreachUpdate = shouldSkip
-        ? { data: null, error: null }
-        : await supabase
-            .from("outreach_attempt")
-            .update({ disposition })
-            .eq("id", messageData.outreach_attempt_id)
-            .select(`*, campaign(end_date)`)
-            .single();
+      if (!shouldSkip) {
+        const outreachResult = await updateOutreachAttemptForWorkspace(
+          messageData.workspace,
+          messageData.outreach_attempt_id,
+          { disposition },
+        );
 
-      const { data: outreachResult, error: outreachError } = outreachUpdate;
-
-      if (outreachError) {
-        logger.error("Error updating outreach attempt:", outreachError);
-      } else if (outreachResult) {
-        // outreachResult doesn't include call property, so we cast it
-        outreachData = outreachResult as OutreachAttempt & { campaign: Partial<Campaign> };
+        if (!(outreachResult instanceof Response)) {
+          const tdb = createTenantDb(messageData.workspace);
+          const campaign = outreachResult.campaign_id
+            ? await tdb.campaign.findFirst({
+                where: eq(campaignTable.id, outreachResult.campaign_id),
+                columns: { end_date: true },
+              })
+            : null;
+          outreachData = {
+            ...outreachResult,
+            campaign: { end_date: campaign?.end_date ?? null },
+          } as OutreachAttempt & { campaign: Partial<Campaign> };
+        } else {
+          logger.error("Error updating outreach attempt:", outreachResult.statusText);
+        }
       }
     }
     if (outreachData && outreachData.campaign?.end_date) {
@@ -172,8 +175,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (
         outreachData.campaign?.end_date &&
         now > new Date(outreachData.campaign.end_date) &&
-        typeof messageData?.campaign_id === "number" &&
-        messageData?.workspace
+        typeof messageData.campaign_id === "number" &&
+        messageData.workspace
       ) {
         // Use the workspace subaccount client (ADR-0011) instead of the parent account.
         const twilio = await createWorkspaceTwilioInstance({
@@ -188,8 +191,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
     }
     logger.debug("Message status update", { messageData });
-    
-    if (messageData?.workspace) {
+
+    if (messageData.workspace) {
       const webhookResult = await sendWorkspaceWebhookNotification({
         supabaseClient: supabase,
         workspaceId: messageData.workspace,

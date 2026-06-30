@@ -1,11 +1,32 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession } from "./helpers/route-auth-mock";
 const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+  };
+});
+
+const campaignMocks = vi.hoisted(() => ({
+  findCampaignMessageMedia: vi.fn(),
+  updateCampaignMessageMedia: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignMessageMedia: (...args: unknown[]) =>
+      campaignMocks.findCampaignMessageMedia(...args),
+    updateCampaignMessageMedia: (...args: unknown[]) =>
+      campaignMocks.updateCampaignMessageMedia(...args),
   };
 });
 
@@ -25,6 +46,22 @@ function makeSupabase(opts?: {
   campaign?: any;
 }) {
   const hasCampaignOverride = Boolean(opts && Object.prototype.hasOwnProperty.call(opts, "campaign"));
+  campaignMocks.findCampaignMessageMedia.mockImplementation(async () => {
+    if (opts?.campaignError) {
+      throw opts.campaignError;
+    }
+    if (hasCampaignOverride && opts?.campaign == null) {
+      return null;
+    }
+    return opts?.campaign ?? { id: 1, message_media: ["a.png"] };
+  });
+  campaignMocks.updateCampaignMessageMedia.mockImplementation(async () => {
+    if (opts?.updateError) {
+      throw opts.updateError;
+    }
+    return { ok: 1 };
+  });
+
   const supabaseClient: any = {
     storage: {
       from: () => ({
@@ -35,21 +72,6 @@ function makeSupabase(opts?: {
         }),
       }),
     },
-    from: (_table: string) => ({
-      select: () => ({
-        eq: () => ({
-          single: async () => ({
-            data: hasCampaignOverride ? opts!.campaign : { id: 1, message_media: ["a.png"] },
-            error: opts?.campaignError ?? null,
-          }),
-        }),
-      }),
-      update: () => ({
-        eq: () => ({
-          select: async () => ({ data: [{ ok: 1 }], error: opts?.updateError ?? null }),
-        }),
-      }),
-    }),
   };
   return supabaseClient;
 }
@@ -62,6 +84,8 @@ describe("app/routes/api+/message_media/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.logger.error.mockReset();
+    campaignMocks.findCampaignMessageMedia.mockReset();
+    campaignMocks.updateCampaignMessageMedia.mockReset();
   });
 
   test("requires workspaceId", async () => {

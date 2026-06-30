@@ -1,5 +1,9 @@
 import { findActiveAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  findCallConferenceIdForWorkspace,
+  updateOutreachDispositionByContactId,
+} from "@/lib/telephony-db.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
@@ -22,18 +26,12 @@ export const action = async ({ request }: { request: Request }) => {
         return routeData({ success: false, message: "Invalid hangup payload" }, { status: 400 });
     }
     try {
-        await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId });
+        await requireWorkspaceAccess({ user, workspaceId });
 
         let resolvedConferenceId = conferenceId;
         if (!resolvedConferenceId) {
-            const { data: callRecord, error: callError } = await supabase
-                .from("call")
-                .select("conference_id")
-                .eq("sid", callSid)
-                .eq("workspace", workspaceId)
-                .maybeSingle();
-            if (callError) throw callError;
-            resolvedConferenceId = callRecord?.conference_id ?? null;
+          resolvedConferenceId =
+            (await findCallConferenceIdForWorkspace(workspaceId, callSid)) ?? null;
         }
 
         const realtime = resolvedConferenceId
@@ -65,12 +63,11 @@ export const action = async ({ request }: { request: Request }) => {
                 dequeued_reason_text: "Call completed"
             });
             if (error) throw error;
-            const { error: outreachError } = await supabase
-                .from("outreach_attempt")
-                .update({ disposition: "completed" })
-                .eq("contact_id", queue.contact_id)
-                .eq("workspace", workspaceId);
-            if (outreachError) throw outreachError;
+            await updateOutreachDispositionByContactId(
+                workspaceId,
+                queue.contact_id,
+                "completed",
+            );
         }
         if (realtime) {
             supabase.removeChannel(realtime);

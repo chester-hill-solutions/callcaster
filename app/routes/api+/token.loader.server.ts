@@ -7,6 +7,7 @@ import { requireWorkspaceAccess } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { generateToken } from "@/lib/twilio-token.server";
 import { logger } from "@/lib/logger.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -27,13 +28,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       workspaceId: workspace,
     });
 
-    const { data, error } = await supabase
-      .from("workspace")
-      .select("twilio_data, key, token")
-      .eq("id", workspace)
-      .single();
+    const data = await getWorkspaceById(workspace);
 
-    if (error || !data) {
+    if (!data) {
       return routeData({ error: "workspace not found" }, { status: 404 });
     }
 

@@ -4,12 +4,14 @@ import {
 } from "@/lib/sms-send-resolve";
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { countCampaignMessagesToPhone } from "@/lib/message-db.server";
+import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
+import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import { bodyHasUrls } from "@/lib/sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { campaignSmsDispatchBodySchema } from "@/lib/schemas/api/sms";
@@ -24,43 +26,9 @@ import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
 
-interface CampaignData {
-  body_text: string;
-  message_media?: string[];
-  campaign: {
-    end_time: string;
-    sms_send_mode?: string | null;
-    sms_messaging_service_sid?: string | null;
-    caller_id?: string | null;
-  };
-}
-
-const getCampaignData = async ({ 
-  supabase, 
-  campaign_id 
-}: { 
-  supabase: SupabaseClient; 
-  campaign_id: string 
-}): Promise<CampaignData> => {
-  const { data, error } = await supabase
-    .from("campaign")
-    .select("body_text, message_media, end_date, sms_send_mode, sms_messaging_service_sid, caller_id")
-    .eq("id", Number(campaign_id))
-    .single();
-
-  if (error) throw new Error(`Campaign fetch failed: ${error.message}`);
-  return {
-    body_text: data.body_text ?? "",
-    message_media: data.message_media ?? [],
-    campaign: {
-      end_time: data.end_date ?? "",
-      sms_send_mode: data.sms_send_mode,
-      sms_messaging_service_sid: data.sms_messaging_service_sid,
-      caller_id: data.caller_id,
-    },
-  };
-};
+const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
 
 interface SendMessageParams {
   body: string;
@@ -76,25 +44,25 @@ interface SendMessageParams {
   portalConfig: WorkspaceTwilioOpsConfig;
   messageIntent?: TwilioMessageIntent | null;
   messagingServiceSidFromRequest: string | null;
-  campaignSmsRow?: CampaignData["campaign"];
+  campaignSmsRow?: {
+    end_time: string;
+    sms_send_mode?: string | null;
+    sms_messaging_service_sid?: string | null;
+    caller_id?: string | null;
+  };
 }
 
-const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
-
-import { parseOptionalString } from "@/lib/parse-utils.server";
-
 async function hasDuplicateCampaignSms(args: {
-  supabase: SupabaseClient;
+  workspaceId: string;
   campaignId: string;
   to: string;
 }): Promise<boolean> {
-  const { count, error } = await args.supabase
-    .from("message")
-    .select("sid", { head: true, count: "exact" })
-    .eq("campaign_id", Number(args.campaignId))
-    .eq("to", args.to);
-  if (error) throw error;
-  return (count ?? 0) > 0;
+  const count = await countCampaignMessagesToPhone(
+    args.workspaceId,
+    args.campaignId,
+    args.to,
+  );
+  return count > 0;
 }
 
 const sendMessage = async ({
@@ -120,7 +88,6 @@ const sendMessage = async ({
     workspace_id: workspace,
   });
 
-  // Process URLs in the message body to shorten them
   const processedBody = body;
 
   const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
@@ -168,15 +135,17 @@ const sendMessage = async ({
     { workspace, campaign_id, contact_id },
   );
 
+  const outreachUpdate = await updateOutreachAttemptForWorkspace(
+    workspace,
+    outreachAttempt,
+    { disposition: "completed" },
+  );
+  if (outreachUpdate instanceof Response) {
+    throw new Error(await outreachUpdate.text());
+  }
+
   await Promise.all([
     persistMessageRecord(workspace, messageFields),
-
-    updateOutreach({
-      supabase,
-      id: outreachAttempt,
-      status: 'completed'
-    }),
-
     dequeueCampaignQueueById({
       queueId: Number(queue_id),
       userId: user_id,
@@ -185,18 +154,6 @@ const sendMessage = async ({
   ]);
 
   return { message };
-};
-
-const updateOutreach = async ({ supabase, id, status }: { supabase: SupabaseClient, id: string, status: string }) => {
-  const { data, error } = await supabase
-    .from("outreach_attempt")
-    .update({ disposition: status })
-    .eq("id", id);
-  if (error) {
-    logger.error("Error updating outreach attempt", error);
-    throw error;
-  }
-  return data;
 };
 
 const createOutreachAttempt = async ({
@@ -306,7 +263,7 @@ export const action = async ({ request }: { request: Request }) => {
     }
     
     const [campaign, audience, portalConfig] = await Promise.all([
-      getCampaignData({ supabase, campaign_id }),
+      loadCampaignSmsDispatchData(workspace_id, campaign_id),
       getCampaignQueueById({
         supabaseClient: supabase,
         campaign_id,
@@ -363,7 +320,7 @@ export const action = async ({ request }: { request: Request }) => {
         batch.map(async member => {
           const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
           const duplicateExists = await hasDuplicateCampaignSms({
-            supabase,
+            workspaceId: workspace_id,
             campaignId: campaign_id,
             to: normalizedPhone,
           });

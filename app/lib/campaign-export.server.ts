@@ -1,6 +1,16 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { csvRow } from "@/lib/csv";
 import type { Database } from "@/lib/database.types";
+import {
+  countExportCampaignMessages,
+  countExportOutreachAttempts,
+  findCampaignForMessageExport,
+  findCampaignWithScriptForExport,
+  findExportCallsByOutreachAttemptIds,
+  findExportContactsByIds,
+  listExportCampaignMessages,
+  listExportOutreachAttempts,
+} from "@/lib/campaign-export-db.server";
 import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
 import {
@@ -8,12 +18,10 @@ import {
   createInitialExportStatus,
   extractScriptQuestions,
   finalizeCsvExport,
-  parseAttemptResult,
   writeExportErrorStatus,
   writeExportStatus,
   type CampaignExportStatus,
 } from "@/lib/campaign-export-helpers.server";
-import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import type {
   ExportAttemptWithDetails,
   ExportCall,
@@ -23,7 +31,6 @@ import type {
   ExportMessage,
   ExportMessageWithContact,
   ExportOutreachAttempt,
-  ExportScript,
 } from "@/lib/campaign-export-types.server";
 
 export function generateCampaignExportId() {
@@ -56,16 +63,10 @@ export async function processMessageCampaignExport(
       {},
     );
 
-    // First, get campaign info
-    const { data: campaignData, error: campaignError } = await supabaseClient
-      .from('campaign')
-      .select('id, title, start_date, end_date')
-      .eq('id', campaignId)
-      .eq('workspace', workspaceId)
-      .single();
+    const campaignData = await findCampaignForMessageExport(workspaceId, campaignId);
 
-    if (campaignError || !campaignData) {
-      throw new Error(campaignError?.message || "Campaign not found");
+    if (!campaignData) {
+      throw new Error("Campaign not found");
     }
 
     const campaign = campaignData as ExportCampaign;
@@ -89,19 +90,9 @@ export async function processMessageCampaignExport(
     for (let i = 0; i < contactIds.length; i += CONTACT_BATCH_SIZE) {
       const batchIds = contactIds.slice(i, i + CONTACT_BATCH_SIZE);
 
-      const { data: contactBatch, error: batchError } = await supabaseClient
-        .from('contact')
-        .select('*')
-        .in('id', batchIds)
-        .eq('workspace', workspaceId);
+      const contactBatch = await findExportContactsByIds(workspaceId, batchIds);
 
-      if (batchError) {
-        throw new Error(batchError.message || `Error fetching contact batch ${i}`);
-      }
-
-      if (contactBatch) {
-        contactDetails = [...contactDetails, ...contactBatch];
-      }
+      contactDetails = [...contactDetails, ...contactBatch];
 
       statusData = await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
         progress: Math.round((i / contactIds.length) * 30),
@@ -148,38 +139,26 @@ export async function processMessageCampaignExport(
     let totalMessages = 0;
     let processedMessages = 0;
 
-    // Count only messages recorded against this campaign to avoid leaking
-    // unrelated workspace conversations that happen to share a phone number.
-    const { count: messageCount, error: countError } = await supabaseClient
-      .from('message')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace', workspaceId)
-      .eq('campaign_id', campaignId)
-      .gte('date_created', campaign.start_date)
-      .lte('date_created', extendedEndDate.toISOString());
+    const startDate = campaign.start_date ?? "";
+    const endDate = extendedEndDate.toISOString();
 
-    if (countError) {
-      throw new Error(countError.message || "Error counting messages");
-    }
-
-    totalMessages = messageCount || 0;
+    totalMessages = await countExportCampaignMessages(
+      workspaceId,
+      campaignId,
+      startDate,
+      endDate,
+    );
 
     // Process messages in small chunks
     for (let offset = 0; offset < totalMessages; offset += MESSAGE_CHUNK_SIZE) {
-      // Get a chunk of messages
-      const { data: messages, error: messagesError } = await supabaseClient
-        .from('message')
-        .select('*')
-        .eq('workspace', workspaceId)
-        .eq('campaign_id', campaignId)
-        .gte('date_created', campaign.start_date)
-        .lte('date_created', extendedEndDate.toISOString())
-        .order('date_created', { ascending: true })
-        .range(offset, offset + MESSAGE_CHUNK_SIZE - 1);
-
-      if (messagesError) {
-        throw new Error(messagesError.message || `Error fetching messages chunk at offset ${offset}`);
-      }
+      const messages = await listExportCampaignMessages(
+        workspaceId,
+        campaignId,
+        startDate,
+        endDate,
+        offset,
+        MESSAGE_CHUNK_SIZE,
+      );
 
       if (!messages || messages.length === 0) {
         break;
@@ -296,107 +275,57 @@ export async function processCallCampaignExport(
     const csvLines: string[] = [];
     let isFirstChunk = true;
 
-    // First, get campaign info
-    const { data: campaignData, error: campaignError } = await supabaseClient
-      .from('campaign')
-      .select('id, title, start_date, end_date, type, status')
-      .eq('id', campaignId)
-      .eq('workspace', workspaceId)
-      .single();
-    if (campaignError || !campaignData) {
-      throw new Error(campaignError?.message || "Campaign not found");
-    }
-    // Campaign row includes joined script for live_call and IVR exports.
-    const { data: campaignWithScript, error: scriptError } = await supabaseClient
-      .from('campaign')
-      .select('id, title, start_date, end_date, type, status, script_id, script(*)')
-      .eq('id', campaignId)
-      .eq('workspace', workspaceId)
-      .single();
-    if (scriptError) {
-      throw new Error(scriptError.message || "Error fetching script");
+    const campaignWithScript = await findCampaignWithScriptForExport(
+      workspaceId,
+      campaignId,
+    );
+    if (!campaignWithScript) {
+      throw new Error("Campaign not found");
     }
 
-    const script = castExportScript(campaignWithScript?.script);
-    const campaign = (campaignWithScript ?? campaignData) as ExportCampaign;
+    const script = castExportScript(campaignWithScript.script);
+    const campaign = campaignWithScript as ExportCampaign;
     const scriptQuestions = extractScriptQuestions(script);
     const pages = Object.entries(script?.steps?.pages ?? {}).map(([pageId, pageData]) => ({
       id: pageId,
       title: pageData.title || pageId,
     }));
 
-    // Get count of outreach attempts
-    const { count: attemptCount, error: countError } = await supabaseClient
-      .from('outreach_attempt')
-      .select('*', { count: 'exact', head: true })
-      .eq('campaign_id', campaignId);
-
-    if (countError) {
-      throw new Error(countError.message || "Error counting attempts");
-    }
-
-    const totalAttempts = attemptCount || 0;
+    const totalAttempts = await countExportOutreachAttempts(workspaceId, campaignId);
     const ATTEMPT_CHUNK_SIZE = 100;
     let processedAttempts = 0;
 
     // Process attempts in small chunks
     for (let offset = 0; offset < totalAttempts; offset += ATTEMPT_CHUNK_SIZE) {
-      // Get a chunk of attempts
-      const { data: attempts, error: attemptsError } = await supabaseClient
-        .from('outreach_attempt')
-        .select('*')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: true })
-        .range(offset, offset + ATTEMPT_CHUNK_SIZE - 1);
-
-      if (attemptsError) {
-        throw new Error(attemptsError.message || `Error fetching attempts chunk at offset ${offset}`);
-      }
+      const attempts = await listExportOutreachAttempts(
+        workspaceId,
+        campaignId,
+        offset,
+        ATTEMPT_CHUNK_SIZE,
+      );
 
       if (!attempts || attempts.length === 0) {
         break;
       }
 
-      // Get contact IDs from attempts
-      const contactIds = [...new Set(attempts.map(a => a.contact_id))];
+      const contactIds = [...new Set(attempts.map((a) => a.contact_id))];
 
-      // Get contacts
-      const { data: contacts, error: contactsError } = await supabaseClient
-        .from('contact')
-        .select('*')
-        .in('id', contactIds);
-
-      if (contactsError) {
-        throw new Error(contactsError.message || "Error fetching contacts for attempts");
-      }
+      const contacts = await findExportContactsByIds(workspaceId, contactIds);
 
       const contactsMap: Record<string, ExportContact> = {};
-      if (contacts) {
-        contacts.forEach(contact => {
-          contactsMap[contact.id] = contact;
-        });
+      for (const contact of contacts) {
+        contactsMap[contact.id] = contact;
       }
 
-      // Get call IDs from attempts
-      const attemptIds = attempts.map(a => a.id);
+      const attemptIds = attempts.map((a) => a.id);
 
-      // Get calls
-      const { data: calls, error: callsError } = await supabaseClient
-        .from('call')
-        .select('*')
-        .in('outreach_attempt_id', attemptIds);
-
-      if (callsError) {
-        throw new Error(callsError.message || "Error fetching calls for attempts");
-      }
+      const calls = await findExportCallsByOutreachAttemptIds(workspaceId, attemptIds);
 
       const callsMap: Record<string, ExportCall> = {};
-      if (calls) {
-        calls.forEach(call => {
-          if (call.outreach_attempt_id) {
-            callsMap[call.outreach_attempt_id] = call;
-          }
-        });
+      for (const call of calls) {
+        if (call.outreach_attempt_id) {
+          callsMap[call.outreach_attempt_id] = call;
+        }
       }
 
       // Match attempts with contacts and calls

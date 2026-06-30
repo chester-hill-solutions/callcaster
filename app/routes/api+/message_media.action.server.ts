@@ -1,7 +1,11 @@
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthSupabase, requireDualAuth } from "@/lib/api-auth.server";
+import {
+  findCampaignMessageMedia,
+  updateCampaignMessageMedia,
+} from "@/lib/campaign-ivr.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -32,6 +36,7 @@ export async function action({ request }: ActionFunctionArgs) {
             { headers },
         );
     }
+    const workspaceIdStr = String(workspaceId);
     if (method === "POST") {
         const mediaToUpload = formData.get("image") as File | string | null;
         const mediaNameRaw = formData.get("fileName");
@@ -43,7 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
         const { error: uploadError } = await supabase.storage
             .from("messageMedia")
-            .upload(`${workspaceId}/${safeFileName}`, mediaToUpload as any, {
+            .upload(`${workspaceIdStr}/${safeFileName}`, mediaToUpload as any, {
                 cacheControl: "60",
                 upsert: false,
             });
@@ -52,30 +57,28 @@ export async function action({ request }: ActionFunctionArgs) {
             return routeData({ success: false, error: uploadError }, { headers });
         }
         if (campaignId) {
-            const { data: campaign, error } = await supabase
-                .from('campaign')
-                .select('id, message_media')
-                .eq('id', campaignId as number)
-                .single();
-            if (error) {
-                logger.error('Campaign Error', error);
-                return routeData({ success: false, error: error }, { headers });
-            }
-            const { data: campaignUpdate, error: updateError } = await supabase
-                .from('campaign')
-                .update({
-                    message_media: [...((campaign?.message_media ?? []) as string[]), safeFileName]
-                })
-                .eq('id', campaignId as number)
-                .select()
-            if (updateError) {
-                logger.error("Error updating campaign with media:", updateError);
-                return routeData({ success: false, error: updateError }, { headers });
+            let campaignUpdate;
+            try {
+              const campaign = await findCampaignMessageMedia(workspaceIdStr, campaignId);
+              if (!campaign) {
+                return routeData({ success: false, error: "Campaign not found" }, { headers });
+              }
+              campaignUpdate = await updateCampaignMessageMedia(
+                workspaceIdStr,
+                campaignId,
+                [...((campaign.message_media ?? []) as string[]), safeFileName],
+              );
+              if (!campaignUpdate) {
+                return routeData({ success: false, error: "Failed to update campaign" }, { headers });
+              }
+            } catch (error) {
+              logger.error("Error updating campaign with media:", error);
+              return routeData({ success: false, error }, { headers });
             }
 
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
                 .from("messageMedia")
-                .createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
+                .createSignedUrl(`${workspaceIdStr}/${safeFileName}`, 3600);
 
             if (signedUrlError) {
                 logger.error("Error signing uploaded message media:", signedUrlError);
@@ -85,12 +88,12 @@ export async function action({ request }: ActionFunctionArgs) {
             return routeData({
                 success: true,
                 error: null,
-                campaignUpdate,
+                campaignUpdate: [campaignUpdate],
                 uploadedFileName: safeFileName,
                 url: signedUrlData.signedUrl,
             }, { headers });
         } else {
-            const { data, error: imageError } = await supabase.storage.from('messageMedia').createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
+            const { data, error: imageError } = await supabase.storage.from('messageMedia').createSignedUrl(`${workspaceIdStr}/${safeFileName}`, 3600);
             if (imageError) return routeData({ success: false, error: imageError }, { headers });
             return routeData({ success: true, error: null, url: data.signedUrl }, { headers });
         }
@@ -100,30 +103,36 @@ export async function action({ request }: ActionFunctionArgs) {
         const mediaNameRaw = formData.get("fileName");
         const mediaName = typeof mediaNameRaw === 'string' ? mediaNameRaw : String(mediaNameRaw ?? '');
         const encodedMediaName = encodeURI(mediaName);
-        const { data: campaign, error } = await supabase
-            .from("campaign")
-            .select("id, message_media")
-            .eq("id", campaignId as number)
-            .single();
-        if (error) {
-            logger.error("Campaign Error", error);
-            return routeData({ success: false, error: error }, { headers });
-        }
+        try {
+          if (!campaignId) {
+            return routeData({ success: false, error: "Campaign not found" }, { headers });
+          }
+          const campaign = await findCampaignMessageMedia(workspaceIdStr, campaignId);
+          if (!campaign) {
+            logger.error("Campaign Error", new Error("Campaign not found"));
+            return routeData({ success: false, error: "Campaign not found" }, { headers });
+          }
 
-        const { data: campaignUpdate, error: updateError } = await supabase
-            .from("campaign")
-            .update({
-                message_media: (campaign.message_media ?? []).filter(
-                    (med) => med !== encodedMediaName,
-                ),
-            })
-            .eq("id", campaignId as number)
-            .select();
-
-        if (updateError) {
-            return routeData({ success: false, error: updateError }, { headers });
+          const campaignUpdate = await updateCampaignMessageMedia(
+            workspaceIdStr,
+            campaignId,
+            (campaign.message_media ?? []).filter(
+              (med) => med !== encodedMediaName,
+            ),
+          );
+          if (!campaignUpdate) {
+            return routeData({ success: false, error: "Failed to update campaign" }, { headers });
+          }
+          return routeData({
+            success: true,
+            error: null,
+            campaignUpdate: [campaignUpdate],
+            removedFileName: encodedMediaName,
+          }, { headers });
+        } catch (error) {
+          logger.error("Campaign Error", error);
+          return routeData({ success: false, error }, { headers });
         }
-        return routeData({ success: true, error: null, campaignUpdate, removedFileName: encodedMediaName }, { headers });
     }
     return routeData({ success: false, error: 'Method not allowed' }, { status: 405 });
 }

@@ -1,31 +1,51 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { setJsonAuthSession } from "./helpers/route-auth-mock";
 import { logger } from "@/lib/logger.server";
 
+const telephonyMocks = vi.hoisted(() => ({
+  findCallSidByParentCallSid: vi.fn(),
+  loadCampaignVoicedropAudio: vi.fn(),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallSidByParentCallSid: (...args: unknown[]) =>
+    telephonyMocks.findCallSidByParentCallSid(...args),
+}));
+
+vi.mock("@/lib/sms-campaign-db.server", () => ({
+  loadCampaignVoicedropAudio: (...args: unknown[]) =>
+    telephonyMocks.loadCampaignVoicedropAudio(...args),
+}));
+
+vi.mock("@/lib/database.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+  return {
+    ...actual,
+    createWorkspaceTwilioInstance: vi.fn(),
+  };
+});
+
 describe("api.audiodrop action", () => {
   beforeEach(() => {
     (logger.error as any).mockClear?.();
+    telephonyMocks.findCallSidByParentCallSid.mockReset();
+    telephonyMocks.loadCampaignVoicedropAudio.mockReset();
   });
 
   test("returns failure when call lookup errors", async () => {
     const update = vi.fn();
     const createWorkspaceTwilioInstance = vi.fn(async () => ({ calls: () => ({ update }) }));
 
+    telephonyMocks.findCallSidByParentCallSid.mockResolvedValueOnce(null);
+
     const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "call") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: null, error: new Error("call") }),
-              }),
-            }),
-          };
-        }
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }) };
-      },
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
     const mod = await import("../app/routes/api+/audiodrop");
@@ -43,28 +63,10 @@ describe("api.audiodrop action", () => {
   test("returns failure when campaign lookup errors", async () => {
     const createWorkspaceTwilioInstance = vi.fn(async () => ({ calls: () => ({ update: vi.fn() }) }));
 
+    telephonyMocks.findCallSidByParentCallSid.mockResolvedValueOnce("CA1");
+    telephonyMocks.loadCampaignVoicedropAudio.mockRejectedValueOnce(new Error("campaign"));
+
     const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "call") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { sid: "CA1" }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "live_campaign") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: null, error: new Error("campaign") }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
 
@@ -84,28 +86,10 @@ describe("api.audiodrop action", () => {
     const update = vi.fn();
     const createWorkspaceTwilioInstance = vi.fn(async () => ({ calls: () => ({ update }) }));
 
+    telephonyMocks.findCallSidByParentCallSid.mockResolvedValueOnce("CA1");
+    telephonyMocks.loadCampaignVoicedropAudio.mockResolvedValueOnce(null);
+
     const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "call") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { sid: "CA1" }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "live_campaign") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { voicedrop_audio: null }, error: null }),
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
 
@@ -126,17 +110,11 @@ describe("api.audiodrop action", () => {
     const update = vi.fn();
     const createWorkspaceTwilioInstance = vi.fn(async () => ({ calls: () => ({ update }) }));
 
+    telephonyMocks.findCallSidByParentCallSid.mockResolvedValue("CA1");
+    telephonyMocks.loadCampaignVoicedropAudio.mockResolvedValue("a.mp3");
+
     const createSignedUrl = vi.fn();
     const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "call") {
-          return { select: () => ({ eq: () => ({ single: async () => ({ data: { sid: "CA1" }, error: null }) }) }) };
-        }
-        if (table === "live_campaign") {
-          return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicedrop_audio: "a.mp3" }, error: null }) }) }) };
-        }
-        throw new Error("unexpected");
-      },
       storage: { from: () => ({ createSignedUrl }) },
     };
 
@@ -152,7 +130,6 @@ describe("api.audiodrop action", () => {
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
-    // Current implementation checks `audio` before `voicemailError`.
     expect(r1).toMatchObject({ success: false, error: "No audio found" });
     expect(update).toHaveBeenCalledWith({ status: "completed" });
 
@@ -163,7 +140,6 @@ describe("api.audiodrop action", () => {
     } as any));
     expect(r2).toMatchObject({ success: false, error: "No signed URL found" });
 
-    // Covers `if (voicemailError) throw { voicemail: voicemailError }`
     createSignedUrl.mockResolvedValueOnce({
       data: { signedUrl: "https://s" },
       error: new Error("vm"),
@@ -190,19 +166,13 @@ describe("api.audiodrop action", () => {
 
     const update = vi.fn();
     const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "call") {
-          return { select: () => ({ eq: () => ({ single: async () => ({ data: { sid: "CA1" }, error: null }) }) }) };
-        }
-        if (table === "live_campaign") {
-          return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicedrop_audio: "a.mp3" }, error: null }) }) }) };
-        }
-        throw new Error("unexpected");
-      },
       storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: "https://s" }, error: null }) }) },
     };
 
     const createWorkspaceTwilioInstance = vi.fn(async () => ({ calls: () => ({ update }) }));
+
+    telephonyMocks.findCallSidByParentCallSid.mockResolvedValue("CA1");
+    telephonyMocks.loadCampaignVoicedropAudio.mockResolvedValue("a.mp3");
 
     setJsonAuthSession({ supabaseClient, user: { id: "u1" } });
     vi.doMock("@/lib/database.server", () => ({ createWorkspaceTwilioInstance }));
@@ -219,4 +189,3 @@ describe("api.audiodrop action", () => {
     expect(createWorkspaceTwilioInstance).toHaveBeenCalled();
   });
 });
-

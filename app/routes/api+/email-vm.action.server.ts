@@ -6,7 +6,11 @@ import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentia
 import { Resend } from "resend";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
-import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
+import { findWorkspaceNumberVoicemailContextByPhone } from "@/lib/inbound-call-db.server";
+import {
+  findCallBySid,
+  updateCallRecordingUrlBySid,
+} from "@/lib/telephony-db.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
@@ -44,39 +48,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return validation.response;
     }
 
-    const { data: callRow, error: callLookupError } = await supabase
-      .from("call")
-      .select("sid, from, to, workspace")
-      .eq("sid", callSid)
-      .single();
+    const callRow = await findCallBySid(callSid);
 
-    if (callLookupError || !callRow) {
-      throw new Error(`Error fetching call: ${callLookupError?.message ?? "not found"}`);
+    if (!callRow) {
+      throw new Error("Error fetching call: not found");
     }
     if (!callRow.to) {
       throw new Error("Call destination number not found");
     }
 
-    const { data: number, error: numberError } = await supabase
-      .from("workspace_number")
-      .select(
-        `
-        inbound_action,
-        type,
-        workspace (id, twilio_data, name, webhook(*))
-      `,
-      )
-      .eq("phone_number", callRow.to)
-      .single<
-        WorkspaceNumber & {
-          workspace: Workspace & {
-            webhook: (WorkspaceWebhook & { events?: Array<{ category: string }> })[];
-          };
-        }
-      >();
+    const number = await findWorkspaceNumberVoicemailContextByPhone(callRow.to);
 
-    if (numberError) {
-      throw new Error(`Error fetching workspace number: ${numberError.message}`);
+    if (!number) {
+      throw new Error("Error fetching workspace number: not found");
     }
     if (!number.workspace) {
       throw new Error("Workspace not found");
@@ -87,15 +71,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Workspace twilio data not found");
     }
 
-    const { data: call, error: callError } = await supabase
-      .from("call")
-      .update({ recording_url: recordingUrl })
-      .eq("sid", callSid)
-      .select()
-      .single();
+    const call = await updateCallRecordingUrlBySid(callSid, recordingUrl);
 
-    if (callError) {
-      throw new Error(`Error updating call: ${callError.message}`);
+    if (!call) {
+      throw new Error("Error updating call: not found");
     }
 
     const action = number.inbound_action;
@@ -174,11 +153,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       `,
     });
 
-    const voicemailWebhook = number.workspace.webhook
-      .map((webhook) =>
-        webhook.events?.filter((event) => event.category === "voicemail") || [],
-      )
-      .flat();
+    const voicemailWebhook = number.workspace.webhook.filter((webhook) =>
+      webhook.event?.includes("voicemail"),
+    );
     if (voicemailWebhook.length > 0) {
       await sendWebhookNotification({
         eventCategory: "voicemail",

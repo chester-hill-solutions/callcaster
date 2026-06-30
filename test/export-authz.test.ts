@@ -1,9 +1,30 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { setDualAuthSession } from "./helpers/route-auth-mock";
 
 const requireWorkspaceAccess = vi.fn(async () => undefined);
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignExportMeta: vi.fn(async () => null),
+  };
+});
+
+vi.mock("@/lib/audience-upload-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audience-upload-db.server")>();
+  return {
+    ...actual,
+    findAudienceWorkspaceById: vi.fn(async () => "w1"),
+  };
+});
 
 vi.mock("@/lib/env.server", () => {
   const handler = {

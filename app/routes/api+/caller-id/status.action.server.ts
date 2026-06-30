@@ -2,17 +2,21 @@ import {
   rejectMissingTwilioSignatureHeader,
   validateTwilioWebhookForPhoneCandidates,
 } from "@/lib/twilio-webhook.server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import {
+  listWorkspaceNumberTwilioCandidatesByPhone,
+  updateWorkspaceNumberCapabilitiesByPhone,
+} from "@/lib/inbound-call-db.server";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   getWorkspaceMessagingOnboardingState,
   updateMessagingServiceSenders,
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
+import { createClient } from "@supabase/supabase-js";
+import { env } from "@/lib/env.server";
 
 interface FormData {
   VerificationStatus: string;
@@ -43,28 +47,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
-  const supabase: SupabaseClient = createClient(
+  const supabase = createClient(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
   );
 
   try {
-    const { data: candidateNumbers, error: candidateError } = await supabase
-      .from("workspace_number")
-      .select("workspace(twilio_data)")
-      .eq("phone_number", parsedBody.To);
-
-    if (candidateError) {
-      throw new Error(`Database error: ${candidateError.message}`);
-    }
+    const candidateNumbers = await listWorkspaceNumberTwilioCandidatesByPhone(
+      parsedBody.To,
+    );
 
     const isValidTwilioRequest = validateTwilioWebhookForPhoneCandidates({
       request,
       params: parsedBody,
-      candidates: (candidateNumbers ?? []).map((row) => ({
-        twilioData: (row as { workspace?: { twilio_data?: unknown } }).workspace
-          ?.twilio_data,
-      })),
+      candidates: candidateNumbers,
     });
 
     if (!isValidTwilioRequest) {
@@ -87,22 +83,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         emergency_compliance_status: "not_started",
       };
 
-      const { data: numberRequest, error: numberError } = await supabase
-        .from("workspace_number")
-        .update({ capabilities })
-        .eq("phone_number", parsedBody.To)
-        .select();
+      const numberRequest = await updateWorkspaceNumberCapabilitiesByPhone(
+        parsedBody.To,
+        capabilities,
+      );
 
-      if (numberError) {
-        throw new Error(`Database error: ${numberError.message}`);
-      }
-
-      if (!numberRequest || numberRequest.length === 0) {
+      if (numberRequest.length === 0) {
         throw new Error("No matching record found");
       }
 
       if (parsedBody.VerificationStatus === "success") {
-        const updatedNumber = numberRequest[0] as { workspace?: string };
+        const updatedNumber = numberRequest[0];
         const workspaceId = updatedNumber.workspace;
         if (workspaceId) {
           const [current, phoneNumbersResult] = await Promise.all([

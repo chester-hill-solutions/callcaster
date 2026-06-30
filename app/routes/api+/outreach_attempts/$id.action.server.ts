@@ -2,6 +2,8 @@ import { authForOutreachAttempt } from "@/lib/platform-data.server";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
+import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
+import type { OutreachAttempt } from "@/lib/types";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -26,13 +28,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     request,
   );
 
-  const { data: row, error } = await access.supabase
-    .from("outreach_attempt")
-    .update(update)
-    .eq("id", outreachAttemptId)
-    .select()
-    .single();
+  const result = await updateOutreachAttemptForWorkspace(
+    access.workspaceId,
+    outreachAttemptId,
+    update as Partial<OutreachAttempt>,
+  );
 
-  if (error) return routeData({ error: error.message }, { status: 400, headers });
-  return routeData(row, { headers });
+  if (result instanceof Response) {
+    const message = await result.text();
+    return routeData({ error: message.replace(/^Error updating outreach attempt: /, "") }, {
+      status: 400,
+      headers,
+    });
+  }
+
+  return routeData(result, { headers });
 };

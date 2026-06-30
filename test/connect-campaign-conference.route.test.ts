@@ -5,6 +5,7 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => ({
   validateTwilioWebhookForWorkspace: vi.fn(),
   getServiceSupabase: vi.fn(),
+  findCampaignInWorkspace: vi.fn(),
 }));
 
 vi.mock("@/lib/env.server", () => ({
@@ -19,6 +20,10 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
       status: 403,
       headers: { "Content-Type": "application/json" },
     }),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  findCampaignInWorkspace: (...args: unknown[]) => mocks.findCampaignInWorkspace(...args),
 }));
 
 vi.mock("@/lib/supabase.server", () => ({
@@ -57,17 +62,8 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
       authToken: "token",
       workspaceId: "w1",
     });
-    mocks.getServiceSupabase.mockReturnValue({
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: { id: 1 }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mocks.getServiceSupabase.mockReturnValue({});
+    mocks.findCampaignInWorkspace.mockResolvedValue({ id: 1 });
   });
 
   test("returns TwiML with campaign conference name when signature validates", async () => {

@@ -17,12 +17,16 @@ import { normalizeCampaignData } from "@/lib/campaign-settings";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
 import { fetchCampaignDetails, fetchQueueCounts, parseActionRequest, updateCampaign } from "@/lib/database.server";
+import {
+  findCampaignInWorkspace,
+  insertCampaignForWorkspace,
+  updateCampaignStatusInWorkspace,
+} from "@/lib/campaign-ivr.server";
 import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { verifyAuth } from "@/lib/supabase.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { ActionFunctionArgs } from "react-router";
@@ -40,9 +44,8 @@ type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
 };
 
 async function updateCampaignStatus(
-  supabaseClient: SupabaseClient,
-  selected_id: string,
   workspaceId: string,
+  selected_id: string,
   status: string,
   is_active?: boolean,
 ) {
@@ -56,35 +59,22 @@ async function updateCampaignStatus(
   }
 
   logger.debug("Server update object:", update);
-  const { error } = await supabaseClient
-    .from("campaign")
-    .update({ ...update })
-    .eq("id", Number(selected_id))
-    .eq("workspace", workspaceId);
-
-  if (error) throw error;
+  await updateCampaignStatusInWorkspace(workspaceId, Number(selected_id), update);
   return { success: true };
 }
 
 async function handleCampaignDuplicate(
-  supabaseClient: SupabaseClient,
   selected_id: string,
   workspace_id: string,
   campaignData: string,
+  supabaseClient: Parameters<typeof enqueueContactsForCampaign>[0],
 ) {
   const parsedData = JSON.parse(campaignData);
 
-  const { data: campaign, error } = await supabaseClient
-    .from("campaign")
-    .insert({
-      ...parsedData,
-      workspace: workspace_id,
-      live_questions: parsedData.live_questions ?? parsedData.questions ?? null,
-    })
-    .select("id")
-    .single();
-
-  if (error || !campaign) throw error || new Error("Failed to create campaign");
+  const campaign = await insertCampaignForWorkspace(workspace_id, {
+    ...parsedData,
+    live_questions: parsedData.live_questions ?? parsedData.questions ?? null,
+  });
 
   const originalContactIds = await getCampaignQueueContactIds(Number(selected_id));
 
@@ -161,15 +151,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       try {
         const status = String(data.status ?? "") as CampaignStatus;
         const is_active = String(data.is_active ?? "");
-        const { data: campaignRecord, error: campaignError } = await supabaseClient
-          .from("campaign")
-          .select("*")
-          .eq("id", Number(selected_id))
-          .eq("workspace", workspace_id)
-          .single();
+        const campaignRecord = await findCampaignInWorkspace(workspace_id, selected_id);
 
-        if (campaignError || !campaignRecord) {
-          throw campaignError ?? new Error("Campaign could not be loaded");
+        if (!campaignRecord) {
+          throw new Error("Campaign could not be loaded");
         }
 
         if (status === "running" || status === "scheduled") {
@@ -214,9 +199,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
 
         await updateCampaignStatus(
-          supabaseClient,
-          selected_id,
           workspace_id,
+          selected_id,
           status,
           is_active === "true" ? true : is_active === "false" ? false : undefined
         );
@@ -237,7 +221,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     case "duplicate": {
       try {
         const campaignData = data.campaignData != null ? String(data.campaignData) : "";
-        await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData);
+        await handleCampaignDuplicate(selected_id, workspace_id, campaignData, supabaseClient);
         return routeData({ success: true, actionType: "duplicate" as const });
       } catch (error) {
         logger.error("Error duplicating campaign", error);

@@ -38,21 +38,30 @@ vi.mock("@/lib/database.server", async (importOriginal) => {
   };
 });
 
-const supabaseMocks = vi.hoisted(() => {
-  return {
-    createClient: vi.fn(),
-  };
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 });
+
+const inboundMocks = vi.hoisted(() => ({
+  listWorkspaceNumberTwilioCandidatesByPhone: vi.fn(),
+  updateWorkspaceNumberCapabilitiesByPhone: vi.fn(),
+}));
+
+vi.mock("@/lib/inbound-call-db.server", () => ({
+  listWorkspaceNumberTwilioCandidatesByPhone: (...args: unknown[]) =>
+    inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone(...args),
+  updateWorkspaceNumberCapabilitiesByPhone: (...args: unknown[]) =>
+    inboundMocks.updateWorkspaceNumberCapabilitiesByPhone(...args),
+}));
 
 const twilioMocks = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
 }));
 
-vi.mock("@supabase/supabase-js", () => {
-  return {
-    createClient: (...args: any[]) => supabaseMocks.createClient(...args),
-  };
-});
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => ({})),
+}));
 
 vi.mock("@/lib/env.server", () => {
   return {
@@ -85,9 +94,13 @@ function makeCallerIdRequest(body: FormData) {
 
 describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   beforeEach(() => {
-    supabaseMocks.createClient.mockReset();
     twilioMocks.validateTwilioWebhookParams.mockReset();
     twilioMocks.validateTwilioWebhookParams.mockReturnValue(true);
+    inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockReset();
+    inboundMocks.updateWorkspaceNumberCapabilitiesByPhone.mockReset();
+    inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockResolvedValue([
+      { twilioData: { account_sid: "AC123", auth_token: "auth" } },
+    ]);
     onboardingMocks.getWorkspaceMessagingOnboardingState.mockReset();
     onboardingMocks.updateWorkspaceMessagingOnboardingState.mockReset();
     onboardingMocks.updateMessagingServiceSenders.mockReset();
@@ -107,16 +120,6 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   });
 
   test("returns parsed body when VerificationStatus is neither success nor failed", async () => {
-    supabaseMocks.createClient.mockReturnValueOnce({
-      from: () => ({
-        select: () => ({
-          eq: async () => ({
-            data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
-            error: null,
-          }),
-        }),
-      }),
-    });
     const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
@@ -131,30 +134,9 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   });
 
   test("updates capabilities on success and returns first row", async () => {
-    const update = vi.fn(() => ({
-      eq: () => ({
-        select: async () => ({
-          data: [{ id: 1, workspace: "w1" }],
-          error: null,
-        }),
-      }),
-    }));
-    supabaseMocks.createClient.mockReturnValueOnce({
-      from: (table: string) => {
-        if (table === "workspace_number") {
-          return {
-            select: () => ({
-              eq: async () => ({
-                data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
-                error: null,
-              }),
-            }),
-            update,
-          };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    });
+    inboundMocks.updateWorkspaceNumberCapabilitiesByPhone.mockResolvedValueOnce([
+      { id: 1, workspace: "w1" },
+    ]);
 
     const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
@@ -164,14 +146,13 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       request: makeCallerIdRequest(fd),
     } as any));
     expect(await res.json()).toEqual({ id: 1, workspace: "w1" });
-    expect(update).toHaveBeenCalledWith(
+    expect(inboundMocks.updateWorkspaceNumberCapabilitiesByPhone).toHaveBeenCalledWith(
+      "+15555550100",
       expect.objectContaining({
-        capabilities: expect.objectContaining({
-          mms: true,
-          sms: true,
-          voice: true,
-          verification_status: "success",
-        }),
+        mms: true,
+        sms: true,
+        voice: true,
+        verification_status: "success",
       }),
     );
     expect(onboardingMocks.updateMessagingServiceSenders).toHaveBeenCalledWith(
@@ -185,30 +166,10 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
 
   test("updates capabilities on failed and handles DB error + empty update", async () => {
     let mode: "dbErr" | "empty" | "ok" = "dbErr";
-    const update = vi.fn(() => ({
-      eq: () => ({
-        select: async () => {
-          if (mode === "dbErr") return { data: null, error: new Error("db") };
-          if (mode === "empty") return { data: [], error: null };
-          return { data: [{ id: 1 }], error: null };
-        },
-      }),
-    }));
-    supabaseMocks.createClient.mockReturnValue({
-      from: (table: string) => {
-        if (table === "workspace_number") {
-          return {
-            select: () => ({
-              eq: async () => ({
-                data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
-                error: null,
-              }),
-            }),
-            update,
-          };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
+    inboundMocks.updateWorkspaceNumberCapabilitiesByPhone.mockImplementation(async () => {
+      if (mode === "dbErr") throw new Error("db");
+      if (mode === "empty") return [];
+      return [{ id: 1 }];
     });
 
     const mod = await import("../app/routes/api+/caller-id/status.route");
@@ -229,30 +190,18 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     mode = "ok";
     const r3 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
     expect(r3.status).toBe(200);
-    expect(update).toHaveBeenCalledWith(
+    expect(inboundMocks.updateWorkspaceNumberCapabilitiesByPhone).toHaveBeenCalledWith(
+      "+15555550100",
       expect.objectContaining({
-        capabilities: expect.objectContaining({
-          mms: false,
-          sms: false,
-          voice: false,
-          verification_status: "failed",
-        }),
+        mms: false,
+        sms: false,
+        voice: false,
+        verification_status: "failed",
       }),
     );
   });
 
   test("returns 403 when Twilio signature does not validate", async () => {
-    supabaseMocks.createClient.mockReturnValueOnce({
-      from: () => ({
-        select: () => ({
-          eq: async () => ({
-            data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
-            error: null,
-          }),
-        }),
-      }),
-    });
-
     twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
 
     const mod = await import("../app/routes/api+/caller-id/status.route");
@@ -268,16 +217,9 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   });
 
   test("returns 500 when candidate lookup errors", async () => {
-    supabaseMocks.createClient.mockReturnValueOnce({
-      from: () => ({
-        select: () => ({
-          eq: async () => ({
-            data: null,
-            error: { message: "lookup failed" },
-          }),
-        }),
-      }),
-    });
+    inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockRejectedValueOnce(
+      new Error("lookup failed"),
+    );
 
     const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
@@ -292,13 +234,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   });
 
   test("returns 403 when candidate lookup returns null data", async () => {
-    supabaseMocks.createClient.mockReturnValueOnce({
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: null, error: null }),
-        }),
-      }),
-    });
+    inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockResolvedValueOnce([]);
 
     const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();

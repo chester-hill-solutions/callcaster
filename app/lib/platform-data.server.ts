@@ -351,7 +351,7 @@ export async function authForOutreachAttempt(
     return jsonError("Forbidden", 403);
   }
 
-  return { supabase, user: (auth as any).user };
+  return { supabase, user: (auth as any).user, workspaceId: attempt.workspace };
 }
 
 export async function listWorkspaceCampaignsApi(

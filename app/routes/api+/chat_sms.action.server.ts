@@ -11,6 +11,9 @@ import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { chatSmsBodySchema } from "@/lib/schemas/api/chat-sms";
 import type { TwilioMessageIntent } from "@/lib/types";
+import { eq } from "drizzle-orm";
+import { contact as contactTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
 
 export const action = async ({ request }: { request: Request }) => {
   const authResult = await verifyApiKeyOrSession(request);
@@ -87,13 +90,12 @@ export const action = async ({ request }: { request: Request }) => {
   try {
     let processedBody = body || " ";
     if (contact_id && body) {
-      const { data: contact, error: contactError } = await supabase
-        .from("contact")
-        .select("*")
-        .eq("id", Number(contact_id))
-        .single();
+      const tdb = createTenantDb(workspace_id);
+      const contact = await tdb.contact.findFirst({
+        where: eq(contactTable.id, Number(contact_id)),
+      });
 
-      if (!contactError && contact) {
+      if (contact) {
         processedBody = processTemplateTags(body, contact);
       }
     }

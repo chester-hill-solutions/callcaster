@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import {
   appendInboundVoicemailTwiml,
@@ -18,26 +19,6 @@ interface Script {
     options?: Array<{ value: string; next?: string }>;
   }>;
 }
-
-const getWorkspaceNumberData = async (
-  supabase: SupabaseClient<Database>,
-  numberId: string,
-) => {
-  const { data: number } = await supabase
-    .from("workspace_number")
-    .select("id, inbound_script_id, inbound_audio, workspace")
-    .eq("id", Number(numberId))
-    .single();
-  if (!number?.inbound_script_id) throw new Error("Number has no inbound script");
-  const { data: script } = await supabase
-    .from("script")
-    .select("steps")
-    .eq("id", number.inbound_script_id)
-    .single();
-  const steps = script?.steps as Script | null | undefined;
-  if (!steps?.blocks || !steps?.pages) throw new Error("Invalid script structure");
-  return { number, script: steps, workspace: number.workspace };
-};
 
 const findNextBlock = (
   script: Script,
@@ -186,14 +167,26 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   try {
-    const { number, script, workspace } = await getWorkspaceNumberData(supabase, numberId);
-    const currentBlock = script.blocks[blockId];
+    const context = await loadInboundIvrBlockContext(Number(numberId));
+    if (!context) {
+      throw new Error("Number has no inbound script");
+    }
+
+    const { script, number } = context;
+    const currentBlock = script.blocks[blockId] as Script["blocks"][string] | undefined;
     if (!currentBlock) {
       throw new Error(`Block ${blockId} not found`);
     }
 
-    const nextStep = findNextStep(currentBlock, userInput, script, pageId);
-    await renderTerminalTarget(twiml, nextStep, numberId, workspace, supabase, baseUrl);
+    const nextStep = findNextStep(currentBlock, userInput, script as Script, pageId);
+    await renderTerminalTarget(
+      twiml,
+      nextStep,
+      numberId,
+      number.workspaceId,
+      supabase,
+      baseUrl,
+    );
   } catch (e) {
     const errorMessage =
       e instanceof Error ? e.message : "An error occurred. Please try again later.";

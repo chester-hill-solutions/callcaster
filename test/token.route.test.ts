@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => ({
   requireWorkspaceAccess: vi.fn(),
   generateToken: vi.fn(),
+  getWorkspaceById: vi.fn(),
   createErrorResponse: vi.fn((_error: unknown, message?: string, status = 500) =>
     Response.json({ error: message ?? "Unknown error" }, { status }),
   ),
@@ -27,36 +33,33 @@ vi.mock("@/lib/twilio-token.server", () => ({
 vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: unknown[]) => mocks.createErrorResponse(...args),
 }));
+vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/workspace-members-db.server")>();
+  return {
+    ...actual,
+    getWorkspaceById: (...args: unknown[]) => mocks.getWorkspaceById(...args),
+  };
+});
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({
   logger: { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-
-function makeSupabaseRowLookup(result: { data: unknown; error: unknown }) {
-  return {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          single: vi.fn(async () => result),
-        })),
-      })),
-    })),
-  };
-}
 
 describe("app/routes/api+/token/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.generateToken.mockReset();
+    mocks.getWorkspaceById.mockReset();
     mocks.generateToken.mockResolvedValue("jwt-token");
     mocks.createErrorResponse.mockClear();
     mocks.env.TWILIO_APP_SID.mockClear();
   });
 
   test("loader returns 404 when workspace missing", async () => {
+    mocks.getWorkspaceById.mockResolvedValueOnce(null);
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseRowLookup({ data: null, error: { message: "nope" } }),
+      supabaseClient: {},
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
@@ -69,10 +72,7 @@ describe("app/routes/api+/token/route.tsx", () => {
 
   test("loader rejects missing workspace", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseRowLookup({
-        data: { twilio_data: { sid: "AC1" }, key: "K", token: "S" },
-        error: null,
-      }),
+      supabaseClient: {},
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
@@ -84,11 +84,13 @@ describe("app/routes/api+/token/route.tsx", () => {
   });
 
   test("loader generates token with authenticated user identity and logs debug", async () => {
+    mocks.getWorkspaceById.mockResolvedValueOnce({
+      twilio_data: { sid: "AC1" },
+      key: "K",
+      token: "S",
+    });
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseRowLookup({
-        data: { twilio_data: { sid: "AC1" }, key: "K", token: "S" },
-        error: null,
-      }),
+      supabaseClient: {},
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
@@ -109,11 +111,13 @@ describe("app/routes/api+/token/route.tsx", () => {
   });
 
   test("loader handles non-string sid and null key/token", async () => {
+    mocks.getWorkspaceById.mockResolvedValueOnce({
+      twilio_data: { sid: 123 },
+      key: null,
+      token: undefined,
+    });
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseRowLookup({
-        data: { twilio_data: { sid: 123 }, key: null, token: undefined },
-        error: null,
-      }),
+      supabaseClient: {},
       user: { id: "me" },
     });
     const mod = await import("../app/routes/api+/token");
@@ -130,11 +134,13 @@ describe("app/routes/api+/token/route.tsx", () => {
   });
 
   test("loader returns error response when requireWorkspaceAccess throws", async () => {
+    mocks.getWorkspaceById.mockResolvedValueOnce({
+      twilio_data: { sid: "AC1" },
+      key: "K",
+      token: "S",
+    });
     queueJsonAuthSession({
-      supabaseClient: makeSupabaseRowLookup({
-        data: { twilio_data: { sid: "AC1" }, key: "K", token: "S" },
-        error: null,
-      }),
+      supabaseClient: {},
       user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockRejectedValueOnce(new Error("denied"));

@@ -1,11 +1,12 @@
 import { data as routeData } from "react-router";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import type { Json } from "@/lib/database.types";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers } = await verifyAuth(request);
   const url = new URL(request.url);
   const search = new URLSearchParams(url.search);
   const ref = search.get("ref") || null;
@@ -18,21 +19,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   let campaignType;
   if (ref) {
-    const { data: campaign } = await supabaseClient
-      .from("campaign")
-      .select("type")
-      .eq("id", Number(ref) || 0)
-      .eq("workspace", workspaceId)
-      .single();
+    const campaign = await findCampaignInWorkspace(workspaceId, Number(ref) || 0);
     campaignType = campaign?.type;
   }
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (workspaceError) {
-    return routeData({ workspace: null, error: workspaceError }, { headers });
+  const workspaceData = await getWorkspaceById(workspaceId);
+  if (!workspaceData) {
+    return routeData({ workspace: null, error: "Workspace not found" }, { headers, status: 404 });
   }
 
   return routeData(

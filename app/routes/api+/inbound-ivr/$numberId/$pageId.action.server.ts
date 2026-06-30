@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { loadInboundIvrPageContext } from "@/lib/inbound-ivr-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
@@ -12,7 +13,10 @@ interface Script {
 }
 
 export const action = async ({ params, request }: ActionFunctionArgs) => {
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  const supabase = createClient<Database>(
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
+  );
   const twiml = new Twilio.twiml.VoiceResponse();
   const { numberId, pageId } = params as { numberId: string; pageId: string };
   const formData = await request.formData();
@@ -34,35 +38,17 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   }
 
   try {
-    const { data: number } = await supabase
-      .from("workspace_number")
-      .select("id, inbound_script_id")
-      .eq("id", Number(numberId))
-      .single();
+    const context = await loadInboundIvrPageContext(Number(numberId));
 
-    if (!number?.inbound_script_id) {
+    if (!context) {
       twiml.say("There was an error in the IVR flow. Goodbye.");
       twiml.hangup();
       return new Response(twiml.toString(), {
-        headers: { "Content-Type": "application/xml" },
+        headers: { "Content-Type": "text/xml" },
       });
     }
 
-    const { data: script } = await supabase
-      .from("script")
-      .select("steps")
-      .eq("id", number.inbound_script_id)
-      .single();
-
-    const steps = script?.steps as Script | null | undefined;
-    if (!steps?.pages) {
-      twiml.say("There was an error in the IVR flow. Goodbye.");
-      twiml.hangup();
-      return new Response(twiml.toString(), {
-        headers: { "Content-Type": "application/xml" },
-      });
-    }
-
+    const steps = context.steps as Script;
     const currentPage = steps.pages[pageId];
     if (currentPage && currentPage.blocks.length > 0) {
       const firstBlockId = currentPage.blocks[0];
@@ -78,7 +64,6 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   }
 
   return new Response(twiml.toString(), {
-    headers: { "Content-Type": "application/xml" },
+    headers: { "Content-Type": "text/xml" },
   });
-
 };

@@ -14,6 +14,11 @@ import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
+import {
+  findOutreachAttemptWithCampaignType,
+  updateOutreachAttemptForWorkspace,
+  upsertCallBySid,
+} from "@/lib/telephony-db.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -41,33 +46,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const underCaseData = twilioParamsToUnderCase(params);
   const updateData = buildCallUpsertFromTwilioParams(params);
 
-  const { data, error } = await supabase
-    .from("call")
-    .upsert([updateData], { onConflict: "sid" })
-    .select();
-  if (error) {
-    logger.error("Error updating call:", error);
+  const callRow = await upsertCallBySid(updateData);
+  if (!callRow) {
+    logger.error("Error updating call:", { sid: updateData.sid });
     return routeData({ success: false, error: "Failed to update call" }, { status: 500 });
   }
 
-  const callRow = data?.[0];
-  const { outreachAttemptId, workspaceId } = callRow
-    ? await resolveCallOutreachContext(supabase, callRow)
-    : { outreachAttemptId: undefined, workspaceId: undefined };
+  const { outreachAttemptId, workspaceId } = await resolveCallOutreachContext(
+    supabase,
+    callRow,
+  );
 
-  const { data: currentAttempt, error: fetchError } =
-    outreachAttemptId != null
-      ? await supabase
-          .from("outreach_attempt")
-          .select("disposition, contact_id, workspace, campaign(type)")
-          .eq("id", outreachAttemptId)
-          .single()
-      : { data: null, error: null };
-
-  if (outreachAttemptId != null && fetchError) {
-    logger.error("Error fetching current attempt:", fetchError);
-    return routeData({ success: false, error: "Failed to fetch current attempt" }, { status: 500 });
-  }
+  const currentAttempt =
+    outreachAttemptId != null && workspaceId
+      ? await findOutreachAttemptWithCampaignType(workspaceId, outreachAttemptId)
+      : null;
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
   if (currentAttempt) {
@@ -82,16 +75,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const nextDisposition = String(underCaseData.call_status || "").toLowerCase();
-  if (outreachAttemptId != null && nextDisposition) {
+  if (outreachAttemptId != null && workspaceId && nextDisposition) {
     const currentDisposition = currentAttempt?.disposition ?? null;
     if (canTransitionOutreachDisposition(currentDisposition, nextDisposition)) {
-      const { error: updateError } = await supabase
-        .from("outreach_attempt")
-        .update({ disposition: nextDisposition })
-        .eq("id", outreachAttemptId);
+      const result = await updateOutreachAttemptForWorkspace(
+        workspaceId,
+        outreachAttemptId,
+        { disposition: nextDisposition },
+      );
 
-      if (updateError) {
-        logger.error("Error updating attempt:", updateError);
+      if (result instanceof Response) {
+        logger.error("Error updating attempt:", result.statusText);
         return routeData({ success: false, error: "Failed to update attempt" }, { status: 500 });
       }
     } else {
@@ -113,15 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         Number(underCaseData.duration) || 0,
         Number(underCaseData.call_duration) || 0,
       );
-      const campaignType =
-        currentAttempt &&
-        typeof currentAttempt === "object" &&
-        "campaign" in currentAttempt &&
-        currentAttempt.campaign &&
-        typeof currentAttempt.campaign === "object" &&
-        "type" in currentAttempt.campaign
-          ? String(currentAttempt.campaign.type)
-          : null;
+      const campaignType = currentAttempt?.campaign?.type ?? null;
       const billingKind = voiceBillingKindFromCampaignType(campaignType);
       const billingUnits = billingUnitsFromCallDurationSeconds(duration, billingKind);
       const note = currentAttempt
@@ -134,7 +120,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         note,
         idempotencyKey: callKey(updateData.sid, billingKind),
         callSid: updateData.sid,
-        campaignId: callRow?.campaign_id ?? null,
+        campaignId: callRow.campaign_id ?? null,
       });
     }
   }

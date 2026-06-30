@@ -1,11 +1,11 @@
 import { data as routeData } from "react-router";
-import { handleNewAudience } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
   const campaignId = params.campaign_id;
@@ -21,15 +21,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const { data: campaignData, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select()
-    .eq("id", parseInt(campaignId))
-    .eq("workspace", workspaceId)
-    .single();
+  const campaignData = await findCampaignInWorkspace(workspaceId, parseInt(campaignId, 10));
 
-  if (campaignError) {
-    return routeData({ campaign: null, error: campaignError }, { headers });
+  if (!campaignData) {
+    return routeData({ campaign: null, error: "Campaign not found" }, { headers, status: 404 });
   }
 
   return routeData({ campaign: campaignData, error: null }, { headers });

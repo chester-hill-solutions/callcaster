@@ -1,11 +1,11 @@
 import { data as routeData } from "react-router";
-import { formatDateToLocale } from "@/lib/utils";
 import { getUserRole } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
+import { listWorkspaceScriptsApi } from "@/lib/platform-data.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { Json , Database } from "@/lib/database.types";
 import type { LoaderFunctionArgs } from "react-router";
-import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "@/lib/types";
 
 type Script = {
@@ -39,8 +39,6 @@ type LoaderData =
       userRole: Database["public"]["Enums"]["workspace_role"];
     };
 
-// ActionData inferred from action's return via typeof action
-
 export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -57,22 +55,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const roleResult = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user, workspaceId: workspaceId as string });
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
+  const roleResult = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as User, workspaceId: workspaceId as string });
+  const workspace = await getWorkspaceById(workspaceId);
+  const scriptsResult = await listWorkspaceScriptsApi(supabaseClient, workspaceId);
 
-  const { data: scripts, error: scriptsError } = await supabaseClient
-    .from("script")
-    .select()
-    .eq("workspace", workspaceId);
-
-  if (scriptsError || workspaceError) {
-    const errorMessage = [scriptsError, workspaceError]
-      .filter((e): e is PostgrestError => e !== null)
-      .map((error) => error.message)
+  if (!scriptsResult.ok || !workspace) {
+    const errorMessage = [
+      !workspace ? "Workspace not found" : null,
+      !scriptsResult.ok ? scriptsResult.error : null,
+    ]
+      .filter((message): message is string => message !== null)
       .join(", ");
 
     return routeData<LoaderData>(
@@ -81,9 +73,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         error: errorMessage,
         userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null,
       },
-      { headers },
+      { headers, status: !workspace ? 404 : scriptsResult.ok ? 200 : scriptsResult.status },
     );
   }
 
-  return routeData<LoaderData>({ scripts, workspace, error: null, userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null }, { headers });
+  return routeData<LoaderData>({
+    scripts: scriptsResult.scripts as Script[],
+    workspace: { id: workspace.id, name: workspace.name },
+    error: null,
+    userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null,
+  }, { headers });
 }

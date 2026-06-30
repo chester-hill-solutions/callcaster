@@ -1,17 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
+import { getHandsetNumberForWorkspace } from "@/lib/database.server";
+import { findActiveHandsetSession } from "@/lib/handset/handset-session.server";
 import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
-import Twilio from 'twilio';
+import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 
 function isAValidPhoneNumber(number: string): boolean {
   return /^[\d+\-() ]+$/.test(number);
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
   const formData = await request.formData();
   const toNumber = (formData.get("To") as string) ?? "";
   const workspaceId = formData.get("workspace_id") as string | null;
@@ -20,25 +19,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
 
   // Handset outbound: validate session and use workspace handset number as callerId
-  if (
-    workspaceId &&
-    clientIdentity &&
-    toNumber &&
-    isPhoneNumber(toNumber)
-  ) {
-    const supabase = createClient<Database>(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY()
-    );
-    const now = new Date().toISOString();
-    const { data: session } = await supabase
-      .from("handset_session")
-      .select("workspace_id")
-      .eq("workspace_id", workspaceId)
-      .eq("client_identity", clientIdentity)
-      .eq("status", "active")
-      .gt("expires_at", now)
-      .maybeSingle();
+  if (workspaceId && clientIdentity && toNumber && isPhoneNumber(toNumber)) {
+    const session = await findActiveHandsetSession({ workspaceId, clientIdentity });
 
     if (!session) {
       logger.warn("Handset outbound: no active session", {
@@ -51,24 +33,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
 
-    const { data: handset } = await supabase
-      .from("workspace_number")
-      .select("phone_number")
-      .eq("workspace", workspaceId)
-      .eq("handset_enabled", true)
-      .limit(1)
-      .maybeSingle();
-
-    const callerId =
-      handset?.phone_number ??
-      (
-        await supabase
-          .from("workspace_number")
-          .select("phone_number")
-          .eq("workspace", workspaceId)
-          .limit(1)
-          .maybeSingle()
-      ).data?.phone_number;
+    const { data: handset } = await getHandsetNumberForWorkspace({ workspaceId });
+    const callerId = handset?.phone_number;
 
     if (!callerId || !isPhoneNumber(callerId)) {
       twiml.say("No caller ID is configured for this workspace.");
@@ -86,12 +52,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       transcribe: true,
       transcribeCallback: `${baseUrl}/api/transcribe`,
     } as Record<string, unknown>);
-    dial.number({
-      machineDetection: "Enable",
-      amdStatusCallback: `${baseUrl}/api/dial/status`,
-      statusCallback: `${baseUrl}/api/call-status/`,
-      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
-    }, normalizedTo);
+    dial.number(
+      {
+        machineDetection: "Enable",
+        amdStatusCallback: `${baseUrl}/api/dial/status`,
+        statusCallback: `${baseUrl}/api/call-status/`,
+        statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+      },
+      normalizedTo,
+    );
     return new Response(twiml.toString(), {
       headers: { "Content-Type": "text/xml" },
     });
@@ -115,4 +84,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" },
   });
-}
+};
