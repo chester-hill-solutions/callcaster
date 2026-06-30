@@ -2,6 +2,13 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createSupabaseRealtimeMock } from "./hooks-test-helpers";
 
+const messagingMocks = vi.hoisted(() => ({
+  fetchConversationSummaries: vi.fn(),
+  markConversationRead: vi.fn().mockResolvedValue(undefined),
+  fetchCampaignQueueItemWithContact: vi.fn(),
+}));
+
+vi.mock("@/lib/chats/messaging-client", () => messagingMocks);
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
@@ -129,26 +136,23 @@ describe("realtime hooks", () => {
   });
 
   test("useConversationSummaryRealTime refreshes and updates unread", async () => {
+    messagingMocks.fetchConversationSummaries.mockResolvedValue([
+      {
+        contact_phone: "+15551111111",
+        user_phone: "+15550000000",
+        conversation_start: new Date().toISOString(),
+        conversation_last_update: new Date().toISOString(),
+        message_count: 1,
+        unread_count: 2,
+        contact_firstname: "",
+        contact_surname: "",
+      },
+    ]);
+
     const { useConversationSummaryRealTime } = await import(
       "@/hooks/realtime/useChatRealtime"
     );
     const { supabase, emitPayload } = createSupabaseRealtimeMock();
-
-    supabase.rpc = vi.fn().mockResolvedValue({
-      data: [
-        {
-          contact_phone: "+15551111111",
-          user_phone: "+15550000000",
-          conversation_start: new Date().toISOString(),
-          conversation_last_update: new Date().toISOString(),
-          message_count: 1,
-          unread_count: 2,
-          contact_firstname: "",
-          contact_surname: "",
-        },
-      ],
-      error: null,
-    });
 
     const initial = [
       {
@@ -175,7 +179,7 @@ describe("realtime hooks", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(supabase.rpc).toHaveBeenCalled();
+    expect(messagingMocks.fetchConversationSummaries).toHaveBeenCalled();
 
     act(() => {
       emitPayload({
@@ -211,22 +215,14 @@ describe("realtime hooks", () => {
   });
 
   test("useSupabaseRealtime routes table events", async () => {
+    messagingMocks.fetchCampaignQueueItemWithContact.mockResolvedValue({
+      id: 9,
+      campaign_id: 1,
+      contact: { id: 9, phone: "+1" },
+    });
+
     const { useSupabaseRealtime } = await import("@/hooks/realtime/useSupabaseRealtime");
     const { supabase, emitPayload, emitStatus } = createSupabaseRealtimeMock();
-
-    const hydrateSelect = vi.fn(() => ({
-      eq: vi.fn(() => ({
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: {
-            id: 9,
-            campaign_id: 1,
-            contact: { id: 9, phone: "+1" },
-          },
-          error: null,
-        }),
-      })),
-    }));
-    supabase.from = vi.fn(() => ({ select: hydrateSelect, update: vi.fn() }));
 
     const user = { id: "user-1" };
     const init = {
@@ -301,7 +297,7 @@ describe("realtime hooks", () => {
       emitStatus("CHANNEL_ERROR");
       emitStatus("TIMED_OUT");
     });
-    await waitFor(() => expect(hydrateSelect).toHaveBeenCalled());
+    await waitFor(() => expect(messagingMocks.fetchCampaignQueueItemWithContact).toHaveBeenCalled());
 
     act(() => result.current.setDisposition("answered"));
     expect(result.current.disposition).toBe("answered");

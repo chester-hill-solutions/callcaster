@@ -129,7 +129,11 @@ export default function AudienceView() {
             <h2 className="font-Zilla-Slab text-xl font-semibold mb-4 text-brand-primary dark:text-white">
               Upload History
             </h2>
-            <AudienceUploadHistory audienceId={Number(audience_id)} />
+            <AudienceUploadHistory
+              audienceId={Number(audience_id)}
+              workspaceId={workspace_id}
+              supabase={supabase}
+            />
           </div>
         </TabsContent>
       </Tabs>

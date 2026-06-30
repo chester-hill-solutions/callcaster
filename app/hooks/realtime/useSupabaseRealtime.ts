@@ -4,6 +4,7 @@ import { useQueue } from "@/hooks/queue/useQueue";
 import { useAttempts } from "@/hooks/queue/useAttempts";
 import { useCalls } from "@/hooks/queue/useCalls";
 import { usePhoneNumbers } from "@/hooks/phone/usePhoneNumbers";
+import { fetchCampaignQueueItemWithContact } from "@/lib/chats/messaging-client";
 import { QueueItem, User as AppUser, OutreachAttempt, Call, Contact } from "@/lib/types";
 import { Database, Tables } from "@/lib/database.types";
 import { logger } from "@/lib/logger.client";
@@ -302,37 +303,30 @@ export const useSupabaseRealtime = ({
               return;
             }
 
-            void supabase
-              .from("campaign_queue")
-              .select("*, contact(*)")
-              .eq("id", queueItem.id)
-              .maybeSingle()
-              .then(
-                ({ data, error }) => {
-                  if (error) {
-                    logger.error("Failed to hydrate queue item from realtime payload", error);
-                    return;
-                  }
+            void fetchCampaignQueueItemWithContact(
+              campaignIdRef.current,
+              queueItem.id,
+            ).then(
+              (data) => {
+                if (data?.contact) {
+                  updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
+                  return;
+                }
 
-                  if (data?.contact) {
-                    updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
-                    return;
-                  }
-
-                  const existingContact =
-                    queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
-                  if (existingContact) {
-                    updateQueue({
-                      new: {
-                        ...queueItem,
-                        contact: existingContact,
-                      } as Tables<"campaign_queue"> & { contact: Contact },
-                    });
-                  }
-                },
-                (err: unknown) =>
-                  logger.error("Failed to hydrate queue item from realtime payload", err)
-              );
+                const existingContact =
+                  queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
+                if (existingContact) {
+                  updateQueue({
+                    new: {
+                      ...queueItem,
+                      contact: existingContact,
+                    } as Tables<"campaign_queue"> & { contact: Contact },
+                  });
+                }
+              },
+              (err: unknown) =>
+                logger.error("Failed to hydrate queue item from realtime payload", err),
+            );
           }
           break;
         case "workspace_number":

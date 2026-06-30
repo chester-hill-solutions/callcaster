@@ -1,7 +1,8 @@
-import { data as routeData, redirect } from "react-router";
-import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import { data as routeData } from "react-router";
+import { requireWorkspaceAccess, updateContact } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { createTenantDb } from "@/server/tenant-db";
 import type { ActionFunctionArgs } from "react-router";
 
 export type ContactFormData = {
@@ -30,10 +31,9 @@ export const action = async ({
   }
 
   try {
-    const { supabaseClient, user } = await verifyAuth(request);
+    const { user } = await verifyAuth(request);
 
     await requireWorkspaceAccess({
-      supabaseClient,
       user: { id: user.id },
       workspaceId: workspace_id,
     });
@@ -54,30 +54,25 @@ export const action = async ({
       workspace: workspace_id,
     };
 
-    if (selected_id === "new") {
-      const { data: newContact, error: createError } = await supabaseClient
-        .from("contact")
-        .insert(contactData)
-        .select()
-        .single();
+    const tdb = createTenantDb(workspace_id);
 
-      if (createError) {
-        throw createError;
+    if (selected_id === "new") {
+      const { workspace: _workspace, id: _id, ...insertValues } = contactData;
+      const [newContact] = await tdb.contact.insert(insertValues);
+
+      if (!newContact) {
+        throw new Error("Failed to create contact");
       }
 
       return routeData({ success: true, contact: newContact });
     }
 
-    const { data: updatedContact, error: updateError } = await supabaseClient
-      .from("contact")
-      .update(contactData)
-      .eq("id", Number(selected_id))
-      .select()
-      .single();
-
-    if (updateError) {
-      throw updateError;
-    }
+    const contactId = Number(selected_id);
+    const { workspace: _workspace, ...updateValues } = contactData;
+    const updatedContact = await updateContact(workspace_id, {
+      ...updateValues,
+      id: contactId,
+    });
 
     return routeData({ success: true, contact: updatedContact });
   } catch (error) {

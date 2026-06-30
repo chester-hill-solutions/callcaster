@@ -12,6 +12,15 @@ const supabaseJsMocks = vi.hoisted(() => {
   return { rejectApiKeyLastUsedUpdate: false };
 });
 
+const workspaceMembersMocks = vi.hoisted(() => ({
+  apiKeyRow: null as null | {
+    id: string;
+    workspace_id: string;
+    key_hash: string;
+  },
+  touchWorkspaceApiKeyLastUsed: vi.fn(),
+}));
+
 let sessionUser: any = null;
 let sessionError: any = null;
 
@@ -28,38 +37,22 @@ vi.mock("@/lib/supabase.server", () => {
   };
 });
 
-let apiKeyRow: any = null;
-let apiKeyRowError: any = null;
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  findWorkspaceApiKeyByPrefix: async () => workspaceMembersMocks.apiKeyRow,
+  touchWorkspaceApiKeyLastUsed: (...args: unknown[]) => {
+    if (supabaseJsMocks.rejectApiKeyLastUsedUpdate) {
+      return Promise.reject(new Error("update failed"));
+    }
+    return workspaceMembersMocks.touchWorkspaceApiKeyLastUsed(...args);
+  },
+  getUserById: vi.fn(),
+}));
 
 vi.mock("@supabase/supabase-js", () => {
   return {
-    createClient: () => {
-      return {
-        from: (table: string) => {
-          if (table !== "workspace_api_key") {
-            throw new Error(`unexpected table ${table}`);
-          }
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: apiKeyRow, error: apiKeyRowError }),
-              }),
-            }),
-            update: () => ({
-              eq: () => ({
-                then: (resolve: any, reject: any) =>
-                  (supabaseJsMocks.rejectApiKeyLastUsedUpdate
-                    ? Promise.reject(new Error("update failed"))
-                    : Promise.resolve({ data: null, error: null })
-                  ).then(resolve, reject),
-                catch: (reject: any) =>
-                  Promise.resolve({ data: null, error: null }).catch(reject),
-              }),
-            }),
-          };
-        },
-      };
-    },
+    createClient: () => ({
+      auth: { persistSession: false },
+    }),
   };
 });
 
@@ -79,20 +72,19 @@ describe("verifyApiKeyOrSession", () => {
 
     sessionUser = null;
     sessionError = null;
-    apiKeyRow = null;
-    apiKeyRowError = null;
+    workspaceMembersMocks.apiKeyRow = null;
+    workspaceMembersMocks.touchWorkspaceApiKeyLastUsed.mockReset();
     supabaseJsMocks.rejectApiKeyLastUsedUpdate = false;
   });
 
   test("accepts X-API-Key header", async () => {
     const key = `cc_${"a".repeat(30)}`;
     const keyPrefix = key.slice(0, API_KEY_PREFIX_LENGTH);
-    apiKeyRow = {
-      id: 1,
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-1",
       workspace_id: "w1",
       key_hash: hashApiKeyForStorage(key),
     };
-    apiKeyRowError = null;
 
     const req = new Request("http://localhost/api/chat_sms", {
       headers: { "X-API-Key": key },
@@ -103,18 +95,17 @@ describe("verifyApiKeyOrSession", () => {
       authType: "api_key",
       workspaceId: "w1",
     });
-    expect(apiKeyRow).toMatchObject({ key_hash: hashApiKeyForStorage(key) });
+    expect(workspaceMembersMocks.apiKeyRow).toMatchObject({ key_hash: hashApiKeyForStorage(key) });
     expect(keyPrefix.length).toBe(API_KEY_PREFIX_LENGTH);
   });
 
   test("accepts Authorization: Bearer header", async () => {
     const key = `cc_${"b".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-1",
       workspace_id: "w2",
       key_hash: hashApiKeyForStorage(key),
     };
-    apiKeyRowError = null;
 
     const req = new Request("http://localhost/api/chat_sms", {
       headers: { Authorization: `Bearer ${key}` },
@@ -129,8 +120,7 @@ describe("verifyApiKeyOrSession", () => {
 
   test("rejects unknown API key prefix", async () => {
     const key = `cc_${"c".repeat(30)}`;
-    apiKeyRow = null;
-    apiKeyRowError = new Error("not found");
+    workspaceMembersMocks.apiKeyRow = null;
 
     const req = new Request("http://localhost/api/chat_sms", {
       headers: { "X-API-Key": key },
@@ -142,12 +132,11 @@ describe("verifyApiKeyOrSession", () => {
 
   test("rejects hash mismatch", async () => {
     const key = `cc_${"d".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-1",
       workspace_id: "w1",
       key_hash: hashApiKeyForStorage(`cc_${"x".repeat(30)}`),
     };
-    apiKeyRowError = null;
 
     const req = new Request("http://localhost/api/chat_sms", {
       headers: { "X-API-Key": key },
@@ -159,12 +148,11 @@ describe("verifyApiKeyOrSession", () => {
 
   test("rejects when stored hash has unexpected length (secureCompare length mismatch)", async () => {
     const key = `cc_${"f".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-1",
       workspace_id: "w1",
       key_hash: "too-short",
     };
-    apiKeyRowError = null;
 
     const req = new Request("http://localhost/api/chat_sms", {
       headers: { "X-API-Key": key },
@@ -188,12 +176,11 @@ describe("verifyApiKeyOrSession", () => {
 
   test("API key auth still succeeds even if last_used_at update fails", async () => {
     const key = `cc_${"e".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-1",
       workspace_id: "w1",
       key_hash: hashApiKeyForStorage(key),
     };
-    apiKeyRowError = null;
     supabaseJsMocks.rejectApiKeyLastUsedUpdate = true;
 
     const req = new Request("http://localhost/api/chat_sms", {
@@ -225,4 +212,3 @@ describe("verifyApiKeyOrSession", () => {
     });
   });
 });
-

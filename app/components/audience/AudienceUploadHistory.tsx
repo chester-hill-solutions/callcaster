@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import { useOutletContext } from "react-router";
 import { formatDistanceToNow } from "date-fns";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { fetchAudienceUploads } from "@/lib/chats/messaging-client";
 import { Loader2 } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
@@ -9,6 +9,8 @@ import { logger } from "@/lib/logger.client";
 
 interface AudienceUploadHistoryProps {
   audienceId: number;
+  workspaceId: string;
+  supabase: SupabaseClient<Database>;
 }
 
 interface AudienceUpload {
@@ -24,63 +26,47 @@ interface AudienceUpload {
   error_message: string | null;
 }
 
-type OutletContext = {
-  supabase: SupabaseClient<Database>;
-  env: {
-    SUPABASE_URL: string;
-    SUPABASE_KEY: string;
-    BASE_URL: string;
-  };
-};
-
-export default function AudienceUploadHistory({ audienceId }: AudienceUploadHistoryProps) {
-  const { supabase } = useOutletContext<OutletContext>();
+export default function AudienceUploadHistory({
+  audienceId,
+  workspaceId,
+  supabase,
+}: AudienceUploadHistoryProps) {
   const [uploads, setUploads] = useState<AudienceUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchUploads = useCallback(async () => {
-    if (!audienceId) return;
-    
+    if (!audienceId || !workspaceId) return;
+
     try {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
-        .from("audience_upload")
-        .select("*")
-        .eq("audience_id", audienceId)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      setUploads(data || []);
+      const data = await fetchAudienceUploads(workspaceId, audienceId);
+      setUploads(data as AudienceUpload[]);
     } catch (err) {
       logger.error("Error fetching audience uploads:", err);
       setError(err instanceof Error ? err.message : "An error occurred while fetching uploads");
     } finally {
       setLoading(false);
     }
-  }, [supabase, audienceId]);
+  }, [workspaceId, audienceId]);
 
   useEffect(() => {
     fetchUploads();
   }, [fetchUploads]);
 
-  // Use the reusable subscription hook for real-time updates
+  // Phase 3B: Supabase Realtime subscription for live upload progress updates.
   useSupabaseRealtimeSubscription({
     supabase,
     table: "audience_upload",
     filter: `audience_id=eq.${audienceId}`,
     onChange: (payload) => {
-      // More efficient update that doesn't require a full refetch
       if (payload.eventType === "INSERT" && payload.new) {
         setUploads(prev => [payload.new as unknown as AudienceUpload, ...prev]);
       } else if (payload.eventType === "UPDATE" && payload.new) {
         const newData = payload.new as Partial<AudienceUpload> & { id?: number };
-        setUploads(prev => 
-          prev.map(upload => 
+        setUploads(prev =>
+          prev.map(upload =>
             newData.id && upload.id === newData.id ? { ...upload, ...newData } : upload
           )
         );
@@ -104,8 +90,8 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
       <div className="p-4 border border-red-300 rounded-md bg-red-50 text-red-700">
         <p className="font-semibold">Error loading upload history</p>
         <p className="text-sm">{error}</p>
-        <button 
-          onClick={() => fetchUploads()} 
+        <button
+          onClick={() => fetchUploads()}
           className="mt-2 text-sm underline hover:text-red-900"
         >
           Try again
@@ -124,16 +110,16 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
 
   function formatFileSize(bytes: number | null): string {
     if (bytes === null) return "Unknown";
-    
+
     const units = ["B", "KB", "MB", "GB"];
     let size = bytes;
     let unitIndex = 0;
-    
+
     while (size >= 1024 && unitIndex < units.length - 1) {
       size /= 1024;
       unitIndex++;
     }
-    
+
     return `${size.toFixed(1)} ${units[unitIndex]}`;
   }
 
@@ -197,11 +183,11 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
                         <span className="ml-2 text-red-500" title={upload.error_message}>⚠️</span>
                       )}
                     </span>
-                    
+
                     {upload.status === "processing" && (
                       <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 rounded-full" 
+                        <div
+                          className="h-full bg-blue-500 rounded-full"
                           style={{ width: `${getProgressPercentage(upload)}%` }}
                         ></div>
                       </div>
@@ -209,8 +195,8 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {upload.status === "completed" 
-                    ? upload.total_contacts 
+                  {upload.status === "completed"
+                    ? upload.total_contacts
                     : `${upload.processed_contacts} / ${upload.total_contacts}`}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -223,4 +209,4 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
       </div>
     </div>
   );
-} 
+}

@@ -490,6 +490,76 @@ export async function fetchCampaignQueuePage(args: {
   return { items, totalCount };
 }
 
+export async function fetchCampaignQueueItemWithContact(args: {
+  campaignId: number;
+  queueId: number;
+}): Promise<CampaignQueueApiItem | null> {
+  const queueRows = await db
+    .select()
+    .from(campaignQueueTable)
+    .where(
+      and(
+        eq(campaignQueueTable.id, args.queueId),
+        eq(campaignQueueTable.campaign_id, args.campaignId),
+      ),
+    )
+    .limit(1);
+
+  const queueRow = queueRows[0];
+  if (!queueRow) {
+    return null;
+  }
+
+  const contactIds = [queueRow.contact_id];
+  const campaignIdNum = args.campaignId;
+
+  const [contacts, attempts, audienceLinks] = await Promise.all([
+    db.select().from(contactTable).where(inArray(contactTable.id, contactIds)),
+    db
+      .select({
+        id: outreachAttemptTable.id,
+        disposition: outreachAttemptTable.disposition,
+        campaign_id: outreachAttemptTable.campaign_id,
+        contact_id: outreachAttemptTable.contact_id,
+      })
+      .from(outreachAttemptTable)
+      .where(
+        and(
+          inArray(outreachAttemptTable.contact_id, contactIds),
+          eq(outreachAttemptTable.campaign_id, campaignIdNum),
+        ),
+      ),
+    db
+      .select({
+        contact_id: contactAudienceTable.contact_id,
+        audience_id: contactAudienceTable.audience_id,
+        name: audienceTable.name,
+      })
+      .from(contactAudienceTable)
+      .leftJoin(audienceTable, eq(contactAudienceTable.audience_id, audienceTable.id))
+      .where(inArray(contactAudienceTable.contact_id, contactIds)),
+  ]);
+
+  const contact = contacts[0];
+  if (!contact) {
+    return null;
+  }
+
+  const attemptsForContact = attempts.filter((attempt) => attempt.contact_id === queueRow.contact_id);
+  const audiencesForContact = audienceLinks
+    .filter((link) => link.contact_id === queueRow.contact_id)
+    .map((link) => ({ audience: { name: link.name } }));
+
+  return {
+    ...queueRow,
+    contact: {
+      ...contact,
+      outreach_attempt: attemptsForContact,
+      contact_audience: audiencesForContact,
+    },
+  };
+}
+
 /** Map Drizzle hydration shape to queue UI (`contact.audiences` from nested links). */
 export function mapCampaignQueueItemForUi(item: CampaignQueueApiItem) {
   return {

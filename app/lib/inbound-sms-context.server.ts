@@ -1,10 +1,17 @@
 import { data as routeData } from "react-router";
+import { eq, or, sql } from "drizzle-orm";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  webhook as webhookTable,
+  workspace as workspaceTable,
+  workspace_number as workspaceNumberTable,
+} from "@/db/schema";
 import type { Database } from "@/lib/database.types";
 import { findPotentialContacts } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { adminDb } from "@/server/admin-db";
 
 export type InboundWorkspaceContext = {
   workspace: string;
@@ -29,10 +36,14 @@ function normalizeInboundToNumber(raw: string): string {
   }
 }
 
-async function lookupWorkspaceNumberByPhone(
-  supabase: SupabaseClient<Database>,
-  phone: string,
-): Promise<
+async function loadWebhooksForWorkspace(workspaceId: string) {
+  return adminDb
+    .select()
+    .from(webhookTable)
+    .where(eq(webhookTable.workspace, workspaceId));
+}
+
+async function lookupWorkspaceNumberByPhone(phone: string): Promise<
   | { ok: true; ctx: InboundWorkspaceContext }
   | { ok: false; error: unknown }
   | { ok: false; notFound: true }
@@ -41,34 +52,58 @@ async function lookupWorkspaceNumberByPhone(
     return { ok: false, notFound: true };
   }
 
-  const { data, error } = await supabase
-    .from("workspace_number")
-    .select(
-      `
-        workspace,
-        ...workspace!inner(twilio_data, webhook(*))`,
-    )
-    .eq("phone_number", phone)
-    .maybeSingle();
+  try {
+    const [row] = await adminDb
+      .select({
+        workspaceId: workspaceNumberTable.workspace,
+        twilioData: workspaceTable.twilio_data,
+      })
+      .from(workspaceNumberTable)
+      .innerJoin(workspaceTable, eq(workspaceNumberTable.workspace, workspaceTable.id))
+      .where(eq(workspaceNumberTable.phone_number, phone))
+      .limit(1);
 
-  if (error) {
+    if (!row?.workspaceId) {
+      return { ok: false, notFound: true };
+    }
+
+    const webhooks = await loadWebhooksForWorkspace(row.workspaceId);
+
+    return {
+      ok: true,
+      ctx: {
+        workspace: row.workspaceId,
+        twilio_data: row.twilioData as InboundWorkspaceContext["twilio_data"],
+        webhook: webhooks as InboundWorkspaceContext["webhook"],
+      },
+    };
+  } catch (error) {
     return { ok: false, error };
   }
+}
 
-  if (!data) {
-    return { ok: false, notFound: true };
-  }
-
-  return { ok: true, ctx: data as unknown as InboundWorkspaceContext };
+async function findWorkspacesByMessagingServiceSid(msSid: string) {
+  return adminDb
+    .select({
+      id: workspaceTable.id,
+      twilio_data: workspaceTable.twilio_data,
+    })
+    .from(workspaceTable)
+    .where(
+      or(
+        sql`${workspaceTable.twilio_data}->'portalConfig'->>'messagingServiceSid' = ${msSid}`,
+        sql`${workspaceTable.twilio_data}->'onboarding'->'messagingService'->>'serviceSid' = ${msSid}`,
+      ),
+    );
 }
 
 export async function findMatchingContactIds(
-  supabase: SupabaseClient<Database>,
+  supabase: SupabaseClient<Database> | null,
   workspaceId: string,
   phoneNumber: string,
 ): Promise<number[]> {
   const { data: contacts, error } = await findPotentialContacts(
-    supabase,
+    supabase as SupabaseClient<Database>,
     phoneNumber,
     workspaceId,
   );
@@ -88,7 +123,6 @@ export async function findMatchingContactIds(
 }
 
 export async function resolveInboundWorkspaceContext(
-  supabase: SupabaseClient<Database>,
   args: { toRaw: string; messagingServiceSid: string },
 ): Promise<
   | { ok: true; ctx: InboundWorkspaceContext; attributionPath: string }
@@ -100,7 +134,7 @@ export async function resolveInboundWorkspaceContext(
   for (const candidate of new Set(
     [normalizedTo, rawTrimmed].filter((value) => Boolean(value)),
   )) {
-    const result = await lookupWorkspaceNumberByPhone(supabase, candidate);
+    const result = await lookupWorkspaceNumberByPhone(candidate);
     if (result.ok) {
       return {
         ok: true,
@@ -138,60 +172,52 @@ export async function resolveInboundWorkspaceContext(
     return { ok: false, response: routeData({ error: "Number not found" }, { status: 404 }) };
   }
 
-  const { data: workspaces, error: workspaceError } = await supabase
-    .from("workspace")
-    .select("id, twilio_data, webhook(*)")
-    .or(
-      `twilio_data->portalConfig->>messagingServiceSid.eq.${msSid},twilio_data->onboarding->messagingService->>serviceSid.eq.${msSid}`,
-    );
+  try {
+    const workspaces = await findWorkspacesByMessagingServiceSid(msSid);
 
-  if (workspaceError) {
+    if (!workspaces.length) {
+      logger.warn(
+        "Inbound SMS number not found; Messaging Service SID did not match any workspace",
+        {
+          messagingServiceSid: msSid,
+          toRaw: args.toRaw,
+          normalizedTo,
+        },
+      );
+      return { ok: false, response: routeData({ error: "Number not found" }, { status: 404 }) };
+    }
+
+    if (workspaces.length > 1) {
+      logger.error("Inbound SMS Messaging Service SID matched multiple workspaces", {
+        messagingServiceSid: msSid,
+        workspaceCount: workspaces.length,
+      });
+      return {
+        ok: false,
+        response: routeData(
+          { error: "Messaging service matches multiple workspaces" },
+          { status: 409 },
+        ),
+      };
+    }
+
+    const row = workspaces[0]!;
+    const webhooks = await loadWebhooksForWorkspace(row.id);
+
+    return {
+      ok: true,
+      ctx: {
+        workspace: row.id,
+        twilio_data: row.twilio_data as InboundWorkspaceContext["twilio_data"],
+        webhook: webhooks as InboundWorkspaceContext["webhook"],
+      },
+      attributionPath: "matched_by_messaging_service_sid",
+    };
+  } catch (workspaceError) {
     logger.error("Inbound SMS workspace lookup by Messaging Service SID failed", workspaceError);
     return {
       ok: false,
       response: routeData({ error: "Messaging service lookup failed" }, { status: 500 }),
     };
   }
-
-  if (!workspaces?.length) {
-    logger.warn(
-      "Inbound SMS number not found; Messaging Service SID did not match any workspace",
-      {
-        messagingServiceSid: msSid,
-        toRaw: args.toRaw,
-        normalizedTo,
-      },
-    );
-    return { ok: false, response: routeData({ error: "Number not found" }, { status: 404 }) };
-  }
-
-  if (workspaces.length > 1) {
-    logger.error("Inbound SMS Messaging Service SID matched multiple workspaces", {
-      messagingServiceSid: msSid,
-      workspaceCount: workspaces.length,
-    });
-    return {
-      ok: false,
-      response: routeData(
-        { error: "Messaging service matches multiple workspaces" },
-        { status: 409 },
-      ),
-    };
-  }
-
-  const row = workspaces[0] as {
-    id: string;
-    twilio_data: InboundWorkspaceContext["twilio_data"];
-    webhook?: InboundWorkspaceContext["webhook"];
-  };
-
-  return {
-    ok: true,
-    ctx: {
-      workspace: row.id,
-      twilio_data: row.twilio_data,
-      webhook: row.webhook ?? [],
-    },
-    attributionPath: "matched_by_messaging_service_sid",
-  };
 }

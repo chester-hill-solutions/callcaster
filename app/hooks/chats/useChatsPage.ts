@@ -22,6 +22,7 @@ import {
   sortConversationSummaries,
 } from "@/lib/chat-conversation-sort";
 import { useImageHandling } from "@/hooks/chats/useImageHandling";
+import { markConversationRead } from "@/lib/chats/messaging-client";
 import type { Contact, Workspace } from "@/lib/types";
 import type { Tables } from "@/lib/database.types";
 import { logger } from "@/lib/logger.client";
@@ -162,7 +163,6 @@ export function useChatsPage() {
     toggleContactMenu,
     isValid,
   } = useContactSearch({
-    supabase,
     workspace_id: workspace.id,
     contact_number,
     potentialContacts,
@@ -311,33 +311,22 @@ export function useChatsPage() {
     ],
   );
 
-  const markConversationRead = useCallback(
+  const markConversationReadForContact = useCallback(
     (number: string) => {
       clearUnreadCount(number);
 
-      supabase
-        .from("message")
-        .update({ status: "delivered" })
-        .eq("workspace", workspace.id)
-        .eq("status", "received")
-        .or(`from.eq.${number},to.eq.${number}`)
-        .then(
-          ({ error }) => {
-            if (error) {
-              logger.error("Error marking messages as read:", error);
-            } else {
-              window.dispatchEvent(
-                new CustomEvent("messages-read", {
-                  detail: { contactNumber: number },
-                }),
-              );
-            }
-          },
-          (err: unknown) =>
-            logger.error("Error marking messages as read:", err),
-        );
+      void markConversationRead(workspace.id, number).then(
+        () => {
+          window.dispatchEvent(
+            new CustomEvent("messages-read", {
+              detail: { contactNumber: number },
+            }),
+          );
+        },
+        (err: unknown) => logger.error("Error marking messages as read:", err),
+      );
     },
-    [clearUnreadCount, supabase, workspace.id],
+    [clearUnreadCount, workspace.id],
   );
 
   const handleContactSelect = useCallback(
@@ -346,10 +335,10 @@ export function useChatsPage() {
       if (number) {
         closeMobileConversationList();
         navigate(`./${number}`);
-        markConversationRead(number);
+        markConversationReadForContact(number);
       }
     },
-    [closeMobileConversationList, navigate, markConversationRead],
+    [closeMobileConversationList, navigate, markConversationReadForContact],
   );
 
   const handleExistingConversationClick = useCallback(
@@ -361,14 +350,14 @@ export function useChatsPage() {
       const query = search.toString();
       const path = `./${encodeURIComponent(nextPhoneNumber)}`;
       navigate(query ? `${path}?${query}` : path);
-      markConversationRead(nextPhoneNumber);
+      markConversationReadForContact(nextPhoneNumber);
     },
     [
       closeMobileConversationList,
       navigate,
       searchParams,
       hideStopConversations,
-      markConversationRead,
+      markConversationReadForContact,
     ],
   );
 

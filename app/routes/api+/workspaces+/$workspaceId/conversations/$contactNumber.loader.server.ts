@@ -1,4 +1,5 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { fetchLatestMessageForPhone } from "@/lib/message-db.server";
 import {
   getConversationMessagesApi,
   resolveDataPlaneAuth,
@@ -15,11 +16,28 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const auth = await resolveDataPlaneAuth(request, workspaceId);
   if (auth instanceof Response) return auth;
 
+  const decodedContactNumber = decodeURIComponent(contactNumber);
   const url = new URL(request.url);
+
+  if (url.searchParams.get("latest") === "1") {
+    try {
+      const latestMessage = await fetchLatestMessageForPhone(
+        workspaceId,
+        decodedContactNumber,
+      );
+      return jsonResponse({ latest_message: latestMessage }, 200);
+    } catch (error) {
+      return jsonError(
+        error instanceof Error ? error.message : "Failed to load latest message",
+        500,
+      );
+    }
+  }
+
   const result = await getConversationMessagesApi(
     auth.supabase,
     workspaceId,
-    decodeURIComponent(contactNumber),
+    decodedContactNumber,
     url.searchParams,
   );
 

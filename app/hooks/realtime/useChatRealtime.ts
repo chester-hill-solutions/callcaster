@@ -3,6 +3,10 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { Message } from "@/lib/types";
 import type { Database, Tables } from "@/lib/database.types";
 import { compareByRecentActivity } from "@/lib/chat-conversation-sort";
+import {
+  fetchConversationSummaries,
+  markConversationRead,
+} from "@/lib/chats/messaging-client";
 import { useSupabaseRealtimeSubscription } from "./useSupabaseRealtime";
 import { logger } from "@/lib/logger.client";
 
@@ -244,43 +248,29 @@ export const useConversationSummaryRealTime = ({
     lastUpdateTimeRef.current = now;
     
     try {
-      const { data, error } = await supabase.rpc("get_conversation_summary", {
-        p_workspace: workspace,
+      const data = await fetchConversationSummaries(workspace);
+      const filteredData = data.filter((item): item is ConversationSummary => item !== null);
+
+      const processedData = filteredData.map(conv => {
+        if (activeContactRef.current &&
+            phoneNumbersMatch(conv.contact_phone, activeContactRef.current)) {
+          return {
+            ...conv,
+            unread_count: 0,
+          };
+        }
+        return conv;
       });
-      if (error) {
-        logger.error("Error fetching conversation summary:", error);
-        // Don't throw, just return early to prevent breaking the UI
-        // The error is logged for debugging purposes
-        return;
-      }
-      if (data) {
-        const filteredData = data.filter((item): item is ConversationSummary => item !== null);
-        
-        // Process the data to update unread counts
-        const processedData = filteredData.map(conv => {
-          // If this is the active conversation, we can assume messages are being read
-          if (activeContactRef.current && 
-              phoneNumbersMatch(conv.contact_phone, activeContactRef.current)) {
-            return {
-              ...conv,
-              unread_count: 0 // Mark as read for the active conversation
-            };
-          }
-          return conv;
-        });
-        
-        // Sort conversations by most recent first
-        processedData.sort(compareByRecentActivity);
-        
-        setConversations(processedData);
-        
-        // Update the phone numbers set for future comparisons
-        phoneNumbersRef.current = new Set(processedData.map(conv => conv.contact_phone));
-      }
+
+      processedData.sort(compareByRecentActivity);
+      setConversations(processedData);
+      phoneNumbersRef.current = new Set(processedData.map(conv => conv.contact_phone));
+    } catch (error) {
+      logger.error("Error fetching conversation summary:", error);
     } finally {
       isFetchingRef.current = false;
     }
-  }, [supabase, workspace]);
+  }, [workspace]);
 
   // Update conversations when initial data changes
   useEffect(() => {
@@ -440,26 +430,14 @@ export const useConversationSummaryRealTime = ({
   // Mark all messages as read for the active contact
   const markConversationAsRead = useCallback(async (contactPhone: string) => {
     if (!contactPhone) return;
-    
+
     try {
-      // Update all received messages for this contact to delivered
-      const { error } = await supabase
-        .from("message")
-        .update({ status: "delivered" })
-        .eq("workspace", workspace)
-        .eq("status", "received")
-        .or(`from.eq.${contactPhone},to.eq.${contactPhone}`);
-      
-      if (error) {
-        logger.error("Error marking conversation as read:", error);
-      } else {
-        // Force refresh conversation summary to update unread counts
-        fetchConversationSummary(true);
-      }
+      await markConversationRead(workspace, contactPhone);
+      fetchConversationSummary(true);
     } catch (err) {
       logger.error("Error in markConversationAsRead:", err);
     }
-  }, [supabase, workspace, fetchConversationSummary]);
+  }, [workspace, fetchConversationSummary]);
 
   return { 
     conversations, 

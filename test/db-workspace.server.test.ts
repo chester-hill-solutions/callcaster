@@ -30,7 +30,27 @@ const tdbMocks = vi.hoisted(() => ({
   script: {
     findMany: vi.fn(),
   },
+  message: {
+    findMany: vi.fn(),
+  },
+  contact: {
+    findMany: vi.fn(),
+  },
 }));
+
+function mockConversationTenantData({
+  workspaceNumbers = [{ phone_number: "+15551111111" }],
+  messageRows = [],
+  contactRows = [],
+}: {
+  workspaceNumbers?: Array<{ phone_number: string }>;
+  messageRows?: unknown[];
+  contactRows?: unknown[];
+}) {
+  tdbMocks.workspace_number.findMany.mockResolvedValue(workspaceNumbers);
+  tdbMocks.message.findMany.mockResolvedValue(messageRows);
+  tdbMocks.contact.findMany.mockResolvedValue(contactRows);
+}
 
 describe("app/lib/database/workspace.server.ts", () => {
   beforeEach(() => {
@@ -927,117 +947,60 @@ describe("app/lib/database/workspace.server.ts", () => {
 
   test("fetchConversationSummary paginates and applies campaign filtering", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    let selectedCampaignId: number | null = null;
 
-    const messageRows = [
-      {
-        campaign_id: 1,
-        contact_id: 10,
-        date_created: "2026-03-03T00:00:00.000Z",
-        direction: "outbound",
-        from: "+15551111111",
-        status: "delivered",
-        to: "+15550000001",
-      },
-      {
-        campaign_id: 1,
-        contact_id: 10,
-        date_created: "2026-03-01T00:00:00.000Z",
-        direction: "inbound",
-        from: "+15550000001",
-        status: "received",
-        to: "+15551111111",
-      },
-      {
-        campaign_id: 1,
-        contact_id: 11,
-        date_created: "2026-03-02T00:00:00.000Z",
-        direction: "outbound",
-        from: "+15551111111",
-        status: "delivered",
-        to: "+15550000002",
-      },
-      {
-        campaign_id: 2,
-        contact_id: 12,
-        date_created: "2026-03-04T00:00:00.000Z",
-        direction: "outbound",
-        from: "+15551111111",
-        status: "delivered",
-        to: "+15550000003",
-      },
-    ];
+    mockConversationTenantData({
+      messageRows: [
+        {
+          campaign_id: 1,
+          contact_id: 10,
+          date_created: "2026-03-03T00:00:00.000Z",
+          direction: "outbound",
+          from: "+15551111111",
+          status: "delivered",
+          to: "+15550000001",
+        },
+        {
+          campaign_id: 1,
+          contact_id: 10,
+          date_created: "2026-03-01T00:00:00.000Z",
+          direction: "inbound",
+          from: "+15550000001",
+          status: "received",
+          to: "+15551111111",
+        },
+        {
+          campaign_id: 1,
+          contact_id: 11,
+          date_created: "2026-03-02T00:00:00.000Z",
+          direction: "outbound",
+          from: "+15551111111",
+          status: "delivered",
+          to: "+15550000002",
+        },
+      ],
+      contactRows: [
+        {
+          id: 10,
+          firstname: "Taylor",
+          surname: "One",
+          phone: "+15550000001",
+        },
+        {
+          id: 11,
+          firstname: "Jordan",
+          surname: "Two",
+          phone: "+15550000002",
+        },
+      ],
+    });
 
-    const workspaceNumberQuery = {
-      select: vi.fn(() => workspaceNumberQuery),
-      eq: vi.fn(() => workspaceNumberQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
-    };
-
-    const messageQuery = {
-      select: vi.fn(() => messageQuery),
-      eq: vi.fn((column: string, value: unknown) => {
-        if (column === "campaign_id") {
-          selectedCampaignId = Number(value);
-        }
-        return messageQuery;
-      }),
-      not: vi.fn(() => messageQuery),
-      neq: vi.fn(() => messageQuery),
-      order: vi.fn(() => messageQuery),
-      range: vi.fn(() => messageQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({
-          data: messageRows.filter((row) =>
-            selectedCampaignId === null
-              ? true
-              : row.campaign_id === selectedCampaignId,
-          ),
-          error: null,
-        }),
-    };
-
-    const contactQuery = {
-      select: vi.fn(() => contactQuery),
-      eq: vi.fn(() => contactQuery),
-      in: vi.fn(() =>
-        Promise.resolve({
-          data: [
-            {
-              id: 10,
-              firstname: "Taylor",
-              surname: "One",
-              phone: "+15550000001",
-            },
-            {
-              id: 11,
-              firstname: "Jordan",
-              surname: "Two",
-              phone: "+15550000002",
-            },
-          ],
-          error: null,
-        }),
-      ),
-    };
-
-    const supabase: any = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") return workspaceNumberQuery;
-        if (table === "message") return messageQuery;
-        if (table === "contact") return contactQuery;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-
-    const result = await mod.fetchConversationSummary(supabase, "w1", "1", {
+    const result = await mod.fetchConversationSummary({ rpc: vi.fn() } as any, "w1", "1", {
       limit: 1,
       offset: 0,
       sort: "recent",
     });
 
-    expect(selectedCampaignId).toBe(1);
+    expect(tdbMocks.message.findMany).toHaveBeenCalled();
     expect(result.hasMore).toBe(true);
     expect(result.chats).toEqual([
       expect.objectContaining({
@@ -1053,82 +1016,44 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("fetchConversationSummary applies strict hasReplied filtering before pagination", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const messageRows = [
-      {
-        campaign_id: 1,
-        contact_id: 10,
-        date_created: "2026-03-05T00:00:00.000Z",
-        direction: "inbound",
-        from: "+15550000001",
-        status: "received",
-        to: "+15551111111",
-      },
-      {
-        campaign_id: 1,
-        contact_id: 11,
-        date_created: "2026-03-04T00:00:00.000Z",
-        direction: "inbound",
-        from: "+15550000002",
-        status: "read",
-        to: "+15551111111",
-      },
-      {
-        campaign_id: 1,
-        contact_id: 12,
-        date_created: "2026-03-03T00:00:00.000Z",
-        direction: "outbound",
-        from: "+15551111111",
-        status: "delivered",
-        to: "+15550000003",
-      },
-    ];
+    mockConversationTenantData({
+      messageRows: [
+        {
+          campaign_id: 1,
+          contact_id: 10,
+          date_created: "2026-03-05T00:00:00.000Z",
+          direction: "inbound",
+          from: "+15550000001",
+          status: "received",
+          to: "+15551111111",
+        },
+        {
+          campaign_id: 1,
+          contact_id: 11,
+          date_created: "2026-03-04T00:00:00.000Z",
+          direction: "inbound",
+          from: "+15550000002",
+          status: "read",
+          to: "+15551111111",
+        },
+        {
+          campaign_id: 1,
+          contact_id: 12,
+          date_created: "2026-03-03T00:00:00.000Z",
+          direction: "outbound",
+          from: "+15551111111",
+          status: "delivered",
+          to: "+15550000003",
+        },
+      ],
+      contactRows: [
+        { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
+        { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
+        { id: 12, firstname: "Casey", surname: "Three", phone: "+15550000003" },
+      ],
+    });
 
-    const workspaceNumberQuery = {
-      select: vi.fn(() => workspaceNumberQuery),
-      eq: vi.fn(() => workspaceNumberQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
-    };
-
-    const messageQuery = {
-      select: vi.fn(() => messageQuery),
-      eq: vi.fn(() => messageQuery),
-      not: vi.fn(() => messageQuery),
-      neq: vi.fn(() => messageQuery),
-      order: vi.fn(() => messageQuery),
-      range: vi.fn(() => messageQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({
-          data: messageRows,
-          error: null,
-        }),
-    };
-
-    const contactQuery = {
-      select: vi.fn(() => contactQuery),
-      eq: vi.fn(() => contactQuery),
-      in: vi.fn(() =>
-        Promise.resolve({
-          data: [
-            { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
-            { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
-            { id: 12, firstname: "Casey", surname: "Three", phone: "+15550000003" },
-          ],
-          error: null,
-        }),
-      ),
-    };
-
-    const supabase: any = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") return workspaceNumberQuery;
-        if (table === "message") return messageQuery;
-        if (table === "contact") return contactQuery;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-
-    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
+    const result = await mod.fetchConversationSummary({ rpc: vi.fn() } as any, "w1", null, {
       limit: 1,
       offset: 0,
       sort: "hasReplied",
@@ -1146,82 +1071,44 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("fetchConversationSummary applies strict hasUnreadReply filtering", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const messageRows = [
-      {
-        campaign_id: 1,
-        contact_id: 10,
-        date_created: "2026-03-05T00:00:00.000Z",
-        direction: "inbound",
-        from: "+15550000001",
-        status: "received",
-        to: "+15551111111",
-      },
-      {
-        campaign_id: 1,
-        contact_id: 11,
-        date_created: "2026-03-04T00:00:00.000Z",
-        direction: "inbound",
-        from: "+15550000002",
-        status: "read",
-        to: "+15551111111",
-      },
-      {
-        campaign_id: 1,
-        contact_id: 12,
-        date_created: "2026-03-03T00:00:00.000Z",
-        direction: "outbound",
-        from: "+15551111111",
-        status: "delivered",
-        to: "+15550000003",
-      },
-    ];
+    mockConversationTenantData({
+      messageRows: [
+        {
+          campaign_id: 1,
+          contact_id: 10,
+          date_created: "2026-03-05T00:00:00.000Z",
+          direction: "inbound",
+          from: "+15550000001",
+          status: "received",
+          to: "+15551111111",
+        },
+        {
+          campaign_id: 1,
+          contact_id: 11,
+          date_created: "2026-03-04T00:00:00.000Z",
+          direction: "inbound",
+          from: "+15550000002",
+          status: "read",
+          to: "+15551111111",
+        },
+        {
+          campaign_id: 1,
+          contact_id: 12,
+          date_created: "2026-03-03T00:00:00.000Z",
+          direction: "outbound",
+          from: "+15551111111",
+          status: "delivered",
+          to: "+15550000003",
+        },
+      ],
+      contactRows: [
+        { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
+        { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
+        { id: 12, firstname: "Casey", surname: "Three", phone: "+15550000003" },
+      ],
+    });
 
-    const workspaceNumberQuery = {
-      select: vi.fn(() => workspaceNumberQuery),
-      eq: vi.fn(() => workspaceNumberQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
-    };
-
-    const messageQuery = {
-      select: vi.fn(() => messageQuery),
-      eq: vi.fn(() => messageQuery),
-      not: vi.fn(() => messageQuery),
-      neq: vi.fn(() => messageQuery),
-      order: vi.fn(() => messageQuery),
-      range: vi.fn(() => messageQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({
-          data: messageRows,
-          error: null,
-        }),
-    };
-
-    const contactQuery = {
-      select: vi.fn(() => contactQuery),
-      eq: vi.fn(() => contactQuery),
-      in: vi.fn(() =>
-        Promise.resolve({
-          data: [
-            { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
-            { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
-            { id: 12, firstname: "Casey", surname: "Three", phone: "+15550000003" },
-          ],
-          error: null,
-        }),
-      ),
-    };
-
-    const supabase: any = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") return workspaceNumberQuery;
-        if (table === "message") return messageQuery;
-        if (table === "contact") return contactQuery;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-
-    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
+    const result = await mod.fetchConversationSummary({ rpc: vi.fn() } as any, "w1", null, {
       limit: 20,
       offset: 0,
       sort: "hasUnreadReply",
@@ -1239,69 +1126,38 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("fetchConversationSummary ignores mismatched contact phone metadata", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const workspaceNumberQuery = {
-      select: vi.fn(() => workspaceNumberQuery),
-      eq: vi.fn(() => workspaceNumberQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
-    };
-
-    const messageQuery = {
-      select: vi.fn(() => messageQuery),
-      eq: vi.fn(() => messageQuery),
-      not: vi.fn(() => messageQuery),
-      neq: vi.fn(() => messageQuery),
-      order: vi.fn(() => messageQuery),
-      range: vi.fn(() => messageQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({
-          data: [
-            {
-              campaign_id: 1,
-              contact_id: 10,
-              date_created: "2026-03-03T00:00:00.000Z",
-              direction: "outbound",
-              from: "+15551111111",
-              status: "delivered",
-              to: "+15550000001",
-            },
-          ],
-          error: null,
-        }),
-    };
-
-    const contactQuery = {
-      select: vi.fn(() => contactQuery),
-      eq: vi.fn(() => contactQuery),
-      in: vi.fn(() =>
-        Promise.resolve({
-          data: [
-            {
-              id: 10,
-              firstname: "Wrong",
-              surname: "Person",
-              phone: "+15559999999",
-            },
-          ],
-          error: null,
-        }),
-      ),
-    };
-
-    const supabase: any = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") return workspaceNumberQuery;
-        if (table === "message") return messageQuery;
-        if (table === "contact") return contactQuery;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-
-    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
-      limit: 20,
-      offset: 0,
-      sort: "recent",
+    mockConversationTenantData({
+      messageRows: [
+        {
+          campaign_id: 1,
+          contact_id: 10,
+          date_created: "2026-03-03T00:00:00.000Z",
+          direction: "outbound",
+          from: "+15551111111",
+          status: "delivered",
+          to: "+15550000001",
+        },
+      ],
+      contactRows: [
+        {
+          id: 10,
+          firstname: "Wrong",
+          surname: "Person",
+          phone: "+15559999999",
+        },
+      ],
     });
+
+    const result = await mod.fetchConversationSummary(
+      { rpc: vi.fn(async () => ({ data: [], error: null })) } as any,
+      "w1",
+      null,
+      {
+        limit: 20,
+        offset: 0,
+        sort: "recent",
+      },
+    );
 
     expect(result.chats).toEqual([
       expect.objectContaining({
@@ -1315,42 +1171,20 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("fetchConversationSummary falls back to first phone-matched contact", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    const workspaceNumberQuery = {
-      select: vi.fn(() => workspaceNumberQuery),
-      eq: vi.fn(() => workspaceNumberQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
-    };
-
-    const messageQuery = {
-      select: vi.fn(() => messageQuery),
-      eq: vi.fn(() => messageQuery),
-      not: vi.fn(() => messageQuery),
-      neq: vi.fn(() => messageQuery),
-      order: vi.fn(() => messageQuery),
-      range: vi.fn(() => messageQuery),
-      then: (resolve: (value: unknown) => void) =>
-        resolve({
-          data: [
-            {
-              campaign_id: 1,
-              contact_id: null,
-              date_created: "2026-03-03T00:00:00.000Z",
-              direction: "outbound",
-              from: "+15551111111",
-              status: "delivered",
-              to: "+15550000001",
-            },
-          ],
-          error: null,
-        }),
-    };
-
-    const contactQuery = {
-      select: vi.fn(() => contactQuery),
-      eq: vi.fn(() => contactQuery),
-      in: vi.fn(() => Promise.resolve({ data: [], error: null })),
-    };
+    mockConversationTenantData({
+      messageRows: [
+        {
+          campaign_id: 1,
+          contact_id: null,
+          date_created: "2026-03-03T00:00:00.000Z",
+          direction: "outbound",
+          from: "+15551111111",
+          status: "delivered",
+          to: "+15550000001",
+        },
+      ],
+      contactRows: [],
+    });
 
     const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
       expect(fn).toBe("find_contacts_by_phones");
@@ -1373,17 +1207,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       };
     });
 
-    const supabase: any = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") return workspaceNumberQuery;
-        if (table === "message") return messageQuery;
-        if (table === "contact") return contactQuery;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-      rpc,
-    };
-
-    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
+    const result = await mod.fetchConversationSummary({ rpc } as any, "w1", null, {
       limit: 20,
       offset: 0,
       sort: "recent",

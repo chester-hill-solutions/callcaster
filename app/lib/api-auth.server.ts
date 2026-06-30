@@ -4,6 +4,11 @@ import { env } from "./env.server";
 import type { Database } from "./database.types";
 import { createHash, timingSafeEqual } from "crypto";
 import { jsonError } from "./platform-api.server";
+import {
+  findWorkspaceApiKeyByPrefix,
+  getUserById,
+  touchWorkspaceApiKeyLastUsed,
+} from "@/lib/workspace-members-db.server";
 
 const KEY_PREFIX_LENGTH = 10;
 
@@ -135,19 +140,9 @@ export async function verifyApiKeyOrSession(
 
   if (rawKey?.startsWith("cc_") && rawKey.length > KEY_PREFIX_LENGTH) {
     const keyPrefix = rawKey.slice(0, KEY_PREFIX_LENGTH);
-    const supabase = createClient<Database>(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY(),
-      { auth: { persistSession: false } }
-    );
+    const row = await findWorkspaceApiKeyByPrefix(keyPrefix);
 
-    const { data: row, error } = await supabase
-      .from("workspace_api_key")
-      .select("id, workspace_id, key_hash")
-      .eq("key_prefix", keyPrefix)
-      .single();
-
-    if (error || !row) {
+    if (!row) {
       return { error: "Invalid API key", status: 401 };
     }
 
@@ -157,10 +152,13 @@ export async function verifyApiKeyOrSession(
       return { error: "Invalid API key", status: 401 };
     }
 
-    void supabase
-      .from("workspace_api_key")
-      .update({ last_used_at: new Date().toISOString() })
-      .eq("id", row.id);
+    void Promise.resolve(touchWorkspaceApiKeyLastUsed(row.id)).catch(() => undefined);
+
+    const supabase = createClient<Database>(
+      env.SUPABASE_URL(),
+      env.SUPABASE_SERVICE_KEY(),
+      { auth: { persistSession: false } },
+    );
 
     return {
       authType: "api_key",
@@ -228,13 +226,9 @@ export async function requireSudo(
   if (auth instanceof Response) return auth;
 
   const supabaseClient = getAuthSupabaseClient(auth);
-  const { data: userData, error } = await supabaseClient
-    .from("user")
-    .select("*")
-    .eq("id", auth.user.id)
-    .single();
+  const userData = await getUserById(auth.user.id);
 
-  if (error || !userData || userData.access_level !== "sudo") {
+  if (!userData || userData.access_level !== "sudo") {
     return jsonError("Forbidden", 403);
   }
 

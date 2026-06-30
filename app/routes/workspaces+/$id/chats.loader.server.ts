@@ -1,19 +1,20 @@
-import {
-  getChatSortOption,
-} from "@/lib/chat-conversation-sort";
-import {
-  SupabaseClient,
-} from "@supabase/supabase-js";
+import { getChatSortOption } from "@/lib/chat-conversation-sort";
 import { data as routeData, redirect } from "react-router";
-import { fetchCampaignsByType, fetchContactData, fetchConversationSummary, getUserRole } from "@/lib/database.server";
+import {
+  fetchCampaignsByType,
+  fetchContactData,
+  fetchConversationSummary,
+  getUserRole,
+} from "@/lib/database.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { verifyAuth } from "@/lib/supabase.server";
+import { workspace_number as workspaceNumberTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
+import { eq } from "drizzle-orm";
 import type { LoaderFunctionArgs } from "react-router";
-import type { User } from "@/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const { id: workspaceId } = params;
   const url = new URL(request.url);
@@ -37,17 +38,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!workspaceId) {
     throw redirect("/workspaces");
   }
+
+  const tdb = createTenantDb(workspaceId);
   const userRole = await getUserRole({
-    supabaseClient: supabaseClient as SupabaseClient,
-    user: user,
-    workspaceId: workspaceId as string,
+    user,
+    workspaceId,
+    tdb,
   });
 
   let optOutKeywords = parseOptOutKeywords(null);
   try {
     const onboarding = await getWorkspaceMessagingOnboardingState({
-      supabaseClient,
-      workspaceId: workspaceId as string,
+      workspaceId,
     });
     optOutKeywords = parseOptOutKeywords(
       onboarding.businessProfile.optOutKeywords,
@@ -57,23 +59,22 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
-    supabaseClient
-      .from("workspace_number")
-      .select("*")
-      .eq("workspace", workspaceId)
-      .eq("type", "rented"),
+    tdb.workspace_number.findMany({
+      where: eq(workspaceNumberTable.type, "rented"),
+    }),
     contact_number
       ? fetchContactData(
           supabaseClient,
           workspaceId,
           contact_id,
           contact_number,
+          tdb,
         )
       : null,
     fetchCampaignsByType({
-      supabaseClient,
       workspaceId,
       type: "message_campaign",
+      tdb,
     }),
   ]);
   const { contact, potentialContacts, contactError } = contactData || {
@@ -104,7 +105,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         },
         potentialContacts: [],
         userRole,
-        workspaceNumbers: workspaceNumbers?.data ?? [],
+        workspaceNumbers: workspaceNumbers ?? [],
         contact_number,
       },
       { headers },
@@ -125,7 +126,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return routeData(
     {
       campaigns: smsCampaigns,
-      workspaceNumbers: workspaceNumbers?.data ?? [],
+      workspaceNumbers: workspaceNumbers ?? [],
       chats: chats ?? [],
       chatsError:
         chatsError && typeof chatsError === "object" && "message" in chatsError

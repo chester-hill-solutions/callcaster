@@ -8,6 +8,7 @@ import {
   script as scriptTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
+import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 
 /** PostgREST select for unified campaign + joined script row. */
@@ -36,16 +37,21 @@ export function ivrScriptStepsFromCampaign(
 }
 
 export async function fetchCampaignWithScript(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database> | null,
   campaignId: string | number,
 ) {
-  const { data, error } = await supabase
-    .from("campaign")
-    .select(CAMPAIGN_WITH_SCRIPT_SELECT)
-    .eq("id", Number(campaignId))
-    .single();
-  if (error) throw error;
-  return data;
+  const campaign = await adminDb.query.campaign.findFirst({
+    where: eq(campaignTable.id, Number(campaignId)),
+  });
+  if (!campaign) {
+    throw new Error(`Campaign ${campaignId} not found`);
+  }
+  const script = campaign.script_id
+    ? await adminDb.query.script.findFirst({
+        where: eq(scriptTable.id, campaign.script_id),
+      })
+    : null;
+  return { ...campaign, script };
 }
 
 export async function fetchCampaignByIdForWorkspace(
@@ -183,4 +189,17 @@ export async function listArchivedCampaignsInWorkspace(workspaceId: string) {
     where: eq(campaignTable.status, "archived"),
     orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
   });
+}
+
+export async function updateCampaignScriptId(
+  workspaceId: string,
+  campaignId: number,
+  scriptId: number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const [row] = await tdb.campaign.update({
+    set: { script_id: scriptId },
+    where: eq(campaignTable.id, campaignId),
+  });
+  return row ?? null;
 }

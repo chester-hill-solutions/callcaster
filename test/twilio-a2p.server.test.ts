@@ -12,11 +12,51 @@ const mocks = vi.hoisted(() => ({
   logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   brandCreate: vi.fn(),
   campaignCreate: vi.fn(),
+  twilioData: {} as Record<string, unknown>,
+  loadError: null as Error | null,
+  persistError: null as Error | null,
+  persistCalls: [] as unknown[],
+  twilioInstanceError: null as Error | null,
 }));
 
 vi.mock("../app/lib/twilio-bootstrap.server", () => ({
   ensureWorkspaceTwilioBootstrap: (...args: any[]) =>
     mocks.ensureWorkspaceTwilioBootstrap(...args),
+}));
+
+vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
+  loadWorkspaceTwilioData: vi.fn(async () => {
+    if (mocks.loadError) {
+      throw mocks.loadError;
+    }
+    return mocks.twilioData;
+  }),
+  persistWorkspaceTwilioData: vi.fn(async (_client: unknown, _workspaceId: string, data: unknown) => {
+    if (mocks.persistError) {
+      throw mocks.persistError;
+    }
+    mocks.persistCalls.push(data);
+  }),
+}));
+
+vi.mock("@/lib/database.server", () => ({
+  createWorkspaceTwilioInstance: vi.fn(async () => {
+    if (mocks.twilioInstanceError) {
+      throw mocks.twilioInstanceError;
+    }
+    return {
+      messaging: {
+        v1: {
+          brandRegistrations: {
+            create: (...args: any[]) => mocks.brandCreate(...args),
+          },
+          campaigns: {
+            create: (...args: any[]) => mocks.campaignCreate(...args),
+          },
+        },
+      },
+    };
+  }),
 }));
 
 vi.mock("@/lib/logger.server", () => ({
@@ -148,35 +188,14 @@ function makeWorkspaceTwilioData(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeSupabase(
-  twilioData: any,
-  options?: {
-    selectError?: unknown;
-    updateError?: unknown;
-  },
+function configureTwilioData(
+  twilioData: unknown,
+  options?: { selectError?: unknown; updateError?: unknown },
 ) {
-  const updateEq = vi.fn(async () => ({ error: options?.updateError ?? null }));
-  return {
-    from: vi.fn((table: string) => {
-      if (table !== "workspace") {
-        throw new Error(`Unexpected table: ${table}`);
-      }
-      return {
-        select: () => ({
-          eq: () => ({
-            single: vi.fn(async () => ({
-              data: { id: "w1", name: "Workspace", twilio_data: twilioData },
-              error: options?.selectError ?? null,
-            })),
-          }),
-        }),
-        update: () => ({
-          eq: updateEq,
-        }),
-      };
-    }),
-    _updateEq: updateEq,
-  };
+  mocks.twilioData = (twilioData ?? {}) as Record<string, unknown>;
+  mocks.loadError = options?.selectError instanceof Error ? options.selectError : null;
+  mocks.persistError = options?.updateError instanceof Error ? options.updateError : null;
+  return {} as const;
 }
 
 describe("twilio A2P service", () => {
@@ -186,6 +205,11 @@ describe("twilio A2P service", () => {
     mocks.logger.error.mockReset();
     mocks.brandCreate.mockReset();
     mocks.campaignCreate.mockReset();
+    mocks.twilioData = {};
+    mocks.loadError = null;
+    mocks.persistError = null;
+    mocks.persistCalls = [];
+    mocks.twilioInstanceError = null;
     mocks.ensureWorkspaceTwilioBootstrap.mockImplementation(async () => {
       const data = makeWorkspaceTwilioData();
       return {
@@ -200,7 +224,7 @@ describe("twilio A2P service", () => {
   });
 
   test("stores blocking issues when required business information is missing", async () => {
-    const supabase = makeSupabase(
+    const supabase = configureTwilioData(
       makeWorkspaceTwilioData({
         businessProfile: {
           legalBusinessName: "",
@@ -229,14 +253,14 @@ describe("twilio A2P service", () => {
 
     expect(result.reviewState.blockingIssues.length).toBeGreaterThan(0);
     expect(result.a2p10dlc.status).toBe("collecting_business");
-    expect(supabase._updateEq).toHaveBeenCalled();
+    expect(mocks.persistCalls.length).toBeGreaterThan(0);
   });
 
   test("creates brand and campaign resources when Twilio APIs are available", async () => {
     mocks.brandCreate.mockResolvedValueOnce({ sid: "BN123" });
     mocks.campaignCreate.mockResolvedValueOnce({ sid: "CP123" });
 
-    const supabase = makeSupabase(
+    const supabase = configureTwilioData(
       makeWorkspaceTwilioData({
         a2p10dlc: {
           status: "collecting_business",
@@ -268,7 +292,7 @@ describe("twilio A2P service", () => {
   });
 
   test("syncWorkspaceA2PStatus updates onboarding sync timestamp", async () => {
-    const supabase = makeSupabase(makeWorkspaceTwilioData());
+    const supabase = configureTwilioData(makeWorkspaceTwilioData());
     const mod = await import("../app/lib/twilio-a2p.server");
 
     const result = await mod.syncWorkspaceA2PStatus({
@@ -277,18 +301,19 @@ describe("twilio A2P service", () => {
     });
 
     expect(result.a2p10dlc.lastSyncedAt).toMatch(/T/);
-    expect(supabase._updateEq).toHaveBeenCalled();
+    expect(mocks.persistCalls.length).toBeGreaterThan(0);
   });
 
   test("throws when workspace is missing Twilio credentials", async () => {
-    const supabase = makeSupabase({
+    configureTwilioData({
       onboarding: makeWorkspaceTwilioData().onboarding,
     });
+    mocks.twilioInstanceError = new Error("Workspace missing Twilio credentials");
     const mod = await import("../app/lib/twilio-a2p.server");
 
     await expect(
       mod.provisionWorkspaceA2P({
-        supabaseClient: supabase as any,
+        supabaseClient: {} as any,
         workspaceId: "w1",
         actorUserId: "u1",
       }),
@@ -296,38 +321,29 @@ describe("twilio A2P service", () => {
   });
 
   test("throws when auth token is missing even if sid exists", async () => {
-    const supabase = makeSupabase({
+    configureTwilioData({
       sid: "AC123",
       onboarding: makeWorkspaceTwilioData().onboarding,
     });
+    mocks.twilioInstanceError = new Error("Workspace missing Twilio credentials");
     const mod = await import("../app/lib/twilio-a2p.server");
 
     await expect(
       mod.syncWorkspaceA2PStatus({
-        supabaseClient: supabase as any,
+        supabaseClient: {} as any,
         workspaceId: "w1",
       }),
     ).rejects.toThrow("Workspace missing Twilio credentials");
   });
 
   test("throws when workspace twilio_data is null", async () => {
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: { id: "w1", name: "Workspace", twilio_data: null },
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    };
+    configureTwilioData(null);
+    mocks.twilioInstanceError = new Error("Workspace missing Twilio credentials");
     const mod = await import("../app/lib/twilio-a2p.server");
 
     await expect(
       mod.syncWorkspaceA2PStatus({
-        supabaseClient: supabase,
+        supabaseClient: {} as any,
         workspaceId: "w1",
       }),
     ).rejects.toThrow("Workspace missing Twilio credentials");
@@ -336,7 +352,7 @@ describe("twilio A2P service", () => {
   test("marks onboarding rejected when Twilio throws an Error", async () => {
     mocks.brandCreate.mockRejectedValueOnce(new Error("Twilio failed"));
 
-    const supabase = makeSupabase(
+    const supabase = configureTwilioData(
       makeWorkspaceTwilioData({
         a2p10dlc: {
           status: "collecting_business",
@@ -370,7 +386,7 @@ describe("twilio A2P service", () => {
   test("stores unknown error message for non-Error throws", async () => {
     mocks.brandCreate.mockRejectedValueOnce("bad");
 
-    const supabase = makeSupabase(
+    const supabase = configureTwilioData(
       makeWorkspaceTwilioData({
         a2p10dlc: {
           status: "collecting_business",
@@ -406,7 +422,7 @@ describe("twilio A2P service", () => {
 
     await expect(
       mod.provisionWorkspaceA2P({
-        supabaseClient: makeSupabase(base, { selectError }) as any,
+        supabaseClient: configureTwilioData(base, { selectError }) as any,
         workspaceId: "w1",
         actorUserId: "u1",
       }),
@@ -414,14 +430,14 @@ describe("twilio A2P service", () => {
 
     await expect(
       mod.syncWorkspaceA2PStatus({
-        supabaseClient: makeSupabase(base, { updateError }) as any,
+        supabaseClient: configureTwilioData(base, { updateError }) as any,
         workspaceId: "w1",
       }),
     ).rejects.toThrow("update failed");
   });
 
   test("skips brand create when brand exists and trims campaign sid", async () => {
-    const supabase = makeSupabase(
+    const supabase = configureTwilioData(
       makeWorkspaceTwilioData({
         a2p10dlc: {
           status: "collecting_business",
@@ -453,7 +469,7 @@ describe("twilio A2P service", () => {
   });
 
   test("adds blocking issue when messaging service is missing", async () => {
-    const supabase = makeSupabase(
+    const supabase = configureTwilioData(
       makeWorkspaceTwilioData({
         messagingService: {
           ...makeWorkspaceTwilioData().onboarding.messagingService,
@@ -478,7 +494,7 @@ describe("twilio A2P service", () => {
   test("keeps onboarding in submitting when brand sid is not parseable", async () => {
     mocks.brandCreate.mockResolvedValueOnce({ sid: 12345 });
 
-    const supabase = makeSupabase(
+    const supabase = configureTwilioData(
       makeWorkspaceTwilioData({
         a2p10dlc: {
           status: "collecting_business",

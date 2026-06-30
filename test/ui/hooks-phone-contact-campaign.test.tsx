@@ -1,5 +1,12 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
+
+const contactSearchMocks = vi.hoisted(() => ({
+  fetchContactsByPhone: vi.fn(),
+  fetchLatestMessageForPhone: vi.fn(),
+}));
+
+vi.mock("@/lib/chats/messaging-client", () => contactSearchMocks);
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
@@ -49,34 +56,18 @@ describe("phone, contact, campaign hooks", () => {
   });
 
   test("useContactSearch searches and handles UI", async () => {
+    contactSearchMocks.fetchContactsByPhone.mockResolvedValue([{ id: 1, phone: "+15551234567" }]);
+    contactSearchMocks.fetchLatestMessageForPhone.mockResolvedValue({
+      body: "hi",
+      date_created: new Date().toISOString(),
+    });
+
     const { useContactSearch } = await import("@/hooks/contact/useContactSearch");
     const dropdownRef = { current: document.createElement("div") };
     document.body.appendChild(dropdownRef.current);
 
-    const rpc = vi.fn().mockResolvedValue({ data: [{ id: 1, phone: "+15551234567" }], error: null });
-    const supabase = {
-      rpc,
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            or: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: vi.fn(() => ({
-                  single: vi.fn().mockResolvedValue({
-                    data: { body: "hi", date_created: new Date().toISOString() },
-                    error: null,
-                  }),
-                })),
-              })),
-            })),
-          })),
-        })),
-      })),
-    } as never;
-
     const { result } = renderHook(() =>
       useContactSearch({
-        supabase,
         workspace_id: "ws",
         contact_number: "+1 (555) 123-4567",
         potentialContacts: [],
@@ -98,7 +89,7 @@ describe("phone, contact, campaign hooks", () => {
         target: { value: "+1 (555) 987-6543" },
       } as React.ChangeEvent<HTMLInputElement>);
     });
-    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(contactSearchMocks.fetchContactsByPhone).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(result.current.isSearching).toBe(false));
     expect(result.current.isValid).toBe(true);
 

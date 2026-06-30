@@ -1,23 +1,19 @@
 import { data as routeData } from "react-router";
-import { Database } from "@/lib/database.types";
+import { getAudienceDetailApi } from "@/lib/platform-data.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 import type { LoaderFunctionArgs } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
   const result = await requireWorkspaceLoaderContext(request, params.id);
   if (!result.ok) return result.response;
-  const { supabaseClient, headers, user, workspaceId: workspace_id } = result.ctx;
+  const { supabaseClient, headers, workspaceId: workspace_id } = result.ctx;
 
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
   const pageSize = parseInt(url.searchParams.get("pageSize") || "50", 10);
   const sortKey = url.searchParams.get("sortKey") || "id";
   const sortDirection = url.searchParams.get("sortDirection") === "desc" ? "desc" : "asc";
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
 
   const audience_id = params.audience_id;
 
@@ -32,90 +28,79 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         pagination: {
           currentPage: page,
           pageSize,
-          totalCount: null
+          totalCount: null,
         },
         sorting: {
           sortKey,
-          sortDirection
-        }
+          sortDirection,
+        },
       },
-      { headers }
+      { headers },
     );
   }
 
-  // Build a simpler query that should work with sorting
-  let query = supabaseClient
-    .from("contact_audience")
-    .select("...contact!inner(*)", { count: 'exact' })
-    .eq("audience_id", parseInt(audience_id));
-  
-  if (sortKey) {
-    query = query.order(`contact(${sortKey})`, { ascending: sortDirection === 'asc' });
-  }
-  
-  const { data: contacts, error: contactError, count } = await query.range(from, to);
+  const apiSearchParams = new URLSearchParams();
+  apiSearchParams.set("page", String(page));
+  apiSearchParams.set("page_size", String(pageSize));
+  apiSearchParams.set("sort_key", sortKey);
+  apiSearchParams.set("sort_direction", sortDirection);
 
-  const { data: audience, error: audienceError } = await supabaseClient
-    .from("audience")
-    .select()
-    .eq("id", parseInt(audience_id))
-    .single();
+  const detailResult = await getAudienceDetailApi(
+    supabaseClient,
+    workspace_id,
+    audience_id,
+    apiSearchParams,
+  );
 
-  // Get the latest upload for this audience
-  const { data: latestUpload } = await supabaseClient
-    .from("audience_upload")
-    .select("*")
-    .eq("audience_id", parseInt(audience_id))
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (contactError) {
-    return routeData<AudienceDetailLoaderData>({
-      contacts: null,
-      workspace_id,
-      audience: null,
-      audience_id,
-      error: contactError.message,
-      pagination: {
-        currentPage: page,
-        pageSize,
-        totalCount: null
+  if (!detailResult.ok) {
+    return routeData<AudienceDetailLoaderData>(
+      {
+        contacts: null,
+        workspace_id,
+        audience: null,
+        audience_id,
+        error: detailResult.error,
+        pagination: {
+          currentPage: page,
+          pageSize,
+          totalCount: null,
+        },
+        sorting: {
+          sortKey,
+          sortDirection,
+        },
+        latestUpload: null,
       },
-      sorting: {
-        sortKey,
-        sortDirection
-      },
-      latestUpload: null
-    }, { headers });
+      { headers, status: detailResult.status },
+    );
   }
 
   return routeData<AudienceDetailLoaderData>(
     {
-      contacts: contacts?.map(contact => ({ contact })) || null,
+      contacts: detailResult.contacts,
       workspace_id,
-      audience,
+      audience: detailResult.audience,
       audience_id,
       error: null,
       pagination: {
-        currentPage: page,
-        pageSize,
-        totalCount: count
+        currentPage: detailResult.pagination.page,
+        pageSize: detailResult.pagination.page_size,
+        totalCount: detailResult.pagination.total_count,
       },
       sorting: {
-        sortKey,
-        sortDirection
+        sortKey: detailResult.sorting.sort_key,
+        sortDirection: detailResult.sorting.sort_direction,
       },
-      latestUpload: latestUpload ? {
-        id: latestUpload['id'],
-        status: latestUpload['status'] || 'unknown',
-        progress: latestUpload['processed_contacts'] && latestUpload['total_contacts'] 
-          ? Math.round((latestUpload['processed_contacts'] / latestUpload['total_contacts']) * 100)
-          : 0,
-        total_contacts: latestUpload['total_contacts'] || 0,
-        processed_contacts: latestUpload['processed_contacts'] || 0,
-        error_message: latestUpload['error_message']
-      } : null
+      latestUpload: detailResult.latest_upload
+        ? {
+            id: detailResult.latest_upload.id,
+            status: detailResult.latest_upload.status,
+            progress: detailResult.latest_upload.progress,
+            total_contacts: detailResult.latest_upload.total_contacts,
+            processed_contacts: detailResult.latest_upload.processed_contacts,
+            error_message: detailResult.latest_upload.error_message,
+          }
+        : null,
     },
     { headers },
   );

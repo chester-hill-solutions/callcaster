@@ -35,7 +35,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const toNumber = parseTrimmedString(params.To);
   const messagingServiceSid = parseTrimmedString(params.MessagingServiceSid);
 
-  const resolved = await resolveInboundWorkspaceContext(supabase, {
+  const resolved = await resolveInboundWorkspaceContext({
     toRaw: toNumber,
     messagingServiceSid,
   });

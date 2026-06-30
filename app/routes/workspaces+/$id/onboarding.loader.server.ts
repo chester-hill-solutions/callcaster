@@ -18,8 +18,8 @@ import {
 } from "@/lib/rcs-onboarding.server";
 import { data as routeData, redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
+import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import type {
-  User,
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
@@ -45,24 +45,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   await requireWorkspaceAccess({
-    supabaseClient,
     user,
     workspaceId,
   });
 
   const userRole = (
     await getUserRole({
-      supabaseClient,
-      user: user,
+      user,
       workspaceId,
     })
   )?.role;
-  const [{ data: workspaceInfo }, { data: phoneNumbers }, onboarding, workspaceCredits] =
+  const [{ data: workspaceInfo }, { data: phoneNumbers }, onboarding, creditsBalance] =
     await Promise.all([
-      getWorkspaceInfo({ supabaseClient, workspaceId }),
-      getWorkspacePhoneNumbers({ supabaseClient, workspaceId }),
+      getWorkspaceInfo({ workspaceId }),
+      getWorkspacePhoneNumbers({ workspaceId }),
       getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
-      supabaseClient.from("workspace").select("credits").eq("id", workspaceId).single(),
+      getWorkspaceCredits(workspaceId),
     ]);
   const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
     hydrateWorkspaceRcsOnboardingState(applyWorkspaceOnboardingChannelPolicy(onboarding)),
@@ -110,7 +108,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       onboarding: hydratedOnboarding,
       readiness,
       phoneNumbers,
-      creditsBalance: workspaceCredits.data?.credits ?? 0,
+      creditsBalance: creditsBalance ?? 0,
       rcsBlockingIssues,
     },
     { headers },

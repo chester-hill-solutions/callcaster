@@ -1,16 +1,16 @@
 import { data as routeData } from "react-router";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
+import { markReceivedMessagesAsDeliveredForPhone } from "@/lib/message-db.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { verifyAuth } from "@/lib/supabase.server";
+import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
+import type { Message } from "@/lib/types";
 import { fetchMessagePage } from "./$contact_number.messages.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
   const { id, contact_number } = params;
   const { supabaseClient, headers } = await verifyAuth(request);
   const url = new URL(request.url);
@@ -23,7 +23,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (id) {
     try {
       const onboarding = await getWorkspaceMessagingOnboardingState({
-        supabaseClient,
         workspaceId: id,
       });
       optOutKeywords = parseOptOutKeywords(
@@ -34,6 +33,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   }
 
+  const tdb = id ? createTenantDb(id) : null;
+
   if (contact_number !== "new") {
     try {
       normalizedNumber = normalizePhoneNumber(contact_number || "");
@@ -42,26 +43,24 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     const contactFilter = normalizedNumber ?? contact_number ?? "";
-    if (contactFilter) {
+    if (contactFilter && id) {
       const result = await fetchMessagePage({
         supabaseClient,
-        workspaceId: id as string,
+        workspaceId: id,
         contactFilter,
         before: before || null,
+        tdb: tdb ?? undefined,
       });
       messages = result.messages;
       hasMore = result.hasMore;
     }
 
     // Mark messages as read on initial load (no "before" = first page)
-    if (normalizedNumber && !before) {
+    if (normalizedNumber && !before && id) {
       try {
-        await supabaseClient
-          .from("message")
-          .update({ status: "delivered" })
-          .eq("workspace", id as string)
-          .eq("status", "received")
-          .or(`from.eq.${normalizedNumber},to.eq.${normalizedNumber}`);
+        await markReceivedMessagesAsDeliveredForPhone(id, normalizedNumber, {
+          tdb: tdb ?? undefined,
+        });
       } catch (error) {
         logger.error("Error marking messages as read:", error);
       }

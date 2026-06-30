@@ -173,6 +173,9 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { createWorkspaceTwilioInstance } from "./database/workspace.server";
+import { and, eq, inArray } from "drizzle-orm";
+import { call as callTable, message as messageTable } from "@/db/schema";
+import { adminDb } from "@/server/admin-db";
 
 // Marked for deprecation
 export async function endConferenceByUser({
@@ -201,10 +204,15 @@ export async function endConferenceByUser({
       try {
         await twilio.conferences(conf.sid).update({ status: "completed" });
 
-        const { data, error } = await supabaseClient
-          .from("call")
-          .select("sid")
-          .eq("conference_id", conf.sid);
+        const { data, error } = await adminDb
+          .select({ sid: callTable.sid })
+          .from(callTable)
+          .where(eq(callTable.conference_id, conf.sid))
+          .then((rows) => ({ data: rows, error: null as null }))
+          .catch((lookupError) => ({
+            data: null as null,
+            error: lookupError as Error,
+          }));
         if (error) throw error;
 
         await Promise.all(
@@ -419,19 +427,18 @@ export async function cancelQueuedMessagesForCampaign(
 
   while (hasMore) {
     try {
-      const { data: queuedMessages, error } = await supabase
-        .from("message")
-        .select("sid")
-        .eq("campaign_id", campaignId)
-        .in("status", cancellableStatuses)
+      const rows = await adminDb
+        .select({ sid: messageTable.sid })
+        .from(messageTable)
+        .where(
+          and(
+            eq(messageTable.campaign_id, campaignId),
+            inArray(messageTable.status, [...cancellableStatuses]),
+          ),
+        )
         .limit(batchSize);
 
-      if (error) {
-        allErrors.push(`Error retrieving messages: ${error.message || "Unknown error"}`);
-        break;
-      }
-
-      const messages = (queuedMessages ?? []).filter(
+      const messages = rows.filter(
         (message): message is { sid: string } => typeof message?.sid === "string" && message.sid.length > 0,
       );
 
@@ -453,7 +460,8 @@ export async function cancelQueuedMessagesForCampaign(
         hasMore = false;
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error && error.message ? error.message : "Unknown error";
       allErrors.push(`Error retrieving messages: ${errorMessage}`);
       hasMore = false;
     }

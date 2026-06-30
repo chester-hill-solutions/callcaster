@@ -1,13 +1,15 @@
-import { SupabaseClient } from "@supabase/supabase-js";
 import { MutableRefObject, useEffect, useState, useCallback } from "react";
 import { useClickOutside } from "@/hooks/utils/useClickOutside";
+import {
+  fetchContactsByPhone,
+  fetchLatestMessageForPhone,
+} from "@/lib/chats/messaging-client";
 import { Contact } from "@/lib/types";
 import { formatMessageTimestamp } from "@/lib/utils";
-import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone";
+import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { logger } from "@/lib/logger.client";
 
 interface UseContactSearchProps {
-  supabase: SupabaseClient;
   workspace_id: string;
   contact_number: string;
   potentialContacts: Contact[];
@@ -23,73 +25,8 @@ interface ExistingConversation {
 
 /**
  * Hook for searching and managing contacts by phone number
- * 
- * Provides contact search functionality with phone number validation, automatic search
- * on valid phone numbers, conversation history lookup, and dropdown menu management.
- * Handles click-outside detection for closing the contact dropdown.
- * 
- * @param props - Configuration object
- * @param props.supabase - Supabase client instance
- * @param props.workspace_id - Workspace ID for filtering contacts
- * @param props.contact_number - Initial contact phone number
- * @param props.potentialContacts - Initial list of potential contacts to display
- * @param props.dropdownRef - Ref to the dropdown element for click-outside detection
- * @param props.initialContact - Initially selected contact, if any
- * 
- * @returns Object containing:
- *   - selectedContact: Currently selected contact or null
- *   - isContactMenuOpen: Boolean indicating if contact dropdown is open
- *   - searchError: Error message string if search failed, null otherwise
- *   - contacts: Array of contacts matching the search
- *   - isValid: Boolean indicating if current phone number is valid
- *   - phoneNumber: Current phone number value
- *   - existingConversation: Latest conversation data if found, null otherwise
- *   - isSearching: Boolean indicating if search is in progress
- *   - setPhoneNumber: Function to manually set phone number
- *   - handleSearch: Function to handle phone number input changes
- *   - handleContactSelect: Function to handle contact selection from dropdown
- *   - toggleContactMenu: Function to toggle contact dropdown visibility
- *   - clearSelectedContact: Function to clear selected contact
- * 
- * @example
- * ```tsx
- * const dropdownRef = useRef<HTMLDivElement>(null);
- * 
- * const {
- *   selectedContact,
- *   contacts,
- *   isValid,
- *   phoneNumber,
- *   isSearching,
- *   handleSearch,
- *   handleContactSelect
- * } = useContactSearch({
- *   supabase,
- *   workspace_id: workspace.id,
- *   contact_number: '+1234567890',
- *   potentialContacts: [],
- *   dropdownRef,
- *   initialContact: null
- * });
- * 
- * // Use in input
- * <input
- *   value={phoneNumber}
- *   onChange={handleSearch}
- *   placeholder="Enter phone number"
- * />
- * 
- * // Display search results
- * {isSearching && <div>Searching...</div>}
- * {contacts.map(contact => (
- *   <div key={contact.id} onClick={() => handleContactSelect(contact)}>
- *     {contact.name}
- *   </div>
- * ))}
- * ```
  */
 export function useContactSearch({
-  supabase,
   workspace_id,
   contact_number,
   potentialContacts,
@@ -127,18 +64,13 @@ export function useContactSearch({
     setManualContact(null);
   }, []);
 
-  const searchContact = useCallback(async (phoneNumber: string) => {
+  const searchContact = useCallback(async (nextPhoneNumber: string) => {
     setIsSearching(true);
     setSearchError(null);
     try {
-      const { data, error } = await supabase.rpc("find_contact_by_phone", {
-        p_workspace_id: workspace_id,
-        p_phone_number: phoneNumber,
-      });
-      
-      if (error) throw error;
+      const data = await fetchContactsByPhone(workspace_id, nextPhoneNumber);
 
-      if (data && data.length > 0) {
+      if (data.length > 0) {
         setContacts(data);
         setManualContact(null);
         setIsContactMenuOpen(true);
@@ -152,30 +84,24 @@ export function useContactSearch({
       logger.error("Contact search error:", error);
       setContacts([]);
       setManualContact(null);
-      const errorMessage = error instanceof Error 
+      const errorMessage = error instanceof Error
         ? `Error searching for contact: ${error.message}`
         : "Unable to search for contact. Please try again.";
       setSearchError(errorMessage);
     } finally {
       setIsSearching(false);
     }
-  }, [supabase, workspace_id]);
+  }, [workspace_id]);
 
-  const searchConversation = useCallback(async (phoneNumber: string) => {
+  const searchConversation = useCallback(async (nextPhoneNumber: string) => {
     try {
-      const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-      const { data: latestMessage, error: messageSearchError } = await supabase
-        .from("message")
-        .select("*")
-        .eq("workspace", workspace_id)
-        .or(`from.eq.${normalizedPhoneNumber},to.eq.${normalizedPhoneNumber}`)
-        .order("date_created", { ascending: false })
-        .limit(1)
-        .single();
+      const normalizedPhoneNumber = normalizePhoneNumber(nextPhoneNumber);
+      const latestMessage = await fetchLatestMessageForPhone(
+        workspace_id,
+        normalizedPhoneNumber,
+      );
 
-      if (messageSearchError) {
-        setExistingConversation(null);
-      } else if (latestMessage) {
+      if (latestMessage?.body && latestMessage.date_created) {
         setExistingConversation({
           phoneNumber: normalizedPhoneNumber,
           latestMessage: latestMessage.body,
@@ -186,10 +112,9 @@ export function useContactSearch({
       }
     } catch (error) {
       logger.error("Conversation search error:", error);
-      // Silently fail for conversation search - it's not critical
       setExistingConversation(null);
     }
-  }, [supabase, workspace_id]);
+  }, [workspace_id]);
 
   useEffect(() => {
     if (isValid && phoneNumber) {

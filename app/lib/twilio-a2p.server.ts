@@ -9,7 +9,10 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
-import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import {
+  loadWorkspaceTwilioData,
+  persistWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 import type {
   TwilioAccountData,
   WorkspaceMessagingOnboardingState,
@@ -39,29 +42,19 @@ async function loadWorkspaceTwilioContext(
 }
 
 async function persistOnboardingState({
-  supabaseClient,
   workspaceId,
   twilioData,
   onboarding,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient?: SupabaseClient<Database> | null;
   workspaceId: string;
   twilioData: TwilioAccountData;
   onboarding: WorkspaceMessagingOnboardingState;
 }) {
-  const { error } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data: {
-        ...twilioData,
-        onboarding,
-      } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (error) {
-    throw error;
-  }
+  await persistWorkspaceTwilioData(null, workspaceId, {
+    ...(twilioData as Record<string, unknown>),
+    onboarding,
+  });
 }
 
 export function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {

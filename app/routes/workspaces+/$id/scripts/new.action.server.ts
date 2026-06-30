@@ -1,11 +1,11 @@
 import { data as routeData, redirect } from "react-router";
+import { updateCampaignScriptId } from "@/lib/campaign-ivr.server";
+import { createWorkspaceScript } from "@/lib/script-api-db.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Json } from "@/lib/database.types";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -37,7 +37,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     try {
       const stepsContent = await stepsFileValue.text();
       steps = JSON.parse(stepsContent) as Record<string, unknown>;
-    } catch (error) {
+    } catch {
       return routeData(
         { success: false, error: "Invalid JSON file for steps" },
         { headers },
@@ -46,54 +46,40 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } else {
     steps = { pages: {}, blocks: {} };
   }
-  const { data, error } = await supabaseClient
-    .from("script")
-    .insert({
+
+  let createdScript;
+  try {
+    createdScript = await createWorkspaceScript({
+      workspaceId,
       name,
       type,
-      steps: steps as Json,
-      created_by: user?.id,
-      workspace: workspaceId,
-    })
-    .select();
-  if (ref && data && data.length > 0) {
-    const createdScript = data[0];
-    if (!createdScript) {
-      return routeData(
-        { success: false, error: "Failed to create script" },
-        { headers },
-      );
-    }
-    const { error: updateError } = await supabaseClient
-      .from("campaign")
-      .update({ script_id: createdScript.id })
-      .eq("id", Number(ref) || 0)
-      .select();
-    if (updateError) {
-      return routeData(
-        { success: false, error: updateError },
-        { headers },
-      );
-    }
+      steps,
+      createdBy: user?.id,
+    });
+  } catch (error) {
+    return routeData({ success: false, error }, { headers });
   }
 
-  if (error) {
-    return routeData({ success: false, error: error }, { headers });
-  }
-
-  if (!data || data.length === 0) {
-    return routeData(
-      { success: false, error: "Failed to create script" },
-      { headers },
-    );
-  }
-
-  const createdScript = data[0];
   if (!createdScript) {
     return routeData(
       { success: false, error: "Failed to create script" },
       { headers },
     );
+  }
+
+  if (ref) {
+    const campaignId = Number(ref) || 0;
+    const updatedCampaign = await updateCampaignScriptId(
+      workspaceId,
+      campaignId,
+      createdScript.id,
+    );
+    if (!updatedCampaign) {
+      return routeData(
+        { success: false, error: "Failed to link script to campaign" },
+        { headers },
+      );
+    }
   }
 
   return redirect(`../${createdScript.id}?created=1`, { headers });

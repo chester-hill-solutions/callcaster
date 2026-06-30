@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import {
   audience as audienceTable,
   audience_upload as audienceUploadTable,
@@ -119,4 +119,27 @@ export async function deleteAudienceById(audienceId: number): Promise<boolean> {
     where: eq(audienceTable.id, audienceId),
   });
   return true;
+}
+
+export async function createEmptyAudience(
+  workspaceId: string,
+  name: string,
+): Promise<AudienceRow | null> {
+  const tdb = createTenantDb(workspaceId);
+  const [row] = await tdb.audience.insert({
+    name,
+    status: "empty",
+  });
+  return row ?? null;
+}
+
+export async function listAudienceUploadsByAudienceId(
+  workspaceId: string,
+  audienceId: number,
+): Promise<AudienceUploadRow[]> {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.audience_upload.findMany({
+    where: eq(audienceUploadTable.audience_id, audienceId),
+    orderBy: [desc(audienceUploadTable.created_at)],
+  });
 }

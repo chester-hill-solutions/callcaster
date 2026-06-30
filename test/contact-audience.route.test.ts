@@ -1,15 +1,30 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession } from "./helpers/route-auth-mock";
+
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
+});
+
 const supabaseServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
+    requireDualAuth: vi.fn(),
+    getDualAuthSupabase: vi.fn(() => ({})),
     parseActionRequest: vi.fn(),
     removeContactFromAudience: vi.fn(),
-    createErrorResponse: vi.fn((e: any) => new Response(String(e?.message ?? e), { status: 500 })),
+    createErrorResponse: vi.fn((e: unknown) =>
+      new Response(String(e instanceof Error ? e.message : e), { status: 500 }),
+    ),
   };
 });
+
+vi.mock("@/lib/api-auth.server", () => ({
+  requireDualAuth: (...args: unknown[]) => mocks.requireDualAuth(...args),
+  getDualAuthSupabase: (...args: unknown[]) => mocks.getDualAuthSupabase(...args),
+  getDualAuthUser: vi.fn(),
+}));
 
 vi.mock("../app/lib/supabase.server", () => ({
   createSupabaseServerClient: () => ({
@@ -18,16 +33,17 @@ vi.mock("../app/lib/supabase.server", () => ({
   }),
 }));
 vi.mock("../app/lib/database.server", () => ({
-  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
-  removeContactFromAudience: (...args: any[]) => mocks.removeContactFromAudience(...args),
+  parseActionRequest: (...args: unknown[]) => mocks.parseActionRequest(...args),
+  removeContactFromAudience: (...args: unknown[]) => mocks.removeContactFromAudience(...args),
 }));
 vi.mock("@/lib/errors.server", () => ({
-  createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
+  createErrorResponse: (...args: unknown[]) => mocks.createErrorResponse(...args),
 }));
 
 describe("app/routes/api+/contact-audience/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
+    mocks.requireDualAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.removeContactFromAudience.mockReset();
     mocks.createErrorResponse.mockClear();
@@ -35,10 +51,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
 
   test("DELETE returns 400 when ids missing", async () => {
     supabaseServerMocks.headers = new Headers({ "X-Test": "1" });
-    queueDualAuthSession({
-      supabaseClient: {},
-      headers: supabaseServerMocks.headers,
-    });
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "", audience_id: "" });
     const mod = await import("../app/routes/api+/contact-audience");
     const res = await asRouteResponse(await mod.action({
@@ -51,8 +64,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
   test("DELETE removes contact from audience", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
     supabaseServerMocks.headers = headers;
-    const supabaseClient = {};
-    queueDualAuthSession({ supabaseClient, headers });
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockResolvedValueOnce({ ok: true });
 
@@ -68,7 +80,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
 
   test("DELETE error uses createErrorResponse", async () => {
     supabaseServerMocks.headers = new Headers();
-    queueDualAuthSession({ supabaseClient: {}, headers: new Headers() });
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockRejectedValueOnce(new Error("nope"));
 
@@ -82,7 +94,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
 
   test("non-DELETE returns json(undefined) with headers", async () => {
     supabaseServerMocks.headers = new Headers({ "X": "1" });
-    queueDualAuthSession({ supabaseClient: {}, headers: new Headers({ "X": "1" }) });
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     const mod = await import("../app/routes/api+/contact-audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "POST" }),

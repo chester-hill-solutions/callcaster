@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
+});
+
 const mocks = vi.hoisted(() => ({
   listWorkspaceAudiencesApi: vi.fn(),
   resolveDataPlaneAuth: vi.fn(),
@@ -11,6 +16,14 @@ vi.mock("@/lib/platform-data.server", () => ({
   listWorkspaceAudiencesApi: (...args: unknown[]) =>
     mocks.listWorkspaceAudiencesApi(...args),
   resolveDataPlaneAuth: (...args: unknown[]) => mocks.resolveDataPlaneAuth(...args),
+}));
+
+vi.mock("@/lib/database.server", () => ({
+  getUserRole: vi.fn(async () => ({ role: "admin" })),
+}));
+
+vi.mock("@/server/db", () => ({
+  db: {},
 }));
 
 describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {

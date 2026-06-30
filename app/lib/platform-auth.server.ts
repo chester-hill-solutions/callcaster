@@ -8,6 +8,7 @@ import {
 import { logger } from "@/lib/logger.server";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import type { Database } from "@/lib/database.types";
+import { listUserWorkspaceMembershipsForProfile } from "@/lib/workspace-members-db.server";
 import type {
   acceptInvitesBodySchema,
   forgotPasswordBodySchema,
@@ -245,15 +246,7 @@ export async function getMeProfile(
   supabaseClient: SupabaseClient<Database>,
   userId: string,
 ) {
-  const { data: workspaces, error: workspacesError } = await supabaseClient
-    .from("workspace_users")
-    .select("last_accessed, role, workspace(id, name)")
-    .eq("user_id", userId)
-    .order("last_accessed", { ascending: false });
-
-  if (workspacesError) {
-    logger.error("getMeProfile workspaces error", workspacesError);
-  }
+  const workspaces = await listUserWorkspaceMembershipsForProfile(userId);
 
   const {
     data: { user },
@@ -261,10 +254,8 @@ export async function getMeProfile(
 
   return {
     user: user ? mapUserProfile(user) : { id: userId },
-    workspaces: workspaces ?? [],
-    last_accessed_workspace_id: workspaces?.[0]?.workspace
-      ? (workspaces[0].workspace as { id: string }).id
-      : null,
+    workspaces,
+    last_accessed_workspace_id: workspaces[0]?.workspace?.id ?? null,
   };
 }
 

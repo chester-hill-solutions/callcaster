@@ -40,3 +40,31 @@ export async function updateScriptForWorkspace(args: {
   });
   return row ?? null;
 }
+
+export async function createWorkspaceScript(args: {
+  workspaceId: string;
+  name: string;
+  type: string;
+  steps: unknown;
+  createdBy?: string | null;
+}): Promise<ScriptRow | null> {
+  const tdb = createTenantDb(args.workspaceId);
+  const [row] = await tdb.script.insert({
+    name: args.name,
+    type: args.type,
+    steps: args.steps as Json,
+    created_by: args.createdBy ?? null,
+  });
+  return row ?? null;
+}
+
+export async function getScriptExportFields(
+  workspaceId: string,
+  scriptId: number,
+): Promise<Pick<ScriptRow, "name" | "steps"> | null> {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.script.findFirst({
+    where: eq(scriptTable.id, scriptId),
+    columns: { name: true, steps: true },
+  });
+}

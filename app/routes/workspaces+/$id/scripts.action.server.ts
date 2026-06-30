@@ -1,37 +1,35 @@
 import { data as routeData } from "react-router";
-import { formatDateToLocale } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getScriptExportFields } from "@/lib/script-api-db.server";
+import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Json , Database } from "@/lib/database.types";
-import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
-import type { User } from "@/lib/types";
 
-export async function action({ request }: ActionFunctionArgs) {
-
-  const { supabaseClient, headers } = await verifyAuth(request);
+export async function action({ request, params }: ActionFunctionArgs) {
+  const access = await requireWorkspaceLoaderContext(request, params.id);
+  if (!access.ok) {
+    return access.response;
+  }
+  const { headers, workspaceId } = access.ctx;
 
   const formData = await request.formData();
   const data = Object.fromEntries(formData.entries());
 
   const idValue = data["id"];
   if (!idValue) {
-    return routeData({ error: "Script ID is required" }, { status: 400 });
+    return routeData({ error: "Script ID is required" }, { status: 400, headers });
   }
 
-  const { data: script, error: scriptError } = await supabaseClient
-    .from("script")
-    .select("name, steps")
-    .eq("id", Number(idValue) || 0)
-    .single();
-
-  if (scriptError) {
-    logger.error("Error fetching script:", scriptError);
-    return routeData({ error: "Error fetching script" }, { status: 500 });
+  const scriptId = Number(idValue) || 0;
+  let script: { name: string; steps: unknown } | null;
+  try {
+    script = await getScriptExportFields(workspaceId, scriptId);
+  } catch (error) {
+    logger.error("Error fetching script:", error);
+    return routeData({ error: "Error fetching script" }, { status: 500, headers });
   }
 
   if (!script) {
-    return routeData({ error: "Script not found" }, { status: 404 });
+    return routeData({ error: "Script not found" }, { status: 404, headers });
   }
 
   const scriptJson = JSON.stringify(script.steps, null, 2);

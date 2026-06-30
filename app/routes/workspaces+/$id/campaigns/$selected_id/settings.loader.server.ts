@@ -81,7 +81,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const campaignBilling = await loadCampaignBillingSummary({
-    supabaseClient,
     workspaceId: workspace_id,
     campaignId: Number(selected_id),
     campaignType: campaignType?.type,

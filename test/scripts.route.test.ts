@@ -1,36 +1,55 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
+
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
+});
 
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
+    requireDualAuth: vi.fn(),
+    getDualAuthUser: vi.fn(),
     safeParseJson: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    insertScriptForWorkspace: vi.fn(),
+    updateScriptForWorkspace: vi.fn(),
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
 
-vi.mock("../app/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+vi.mock("@/lib/api-auth.server", () => ({
+  requireDualAuth: (...args: unknown[]) => mocks.requireDualAuth(...args),
+  getDualAuthUser: (...args: unknown[]) => mocks.getDualAuthUser(...args),
 }));
+
 vi.mock("@/lib/database.server", () => ({
-  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
+  safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
 }));
+
+vi.mock("@/lib/script-api-db.server", () => ({
+  insertScriptForWorkspace: (...args: unknown[]) =>
+    mocks.insertScriptForWorkspace(...args),
+  updateScriptForWorkspace: (...args: unknown[]) =>
+    mocks.updateScriptForWorkspace(...args),
+}));
+
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 describe("app/routes/api+/scripts/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
+    mocks.requireDualAuth.mockReset();
+    mocks.getDualAuthUser.mockReset();
     mocks.safeParseJson.mockReset();
+    mocks.insertScriptForWorkspace.mockReset();
+    mocks.updateScriptForWorkspace.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("inserts when saveAsCopy or id missing (copy suffix branch)", async () => {
-    const select = vi.fn().mockResolvedValueOnce({ data: [{ id: 1, name: "N (Copy)" }], error: null });
-    const insert = vi.fn().mockReturnValueOnce({ select });
-    const from = vi.fn().mockReturnValueOnce({ insert });
-    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
+    mocks.getDualAuthUser.mockReturnValueOnce({ id: "u1" });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: 123,
       name: "N",
@@ -38,20 +57,25 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: true,
     });
+    mocks.insertScriptForWorkspace.mockResolvedValueOnce({ id: 1, name: "N (Copy)" });
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(
+      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 1, name: "N (Copy)" } });
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ name: "N (Copy)", updated_by: "u1" }));
+    expect(mocks.insertScriptForWorkspace).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      name: "N (Copy)",
+      steps: {},
+      updatedBy: "u1",
+    });
   });
 
   test("updates when id present and not saveAsCopy", async () => {
-    const select = vi.fn().mockResolvedValueOnce({ data: [{ id: 2, name: "N" }], error: null });
-    const eq = vi.fn().mockReturnValueOnce({ select });
-    const update = vi.fn().mockReturnValueOnce({ eq });
-    const from = vi.fn().mockReturnValueOnce({ update });
-    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
+    mocks.getDualAuthUser.mockReturnValueOnce({ id: "u1" });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: 2,
       name: "N",
@@ -59,19 +83,26 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: false,
     });
+    mocks.updateScriptForWorkspace.mockResolvedValueOnce({ id: 2, name: "N" });
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(
+      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 2, name: "N" } });
-    expect(eq).toHaveBeenCalledWith("id", 2);
+    expect(mocks.updateScriptForWorkspace).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      scriptId: 2,
+      name: "N",
+      steps: {},
+      updatedBy: "u1",
+    });
   });
 
   test("returns 400 on unique violation (23505)", async () => {
-    const select = vi.fn().mockResolvedValueOnce({ data: [], error: { code: "23505", message: "dup" } });
-    const insert = vi.fn().mockReturnValueOnce({ select });
-    const from = vi.fn().mockReturnValueOnce({ insert });
-    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
+    mocks.getDualAuthUser.mockReturnValueOnce({ id: "u1" });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: null,
       name: "N",
@@ -79,20 +110,23 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: false,
     });
+    mocks.insertScriptForWorkspace.mockRejectedValueOnce(
+      new Error("duplicate key value violates unique constraint 23505"),
+    );
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(
+      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "A script with this name already exists in the workspace",
     });
   });
 
-  test("returns 500 when supabase returns non-23505 error", async () => {
-    const select = vi.fn().mockResolvedValueOnce({ data: [], error: { code: "X", message: "nope" } });
-    const insert = vi.fn().mockReturnValueOnce({ select });
-    const from = vi.fn().mockReturnValueOnce({ insert });
-    queueDualAuthSession({ supabaseClient: { from }, user: { id: "u1" } });
+  test("returns 500 when insert throws non-23505 error", async () => {
+    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
+    mocks.getDualAuthUser.mockReturnValueOnce({ id: "u1" });
     mocks.safeParseJson.mockResolvedValueOnce({
       id: null,
       name: "N",
@@ -100,12 +134,14 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: false,
     });
+    mocks.insertScriptForWorkspace.mockRejectedValueOnce(new Error("nope"));
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(
+      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    );
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "nope" });
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 });
-

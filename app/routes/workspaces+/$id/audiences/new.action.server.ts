@@ -1,12 +1,10 @@
 import { data as routeData, redirect } from "react-router";
+import { createEmptyAudience } from "@/lib/audience-upload-db.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
 
@@ -23,7 +21,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const formAction = formData.get("formAction") as string;
   const audienceName = formData.get("audience-name") as string;
-  
 
   if (!audienceName) {
     return routeData(
@@ -37,22 +34,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   switch (formAction) {
     case "createAudience": {
-      // Just create the audience without contacts
-      const { data: audienceData, error: audienceError } = await supabaseClient
-        .from("audience")
-        .insert({
-          name: audienceName,
-          workspace: workspaceId,
-          status: "empty",
-        })
-        .select()
-        .single();
-
-      if (audienceError) {
+      let audienceData;
+      try {
+        audienceData = await createEmptyAudience(workspaceId, audienceName);
+      } catch (error) {
         return routeData(
           {
             success: false,
-            error: audienceError.message,
+            error: error instanceof Error ? error.message : "Failed to create audience",
+          },
+          { headers },
+        );
+      }
+
+      if (!audienceData) {
+        return routeData(
+          {
+            success: false,
+            error: "Failed to create audience",
           },
           { headers },
         );

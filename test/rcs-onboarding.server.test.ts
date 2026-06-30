@@ -1,5 +1,27 @@
 import { describe, expect, test, vi } from "vitest";
 
+const twilioDataMocks = vi.hoisted(() => ({
+  data: {} as Record<string, unknown>,
+  loadError: null as Error | null,
+  persistError: null as Error | null,
+  persistCalls: [] as unknown[],
+}));
+
+vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
+  loadWorkspaceTwilioData: vi.fn(async () => {
+    if (twilioDataMocks.loadError) {
+      throw twilioDataMocks.loadError;
+    }
+    return twilioDataMocks.data;
+  }),
+  persistWorkspaceTwilioData: vi.fn(async (_client: unknown, _workspaceId: string, data: unknown) => {
+    if (twilioDataMocks.persistError) {
+      throw twilioDataMocks.persistError;
+    }
+    twilioDataMocks.persistCalls.push(data);
+  }),
+}));
+
 import {
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
   mergeWorkspaceMessagingOnboardingState,
@@ -12,28 +34,15 @@ import {
   updateWorkspaceRcsOnboarding,
 } from "../app/lib/rcs-onboarding.server";
 
-function makeSupabase(
+function configureTwilioData(
   twilioData: unknown,
   options?: { selectError?: unknown; updateError?: unknown },
 ) {
-  const updateEq = vi.fn(async () => ({ error: options?.updateError ?? null }));
-  return {
-    from: vi.fn((table: string) => {
-      if (table !== "workspace") throw new Error(`Unexpected table: ${table}`);
-      return {
-        select: () => ({
-          eq: () => ({
-            single: vi.fn(async () => ({
-              data: { twilio_data: twilioData },
-              error: options?.selectError ?? null,
-            })),
-          }),
-        }),
-        update: () => ({ eq: updateEq }),
-      };
-    }),
-    _updateEq: updateEq,
-  };
+  twilioDataMocks.data = (twilioData ?? {}) as Record<string, unknown>;
+  twilioDataMocks.loadError = options?.selectError instanceof Error ? options.selectError : null;
+  twilioDataMocks.persistError = options?.updateError instanceof Error ? options.updateError : null;
+  twilioDataMocks.persistCalls = [];
+  return {} as const;
 }
 
 describe("RCS onboarding helpers", () => {
@@ -176,7 +185,7 @@ describe("RCS onboarding helpers", () => {
         },
       ),
     };
-    const supabase = makeSupabase(starting);
+    const supabase = configureTwilioData(starting);
 
     const result = await updateWorkspaceRcsOnboarding({
       supabaseClient: supabase as any,
@@ -206,7 +215,7 @@ describe("RCS onboarding helpers", () => {
     expect(result.rcs.displayName).toBe("Acme Alerts");
     expect(result.rcs.provider).toBe("Twilio");
     expect(result.rcs.lastSubmittedAt).toMatch(/T/);
-    expect(supabase._updateEq).toHaveBeenCalled();
+    expect(twilioDataMocks.persistCalls.length).toBeGreaterThan(0);
   });
 
   test("updateWorkspaceRcsOnboarding throws on read/write errors", async () => {
@@ -215,7 +224,7 @@ describe("RCS onboarding helpers", () => {
 
     await expect(
       updateWorkspaceRcsOnboarding({
-        supabaseClient: makeSupabase({}, { selectError }) as any,
+        supabaseClient: configureTwilioData({}, { selectError }) as any,
         workspaceId: "w1",
         actorUserId: null,
         provider: null,
@@ -240,7 +249,7 @@ describe("RCS onboarding helpers", () => {
 
     await expect(
       updateWorkspaceRcsOnboarding({
-        supabaseClient: makeSupabase({}, { updateError }) as any,
+        supabaseClient: configureTwilioData({}, { updateError }) as any,
         workspaceId: "w1",
         actorUserId: null,
         provider: null,

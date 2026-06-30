@@ -1,18 +1,19 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 
 const mocks = vi.hoisted(() => {
   return {
-    outletContext: { supabase: null as any },
+    fetchAudienceUploads: vi.fn(),
     realtimeOpts: null as any,
     formatDistanceToNow: vi.fn(() => "2 minutes ago"),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
 
-vi.mock("react-router", () => ({
-  useOutletContext: () => mocks.outletContext,
+vi.mock("@/lib/chats/messaging-client", () => ({
+  fetchAudienceUploads: (...args: unknown[]) => mocks.fetchAudienceUploads(...args),
 }));
 
 vi.mock("date-fns", () => ({
@@ -32,116 +33,107 @@ vi.mock("lucide-react", () => ({
   Loader2: (props: any) => <div {...props}>loader</div>,
 }));
 
-function makeSupabase(returnValue: { data: any; error: any } | (() => Promise<{ data: any; error: any }>)) {
-  const order = vi.fn(async () => {
-    if (typeof returnValue === "function") return await returnValue();
-    return returnValue;
-  });
+const supabaseStub = { channel: vi.fn() } as const;
 
-  const chain = {
-    select: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    order,
-  };
-
-  return {
-    from: vi.fn(() => chain),
-    __order: order,
-    __chain: chain,
-  };
+function renderHistory(props: {
+  audienceId: number;
+  workspaceId?: string;
+}) {
+  return render(
+    <AudienceUploadHistory
+      audienceId={props.audienceId}
+      workspaceId={props.workspaceId ?? "ws-1"}
+      supabase={supabaseStub as never}
+    />,
+  );
 }
 
 describe("app/components/audience/AudienceUploadHistory.tsx", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     mocks.realtimeOpts = null;
     mocks.formatDistanceToNow.mockClear();
     mocks.logger.error.mockReset();
+    mocks.fetchAudienceUploads.mockReset();
   });
 
   test("shows loading, then renders uploads with status/size/progress and file name fallback", async () => {
-    const { default: AudienceUploadHistory } = await import("@/components/audience/AudienceUploadHistory");
+    mocks.fetchAudienceUploads.mockResolvedValue([
+      {
+        id: 1,
+        audience_id: 99,
+        created_at: new Date().toISOString(),
+        status: "processing",
+        file_name: null,
+        file_size: 1024,
+        total_contacts: 10,
+        processed_contacts: 4,
+        processed_at: null,
+        error_message: null,
+      },
+      {
+        id: 6,
+        audience_id: 99,
+        created_at: new Date().toISOString(),
+        status: "processing",
+        file_name: "zero.csv",
+        file_size: 0,
+        total_contacts: 0,
+        processed_contacts: 0,
+        processed_at: null,
+        error_message: null,
+      },
+      {
+        id: 2,
+        audience_id: 99,
+        created_at: new Date().toISOString(),
+        status: "completed",
+        file_name: "ok.csv",
+        file_size: null,
+        total_contacts: 5,
+        processed_contacts: 5,
+        processed_at: new Date().toISOString(),
+        error_message: null,
+      },
+      {
+        id: 3,
+        audience_id: 99,
+        created_at: new Date().toISOString(),
+        status: "error",
+        file_name: "bad.csv",
+        file_size: 0,
+        total_contacts: 0,
+        processed_contacts: 0,
+        processed_at: null,
+        error_message: "boom",
+      },
+      {
+        id: 4,
+        audience_id: 99,
+        created_at: new Date().toISOString(),
+        status: "pending",
+        file_name: "p.csv",
+        file_size: 1024 * 1024,
+        total_contacts: 1,
+        processed_contacts: 0,
+        processed_at: null,
+        error_message: null,
+      },
+      {
+        id: 5,
+        audience_id: 99,
+        created_at: new Date().toISOString(),
+        status: "unknown",
+        file_name: "u.csv",
+        file_size: 1024 * 1024 * 1024,
+        total_contacts: 1,
+        processed_contacts: 0,
+        processed_at: null,
+        error_message: null,
+      },
+    ]);
 
-    const supabase = makeSupabase({
-      data: [
-        {
-          id: 1,
-          audience_id: 99,
-          created_at: new Date().toISOString(),
-          status: "processing",
-          file_name: null,
-          file_size: 1024,
-          total_contacts: 10,
-          processed_contacts: 4,
-          processed_at: null,
-          error_message: null,
-        },
-        {
-          id: 6,
-          audience_id: 99,
-          created_at: new Date().toISOString(),
-          status: "processing",
-          file_name: "zero.csv",
-          file_size: 0,
-          total_contacts: 0,
-          processed_contacts: 0,
-          processed_at: null,
-          error_message: null,
-        },
-        {
-          id: 2,
-          audience_id: 99,
-          created_at: new Date().toISOString(),
-          status: "completed",
-          file_name: "ok.csv",
-          file_size: null,
-          total_contacts: 5,
-          processed_contacts: 5,
-          processed_at: new Date().toISOString(),
-          error_message: null,
-        },
-        {
-          id: 3,
-          audience_id: 99,
-          created_at: new Date().toISOString(),
-          status: "error",
-          file_name: "bad.csv",
-          file_size: 0,
-          total_contacts: 0,
-          processed_contacts: 0,
-          processed_at: null,
-          error_message: "boom",
-        },
-        {
-          id: 4,
-          audience_id: 99,
-          created_at: new Date().toISOString(),
-          status: "pending",
-          file_name: "p.csv",
-          file_size: 1024 * 1024,
-          total_contacts: 1,
-          processed_contacts: 0,
-          processed_at: null,
-          error_message: null,
-        },
-        {
-          id: 5,
-          audience_id: 99,
-          created_at: new Date().toISOString(),
-          status: "unknown",
-          file_name: "u.csv",
-          file_size: 1024 * 1024 * 1024,
-          total_contacts: 1,
-          processed_contacts: 0,
-          processed_at: null,
-          error_message: null,
-        },
-      ],
-      error: null,
-    });
-    mocks.outletContext.supabase = supabase;
-
-    render(<AudienceUploadHistory audienceId={99} />);
+    renderHistory({ audienceId: 99 });
     expect(screen.getByText("Loading upload history...")).toBeInTheDocument();
 
     await waitFor(() => {
@@ -154,26 +146,21 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     expect(screen.getByText("1.0 MB")).toBeInTheDocument();
     expect(screen.getByText("1.0 GB")).toBeInTheDocument();
 
-    // processing shows progress bar with rounded percentage (4/10 = 40%)
     const processingRow = screen.getByText("Unknown file").closest("tr") as HTMLElement;
     const progressInner = processingRow.querySelector("div[style]") as HTMLElement;
     expect(progressInner.getAttribute("style")).toContain("40%");
 
-    // processing with total_contacts=0 yields 0%
     const zeroRow = screen.getByText("zero.csv").closest("tr") as HTMLElement;
     const zeroProgress = zeroRow.querySelector("div[style]") as HTMLElement;
     expect(zeroProgress.getAttribute("style")).toContain("0%");
 
-    // completed uses total_contacts as plain number
     const completedRow = screen.getByText("completed").closest("tr") as HTMLElement;
     expect(within(completedRow).getByText("5")).toBeInTheDocument();
 
-    // error shows warning icon with title
     const errorRow = screen.getByText("error").closest("tr") as HTMLElement;
     const warn = within(errorRow).getByTitle("boom");
     expect(warn).toBeInTheDocument();
 
-    // status badge class switch (spot check)
     expect(screen.getByText("pending").className).toContain("bg-yellow-100");
     expect(screen.getAllByText("processing")[0]!.className).toContain("bg-blue-100");
     expect(screen.getByText("completed").className).toContain("bg-green-100");
@@ -182,54 +169,33 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
   });
 
   test("renders empty state when no uploads", async () => {
-    const { default: AudienceUploadHistory } = await import("@/components/audience/AudienceUploadHistory");
-    mocks.outletContext.supabase = makeSupabase({ data: [], error: null });
+    mocks.fetchAudienceUploads.mockResolvedValue([]);
 
-    render(<AudienceUploadHistory audienceId={1} />);
+    renderHistory({ audienceId: 1 });
     await waitFor(() => {
       expect(screen.getByText("No upload history found for this audience")).toBeInTheDocument();
     });
   });
 
-  test("null data falls back to empty uploads list", async () => {
-    const { default: AudienceUploadHistory } = await import("@/components/audience/AudienceUploadHistory");
-    mocks.outletContext.supabase = makeSupabase({ data: null, error: null });
+  test("fetch failure shows error state and Try again refetches successfully", async () => {
+    mocks.fetchAudienceUploads
+      .mockRejectedValueOnce(new Error("nope"))
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          audience_id: 1,
+          created_at: new Date().toISOString(),
+          status: "completed",
+          file_name: "x.csv",
+          file_size: 1,
+          total_contacts: 1,
+          processed_contacts: 1,
+          processed_at: null,
+          error_message: null,
+        },
+      ]);
 
-    render(<AudienceUploadHistory audienceId={1} />);
-    await waitFor(() => {
-      expect(screen.getByText("No upload history found for this audience")).toBeInTheDocument();
-    });
-  });
-
-  test("renders error state and Try again refetches successfully", async () => {
-    const { default: AudienceUploadHistory } = await import("@/components/audience/AudienceUploadHistory");
-    let call = 0;
-    const supabase = makeSupabase(async () => {
-      call++;
-      if (call === 1) {
-        return { data: null, error: new Error("nope") };
-      }
-      return {
-        data: [
-          {
-            id: 1,
-            audience_id: 1,
-            created_at: new Date().toISOString(),
-            status: "completed",
-            file_name: "x.csv",
-            file_size: 1,
-            total_contacts: 1,
-            processed_contacts: 1,
-            processed_at: null,
-            error_message: null,
-          },
-        ],
-        error: null,
-      };
-    });
-    mocks.outletContext.supabase = supabase;
-
-    render(<AudienceUploadHistory audienceId={1} />);
+    renderHistory({ audienceId: 1 });
 
     await waitFor(() => {
       expect(screen.getByText("Error loading upload history")).toBeInTheDocument();
@@ -244,11 +210,9 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
   });
 
   test("non-Error thrown during fetch shows generic error message", async () => {
-    const { default: AudienceUploadHistory } = await import("@/components/audience/AudienceUploadHistory");
-    const supabase = makeSupabase({ data: null, error: "nope" as any });
-    mocks.outletContext.supabase = supabase;
+    mocks.fetchAudienceUploads.mockRejectedValueOnce("nope");
 
-    render(<AudienceUploadHistory audienceId={1} />);
+    renderHistory({ audienceId: 1 });
     await waitFor(() => {
       expect(screen.getByText("Error loading upload history")).toBeInTheDocument();
     });
@@ -256,30 +220,25 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
   });
 
   test("realtime subscription INSERT/UPDATE/DELETE mutate uploads without refetch", async () => {
-    const { default: AudienceUploadHistory } = await import("@/components/audience/AudienceUploadHistory");
-    mocks.outletContext.supabase = makeSupabase({
-      data: [
-        {
-          id: 1,
-          audience_id: 1,
-          created_at: new Date().toISOString(),
-          status: "pending",
-          file_name: "a.csv",
-          file_size: 1,
-          total_contacts: 2,
-          processed_contacts: 0,
-          processed_at: null,
-          error_message: null,
-        },
-      ],
-      error: null,
-    });
+    mocks.fetchAudienceUploads.mockResolvedValue([
+      {
+        id: 1,
+        audience_id: 1,
+        created_at: new Date().toISOString(),
+        status: "pending",
+        file_name: "a.csv",
+        file_size: 1,
+        total_contacts: 2,
+        processed_contacts: 0,
+        processed_at: null,
+        error_message: null,
+      },
+    ]);
 
-    render(<AudienceUploadHistory audienceId={1} />);
+    renderHistory({ audienceId: 1 });
     await waitFor(() => expect(screen.getByText("a.csv")).toBeInTheDocument());
     expect(mocks.realtimeOpts?.table).toBe("audience_upload");
 
-    // INSERT
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "INSERT",
@@ -299,7 +258,6 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     });
     await waitFor(() => expect(screen.getByText("b.csv")).toBeInTheDocument());
 
-    // UPDATE merges by id
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
@@ -309,7 +267,6 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     await waitFor(() => expect(screen.getByText("error")).toBeInTheDocument());
     expect(screen.getByTitle("e")).toBeInTheDocument();
 
-    // UPDATE with non-matching id should be a no-op (covers upload.id !== newData.id branch)
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
@@ -318,7 +275,6 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     });
     expect(screen.getByText("a.csv")).toBeInTheDocument();
 
-    // UPDATE with no id should be a no-op (covers newData.id falsy branch)
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
@@ -327,7 +283,6 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     });
     expect(screen.getByText("a.csv")).toBeInTheDocument();
 
-    // DELETE removes by id
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "DELETE",
@@ -336,7 +291,6 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     });
     await waitFor(() => expect(screen.queryByText("b.csv")).toBeNull());
 
-    // DELETE with no id should not remove existing rows (covers old.id undefined path)
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "DELETE",
@@ -345,7 +299,6 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     });
     expect(screen.getByText("a.csv")).toBeInTheDocument();
 
-    // Unknown eventType should be ignored (covers DELETE condition false branch)
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UNKNOWN",
@@ -357,13 +310,10 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
   });
 
   test("audienceId=0 short-circuits fetch and remains loading", async () => {
-    const { default: AudienceUploadHistory } = await import("@/components/audience/AudienceUploadHistory");
-    const supabase = makeSupabase({ data: [], error: null });
-    mocks.outletContext.supabase = supabase;
+    mocks.fetchAudienceUploads.mockResolvedValue([]);
 
-    render(<AudienceUploadHistory audienceId={0} />);
+    renderHistory({ audienceId: 0 });
     expect(screen.getByText("Loading upload history...")).toBeInTheDocument();
-    expect(supabase.from).not.toHaveBeenCalled();
+    expect(mocks.fetchAudienceUploads).not.toHaveBeenCalled();
   });
 });
-

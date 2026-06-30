@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 
 vi.mock("@/lib/env.server", () => ({
@@ -7,27 +7,27 @@ vi.mock("@/lib/env.server", () => ({
   },
 }));
 
+const workspaceMocks = vi.hoisted(() => ({
+  getWorkspaceById: vi.fn(),
+}));
+
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  getWorkspaceById: (...args: unknown[]) => workspaceMocks.getWorkspaceById(...args),
+}));
+
 describe("createHandsetAccessToken", () => {
+  beforeEach(() => {
+    workspaceMocks.getWorkspaceById.mockReset();
+  });
+
   it("returns error when workspace is missing credentials", async () => {
-    const supabaseClient = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: {
-                twilio_data: { sid: "" },
-                key: "",
-                token: "",
-              },
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    } as never;
+    workspaceMocks.getWorkspaceById.mockResolvedValueOnce({
+      twilio_data: { sid: "" },
+      key: "",
+      token: "",
+    });
 
     const result = await createHandsetAccessToken({
-      supabaseClient,
       workspaceId: "ws-1",
       clientIdentity: "handset-1",
     });
@@ -37,18 +37,9 @@ describe("createHandsetAccessToken", () => {
   });
 
   it("returns error when workspace is not found", async () => {
-    const supabaseClient = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: null, error: { message: "not found" } }),
-          }),
-        }),
-      }),
-    } as never;
+    workspaceMocks.getWorkspaceById.mockResolvedValueOnce(null);
 
     const result = await createHandsetAccessToken({
-      supabaseClient,
       workspaceId: "ws-missing",
       clientIdentity: "handset-1",
     });

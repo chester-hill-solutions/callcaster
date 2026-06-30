@@ -1,4 +1,5 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { findContactsByPhone } from "@/lib/database/contact.server";
 import {
   listWorkspaceContactsApi,
   resolveDataPlaneAuth,
@@ -15,6 +16,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (auth instanceof Response) return auth;
 
   const url = new URL(request.url);
+  const phone = url.searchParams.get("phone");
+  if (phone) {
+    try {
+      const contacts = await findContactsByPhone(workspaceId, phone);
+      return jsonResponse({ contacts }, 200);
+    } catch (error) {
+      return jsonError(
+        error instanceof Error ? error.message : "Failed to search contacts by phone",
+        500,
+      );
+    }
+  }
+
   const result = await listWorkspaceContactsApi(
     auth.supabase,
     workspaceId,

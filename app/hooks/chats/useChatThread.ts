@@ -3,6 +3,7 @@ import { useFetcher, useLoaderData, useLocation, useParams } from "react-router"
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
 import { useInfiniteScroll } from "@/hooks";
+import { markConversationRead } from "@/lib/chats/messaging-client";
 import { isOptOutMessage } from "@/lib/chat-opt-out";
 import { logger } from "@/lib/logger.client";
 import type { Message, Workspace, WorkspaceNumber } from "@/lib/types";
@@ -148,30 +149,21 @@ export function useChatThread({
 
     const markMessagesAsRead = async () => {
       try {
-        const { error } = await supabase
-          .from("message")
-          .update({ status: "delivered" })
-          .eq("workspace", workspace.id)
-          .eq("status", "received")
-          .or(`from.eq.${contact_number},to.eq.${contact_number}`);
+        await markConversationRead(workspace.id, contact_number);
 
-        if (error) {
-          logger.error("Error marking messages as read:", error);
-        } else {
-          setMessages((prevMessages) =>
-            prevMessages.map((msg) =>
-              msg?.status === "received" ? { ...msg, status: "delivered" } : msg,
-            ),
-          );
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) =>
+            msg?.status === "received" ? { ...msg, status: "delivered" } : msg,
+          ),
+        );
 
-          window.dispatchEvent(
-            new CustomEvent("messages-read", {
-              detail: { contactNumber: contact_number },
-            }),
-          );
+        window.dispatchEvent(
+          new CustomEvent("messages-read", {
+            detail: { contactNumber: contact_number },
+          }),
+        );
 
-          hasMarkedAsReadRef.current = true;
-        }
+        hasMarkedAsReadRef.current = true;
       } catch (err) {
         logger.error("Error in markMessagesAsRead:", err);
       }
@@ -182,17 +174,14 @@ export function useChatThread({
     return () => {
       hasMarkedAsReadRef.current = false;
     };
-  }, [contact_number, supabase, workspace.id, setMessages]);
+  }, [contact_number, workspace.id, setMessages]);
 
   const updateMessageStatus = async (messageId: string) => {
-    const { error } = await supabase
-      .from("message")
-      .update({ status: "delivered" })
-      .eq("sid", messageId);
+    try {
+      await markConversationRead(workspace.id, contact_number, {
+        messageSid: messageId,
+      });
 
-    if (error) {
-      logger.error("Error updating message status:", error);
-    } else {
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg?.sid === messageId ? { ...msg, status: "delivered" } : msg,
@@ -204,6 +193,8 @@ export function useChatThread({
           detail: { messageId, contactNumber: contact_number },
         }),
       );
+    } catch (error) {
+      logger.error("Error updating message status:", error);
     }
   };
 

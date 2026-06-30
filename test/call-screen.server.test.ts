@@ -1,5 +1,18 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
+vi.mock("@/server/db", () => ({
+  db: {
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+  },
+}));
+
 vi.mock("@/lib/logger.server", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
@@ -62,6 +75,14 @@ vi.mock("@/server/tenant-db", () => ({
   })),
 }));
 
+const workspaceMembersMocks = vi.hoisted(() => ({
+  getUserById: vi.fn(),
+}));
+
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  getUserById: (...args: unknown[]) => workspaceMembersMocks.getUserById(...args),
+}));
+
 import {
   getCallScreenData,
   getInitialCallsList,
@@ -77,6 +98,7 @@ describe("call-screen.server", () => {
     vi.clearAllMocks();
     adminDbMocks.workspaceRows = [{ id: "ws-1" }];
     adminDbMocks.workspaceError = null;
+    workspaceMembersMocks.getUserById.mockReset();
     queueSearchMocks.countCampaignQueueRows.mockResolvedValue(10);
     queueSearchMocks.countCompletedCampaignQueueRows.mockResolvedValue(4);
     queueSearchMocks.fetchActiveCampaignQueueWithContacts.mockResolvedValue([]);
@@ -121,34 +143,17 @@ describe("call-screen.server", () => {
   });
 
   test("getVerifiedNumbers returns verified numbers", async () => {
-    const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn().mockResolvedValue({
-              data: { verified_audio_numbers: ["+15551234567"] },
-              error: null,
-            }),
-          })),
-        })),
-      })),
-    };
-    await expect(getVerifiedNumbers(supabase as never, "user-1")).resolves.toEqual([
+    workspaceMembersMocks.getUserById.mockResolvedValueOnce({
+      verified_audio_numbers: ["+15551234567"],
+    });
+    await expect(getVerifiedNumbers({} as never, "user-1")).resolves.toEqual([
       "+15551234567",
     ]);
   });
 
   test("getVerifiedNumbers throws on error", async () => {
-    const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn().mockResolvedValue({ data: null, error: new Error("fail") }),
-          })),
-        })),
-      })),
-    };
-    await expect(getVerifiedNumbers(supabase as never, "user-1")).rejects.toThrow("fail");
+    workspaceMembersMocks.getUserById.mockResolvedValueOnce(null);
+    await expect(getVerifiedNumbers({} as never, "user-1")).rejects.toThrow("User not found");
   });
 
   test("getQueueByDialType throws for invalid dial type", async () => {

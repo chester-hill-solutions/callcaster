@@ -1,34 +1,29 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 
-import type { Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 
 export type HandsetAccessTokenResult =
   | { token: string; error: null }
   | { token: null; error: string };
 
 export async function createHandsetAccessToken({
-  supabaseClient,
   workspaceId,
   clientIdentity,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   clientIdentity: string;
+  /** @deprecated Drizzle lookup — ignored when workspaceId is set. */
+  supabaseClient?: unknown;
 }): Promise<HandsetAccessTokenResult> {
   if (!workspaceId || !clientIdentity) {
     return { token: null, error: "workspace and client_identity are required" };
   }
 
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data, key, token")
-    .eq("id", workspaceId)
-    .single();
+  const data = await getWorkspaceById(workspaceId);
 
-  if (error || !data) {
+  if (!data) {
     return { token: null, error: "Workspace not found" };
   }
 

@@ -19,6 +19,7 @@ import {
   outreach_attempt as outreachAttemptTable,
 } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
+import { getUserById } from "@/lib/workspace-members-db.server";
 
 export async function getCallScreenData(
   supabase: SupabaseClient,
@@ -91,17 +92,12 @@ export async function getCallScreenData(
   };
 }
 
-export async function getVerifiedNumbers(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase
-    .from("user")
-    .select("verified_audio_numbers")
-    .eq("id", userId)
-    .single();
-  if (error) {
-    logger.error("Error fetching verified numbers:", error);
-    throw error;
+export async function getVerifiedNumbers(_supabase: SupabaseClient, userId: string) {
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new Error("User not found");
   }
-  return data?.verified_audio_numbers || [];
+  return user.verified_audio_numbers || [];
 }
 
 export async function getQueueByDialType(

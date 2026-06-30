@@ -1,5 +1,18 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
+vi.mock("@/server/db", () => ({
+  db: {
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+  },
+}));
+
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
@@ -32,6 +45,26 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 const inboundContextMocks = vi.hoisted(() => ({
   contacts: [] as Array<{ id: number }>,
   contactError: null as Error | null,
+  resolveInboundWorkspaceContext: vi.fn(),
+}));
+
+vi.mock("@/lib/inbound-sms-context.server", () => ({
+  parseTrimmedString: (value: unknown) => (typeof value === "string" ? value.trim() : ""),
+  resolveInboundWorkspaceContext: (...args: unknown[]) =>
+    inboundContextMocks.resolveInboundWorkspaceContext(...args),
+  findMatchingContactIds: vi.fn(async () => {
+    if (inboundContextMocks.contactError) {
+      mocks.logger.error("Contact lookup error:", inboundContextMocks.contactError);
+      return [];
+    }
+    return Array.from(
+      new Set(
+        inboundContextMocks.contacts
+          .map((contact) => contact?.id)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    );
+  }),
 }));
 
 vi.mock("@/lib/database.server", async (importOriginal) => {
@@ -51,6 +84,72 @@ vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => createTenantDbMock(),
 }));
 
+function configureInboundWorkspaceContext(opts?: {
+  number?: any;
+  workspaceNumberError?: any;
+  workspaceMsMatches?: any[];
+  workspaceMsError?: any;
+}) {
+  if (opts?.workspaceNumberError) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: false,
+      response: Response.json({ error: "Number lookup failed" }, { status: 500 }),
+    });
+    return;
+  }
+
+  if (opts?.number) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: true,
+      ctx: {
+        workspace: opts.number.workspace,
+        twilio_data: opts.number.twilio_data,
+        webhook: opts.number.webhook ?? [],
+      },
+      attributionPath: "matched_by_to_number",
+    });
+    return;
+  }
+
+  if (opts?.workspaceMsError) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: false,
+      response: Response.json({ error: "Messaging service lookup failed" }, { status: 500 }),
+    });
+    return;
+  }
+
+  const matches = opts?.workspaceMsMatches ?? [];
+  if (matches.length === 1) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: true,
+      ctx: {
+        workspace: matches[0].id,
+        twilio_data: matches[0].twilio_data,
+        webhook: matches[0].webhook ?? [],
+      },
+      attributionPath: "matched_by_messaging_service_sid",
+    });
+    return;
+  }
+
+  if (matches.length > 1) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: false,
+      response: Response.json(
+        { error: "Messaging service matches multiple workspaces" },
+        { status: 409 },
+      ),
+    });
+    return;
+  }
+
+  inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+    ok: false,
+    response: Response.json({ error: "Number not found" }, { status: 404 }),
+  });
+}
+
 function makeSupabase(opts?: {
   number?: any;
   workspaceNumberError?: any;
@@ -66,6 +165,7 @@ function makeSupabase(opts?: {
 }) {
   inboundContextMocks.contacts = (opts?.contacts ?? []) as Array<{ id: number }>;
   inboundContextMocks.contactError = opts?.contactError ?? null;
+  configureInboundWorkspaceContext(opts);
 
   const supabase: any = {
     rpc: async () => ({
@@ -81,28 +181,6 @@ function makeSupabase(opts?: {
       }),
     },
     from: (table: string) => {
-      if (table === "workspace_number") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({
-                data: opts?.number ?? null,
-                error: opts?.workspaceNumberError ?? null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            or: async () => ({
-              data: opts?.workspaceMsMatches ?? [],
-              error: opts?.workspaceMsError ?? null,
-            }),
-          }),
-        };
-      }
       if (table === "contact") {
         const contactQuery: any = {
           select: () => contactQuery,
@@ -172,6 +250,7 @@ describe("app/routes/api+/inbound-sms", () => {
     configureTenantDbStub();
     inboundContextMocks.contacts = [];
     inboundContextMocks.contactError = null;
+    inboundContextMocks.resolveInboundWorkspaceContext.mockReset();
     mocks.createClient.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);

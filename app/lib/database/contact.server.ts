@@ -78,6 +78,45 @@ function phoneLookupFilters(exactPhoneCandidates: string[]): SQL | undefined {
   );
 }
 
+export async function findContactsByPhone(
+  workspaceId: string,
+  phoneNumber: string,
+  tdb?: TenantDb,
+): Promise<Contact[]> {
+  const fullNumber = phoneNumber.replace(/\D/g, "");
+  if (!fullNumber) {
+    return [];
+  }
+
+  const tenantDb = tdb ?? createTenantDb(workspaceId);
+  const exactPhoneCandidates = buildExactPhoneCandidates(fullNumber);
+  const exactFilter = phoneLookupFilters(exactPhoneCandidates);
+
+  if (!exactFilter) {
+    return [];
+  }
+
+  const exactMatches = (await tenantDb.contact.findMany({
+    where: exactFilter,
+  })) as Contact[];
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+
+  const prefixCandidates = buildPrefixPhoneCandidates(fullNumber);
+  const prefixFilters = prefixCandidates.map((candidate) =>
+    ilike(contactTable.phone, `${candidate}%`),
+  );
+
+  if (prefixFilters.length === 0) {
+    return exactMatches;
+  }
+
+  return (await tenantDb.contact.findMany({
+    where: and(or(...prefixFilters), isNotNull(contactTable.phone), ne(contactTable.phone, "")),
+  })) as Contact[];
+}
+
 export const findPotentialContacts = async (
   supabaseClient: SupabaseClient<Database>,
   phoneNumber: string,
@@ -106,34 +145,9 @@ export const findPotentialContacts = async (
     },
   );
 
-  const tenantDb = tdb ?? createTenantDb(workspaceId);
-  const exactPhoneCandidates = buildExactPhoneCandidates(fullNumber);
-  const exactFilter = phoneLookupFilters(exactPhoneCandidates);
-
-  if (!exactFilter) {
-    return { data: [], error: null };
-  }
-
   try {
-    const exactMatches = await tenantDb.contact.findMany({ where: exactFilter });
-    if (exactMatches.length > 0) {
-      return { data: exactMatches, error: null };
-    }
-
-    const prefixCandidates = buildPrefixPhoneCandidates(fullNumber);
-    const prefixFilters = prefixCandidates.map((candidate) =>
-      ilike(contactTable.phone, `${candidate}%`),
-    );
-
-    if (prefixFilters.length === 0) {
-      return { data: exactMatches, error: null };
-    }
-
-    const prefixMatches = await tenantDb.contact.findMany({
-      where: and(or(...prefixFilters), isNotNull(contactTable.phone), ne(contactTable.phone, "")),
-    });
-
-    return { data: prefixMatches, error: null };
+    const contacts = await findContactsByPhone(workspaceId, phoneNumber, tdb);
+    return { data: contacts, error: null };
   } catch (error) {
     return { data: null, error: error as Error };
   }

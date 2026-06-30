@@ -594,6 +594,42 @@ export async function listAdminWorkspaceUsersWithUser(workspaceId: string) {
   }));
 }
 
+export async function findWorkspaceApiKeyByPrefix(keyPrefix: string) {
+  const [row] = await adminDb
+    .select({
+      id: workspaceApiKeyTable.id,
+      workspace_id: workspaceApiKeyTable.workspace_id,
+      key_hash: workspaceApiKeyTable.key_hash,
+    })
+    .from(workspaceApiKeyTable)
+    .where(eq(workspaceApiKeyTable.key_prefix, keyPrefix))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function touchWorkspaceApiKeyLastUsed(keyId: string) {
+  await adminDb
+    .update(workspaceApiKeyTable)
+    .set({ last_used_at: new Date().toISOString() })
+    .where(eq(workspaceApiKeyTable.id, keyId));
+}
+
+export async function listUserWorkspaceMembershipsForProfile(userId: string) {
+  return adminDb
+    .select({
+      last_accessed: workspaceUsersTable.last_accessed,
+      role: workspaceUsersTable.role,
+      workspace: {
+        id: workspaceTable.id,
+        name: workspaceTable.name,
+      },
+    })
+    .from(workspaceUsersTable)
+    .innerJoin(workspaceTable, eq(workspaceUsersTable.workspace_id, workspaceTable.id))
+    .where(eq(workspaceUsersTable.user_id, userId))
+    .orderBy(desc(workspaceUsersTable.last_accessed));
+}
+
 export async function listUserWorkspaceMembershipsWithWorkspace(userId: string) {
   const memberships = await listUserWorkspaceMemberships(userId);
   if (memberships.length === 0) {

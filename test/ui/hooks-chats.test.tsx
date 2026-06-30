@@ -10,6 +10,12 @@ vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
+const messagingMocks = vi.hoisted(() => ({
+  markConversationRead: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/chats/messaging-client", () => messagingMocks);
+
 const imageFetcher = createMockFetcher({ state: "idle", data: { success: true, url: "https://img" } });
 const olderFetcher = createMockFetcher({ state: "idle" });
 
