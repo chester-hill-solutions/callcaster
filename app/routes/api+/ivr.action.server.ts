@@ -1,4 +1,4 @@
-import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { createClient } from "@supabase/supabase-js";
 import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
@@ -75,12 +75,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!callRow) throw new Error("Failed to insert call record");
 
     // Dequeue
-    const { error: dequeueError } = await supabase
-      .from("campaign_queue")
-      .update(buildDequeuedQueueUpdate(user_id, "IVR call completed", { includeNormalizedFields: true }))
-      .eq("id", queue_id);
-      
-    if (dequeueError) throw dequeueError;
+    await dequeueCampaignQueueById({
+      queueId: Number(queue_id),
+      userId: user_id,
+      reason: "IVR call completed",
+    });
 
     return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
       status: 200,

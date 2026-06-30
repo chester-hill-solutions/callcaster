@@ -8,6 +8,10 @@ import {
 } from "./helpers/transaction-history-stub";
 import { telephonyStubState, configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
@@ -19,8 +23,20 @@ const loggerMocks = vi.hoisted(() => ({
   debug: vi.fn(),
   info: vi.fn(),
 }));
+const campaignQueueDbMocks = vi.hoisted(() => ({
+  updateCampaignQueueByContactAndCampaign: vi.fn(async () => []),
+  updateError: null as Error | null,
+}));
 vi.mock("@/lib/logger.server", () => ({
   logger: loggerMocks,
+}));
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  updateCampaignQueueByContactAndCampaign: async (...args: unknown[]) => {
+    if (campaignQueueDbMocks.updateError) {
+      throw campaignQueueDbMocks.updateError;
+    }
+    return campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign(...args);
+  },
 }));
 
 const twilioValidation = vi.hoisted(() => ({
@@ -71,7 +87,6 @@ vi.mock("../app/lib/database.server", async () => {
 function makeSupabaseStub(args?: { outreachDisposition?: string }) {
   const transactionRows: TransactionRow[] = [];
   const outreachUpdateCalls: any[] = [];
-  const campaignQueueEqCalls: Array<[string, unknown]> = [];
   let lastCallSid: string = "CA1";
 
   const callSelectError: Error | null = (args as any)?.callSelectError ?? null;
@@ -80,6 +95,8 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
   const outreachUpdateError: Error | null = (args as any)?.outreachUpdateError ?? null;
   const outreachUpdateThrows: unknown = (args as any)?.outreachUpdateThrows ?? null;
   const campaignQueueUpdateError: Error | null = (args as any)?.campaignQueueUpdateError ?? null;
+  campaignQueueDbMocks.updateError = campaignQueueUpdateError;
+  campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockClear();
   const rpcDequeueError: Error | null = (args as any)?.rpcDequeueError ?? null;
   const outreachFetchError: Error | null = (args as any)?.outreachFetchError ?? null;
 
@@ -172,19 +189,6 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
       };
     }
 
-    if (table === "campaign_queue") {
-      const builder: any = {
-        eq: (col: string, val: unknown) => {
-          campaignQueueEqCalls.push([col, val]);
-          return builder;
-        },
-        select: async () => ({ data: [], error: campaignQueueUpdateError }),
-      };
-      return {
-        update: () => builder,
-      };
-    }
-
     if (table === "transaction_history") {
       return makeTransactionHistoryTableStub(transactionRows);
     }
@@ -205,7 +209,6 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
     removeChannel: vi.fn(),
     _transactionRows: transactionRows,
     _outreachUpdateCalls: outreachUpdateCalls,
-    _campaignQueueEqCalls: campaignQueueEqCalls,
     _telephonyConfig: {
       callRow: dbCallRow,
       callSelectError,
@@ -253,6 +256,8 @@ describe("api.auto-dial.status", () => {
     twilioClientMock.conferences.list.mockResolvedValue([]);
     loggerMocks.error.mockReset();
     loggerMocks.debug.mockReset();
+    campaignQueueDbMocks.updateError = null;
+    campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockReset();
     loggerMocks.info.mockReset();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
   });
@@ -413,8 +418,9 @@ describe("api.auto-dial.status", () => {
     } as any));
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBeGreaterThan(0);
-    expect(supabaseStub._campaignQueueEqCalls).toContainEqual(["contact_id", 1]);
-    expect(supabaseStub._campaignQueueEqCalls).toContainEqual(["campaign_id", 1]);
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: 1, campaignId: 1 }),
+    );
   });
 
   test("participant-leave completes conferences and sets completed status", async () => {

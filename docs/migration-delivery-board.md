@@ -14,7 +14,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 |--------|------:|------|
 | Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
 | `app/lib/database/*.server.ts` on tenant-db | **7 / 13** | G2 |
-| App `supabase.from()` call sites in `app/` | **~30+** (queue/survey paths; platform-data down ~16) | G2 |
+| App `supabase.from()` call sites in `app/` | **~30+** (survey/admin/platform routes; `campaign_queue` server reads/writes on Drizzle; client realtime hook only) | G2 |
 | `database.types` imports in `app/` | **~168 files** | G2 (delete at exit) |
 | Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
 | E2E on review URL | Not run | G4 |
@@ -89,20 +89,20 @@ Inventory: [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventor
 | ID | Module | Status | Owner |
 |----|--------|--------|-------|
 | 2.1 | `workspace.server.ts` | **Done** | Supabase retained for auth + RPCs only |
-| 2.2 | `campaign.server.ts` + `campaign-stats.server.ts` | **Done** | Tenant-db for campaign/message/script/outreach; Supabase for RPC + `campaign_queue` |
+| 2.2 | `campaign.server.ts` + `campaign-stats.server.ts` | **Done** | Tenant-db + Drizzle queue counts; Supabase RPC `get_campaign_stats` only |
 | 2.3 | Queue/dial stack | **Done** | `telephony-db.server.ts`; auto-dial/dial/status/end/$roomId + `twilio-call-status`; 88 dial-stack tests green |
 | 2.4 | Contacts + audiences | **Done** | `contact.server.ts`, `contact-audience.server.ts` |
 | 2.5 | Messaging + chats | **Done** | sms-send, inbound-sms, auto-dial/dial credits+calls on tenant-db/telephony-db; Supabase kept for RPCs + realtime only |
-| 2.6 | Billing + ledger + RPC wrappers | **Partial** | `stripe.server.ts` done; `transaction-history`, reconciliation remain |
+| 2.6 | Billing + ledger + RPC wrappers | **Partial** | `stripe.server.ts` + `billing-reconciliation.server.ts` on tenant-db; transaction-history RPC wrappers remain |
 | 2.7 | Telephony adjunct | Todo | `agent-status`, handset, inbound queue |
-| 2.8 | Twilio config modules | Todo | 4× `workspace-twilio-*.server.ts` |
-| 2.9 | Platform facades | **In progress** | contacts/audiences/scripts/status/upload on tenant-db; queue + survey APIs remain PostgREST |
-| 2.10 | Route stragglers | **Done** | Last `supabase.from()` removed; `QueueContent` contact fetch via `/api/contacts/:id` |
+| 2.8 | Twilio config modules | **Partial** | `merge-workspace-twilio-data`, portal config/snapshot on Drizzle; sync module remains |
+| 2.9 | Platform facades | **Done** | `platform-data.server.ts` on tenant-db/Drizzle; Supabase storage for audience-upload download only |
+| 2.10 | Route stragglers | **Done** | Queue UI + dial-path queue writes; survey routes/loaders on `survey-db.server.ts` |
 | 2.11 | UI/hooks type cleanup | Todo | `LiveCampaign` / `IVRCampaign` / `MessageCampaign` in components |
 | 2.12 | Delete `database.types.ts` | Todo | ~168 imports remain |
 | 2.13 | E2E factories → Drizzle | Todo | `e2e/fixtures/factories.ts` still references subtype tables |
 
-**Progress:** **7 done** · **2 in progress** · 4 todo (of 13 modules) · ~168 `database.types` imports · **127** dial/messaging unit tests green
+**Progress:** **8 done** · **2 in progress** · 3 todo (of 13 modules) · ~168 `database.types` imports · route auth test harness fixed
 
 ---
 
@@ -202,11 +202,11 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **WS-B 2.9** — Continue `platform-data.server.ts` list/detail APIs on tenant-db + Drizzle
-2. **WS-B 2.6–2.8** — Billing reconciliation + Twilio config modules
-3. **WS-C 3D** — Delete Edge `sms-status`; finish Edge IVR handler tests + webhook repoint
-4. **WS-B 2.11–2.12** — UI type cleanup + drop `database.types.ts`
-5. **WS-A 1.12** — Apply transform **06, 07, 09** when SSE/worker schema lands
+1. **WS-B 2.7** — Telephony adjunct (`agent-status`, handset, inbound queue)
+2. **WS-B 2.6** — Transaction-history RPC wrappers
+3. **WS-B 2.8** — Finish Twilio sync module
+4. **WS-B settings loader** — `settings.loader.server.ts` survey PostgREST straggler
+5. **WS-B 2.11–2.12** — UI type cleanup + drop `database.types.ts`
 
 ---
 
@@ -221,6 +221,6 @@ gantt
 | 2026-06-29 | agent | Unified campaign: IVR Remix routes, export, create flow, `campaign-ivr.server.ts` |
 | 2026-06-29 | agent | Phase 2 B1: `campaign-stats.server.ts` → tenant-db |
 | 2026-06-29 | agent | Phase 2 B2 (partial): `call-screen`, `auto-dial`, settings readiness fix |
-| 2026-06-29 | agent | Sprint 2: `telephony-db.server.ts`, dial/auto-dial stack tenant-db, 88 tests; Edge IVR unified script; `workspace-conversations` tenant-db |
+| 2026-06-29 | agent | Survey routes/loaders → `survey-db.server.ts`; platform-data deduped; 28 survey route tests green |
 | 2026-06-29 | agent | Messaging port: `workspace-credits`, `sms-send`/inbound-sms/ivr/auto-dial tenant-db; test stubs; **127** dial+messaging tests green; route `supabase.from()` → 1 file |
 | 2026-06-29 | agent | Platform-data: contacts, audiences, scripts, campaign status, audience upload on tenant-db/Drizzle; `buildContactSearchWhere` |

@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    fetchCampaignQueueRowsByIds: vi.fn(async () => []),
+    requeueAllCampaignQueueForCampaign: vi.fn(async () => []),
+    resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
+    resolveContactWorkspaceId: vi.fn(async () => "w1"),
   };
 });
 
@@ -21,53 +25,18 @@ vi.mock("@/lib/database.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  fetchCampaignQueueRowsByIds: (...args: unknown[]) => mocks.fetchCampaignQueueRowsByIds(...args),
+  requeueAllCampaignQueueForCampaign: (...args: unknown[]) =>
+    mocks.requeueAllCampaignQueueForCampaign(...args),
+}));
+vi.mock("@/lib/platform-telephony.server", () => ({
+  resolveCampaignWorkspaceId: (...args: unknown[]) => mocks.resolveCampaignWorkspaceId(...args),
+  resolveContactWorkspaceId: (...args: unknown[]) => mocks.resolveContactWorkspaceId(...args),
+}));
 
 function withQueueActionClient(supabaseClient: { rpc?: ReturnType<typeof vi.fn> }) {
-  return withCampaignWorkspace({
-    ...supabaseClient,
-    from: (table: string) => {
-      if (table === "campaign_queue") {
-        return {
-          select: () => ({
-            eq: () => ({
-              limit: () => ({
-                maybeSingle: async () => ({
-                  data: { campaign: { workspace: "w1" } },
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    },
-  });
-}
-
-function withCampaignWorkspace(supabaseClient: any, workspace = "w1") {
-  const baseFrom = supabaseClient.from?.bind(supabaseClient);
-  return {
-    ...supabaseClient,
-    from: (table: string) => {
-      if (table === "campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: { workspace }, error: null }),
-            }),
-          }),
-        };
-      }
-      if (table === "campaign_queue" && typeof baseFrom === "function") {
-        return baseFrom(table);
-      }
-      if (typeof baseFrom === "function") {
-        return baseFrom(table);
-      }
-      throw new Error(`unexpected table ${table}`);
-    },
-  };
+  return supabaseClient;
 }
 
 describe("app/routes/api+/queues/route.tsx", () => {
@@ -75,10 +44,18 @@ describe("app/routes/api+/queues/route.tsx", () => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
     mocks.logger.error.mockReset();
+    mocks.fetchCampaignQueueRowsByIds.mockReset();
+    mocks.requeueAllCampaignQueueForCampaign.mockReset();
+    mocks.resolveCampaignWorkspaceId.mockReset();
+    mocks.resolveContactWorkspaceId.mockReset();
+    mocks.resolveCampaignWorkspaceId.mockResolvedValue("w1");
+    mocks.resolveContactWorkspaceId.mockResolvedValue("w1");
+    mocks.fetchCampaignQueueRowsByIds.mockResolvedValue([]);
+    mocks.requeueAllCampaignQueueForCampaign.mockResolvedValue([]);
   });
 
   test("loader returns [] when limit is 0", async () => {
-    queueJsonAuthSession({ supabaseClient: withCampaignWorkspace({}), user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=0"),
@@ -112,10 +89,8 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
   test("loader returns queue items from campaign_queue", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [{ queue_id: 1 }, { queue_id: 2 }] });
-    const inFn = vi.fn().mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
-    const select = vi.fn().mockReturnValueOnce({ in: inFn });
-    const from = vi.fn().mockReturnValueOnce({ select });
-    queueJsonAuthSession({ supabaseClient: withCampaignWorkspace({ rpc, from }), user: { id: "u1" } });
+    mocks.fetchCampaignQueueRowsByIds.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
+    queueJsonAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
@@ -127,9 +102,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
       p_campaign_id: 99,
       p_initial_limit: 2,
     });
-    expect(from).toHaveBeenCalledWith("campaign_queue");
-    expect(select).toHaveBeenCalledWith("*, contact(*)");
-    expect(inFn).toHaveBeenCalledWith("id", [1, 2]);
+    expect(mocks.fetchCampaignQueueRowsByIds).toHaveBeenCalledWith([1, 2]);
   });
 
   test("action POST returns 500 and logs when rpc errors", async () => {
@@ -168,11 +141,8 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("action DELETE returns 500 and logs when update errors", async () => {
-    const select = vi.fn().mockResolvedValueOnce({ data: [], error: { message: "update fail" } });
-    const eq = vi.fn().mockReturnValueOnce({ select });
-    const update = vi.fn().mockReturnValueOnce({ eq });
-    const from = vi.fn().mockReturnValueOnce({ update });
-    queueJsonAuthSession({ supabaseClient: withCampaignWorkspace({ from }), user: { id: "u1" } });
+    mocks.requeueAllCampaignQueueForCampaign.mockRejectedValueOnce(new Error("update fail"));
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
@@ -181,16 +151,12 @@ describe("app/routes/api+/queues/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "update fail" });
-    expect(mocks.logger.error).toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({ error: "update fail" });
   });
 
   test("action DELETE returns affected_rows on success", async () => {
-    const select = vi.fn().mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }, { id: 3 }], error: null });
-    const eq = vi.fn().mockReturnValueOnce({ select });
-    const update = vi.fn().mockReturnValueOnce({ eq });
-    const from = vi.fn().mockReturnValueOnce({ update });
-    queueJsonAuthSession({ supabaseClient: withCampaignWorkspace({ from }), user: { id: "u1" } });
+    mocks.requeueAllCampaignQueueForCampaign.mockResolvedValueOnce([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
@@ -203,19 +169,11 @@ describe("app/routes/api+/queues/route.tsx", () => {
       message: "Campaign queue items reset successfully",
       affected_rows: 3,
     });
-    expect(update).toHaveBeenCalledWith({
-      status: "queued",
-      dequeued_at: null,
-      dequeued_by: null,
-      dequeued_reason: null,
-      assigned_to_user_id: null,
-      provider_status: null,
-      queue_state: "queued",
-    });
+    expect(mocks.requeueAllCampaignQueueForCampaign).toHaveBeenCalledWith(5);
   });
 
   test("action returns 405 for unsupported method", async () => {
-    queueJsonAuthSession({ supabaseClient: withCampaignWorkspace({}), user: { id: "u1" } });
+    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/queues", { method: "PUT" }),

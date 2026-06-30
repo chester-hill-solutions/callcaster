@@ -4,8 +4,8 @@ import {
   createWorkspaceTwilioInstance,
   requireWorkspaceAccess,
 } from "@/lib/database.server";
+import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { env } from "@/lib/env.server";
-import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
@@ -99,15 +99,11 @@ export async function initiateIvrCall(
       return { success: false, error: "Failed to insert call row" };
     }
 
-    const { error: dequeueError } = await supabase
-      .from("campaign_queue")
-      .update(buildDequeuedQueueUpdate(input.user_id, "IVR call completed", { includeNormalizedFields: true }))
-      .eq("id", input.contact.id);
-
-    if (dequeueError) {
-      logger.error("initiateIvrCall dequeue error", dequeueError);
-      return { success: false, error: dequeueError.message };
-    }
+    await dequeueCampaignQueueById({
+      queueId: input.contact.id,
+      userId: input.user_id,
+      reason: "IVR call completed",
+    });
 
     return { success: true, callSid: call.sid };
   } catch (error) {

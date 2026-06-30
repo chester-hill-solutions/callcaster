@@ -24,7 +24,7 @@ import {
 } from "@/lib/throughput-config.server";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
-import { mergeWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { mergeWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
 export const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   trafficClass: "unknown",
@@ -301,18 +301,10 @@ export async function getWorkspaceTwilioPortalConfig({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const twilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
 
   return getWorkspaceTwilioPortalConfigFromTwilioData(
-    (data?.twilio_data ?? null) as TwilioAccountData,
+    twilioData as TwilioAccountData,
   );
 }
 
@@ -329,19 +321,10 @@ export async function updateWorkspaceTwilioPortalConfig({
   actorUserId: string | null;
   actorUsername: string | null;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  const currentTwilioData = isObject(data?.twilio_data) ? data.twilio_data : {};
+  const twilioData = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const currentTwilioData = isObject(twilioData) ? twilioData : {};
   const currentConfig = getWorkspaceTwilioPortalConfigFromTwilioData(
-    (data?.twilio_data ?? null) as TwilioAccountData,
+    twilioData as TwilioAccountData,
   );
 
   const mergedConfig = normalizeWorkspaceTwilioOpsConfig({

@@ -132,6 +132,7 @@ export const campaign_queue = pgTable("campaign_queue", {
   provider_status: text(),
   queue_order: integer(),
   queue_state: text(),
+  status: text(),
   dequeued_by: uuid(),
   dequeued_at: text(),
   dequeued_reason: text(),

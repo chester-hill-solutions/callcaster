@@ -1,16 +1,19 @@
 /**
- * Campaign stats and aggregated reads (tenant-db for scoped tables; Supabase for RPC/queue).
+ * Campaign stats and aggregated reads (tenant-db for scoped tables; Supabase for RPC only).
  */
 import { and, eq, isNotNull, ne } from "drizzle-orm";
-import { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../database.types";
 import { Script } from "../types";
 import { logger } from "../logger.server";
 import { getSignedUrls } from "./workspace.server";
 import {
-  COMPLETED_QUEUE_COUNT_FILTER,
-  applyQueueStatusFilter,
-} from "../queue-status";
+  countCampaignQueueRows,
+  countDialableCampaignQueueRows,
+  countDialableCompletedCampaignQueueRows,
+  countDialableQueuedCampaignQueueRows,
+  fetchDialableCampaignQueueWithContacts,
+} from "../campaign-queue-search.server";
 import {
   campaign as campaignTable,
   campaign_audience as campaignAudienceTable,
@@ -29,7 +32,7 @@ export async function fetchBasicResults({
 }: {
   workspaceId: string;
   campaignId: string;
-  /** RPC `get_campaign_stats` and `campaign_queue` queries */
+  /** RPC `get_campaign_stats` */
   supabaseClient: SupabaseClient<Database>;
   tdb?: TenantDb;
 }) {
@@ -65,40 +68,27 @@ export async function fetchBasicResults({
     return baseResults;
   }
 
-  const [queueCounts, completedQueueResult, messageStatuses, attemptDispositions] =
+  const campaignIdNum = Number(campaignId);
+  const [queueCounts, completedQueueCount, messageStatuses, attemptDispositions] =
     await Promise.all([
-      fetchQueueCounts({ workspaceId, campaignId, supabaseClient }),
-      supabaseClient
-        .from("campaign_queue")
-        .select("id, contact!inner(*)", { count: "exact", head: true })
-        .eq("campaign_id", Number(campaignId))
-        .or(COMPLETED_QUEUE_COUNT_FILTER)
-        .not("contact.phone", "is", null)
-        .neq("contact.phone", "")
-        .limit(1),
+      fetchQueueCounts({ workspaceId, campaignId }),
+      countDialableCompletedCampaignQueueRows(campaignIdNum),
       tdb.message.findMany({
         where: and(
-          eq(messageTable.campaign_id, Number(campaignId)),
+          eq(messageTable.campaign_id, campaignIdNum),
           isNotNull(messageTable.status),
         ),
         columns: { status: true },
       }),
       tdb.outreach_attempt.findMany({
         where: and(
-          eq(outreachAttemptTable.campaign_id, Number(campaignId)),
+          eq(outreachAttemptTable.campaign_id, campaignIdNum),
           isNotNull(outreachAttemptTable.disposition),
           ne(outreachAttemptTable.disposition, ""),
         ),
         columns: { disposition: true },
       }),
     ]);
-
-  if (completedQueueResult.error) {
-    logger.error(
-      "Error fetching completed queue count for message stats:",
-      completedQueueResult.error,
-    );
-  }
 
   const dispositionCounts = messageStatuses.reduce(
     (acc, row) => {
@@ -119,7 +109,6 @@ export async function fetchBasicResults({
     {} as Record<string, number>,
   );
 
-  // Backfill key outcome buckets from outreach_attempt when message.status lacks them.
   const outcomeFallbackKeys = ["failed", "undelivered", "delivered", "sent"] as const;
   for (const key of outcomeFallbackKeys) {
     if ((dispositionCounts[key] ?? 0) > 0) continue;
@@ -128,9 +117,7 @@ export async function fetchBasicResults({
     }
   }
 
-  // Align queued with settings queue semantics.
   dispositionCounts.queued = queueCounts.queuedCount ?? 0;
-  const completedQueueCount = completedQueueResult.count ?? 0;
   if (completedQueueCount > 0 && dispositionCounts.dequeued == null) {
     dispositionCounts.dequeued = completedQueueCount;
   }
@@ -160,41 +147,44 @@ export async function fetchBasicResults({
 export async function fetchCampaignCounts({
   workspaceId,
   campaignId,
-  supabaseClient,
   tdb: tdbIn,
 }: {
   workspaceId: string;
   campaignId: string;
-  /** `campaign_queue` counts */
-  supabaseClient: SupabaseClient<Database>;
+  /** @deprecated Supabase no longer used; kept for call-site compatibility */
+  supabaseClient?: SupabaseClient<Database>;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
-
-  const { count, error } = await supabaseClient
-    .from("campaign_queue")
-    .select("*", { count: "exact", head: true })
-    .eq("campaign_id", campaignId);
+  const campaignIdNum = Number(campaignId);
 
   let callCount: number | null = null;
   let callCountError: unknown = null;
   try {
     callCount = await tdb.outreach_attempt.count({
-      where: eq(outreachAttemptTable.campaign_id, Number(campaignId)),
+      where: eq(outreachAttemptTable.campaign_id, campaignIdNum),
     });
   } catch (error) {
     callCountError = error;
   }
 
-  if (error) {
-    logger.error("Error fetching campaign counts:", error);
+  let queueCount: number | null = null;
+  let queueCountError: unknown = null;
+  try {
+    queueCount = await countCampaignQueueRows(campaignIdNum);
+  } catch (error) {
+    queueCountError = error;
+  }
+
+  if (queueCountError) {
+    logger.error("Error fetching campaign counts:", queueCountError);
   }
   if (callCountError) {
     logger.error("Error fetching call counts:", callCountError);
   }
 
   return {
-    callCount: count,
+    callCount: queueCount,
     completedCount: callCount,
   };
 }
@@ -278,113 +268,53 @@ export async function fetchCampaignDetails({
 }
 
 export async function fetchQueueCounts({
-  workspaceId,
+  workspaceId: _workspaceId,
   campaignId,
-  supabaseClient,
 }: {
   workspaceId: string;
   campaignId: string;
-  /** `campaign_queue` counts */
-  supabaseClient: SupabaseClient<Database>;
+  /** @deprecated Supabase no longer used; kept for call-site compatibility */
+  supabaseClient?: SupabaseClient<Database>;
 }) {
-  const { error: fullCountError, count: fullCountCount } = await supabaseClient
-    .from("campaign_queue")
-    .select("*, contact!inner(*)", { count: "exact", head: true })
-    .eq("campaign_id", Number(campaignId))
-    .not("contact.phone", "is", null)
-    .neq("contact.phone", "")
-    .limit(1);
-
-  const { error: queuedCountError, count: queuedCountCount } =
-    await applyQueueStatusFilter(
-      supabaseClient
-        .from("campaign_queue")
-        .select("*, contact!inner(*)", { count: "exact", head: true })
-        .eq("campaign_id", Number(campaignId))
-        .not("contact.phone", "is", null)
-        .neq("contact.phone", ""),
-      "queued",
-    ).limit(1);
-
-  if (fullCountError)
-    throw new Error(
-      `Error fetching full count: ${fullCountError?.message || "Unknown error fetching full count"}`,
-    );
-  if (queuedCountError)
-    throw new Error(
-      `Error fetching queued count: ${queuedCountError?.message || "Unknown error fetching queued count"}`,
-    );
+  const campaignIdNum = Number(campaignId);
+  const [fullCount, queuedCount] = await Promise.all([
+    countDialableCampaignQueueRows(campaignIdNum),
+    countDialableQueuedCampaignQueueRows(campaignIdNum),
+  ]);
 
   return {
-    fullCount: fullCountCount,
-    queuedCount: queuedCountCount,
+    fullCount,
+    queuedCount,
   };
 }
 
 export async function fetchCampaignAudience({
   workspaceId,
   campaignId,
-  supabaseClient,
   tdb: tdbIn,
 }: {
   workspaceId: string;
   campaignId: string;
-  /** `campaign_queue` queries */
-  supabaseClient: SupabaseClient<Database>;
+  /** @deprecated Supabase no longer used; kept for call-site compatibility */
+  supabaseClient?: SupabaseClient<Database>;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const campaignIdNum = Number(campaignId);
 
-  const queuePromise = supabaseClient
-    .from("campaign_queue")
-    .select(`*, contact!inner(*)`, { count: "exact" })
-    .eq("campaign_id", Number(campaignId))
-    .not("contact.phone", "is", null)
-    .neq("contact.phone", "")
-    .limit(25);
-
-  const isQueuedCountPromise = applyQueueStatusFilter(
-    supabaseClient
-      .from("campaign_queue")
-      .select(`id, contact_id, contact!inner(*)`, { count: "exact" })
-      .eq("campaign_id", Number(campaignId))
-      .not("contact.phone", "is", null)
-      .neq("contact.phone", ""),
-    "queued",
-  ).limit(1);
-
-  const dequeuedCountPromise = supabaseClient
-    .from("campaign_queue")
-    .select(`id, contact_id, contact!inner(*)`, { count: "exact", head: true })
-    .eq("campaign_id", Number(campaignId))
-    .or(COMPLETED_QUEUE_COUNT_FILTER)
-    .not("contact.phone", "is", null)
-    .neq("contact.phone", "")
-    .limit(1);
-
-  const [queueResult, isQueuedCount, dequeuedCount, scripts] = await Promise.all([
-    queuePromise,
-    isQueuedCountPromise,
-    dequeuedCountPromise,
+  const [campaignQueue, queueCount, dequeuedCount, totalCount, scripts] = await Promise.all([
+    fetchDialableCampaignQueueWithContacts({ campaignId: campaignIdNum, limit: 25 }),
+    countDialableQueuedCampaignQueueRows(campaignIdNum),
+    countDialableCompletedCampaignQueueRows(campaignIdNum),
+    countDialableCampaignQueueRows(campaignIdNum),
     tdb.script.findMany({}),
   ]);
 
-  if (queueResult.error)
-    throw new Error(`Error fetching queue data: ${queueResult.error.message}`);
-  if (isQueuedCount.error)
-    throw new Error(
-      `Error fetching queued count: ${isQueuedCount.error.message}`,
-    );
-  if (dequeuedCount.error)
-    throw new Error(
-      `Error fetching dequeued count: ${dequeuedCount.error.message}`,
-    );
-
   return {
-    campaign_queue: queueResult.data,
-    queue_count: isQueuedCount.count,
-    dequeued_count: dequeuedCount.count,
-    total_count: queueResult.count,
+    campaign_queue: campaignQueue,
+    queue_count: queueCount,
+    dequeued_count: dequeuedCount,
+    total_count: totalCount,
     scripts,
   };
 }

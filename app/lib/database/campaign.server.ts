@@ -11,7 +11,7 @@ import {
   Contact,
 } from "../types";
 import { logger } from "../logger.server";
-import { applyQueueStatusFilter } from "../queue-status";
+import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
 import { campaign as campaignTable, script as scriptTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
@@ -411,7 +411,7 @@ export async function fetchCampaignsByType({
 }
 
 export async function getCampaignQueueById({
-  supabaseClient,
+  supabaseClient: _supabaseClient,
   campaign_id,
   onlyQueued = false,
 }: {
@@ -419,18 +419,10 @@ export async function getCampaignQueueById({
   campaign_id: string;
   onlyQueued?: boolean;
 }) {
-  let query = supabaseClient
-    .from("campaign_queue")
-    .select("*, contact(*)")
-    .eq("campaign_id", Number(campaign_id));
-
-  if (onlyQueued) {
-    query = applyQueueStatusFilter(query, "queued");
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data;
+  return fetchCampaignQueueWithContacts({
+    campaignId: Number(campaign_id),
+    onlyQueued,
+  });
 }
 
 export function checkSchedule(campaignData: Campaign) {

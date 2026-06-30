@@ -8,7 +8,7 @@ import {
   resolveCampaignWorkspaceId,
   resolveContactWorkspaceId,
 } from "@/lib/platform-telephony.server";
-import { buildQueuedQueueUpdate } from "@/lib/queue-status";
+import { requeueAllCampaignQueueForCampaign } from "@/lib/campaign-queue-db.server";
 import { jsonError } from "@/lib/platform-api.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
@@ -65,16 +65,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         workspaceId,
       });
 
-      const { data, error } = await supabase
-        .from("campaign_queue")
-        .update(buildQueuedQueueUpdate({ includeNormalizedFields: true }))
-        .eq("campaign_id", Number(campaignId))
-        .select();
-
-      if (error) {
-        logger.error("Error resetting campaign queue items:", error);
-        return routeData({ error: error.message }, { status: 500 });
-      }
+      const data = await requeueAllCampaignQueueForCampaign(Number(campaignId));
 
       return routeData({
         message: "Campaign queue items reset successfully",

@@ -1,4 +1,5 @@
 import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
+import { getQueuedContactIdsForCampaign } from "@/lib/campaign-queue-db.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
@@ -53,15 +54,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (allContacts.length === 0) {
       return routeData({ contacts: [] });
     } else {
-      const { data: queuedContacts, error: queuedError } = await supabaseClient
-        .from('campaign_queue')
-        .select('contact_id')
-        .eq('campaign_id', Number(campaignId))
-        .in('contact_id', allContacts.map((contact) => contact?.id))
-      if (queuedError) throw queuedError;
+      const queuedContactIds = await getQueuedContactIdsForCampaign({
+        campaignId: Number(campaignId),
+        contactIds: allContacts.map((contact) => contact?.id).filter(Boolean) as number[],
+      });
+      const queuedContactIdSet = new Set(queuedContactIds);
       const contacts = allContacts.map((contact) => ({
         ...contact,
-        queued: queuedContacts.some((queuedContact) => queuedContact.contact_id === contact?.id)
+        queued: queuedContactIdSet.has(contact?.id),
       }));
       return routeData({ contacts });
     }

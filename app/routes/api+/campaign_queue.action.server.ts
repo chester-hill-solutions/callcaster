@@ -1,28 +1,21 @@
 import { data as routeData } from "react-router";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  deleteCampaignQueueByIds,
+} from "@/lib/campaign-queue-db.server";
+import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { filteredSearch } from "@/lib/queue-filter-search.server";
 import { parseRequestData } from "@/lib/database.server";
 import { safeNumber } from "@/lib/type-safety-utils";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { campaign_queue as campaignQueueTable } from "@/db/schema";
+import { db } from "@/server/db";
+import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 
 import type { ActionFunctionArgs } from "react-router";
 import type { CampaignQueue } from "@/lib/types";
 
-interface ContactMapping {
-  id: number;
-  contact_id: number;
-  campaign_id: number;
-  status: string;
-  created_at: string;
-  contact: {
-    id: number;
-    firstname: string | null;
-    surname: string | null;
-    phone: string | null;
-    email: string | null;
-    [key: string]: unknown;
-  };
-}
+const BATCH_SIZE = 100;
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireDualAuth(request);
@@ -47,63 +40,59 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
     return routeData({ success: true });
   }
+
   if (request.method === "DELETE") {
     const { ids, campaign_id, filters } = data;
-    const BATCH_SIZE = 100;
+    const campaignIdNum = Number(campaign_id);
 
-    if (ids) {
-      const results = [];
-      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-        const batch = ids.slice(i, i + BATCH_SIZE);
-        const { data: deletedContacts, error } = await supabaseClient
-          .from("campaign_queue")
-          .delete()
-          .eq("campaign_id", Number(campaign_id))
-          .in("id", batch)
-          .select();
+    try {
+      if (ids) {
+        const results: CampaignQueue[] = [];
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+          const batch = ids
+            .slice(i, i + BATCH_SIZE)
+            .map((id: string | number) => (typeof id === "string" ? parseInt(id, 10) : id))
+            .filter((id: number) => Number.isFinite(id));
 
-        if (error) return routeData({ error: error.message }, { status: 500 });
-        results.push(...(deletedContacts as CampaignQueue[]));
+          const deleted = await db
+            .delete(campaignQueueTable)
+            .where(
+              and(
+                eq(campaignQueueTable.campaign_id, campaignIdNum),
+                inArray(campaignQueueTable.id, batch),
+              ),
+            )
+            .returning();
+
+          results.push(...(deleted as CampaignQueue[]));
+        }
+        return routeData({ data: results });
       }
+
+      const deleteIds = await searchCampaignQueueIds({
+        campaignId: campaignIdNum,
+        filters: (filters ?? {}) as QueueSearchFilters,
+      });
+
+      const validDeleteIds = deleteIds
+        .map((id) => safeNumber(id))
+        .filter((id) => id > 0);
+
+      const results: CampaignQueue[] = [];
+      for (let i = 0; i < validDeleteIds.length; i += BATCH_SIZE) {
+        const batch = validDeleteIds.slice(i, i + BATCH_SIZE);
+        const deleted = await deleteCampaignQueueByIds(batch);
+        results.push(...(deleted as CampaignQueue[]));
+      }
+
       return routeData({ data: results });
+    } catch (error) {
+      return routeData(
+        { error: error instanceof Error ? error.message : "Failed to delete queue rows" },
+        { status: 500 },
+      );
     }
-
-    const { data: contactsToDelete, error: lookupError } = await filteredSearch(
-      "",
-      filters,
-      supabaseClient,
-      ["id"],
-      campaign_id,
-    );
-    if (lookupError) return routeData({ error: lookupError.message }, { status: 500 });
-
-    const results = [];
-    const contacts =
-      (contactsToDelete as unknown as ContactMapping[] | null)?.map((item) => ({
-        id: item.id,
-        contact_id: item.contact_id,
-        campaign_id: item.campaign_id,
-        status: item.status,
-        created_at: item.created_at,
-        contact: item.contact,
-      })) || [];
-
-    const deleteIds = contacts
-      .map((contact: unknown) => safeNumber((contact as { id: unknown }).id))
-      .filter((id) => id > 0);
-
-    for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
-      const batch = deleteIds.slice(i, i + BATCH_SIZE);
-      const { data: deletedContacts, error } = await supabaseClient
-        .from("campaign_queue")
-        .delete()
-        .in("id", batch)
-        .select();
-
-      if (error) return routeData({ error: error.message }, { status: 500 });
-      results.push(...(deletedContacts as CampaignQueue[]));
-    }
-    return routeData({ data: results });
   }
+
   return routeData({ error: "Method not allowed" }, { status: 405 });
 };

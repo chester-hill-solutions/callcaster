@@ -4,6 +4,7 @@ import {
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
+import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
@@ -77,18 +78,14 @@ export const updateOutreachAttempt = async (
 const updateCampaignQueue = async (
   contactId: number,
   campaignId: number,
-  update: Partial<Tables<"campaign_queue">>,
+  update: Record<string, unknown>,
 ) => {
-  const supabase = getSupabase();
   try {
-    const { data, error } = await supabase
-      .from("campaign_queue")
-      .update(update)
-      .eq("contact_id", contactId)
-      .eq("campaign_id", campaignId)
-      .select();
-    if (error) throw error;
-    return data;
+    return await updateCampaignQueueByContactAndCampaign({
+      contactId,
+      campaignId,
+      update,
+    });
   } catch (error) {
     logger.error("Error updating campaign queue:", error);
     throw error;

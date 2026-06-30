@@ -1,22 +1,39 @@
 import { data as routeData, redirect } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
+import { eq } from "drizzle-orm";
+import {
+  deleteAllCampaignQueueForCampaign,
+  deleteCampaignQueueByIds,
+  updateCampaignQueueStatusByIds,
+} from "@/lib/campaign-queue-db.server";
+import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { parseActionRequest } from "@/lib/database.server";
-import {
-  filteredSearch,
-  type QueueSearchFilters,
-} from "@/lib/queue-filter-search.server";
+import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { contact_audience as contactAudienceTable } from "@/db/schema";
+import { db } from "@/server/db";
 import type { Contact } from "@/lib/types";
+
+const EMPTY_FILTERS: QueueSearchFilters = {
+  name: "",
+  phone: "",
+  email: "",
+  address: "",
+  audiences: "",
+  disposition: "",
+  queueStatus: "",
+};
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { selected_id } = params;
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { supabaseClient } = await verifyAuth(request);
 
   if (!selected_id) throw redirect("../../");
 
   const data = await parseActionRequest(request);
   const intent = data.intent as string;
+  const campaignIdNum = parseInt(selected_id, 10);
 
   if (intent === "update_status") {
     const ids = data.ids;
@@ -25,95 +42,60 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       data.isAllSelected === true || data.isAllSelected === "true";
     const filters =
       typeof data.filters === "string"
-        ? JSON.parse(data.filters)
-        : (data.filters as QueueSearchFilters | undefined);
+        ? (JSON.parse(data.filters) as QueueSearchFilters)
+        : ((data.filters as QueueSearchFilters | undefined) ?? EMPTY_FILTERS);
 
-    if (isAllSelected) {
-      const filteredIdsQuery = filteredSearch(
-        "",
-        filters || {
-          name: "",
-          phone: "",
-          email: "",
-          address: "",
-          audiences: "",
-          disposition: "",
-          queueStatus: "",
-        },
-        supabaseClient,
-        ["id"],
-        selected_id,
-      );
-      const { data: filteredRows, error: filteredRowsError } =
-        await filteredIdsQuery;
+    try {
+      if (isAllSelected) {
+        const filteredIds = await searchCampaignQueueIds({
+          campaignId: campaignIdNum,
+          filters,
+        });
+        await updateCampaignQueueStatusByIds(filteredIds, newStatus);
+      } else {
+        const updateIds = (
+          Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))
+        )
+          .map((item: string | { id: string }) =>
+            typeof item === "object" ? Number(item.id) : Number(item),
+          )
+          .filter((id): id is number => Number.isFinite(id));
 
-      if (filteredRowsError) {
-        return routeData({ success: false, error: filteredRowsError.message });
+        await updateCampaignQueueStatusByIds(updateIds, newStatus);
       }
 
-      const filteredIds = (
-        (filteredRows ?? []) as unknown as Array<{ id: number | string }>
-      )
-        .map((row) => {
-          const id = row?.id ?? null;
-          return typeof id === "number" ? id : Number(id);
-        })
-        .filter((id): id is number => Number.isFinite(id));
-
-      if (filteredIds.length === 0) {
-        return routeData({ success: true });
-      }
-
-      const { error } = await supabaseClient
-        .from("campaign_queue")
-        .update({ status: newStatus })
-        .in("id", filteredIds);
-
-      if (error) {
-        return routeData({ success: false, error: error.message });
-      }
-    } else {
-      const updateIds = (
-        Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))
-      ).map((item: string | { id: string }) =>
-        typeof item === "object" ? item.id : item,
-      );
-
-      if (updateIds.length > 0) {
-        const { error } = await supabaseClient
-          .from("campaign_queue")
-          .update({ status: newStatus })
-          .in("id", updateIds);
-
-        if (error) {
-          return routeData({ success: false, error: error.message });
-        }
-      }
+      return routeData({ success: true });
+    } catch (error) {
+      return routeData({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update queue status",
+      });
     }
-
-    return routeData({ success: true });
   }
 
   if (intent === "add_from_audience") {
-    const audienceId = parseInt(String(data.audienceId ?? ""));
-    const { data: contacts, error } = await supabaseClient
-      .from("contact_audience")
-      .select("contact_id")
-      .eq("audience_id", audienceId);
+    const audienceId = parseInt(String(data.audienceId ?? ""), 10);
 
-    if (error) {
-      return routeData({ success: false, error: error.message });
+    try {
+      const contacts = await db
+        .select({ contact_id: contactAudienceTable.contact_id })
+        .from(contactAudienceTable)
+        .where(eq(contactAudienceTable.audience_id, audienceId));
+
+      await enqueueContactsForCampaign(
+        supabaseClient,
+        campaignIdNum,
+        contacts.map((contact) => contact.contact_id),
+        { requeue: false },
+      );
+
+      return routeData({ success: true });
+    } catch (error) {
+      return routeData({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to add audience to queue",
+      });
     }
-
-    const contactIds = contacts.map((contact) => contact.contact_id);
-    await enqueueContactsForCampaign(
-      supabaseClient,
-      parseInt(selected_id),
-      contactIds,
-      { requeue: false },
-    );
-
-    return routeData({ success: true });
   }
 
   if (intent === "add_contacts") {
@@ -122,14 +104,22 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         ? JSON.parse(data.contacts)
         : data.contacts
     ) as Contact[];
-    await enqueueContactsForCampaign(
-      supabaseClient,
-      parseInt(selected_id),
-      contacts.map((contact) => contact.id),
-      { requeue: false },
-    );
 
-    return routeData({ success: true });
+    try {
+      await enqueueContactsForCampaign(
+        supabaseClient,
+        campaignIdNum,
+        contacts.map((contact) => contact.id),
+        { requeue: false },
+      );
+
+      return routeData({ success: true });
+    } catch (error) {
+      return routeData({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to add contacts to queue",
+      });
+    }
   }
 
   if (intent === "remove_contacts") {
@@ -137,35 +127,28 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const isAllSelected =
       data.isAllSelected === true || data.isAllSelected === "true";
 
-    if (isAllSelected) {
-      const { error } = await supabaseClient
-        .from("campaign_queue")
-        .delete()
-        .eq("campaign_id", parseInt(selected_id));
+    try {
+      if (isAllSelected) {
+        await deleteAllCampaignQueueForCampaign(campaignIdNum);
+      } else {
+        const removeIds = (
+          Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))
+        )
+          .map((item: string | { id: string }) =>
+            typeof item === "object" ? Number(item.id) : Number(item),
+          )
+          .filter((id): id is number => Number.isFinite(id));
 
-      if (error) {
-        return routeData({ success: false, error: error.message });
+        await deleteCampaignQueueByIds(removeIds);
       }
-    } else {
-      const removeIds = (
-        Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))
-      ).map((item: string | { id: string }) =>
-        typeof item === "object" ? item.id : item,
-      );
 
-      if (removeIds.length > 0) {
-        const { error } = await supabaseClient
-          .from("campaign_queue")
-          .delete()
-          .in("id", removeIds);
-
-        if (error) {
-          return routeData({ success: false, error: error.message });
-        }
-      }
+      return routeData({ success: true });
+    } catch (error) {
+      return routeData({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to remove queue contacts",
+      });
     }
-
-    return routeData({ success: true });
   }
 
   return routeData({ success: false, error: "Invalid intent" });

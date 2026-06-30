@@ -1,4 +1,5 @@
 import { createCampaign, requireWorkspaceAccess } from "@/lib/database.server";
+import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { logger } from "@/lib/logger.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
@@ -246,11 +247,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   let queuedContactIds = new Set<number>();
   if (enqueue_audience_contacts && audience_ids.length > 0) {
-    const { data: queuedRows } = await supabase
-      .from("campaign_queue")
-      .select("contact_id")
-      .eq("campaign_id", campaignId);
-    queuedContactIds = new Set((queuedRows ?? []).map((r) => r.contact_id));
+    queuedContactIds = new Set(await getCampaignQueueContactIds(campaignId));
   }
 
   for (const audienceId of audience_ids) {

@@ -7,6 +7,7 @@ import { createErrorResponse } from "@/lib/errors.server";
 import {
   resolveCampaignWorkspaceId,
 } from "@/lib/platform-telephony.server";
+import { fetchCampaignQueueRowsByIds } from "@/lib/campaign-queue-db.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
@@ -56,15 +57,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return jsonResponse([], 200);
     }
 
-    const { data: queueItems } = await supabase
-      .from("campaign_queue")
-      .select("*, contact(*)")
-      .in(
-        "id",
-        newQueue.map((item: { queue_id: number }) => item.queue_id),
-      );
+    const queueItems = await fetchCampaignQueueRowsByIds(
+      newQueue.map((item: { queue_id: number }) => item.queue_id),
+    );
 
-    return routeData(queueItems ?? []);
+    return routeData(queueItems);
   } catch (error) {
     return createErrorResponse(error, "Failed to load queue");
   }

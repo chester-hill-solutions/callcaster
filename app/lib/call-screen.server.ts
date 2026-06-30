@@ -1,8 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { workspace } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import {
-  applyQueueStatusFilter,
+  countCampaignQueueRows,
+  countCompletedCampaignQueueRows,
+  fetchActiveCampaignQueueWithContacts,
+} from "@/lib/campaign-queue-search.server";
+import {
   isAssignedToUser,
   isQueued,
 } from "@/lib/queue-status";
@@ -15,7 +19,6 @@ import {
   outreach_attempt as outreachAttemptTable,
 } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
-import { and, eq, inArray } from "drizzle-orm";
 
 export async function getCallScreenData(
   supabase: SupabaseClient,
@@ -43,17 +46,8 @@ export async function getCallScreenData(
       return null;
     }),
     supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: campaignIdNum }),
-    supabase
-      .from("campaign_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", campaignIdNum),
-    applyQueueStatusFilter(
-      supabase
-        .from("campaign_queue")
-        .select("id", { count: "exact", head: true })
-        .eq("campaign_id", campaignIdNum),
-      "completed",
-    ),
+    countCampaignQueueRows(campaignIdNum),
+    countCompletedCampaignQueueRows(campaignIdNum),
     tdb.outreach_attempt.findMany({
       where: and(
         eq(outreachAttemptTable.campaign_id, campaignIdNum),
@@ -78,8 +72,6 @@ export async function getCallScreenData(
     workspaceData.error,
     campaignWithScript ? null : new Error("Campaign not found"),
     audiences.error,
-    queueCount.error,
-    completedCount.error,
   ].filter(Boolean);
 
   if (errors.length) {
@@ -93,8 +85,8 @@ export async function getCallScreenData(
     campaign,
     campaignDetails: campaign,
     audiences: audiences.data,
-    queueCount: queueCount.count,
-    completedCount: completedCount.count,
+    queueCount,
+    completedCount,
     attempts,
   };
 }
@@ -113,36 +105,24 @@ export async function getVerifiedNumbers(supabase: SupabaseClient, userId: strin
 }
 
 export async function getQueueByDialType(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   campaignId: string,
   dialType: string,
   userId: string,
 ) {
-  let queue = [] as QueueItem[];
-  const { data, error } = await supabase
-    .from("campaign_queue")
-    .select("*, contact(*)")
-    .eq("campaign_id", parseInt(campaignId))
-    .is("dequeued_at", null)
-    .order("attempts", { ascending: true })
-    .order("queue_order", { ascending: true })
-    .limit(200);
-
-  if (error) {
-    logger.error(`Error fetching ${dialType} queue:`, error);
-    throw error;
-  }
-
-  const rows = (data as unknown as QueueItem[]) ?? [];
+  const rows = await fetchActiveCampaignQueueWithContacts({
+    campaignId: parseInt(campaignId, 10),
+    limit: 200,
+  });
+  const queueItems = rows as unknown as QueueItem[];
 
   if (dialType === "predictive") {
-    queue = rows.filter((item) => isQueued(item)).slice(0, 50);
-  } else if (dialType === "call") {
-    queue = rows.filter((item) => isAssignedToUser(item, userId)).slice(0, 50);
-  } else {
-    throw new Error("Invalid dial type");
+    return queueItems.filter((item) => isQueued(item)).slice(0, 50);
   }
-  return queue;
+  if (dialType === "call") {
+    return queueItems.filter((item) => isAssignedToUser(item, userId)).slice(0, 50);
+  }
+  throw new Error("Invalid dial type");
 }
 
 export function getNextRecipient(queue: QueueItem[], dialType: string, userId: string) {

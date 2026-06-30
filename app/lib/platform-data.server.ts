@@ -26,18 +26,28 @@ import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { logger } from "@/lib/logger.server";
 import { jsonError } from "@/lib/platform-api.server";
 import { parsePagination, type PaginationMeta } from "@/lib/pagination.server";
-import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
-  filteredSearch,
-  type QueueSearchFilters,
-} from "@/lib/queue-filter-search.server";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+  deleteAllCampaignQueueForCampaign,
+  deleteCampaignQueueByIds,
+  updateCampaignQueueStatusByIds,
+} from "@/lib/campaign-queue-db.server";
+import {
+  countCampaignQueueRows,
+  countQueuedCampaignQueueRows,
+  fetchCampaignQueuePage,
+  searchCampaignQueueIds,
+} from "@/lib/campaign-queue-search.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 import type { Campaign } from "@/lib/types";
 import type {
   CampaignStatusBody,
   PatchCampaignQueueBody,
 } from "@/lib/schemas/api/platform-data";
-import { fetchMessagePage } from "@/lib/chats/fetch-message-page.server";
+import {
+  loadSurveyDetailByPublicId,
+  loadSurveyResponseCounts,
+} from "@/lib/survey-db.server";
 import {
   audience as audienceTable,
   audience_upload as audienceUploadTable,
@@ -47,8 +57,13 @@ import {
   contact as contactTable,
   contact_audience as contactAudienceTable,
   outreach_attempt as outreachAttemptTable,
+  question_option as questionOptionTable,
+  response_answer as responseAnswerTable,
   script as scriptTable,
   survey as surveyTable,
+  survey_page as surveyPageTable,
+  survey_question as surveyQuestionTable,
+  survey_response as surveyResponseTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
@@ -540,7 +555,7 @@ export async function transitionCampaignStatusApi(
 }
 
 export async function getCampaignQueueApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   campaignId: string,
   workspaceId: string,
   searchParams: URLSearchParams,
@@ -564,50 +579,41 @@ export async function getCampaignQueueApi(
     queueStatus: searchParams.get("queue_status") ?? undefined,
   });
 
-  const selectFields = [
-    "*",
-    `contact!left(
-      *,
-      outreach_attempt!left(id, disposition, campaign_id),
-      contact_audience!left(...audience!left(name))
-    )`,
-  ];
+  const campaignIdNum = Number(campaignId);
 
-  const [queueResult, unfilteredCount, queuedCount] = await Promise.all([
-    filteredSearch("", filters, supabase, selectFields, campaignId)
-      .range(offset, offset + pageSize - 1)
-      .then(({ data, error, count }) => ({ data, error, count })),
-    supabase
-      .from("campaign_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", Number(campaignId))
-      .then(({ count, error }) => ({ count, error })),
-    supabase
-      .from("campaign_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", Number(campaignId))
-      .eq("status", QUEUE_STATUS_QUEUED)
-      .then(({ count, error }) => ({ count, error })),
-  ]);
+  try {
+    const [queueResult, unfilteredCount, queuedCount] = await Promise.all([
+      fetchCampaignQueuePage({
+        campaignId: campaignIdNum,
+        filters,
+        offset,
+        limit: pageSize,
+      }),
+      countCampaignQueueRows(campaignIdNum),
+      countQueuedCampaignQueueRows(campaignIdNum),
+    ]);
 
-  if (queueResult.error) {
-    return { ok: false as const, error: queueResult.error.message, status: 500 };
+    return {
+      ok: true as const,
+      queue: {
+        items: queueResult.items,
+        pagination: {
+          page,
+          page_size: pageSize,
+          total_count: queueResult.totalCount,
+          unfiltered_count: unfilteredCount,
+          queued_count: queuedCount,
+        } satisfies PaginationMeta,
+        filters,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load campaign queue",
+      status: 500,
+    };
   }
-
-  return {
-    ok: true as const,
-    queue: {
-      items: queueResult.data ?? [],
-      pagination: {
-        page,
-        page_size: pageSize,
-        total_count: queueResult.count ?? 0,
-        unfiltered_count: unfilteredCount.count ?? 0,
-        queued_count: queuedCount.count ?? 0,
-      } satisfies PaginationMeta,
-      filters,
-    },
-  };
 }
 
 export async function patchCampaignQueueApi(
@@ -622,92 +628,60 @@ export async function patchCampaignQueueApi(
   }
 
   const filters = normalizeQueueFilters(body.filters);
+  const campaignIdNum = Number(campaignId);
 
-  switch (body.action) {
-    case "update_status": {
-      if (body.all) {
-        const { data: rows, error } = await filteredSearch(
-          "",
-          filters,
+  try {
+    switch (body.action) {
+      case "update_status": {
+        if (body.all) {
+          const ids = await searchCampaignQueueIds({ campaignId: campaignIdNum, filters });
+          await updateCampaignQueueStatusByIds(ids, body.status!);
+        } else if (body.ids?.length) {
+          await updateCampaignQueueStatusByIds(body.ids, body.status!);
+        }
+        return { ok: true as const, success: true };
+      }
+      case "add_contact_ids": {
+        await enqueueContactsForCampaign(
           supabase,
-          ["id"],
-          campaignId,
+          campaignIdNum,
+          body.contact_ids!,
+          { requeue: false },
         );
-        if (error) {
-          return { ok: false as const, error: error.message, status: 500 };
-        }
-        const ids = (rows ?? [])
-          .map((row) => (row as unknown as { id: number }).id)
-          .filter((id) => Number.isFinite(id));
-        if (ids.length > 0) {
-          const { error: updateError } = await supabase
-            .from("campaign_queue")
-            .update({ status: body.status! })
-            .in("id", ids);
-          if (updateError) {
-            return { ok: false as const, error: updateError.message, status: 500 };
-          }
-        }
-      } else if (body.ids?.length) {
-        const { error } = await supabase
-          .from("campaign_queue")
-          .update({ status: body.status! })
-          .in("id", body.ids);
-        if (error) {
-          return { ok: false as const, error: error.message, status: 500 };
-        }
+        return { ok: true as const, success: true };
       }
-      return { ok: true as const, success: true };
-    }
-    case "add_contact_ids": {
-      await enqueueContactsForCampaign(
-        supabase,
-        Number(campaignId),
-        body.contact_ids!,
-        { requeue: false },
-      );
-      return { ok: true as const, success: true };
-    }
-    case "add_audience": {
-      const { data: contacts, error } = await supabase
-        .from("contact_audience")
-        .select("contact_id")
-        .eq("audience_id", body.audience_id!);
-      if (error) {
-        return { ok: false as const, error: error.message, status: 500 };
+      case "add_audience": {
+        const contacts = await db
+          .select({ contact_id: contactAudienceTable.contact_id })
+          .from(contactAudienceTable)
+          .where(eq(contactAudienceTable.audience_id, body.audience_id!));
+        await enqueueContactsForCampaign(
+          supabase,
+          campaignIdNum,
+          contacts.map((row) => row.contact_id),
+          { requeue: false },
+        );
+        return { ok: true as const, success: true };
       }
-      await enqueueContactsForCampaign(
-        supabase,
-        Number(campaignId),
-        contacts.map((row) => row.contact_id),
-        { requeue: false },
-      );
-      return { ok: true as const, success: true };
-    }
-    case "remove": {
-      if (body.all) {
-        const { error } = await supabase
-          .from("campaign_queue")
-          .delete()
-          .eq("campaign_id", Number(campaignId));
-        if (error) {
-          return { ok: false as const, error: error.message, status: 500 };
+      case "remove": {
+        if (body.all) {
+          await deleteAllCampaignQueueForCampaign(campaignIdNum);
+        } else if (body.ids?.length) {
+          await deleteCampaignQueueByIds(body.ids);
         }
-      } else if (body.ids?.length) {
-        const { error } = await supabase
-          .from("campaign_queue")
-          .delete()
-          .in("id", body.ids);
-        if (error) {
-          return { ok: false as const, error: error.message, status: 500 };
-        }
+        return { ok: true as const, success: true };
       }
-      return { ok: true as const, success: true };
+      default: {
+        const _exhaustive: never = body.action;
+        return { ok: false as const, error: "Invalid action", status: 400 };
+      }
     }
-    default: {
-      const _exhaustive: never = body.action;
-      return { ok: false as const, error: "Invalid action", status: 400 };
-    }
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to update campaign queue",
+      status: 500,
+    };
   }
 }
 
@@ -1004,103 +978,214 @@ export async function getScriptDetailApi(
 }
 
 export async function listWorkspaceSurveysApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   workspaceId: string,
 ) {
-  const { data, error } = await supabase
-    .from("survey")
-    .select(`*, survey_response(count)`)
-    .eq("workspace", workspaceId)
-    .order("created_at", { ascending: false });
+  const tdb = createTenantDb(workspaceId);
 
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  try {
+    const surveys = await tdb.survey.findMany({
+      orderBy: (survey, { desc: descFn }) => [descFn(survey.created_at)],
+    });
+    const responseCounts = await loadSurveyResponseCounts(surveys.map((survey) => survey.id));
+
+    return {
+      ok: true as const,
+      surveys: surveys.map((survey) => ({
+        ...survey,
+        survey_response: [{ count: responseCounts.get(survey.id) ?? 0 }],
+      })),
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load surveys",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, surveys: data ?? [] };
 }
 
 export async function getSurveyDetailApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   surveyId: string,
   workspaceId: string,
 ) {
-  const { data: survey, error } = await supabase
-    .from("survey")
-    .select(`
-      *,
-      survey_page(
-        *,
-        survey_question(
-          *,
-          question_option(*)
-        )
-      ),
-      survey_response(count)
-    `)
-    .eq("survey_id", surveyId)
-    .eq("workspace", workspaceId)
-    .single();
-
-  if (error || !survey) {
-    return { ok: false as const, error: "Survey not found", status: 404 };
+  try {
+    const survey = await loadSurveyDetailByPublicId(surveyId, { workspaceId });
+    if (!survey) {
+      return { ok: false as const, error: "Survey not found", status: 404 };
+    }
+    return { ok: true as const, survey };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Survey not found",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, survey };
 }
 
 export async function getSurveyResponsesApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   surveyId: string,
   workspaceId: string,
 ) {
-  const { data: survey, error: surveyError } = await supabase
-    .from("survey")
-    .select("id, survey_id, title, workspace")
-    .eq("survey_id", surveyId)
-    .eq("workspace", workspaceId)
-    .single();
+  const tdb = createTenantDb(workspaceId);
 
-  if (surveyError || !survey) {
-    return { ok: false as const, error: "Survey not found", status: 404 };
+  try {
+    const survey = await tdb.survey.findFirst({
+      where: eq(surveyTable.survey_id, surveyId),
+      columns: {
+        id: true,
+        survey_id: true,
+        title: true,
+        workspace: true,
+      },
+    });
+    if (!survey) {
+      return { ok: false as const, error: "Survey not found", status: 404 };
+    }
+
+    const responseRows = await db
+      .select()
+      .from(surveyResponseTable)
+      .where(eq(surveyResponseTable.survey_id, survey.id))
+      .orderBy(desc(surveyResponseTable.created_at));
+
+    if (responseRows.length === 0) {
+      return {
+        ok: true as const,
+        survey_id: survey.survey_id,
+        responses: [],
+        stats: {
+          total: 0,
+          completed: 0,
+          in_progress: 0,
+          completion_rate: 0,
+        },
+      };
+    }
+
+    const responseIds = responseRows.map((response) => response.id);
+    const contactIds = [
+      ...new Set(
+        responseRows
+          .map((response) => response.contact_id)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    ];
+
+    const pages = await db
+      .select({ id: surveyPageTable.id })
+      .from(surveyPageTable)
+      .where(eq(surveyPageTable.survey_id, survey.id));
+    const pageIds = pages.map((page) => page.id);
+    const questions =
+      pageIds.length === 0
+        ? []
+        : await db
+            .select()
+            .from(surveyQuestionTable)
+            .where(inArray(surveyQuestionTable.page_id, pageIds));
+    const questionIds = questions.map((question) => question.id);
+
+    const [contacts, answerRows, options] = await Promise.all([
+      contactIds.length > 0
+        ? db
+            .select({
+              id: contactTable.id,
+              firstname: contactTable.firstname,
+              surname: contactTable.surname,
+              phone: contactTable.phone,
+              email: contactTable.email,
+            })
+            .from(contactTable)
+            .where(
+              and(
+                eq(contactTable.workspace, workspaceId),
+                inArray(contactTable.id, contactIds),
+              ),
+            )
+        : Promise.resolve([]),
+      db
+        .select()
+        .from(responseAnswerTable)
+        .where(inArray(responseAnswerTable.response_id, responseIds)),
+      questionIds.length === 0
+        ? Promise.resolve([])
+        : db
+            .select()
+            .from(questionOptionTable)
+            .where(inArray(questionOptionTable.question_id, questionIds)),
+    ]);
+
+    const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
+    const questionById = new Map(questions.map((question) => [question.id, question]));
+    const optionsByQuestionId = new Map<number, typeof options>();
+    for (const option of options) {
+      const existing = optionsByQuestionId.get(option.question_id) ?? [];
+      existing.push(option);
+      optionsByQuestionId.set(option.question_id, existing);
+    }
+
+    const answersByResponseId = new Map<number, Array<(typeof answerRows)[number] & {
+      survey_question: {
+        question_id: string;
+        question_text: string;
+        question_type: string;
+        question_option: Array<{ option_label: string }>;
+      } | null;
+    }>>();
+
+    for (const answer of answerRows) {
+      const question = questionById.get(answer.question_id);
+      const enrichedAnswer = {
+        ...answer,
+        survey_question: question
+          ? {
+              question_id: question.question_id,
+              question_text: question.question_text,
+              question_type: question.question_type,
+              question_option: (optionsByQuestionId.get(question.id) ?? []).map(
+                (option) => ({ option_label: option.option_label }),
+              ),
+            }
+          : null,
+      };
+      const existing = answersByResponseId.get(answer.response_id) ?? [];
+      existing.push(enrichedAnswer);
+      answersByResponseId.set(answer.response_id, existing);
+    }
+
+    const responses = responseRows.map((response) => ({
+      ...response,
+      contact: response.contact_id
+        ? (contactById.get(response.contact_id) ?? null)
+        : null,
+      response_answer: answersByResponseId.get(response.id) ?? [],
+    }));
+
+    const total = responses.length;
+    const completed = responses.filter((row) => row.completed_at)?.length ?? 0;
+
+    return {
+      ok: true as const,
+      survey_id: survey.survey_id,
+      responses,
+      stats: {
+        total,
+        completed,
+        in_progress: total - completed,
+        completion_rate: total > 0 ? (completed / total) * 100 : 0,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load survey responses",
+      status: 500,
+    };
   }
-
-  const { data: responses, error: responsesError } = await supabase
-    .from("survey_response")
-    .select(`
-      *,
-      contact(firstname, surname, phone, email),
-      response_answer(
-        *,
-        survey_question(
-          question_id,
-          question_text,
-          question_type,
-          question_option(option_label)
-        )
-      )
-    `)
-    .eq("survey_id", survey.id)
-    .order("created_at", { ascending: false });
-
-  if (responsesError) {
-    return { ok: false as const, error: responsesError.message, status: 500 };
-  }
-
-  const total = responses?.length ?? 0;
-  const completed = responses?.filter((row) => row.completed_at)?.length ?? 0;
-
-  return {
-    ok: true as const,
-    survey_id: survey.survey_id,
-    responses: responses ?? [],
-    stats: {
-      total,
-      completed,
-      in_progress: total - completed,
-      completion_rate: total > 0 ? (completed / total) * 100 : 0,
-    },
-  };
 }
 
 export async function exportSurveyResponsesCsv(
@@ -1113,24 +1198,16 @@ export async function exportSurveyResponsesCsv(
     return result;
   }
 
-  const { data: survey } = await supabase
-    .from("survey")
-    .select(`
-      title,
-      survey_page(
-        page_order,
-        survey_question(
-          id,
-          question_id,
-          question_text,
-          question_type,
-          question_order
-        )
-      )
-    `)
-    .eq("survey_id", surveyId)
-    .eq("workspace", workspaceId)
-    .single();
+  let survey;
+  try {
+    survey = await loadSurveyDetailByPublicId(surveyId, { workspaceId });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Survey not found",
+      status: 500,
+    };
+  }
 
   if (!survey) {
     return { ok: false, error: "Survey not found", status: 404 };

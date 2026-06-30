@@ -1,42 +1,38 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { eq } from "drizzle-orm";
+import { workspace as workspaceTable } from "@/db/schema";
+import { adminDb } from "@/server/admin-db";
 import { isObject } from "@/lib/type-safety-utils";
 
 export type WorkspaceTwilioData = Record<string, unknown>;
 
 export async function loadWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database> | null,
   workspaceId: string,
 ): Promise<WorkspaceTwilioData> {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
+  const [row] = await adminDb
+    .select({ twilio_data: workspaceTable.twilio_data })
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
 
-  if (error) {
-    throw error;
+  if (!row) {
+    throw new Error(`Workspace ${workspaceId} not found`);
   }
 
-  return isObject(data?.twilio_data) ? data.twilio_data : {};
+  return isObject(row.twilio_data) ? row.twilio_data : {};
 }
 
 export async function persistWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database> | null,
   workspaceId: string,
   twilioData: WorkspaceTwilioData,
 ): Promise<void> {
-  const { error } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data:
-        twilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (error) {
-    throw error;
-  }
+  await adminDb
+    .update(workspaceTable)
+    .set({ twilio_data: twilioData })
+    .where(eq(workspaceTable.id, workspaceId));
 }
 
 export async function mergeWorkspaceTwilioData(

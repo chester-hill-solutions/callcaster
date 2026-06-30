@@ -1,12 +1,10 @@
 import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
-import { Survey, User } from "@/lib/types";
+import { listWorkspaceSurveysApi } from "@/lib/platform-data.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
   const { supabaseClient, user } = await verifyAuth(request);
   const workspaceId = params.id;
 
@@ -14,30 +12,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Workspace ID is required", { status: 400 });
   }
 
-  // Get user role for this workspace
-  const userRole = await getUserRole({ 
-    supabaseClient, 
-    user: user, 
-    workspaceId 
+  const userRole = await getUserRole({
+    supabaseClient,
+    user,
+    workspaceId,
   });
 
-  // Get surveys for this workspace
-  const { data: surveys, error } = await supabaseClient
-    .from("survey")
-    .select(`
-      *,
-      survey_response(count)
-    `)
-    .eq("workspace", workspaceId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    logger.error("Error fetching surveys:", error);
-    throw new Response("Failed to load surveys", { status: 500 });
+  const result = await listWorkspaceSurveysApi(supabaseClient, workspaceId);
+  if (!result.ok) {
+    throw new Response(result.error, { status: result.status });
   }
 
   return routeData({
-    surveys: surveys || [],
+    surveys: result.surveys,
     workspaceId,
     user,
     userRole,

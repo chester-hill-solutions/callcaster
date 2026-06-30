@@ -12,6 +12,13 @@ import {
 } from "@/lib/pricing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { and, gte, inArray, like, lte, ne } from "drizzle-orm";
+import {
+  call as callTable,
+  message as messageTable,
+  transaction_history as transactionHistoryTable,
+} from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
 
 const TERMINAL_SMS_STATUSES = TERMINAL_BILLABLE_SMS_STATUSES;
 const BILLABLE_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
@@ -19,52 +26,45 @@ const BILLABLE_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
 export type { BillingReconciliationReport };
 
 export async function loadBillingEntityAudit(args: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient?: SupabaseClient<Database>;
   workspaceId: string;
   period: { startDate: string; endDate: string };
 }): Promise<BillingEntityAudit> {
   const periodStart = `${args.period.startDate}T00:00:00.000Z`;
   const periodEnd = `${args.period.endDate}T23:59:59.999Z`;
+  const tdb = createTenantDb(args.workspaceId);
 
-  const [messagesResult, callsResult, debitsResult] = await Promise.all([
-    args.supabaseClient
-      .from("message")
-      .select("sid", { count: "exact", head: true })
-      .eq("workspace", args.workspaceId)
-      .neq("direction", "inbound")
-      .in("status", [...TERMINAL_SMS_STATUSES])
-      .gte("date_created", periodStart)
-      .lte("date_created", periodEnd),
-    args.supabaseClient
-      .from("call")
-      .select("sid", { count: "exact", head: true })
-      .eq("workspace", args.workspaceId)
-      .in("status", [...BILLABLE_CALL_STATUSES])
-      .gte("date_created", periodStart)
-      .lte("date_created", periodEnd),
-    args.supabaseClient
-      .from("transaction_history")
-      .select("idempotency_key", { count: "exact", head: true })
-      .eq("workspace", args.workspaceId)
-      .eq("type", "DEBIT")
-      .gte("created_at", periodStart)
-      .lte("created_at", periodEnd)
-      .like("idempotency_key", "sms:%"),
-  ]);
+  const messageWhere = and(
+    ne(messageTable.direction, "inbound"),
+    inArray(messageTable.status, [...TERMINAL_SMS_STATUSES]),
+    gte(messageTable.date_created, periodStart),
+    lte(messageTable.date_created, periodEnd),
+  );
+  const callWhere = and(
+    inArray(callTable.status, [...BILLABLE_CALL_STATUSES]),
+    gte(callTable.date_created, periodStart),
+    lte(callTable.date_created, periodEnd),
+  );
+  const smsDebitWhere = and(
+    eq(transactionHistoryTable.type, "DEBIT"),
+    gte(transactionHistoryTable.created_at, periodStart),
+    lte(transactionHistoryTable.created_at, periodEnd),
+    like(transactionHistoryTable.idempotency_key, "sms:%"),
+  );
+  const callDebitWhere = and(
+    eq(transactionHistoryTable.type, "DEBIT"),
+    gte(transactionHistoryTable.created_at, periodStart),
+    lte(transactionHistoryTable.created_at, periodEnd),
+    like(transactionHistoryTable.idempotency_key, "call:%"),
+  );
 
-  const callDebitsResult = await args.supabaseClient
-    .from("transaction_history")
-    .select("idempotency_key", { count: "exact", head: true })
-    .eq("workspace", args.workspaceId)
-    .eq("type", "DEBIT")
-    .gte("created_at", periodStart)
-    .lte("created_at", periodEnd)
-    .like("idempotency_key", "call:%");
-
-  const billableMessages = messagesResult.count ?? 0;
-  const debitedMessages = debitsResult.count ?? 0;
-  const billableCalls = callsResult.count ?? 0;
-  const debitedCalls = callDebitsResult.count ?? 0;
+  const [billableMessages, billableCalls, debitedMessages, debitedCalls] =
+    await Promise.all([
+      tdb.message.count({ where: messageWhere }),
+      tdb.call.count({ where: callWhere }),
+      tdb.transaction_history.count({ where: smsDebitWhere }),
+      tdb.transaction_history.count({ where: callDebitWhere }),
+    ]);
 
   return {
     billableMessages,
@@ -77,38 +77,39 @@ export async function loadBillingEntityAudit(args: {
 }
 
 export async function loadBillingReconciliationReport(args: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient?: SupabaseClient<Database>;
   workspaceId: string;
   twilioUsage: TwilioUsageRecord[];
   referenceDate?: Date;
 }): Promise<BillingReconciliationReport> {
   const period = getTwilioUsageDateRange(args.referenceDate);
-
   const periodStart = `${period.startDate}T00:00:00.000Z`;
   const periodEnd = `${period.endDate}T23:59:59.999Z`;
+  const tdb = createTenantDb(args.workspaceId);
 
-  const [{ data: ledgerRows, error }, entityAudit] = await Promise.all([
-    args.supabaseClient
-      .from("transaction_history")
-      .select("type, amount, idempotency_key, created_at")
-      .eq("workspace", args.workspaceId)
-      .gte("created_at", periodStart)
-      .lte("created_at", periodEnd),
+  const [ledgerRows, entityAudit] = await Promise.all([
+    tdb.transaction_history.findMany({
+      where: and(
+        gte(transactionHistoryTable.created_at, periodStart),
+        lte(transactionHistoryTable.created_at, periodEnd),
+      ),
+      columns: {
+        type: true,
+        amount: true,
+        idempotency_key: true,
+        created_at: true,
+      },
+    }),
     loadBillingEntityAudit({
-      supabaseClient: args.supabaseClient,
       workspaceId: args.workspaceId,
       period,
     }),
   ]);
 
-  if (error) {
-    throw error;
-  }
-
   return buildBillingReconciliationReport({
     period,
     twilioUsage: args.twilioUsage,
-    ledgerRows: (ledgerRows ?? []) as LedgerTransactionRow[],
+    ledgerRows: ledgerRows as LedgerTransactionRow[],
     entityAudit,
   });
 }

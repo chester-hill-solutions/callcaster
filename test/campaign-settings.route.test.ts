@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => {
     fetchCampaignDetails: vi.fn(),
     fetchQueueCounts: vi.fn(),
     getSignedUrls: vi.fn(),
+    getCampaignQueueContactIds: vi.fn(async () => []),
+    enqueueContactsForCampaign: vi.fn(async () => undefined),
     logger: {
       debug: vi.fn(),
       error: vi.fn(),
@@ -37,6 +39,12 @@ vi.mock("@/lib/database.server", () => ({
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  getCampaignQueueContactIds: (...args: unknown[]) => mocks.getCampaignQueueContactIds(...args),
+}));
+vi.mock("@/lib/queue.server", () => ({
+  enqueueContactsForCampaign: (...args: unknown[]) => mocks.enqueueContactsForCampaign(...args),
+}));
 
 function makeSupabaseForSettingsRoute(options?: {
   campaign?: any;
@@ -91,14 +99,6 @@ function makeSupabaseForSettingsRoute(options?: {
         };
       }
 
-      if (table === "campaign_queue") {
-        return {
-          select: () => ({
-            eq: async () => ({ data: [], error: null }),
-          }),
-        };
-      }
-
       throw new Error(`unexpected table ${table}`);
     }),
     statusUpdate,
@@ -117,6 +117,8 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.fetchCampaignDetails.mockReset();
     mocks.fetchQueueCounts.mockReset();
     mocks.getSignedUrls.mockReset();
+    mocks.getCampaignQueueContactIds.mockReset();
+    mocks.enqueueContactsForCampaign.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
     mocks.fetchCampaignDetails.mockResolvedValue({

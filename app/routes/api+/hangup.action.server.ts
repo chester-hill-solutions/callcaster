@@ -1,6 +1,6 @@
+import { findActiveAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { data as routeData } from "react-router";
-import { isAssignedToUser } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
@@ -56,16 +56,11 @@ export const action = async ({ request }: { request: Request }) => {
                 status: 'idle'
             }
         });
-        const { data: queueRows, error: queueError } = await supabase
-            .from("campaign_queue")
-            .select("*, campaign(group_household_queue)")
-            .is("dequeued_at", null);
-        if (queueError) throw queueError;
-        const queue = queueRows?.find((row) => isAssignedToUser(row, user.id));
+        const queue = await findActiveAssignedQueueForUser(user.id);
         if (queue) {
             const { error } = await supabase.rpc('dequeue_contact', {
                 passed_contact_id: queue.contact_id,
-                group_on_household: queue.campaign.group_household_queue,
+                group_on_household: queue.group_household_queue,
                 dequeued_by_id: user.id,
                 dequeued_reason_text: "Call completed"
             });

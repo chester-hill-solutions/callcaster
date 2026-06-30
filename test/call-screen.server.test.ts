@@ -37,6 +37,20 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
     tenantDbMocks.fetchCampaignWithScriptForWorkspace(...args),
 }));
 
+const queueSearchMocks = vi.hoisted(() => ({
+  countCampaignQueueRows: vi.fn(async () => 10),
+  countCompletedCampaignQueueRows: vi.fn(async () => 4),
+  fetchActiveCampaignQueueWithContacts: vi.fn(async () => []),
+}));
+
+vi.mock("@/lib/campaign-queue-search.server", () => ({
+  countCampaignQueueRows: (...args: unknown[]) => queueSearchMocks.countCampaignQueueRows(...args),
+  countCompletedCampaignQueueRows: (...args: unknown[]) =>
+    queueSearchMocks.countCompletedCampaignQueueRows(...args),
+  fetchActiveCampaignQueueWithContacts: (...args: unknown[]) =>
+    queueSearchMocks.fetchActiveCampaignQueueWithContacts(...args),
+}));
+
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => ({
     outreach_attempt: {
@@ -63,6 +77,9 @@ describe("call-screen.server", () => {
     vi.clearAllMocks();
     adminDbMocks.workspaceRows = [{ id: "ws-1" }];
     adminDbMocks.workspaceError = null;
+    queueSearchMocks.countCampaignQueueRows.mockResolvedValue(10);
+    queueSearchMocks.countCompletedCampaignQueueRows.mockResolvedValue(4);
+    queueSearchMocks.fetchActiveCampaignQueueWithContacts.mockResolvedValue([]);
   });
 
   test("getNextRecipient returns null for predictive dial type", () => {
@@ -135,17 +152,7 @@ describe("call-screen.server", () => {
   });
 
   test("getQueueByDialType throws for invalid dial type", async () => {
-    const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn().mockReturnThis(),
-          is: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-        })),
-      })),
-    };
-    await expect(getQueueByDialType(supabase as never, "1", "invalid", "user-1")).rejects.toThrow(
+    await expect(getQueueByDialType({} as never, "1", "invalid", "user-1")).rejects.toThrow(
       "Invalid dial type",
     );
   });
@@ -153,42 +160,13 @@ describe("call-screen.server", () => {
   test("getCallScreenData throws when any query errors", async () => {
     tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockRejectedValue(new Error("boom"));
     tenantDbMocks.outreachFindMany.mockResolvedValue([]);
-    let queueEqCalls = 0;
     const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === "campaign_queue") {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => {
-                queueEqCalls += 1;
-                if (queueEqCalls === 1) {
-                  return Promise.resolve({ count: 0, error: null });
-                }
-                return applyCompletedCountQuery();
-              }),
-            })),
-          };
-        }
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: vi.fn().mockResolvedValue({ data: null, error: new Error("boom") }),
-            })),
-          })),
-        };
-      }),
       rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     };
     await expect(getCallScreenData(supabase as never, "1", "ws-1", "user-1")).rejects.toThrow(
       "Error fetching campaign data",
     );
   });
-
-  function applyCompletedCountQuery() {
-    return {
-      or: vi.fn().mockResolvedValue({ count: 4, error: null }),
-    };
-  }
 
   test("getCallScreenData returns aggregated loader data", async () => {
     adminDbMocks.workspaceRows = [{ id: "ws-1" }];
@@ -198,23 +176,10 @@ describe("call-screen.server", () => {
     });
     tenantDbMocks.outreachFindMany.mockResolvedValue([]);
     tenantDbMocks.callFindMany.mockResolvedValue([]);
-
-    const queueSelect = vi
-      .fn()
-      .mockReturnValueOnce({
-        eq: vi.fn().mockResolvedValue({ count: 10, error: null }),
-      })
-      .mockReturnValueOnce({
-        eq: vi.fn().mockReturnValue(applyCompletedCountQuery()),
-      });
+    queueSearchMocks.countCampaignQueueRows.mockResolvedValue(10);
+    queueSearchMocks.countCompletedCampaignQueueRows.mockResolvedValue(4);
 
     const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === "campaign_queue") {
-          return { select: queueSelect };
-        }
-        throw new Error(`Unexpected table: ${table}`);
-      }),
       rpc: vi.fn().mockResolvedValue({ data: [{ id: "aud-1" }], error: null }),
     };
 

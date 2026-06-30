@@ -19,3 +19,7 @@ vi.mock("@/lib/api-auth.server", async (importOriginal) => {
     resolveJsonAuthSession: routeAuthMocks.resolveJsonAuthSession,
   };
 });
+
+export function getRouteAuthMocks() {
+  return routeAuthMocks;
+}

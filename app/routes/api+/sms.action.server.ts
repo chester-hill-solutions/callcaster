@@ -3,7 +3,7 @@ import {
   resolveTwilioSmsMessagingServiceSid,
 } from "@/lib/sms-send-resolve";
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
-import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
@@ -177,10 +177,11 @@ const sendMessage = async ({
       status: 'completed'
     }),
 
-    supabase
-      .from("campaign_queue")
-      .update(buildDequeuedQueueUpdate(user_id, "SMS message sent", { includeNormalizedFields: true }))
-      .eq("id", queue_id)
+    dequeueCampaignQueueById({
+      queueId: Number(queue_id),
+      userId: user_id,
+      reason: "SMS message sent",
+    }),
   ]);
 
   return { message };
@@ -368,16 +369,11 @@ export const action = async ({ request }: { request: Request }) => {
           });
 
           if (duplicateExists) {
-            await supabase
-              .from("campaign_queue")
-              .update(
-                buildDequeuedQueueUpdate(
-                  effectiveUserId as string,
-                  DUPLICATE_SMS_DEQUEUED_REASON,
-                  { includeNormalizedFields: true },
-                ),
-              )
-              .eq("id", member.id);
+            await dequeueCampaignQueueById({
+              queueId: member.id,
+              userId: effectiveUserId as string,
+              reason: DUPLICATE_SMS_DEQUEUED_REASON,
+            });
             return {
               [member.contact_id]: {
                 success: true,

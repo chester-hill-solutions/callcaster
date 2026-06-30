@@ -6,6 +6,10 @@ import {
   TEST_WORKSPACE_ID_ALT,
 } from "./helpers/public-api-fixtures";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 let currentSupabase: any = null;
 const defaultPortalConfig = {
   trafficClass: "unknown",
@@ -37,6 +41,7 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     processTemplateTags: vi.fn((text: string) => text),
+    dequeueCampaignQueueById: vi.fn(async () => []),
     env: {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service-key"),
@@ -92,6 +97,10 @@ vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => createTenantDbMock(),
 }));
 
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueCampaignQueueById: (...args: unknown[]) => mocks.dequeueCampaignQueueById(...args),
+}));
+
 vi.mock("@/lib/workspace-credits.server", () => ({
   getWorkspaceCreditsBalance: vi.fn(async () => 100),
 }));
@@ -132,7 +141,6 @@ function makeSupabase(opts: {
   outreachUpdate?: { data: any; error: any };
   messageInsert?: any;
   messageCount?: number;
-  queueUpdate?: any;
   signedUrls?: Array<string | undefined>;
 } = {}) {
   configureTenantDbStub({
@@ -189,13 +197,6 @@ function makeSupabase(opts: {
           }),
         };
       }
-      if (table === "campaign_queue") {
-        return {
-          update: () => ({
-            eq: vi.fn(async () => opts.queueUpdate ?? ({ data: [], error: null } as any)),
-          }),
-        };
-      }
       throw new Error(`Unexpected table: ${table}`);
     }),
   };
@@ -212,6 +213,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.processTemplateTags.mockReset();
+    mocks.dequeueCampaignQueueById.mockReset();
     mocks.logger.error.mockReset();
     mocks.createClient.mockClear();
     mocks.verifyApiKeyOrSession.mockResolvedValue({

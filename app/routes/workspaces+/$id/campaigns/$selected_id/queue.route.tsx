@@ -1,24 +1,18 @@
 export { loader } from "./queue.loader.server";
 export { action } from "./queue.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
+import { data as routeData, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
 import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign , Contact } from "@/lib/types";
+import { Audience, QueueItem, Contact } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
 import type { AppError } from "@/lib/errors.server";
-import {
-    applyQueueStatusFilter,
-    COMPLETED_QUEUE_COUNT_FILTER,
-    QUEUE_STATUS_QUEUED,
-    type QueueStatusFilter,
-} from "@/lib/queue-status";
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -43,41 +37,6 @@ interface LoaderData {
     queuePromise: Promise<QueueResponse>;
     selectedAudienceIds: number[];
     campaignId: string;
-}
-
-export const filteredSearch = (query: string, filters: { name: string, phone: string, email: string, address: string, audiences: string, disposition: string, queueStatus: string }, supabaseClient: SupabaseClient, returnFields: string[] | null = null, campaignId: string) => {
-    let searchQuery = supabaseClient.from("campaign_queue").select(returnFields ? returnFields.join(',') : '*', { count: 'exact' }).eq('campaign_id', Number(campaignId));
-    if (query) {
-        searchQuery = searchQuery.or(`firstname.ilike.%${query}%,surname.ilike.%${query}%`, { foreignTable: 'contact' });
-    }
-    if (filters.name) {
-        searchQuery = searchQuery.or(`firstname.ilike.%${filters.name}%,surname.ilike.%${filters.name}%`, { foreignTable: 'contact' });
-    }
-    if (filters.phone) {
-        searchQuery = searchQuery.ilike('contact.phone', `%${filters.phone}%`);
-    }
-    if (filters.disposition) {
-        if (filters.disposition === 'unknown') {
-            searchQuery = searchQuery.is('contact.outreach_attempt.disposition', null);
-        } else {
-            searchQuery = searchQuery.eq('contact.outreach_attempt.disposition', filters.disposition);
-        }
-    }
-    if (filters.queueStatus) {
-        const queueStatus = filters.queueStatus as QueueStatusFilter;
-        searchQuery = applyQueueStatusFilter(searchQuery, queueStatus);
-    }
-    if (filters.audiences) {
-        const audienceId = Number(filters.audiences);
-        searchQuery = searchQuery.in('contact.contact_audience.audience_id', [audienceId]);
-    }
-    if (filters.email) {
-        searchQuery = searchQuery.ilike('contact.email', `%${filters.email}%`);
-    }
-    if (filters.address) {
-        searchQuery = searchQuery.ilike('contact.address', `%${filters.address}%`);
-    }
-    return searchQuery;
 }
 
 export function ErrorBoundary() {

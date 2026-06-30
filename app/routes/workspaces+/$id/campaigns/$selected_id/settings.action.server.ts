@@ -17,6 +17,8 @@ import { normalizeCampaignData } from "@/lib/campaign-settings";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
 import { fetchCampaignDetails, fetchQueueCounts, parseActionRequest, updateCampaign } from "@/lib/database.server";
+import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -84,22 +86,15 @@ async function handleCampaignDuplicate(
 
   if (error || !campaign) throw error || new Error("Failed to create campaign");
 
-  const { data: originalQueue } = await supabaseClient
-    .from("campaign_queue")
-    .select("contact_id")
-    .eq("campaign_id", selected_id);
+  const originalContactIds = await getCampaignQueueContactIds(Number(selected_id));
 
-  if (originalQueue?.length) {
-    const newQueueItems = originalQueue.map((item) => ({
-      campaign_id: campaign.id,
-      contact_id: item.contact_id,
-    }));
-
-    const { error: queueError } = await supabaseClient
-      .from("campaign_queue")
-      .insert(newQueueItems);
-
-    if (queueError) throw queueError;
+  if (originalContactIds.length > 0) {
+    await enqueueContactsForCampaign(
+      supabaseClient,
+      campaign.id,
+      originalContactIds,
+      { requeue: false },
+    );
   }
 
   return { success: true };

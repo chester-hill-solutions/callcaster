@@ -1,8 +1,11 @@
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import {
+  deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds,
+  getQueuedContactIdsForCampaign,
+} from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
 import { safeParseJson } from "@/lib/database.server";
 import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 
@@ -67,16 +70,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             let warning: string | undefined;
 
             if (audienceContactIds.length > 0) {
-                const { data: existingQueueRows, error: queueError } = await supabase
-                    .from("campaign_queue")
-                    .select("contact_id")
-                    .eq("campaign_id", campaignId)
-                    .in("contact_id", audienceContactIds);
-
-                if (queueError) throw queueError;
-
                 const existingContactIds = new Set(
-                    (existingQueueRows ?? []).map((row) => row.contact_id),
+                    await getQueuedContactIdsForCampaign({
+                        campaignId,
+                        contactIds: audienceContactIds,
+                    }),
                 );
                 const contactIds = audienceContactIds.filter(
                     (contactId) => !existingContactIds.has(contactId),
@@ -170,16 +168,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             if (contactsToRemove && contactsToRemove.length > 0) {
-                // Remove these contacts from the queue if they haven't been called yet
-                const { error: removeError } = await supabase
-                    .from('campaign_queue')
-                    .delete()
-                    .eq('campaign_id', campaignId)
-                    .in('contact_id', contactsToRemove.map(c => c.contact_id))
-                    .eq('status', QUEUE_STATUS_QUEUED)
-                    .eq('attempts', 0);
-
-                if (removeError) throw removeError;
+                await deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds({
+                    campaignId,
+                    contactIds: contactsToRemove.map((contact) => contact.contact_id),
+                });
             }
 
             return routeData({ success: true }, { headers });

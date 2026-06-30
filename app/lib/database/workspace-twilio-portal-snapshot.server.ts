@@ -1,5 +1,11 @@
-import { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../database.types";
+import { desc, eq } from "drizzle-orm";
+import {
+  message as messageTable,
+  workspace as workspaceTable,
+  workspace_number as workspaceNumberTable,
+} from "@/db/schema";
 import {
   type TwilioAccountData,
   type WorkspaceTwilioPortalMetrics,
@@ -35,6 +41,8 @@ import {
   buildTwilioPortalRecommendations,
   buildTwilioSupportRequestSummary,
 } from "./workspace-twilio-recommendations.server";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb } from "@/server/tenant-db";
 
 export function buildDefaultWorkspaceTwilioPortalSnapshot(): WorkspaceTwilioPortalSnapshot {
   const onboarding = {
@@ -74,46 +82,44 @@ export function buildDefaultWorkspaceTwilioPortalSnapshot(): WorkspaceTwilioPort
 }
 
 export async function getWorkspaceTwilioPortalSnapshot({
-  supabaseClient,
+  supabaseClient: _supabaseClient,
   workspaceId,
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const [
-    { data: workspace, error: workspaceError },
-    { data: workspaceNumbers, error: numbersError },
-    { data: recentMessages, error: messagesError },
-  ] = await Promise.all([
-    supabaseClient
-      .from("workspace")
-      .select("name, twilio_data")
-      .eq("id", workspaceId)
-      .single(),
-    supabaseClient
-      .from("workspace_number")
-      .select("type, phone_number, capabilities")
-      .eq("workspace", workspaceId),
-    supabaseClient
-      .from("message")
-      .select("status, messaging_service_sid")
-      .eq("workspace", workspaceId)
-      .eq("direction", "outbound-api")
-      .order("date_created", { ascending: false })
-      .limit(200),
+  const tdb = createTenantDb(workspaceId);
+
+  const [workspaceRow, workspaceNumbers, recentMessages] = await Promise.all([
+    adminDb
+      .select({ name: workspaceTable.name, twilio_data: workspaceTable.twilio_data })
+      .from(workspaceTable)
+      .where(eq(workspaceTable.id, workspaceId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+    tdb.workspace_number.findMany({
+      columns: {
+        type: true,
+        phone_number: true,
+        capabilities: true,
+      },
+    }),
+    tdb.message.findMany({
+      where: eq(messageTable.direction, "outbound-api"),
+      columns: {
+        status: true,
+        messaging_service_sid: true,
+      },
+      orderBy: (message, { desc: descFn }) => [descFn(message.date_created)],
+      limit: 200,
+    }),
   ]);
 
-  if (workspaceError) {
-    throw workspaceError;
-  }
-  if (numbersError) {
-    throw numbersError;
-  }
-  if (messagesError) {
-    throw messagesError;
+  if (!workspaceRow) {
+    throw new Error(`Workspace ${workspaceId} not found`);
   }
 
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (workspaceRow.twilio_data ?? null) as TwilioAccountData;
   const config = getWorkspaceTwilioPortalConfigFromTwilioData(twilioData);
   const effectiveConfig = getEffectiveWorkspaceTwilioPortalConfig(twilioData);
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
@@ -121,14 +127,14 @@ export async function getWorkspaceTwilioPortalSnapshot({
   const senderTypes =
     syncSnapshot.senderTypes.length > 0
       ? syncSnapshot.senderTypes
-      : (workspaceNumbers ?? [])
+      : workspaceNumbers
           .map((number) => number.type)
           .filter(
             (value): value is string =>
               typeof value === "string" && value.length > 0,
           );
   const detectedTrafficClass = detectTwilioTrafficClassFromSenderTypes(senderTypes);
-  const statusCounts = (recentMessages ?? []).reduce<
+  const statusCounts = recentMessages.reduce<
     WorkspaceTwilioPortalMetrics["statusCounts"]
   >((acc, message) => {
     if (message.status) {
@@ -141,11 +147,11 @@ export async function getWorkspaceTwilioPortalSnapshot({
     syncSnapshot.numberTypes.length > 0 ? syncSnapshot.numberTypes : [];
 
   const metrics: WorkspaceTwilioPortalMetrics = {
-    recentOutboundCount: recentMessages?.length ?? 0,
-    rawFromCount: (recentMessages ?? []).filter(
+    recentOutboundCount: recentMessages.length,
+    rawFromCount: recentMessages.filter(
       (message) => !message.messaging_service_sid,
     ).length,
-    messagingServiceCount: (recentMessages ?? []).filter(
+    messagingServiceCount: recentMessages.filter(
       (message) => !!message.messaging_service_sid,
     ).length,
     statusCounts,
@@ -180,7 +186,7 @@ export async function getWorkspaceTwilioPortalSnapshot({
   });
   const readiness = deriveWorkspaceMessagingReadiness({
     onboarding,
-    workspaceNumbers: (workspaceNumbers ?? []).map((number) => ({
+    workspaceNumbers: workspaceNumbers.map((number) => ({
       type: number.type,
       phone_number: number.phone_number,
       capabilities: number.capabilities,
@@ -198,7 +204,7 @@ export async function getWorkspaceTwilioPortalSnapshot({
   }
 
   const supportRequestSummary = buildTwilioSupportRequestSummary({
-    workspaceName: workspace?.name ?? null,
+    workspaceName: workspaceRow.name ?? null,
     workspaceId,
     config,
     senderTypes,

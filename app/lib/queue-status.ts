@@ -348,38 +348,4 @@ export function buildDequeuedQueueUpdate(
  * queued pool. Collapses the duplicated select → filter → requeue logic that
  * previously lived inline in the call-screen action and platform-telephony.
  */
-export async function releaseAssignedQueueForUser(
-  supabaseClient: SupabaseClient<Database>,
-  userId: string,
-  campaignId: string | number,
-): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
-  const { data: assignedRows, error: assignedRowsError } = await supabaseClient
-    .from("campaign_queue")
-    .select("id, dequeued_at, assigned_to_user_id, queue_state")
-    .eq("campaign_id", Number(campaignId))
-    .is("dequeued_at", null);
-
-  if (assignedRowsError) {
-    return { ok: false, error: assignedRowsError.message };
-  }
-
-  const assignedIds = (assignedRows ?? [])
-    .filter((row) => isAssignedToUser(row, userId))
-    .map((row) => row.id);
-
-  if (assignedIds.length === 0) {
-    return { ok: true, released: 0 };
-  }
-
-  const update = await supabaseClient
-    .from("campaign_queue")
-    .update(buildQueuedQueueUpdate({ includeNormalizedFields: true }))
-    .in("id", assignedIds)
-    .select("id");
-
-  if (update.error) {
-    return { ok: false, error: update.error.message };
-  }
-
-  return { ok: true, released: update.data?.length ?? 0 };
-}
+export { releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";

@@ -7,7 +7,9 @@ const mocks = vi.hoisted(() => {
   return {
     parseRequestData: vi.fn(),
     enqueueContactsForCampaign: vi.fn(),
-    filteredSearch: vi.fn(),
+    searchCampaignQueueIds: vi.fn(),
+    deleteCampaignQueueByIds: vi.fn(),
+    dbDeleteReturning: vi.fn(),
   };
 });
 
@@ -23,16 +25,29 @@ vi.mock("@/lib/database.server", () => ({
 vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: any[]) => mocks.enqueueContactsForCampaign(...args),
 }));
-vi.mock("@/lib/queue-filter-search.server", () => ({
-  filteredSearch: (...args: any[]) => mocks.filteredSearch(...args),
+vi.mock("@/lib/campaign-queue-search.server", () => ({
+  searchCampaignQueueIds: (...args: any[]) => mocks.searchCampaignQueueIds(...args),
+}));
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  deleteCampaignQueueByIds: (...args: any[]) => mocks.deleteCampaignQueueByIds(...args),
+}));
+vi.mock("@/server/db", () => ({
+  db: {
+    delete: () => ({
+      where: () => ({
+        returning: (...args: any[]) => mocks.dbDeleteReturning(...args),
+      }),
+    }),
+  },
 }));
 
 describe("app/routes/api+/campaign_queue/route.tsx", () => {
   beforeEach(() => {
-    vi.resetModules();
     mocks.parseRequestData.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
-    mocks.filteredSearch.mockReset();
+    mocks.searchCampaignQueueIds.mockReset();
+    mocks.deleteCampaignQueueByIds.mockReset();
+    mocks.dbDeleteReturning.mockReset();
   });
 
   test("redirects to /signin when user missing", async () => {
@@ -60,15 +75,9 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("DELETE with ids deletes in batches and returns aggregated data", async () => {
-    const select = vi.fn().mockResolvedValueOnce({ data: [{ id: 1 }], error: null });
-    const inFn = vi.fn().mockReturnValueOnce({ select });
-    const eq = vi.fn().mockReturnValueOnce({ in: inFn });
-    const del = vi.fn().mockReturnValueOnce({ eq });
-    const from = vi.fn().mockReturnValueOnce({ delete: () => ({ eq: (col: string, v: any) => ({ in: (c: string, b: any) => ({ select }) }) }) });
-
-    const supabaseClient = { from };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1, 2], campaign_id: 10 });
+    mocks.dbDeleteReturning.mockResolvedValueOnce([{ id: 1 }]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
@@ -76,20 +85,10 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ data: [{ id: 1 }] });
   });
 
-  test("DELETE with ids returns 500 on supabase delete error", async () => {
-    const supabaseClient = {
-      from: vi.fn().mockReturnValueOnce({
-        delete: () => ({
-          eq: () => ({
-            in: () => ({
-              select: async () => ({ data: null, error: { message: "bad" } }),
-            }),
-          }),
-        }),
-      }),
-    };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+  test("DELETE with ids returns 500 on delete error", async () => {
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1], campaign_id: 10 });
+    mocks.dbDeleteReturning.mockRejectedValueOnce(new Error("bad"));
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
@@ -97,22 +96,11 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "bad" });
   });
 
-  test("DELETE without ids uses filteredSearch and safeNumber mapping", async () => {
-    const supabaseClient = {
-      from: vi.fn().mockReturnValueOnce({
-        delete: () => ({
-          in: () => ({
-            select: async () => ({ data: [{ id: 5 }], error: null }),
-          }),
-        }),
-      }),
-    };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+  test("DELETE without ids uses searchCampaignQueueIds and safeNumber mapping", async () => {
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
-    mocks.filteredSearch.mockResolvedValueOnce({
-      data: [{ id: "5", contact_id: 1, campaign_id: 10, status: "queued", created_at: "", contact: {} }, {}],
-      error: null,
-    });
+    mocks.searchCampaignQueueIds.mockResolvedValueOnce([5]);
+    mocks.deleteCampaignQueueByIds.mockResolvedValueOnce([{ id: 5 }]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
@@ -120,13 +108,10 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ data: [{ id: 5 }] });
   });
 
-  test("DELETE without ids returns empty array when filteredSearch returns null data", async () => {
-    const supabaseClient = {
-      from: vi.fn(),
-    };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+  test("DELETE without ids returns empty array when search returns no ids", async () => {
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
-    mocks.filteredSearch.mockResolvedValueOnce({ data: null, error: null });
+    mocks.searchCampaignQueueIds.mockResolvedValueOnce([]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
@@ -135,21 +120,10 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("DELETE without ids returns 500 when delete-in-batch errors", async () => {
-    const supabaseClient = {
-      from: vi.fn().mockReturnValueOnce({
-        delete: () => ({
-          in: () => ({
-            select: async () => ({ data: null, error: { message: "del bad" } }),
-          }),
-        }),
-      }),
-    };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
-    mocks.filteredSearch.mockResolvedValueOnce({
-      data: [{ id: 5, contact_id: 1, campaign_id: 10, status: "queued", created_at: "", contact: {} }],
-      error: null,
-    });
+    mocks.searchCampaignQueueIds.mockResolvedValueOnce([5]);
+    mocks.deleteCampaignQueueByIds.mockRejectedValueOnce(new Error("del bad"));
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
@@ -157,11 +131,10 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "del bad" });
   });
 
-  test("DELETE without ids returns 500 on filteredSearch error", async () => {
-    const supabaseClient = {};
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+  test("DELETE without ids returns 500 on search error", async () => {
+    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
-    mocks.filteredSearch.mockResolvedValueOnce({ data: null, error: { message: "lookup bad" } });
+    mocks.searchCampaignQueueIds.mockRejectedValueOnce(new Error("lookup bad"));
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
@@ -178,4 +151,3 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     expect(res.status).toBe(405);
   });
 });
-

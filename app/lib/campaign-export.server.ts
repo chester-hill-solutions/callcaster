@@ -1,6 +1,7 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { csvRow } from "@/lib/csv";
 import type { Database } from "@/lib/database.types";
+import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
 import {
   castExportScript,
@@ -12,6 +13,7 @@ import {
   writeExportStatus,
   type CampaignExportStatus,
 } from "@/lib/campaign-export-helpers.server";
+import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import type {
   ExportAttemptWithDetails,
   ExportCall,
@@ -68,17 +70,7 @@ export async function processMessageCampaignExport(
 
     const campaign = campaignData as ExportCampaign;
 
-    // Get contacts in campaign queue
-    const { data: campaignContacts, error: contactsError } = await supabaseClient
-      .from('campaign_queue')
-      .select('contact_id')
-      .eq('campaign_id', campaignId);
-
-    if (contactsError) {
-      throw new Error(contactsError.message || "Error fetching campaign contacts");
-    }
-
-    const contactIds = campaignContacts.map(c => c.contact_id);
+    const contactIds = await getCampaignQueueContactIds(campaignId);
 
     if (contactIds.length === 0) {
       throw new Error("No contacts found in campaign");

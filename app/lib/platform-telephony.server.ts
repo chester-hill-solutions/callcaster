@@ -16,6 +16,10 @@ import {
 } from "@/lib/handset/handset-session.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import type { Database } from "@/lib/database.types";
+import { resolveContactWorkspaceIdFromQueue } from "@/lib/campaign-queue-db.server";
+import { campaign as campaignTable } from "@/db/schema";
+import { db } from "@/server/db";
+import { eq } from "drizzle-orm";
 import { MemberRole } from "@/lib/member-role";
 import { generateToken } from "@/lib/twilio-token.server";
 import { releaseAssignedQueueForUser } from "@/lib/queue-status";
@@ -293,37 +297,21 @@ export async function releaseCampaignCallSessionApi(
 }
 
 export async function resolveCampaignWorkspaceId(
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   campaignId: string | number,
 ) {
-  const { data, error } = await supabaseClient
-    .from("campaign")
-    .select("workspace")
-    .eq("id", Number(campaignId))
-    .single();
+  const [row] = await db
+    .select({ workspace: campaignTable.workspace })
+    .from(campaignTable)
+    .where(eq(campaignTable.id, Number(campaignId)))
+    .limit(1);
 
-  if (error || !data) {
-    return null;
-  }
-
-  return data.workspace;
+  return row?.workspace ?? null;
 }
 
 export async function resolveContactWorkspaceId(
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   contactId: string | number,
 ) {
-  const { data, error } = await supabaseClient
-    .from("campaign_queue")
-    .select("campaign!inner(workspace)")
-    .eq("contact_id", Number(contactId))
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) {
-    return null;
-  }
-
-  const campaign = data.campaign as { workspace: string } | null;
-  return campaign?.workspace ?? null;
+  return resolveContactWorkspaceIdFromQueue(Number(contactId));
 }
