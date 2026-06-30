@@ -1,4 +1,4 @@
-> **Canonical migration plan** — grilled 2026-06-29; orchestration started 2026-06-29.  
+> **Canonical migration plan** — grilled 2026-06-29; orchestration started 2026-06-29; **Sprint 2 progress synced 2026-06-29**.  
 > **Branch:** `feat/supabase-postgres-migration`  
 > **Railway target:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
 > **Track progress:** [`migration-delivery-board.md`](./migration-delivery-board.md) · [`migration-orchestration.md`](./migration-orchestration.md)
@@ -9,22 +9,22 @@
 
 ---
 
-## Execution status (2026-06-29)
+## Execution status (2026-06-29, Sprint 2)
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **0** — Ledger audit & local stack | **Done** | Ledger 34/34 on Railway `PostgreSQL 18` (2026-06-29) |
-| **1** — Schema transform | **Mostly applied** | 02/03/08 on review; `drizzle/0000_baseline.sql`; 06/07/09 sketches pending |
+| **0** — Ledger audit & local stack | **Done** | Ledger 34/34 on Railway `PostgreSQL 18` |
+| **1** — Schema transform | **Mostly applied** | 01–05, 08, 08b, 10 on review; baseline dumped; **06/07/09** pending (SSE/worker) |
 | **1D** — Scriptkit packages | Not started | CHS monorepo upstream |
-| **2** — Drizzle port | **Ready to start** | Introspect `schema.ts`; port `workspace.server.ts` |
-| **3** — Staging stack (3A–3F) | Not started | 3D partial (Remix IVR/sms routes exist; Edge still canonical for sms/acd) |
+| **2** — Drizzle port | **In progress** | **7/13** modules done; platform-data contacts/audiences/scripts ported; ~30+ PostgREST sites remain |
+| **3** — Staging stack (3A–3F) | Not started | **3D partial** — Remix sms-status live; Edge IVR unified `campaign` select |
 | **4** — Staging gate | Blocked | Requires Phases 2–3 |
 | **5** — Prod big-bang | Blocked | Requires Phase 4 |
 | **6** — Docs cleanup | Not started | Requires Phase 5 |
 
-**Workstreams:** WS-A (schema) · WS-B (Drizzle) · WS-C (v2 stack) · WS-D (scriptkit) · WS-E (households)
+**Workstreams:** WS-A (schema) · **WS-B (Drizzle — active)** · WS-C (v2 stack) · WS-D (scriptkit) · WS-E (households)
 
-**Gate criteria:** G0 ✓ · G1–G6 pending — see [`migration-delivery-board.md`](./migration-delivery-board.md)
+**Gate criteria:** G0 ✓ · G1 mostly ✓ · G2–G6 pending — see [`migration-delivery-board.md`](./migration-delivery-board.md)
 
 ---
 
@@ -91,12 +91,19 @@
 
 **Done (orchestration — 2026-06-29):**
 
-- Phase 0: [`migration-ledger-audit.md`](./migration-ledger-audit.md), `npm run db:ledger:check`, [`docker-compose.dev.yml`](../docker-compose.dev.yml)
-- Phase 1 SQL: [`scripts/schema-transform/`](../scripts/schema-transform/) (`00`–`10`, [`apply-all.sh`](../scripts/schema-transform/apply-all.sh))
+- Phase 0: [`migration-ledger-audit.md`](./migration-ledger-audit.md), `npm run db:ledger:check`, [`docker-compose.dev.yml`](../docker-compose.dev.yml), ledger **34/34** on Railway review
+- Phase 1 SQL: [`scripts/schema-transform/`](../scripts/schema-transform/) (`00`–`10`); **mostly applied** on review; [`drizzle/0000_baseline.sql`](../drizzle/0000_baseline.sql) (6951 lines); migrations archived to [`docs/archive/supabase-migrations/`](./archive/supabase-migrations/)
+- Phase 1 app: unified `campaign` runtime (IVR Remix routes, export, create/settings); `campaign-ivr.server.ts`; `workspace-scoped-tables.ts` (22 tables)
+- Phase 2 (partial): tenant-db ports for workspace, campaign, contacts, dial stack, messaging; see [Phase 2 progress](#phase-2--drizzle-data-access-port-against-cleaned-schema) below
 - Inventories: [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventory.md), [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 - Branch: `feat/supabase-postgres-migration`
 
-**Not done:** Apply transform on Railway review; squashed baseline; **166** `database.types` imports; **0** production `createTenantDb` call sites; Supabase Auth/Realtime/Edge/Storage; Express runtime; legacy schema shape on prod
+**Remaining (G2 exit):**
+
+- ~**168** `database.types` imports; delete [`database.types.ts`](app/lib/database.types.ts) last
+- ~**40+** PostgREST `.from()` call sites in `app/` (concentrated in `platform-data.server.ts`, queue loaders, survey/admin paths)
+- `campaign_queue` + RPC paths intentionally stay on Supabase PostgREST until worker/RPC wrappers land
+- Supabase Auth/Realtime/Edge/Storage; Express runtime; transforms **06/07/09** on review
 
 ```mermaid
 flowchart TB
@@ -143,7 +150,7 @@ flowchart TB
 
 **Remaining:**
 
-- Run `DATABASE_URL=... npm run db:ledger:check` against Railway review (expect 34/34 match)
+- ~~Run `DATABASE_URL=... npm run db:ledger:check` against Railway review~~ ✓ (34/34, 2026-06-29)
 - Ledger version = numeric prefix before `_` in filename (e.g. `202604140001`, `20260628130500`)
 
 ---
@@ -152,7 +159,7 @@ flowchart TB
 
 **Goal:** Clean schema exists only on Railway review until prod flip.
 
-**Status:** SQL scripts drafted (`00`–`10`). **Not yet applied** on Railway review.
+**Status:** SQL scripts drafted (`00`–`10`). **Mostly applied** on Railway review; squashed baseline generated.
 
 ### 1A. Seed Railway review from prod
 
@@ -167,17 +174,18 @@ Apply via [`scripts/schema-transform/apply-all.sh`](../scripts/schema-transform/
 
 | Step | Script | Status |
 |------|--------|--------|
-| 00 | `00-preflight.sql` | Drafted |
-| 01 | `01-drop-vestigial.sql` | Drafted |
-| 02 | `02-consolidate-campaign.sql` | **Sketch** — backfill + subtype drops commented |
-| 03 | `03-normalize-campaign-queue.sql` | Drafted — RPC rewrites needed before apply |
-| 04 | `04-contact-prune.sql` | Drafted |
-| 05 | `05-drop-rcs-onboarding.sql` | Drafted (app-layer RCS; no DDL columns) |
-| 06 | `06-adr-0015-call-message.sql` | **Sketch** — PK swap commented |
-| 07 | `07-split-workspace-twilio-data.sql` | **Sketch** — typed tables + backfill commented |
-| 08 | `08-household-key.sql` | Drafted |
-| 09 | `09-drop-legacy-presence.sql` | **Guarded** — requires Phase 3B SSE |
-| 10 | `10-verify.sql` | Drafted (read-only checks) |
+| 00 | `00-preflight.sql` | Applied |
+| 01 | `01-drop-vestigial.sql` | Applied |
+| 02 | `02-consolidate-campaign.sql` | Applied — backfill review ongoing |
+| 03 | `03-normalize-campaign-queue.sql` | Applied — RPC rewrites still needed in app |
+| 04 | `04-contact-prune.sql` | Applied |
+| 05 | `05-drop-rcs-onboarding.sql` | Applied (app-layer RCS; no DDL columns) |
+| 06 | `06-adr-0015-call-message.sql` | **Pending** — PK swap sketch; blocked on full ADR-0015 rollout |
+| 07 | `07-split-workspace-twilio-data.sql` | **Pending** — typed tables + backfill sketch |
+| 08 | `08-household-key.sql` | Applied |
+| 08b | household backfill (if present) | Applied |
+| 09 | `09-drop-legacy-presence.sql` | **Pending** — guarded; requires Phase 3B SSE |
+| 10 | `10-verify.sql` | Applied (read-only checks) |
 
 **Known mismatches to resolve before apply:**
 
@@ -217,14 +225,14 @@ Apply via [`scripts/schema-transform/apply-all.sh`](../scripts/schema-transform/
 
 ### 1C. Squashed baseline + archive
 
-**Pending** — after transform applied and `10-verify.sql` passes:
+**Mostly done** — after transform applied and `10-verify.sql` passes:
 
-- `pg_dump --schema-only` from **cleaned** Railway review → `drizzle/0000_baseline.sql`.
-- Regenerate [`app/db/schema.ts`](app/db/schema.ts) via `drizzle-kit introspect`.
-- Update [`app/db/workspace-scoped-tables.ts`](app/db/workspace-scoped-tables.ts) for consolidated schema.
-- Move [`supabase/migrations/`](supabase/migrations/) → [`docs/archive/supabase-migrations/`](./archive/supabase-migrations/) (reference only).
-- Forward DDL: **`drizzle-kit generate`** only.
-- CI: `drizzle-kit check` against review DB after apply.
+- ✓ `pg_dump --schema-only` from cleaned Railway review → [`drizzle/0000_baseline.sql`](../drizzle/0000_baseline.sql) (6951 lines)
+- ⚠ Regenerate [`app/db/schema.ts`](app/db/schema.ts) via `drizzle-kit introspect` — **blocked** (JSON error on PG 18); hand-synced from baseline
+- ✓ Update [`app/db/workspace-scoped-tables.ts`](app/db/workspace-scoped-tables.ts) — 22 scoped tables
+- ✓ Move [`supabase/migrations/`](../supabase/migrations/) → [`docs/archive/supabase-migrations/`](./archive/supabase-migrations/)
+- Forward DDL: **`drizzle-kit generate`** only
+- CI: `drizzle-kit check` against review DB after apply
 
 ### 1D. Scriptkit packages (CHS monorepo — blocks staging gate)
 
@@ -239,24 +247,56 @@ Apply via [`scripts/schema-transform/apply-all.sh`](../scripts/schema-transform/
 
 **Goal:** All tenant data via `createTenantDb`; delete `database.types.ts`.
 
-**Inventory:** [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventory.md) — **166** app files import `database.types`; **13** files with literal `supabase.from()` (24 calls); **0** production `createTenantDb` call sites.
+**Inventory:** [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventory.md) · task IDs in [`migration-delivery-board.md`](./migration-delivery-board.md) § Phase 2
 
-Port order — modules first, routes last:
+### Progress (2026-06-29)
 
-1. [`app/lib/database/workspace.server.ts`](app/lib/database/workspace.server.ts)
-2. Campaign + queue — [`campaign.server.ts`](app/lib/database/campaign.server.ts), [`auto-dial.server.ts`](app/lib/auto-dial.server.ts)
-3. Contacts + audiences
-4. Messaging + chats
-5. Billing + ledger — [`transaction-history.server.ts`](app/lib/transaction-history.server.ts)
-6. Telephony adjunct (handset, agent_status, inbound_queue)
-7. Admin cross-workspace — [`admin-db`](app/server/admin-db.ts) only
-8. ~12 route stragglers with direct `supabase.from()` / `supabaseClient.from()` (7 + 5 files per inventory)
+| ID | Module | Status |
+|----|--------|--------|
+| 2.1 | `workspace.server.ts` | **Done** — Supabase retained for auth + RPCs only |
+| 2.2 | `campaign.server.ts` + `campaign-stats.server.ts` | **Done** — tenant-db; PostgREST for RPC + `campaign_queue` |
+| 2.3 | Queue/dial stack | **Done** — see [Sprint 2 helpers](#sprint-2-telephony--messaging-helpers) |
+| 2.4 | Contacts + audiences | **Done** |
+| 2.5 | Messaging + chats | **Done** — sms-send, inbound-sms, credits gates |
+| 2.6 | Billing + ledger | **Partial** — `stripe.server.ts` done |
+| 2.7 | Telephony adjunct | Todo — agent_status, handset, inbound queue |
+| 2.8 | Twilio config modules | Todo — 4× `workspace-twilio-*.server.ts` |
+| 2.9 | Platform facades | **In progress** — `duplicateCampaignApi` + auth resolvers on Drizzle |
+| 2.10 | Route stragglers | **Done** — targeted route/component PostgREST removed |
+| 2.11 | UI/hooks type cleanup | Todo |
+| 2.12 | Delete `database.types.ts` | Todo — ~168 imports |
+| 2.13 | E2E factories → Drizzle | Todo |
 
-- Typed RPC wrappers in `app/server/rpc/`.
-- Extend [`test/tenant-db.test.ts`](test/tenant-db.test.ts); PGlite per test file.
-- **Exit:** zero `supabase.from()` in `app/` (except temporary auth paths); delete [`database.types.ts`](app/lib/database.types.ts).
+**Metrics:** 7/13 modules done · **127** dial/messaging unit tests green · **7/13** `app/lib/database/*.server.ts` on tenant-db · ~40+ PostgREST `.from()` sites remain (not zero)
 
-Develop and test against **Railway review `DATABASE_URL`**, not hosted Supabase. **Blocked on Phase 1 baseline** (1.13–1.14).
+### Sprint 2 telephony + messaging helpers
+
+Shared modules introduced during dial/messaging port (use these patterns for remaining routes):
+
+| Module | Role |
+|--------|------|
+| [`telephony-db.server.ts`](app/lib/telephony-db.server.ts) | Unscoped `call` lookup by SID; scoped call/outreach writes |
+| [`campaign-queue-db.server.ts`](app/lib/campaign-queue-db.server.ts) | Drizzle `campaign_queue` dequeue (non-household path) |
+| [`workspace-credits.server.ts`](app/lib/workspace-credits.server.ts) | `adminDb` credit balance for dial/SMS gates |
+| [`user-audio.server.ts`](app/lib/user-audio.server.ts) | `adminDb` verified audio numbers for device checks |
+| [`campaign-ivr.server.ts`](app/lib/campaign-ivr.server.ts) | Unified campaign + script fetch for IVR |
+
+**Ported routes (high level):** auto-dial, dial, dial/status, auto-dial/status, auto-dial/end, auto-dial/$roomId, ivr response, inbound-sms (message/contact), sms dispatch, ivr initiate call insert.
+
+**Test coverage:** `test/auto-dial*.test.ts`, `test/dial-status.route.test.ts`, `test/call-screen.server.test.ts`, `test/inbound-sms.route.test.ts`, `test/sms.route.test.ts`, `test/ivr-block-response.route.test.ts` — stubs in `test/helpers/telephony-db-stub.ts`, `tenant-db-stub.ts`.
+
+### Remaining port order
+
+1. **`platform-data.server.ts`** — queue CRUD + survey list/detail/export (PostgREST joins / nested selects)
+2. Billing reconciliation + transaction-history RPC wrappers
+3. Twilio config modules (`workspace-twilio-*.server.ts`)
+4. Queue loaders/actions still on PostgREST joins (`campaign_queue` + nested `contact`)
+5. Survey/admin/platform paths (large PostgREST surface)
+6. Typed RPC wrappers in `app/server/rpc/` where PostgREST RPC is unavoidable short-term
+7. Extend [`test/tenant-db.test.ts`](test/tenant-db.test.ts); PGlite per test file
+8. **Exit:** zero PostgREST `.from()` in `app/`; delete [`database.types.ts`](app/lib/database.types.ts)
+
+**Ported in Sprint 2 (platform-data):** `listWorkspaceContactsApi`, `getContactDetailApi`, `deleteContactApi`, `listWorkspaceAudiencesApi`, `getAudienceDetailApi`, `listWorkspaceScriptsApi`, `getScriptDetailApi`, `transitionCampaignStatusApi`, `getAudienceUploadStatusApi`, `duplicateCampaignApi`, auth workspace resolvers.
 
 ---
 
@@ -289,10 +329,12 @@ Build entirely on Railway review. Nothing ships to prod until Phase 4 passes.
 
 ### 3D. Twilio Edge → Bun routes (ADR-0009) — partial
 
-- **First merge:** `app/routes/api+/sms/status.action.server.ts` (Edge `sms-status` still canonical today)
-- Port Deno tests → Vitest first.
-- P0 webhooks: `ivr-flow`, `ivr-status`, `ivr-recording`, `sms-status`, `acd-router` → `app/routes/api+/`.
-- Delete remaining Edge functions + `supabase/functions/`.
+- Remix `/api/sms/status` live; Edge `sms-status` **still canonical** — delete after staging dry-run
+- Edge IVR: `ivr-flow`, `ivr-recording`, `ivr-status` select unified `campaign(*, script:script(*))` via [`_shared/unified-campaign-script.ts`](../supabase/functions/_shared/unified-campaign-script.ts)
+- **First merge:** finish Edge IVR Vitest parity; repoint Twilio webhooks on staging
+- P0 webhooks remaining: `acd-router` → `app/routes/api+/`
+- Port Deno tests → Vitest first where not already done
+- Delete remaining Edge functions + `supabase/functions/` after Bun routes canonical
 
 ### 3E. Storage (ADR-0002) — not started
 
@@ -378,11 +420,13 @@ Phase 0 (ledger audit)
 
 ### Next actions (orchestrator)
 
-1. `DATABASE_URL=... npm run db:ledger:check` on Railway review.
-2. Review/uncomment `02-consolidate-campaign.sql` backfill; run `apply-all.sh` on review.
-3. Generate squashed baseline (`drizzle/0000_baseline.sql`) — **unblocks Phase 2**.
-4. Parallel: port `workspace.server.ts` (WS-B) + merge sms-status route (WS-C 3D).
-5. CHS monorepo: `scriptkit-survey-core` + `scriptkit-survey-react` (WS-D).
+1. **WS-B 2.9** — Continue `platform-data.server.ts` list/detail APIs on tenant-db + Drizzle.
+2. **WS-B 2.6–2.8** — Billing reconciliation + Twilio config modules.
+3. **WS-C 3D** — Delete Edge `sms-status`; finish Edge IVR handler tests + webhook repoint.
+4. **WS-B 2.11–2.12** — UI type cleanup + drop `database.types.ts`.
+5. **WS-A 1.12** — Apply transform **06, 07, 09** when SSE/worker schema lands.
+
+Full task checkboxes: [`migration-delivery-board.md`](./migration-delivery-board.md).
 
 ---
 

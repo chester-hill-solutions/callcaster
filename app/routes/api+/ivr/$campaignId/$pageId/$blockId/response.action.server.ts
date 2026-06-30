@@ -1,5 +1,10 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
+import {
+  findCallBySid,
+  findOutreachAttemptById,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { redirect } from "react-router";
@@ -8,14 +13,10 @@ import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
-const getOutreach = async (supabase: SupabaseClient<Database>, outreachId: number) => {
-  const { data, error } = await supabase
-    .from("outreach_attempt")
-    .select("result")
-    .eq("id", outreachId)
-    .single();
-  if (error) throw error;
-  return data.result;
+const getOutreach = async (workspaceId: string, outreachId: number) => {
+  const row = await findOutreachAttemptById(workspaceId, outreachId);
+  if (!row) throw new Error("Outreach attempt not found");
+  return row.result;
 };
 
 interface Script {
@@ -150,12 +151,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   try {
-    const [{ data: call }, campaignData] = await Promise.all([
-      supabase.from("call").select("*").eq("sid", callSid).single(),
+    const [call, campaignData] = await Promise.all([
+      findCallBySid(callSid),
       fetchCampaignWithScript(supabase, campaignId),
     ]);
 
-    if (!call) {
+    if (!call?.workspace) {
       throw new Error("Call not found");
     }
 
@@ -173,7 +174,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       throw new Error(`Block ${blockId} not found`);
     }
 
-    const resultValue = await getOutreach(supabase, call.outreach_attempt_id);
+    const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id ?? 0);
     const result =
       resultValue && typeof resultValue === "object"
         ? (resultValue as Record<string, unknown>)
@@ -194,10 +195,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       },
     };
 
-    await supabase
-      .from("outreach_attempt")
-      .update({ result: newResult })
-      .eq("id", call.outreach_attempt_id);
+    if (!call.outreach_attempt_id) {
+      throw new Error("Missing outreach attempt for IVR response");
+    }
+    const outreachUpdate = await updateOutreachAttemptForWorkspace(
+      call.workspace,
+      call.outreach_attempt_id,
+      { result: newResult },
+    );
+    if (outreachUpdate instanceof Response) {
+      throw new Error(await outreachUpdate.text());
+    }
 
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);
     handleNextStep(twiml, nextStep, campaignId, pageId, baseUrl);

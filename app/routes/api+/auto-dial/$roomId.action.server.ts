@@ -5,8 +5,13 @@ import { Database, Tables } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { getServiceSupabase } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
-import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
+import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
+import {
+  findCallBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import Twilio from "twilio";
@@ -14,10 +19,11 @@ import Twilio from "twilio";
 const getSupabase = () => getServiceSupabase();
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace, conference_id').eq('sid', callSid).single();
-    if (error) throw new Error(`Error fetching call data: ${error.message}`);
-    return data;
+  const row = await findCallBySid(callSid);
+  if (!row) {
+    throw new Error(`Error fetching call data: call ${callSid} not found`);
+  }
+  return row;
 };
 
 const fetchCampaignData = async (campaignId: string, workspaceId: string) => {
@@ -37,7 +43,12 @@ const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) =
     return data.signedUrl;
 };
 
-const dequeueContact = async (contactId: string, groupOnHousehold: boolean, userId: string) => {
+const dequeueContact = async (
+  contactId: string,
+  groupOnHousehold: boolean,
+  userId: string,
+  campaignId?: number | null,
+) => {
   const supabase = getSupabase();
     if (groupOnHousehold) {
         const { data, error } = await supabase.rpc('dequeue_contact', {
@@ -48,20 +59,32 @@ const dequeueContact = async (contactId: string, groupOnHousehold: boolean, user
         });
         if (error) throw new Error(`Error dequeueing household: ${error.message}`);
         return data;
-    } else {
-        const { data, error } = await supabase.from('campaign_queue')
-            .update(buildDequeuedQueueUpdate(userId, "Auto-dial completed", { includeNormalizedFields: true }))
-            .eq('contact_id', Number(contactId)).select();
-        if (error) throw new Error(`Error updating queue status: ${error.message}`);
-        return data;
+    }
+
+    try {
+        return await dequeueCampaignQueueByContact({
+          contactId: Number(contactId),
+          campaignId,
+          userId,
+          reason: "Auto-dial completed",
+        });
+    } catch (error) {
+        throw new Error(
+          `Error updating queue status: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
 };
 
-const updateOutreachAttempt = async (attemptId: string, update: Partial<Tables<"outreach_attempt">>) => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase.from('outreach_attempt').update(update).eq('id', Number(attemptId)).select();
-    if (error) throw new Error(`Error updating outreach attempt: ${error.message}`);
-    return data;
+const updateOutreachAttempt = async (
+  attemptId: string,
+  workspaceId: string,
+  update: Partial<Tables<"outreach_attempt">>,
+) => {
+  const result = await updateOutreachAttemptForWorkspace(workspaceId, attemptId, update);
+  if (result instanceof Response) {
+    throw new Error(`Error updating outreach attempt: ${await result.text()}`);
+  }
+  return [result];
 };
 
 const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string) => {
@@ -94,7 +117,12 @@ const handleMachineAnswer = async (
         });
     }
 
-    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue ?? false, firstOutreachStatus.user_id?.toString() ?? '');
+    await dequeueContact(
+      dbCall.contact_id?.toString() ?? "",
+      campaign.group_household_queue ?? false,
+      firstOutreachStatus.user_id?.toString() ?? "",
+      dbCall.campaign_id ?? null,
+    );
 
     const conferences = await twilio.conferences.list({ friendlyName: firstOutreachStatus.user_id?.toString() ?? '', status: 'in-progress' });
     if (conferences.length) {
@@ -112,7 +140,11 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceN
     const twiml = new Twilio.twiml.VoiceResponse();
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
-        await updateOutreachAttempt(String(dbCall.outreach_attempt_id), { answered_at: new Date().toISOString() });
+        await updateOutreachAttempt(
+          String(dbCall.outreach_attempt_id),
+          dbCall.workspace?.toString() ?? "",
+          { answered_at: new Date().toISOString() },
+        );
     }
 
     const dial = twiml.dial();
@@ -145,17 +177,11 @@ async function addToConference(conferenceId: string, campaignId: string, workspa
 }
 
 const checkUserDevices = async (contactId: string, conferenceName: string, called: string, callerId: string) => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase
-        .from('user')
-        .select('verified_audio_numbers')
-        .eq('id', conferenceName)
-        .single();
-    if (error) throw new Error(`Error fetching user devices: ${error.message}`);
-    if (!data || !data.verified_audio_numbers) return false;
+    const verifiedNumbers = await getUserVerifiedAudioNumbers(conferenceName);
+    if (!verifiedNumbers?.length) return false;
     if (called.includes('client')) return true;
     if (called === callerId) return true;
-    if (!contactId && data.verified_audio_numbers.includes(called)) return true;
+    if (!contactId && verifiedNumbers.includes(called)) return true;
     return false;
 }
 
@@ -206,7 +232,11 @@ export const action = async ({ request, params }: { request: Request, params: { 
                 //This is an answering machine
                 const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
                 const signedUrl = await getVoicemailSignedUrl(dbCall.workspace?.toString() ?? '', campaign.voicemail_file?.toString() ?? '');
-                const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id?.toString() ?? '', { disposition: 'voicemail' });
+                const outreachStatus = await updateOutreachAttempt(
+                  dbCall.outreach_attempt_id?.toString() ?? "",
+                  dbCall.workspace?.toString() ?? "",
+                  { disposition: "voicemail" },
+                );
                 supabase.removeChannel(realtime);
                 if (signedUrl) {
                     response = await handleMachineAnswer(call, twilio, dbCall, campaign, signedUrl, outreachStatus);

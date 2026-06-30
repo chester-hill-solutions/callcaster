@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { workspace } from "@/db/schema";
+import { adminDb } from "@/server/admin-db";
 import {
   applyQueueStatusFilter,
   isAssignedToUser,
@@ -31,7 +34,10 @@ export async function getCallScreenData(
     completedCount,
     attemptRows,
   ] = await Promise.all([
-    supabase.from("workspace").select("*").eq("id", workspaceId).single(),
+    adminDb.select().from(workspace).where(eq(workspace.id, workspaceId)).limit(1).then((rows) => ({
+      data: rows[0] ?? null,
+      error: rows[0] ? null : { message: "Workspace not found" },
+    })),
     fetchCampaignWithScriptForWorkspace(workspaceId, campaignIdNum).catch((error) => {
       logger.error("Error fetching campaign data:", error);
       return null;

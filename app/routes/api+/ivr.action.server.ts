@@ -7,10 +7,10 @@ import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
 
+import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }:ActionFunctionArgs) => {
-
+export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
   const userSupabase = getAuthSupabaseClient(auth);
@@ -63,18 +63,16 @@ export const action = async ({ request }:ActionFunctionArgs) => {
       { workspaceId: workspace_id, operation: "calls.create" },
     );
 
-    
-    const { error: insertError } = await supabase.from("call").insert({
+    const callRow = await insertCallForWorkspace(workspace_id, {
       sid: call.sid,
       to: to_number,
       from: caller_id,
-      campaign_id,
-      contact_id,
-      workspace: workspace_id,
-      outreach_attempt_id: outreachAttemptId,
-    }).select();
+      campaign_id: Number(campaign_id),
+      contact_id: Number(contact_id),
+      outreach_attempt_id: Number(outreachAttemptId),
+    });
 
-    if (insertError) throw insertError;
+    if (!callRow) throw new Error("Failed to insert call record");
 
     // Dequeue
     const { error: dequeueError } = await supabase

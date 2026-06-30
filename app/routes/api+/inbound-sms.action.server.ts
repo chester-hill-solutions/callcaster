@@ -13,8 +13,11 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { inArray } from "drizzle-orm";
+import { contact as contactTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const missingHeader = rejectMissingTwilioSignatureHeader(request);
@@ -137,7 +140,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const matchedContactId =
     matchingContactIds.length === 1 ? matchingContactIds[0] : null;
 
-  const messagePayload: Database["public"]["Tables"]["message"]["Insert"] = {
+  const messagePayload = {
     sid: messageSid,
     account_sid: accountSid,
     body,
@@ -145,32 +148,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     to: toNumber,
     num_media: String(numMedia),
     num_segments: String(numSegments),
-    workspace: workspaceNumber.workspace,
-    direction: "inbound",
+    direction: "inbound" as const,
     date_created: nowIso,
     date_sent: nowIso,
-    status: "received",
+    status: "received" as const,
     ...(messagingServiceSid ? { messaging_service_sid: messagingServiceSid } : {}),
     ...(media.length > 0 ? { inbound_media: media } : {}),
     ...(matchedContactId != null ? { contact_id: matchedContactId } : {}),
   };
 
-  const { data: message, error: messageError } = await supabase
-    .from("message")
-    .insert(messagePayload)
-    .select();
+  const tdb = createTenantDb(workspaceNumber.workspace);
+  let message: unknown[] | null = null;
+  let messageError: { message: string } | null = null;
+  try {
+    message = await tdb.message.insert(messagePayload);
+  } catch (error) {
+    messageError = { message: error instanceof Error ? error.message : String(error) };
+  }
 
   if (body.toLowerCase() === "stop" || body.toLowerCase() === '"stop"') {
     if (matchingContactIds.length > 0) {
-      await supabase.from("contact").update({
-        opt_out: true,
-      }).in("id", matchingContactIds);
+      await tdb.contact.update({
+        set: { opt_out: true },
+        where: inArray(contactTable.id, matchingContactIds),
+      });
     }
   } else if (body.toLowerCase() === "start" || body.toLowerCase() === '"start"') {
     if (matchingContactIds.length > 0) {
-      await supabase.from("contact").update({
-        opt_out: false,
-      }).in("id", matchingContactIds);
+      await tdb.contact.update({
+        set: { opt_out: false },
+        where: inArray(contactTable.id, matchingContactIds),
+      });
     }
   }
 

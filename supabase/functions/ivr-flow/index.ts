@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6"
 import Twilio from "npm:twilio@^5.3.0";
 import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
+import { scriptStepsFromCampaign } from "../_shared/unified-campaign-script.ts";
 
 interface TwilioEventData {
   CallSid?: string;
@@ -22,7 +23,7 @@ const getCallWithRetry = async (supabase: SupabaseClient, callSid: string, retri
 
   const { data, error } = await supabase
     .from("call")
-    .select('*, outreach_attempt(id, result, current_step), campaign(*,ivr_campaign(*, script(*)))')
+    .select('*, outreach_attempt(id, result, current_step), campaign(*, script:script(*))')
     .eq("sid", callSid)
     .single();
 
@@ -366,13 +367,14 @@ export async function handleRequest(
       });
     }
 
-    if (!callData.campaign?.ivr_campaign?.[0]?.script?.steps) {
+    const scriptSteps = scriptStepsFromCampaign(callData.campaign);
+    if (!scriptSteps) {
       throw new Error("Invalid IVR campaign structure");
     }
 
     let currentStep = callData.outreach_attempt?.current_step || 'page_1:block_1';
     let [currentPageId, currentBlockId] = currentStep.split(':');
-    const script = callData.campaign.ivr_campaign[0].script.steps;
+    const script = scriptSteps;
     let currentBlock = script.blocks[currentBlockId];
     const userInput = event.Digits || event.SpeechResult;
     let result = callData.outreach_attempt?.result || {};

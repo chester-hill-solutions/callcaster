@@ -95,7 +95,7 @@ export async function getCallWithRetry<TCall = any>(
     const { data, error } = (await supabase
       .from("call")
       .select(
-        "*, outreach_attempt(id, result, current_step), campaign(*,ivr_campaign(*, script(*)))",
+        "*, outreach_attempt(id, result, current_step), campaign(*, script:script(*))",
       )
       .eq("sid", callSid)
       .single()) as Awaited<SupabaseSingleResult<TCall>>;

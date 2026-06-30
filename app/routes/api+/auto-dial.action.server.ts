@@ -4,7 +4,12 @@ import {
   safeParseJson,
 } from "@/lib/database.server";
 import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
+import { eq } from "drizzle-orm";
+import { call as callTable } from "@/db/schema";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { insertCallForWorkspace, updateCallBySid } from "@/lib/telephony-db.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { createTenantDb } from "@/server/tenant-db";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
@@ -139,13 +144,10 @@ export const action = async ({
     );
   }
 
-  const { data, error } = await supabase
-    .from("workspace")
-    .select("credits")
-    .eq("id", workspace_id)
-    .single();
-  if (error) throw error;
-  const credits = data.credits;
+  const credits = await getWorkspaceCreditsBalance(workspace_id);
+  if (credits === null) {
+    throw new Error(`Workspace ${workspace_id} not found`);
+  }
   if (credits <= 0) {
     return {
       creditsError: true,
@@ -162,20 +164,18 @@ export const action = async ({
       : `client:${authenticatedUser.id}`;
   const pendingCallSid = buildPendingCallSid();
 
-  const { error: pendingInsertError } = await supabase.from("call").insert({
+  const pendingRow = await insertCallForWorkspace(workspace_id, {
     sid: pendingCallSid,
     from: caller_id,
     to: targetDevice,
     status: "initiated",
     campaign_id: typeof campaign_id === "number" ? campaign_id : null,
-    workspace: workspace_id,
     conference_id: authenticatedUser.id,
     direction: "outbound-api",
   });
 
-  if (pendingInsertError) {
+  if (!pendingRow) {
     d.logger.error("Error creating pending auto-dial call record", {
-      error: pendingInsertError,
       workspace_id,
       conferenceName,
     });
@@ -201,43 +201,32 @@ export const action = async ({
       { workspaceId: workspace_id, operation: "calls.create" },
     );
 
-    const callData = {
+    const savedCall = await insertCallForWorkspace(workspace_id, {
       sid: call.sid,
-      date_updated: call.dateUpdated?.toISOString(),
-      parent_call_sid: call.parentCallSid,
-      account_sid: call.accountSid,
-      from: call.from,
-      phone_number_sid: call.phoneNumberSid,
-      status: call.status,
-      start_time: call.startTime?.toISOString(),
-      end_time: call.endTime?.toISOString(),
-      duration: call.duration,
-      price: call.price,
-      direction: call.direction,
-      answered_by: call.answeredBy as "human" | "machine" | "unknown" | null,
-      api_version: call.apiVersion,
-      forwarded_from: call.forwardedFrom,
-      group_sid: call.groupSid,
-      caller_name: call.callerName,
-      uri: call.uri,
+      date_updated: call.dateUpdated?.toISOString() ?? null,
+      parent_call_sid: call.parentCallSid ?? null,
+      account_sid: call.accountSid ?? null,
+      from: call.from ?? null,
+      to: call.to ?? null,
+      phone_number_sid: call.phoneNumberSid ?? null,
+      status: call.status ?? null,
+      start_time: call.startTime?.toISOString() ?? null,
+      end_time: call.endTime?.toISOString() ?? null,
+      duration: call.duration ?? null,
+      price: call.price ?? null,
+      direction: call.direction ?? null,
+      answered_by: (call.answeredBy as "human" | "machine" | "unknown" | null) ?? null,
+      api_version: call.apiVersion ?? null,
+      forwarded_from: call.forwardedFrom ?? null,
+      group_sid: call.groupSid ?? null,
+      caller_name: call.callerName ?? null,
+      uri: call.uri ?? null,
       campaign_id: typeof campaign_id === "number" ? campaign_id : null,
-      workspace: workspace_id,
       conference_id: authenticatedUser.id,
-    };
+    });
 
-    Object.keys(callData).forEach(
-      (key) =>
-        callData[key as keyof typeof callData] === undefined &&
-        delete callData[key as keyof typeof callData],
-    );
-
-    const { error: upsertError } = await supabase
-      .from("call")
-      .upsert({ ...callData })
-      .select();
-
-    if (upsertError) {
-      d.logger.error("Error saving the call to the database:", upsertError);
+    if (!savedCall) {
+      d.logger.error("Error saving the call to the database:", { callSid: call.sid });
 
       try {
         await withTwilioRetry(
@@ -251,10 +240,10 @@ export const action = async ({
         });
       }
 
-      await supabase
-        .from("call")
-        .update({ status: "failed", date_updated: new Date().toISOString() })
-        .eq("sid", pendingCallSid);
+      await updateCallBySid(workspace_id, pendingCallSid, {
+        status: "failed",
+        date_updated: new Date().toISOString(),
+      });
 
       return new Response(
         JSON.stringify({
@@ -270,12 +259,10 @@ export const action = async ({
       );
     }
 
-    const { error: pendingDeleteError } = await supabase
-      .from("call")
-      .delete()
-      .eq("sid", pendingCallSid);
-
-    if (pendingDeleteError) {
+    const tdb = createTenantDb(workspace_id);
+    try {
+      await tdb.call.delete({ where: eq(callTable.sid, pendingCallSid) });
+    } catch (pendingDeleteError) {
       d.logger.warn("Failed to remove pending auto-dial call record", {
         pendingCallSid,
         error: pendingDeleteError,
@@ -288,10 +275,10 @@ export const action = async ({
       },
     });
   } catch (error) {
-    await supabase
-      .from("call")
-      .update({ status: "failed", date_updated: new Date().toISOString() })
-      .eq("sid", pendingCallSid);
+    await updateCallBySid(workspace_id, pendingCallSid, {
+      status: "failed",
+      date_updated: new Date().toISOString(),
+    });
 
     d.logger.error("Error starting conference:", error);
     return new Response(

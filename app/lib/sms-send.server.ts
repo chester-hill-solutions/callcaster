@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import type { Database } from "@/lib/database.types";
+import { createTenantDb } from "@/server/tenant-db";
 import { withTwilioRetry, type TwilioClientCallOptions } from "@/lib/twilio-client.server";
 
 type MessageInsert = Database["public"]["Tables"]["message"]["Insert"];
@@ -174,21 +173,25 @@ function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
 }
 
 /**
- * Insert a persisted SMS record into the `message` table.
+ * Insert a persisted SMS record into the `message` table via tenant-db.
  *
- * Returns the Supabase query (already `.select()`-ed) so callers can either
- * `await` it directly or compose it inside a `Promise.all`.
- *
- * Optional fields (`date_created`, `contact_id`, `campaign_id`,
- * `outbound_media`) are only included when truthy, matching the conditional
- * spread behaviour of the original call sites.
+ * Returns a Supabase-shaped `{ data, error }` tuple so existing callers can
+ * compose it inside `Promise.all` without API churn.
  */
-export function persistMessageRecord(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any>,
+export async function persistMessageRecord(
+  workspaceId: string,
   fields: MessagePersistFields,
-) {
-  return supabase.from("message").insert(buildMessageInsert(fields)).select();
+): Promise<{ data: unknown[] | null; error: { message: string } | null }> {
+  try {
+    const tdb = createTenantDb(workspaceId);
+    const rows = await tdb.message.insert(buildMessageInsert(fields));
+    return { data: rows, error: null };
+  } catch (error) {
+    return {
+      data: null,
+      error: { message: error instanceof Error ? error.message : String(error) },
+    };
+  }
 }
 
 /**
@@ -201,22 +204,19 @@ export function persistMessageRecord(
  */
 export async function sendSmsAndPersist(args: {
   twilio: TwilioSmsClientLike;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any>;
   createParams: Record<string, unknown>;
   retryOptions: TwilioClientCallOptions;
   persistExtras: Pick<MessagePersistFields, "workspace"> &
     Partial<Omit<MessagePersistFields, "sid" | "workspace">>;
 }): Promise<{
   message: TwilioMessageLike;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  result: { data: any; error: any };
+  result: { data: unknown[] | null; error: { message: string } | null };
 }> {
   const message = await withTwilioRetry(
     () => args.twilio.messages.create(args.createParams),
     args.retryOptions,
   );
   const fields = twilioMessageToPersistFields(message, args.persistExtras);
-  const result = await persistMessageRecord(args.supabase, fields);
-  return { message, result: { data: result.data, error: result.error } };
+  const result = await persistMessageRecord(args.persistExtras.workspace, fields);
+  return { message, result };
 }

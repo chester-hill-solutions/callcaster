@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import {
   getDualAuthSupabase,
   requireJsonAuth,
@@ -6,7 +7,6 @@ import {
   type VerifyApiKeyOrSessionResult,
 } from "@/lib/api-auth.server";
 import {
-  getCampaignTableKey,
   getWorkspaceCampaigns,
 } from "@/lib/database/campaign.server";
 import {
@@ -14,7 +14,7 @@ import {
   fetchCampaignDetails,
   fetchQueueCounts,
 } from "@/lib/database/campaign-stats.server";
-import { buildContactSearchFilter } from "@/lib/contacts/search.server";
+import { buildContactSearchWhere } from "@/lib/contacts/search.server";
 import { getChatSortOption } from "@/lib/chat-conversation-sort";
 import { csvResponse, formatDateUtc, safeFilenamePart, toCsvString } from "@/lib/csv";
 import {
@@ -38,6 +38,38 @@ import type {
   PatchCampaignQueueBody,
 } from "@/lib/schemas/api/platform-data";
 import { fetchMessagePage } from "@/lib/chats/fetch-message-page.server";
+import {
+  audience as audienceTable,
+  audience_upload as audienceUploadTable,
+  campaign as campaignTable,
+  campaign_audience as campaignAudienceTable,
+  campaign_queue as campaignQueueTable,
+  contact as contactTable,
+  contact_audience as contactAudienceTable,
+  outreach_attempt as outreachAttemptTable,
+  script as scriptTable,
+  survey as surveyTable,
+} from "@/db/schema";
+import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
+
+const AUDIENCE_CONTACT_SORT_KEYS = [
+  "id",
+  "firstname",
+  "surname",
+  "phone",
+  "email",
+  "created_at",
+] as const;
+
+type AudienceContactSortKey = (typeof AUDIENCE_CONTACT_SORT_KEYS)[number];
+
+function audienceContactSortColumn(sortKey: string) {
+  if (AUDIENCE_CONTACT_SORT_KEYS.includes(sortKey as AudienceContactSortKey)) {
+    return contactTable[sortKey as AudienceContactSortKey];
+  }
+  return contactTable.id;
+}
 
 export type DataPlaneAuthContext = {
   supabase: SupabaseClient<Database>;
@@ -104,51 +136,51 @@ export async function resolveDataPlaneAuth(
 }
 
 async function getCampaignWorkspaceId(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   campaignId: string,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("campaign")
-    .select("workspace")
-    .eq("id", Number(campaignId))
-    .maybeSingle();
-  return data?.workspace ?? null;
+  const rows = await db
+    .select({ workspace: campaignTable.workspace })
+    .from(campaignTable)
+    .where(eq(campaignTable.id, Number(campaignId)))
+    .limit(1);
+  return rows[0]?.workspace ?? null;
 }
 
 async function getContactWorkspaceId(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   contactId: string,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("contact")
-    .select("workspace")
-    .eq("id", Number(contactId))
-    .maybeSingle();
-  return data?.workspace ?? null;
+  const rows = await db
+    .select({ workspace: contactTable.workspace })
+    .from(contactTable)
+    .where(eq(contactTable.id, Number(contactId)))
+    .limit(1);
+  return rows[0]?.workspace ?? null;
 }
 
 async function getScriptWorkspaceId(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   scriptId: string,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("script")
-    .select("workspace")
-    .eq("id", Number(scriptId))
-    .maybeSingle();
-  return data?.workspace ?? null;
+  const rows = await db
+    .select({ workspace: scriptTable.workspace })
+    .from(scriptTable)
+    .where(eq(scriptTable.id, Number(scriptId)))
+    .limit(1);
+  return rows[0]?.workspace ?? null;
 }
 
 async function getSurveyWorkspaceId(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   surveyId: string,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("survey")
-    .select("workspace")
-    .eq("survey_id", surveyId)
-    .maybeSingle();
-  return data?.workspace ?? null;
+  const rows = await db
+    .select({ workspace: surveyTable.workspace })
+    .from(surveyTable)
+    .where(eq(surveyTable.survey_id, surveyId))
+    .limit(1);
+  return rows[0]?.workspace ?? null;
 }
 
 export async function authForCampaign(
@@ -279,14 +311,15 @@ export async function authForOutreachAttempt(
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
-  const supabase = getDualAuthSupabase(auth as any);
-  const { data: attempt, error } = await supabase
-    .from("outreach_attempt")
-    .select("workspace")
-    .eq("id", outreachAttemptId)
-    .single();
+  const supabase = getDualAuthSupabase(auth as VerifyApiKeyOrSessionResult);
+  const rows = await db
+    .select({ workspace: outreachAttemptTable.workspace })
+    .from(outreachAttemptTable)
+    .where(eq(outreachAttemptTable.id, outreachAttemptId))
+    .limit(1);
+  const attempt = rows[0];
 
-  if (error || !attempt?.workspace) {
+  if (!attempt?.workspace) {
     return jsonError("Outreach attempt not found", 404);
   }
 
@@ -325,7 +358,7 @@ export async function getCampaignDetailApi(
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
-  const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabase });
+  const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabaseClient: supabase });
   let details: unknown = null;
   if (
     campaign.type &&
@@ -372,72 +405,59 @@ export async function duplicateCampaignApi(
     title: `${campaign.title} (Copy)`,
     status: "draft" as const,
     is_active: false,
-    workspace: workspaceId,
   };
 
-  const { data: newCampaign, error } = await supabase
-    .from("campaign")
-    .insert(insertPayload)
-    .select("id")
-    .single();
-
-  if (error || !newCampaign) {
+  const tdb = createTenantDb(workspaceId);
+  let newCampaign: { id: number };
+  try {
+    const inserted = await tdb.campaign.insert(insertPayload);
+    const row = inserted[0];
+    if (!row?.id) {
+      return {
+        ok: false as const,
+        error: "Failed to duplicate campaign",
+        status: 500,
+      };
+    }
+    newCampaign = { id: row.id };
+  } catch (error) {
     logger.error("duplicateCampaignApi insert", error);
     return {
       ok: false as const,
-      error: error?.message ?? "Failed to duplicate campaign",
+      error: error instanceof Error ? error.message : "Failed to duplicate campaign",
       status: 500,
     };
   }
 
-  if (
-    campaign.type &&
-    campaign.type !== "email" &&
-    ["live_call", "message", "robocall", "simple_ivr", "complex_ivr"].includes(
-      campaign.type,
-    )
-  ) {
-    const tableKey = getCampaignTableKey(
-      campaign.type as Exclude<Campaign["type"], "email" | null>,
-    );
-    const details = await fetchCampaignDetails({
-      workspaceId,
-      campaignId,
-    });
+  const originalQueue = await db
+    .select({ contact_id: campaignQueueTable.contact_id })
+    .from(campaignQueueTable)
+    .where(eq(campaignQueueTable.campaign_id, Number(campaignId)));
 
-    if (details) {
-      const { campaign_id: _detailCampaignId, ...detailRest } = details as Record<
-        string,
-        unknown
-      >;
-      await supabase.from(tableKey).insert({
-        ...detailRest,
-        campaign_id: newCampaign.id,
-        workspace: workspaceId,
-      });
+  if (originalQueue.length > 0) {
+    try {
+      await enqueueContactsForCampaign(
+        supabase,
+        newCampaign.id,
+        originalQueue.map((item) => item.contact_id),
+        { requeue: false },
+      );
+    } catch (error) {
+      logger.error("duplicateCampaignApi queue copy", error);
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Failed to copy campaign queue",
+        status: 500,
+      };
     }
   }
 
-  const { data: originalQueue } = await supabase
-    .from("campaign_queue")
-    .select("contact_id")
-    .eq("campaign_id", Number(campaignId));
-
-  if (originalQueue?.length) {
-    await supabase.from("campaign_queue").insert(
-      originalQueue.map((item) => ({
-        campaign_id: newCampaign.id,
-        contact_id: item.contact_id,
-        workspace: workspaceId,
-      })),
-    );
-  }
-
   if (audiences?.length) {
-    await supabase.from("campaign_audience").insert(
+    await db.insert(campaignAudienceTable).values(
       audiences.map((row: { audience_id: number }) => ({
         campaign_id: newCampaign.id,
         audience_id: row.audience_id,
+        created_at: new Date().toISOString(),
       })),
     );
   }
@@ -451,14 +471,8 @@ export async function transitionCampaignStatusApi(
   workspaceId: string,
   body: CampaignStatusBody,
 ) {
-  const { data: campaignRecord, error: campaignError } = await supabase
-    .from("campaign")
-    .select("*")
-    .eq("id", Number(campaignId))
-    .eq("workspace", workspaceId)
-    .single();
-
-  if (campaignError || !campaignRecord) {
+  const campaignRecord = await fetchCampaignData({ workspaceId, campaignId });
+  if (!campaignRecord || campaignRecord.workspace !== workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
@@ -478,21 +492,8 @@ export async function transitionCampaignStatusApi(
       };
     }
 
-    const detailTable = getCampaignTableKey(
-      campaignRecord.type as Exclude<Campaign["type"], "email" | null>,
-    );
-    const { data: campaignDetails, error: detailError } = await supabase
-      .from(detailTable)
-      .select("*")
-      .eq("campaign_id", Number(campaignId))
-      .eq("workspace", workspaceId)
-      .maybeSingle();
-
-    if (detailError) {
-      return { ok: false as const, error: detailError.message, status: 500 };
-    }
-
-    const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabase });
+    const campaignDetails = await fetchCampaignDetails({ workspaceId, campaignId });
+    const queueCounts = await fetchQueueCounts({ workspaceId, campaignId, supabaseClient: supabase });
     const readiness = getCampaignReadiness(
       campaignRecord as Campaign,
       campaignDetails,
@@ -521,14 +522,18 @@ export async function transitionCampaignStatusApi(
     update.is_active = false;
   }
 
-  const { error } = await supabase
-    .from("campaign")
-    .update(update)
-    .eq("id", Number(campaignId))
-    .eq("workspace", workspaceId);
-
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  const tdb = createTenantDb(workspaceId);
+  try {
+    await tdb.campaign.update({
+      set: update,
+      where: eq(campaignTable.id, Number(campaignId)),
+    });
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to update campaign",
+      status: 500,
+    };
   }
 
   return { ok: true as const, status, is_active: update.is_active ?? null };
@@ -707,7 +712,7 @@ export async function patchCampaignQueueApi(
 }
 
 export async function listWorkspaceContactsApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   workspaceId: string,
   searchParams: URLSearchParams,
 ) {
@@ -717,120 +722,162 @@ export async function listWorkspaceContactsApi(
     defaultPageSize: 20,
   });
 
-  let countQuery = supabase
-    .from("contact")
-    .select("*", { count: "exact", head: true })
-    .eq("workspace", workspaceId);
+  const tdb = createTenantDb(workspaceId);
+  const searchWhere = searchQuery ? buildContactSearchWhere(searchQuery) : undefined;
 
-  let contactsQuery = supabase
-    .from("contact")
-    .select(
-      "id, firstname, surname, phone, email, address, city, other_data, created_at",
-    )
-    .eq("workspace", workspaceId)
-    .range(offset, offset + pageSize - 1)
-    .order("created_at", { ascending: false });
+  try {
+    const [totalCount, contacts] = await Promise.all([
+      tdb.contact.count({ where: searchWhere }),
+      tdb.contact.findMany({
+        where: searchWhere,
+        columns: {
+          id: true,
+          firstname: true,
+          surname: true,
+          phone: true,
+          email: true,
+          address: true,
+          city: true,
+          other_data: true,
+          created_at: true,
+        },
+        orderBy: (contact, { desc: descFn }) => [descFn(contact.created_at)],
+        limit: pageSize,
+        offset,
+      }),
+    ]);
 
-  if (searchQuery) {
-    const searchFilter = buildContactSearchFilter(searchQuery);
-    if (searchFilter) {
-      countQuery = countQuery.or(searchFilter);
-      contactsQuery = contactsQuery.or(searchFilter);
-    }
-  }
-
-  const [{ count, error: countError }, { data: contacts, error: contactsError }] =
-    await Promise.all([countQuery, contactsQuery]);
-
-  if (countError || contactsError) {
-    const message = countError?.message ?? contactsError?.message ?? "Failed to load contacts";
+    return {
+      ok: true as const,
+      contacts,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total_count: totalCount,
+        total_pages: Math.ceil(totalCount / pageSize),
+      } satisfies PaginationMeta,
+      search_query: searchQuery || null,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load contacts";
     return { ok: false as const, error: message, status: 500 };
   }
-
-  const totalCount = count ?? 0;
-  return {
-    ok: true as const,
-    contacts: contacts ?? [],
-    pagination: {
-      page,
-      page_size: pageSize,
-      total_count: totalCount,
-      total_pages: Math.ceil(totalCount / pageSize),
-    } satisfies PaginationMeta,
-    search_query: searchQuery || null,
-  };
 }
 
 export async function getContactDetailApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   contactId: string,
   workspaceId: string,
 ) {
-  const { data: contact, error } = await supabase
-    .from("contact")
-    .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
-    .eq("id", Number(contactId))
-    .eq("workspace", workspaceId)
-    .single();
+  const tdb = createTenantDb(workspaceId);
+  const contactIdNum = Number(contactId);
 
-  if (error || !contact) {
-    return { ok: false as const, error: "Contact not found", status: 404 };
+  try {
+    const contactRow = await tdb.contact.findFirst({
+      where: eq(contactTable.id, contactIdNum),
+    });
+    if (!contactRow) {
+      return { ok: false as const, error: "Contact not found", status: 404 };
+    }
+
+    const [attemptRows, audienceLinks] = await Promise.all([
+      tdb.outreach_attempt.findMany({
+        where: eq(outreachAttemptTable.contact_id, contactIdNum),
+      }),
+      db
+        .select()
+        .from(contactAudienceTable)
+        .where(eq(contactAudienceTable.contact_id, contactIdNum)),
+    ]);
+
+    const campaignIds = [
+      ...new Set(
+        attemptRows
+          .map((attempt) => attempt.campaign_id)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    ];
+    const campaigns =
+      campaignIds.length > 0
+        ? await tdb.campaign.findMany({
+            where: inArray(campaignTable.id, campaignIds),
+          })
+        : [];
+    const campaignById = new Map(campaigns.map((row) => [row.id, row]));
+
+    return {
+      ok: true as const,
+      contact: {
+        ...contactRow,
+        outreach_attempt: attemptRows.map((attempt) => ({
+          ...attempt,
+          campaign: attempt.campaign_id
+            ? (campaignById.get(attempt.campaign_id) ?? null)
+            : null,
+        })),
+        contact_audience: audienceLinks,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Contact not found",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, contact };
 }
 
 export async function deleteContactApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   contactId: string,
   workspaceId: string,
 ) {
-  const { data: contact, error: lookupError } = await supabase
-    .from("contact")
-    .select("id")
-    .eq("id", Number(contactId))
-    .eq("workspace", workspaceId)
-    .maybeSingle();
+  const tdb = createTenantDb(workspaceId);
+  const contactIdNum = Number(contactId);
 
-  if (lookupError) {
-    return { ok: false as const, error: lookupError.message, status: 500 };
+  try {
+    const contactRow = await tdb.contact.findFirst({
+      where: eq(contactTable.id, contactIdNum),
+      columns: { id: true },
+    });
+    if (!contactRow) {
+      return { ok: false as const, error: "Contact not found", status: 404 };
+    }
+
+    await tdb.contact.delete({ where: eq(contactTable.id, contactIdNum) });
+    return { ok: true as const, success: true, contact_id: contactIdNum };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to delete contact",
+      status: 500,
+    };
   }
-  if (!contact) {
-    return { ok: false as const, error: "Contact not found", status: 404 };
-  }
-
-  const { error } = await supabase
-    .from("contact")
-    .delete()
-    .eq("id", Number(contactId))
-    .eq("workspace", workspaceId);
-
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
-  }
-
-  return { ok: true as const, success: true, contact_id: Number(contactId) };
 }
 
 export async function listWorkspaceAudiencesApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   workspaceId: string,
 ) {
-  const { data, error } = await supabase
-    .from("audience")
-    .select("*")
-    .eq("workspace", workspaceId)
-    .order("created_at", { ascending: false });
+  const tdb = createTenantDb(workspaceId);
 
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  try {
+    const audiences = await tdb.audience.findMany({
+      orderBy: (audience, { desc: descFn }) => [descFn(audience.created_at)],
+    });
+    return { ok: true as const, audiences };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load audiences",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, audiences: data ?? [] };
 }
 
 export async function getAudienceDetailApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   workspaceId: string,
   audienceId: string,
   searchParams: URLSearchParams,
@@ -840,105 +887,120 @@ export async function getAudienceDetailApi(
   });
   const sortKey = searchParams.get("sort_key") || "id";
   const sortDirection = searchParams.get("sort_direction") === "desc" ? "desc" : "asc";
-  const from = offset;
-  const to = from + pageSize - 1;
+  const audienceIdNum = Number(audienceId);
+  const sortColumn = audienceContactSortColumn(sortKey);
+  const tdb = createTenantDb(workspaceId);
 
-  const { data: audience, error: audienceError } = await supabase
-    .from("audience")
-    .select("*")
-    .eq("id", Number(audienceId))
-    .eq("workspace", workspaceId)
-    .single();
+  try {
+    const audience = await tdb.audience.findFirst({
+      where: eq(audienceTable.id, audienceIdNum),
+    });
+    if (!audience) {
+      return { ok: false as const, error: "Audience not found", status: 404 };
+    }
 
-  if (audienceError || !audience) {
-    return { ok: false as const, error: "Audience not found", status: 404 };
+    const audienceContactFilter = and(
+      eq(contactAudienceTable.audience_id, audienceIdNum),
+      eq(contactTable.workspace, workspaceId),
+    );
+
+    const [contactRows, countRows, latestUpload] = await Promise.all([
+      db
+        .select({ contact: contactTable })
+        .from(contactAudienceTable)
+        .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
+        .where(audienceContactFilter)
+        .orderBy(sortDirection === "asc" ? asc(sortColumn) : desc(sortColumn))
+        .limit(pageSize)
+        .offset(offset),
+      db
+        .select({ value: count() })
+        .from(contactAudienceTable)
+        .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
+        .where(audienceContactFilter),
+      tdb.audience_upload.findFirst({
+        where: eq(audienceUploadTable.audience_id, audienceIdNum),
+        orderBy: (upload, { desc: descFn }) => [descFn(upload.created_at)],
+      }),
+    ]);
+
+    return {
+      ok: true as const,
+      audience,
+      contacts: contactRows.map((row) => ({ contact: row.contact })),
+      pagination: {
+        page,
+        page_size: pageSize,
+        total_count: countRows[0]?.value ?? 0,
+      } satisfies PaginationMeta,
+      sorting: { sort_key: sortKey, sort_direction: sortDirection },
+      latest_upload: latestUpload
+        ? {
+            id: latestUpload.id,
+            status: latestUpload.status ?? "unknown",
+            progress:
+              latestUpload.processed_contacts && latestUpload.total_contacts
+                ? Math.round(
+                    (latestUpload.processed_contacts / latestUpload.total_contacts) * 100,
+                  )
+                : 0,
+            total_contacts: latestUpload.total_contacts ?? 0,
+            processed_contacts: latestUpload.processed_contacts ?? 0,
+            error_message: latestUpload.error_message,
+          }
+        : null,
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load audience",
+      status: 500,
+    };
   }
-
-  let query = supabase
-    .from("contact_audience")
-    .select("...contact!inner(*)", { count: "exact" })
-    .eq("audience_id", Number(audienceId));
-
-  query = query.order(`contact(${sortKey})`, {
-    ascending: sortDirection === "asc",
-  });
-
-  const { data: contacts, error: contactError, count } = await query.range(from, to);
-
-  const { data: latestUpload } = await supabase
-    .from("audience_upload")
-    .select("*")
-    .eq("audience_id", Number(audienceId))
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (contactError) {
-    return { ok: false as const, error: contactError.message, status: 500 };
-  }
-
-  return {
-    ok: true as const,
-    audience,
-    contacts: (contacts ?? []).map((row) => ({ contact: row })),
-    pagination: {
-      page,
-      page_size: pageSize,
-      total_count: count ?? 0,
-    } satisfies PaginationMeta,
-    sorting: { sort_key: sortKey, sort_direction: sortDirection },
-    latest_upload: latestUpload
-      ? {
-          id: latestUpload.id,
-          status: latestUpload.status ?? "unknown",
-          progress:
-            latestUpload.processed_contacts && latestUpload.total_contacts
-              ? Math.round(
-                  (latestUpload.processed_contacts / latestUpload.total_contacts) * 100,
-                )
-              : 0,
-          total_contacts: latestUpload.total_contacts ?? 0,
-          processed_contacts: latestUpload.processed_contacts ?? 0,
-          error_message: latestUpload.error_message,
-        }
-      : null,
-  };
 }
 
 export async function listWorkspaceScriptsApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   workspaceId: string,
 ) {
-  const { data, error } = await supabase
-    .from("script")
-    .select("*")
-    .eq("workspace", workspaceId)
-    .order("updated_at", { ascending: false });
+  const tdb = createTenantDb(workspaceId);
 
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  try {
+    const scripts = await tdb.script.findMany({
+      orderBy: (script, { desc: descFn }) => [descFn(script.updated_at)],
+    });
+    return { ok: true as const, scripts };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load scripts",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, scripts: data ?? [] };
 }
 
 export async function getScriptDetailApi(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   scriptId: string,
   workspaceId: string,
 ) {
-  const { data: script, error } = await supabase
-    .from("script")
-    .select("*")
-    .eq("workspace", workspaceId)
-    .eq("id", Number(scriptId))
-    .single();
+  const tdb = createTenantDb(workspaceId);
 
-  if (error || !script) {
-    return { ok: false as const, error: "Script not found", status: 404 };
+  try {
+    const script = await tdb.script.findFirst({
+      where: eq(scriptTable.id, Number(scriptId)),
+    });
+    if (!script) {
+      return { ok: false as const, error: "Script not found", status: 404 };
+    }
+    return { ok: true as const, script };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Script not found",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, script };
 }
 
 export async function listWorkspaceSurveysApi(
@@ -1226,23 +1288,21 @@ export async function getAudienceUploadStatusApi(
     return { ok: false as const, error: "Invalid upload ID", status: 400 };
   }
 
-  const { data: uploadData, error: uploadError } = await supabase
-    .from("audience_upload")
-    .select("*")
-    .eq("id", parsedUploadId)
-    .single();
-
-  if (uploadError || !uploadData) {
-    return { ok: false as const, error: "Upload not found", status: 404 };
+  const tdb = createTenantDb(workspaceId);
+  let uploadData;
+  try {
+    uploadData = await tdb.audience_upload.findFirst({
+      where: eq(audienceUploadTable.id, parsedUploadId),
+    });
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Upload not found",
+      status: 500,
+    };
   }
 
-  const { data: audience } = await supabase
-    .from("audience")
-    .select("workspace")
-    .eq("id", uploadData.audience_id)
-    .maybeSingle();
-
-  if (!audience || audience.workspace !== workspaceId) {
+  if (!uploadData) {
     return { ok: false as const, error: "Upload not found", status: 404 };
   }
 

@@ -73,8 +73,10 @@ export function QueueContent({
 
         pendingUpdates.current.add(id);
         try {
-            const { data, error } = await supabase.from('contact').select('*').eq('id', id).single();
-            return data;
+            const response = await fetch(`/api/contacts/${id}`);
+            if (!response.ok) return null;
+            const body = (await response.json()) as { contact?: Contact };
+            return body.contact ?? null;
         } finally {
             pendingUpdates.current.delete(id);
         }

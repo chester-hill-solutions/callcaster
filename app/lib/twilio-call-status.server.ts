@@ -2,6 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, Tables, TablesInsert } from "@/lib/database.types";
 import {
+  findCallBySid,
+  updateCallBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
+import {
   voiceBillingKindFromCampaignType,
   voiceCreditsFromDurationSeconds,
   TERMINAL_BILLABLE_CALL_STATUSES,
@@ -97,11 +102,7 @@ export async function resolveCallOutreachContext(
   let workspaceId = callRow.workspace ?? undefined;
 
   if (outreachAttemptId == null && callRow.parent_call_sid) {
-    const { data: parentCall } = await supabase
-      .from("call")
-      .select("workspace, outreach_attempt_id")
-      .eq("sid", callRow.parent_call_sid)
-      .single();
+    const parentCall = await findCallBySid(callRow.parent_call_sid);
     if (parentCall) {
       workspaceId = parentCall.workspace ?? undefined;
       outreachAttemptId = parentCall.outreach_attempt_id ?? undefined;
@@ -174,36 +175,43 @@ export async function persistCallStatusFromParams(args: {
     return null;
   }
 
+  const existing = await findCallBySid(callSid);
+  if (!existing?.workspace) {
+    throw new Error(`Call ${callSid} not found or missing workspace`);
+  }
+
   let data: Tables<"call"> | null = null;
   if (args.selectResult) {
-    const result = await args.supabase
-      .from("call")
-      .update(update)
-      .eq("sid", callSid)
-      .select()
-      .single();
-    if (result.error) throw result.error;
-    data = result.data as Tables<"call"> | null;
+    data = (await updateCallBySid(
+      existing.workspace,
+      callSid,
+      update as Partial<Tables<"call">>,
+    )) as Tables<"call"> | null;
   } else {
-    const { error } = await args.supabase
-      .from("call")
-      .update(update)
-      .eq("sid", callSid);
-    if (error) throw error;
+    await updateCallBySid(
+      existing.workspace,
+      callSid,
+      update as Partial<Tables<"call">>,
+    );
   }
 
   const outreachAttemptId =
     args.outreachAttemptId != null
       ? args.outreachAttemptId
-      : (data as { outreach_attempt_id?: number | null } | null)?.outreach_attempt_id ?? null;
+      : (data as { outreach_attempt_id?: number | null } | null)?.outreach_attempt_id ??
+        existing.outreach_attempt_id ??
+        null;
 
-  if (args.disposition && outreachAttemptId != null) {
-    const { error: outreachError } = await args.supabase
-      .from("outreach_attempt")
-      .update({ disposition: args.disposition })
-      .eq("id", outreachAttemptId);
-    if (outreachError) throw outreachError;
+  if (args.disposition && outreachAttemptId != null && existing.workspace) {
+    const result = await updateOutreachAttemptForWorkspace(
+      existing.workspace,
+      outreachAttemptId,
+      { disposition: args.disposition },
+    );
+    if (result instanceof Response) {
+      throw new Error("Failed to update outreach disposition");
+    }
   }
 
-  return data;
+  return data ?? (existing as Tables<"call">);
 }

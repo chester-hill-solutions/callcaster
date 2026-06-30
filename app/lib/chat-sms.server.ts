@@ -58,7 +58,6 @@ export const sendMessage = async ({
 
     const { message, result } = await sendSmsAndPersist({
       twilio,
-      supabase,
       createParams: buildTwilioOutboundSmsCreateParams({
         body: processedBody,
         to,

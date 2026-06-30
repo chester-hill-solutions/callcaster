@@ -2,31 +2,71 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 
+const autoDialMocks = vi.hoisted(() => ({
+  creditsBalance: 5 as number | null,
+  creditsError: null as Error | null,
+  insertCalls: [] as unknown[],
+  insertCallResults: [] as Array<Record<string, unknown> | null>,
+  updateCallCalls: [] as unknown[],
+  deleteCallCalls: [] as unknown[],
+}));
+
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: vi.fn(async () => {
+    if (autoDialMocks.creditsError) {
+      throw autoDialMocks.creditsError;
+    }
+    return autoDialMocks.creditsBalance;
+  }),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  insertCallForWorkspace: vi.fn(async (_workspaceId: string, payload: unknown) => {
+    autoDialMocks.insertCalls.push(payload);
+    if (autoDialMocks.insertCallResults.length > 0) {
+      return autoDialMocks.insertCallResults.shift() ?? null;
+    }
+    return payload as Record<string, unknown>;
+  }),
+  updateCallBySid: vi.fn(async (...args: unknown[]) => {
+    autoDialMocks.updateCallCalls.push(args);
+    return {};
+  }),
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => ({
+    call: {
+      delete: vi.fn(async (opts: unknown) => {
+        autoDialMocks.deleteCallCalls.push(opts);
+      }),
+    },
+  })),
+}));
+
 const authDeps = {
   getAuthenticatedUser: async () => ({ id: "u1" }),
   requireWorkspaceAccess: async () => undefined,
 };
 
+function resetAutoDialMocks() {
+  autoDialMocks.creditsBalance = 5;
+  autoDialMocks.creditsError = null;
+  autoDialMocks.insertCalls = [];
+  autoDialMocks.insertCallResults = [{ sid: "pending" }, { sid: "CA1" }];
+  autoDialMocks.updateCallCalls = [];
+  autoDialMocks.deleteCallCalls = [];
+}
+
 describe("app/routes/api+/auto-dial/tsx.route", () => {
   beforeEach(() => {
+    resetAutoDialMocks();
     vi.resetModules();
   });
 
   test("returns creditsError when workspace has no credits", async () => {
+    autoDialMocks.creditsBalance = 0;
     const mod = await import("../app/routes/api+/auto-dial");
-
-    const supabase: any = {
-      from: (table: string) => {
-        expect(table).toBe("workspace");
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: { credits: 0 }, error: null }),
-            }),
-          }),
-        };
-      },
-    };
 
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial", {
@@ -35,7 +75,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       deps: {
         ...authDeps,
         createSupabaseServerClient: () =>
-          ({ supabaseClient: supabase, headers: new Headers() }) as any,
+          ({ supabaseClient: {}, headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -74,17 +114,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
   });
 
   test("throws when workspace credits query errors", async () => {
+    autoDialMocks.creditsError = new Error("db");
     const mod = await import("../app/routes/api+/auto-dial");
-
-    const supabase: any = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: null, error: new Error("db") }),
-          }),
-        }),
-      }),
-    };
 
     await expect(
       mod.action({
@@ -94,7 +125,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         deps: {
           ...authDeps,
           createSupabaseServerClient: () =>
-            ({ supabaseClient: supabase, headers: new Headers() }) as any,
+            ({ supabaseClient: {}, headers: new Headers() }) as any,
           safeParseJson: async () => ({
             user_id: "u1",
             caller_id: "+1555",
@@ -110,43 +141,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
   test("creates call, upserts call row, and returns JSON Response", async () => {
     const mod = await import("../app/routes/api+/auto-dial");
 
-    const upsertSelect = vi.fn(async () => ({ error: null }));
     const sequence: string[] = [];
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { credits: 5 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "call") {
-          return {
-            insert: async () => {
-              sequence.push("pending-insert");
-              return { error: null };
-            },
-            upsert: (data: any) => {
-              sequence.push("call-upsert");
-              expect(data).toMatchObject({
-                sid: "CA1",
-                workspace: "w1",
-                campaign_id: 1,
-              });
-              return { select: upsertSelect };
-            },
-            delete: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          };
-        }
-        throw new Error("unexpected table");
-      },
-    };
-
     const callsCreate = vi.fn(async () => {
       sequence.push("twilio-create");
       return {
@@ -167,7 +162,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       deps: {
         ...authDeps,
         createSupabaseServerClient: () =>
-          ({ supabaseClient: supabase, headers: new Headers() }) as any,
+          ({ supabaseClient: {}, headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -197,42 +192,17 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         url: "https://base.example/api/auto-dial/u1",
       }),
     );
-    expect(upsertSelect).toHaveBeenCalled();
-    expect(sequence).toEqual([
-      "pending-insert",
-      "twilio-create",
-      "call-upsert",
-    ]);
+    expect(autoDialMocks.insertCalls).toHaveLength(2);
+    expect(autoDialMocks.insertCalls[1]).toMatchObject({
+      sid: "CA1",
+      campaign_id: 1,
+    });
+    expect(autoDialMocks.deleteCallCalls).toHaveLength(1);
+    expect(sequence).toEqual(["twilio-create"]);
   });
 
   test("uses client target when selected_device is not a string", async () => {
     const mod = await import("../app/routes/api+/auto-dial");
-
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { credits: 5 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "call") {
-          return {
-            insert: async () => ({ error: null }),
-            upsert: () => ({
-              select: async () => ({ error: null }),
-            }),
-            delete: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          };
-        }
-        throw new Error("unexpected table");
-      },
-    };
 
     const callsCreate = vi.fn(async () => ({ sid: "CA2" }));
 
@@ -243,7 +213,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       deps: {
         ...authDeps,
         createSupabaseServerClient: () =>
-          ({ supabaseClient: supabase, headers: new Headers() }) as any,
+          ({ supabaseClient: {}, headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -268,34 +238,6 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
   test("stores null campaign_id when payload campaign_id is not a number", async () => {
     const mod = await import("../app/routes/api+/auto-dial");
 
-    const upsertSelect = vi.fn(async () => ({ error: null }));
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { credits: 5 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "call") {
-          return {
-            insert: async () => ({ error: null }),
-            upsert: (data: any) => {
-              expect(data.campaign_id).toBeNull();
-              return { select: upsertSelect };
-            },
-            delete: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          };
-        }
-        throw new Error("unexpected table");
-      },
-    };
-
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial", {
         method: "POST",
@@ -303,7 +245,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       deps: {
         ...authDeps,
         createSupabaseServerClient: () =>
-          ({ supabaseClient: supabase, headers: new Headers() }) as any,
+          ({ supabaseClient: {}, headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -318,37 +260,13 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     } as any));
 
     expect(res.status).toEqual(expect.any(Number));
-    expect(upsertSelect).toHaveBeenCalled();
+    expect(autoDialMocks.insertCalls[0]).toMatchObject({ campaign_id: null });
+    expect(autoDialMocks.insertCalls[1]).toMatchObject({ campaign_id: null });
   });
 
   test("returns success:false Response when twilio call create throws", async () => {
     const mod = await import("../app/routes/api+/auto-dial");
-    const logger = { error: vi.fn() };
-    const pendingUpdateEq = vi.fn(async () => ({ error: null }));
-
-    const supabase: any = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { credits: 5 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "call") {
-          return {
-            insert: async () => ({ error: null }),
-            upsert: () => ({ select: async () => ({ error: null }) }),
-            update: () => ({
-              eq: pendingUpdateEq,
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() };
 
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial", {
@@ -358,7 +276,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         ...authDeps,
         logger: logger as any,
         createSupabaseServerClient: () =>
-          ({ supabaseClient: supabase, headers: new Headers() }) as any,
+          ({ supabaseClient: {}, headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -375,7 +293,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     } as any));
 
     expect(logger.error).toHaveBeenCalled();
-    expect(pendingUpdateEq).toHaveBeenCalledTimes(1);
+    expect(autoDialMocks.updateCallCalls).toHaveLength(1);
     const response = res as Response;
     await expect(response.json()).resolves.toMatchObject({
       success: false,
@@ -384,43 +302,21 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
   });
 
   test("covers resolveDeps fallbacks and logs call upsert error", async () => {
+    resetAutoDialMocks();
+    autoDialMocks.insertCallResults = [{ sid: "pending" }, null];
     vi.resetModules();
 
-    const logger = { error: vi.fn() };
+    const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() };
     const callsCreate = vi.fn(async () => ({ sid: "CA1" }));
-
-    const supabase: any = {
-      auth: {
-        getUser: async () => ({ data: { user: { id: "u1" } }, error: null }),
-      },
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { credits: 1 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "call") {
-          return {
-            insert: async () => ({ error: null }),
-            upsert: () => ({
-              select: async () => ({ error: new Error("upsert") }),
-            }),
-            update: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    const callsUpdate = vi.fn(async () => ({}));
 
     vi.doMock("../app/lib/supabase.server", () => ({
       createSupabaseServerClient: () => ({
-        supabaseClient: supabase,
+        supabaseClient: {
+          auth: {
+            getUser: async () => ({ data: { user: { id: "u1" } }, error: null }),
+          },
+        },
         headers: new Headers(),
       }),
     }));
@@ -435,8 +331,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       createWorkspaceTwilioInstance: async () => ({
         calls: Object.assign(
-          () => ({
-            update: async () => ({}),
+          (sid: string) => ({
+            update: callsUpdate,
           }),
           { create: callsCreate },
         ),
@@ -457,7 +353,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     expect(res.status).toEqual(expect.any(Number));
     expect(logger.error).toHaveBeenCalledWith(
       "Error saving the call to the database:",
-      expect.any(Error),
+      expect.objectContaining({ callSid: "CA1" }),
     );
   });
 

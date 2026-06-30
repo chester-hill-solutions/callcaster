@@ -29,6 +29,28 @@ vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
+const inboundContextMocks = vi.hoisted(() => ({
+  contacts: [] as Array<{ id: number }>,
+  contactError: null as Error | null,
+}));
+
+vi.mock("@/lib/database.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+  return {
+    ...actual,
+    findPotentialContacts: vi.fn(async () => ({
+      data: inboundContextMocks.contacts,
+      error: inboundContextMocks.contactError,
+    })),
+  };
+});
+
+import { configureTenantDbStub, createTenantDbMock, tenantDbStubState } from "./helpers/tenant-db-stub";
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => createTenantDbMock(),
+}));
+
 function makeSupabase(opts?: {
   number?: any;
   workspaceNumberError?: any;
@@ -42,6 +64,9 @@ function makeSupabase(opts?: {
   smsWebhook?: boolean;
   insertedMessages?: Record<string, unknown>[];
 }) {
+  inboundContextMocks.contacts = (opts?.contacts ?? []) as Array<{ id: number }>;
+  inboundContextMocks.contactError = opts?.contactError ?? null;
+
   const supabase: any = {
     rpc: async () => ({
       data: [],
@@ -144,7 +169,9 @@ function makeInboundSmsRequest(overrides?: Partial<Record<string, unknown>>) {
 
 describe("app/routes/api+/inbound-sms", () => {
   beforeEach(() => {
-    vi.resetModules();
+    configureTenantDbStub();
+    inboundContextMocks.contacts = [];
+    inboundContextMocks.contactError = null;
     mocks.createClient.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
@@ -207,7 +234,6 @@ describe("app/routes/api+/inbound-sms", () => {
   });
 
   test("resolves workspace by MessagingServiceSid when To number is unknown", async () => {
-    const insertedMessages: Record<string, unknown>[] = [];
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
         number: null,
@@ -218,7 +244,6 @@ describe("app/routes/api+/inbound-sms", () => {
             webhook: [],
           },
         ],
-        insertedMessages,
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
@@ -232,8 +257,7 @@ describe("app/routes/api+/inbound-sms", () => {
       } as any),
     );
     expect(res.status).toBe(201);
-    expect(insertedMessages[0]).toMatchObject({
-      workspace: "w-ms",
+    expect(tenantDbStubState.messageInsertCalls[0]).toMatchObject({
       messaging_service_sid: "MG1234567890abcdef",
       direction: "inbound",
     });
@@ -291,12 +315,11 @@ describe("app/routes/api+/inbound-sms", () => {
   test("processes media (handles fetch/upload failures), inserts message, opt-out stop/start, and sends webhook", async () => {
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
-    const insertedMessages: Record<string, unknown>[] = [];
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [{ id: 9 }], insertedMessages, smsWebhook: true }));
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [{ id: 9 }], smsWebhook: true }));
     const mod = await import("../app/routes/api+/inbound-sms");
     let res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
-    expect(insertedMessages[0]?.contact_id).toBe(9);
+    expect(tenantDbStubState.messageInsertCalls[0]?.contact_id).toBe(9);
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
 
     // start branch with quoted start + upload error path
@@ -348,25 +371,24 @@ describe("app/routes/api+/inbound-sms", () => {
 
   test("does not stamp contact_id when phone lookup is ambiguous", async () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
-    const insertedMessages: Record<string, unknown>[] = [];
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
         number,
         contacts: [{ id: 9 }, { id: 10 }],
-        insertedMessages,
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
     const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
 
     expect(res.status).toBe(201);
-    expect(insertedMessages[0]).not.toHaveProperty("contact_id");
+    expect(tenantDbStubState.messageInsertCalls[0]).not.toHaveProperty("contact_id");
   });
 
   test("message insert error returns 400", async () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, messageError: new Error("msg") }));
+    configureTenantDbStub({ messageInsertError: new Error("msg") });
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
     const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(400);

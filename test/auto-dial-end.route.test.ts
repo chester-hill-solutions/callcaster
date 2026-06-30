@@ -2,10 +2,23 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import { setJsonAuthSession } from "./helpers/route-auth-mock";
+import { configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
+
+vi.mock("@/lib/telephony-db.server", async () => {
+  const stub = await import("./helpers/telephony-db-stub");
+  return {
+    findCallBySid: stub.telephonyDbMocks.findCallBySid,
+    findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
+    findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
+    updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
+    insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
+  };
+});
 
 describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   beforeEach(() => {
-    vi.resetModules();
+    configureTelephonyStub();
   });
 
   test("returns 500 with message when conference listing throws", async () => {
@@ -29,40 +42,19 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   }, 60000);
 
   test("handles conference/call update errors and still returns success", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/end.route");
-
-    const outreachSingle = vi
-      .fn()
-      // First call: outreach update fails -> should be logged and skip twilio hangup.
-      .mockResolvedValueOnce({ data: { id: 1 }, error: new Error("db") })
-      // Second call: outreach update succeeds -> then twilio hangup fails -> logged.
-      .mockResolvedValueOnce({ data: { id: 2 }, error: null });
-
-    const callSelect = vi.fn(async () => ({
-      data: [
+    configureTelephonyStub({
+      callsByConference: [
         { sid: "CA1", outreach_attempt_id: 1, contact_id: 1 },
         { sid: "CA2", outreach_attempt_id: 2, contact_id: 2 },
       ],
-      error: null,
-    }));
+    });
+    telephonyDbMocks.updateOutreachAttemptForWorkspace
+      .mockRejectedValueOnce(new Error("db"))
+      .mockResolvedValueOnce({ id: 2, contact_id: 2 });
 
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "call") {
-          return { select: () => ({ eq: async () => (await callSelect()) }) };
-        }
-        if (table === "outreach_attempt") {
-          return {
-            update: () => ({
-              eq: () => ({
-                single: outreachSingle,
-              }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
+
+    const supabaseClient: any = {};
 
     const confUpdate = vi.fn(async () => ({}));
     const callUpdate = vi.fn().mockRejectedValueOnce(new Error("hangup"));
@@ -116,33 +108,13 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     const logger = { error: vi.fn(), debug: vi.fn() };
 
     let callMode: "error" | "empty" | "missingAttempt" = "error";
+    telephonyDbMocks.findCallsByConferenceId.mockImplementation(async () => {
+      if (callMode === "error") throw new Error("call");
+      if (callMode === "empty") return [];
+      return [{ sid: "CA1", outreach_attempt_id: null, contact_id: 1 }];
+    });
 
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "call") {
-          return {
-            select: () => ({
-              eq: async () => {
-                if (callMode === "error") return { data: null, error: new Error("call") };
-                if (callMode === "empty") return { data: [], error: null };
-                return {
-                  data: [{ sid: "CA1", outreach_attempt_id: null, contact_id: 1 }],
-                  error: null,
-                };
-              },
-            }),
-          };
-        }
-        if (table === "outreach_attempt") {
-          return {
-            update: () => ({
-              eq: () => ({ single: async () => ({ data: { id: 1 }, error: null }) }),
-            }),
-          };
-        }
-        throw new Error("unexpected");
-      },
-    };
+    const supabaseClient: any = {};
 
     const conferencesList = vi
       .fn()

@@ -1,9 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import {
+  findCallBySid,
+  updateCallBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -36,28 +42,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return validation.response;
     }
 
-    const { data: dbCall, error: callError } = await supabase
-      .from("call")
-      .select("campaign_id, outreach_attempt_id, workspace")
-      .eq("sid", callSid)
-      .single();
-    if (callError) throw callError;
-    if (!dbCall) {
+    const dbCall = await findCallBySid(callSid);
+    if (!dbCall?.workspace) {
       return routeData({ success: false, error: "Call not found" });
     }
 
-    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
+    const twilio = await createWorkspaceTwilioInstance({
+      supabase,
       workspace_id: dbCall.workspace,
     });
-    const { data: campaign, error: campaignError } = await supabase
-      .from("campaign")
-      .select("voicemail_file")
-      .eq("id", dbCall.campaign_id)
-      .single();
-    if (campaignError) throw campaignError;
-    if (!campaign) {
-      return routeData({ success: false, error: "Campaign not found" });
-    }
+    const campaign = await fetchCampaignByIdForWorkspace(
+      dbCall.workspace,
+      dbCall.campaign_id ?? 0,
+    );
 
     const { data: voicemailData, error: voicemailError } = campaign.voicemail_file
       ? await supabase.storage
@@ -76,47 +73,52 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ) {
       try {
         if (voicemailData && voicemailData.signedUrl) {
-          const { error: outreachError } = await supabase
-            .from("outreach_attempt")
-            .update({ disposition: "voicemail" })
-            .eq("id", dbCall.outreach_attempt_id)
-            .select();
-          if (outreachError) throw outreachError;
+          if (dbCall.outreach_attempt_id) {
+            const outreachResult = await updateOutreachAttemptForWorkspace(dbCall.workspace, dbCall.outreach_attempt_id, {
+              disposition: "voicemail",
+            });
+            if (outreachResult instanceof Response) {
+              throw new Error(await outreachResult.text());
+            }
+          }
           await call.update({
             twiml: pausePlayTwiml(voicemailData.signedUrl, 5),
           });
           return routeData({ success: true });
-        } else {
-          const { error: outreachError } = await supabase
-            .from("outreach_attempt")
-            .update({ disposition: "no-answer" })
-            .eq("id", dbCall.outreach_attempt_id)
-            .select();
-          if (outreachError) throw outreachError;
-          await call.update({
-            twiml: hangupTwiml(),
-          });
-          return routeData({ success: true });
         }
+
+        if (dbCall.outreach_attempt_id) {
+          const outreachResult = await updateOutreachAttemptForWorkspace(dbCall.workspace, dbCall.outreach_attempt_id, {
+            disposition: "no-answer",
+          });
+          if (outreachResult instanceof Response) {
+            throw new Error(await outreachResult.text());
+          }
+        }
+        await call.update({
+          twiml: hangupTwiml(),
+        });
+        return routeData({ success: true });
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to handle voicemail";
         return routeData({ success: false, error: errorMessage });
       }
-    } else {
-      const { data: callData, error: callUpsertError } = await supabase
-        .from("call")
-        .upsert({ sid: callSid, answered_by: answeredBy }, { onConflict: "sid" })
-        .select();
-      if (callUpsertError) throw callUpsertError;
-      const { data: attempt, error: attemptError } = await supabase
-        .from("outreach_attempt")
-        .update({ answered_at: new Date() })
-        .eq("id", dbCall.outreach_attempt_id)
-        .select();
-      if (attemptError) throw attemptError;
-      return routeData({ success: true, data: callData, attempt });
     }
+
+    await updateCallBySid(dbCall.workspace, callSid, { answered_by: answeredBy });
+    if (dbCall.outreach_attempt_id) {
+      const attempt = await updateOutreachAttemptForWorkspace(
+        dbCall.workspace,
+        dbCall.outreach_attempt_id,
+        { answered_at: new Date().toISOString() },
+      );
+      if (attempt instanceof Response) {
+        throw new Error(await attempt.text());
+      }
+      return routeData({ success: true, attempt });
+    }
+    return routeData({ success: true });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "An unexpected error occurred";

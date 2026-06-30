@@ -6,6 +6,7 @@ import {
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
+import { telephonyStubState, configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -33,6 +34,18 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: twilioValidation.validateTwilioWebhookParams,
 }));
+
+vi.mock("@/lib/telephony-db.server", async () => {
+  const stub = await import("./helpers/telephony-db-stub");
+  return {
+    findCallBySid: stub.telephonyDbMocks.findCallBySid,
+    findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
+    findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
+    updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
+    insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
+  };
+});
 
 const twilioClientMock = {
   conferences: Object.assign(
@@ -74,9 +87,9 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
     (args as any)?.dbCall ?? ({
       sid: "CA1",
       workspace: "w1",
-      outreach_attempt_id: "oa1",
+      outreach_attempt_id: 1,
       conference_id: "conf1",
-      contact_id: "c1",
+      contact_id: 1,
       campaign_id: 1,
     } as any);
 
@@ -138,7 +151,7 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
             single: async () => ({
               data: {
                 disposition: args?.outreachDisposition ?? "in-progress",
-                contact_id: "c1",
+                contact_id: 1,
               },
               error: outreachFetchError,
             }),
@@ -151,7 +164,7 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
                 if (outreachUpdateThrows != null) throw outreachUpdateThrows;
                 if (outreachUpdateError) return { data: null, error: outreachUpdateError };
                 outreachUpdateCalls.push(patch);
-                return { data: { ...patch, contact_id: "c1" }, error: null };
+                return { data: { ...patch, contact_id: 1 }, error: null };
               },
             }),
           }),
@@ -193,20 +206,39 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
     _transactionRows: transactionRows,
     _outreachUpdateCalls: outreachUpdateCalls,
     _campaignQueueEqCalls: campaignQueueEqCalls,
+    _telephonyConfig: {
+      callRow: dbCallRow,
+      callSelectError,
+      callUpdateError,
+      outreachDisposition: args?.outreachDisposition,
+      outreachFetchError,
+      outreachUpdateError,
+      outreachUpdateThrows,
+    },
   };
 }
 
 let supabaseStub: ReturnType<typeof makeSupabaseStub>;
 const supabaseState = vi.hoisted(() => ({ supabase: null as any }));
+
+vi.mock("@/lib/supabase.server", () => ({
+  getServiceSupabase: () => supabaseState.supabase,
+}));
+
+async function useSupabaseStub(args?: Parameters<typeof makeSupabaseStub>[0]) {
+  supabaseStub = makeSupabaseStub(args);
+  supabaseState.supabase = supabaseStub as any;
+  const { configureTelephonyStub } = await import("./helpers/telephony-db-stub");
+  configureTelephonyStub(supabaseStub._telephonyConfig);
+  return supabaseStub;
+}
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => supabaseState.supabase,
 }));
 
 describe("api.auto-dial.status", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    supabaseStub = makeSupabaseStub();
-    supabaseState.supabase = supabaseStub as any;
+  beforeEach(async () => {
+    await useSupabaseStub();
     twilioValidation.validateTwilioWebhookParams.mockReset();
     twilioValidation.validateTwilioWebhookParams.mockReturnValue(true);
     twilioValidation.validateTwilioWebhookForCallSid.mockReset();
@@ -280,8 +312,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("does not overwrite terminal disposition (completed -> busy)", async () => {
-    supabaseStub = makeSupabaseStub({ outreachDisposition: "completed" });
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ outreachDisposition: "completed" });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -299,15 +330,14 @@ describe("api.auto-dial.status", () => {
     } as any));
 
     expect(res.status).toBe(200);
-    expect(supabaseStub._outreachUpdateCalls.length).toBe(0);
+    expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
     expect(supabaseStub.rpc).toHaveBeenCalledWith("dequeue_contact", expect.objectContaining({
-      passed_contact_id: "c1",
+      passed_contact_id: 1,
     }));
   });
 
   test("returns 500 when call lookup fails", async () => {
-    supabaseStub = makeSupabaseStub({ callSelectError: new Error("no call") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ callSelectError: new Error("no call") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -328,8 +358,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("uses env TWILIO_AUTH_TOKEN when workspace has no twilio_data", async () => {
-    supabaseStub = makeSupabaseStub({ workspaceAuthToken: null } as any);
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ workspaceAuthToken: null } as any);
     twilioValidation.validateTwilioWebhookParams.mockImplementation(
       (_params: any, _sig: any, _url: any, authToken: string) => {
         expect(authToken).toBe("test");
@@ -356,17 +385,16 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join updates conference_id/start_time and updates queue + outreach attempt", async () => {
-    supabaseStub = makeSupabaseStub({
+    supabaseStub = await useSupabaseStub({
       dbCall: {
         sid: "CA1",
         workspace: "w1",
-        outreach_attempt_id: "oa1",
+        outreach_attempt_id: 1,
         conference_id: null,
-        contact_id: "c1",
+        contact_id: 1,
         campaign_id: 1,
       },
     } as any);
-    supabaseState.supabase = supabaseStub as any;
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -384,8 +412,8 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(supabaseStub._outreachUpdateCalls.length).toBeGreaterThan(0);
-    expect(supabaseStub._campaignQueueEqCalls).toContainEqual(["contact_id", "c1"]);
+    expect(telephonyStubState.outreachUpdateCalls.length).toBeGreaterThan(0);
+    expect(supabaseStub._campaignQueueEqCalls).toContainEqual(["contact_id", 1]);
     expect(supabaseStub._campaignQueueEqCalls).toContainEqual(["campaign_id", 1]);
   });
 
@@ -455,11 +483,10 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateOutreachAttempt catch path returns Response (still returns success)", async () => {
-    supabaseStub = makeSupabaseStub({
+    supabaseStub = await useSupabaseStub({
       outreachFetchError: new Error("fetch"),
       outreachUpdateError: new Error("oa"),
     } as any);
-    supabaseState.supabase = supabaseStub as any;
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -476,27 +503,22 @@ describe("api.auto-dial.status", () => {
         body: fd,
       }),
     } as any));
-    expect(res.status).toBe(200);
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      "Error updating outreach attempt:",
-      expect.any(Error),
-    );
+    expect(res.status).toBe(500);
   });
 
   test("updateOutreachAttempt works without disposition (covers else path)", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.action.server");
-    const res = await mod.updateOutreachAttempt("oa1", {
+    const res = await mod.updateOutreachAttempt("1", "w1", {
       answered_at: new Date().toISOString(),
     } as any);
     expect(res).toMatchObject({ answered_at: expect.any(String) });
-    expect(supabaseStub._outreachUpdateCalls.length).toBeGreaterThan(0);
+    expect(telephonyStubState.outreachUpdateCalls.length).toBeGreaterThan(0);
   });
 
   test("updateOutreachAttempt catch formats non-Error as Unknown error", async () => {
-    supabaseStub = makeSupabaseStub({ outreachUpdateThrows: "nope" } as any);
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ outreachUpdateThrows: "nope" } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.action.server");
-    const res = (await mod.updateOutreachAttempt("oa1", {
+    const res = (await mod.updateOutreachAttempt("1", "w1", {
       answered_at: new Date().toISOString(),
     } as any)) as any;
     expect(res.status).toEqual(expect.any(Number));
@@ -505,8 +527,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateCall error path returns 500", async () => {
-    supabaseStub = makeSupabaseStub({ callUpdateError: new Error("up") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ callUpdateError: new Error("up") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -527,8 +548,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rpc dequeue_contact error returns 500", async () => {
-    supabaseStub = makeSupabaseStub({ rpcDequeueError: new Error("dq") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ rpcDequeueError: new Error("dq") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -549,8 +569,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-leave outreach fetch error returns 500", async () => {
-    supabaseStub = makeSupabaseStub({ outreachFetchError: new Error("out") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ outreachFetchError: new Error("out") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -600,17 +619,16 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join does nothing when conference_id exists and no outreach_attempt_id", async () => {
-    supabaseStub = makeSupabaseStub({
+    supabaseStub = await useSupabaseStub({
       dbCall: {
         sid: "CA1",
         workspace: "w1",
         outreach_attempt_id: null,
         conference_id: "conf1",
-        contact_id: "c1",
+        contact_id: 1,
         campaign_id: 1,
       },
     } as any);
-    supabaseState.supabase = supabaseStub as any;
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -690,8 +708,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join campaign_queue update error hits updateCampaignQueue + join catch branches", async () => {
-    supabaseStub = makeSupabaseStub({ campaignQueueUpdateError: new Error("cq") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    supabaseStub = await useSupabaseStub({ campaignQueueUpdateError: new Error("cq") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();

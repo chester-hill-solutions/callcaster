@@ -1,6 +1,34 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
+
+const roomCallRow = vi.hoisted(() => ({
+  current: {
+    campaign_id: 1,
+    outreach_attempt_id: 1,
+    contact_id: 1,
+    workspace: "w1",
+    conference_id: "u1",
+  } as Record<string, unknown>,
+}));
+
+const roomSupabaseState = vi.hoisted(() => ({ supabase: null as any }));
+
+vi.mock("@/lib/supabase.server", () => ({
+  getServiceSupabase: () => roomSupabaseState.supabase,
+}));
+
+function setRoomCallRow(row: Record<string, unknown>) {
+  roomCallRow.current = row;
+  configureTelephonyStub({ callRow: row });
+}
+
+function useRoomSupabase(supabase: ReturnType<typeof makeSupabase>) {
+  roomSupabaseState.supabase = supabase;
+  mocks.createClient.mockReturnValueOnce(supabase);
+  return supabase;
+}
 
 const mocks = vi.hoisted(() => {
   return {
@@ -59,6 +87,33 @@ vi.mock("@/lib/twilio-twiml.server", () => ({
     `<?xml version="1.0" encoding="UTF-8"?><Response><Pause length="${seconds}"/><Play>${url}</Play></Response>`,
 }));
 
+const roomDbMocks = vi.hoisted(() => ({
+  dequeueCampaignQueueByContact: vi.fn(async () => [{ ok: 1 }]),
+  getUserVerifiedAudioNumbers: vi.fn(async () => ["+1666"] as string[] | null),
+}));
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueCampaignQueueByContact: (...args: unknown[]) =>
+    roomDbMocks.dequeueCampaignQueueByContact(...args),
+}));
+
+vi.mock("@/lib/user-audio.server", () => ({
+  getUserVerifiedAudioNumbers: (...args: unknown[]) =>
+    roomDbMocks.getUserVerifiedAudioNumbers(...args),
+}));
+
+vi.mock("@/lib/telephony-db.server", async () => {
+  const stub = await import("./helpers/telephony-db-stub");
+  return {
+    findCallBySid: stub.telephonyDbMocks.findCallBySid,
+    findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
+    findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
+    updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
+    insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
+  };
+});
+
 vi.mock("twilio", () => {
   class VoiceResponse {
     private _dialed: any[] = [];
@@ -95,6 +150,11 @@ function makeSupabase(overrides: Partial<any>) {
 
 describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   beforeEach(() => {
+    configureTelephonyStub();
+    roomDbMocks.dequeueCampaignQueueByContact.mockReset();
+    roomDbMocks.dequeueCampaignQueueByContact.mockResolvedValue([{ ok: 1 }]);
+    roomDbMocks.getUserVerifiedAudioNumbers.mockReset();
+    roomDbMocks.getUserVerifiedAudioNumbers.mockResolvedValue(["+1666"]);
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.logger.error.mockReset();
@@ -105,8 +165,14 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       group_household_queue: true,
       caller_id: "+1555",
     });
+    setRoomCallRow({
+      campaign_id: 1,
+      outreach_attempt_id: 1,
+      contact_id: 1,
+      workspace: "w1",
+      conference_id: "u1",
+    });
     vi.stubGlobal("fetch", mocks.fetch);
-    vi.resetModules();
   });
 
   test("device-check path: verified device joins conference and triggers dialer", async () => {
@@ -170,7 +236,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       throw new Error(`unexpected table ${table}`);
     });
 
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -274,7 +340,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     supabase.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
 
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -353,7 +419,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected table ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -458,7 +524,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     supabase.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -501,7 +567,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
     supabase.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -541,7 +607,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     supabase.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -557,6 +623,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("user device lookup error is caught", async () => {
+    roomDbMocks.getUserVerifiedAudioNumbers.mockRejectedValueOnce(new Error("user"));
     const supabase = makeSupabase({});
     supabase.from.mockImplementation((table: string) => {
       if (table === "call") {
@@ -565,12 +632,9 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
       }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: new Error("user") }) }) }) };
-      }
       throw new Error(`unexpected ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -610,7 +674,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -668,7 +732,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
     supabase.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -740,7 +804,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected table ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -754,7 +818,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(outreachSelect).toHaveBeenCalled();
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalled();
   });
 
   test("errors are caught and return Hangup response", async () => {
@@ -765,7 +829,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error("unexpected");
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -813,7 +877,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -851,7 +915,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -886,7 +950,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -926,7 +990,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     supabase.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: null, error: new Error("storage") }),
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -952,6 +1016,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
+    roomDbMocks.dequeueCampaignQueueByContact.mockRejectedValueOnce(new Error("q"));
     const supabase = makeSupabase({});
     supabase.from.mockImplementation((table: string) => {
       if (table === "call") {
@@ -960,27 +1025,15 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: false, caller_id: "+1555" }, error: null }) }) }) };
       }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }) }) }) };
-      }
       if (table === "outreach_attempt") {
         return { update: () => ({ eq: () => ({ select: async () => ({ data: [{ user_id: "u1", campaign_id: 1 }], error: null }) }) }) };
-      }
-      if (table === "campaign_queue") {
-        return {
-          update: () => ({
-            eq: () => ({
-              select: async () => ({ data: null, error: new Error("q") }),
-            }),
-          }),
-        };
       }
       throw new Error(`unexpected ${table}`);
     });
     supabase.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
@@ -1021,7 +1074,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
+    useRoomSupabase(supabase);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();

@@ -86,13 +86,44 @@ vi.mock("@/lib/utils", () => ({
 }));
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
-vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+import { configureTenantDbStub, createTenantDbMock, tenantDbStubState } from "./helpers/tenant-db-stub";
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => createTenantDbMock(),
+}));
+
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: vi.fn(async () => 100),
+}));
 vi.mock("@/lib/twilio-readiness.server", () => ({
   assertWorkspaceCanSendSms: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/twilio-client.server", () => ({
   withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
+
+function campaignRowFromOpts(opts?: { campaign?: any }) {
+  const campaign =
+    opts?.campaign ??
+    ({
+      body_text: "hi",
+      message_media: [],
+      campaign: {
+        end_time: new Date().toISOString(),
+        sms_send_mode: null,
+        sms_messaging_service_sid: null,
+        caller_id: "+15550001111",
+      },
+    } as const);
+  return {
+    body_text: campaign.body_text,
+    message_media: campaign.message_media ?? [],
+    end_date: campaign.campaign?.end_time ?? new Date().toISOString(),
+    sms_send_mode: campaign.campaign?.sms_send_mode ?? null,
+    sms_messaging_service_sid: campaign.campaign?.sms_messaging_service_sid ?? null,
+    caller_id: campaign.campaign?.caller_id ?? "+15550001111",
+  };
+}
 
 function makeSupabase(opts: {
   campaign?: any;
@@ -104,6 +135,13 @@ function makeSupabase(opts: {
   queueUpdate?: any;
   signedUrls?: Array<string | undefined>;
 } = {}) {
+  configureTenantDbStub({
+    messageInsertResult: opts?.messageInsert?.data ?? [{ sid: "SM1" }],
+    messageInsertError:
+      opts?.messageInsert?.error != null
+        ? new Error(String(opts.messageInsert.error.message ?? opts.messageInsert.error))
+        : null,
+  });
   const signedUrls = opts.signedUrls ?? [];
   let signedUrlIdx = 0;
 
@@ -118,20 +156,9 @@ function makeSupabase(opts: {
     },
     rpc: vi.fn(async () => opts.rpcResult ?? { data: "oa1", error: null }),
     from: vi.fn((table: string) => {
-      if (table === "message_campaign") {
+      if (table === "campaign") {
         const single = vi.fn(async () => ({
-          data:
-            opts.campaign ??
-            ({
-              body_text: "hi",
-              message_media: [],
-              campaign: {
-                end_time: new Date().toISOString(),
-                sms_send_mode: null,
-                sms_messaging_service_sid: null,
-                caller_id: "+15550001111",
-              },
-            } as any),
+          data: campaignRowFromOpts(opts),
           error: opts.campaignError ?? null,
         }));
         const q: any = {
@@ -176,6 +203,7 @@ function makeSupabase(opts: {
 
 describe("app/routes/api+/sms/route.tsx", () => {
   beforeEach(() => {
+    configureTenantDbStub();
     vi.resetModules();
     mocks.verifyApiKeyOrSession.mockReset();
     mocks.parseJsonBodyOrResponse.mockReset();
@@ -521,33 +549,10 @@ describe("app/routes/api+/sms/route.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "", body: "Hi", to: "+15551234567" })) },
     });
 
-    // observe insert payload sid
-    const inserted: any[] = [];
-    currentSupabase.from = vi.fn((table: string) => {
-      if (table === "message_campaign") return makeSupabase({ campaign: { body_text: "Hi", message_media: [], campaign: { end_time: "" } } }).from("message_campaign");
-      if (table === "outreach_attempt") return makeSupabase({}).from("outreach_attempt");
-      if (table === "campaign_queue") return makeSupabase({}).from("campaign_queue");
-      if (table === "message") {
-        const dedupeQuery: any = {
-          select: () => dedupeQuery,
-          eq: () => dedupeQuery,
-          then: (resolve: (value: any) => any) => resolve({ count: 0, error: null }),
-        };
-        return {
-          select: () => dedupeQuery,
-          insert: (row: any) => {
-            inserted.push(row);
-            return { select: vi.fn(async () => ({ data: [], error: null })) };
-          },
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
-    expect(inserted[0].sid).toBe("failed-+15551234567-123");
+    expect(tenantDbStubState.messageInsertCalls[0]?.sid).toBe("failed-+15551234567-123");
     (Date.now as any).mockRestore?.();
   });
 

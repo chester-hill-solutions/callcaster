@@ -53,9 +53,7 @@ Deno.test(
                       current_step: "page_1:block_1",
                     },
                     campaign: {
-                      ivr_campaign: [{
-                        script: { steps: { blocks: {}, pages: {} } },
-                      }],
+                      script: { steps: { blocks: {}, pages: {} } },
                     },
                   },
                   error: null,

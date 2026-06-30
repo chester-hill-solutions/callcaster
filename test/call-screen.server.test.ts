@@ -10,6 +10,28 @@ const tenantDbMocks = vi.hoisted(() => ({
   callFindMany: vi.fn(),
 }));
 
+const adminDbMocks = vi.hoisted(() => ({
+  workspaceRows: [{ id: "ws-1" }] as unknown[],
+  workspaceError: null as Error | null,
+}));
+
+vi.mock("@/server/admin-db", () => ({
+  adminDb: {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(async () => {
+            if (adminDbMocks.workspaceError) {
+              throw adminDbMocks.workspaceError;
+            }
+            return adminDbMocks.workspaceRows;
+          }),
+        })),
+      })),
+    })),
+  },
+}));
+
 vi.mock("@/lib/campaign-ivr.server", () => ({
   fetchCampaignWithScriptForWorkspace: (...args: unknown[]) =>
     tenantDbMocks.fetchCampaignWithScriptForWorkspace(...args),
@@ -39,6 +61,8 @@ import {
 describe("call-screen.server", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    adminDbMocks.workspaceRows = [{ id: "ws-1" }];
+    adminDbMocks.workspaceError = null;
   });
 
   test("getNextRecipient returns null for predictive dial type", () => {
@@ -167,6 +191,7 @@ describe("call-screen.server", () => {
   }
 
   test("getCallScreenData returns aggregated loader data", async () => {
+    adminDbMocks.workspaceRows = [{ id: "ws-1" }];
     tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockResolvedValue({
       id: 1,
       script: null,
@@ -188,16 +213,7 @@ describe("call-screen.server", () => {
         if (table === "campaign_queue") {
           return { select: queueSelect };
         }
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: vi.fn().mockResolvedValue({
-                data: table === "workspace" ? { id: "ws-1" } : null,
-                error: null,
-              }),
-            })),
-          })),
-        };
+        throw new Error(`Unexpected table: ${table}`);
       }),
       rpc: vi.fn().mockResolvedValue({ data: [{ id: "aud-1" }], error: null }),
     };

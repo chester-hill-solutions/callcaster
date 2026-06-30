@@ -11,6 +11,7 @@ import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import type { Database } from "@/lib/database.types";
+import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 export type InitiateIvrContact = {
   id: number;
   contact_id: number;
@@ -85,19 +86,17 @@ export async function initiateIvrCall(
       },
     );
 
-    const { error: insertError } = await supabase.from("call").insert({
+    const inserted = await insertCallForWorkspace(input.workspace_id, {
       sid: call.sid,
       to: input.contact.phone,
       from: input.contact.caller_id,
       campaign_id: input.campaign_id,
       contact_id: input.contact.contact_id,
-      workspace: input.workspace_id,
-      outreach_attempt_id: outreachAttemptId,
+      outreach_attempt_id: Number(outreachAttemptId),
     });
 
-    if (insertError) {
-      logger.error("initiateIvrCall call insert error", insertError);
-      return { success: false, error: insertError.message };
+    if (!inserted) {
+      return { success: false, error: "Failed to insert call row" };
     }
 
     const { error: dequeueError } = await supabase

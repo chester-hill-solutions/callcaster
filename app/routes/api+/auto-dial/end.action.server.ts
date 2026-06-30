@@ -5,6 +5,10 @@ import { resolveJsonAuthSession } from "@/lib/api-auth.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database, Tables } from "@/lib/database.types";
+import {
+  findCallsByConferenceId,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type TwilioSDK from "twilio";
 
@@ -49,18 +53,11 @@ export const action = async ({
     id: string,
     update: Partial<Tables<"outreach_attempt">>,
   ): Promise<Tables<"outreach_attempt">> => {
-    try {
-      const { data: outreachData, error } = await supabaseClient
-        .from("outreach_attempt")
-        .update(update)
-        .eq("id", Number(id))
-        .single();
-      if (error) throw error;
-      return outreachData;
-    } catch (error) {
-      d.logger.error("Error updating outreach attempt:", error);
-      throw error;
+    const result = await updateOutreachAttemptForWorkspace(workspace_id, id, update);
+    if (result instanceof Response) {
+      throw new Error(await result.text());
     }
+    return result;
   };
 
   try {
@@ -73,23 +70,9 @@ export const action = async ({
         try {
           await twilio.conferences(conf.sid).update({ status: "completed" });
 
-          const { data, error } = await supabaseClient
-            .from("call")
-            .select("sid, outreach_attempt_id, contact_id")
-            .eq("conference_id", conf.sid);
-          logger.debug("Conference calls data:", data);
-          if (error) throw error;
-          if (!data || !data.length) return;
-          type CallRecord = Pick<
-            Tables<"call">,
-            "sid" | "outreach_attempt_id" | "contact_id"
-          >;
-          const calls = data.filter(
-            (call): call is CallRecord =>
-              call !== null &&
-              typeof call.sid === "string" &&
-              call.sid.length > 0,
-          );
+          const calls = await findCallsByConferenceId(workspace_id, conf.sid);
+          logger.debug("Conference calls data:", calls);
+          if (!calls.length) return;
           await Promise.all(
             calls.map(async (call) => {
               if (!call.outreach_attempt_id) return;

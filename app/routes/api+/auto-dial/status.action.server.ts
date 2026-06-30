@@ -4,8 +4,8 @@ import {
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
-import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { getServiceSupabase } from "@/lib/supabase.server";
@@ -14,7 +14,12 @@ import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/database.types";
 import type Twilio from "twilio";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import {
+  findCallBySid,
+  findOutreachAttemptById,
+  updateCallBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
 import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import type { ActionFunctionArgs } from "react-router";
@@ -24,16 +29,12 @@ type TwilioClient = Twilio.Twilio;
 
 const getSupabase = () => getServiceSupabase();
 
-const updateCall = async (sid: string, update: Partial<Tables<"call">>) => {
-  const supabase = getSupabase();
+const updateCall = async (sid: string, workspaceId: string, update: Partial<Tables<"call">>) => {
   try {
-    const { data, error } = await supabase
-      .from("call")
-      .update(update)
-      .eq("sid", sid)
-      .select()
-      .single();
-    if (error) throw error;
+    const data = await updateCallBySid(workspaceId, sid, update);
+    if (!data) {
+      throw new Error(`Call ${sid} not found`);
+    }
     return data;
   } catch (error) {
     logger.error("Error updating call:", error);
@@ -67,45 +68,10 @@ function resolveOutreachUpdate(
 
 export const updateOutreachAttempt = async (
   id: string,
+  workspaceId: string,
   update: Partial<OutreachAttempt>,
 ) => {
-  const supabase = getSupabase();
-  try {
-    if (update.disposition) {
-      const { data: current, error: currentError } = await supabase
-        .from("outreach_attempt")
-        .select("disposition, contact_id")
-        .eq("id", Number(id))
-        .single();
-      if (!currentError && current?.disposition) {
-        const c = String(current.disposition).toLowerCase();
-        const n = String(update.disposition).toLowerCase();
-        if (!canTransitionOutreachDisposition(c, n)) {
-          logger.debug("Skipping outreach disposition transition", {
-            id,
-            current: c,
-            next: n,
-          });
-          return current as Pick<Tables<"outreach_attempt">, "disposition" | "contact_id">;
-        }
-      }
-    }
-
-    const { data, error } = await supabase
-      .from("outreach_attempt")
-      .update(update)
-      .eq("id", Number(id))
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  } catch (error: unknown) {
-    logger.error("Error updating outreach attempt:", error);
-    return new Response(
-      `Error updating outreach attempt: ${error instanceof Error ? error.message : "Unknown error"}`,
-      { status: 500 }
-    );
-  }
+  return updateOutreachAttemptForWorkspace(workspaceId, id, update);
 };
 
 const updateCampaignQueue = async (
@@ -182,6 +148,7 @@ const handleCallStatus = async (
     const outreachStatus = resolveOutreachUpdate(
       await updateOutreachAttempt(
         String(callUpdate.outreach_attempt_id),
+        requireValue(callUpdate.workspace, "workspace"),
         { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
       ),
     );
@@ -250,7 +217,11 @@ const handleParticipantLeave = async (
   try {
     const callSid = requireValue(typeof underCase.call_sid === "string" ? underCase.call_sid : null, "CallSid");
     const timestamp = requireValue(typeof underCase.timestamp === "string" ? underCase.timestamp : null, "Timestamp");
-    const dbCall = await updateCall(callSid, {
+    const existingCall = await findCallBySid(callSid);
+    if (!existingCall?.workspace) {
+      throw new Error("Call not found for participant leave");
+    }
+    const dbCall = await updateCall(callSid, existingCall.workspace, {
       end_time: new Date(timestamp).toISOString(),
       duration: Math.max(Number(underCase.duration), Number(underCase.call_duration)).toString(),
       status: (typeof underCase.call_status === "string" ? underCase.call_status : "")?.toLowerCase() as Tables<"call">["status"]
@@ -258,14 +229,12 @@ const handleParticipantLeave = async (
     if (!dbCall.outreach_attempt_id) {
       throw new Error("Missing outreach_attempt_id for participant leave");
     }
-    const { data: outreachStatus, error: outreachError } = await supabase
-      .from('outreach_attempt')
-      .select('*')
-      .eq('id', dbCall.outreach_attempt_id)
-      .single();
-    if (outreachError) {
-      logger.error("Error fetching outreach status", outreachError);
-      throw outreachError;
+    const outreachStatus = await findOutreachAttemptById(
+      existingCall.workspace,
+      dbCall.outreach_attempt_id,
+    );
+    if (!outreachStatus) {
+      throw new Error("Outreach attempt not found for participant leave");
     }
 
     realtime.send({
@@ -298,9 +267,11 @@ const handleParticipantJoin = async (
 ) => {
   const underCase = twilioParamsToUnderCase(parsedBody);
   try {
+    const workspaceId = requireValue(dbCall.workspace, "workspace");
     if (!dbCall.conference_id) {
       await updateCall(
         requireValue(typeof underCase.call_sid === "string" ? underCase.call_sid : null, "CallSid"),
+        workspaceId,
         {
           conference_id: requireValue(typeof underCase.conference_sid === "string" ? underCase.conference_sid : null, "ConferenceSid"),
           start_time: new Date(requireValue(typeof underCase.timestamp === "string" ? underCase.timestamp : null, "Timestamp")).toISOString(),
@@ -314,6 +285,7 @@ const handleParticipantJoin = async (
       const outreachStatus = resolveOutreachUpdate(
         await updateOutreachAttempt(
           `${dbCall.outreach_attempt_id}`,
+          workspaceId,
           { disposition: "in-progress", answered_at: new Date().toISOString() },
         ),
       );
@@ -370,13 +342,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return validation.response;
     }
 
-    const { data: dbCall, error: callError } = await supabase
-      .from("call")
-      .select()
-      .eq("sid", callSidValue)
-      .single();
-    if (callError) {
-      throw new Error("Failed to fetch call data: " + callError.message);
+    const dbCall = await findCallBySid(callSidValue);
+    if (!dbCall?.workspace) {
+      throw new Error("Failed to fetch call data");
     }
 
     const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,

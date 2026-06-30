@@ -1,5 +1,8 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { and, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import type { Database } from "../database.types";
+import { message as messageTable, contact as contactTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "../logger.server";
 import {
   getConversationParticipantPhones,
@@ -84,15 +87,19 @@ export async function fetchConversationSummary(
   const limit = Math.max(1, options.limit ?? 20);
   const offset = Math.max(0, options.offset ?? 0);
   const sort = options.sort ?? "recent";
+  const tdb = createTenantDb(workspaceId);
 
-  const { data: workspaceNumberRows, error: workspaceNumbersError } =
-    await supabaseClient
-      .from("workspace_number")
-      .select("phone_number")
-      .eq("workspace", workspaceId);
-
-  if (workspaceNumbersError) {
-    return { chats: [], chatsError: workspaceNumbersError, hasMore: false };
+  let workspaceNumberRows: Array<{ phone_number: string | null }>;
+  try {
+    workspaceNumberRows = await tdb.workspace_number.findMany({
+      columns: { phone_number: true },
+    });
+  } catch (workspaceNumbersError) {
+    return {
+      chats: [],
+      chatsError: workspaceNumbersError as { message: string },
+      hasMore: false,
+    };
   }
 
   const workspacePhoneKeys = new Set(
@@ -119,39 +126,47 @@ export async function fetchConversationSummary(
       CONVERSATION_MESSAGE_PAGE_SIZE,
       CONVERSATION_MESSAGE_CAP - scannedMessages,
     );
-    const pageEnd = pageStart + pageLimit - 1;
 
-    let pageQuery = supabaseClient
-      .from("message")
-      .select(
-        "body, campaign_id, contact_id, date_created, direction, from, status, to",
-      )
-      .eq("workspace", workspaceId)
-      .not("date_created", "is", null)
-      .neq("status", "failed")
-      .order("date_created", { ascending: false })
-      .range(pageStart, pageEnd);
+    const messageWhere = [
+      isNotNull(messageTable.date_created),
+      ne(messageTable.status, "failed"),
+      ...(shouldFilterByCampaign
+        ? [eq(messageTable.campaign_id, numericCampaignId as number)]
+        : []),
+    ];
 
-    if (shouldFilterByCampaign) {
-      pageQuery = pageQuery.eq("campaign_id", numericCampaignId as number);
+    let pageRows: ConversationMessageRow[];
+    try {
+      pageRows = (await tdb.message.findMany({
+        where: and(...messageWhere),
+        columns: {
+          body: true,
+          campaign_id: true,
+          contact_id: true,
+          date_created: true,
+          direction: true,
+          from: true,
+          status: true,
+          to: true,
+        },
+        orderBy: [desc(messageTable.date_created)],
+        limit: pageLimit,
+        offset: pageStart,
+      })) as ConversationMessageRow[];
+    } catch (messagesError) {
+      return { chats: [], chatsError: messagesError as { message: string }, hasMore: false };
     }
 
-    const { data: pageRows, error: messagesError } = await pageQuery;
-    if (messagesError) {
-      return { chats: [], chatsError: messagesError, hasMore: false };
-    }
-
-    const typedRows = (pageRows ?? []) as ConversationMessageRow[];
-    if (typedRows.length === 0) {
+    if (pageRows.length === 0) {
       hasMoreRows = false;
       continue;
     }
 
-    scannedMessages += typedRows.length;
-    cursor += typedRows.length;
-    hasMoreRows = typedRows.length === pageLimit;
+    scannedMessages += pageRows.length;
+    cursor += pageRows.length;
+    hasMoreRows = pageRows.length === pageLimit;
 
-    for (const message of typedRows) {
+    for (const message of pageRows) {
       if (typeof message.contact_id === "number") {
         contactIds.add(message.contact_id);
       }
@@ -243,28 +258,27 @@ export async function fetchConversationSummary(
   const contactsById = new Map<number, ContactNameRow>();
   if (contactIds.size > 0) {
     const batches = chunk(Array.from(contactIds), CONTACT_IDS_BATCH_SIZE);
-    const batchResults = await Promise.all(
-      batches.map((ids) =>
-        supabaseClient
-          .from("contact")
-          .select("firstname, id, phone, surname")
-          .eq("workspace", workspaceId)
-          .in("id", ids),
-      ),
-    );
-    for (const { data: contactRows, error: contactsError } of batchResults) {
-      if (contactsError) {
-        logger.error("Error loading contact names for conversations", {
-          message: contactsError.message,
-          code: (contactsError as { code?: string }).code,
-          details: (contactsError as { details?: string }).details,
-          contactIdsCount: contactIds.size,
-        });
-      } else if (contactRows?.length) {
-        for (const contact of contactRows) {
-          contactsById.set(contact.id, contact);
+    try {
+      const batchResults = await Promise.all(
+        batches.map((ids) =>
+          tdb.contact.findMany({
+            where: inArray(contactTable.id, ids),
+            columns: { firstname: true, id: true, phone: true, surname: true },
+          }),
+        ),
+      );
+      for (const contactRows of batchResults) {
+        if (contactRows.length) {
+          for (const contact of contactRows) {
+            contactsById.set(contact.id, contact as ContactNameRow);
+          }
         }
       }
+    } catch (contactsError) {
+      logger.error("Error loading contact names for conversations", {
+        message: contactsError instanceof Error ? contactsError.message : String(contactsError),
+        contactIdsCount: contactIds.size,
+      });
     }
   }
 

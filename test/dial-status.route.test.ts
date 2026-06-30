@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { configureTelephonyStub } from "./helpers/telephony-db-stub";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
     validateTwilioWebhookForCallSid: vi.fn(),
+    fetchCampaignByIdForWorkspace: vi.fn(async () => ({ voicemail_file: "vm.mp3" })),
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
@@ -31,6 +33,23 @@ vi.mock("@/twilio.server", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignByIdForWorkspace: (...args: unknown[]) =>
+    mocks.fetchCampaignByIdForWorkspace(...args),
+}));
+
+vi.mock("@/lib/telephony-db.server", async () => {
+  const stub = await import("./helpers/telephony-db-stub");
+  return {
+    findCallBySid: stub.telephonyDbMocks.findCallBySid,
+    findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
+    findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
+    updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
+    insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
+  };
+});
+
 function makeSupabase() {
   let callRow: any = { campaign_id: 1, outreach_attempt_id: 10, workspace: "w1" };
   let callError: any = null;
@@ -45,6 +64,35 @@ function makeSupabase() {
   let outreachUpdateThrows: unknown = null;
 
   const callUpdate = vi.fn(async (_patch: any) => ({}));
+
+  const syncTelephony = () => {
+    configureTelephonyStub({
+      callRow,
+      callSelectError: callError,
+      callUpdateError: callUpsertError,
+      outreachUpdateError: outreachUpdateError ?? attemptUpdateError,
+      outreachUpdateThrows,
+    });
+  };
+
+  const syncCampaign = () => {
+    if (campaignError) {
+      mocks.fetchCampaignByIdForWorkspace.mockImplementation(async () => {
+        throw campaignError;
+      });
+      return;
+    }
+    if (campaignRow === null) {
+      mocks.fetchCampaignByIdForWorkspace.mockImplementation(async () => {
+        throw new Error("Campaign 1 not found");
+      });
+      return;
+    }
+    mocks.fetchCampaignByIdForWorkspace.mockImplementation(async () => campaignRow);
+  };
+
+  syncTelephony();
+  syncCampaign();
 
   const supabase: any = {
     storage: {
@@ -101,17 +149,41 @@ function makeSupabase() {
       throw new Error("unexpected table");
     },
     _set: {
-      callRow: (r: any) => (callRow = r),
-      callError: (e: any) => (callError = e),
+      callRow: (r: any) => {
+        callRow = r;
+        syncTelephony();
+      },
+      callError: (e: any) => {
+        callError = e;
+        syncTelephony();
+      },
       workspaceRow: (r: any) => (workspaceRow = r),
-      campaignRow: (r: any) => (campaignRow = r),
-      campaignError: (e: any) => (campaignError = e),
+      campaignRow: (r: any) => {
+        campaignRow = r;
+        syncCampaign();
+      },
+      campaignError: (e: any) => {
+        campaignError = e;
+        syncCampaign();
+      },
       signedUrl: (s: string | null) => (signedUrl = s),
       voicemailError: (e: any) => (voicemailError = e),
-      outreachUpdateError: (e: any) => (outreachUpdateError = e),
-      callUpsertError: (e: any) => (callUpsertError = e),
-      attemptUpdateError: (e: any) => (attemptUpdateError = e),
-      outreachUpdateThrows: (e: unknown) => (outreachUpdateThrows = e),
+      outreachUpdateError: (e: any) => {
+        outreachUpdateError = e;
+        syncTelephony();
+      },
+      callUpsertError: (e: any) => {
+        callUpsertError = e;
+        syncTelephony();
+      },
+      attemptUpdateError: (e: any) => {
+        attemptUpdateError = e;
+        syncTelephony();
+      },
+      outreachUpdateThrows: (e: unknown) => {
+        outreachUpdateThrows = e;
+        syncTelephony();
+      },
     },
     _callUpdate: callUpdate,
   };
@@ -138,12 +210,14 @@ function makeReq(fields: Record<string, any>) {
 
 describe("app/routes/api+/dial/status.route.tsx", () => {
   beforeEach(() => {
-    vi.resetModules();
+    configureTelephonyStub();
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
     mocks.validateTwilioWebhookForCallSid.mockReset();
+    mocks.fetchCampaignByIdForWorkspace.mockReset();
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({ voicemail_file: "vm.mp3" });
     mocks.validateTwilioWebhookForCallSid.mockImplementation(
       async (args: { params?: Record<string, string> }) => ({
         ok: true,
@@ -273,7 +347,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: false, error: "upd" });
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: upd" });
 
     // handler catch: non-Error thrown -> "Failed to handle voicemail"
     const { supabase: sup4, twilio: tw4 } = makeSupabase();
@@ -283,7 +357,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Failed to handle voicemail" });
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: Unknown error" });
   });
 
   test("human/other path upserts call, updates attempt, and outer catch formats non-Error", async () => {
@@ -296,7 +370,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toMatchObject({ success: true, data: expect.any(Array), attempt: expect.any(Array) });
+    await expect(res.json()).resolves.toMatchObject({ success: true, attempt: expect.any(Object) });
 
     // callUpsertError / attemptError -> outer catch Error message
     const { supabase: sup2, twilio: tw2 } = makeSupabase();
@@ -315,7 +389,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: false, error: "att" });
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: att" });
 
     // throw non-Error from createWorkspaceTwilioInstance triggers outer catch "An unexpected error occurred"
     mocks.createClient.mockReturnValueOnce(supabase);
@@ -331,13 +405,14 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
 
     // campaign not found
     const { supabase, twilio } = makeSupabase();
+    supabase._set.callRow({ campaign_id: 1, outreach_attempt_id: 10, workspace: "w1" });
     supabase._set.campaignRow(null);
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     let res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Campaign not found" });
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Campaign 1 not found" });
 
     // voicemail_file falsy => ternary else branch and machine no-answer hangup path
     const { supabase: sup2, twilio: tw2 } = makeSupabase();
@@ -357,7 +432,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: false, error: "outreach" });
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: outreach" });
 
     // no signedUrl branch: outreach update returns error => hits the other `if (outreachError) throw outreachError`
     const { supabase: sup4, twilio: tw4 } = makeSupabase();
@@ -368,7 +443,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: false, error: "no-answer-update" });
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: no-answer-update" });
   });
 });
 

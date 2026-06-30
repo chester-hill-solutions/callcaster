@@ -1,4 +1,9 @@
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
+import { saveCallToDatabase } from "@/lib/auto-dial.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { and, eq } from "drizzle-orm";
+import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { env } from "@/lib/env.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -6,7 +11,6 @@ import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
-import type { TablesInsert, Database } from "@/lib/database.types";
 import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
 
 interface DialRequest {
@@ -52,21 +56,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId: workspace_id });
 
-    const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
-    if (error) throw error;
-    const credits = data.credits;
+    const credits = await getWorkspaceCreditsBalance(workspace_id);
+    if (credits === null) {
+        throw new Response("Workspace not found", { status: 404 });
+    }
     if (credits <= 0) {
         return {
             creditsError: true,
         }
     }
-    const [{ data: callerIdRecord }, onboarding] = await Promise.all([
-        supabase
-            .from("workspace_number")
-            .select("type, phone_number")
-            .eq("workspace", workspace_id)
-            .eq("phone_number", caller_id)
-            .maybeSingle(),
+    const tdb = createTenantDb(workspace_id);
+    const [callerIdRecord, onboarding] = await Promise.all([
+        tdb.workspace_number.findFirst({
+            where: eq(workspaceNumberTable.phone_number, caller_id),
+        }),
         getWorkspaceMessagingOnboardingState({
             supabaseClient: supabase,
             workspaceId: workspace_id,
@@ -121,7 +124,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             outreach_attempt_id = Number(outreach_id)
         }
         
-        const callData: TablesInsert<"call"> = {
+        await saveCallToDatabase(workspace_id, {
             sid: call.sid,
             date_updated: call.dateUpdated?.toISOString() ?? new Date().toISOString(),
             parent_call_sid: call.parentCallSid ?? null,
@@ -129,13 +132,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             to: to_number,
             from: call.from ?? null,
             phone_number_sid: call.phoneNumberSid ?? null,
-            status: (call.status ?? null) as Database["public"]["Enums"]["call_status"] | null,
+            status: call.status ?? null,
             start_time: call.startTime?.toISOString() ?? null,
             end_time: call.endTime?.toISOString() ?? null,
             duration: call.duration != null ? String(call.duration) : null,
             price: call.price ?? null,
             direction: call.direction ?? null,
-            answered_by: (call.answeredBy ?? null) as Database["public"]["Enums"]["answered_by"] | null,
+            answered_by: call.answeredBy ?? null,
             api_version: call.apiVersion ?? null,
             forwarded_from: call.forwardedFrom ?? null,
             group_sid: call.groupSid ?? null,
@@ -146,9 +149,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             workspace: workspace_id,
             outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : null,
             queue_id: queueId,
-        };
-        const { error } = await supabase.from('call').upsert(callData);
-        if (error) logger.error('Error saving the call to the database:', error);
+        });
     } catch (error) {
         logger.error('Error placing call:', error);
         twiml.say('There was an error placing your call. Please try again later.');

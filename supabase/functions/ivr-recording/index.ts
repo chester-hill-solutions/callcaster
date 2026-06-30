@@ -3,6 +3,7 @@ import Twilio from "npm:twilio@^5.3.0";
 import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
 import { getFunctionsBaseUrl, getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
+import { scriptStepsFromCampaign } from "../_shared/unified-campaign-script.ts";
 
 interface TwilioEventData {
   CallSid?: string;
@@ -122,7 +123,7 @@ const getCallWithScript = async (supabase: SupabaseClient, callSid: string) => {
     .from("call")
     .select(`
       workspace,
-      campaign(ivr_campaign(id, script(*))),
+      campaign(*, script:script(*)),
       outreach_attempt!inner(
         id,
         result,
@@ -279,7 +280,11 @@ export async function handleRequest(req: Request): Promise<Response> {
             }
           }
         };
-        const script = callData.campaign.ivr_campaign[0].script.steps;
+        const scriptSteps = scriptStepsFromCampaign(callData.campaign);
+        if (!scriptSteps || typeof scriptSteps !== "object") {
+          throw new Error("Invalid IVR campaign structure");
+        }
+        const script = scriptSteps as { blocks: Record<string, unknown>; pages: Record<string, unknown> };
         const currentBlock = script.blocks[currentBlockId];
         const nextStep = findNextStep(currentBlock, null, script, currentPageId);
 

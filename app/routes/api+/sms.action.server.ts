@@ -169,7 +169,7 @@ const sendMessage = async ({
   );
 
   await Promise.all([
-    persistMessageRecord(supabase, messageFields),
+    persistMessageRecord(workspace, messageFields),
 
     updateOutreach({
       supabase,
