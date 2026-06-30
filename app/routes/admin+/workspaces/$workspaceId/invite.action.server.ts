@@ -1,49 +1,26 @@
-import { capitalize } from "@/lib/utils";
 import { data as routeData } from "react-router";
-import { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import { compareMembersByRole } from "@/lib/workspace-members";
-import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
+import {
+  handleAddUser,
+  handleDeleteSelf,
+  handleDeleteUser,
+  handleUpdateUser,
+  removeInvite,
+} from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { requireSudoOrWorkspaceAdmin } from "../../requireSudoOrWorkspaceAdmin.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database, Tables } from "@/lib/database.types";
-
-type MemberUser = Pick<
-  Tables<"user">,
-  "id" | "username" | "first_name" | "last_name"
-> & {
-  role: MemberRole;
-};
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-
   const workspaceId = params.workspaceId;
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
   if (workspaceId == null) {
-    return routeData({ error: "No workspace_id found!" }, { headers });
+    return routeData({ error: "No workspace_id found!" });
   }
 
-  const { data: userData } = await supabaseClient
-    .from("user")
-    .select("access_level")
-    .eq("id", user?.id)
-    .single();
-
-  // Check if user is admin
-  const { data: userRoleData } = await supabaseClient
-    .from("workspace_users")
-    .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", user?.id)
-    .single();
-
-  const hasSudoAccess = userData?.access_level === "sudo";
-  const hasWorkspaceAdminAccess = userRoleData?.role === "admin" || userRoleData?.role === "owner";
-
-  if (!hasSudoAccess && !hasWorkspaceAdminAccess) {
-    return routeData({ error: "Unauthorized" }, { status: 403, headers });
+  const access = await requireSudoOrWorkspaceAdmin(request, workspaceId);
+  if (access instanceof Response) {
+    return access;
   }
 
+  const { supabaseClient, headers } = access;
   const formData = await request.formData();
   const formName = formData.get("formName");
 
@@ -72,4 +49,4 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     { data: null, error: "Error: Unrecognized action called" },
     { headers },
   );
-}
+};

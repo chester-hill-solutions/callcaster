@@ -514,3 +514,76 @@ export async function getWorkspaceCredits(workspaceId: string) {
     .limit(1);
   return row?.credits ?? null;
 }
+
+export async function getWorkspaceById(workspaceId: string) {
+  const [row] = await adminDb
+    .select()
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function getWorkspaceWithCampaigns(workspaceId: string) {
+  const workspace = await getWorkspaceById(workspaceId);
+  if (!workspace) {
+    return null;
+  }
+
+  const campaigns = await adminDb
+    .select()
+    .from(campaignTable)
+    .where(eq(campaignTable.workspace, workspaceId));
+
+  return {
+    ...workspace,
+    campaign: campaigns,
+  };
+}
+
+export async function listWorkspaceNumbersForWorkspace(workspaceId: string) {
+  return adminDb
+    .select()
+    .from(workspaceNumberTable)
+    .where(eq(workspaceNumberTable.workspace, workspaceId));
+}
+
+export async function listAdminWorkspaceUsersWithUser(workspaceId: string) {
+  const rows = await adminDb
+    .select({
+      id: workspaceUsersTable.id,
+      created_at: workspaceUsersTable.created_at,
+      last_accessed: workspaceUsersTable.last_accessed,
+      role: workspaceUsersTable.role,
+      user_id: workspaceUsersTable.user_id,
+      workspace_id: workspaceUsersTable.workspace_id,
+      user: userTable,
+    })
+    .from(workspaceUsersTable)
+    .innerJoin(userTable, eq(workspaceUsersTable.user_id, userTable.id))
+    .where(eq(workspaceUsersTable.workspace_id, workspaceId));
+
+  return rows.map(({ user, ...membership }) => ({
+    ...membership,
+    user,
+  }));
+}
+
+export async function listUserWorkspaceMembershipsWithWorkspace(userId: string) {
+  const memberships = await listUserWorkspaceMemberships(userId);
+  if (memberships.length === 0) {
+    return [];
+  }
+
+  const workspaceIds = [...new Set(memberships.map((row) => row.workspace_id))];
+  const workspaces = await adminDb
+    .select()
+    .from(workspaceTable)
+    .where(inArray(workspaceTable.id, workspaceIds));
+  const workspaceById = new Map(workspaces.map((row) => [row.id, row]));
+
+  return memberships.map((membership) => ({
+    ...membership,
+    workspace: workspaceById.get(membership.workspace_id) ?? null,
+  }));
+}

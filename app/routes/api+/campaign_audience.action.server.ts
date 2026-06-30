@@ -5,184 +5,150 @@ import {
   deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds,
   getQueuedContactIdsForCampaign,
 } from "@/lib/campaign-queue-db.server";
+import {
+  campaignAndAudienceShareWorkspace,
+  deleteCampaignAudienceLink,
+  findCampaignAudienceLink,
+  insertCampaignAudienceLink,
+  listCampaignAudienceIds,
+  listContactIdsForAudience,
+  listContactIdsForAudiences,
+} from "@/lib/campaign-audience-db.server";
 import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthSupabase, requireDualAuth } from "@/lib/api-auth.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-    const auth = await requireDualAuth(request);
+  const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
   const { headers } = createSupabaseServerClient(request);
   const supabase = getDualAuthSupabase(auth);
-    const method = request.method;
+  const method = request.method;
 
-    try {
-        if (method === "POST") {
-            const { audience_id, campaign_id } = await safeParseJson<{
-                audience_id: string | number;
-                campaign_id: string | number;
-            }>(request);
-            const audienceId = Number(audience_id);
-            const campaignId = Number(campaign_id);
-            if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
-                return routeData({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
-            }
+  try {
+    if (method === "POST") {
+      const { audience_id, campaign_id } = await safeParseJson<{
+        audience_id: string | number;
+        campaign_id: string | number;
+      }>(request);
+      const audienceId = Number(audience_id);
+      const campaignId = Number(campaign_id);
+      if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
+        return routeData({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
+      }
 
-            // First check if this audience is already added to the campaign
-            const { data: existing, error: checkError } = await supabase
-                .from("campaign_audience")
-                .select()
-                .eq("campaign_id", campaignId)
-                .eq("audience_id", audienceId)
-                .single();
+      if (!(await campaignAndAudienceShareWorkspace(campaignId, audienceId))) {
+        return routeData({ error: "Campaign or audience not found" }, { status: 404, headers });
+      }
 
-            if (checkError && checkError.code !== "PGRST116") {
-                throw checkError;
-            }
+      const existing = await findCampaignAudienceLink(campaignId, audienceId);
+      if (existing) {
+        return routeData({ success: true, message: "Audience already added to campaign" }, { headers });
+      }
 
-            if (existing) {
-                return routeData({ success: true, message: "Audience already added to campaign" }, { headers });
-            }
+      await insertCampaignAudienceLink(campaignId, audienceId);
 
-            // Add the audience to the campaign
-            const { error: addError } = await supabase
-                .from("campaign_audience")
-                .insert({
-                    campaign_id: campaignId,
-                    audience_id: audienceId
-                });
+      const audienceContactIds = await listContactIdsForAudience(audienceId);
+      let enqueued = 0;
+      let skipped = 0;
+      let warning: string | undefined;
 
-            if (addError) throw addError;
-
-            const { data: audienceContacts, error: contactsError } = await supabase
-                .from('contact_audience')
-                .select('contact_id')
-                .eq('audience_id', audienceId);
-
-            if (contactsError) throw contactsError;
-
-            const audienceContactIds = (audienceContacts ?? []).map((contact) => contact.contact_id);
-            let enqueued = 0;
-            let skipped = 0;
-            let warning: string | undefined;
-
-            if (audienceContactIds.length > 0) {
-                const existingContactIds = new Set(
-                    await getQueuedContactIdsForCampaign({
-                        campaignId,
-                        contactIds: audienceContactIds,
-                    }),
-                );
-                const contactIds = audienceContactIds.filter(
-                    (contactId) => !existingContactIds.has(contactId),
-                );
-                skipped = audienceContactIds.length - contactIds.length;
-
-                if (contactIds.length === 0) {
-                    return routeData({
-                        success: true,
-                        audienceLinked: true,
-                        enqueued: 0,
-                        skipped,
-                    }, { headers });
-                }
-
-                try {
-                    await enqueueContactsForCampaign(supabase,
-                        campaignId,
-                        contactIds,
-                        { requeue: false }
-                    );
-                    enqueued = contactIds.length;
-                } catch (enqueueError) {
-                    logger.error("Audience linked but queue enqueue failed:", enqueueError);
-                    warning =
-                        "Audience was linked, but some contacts could not be added to the queue. Refresh and retry queue sync if needed.";
-                }
-            }
-
-            return routeData({
-                success: true,
-                partial: Boolean(warning),
-                warning,
-                audienceLinked: true,
-                enqueued,
-                skipped,
-            }, { headers });
-        }
-
-        if (method === "DELETE") {
-            const { audience_id, campaign_id } = await safeParseJson<{
-                audience_id: string | number;
-                campaign_id: string | number;
-            }>(request);
-            const audienceId = Number(audience_id);
-            const campaignId = Number(campaign_id);
-            if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
-                return routeData({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
-            }
-
-            // Remove the audience from the campaign
-            const { error } = await supabase
-                .from("campaign_audience")
-                .delete()
-                .eq("campaign_id", campaignId)
-                .eq("audience_id", audienceId);
-
-            if (error) throw error;
-
-            // Get all contacts that are only in this audience (not in other audiences of this campaign)
-            const { data: campaignAudiences } = await supabase
-                .from('campaign_audience')
-                .select('audience_id')
-                .eq('campaign_id', campaignId);
-
-            const remainingAudienceIds = (campaignAudiences ?? []).map((audience) => audience.audience_id);
-
-            const { data: removedAudienceContacts, error: removedAudienceContactsError } = await supabase
-                .from('contact_audience')
-                .select('contact_id')
-                .eq('audience_id', audienceId);
-
-            if (removedAudienceContactsError) throw removedAudienceContactsError;
-
-            let contactsToRemove = removedAudienceContacts ?? [];
-
-            if (remainingAudienceIds.length > 0 && contactsToRemove.length > 0) {
-                const { data: retainedContacts, error: retainedContactsError } = await supabase
-                    .from("contact_audience")
-                    .select("contact_id")
-                    .in("audience_id", remainingAudienceIds);
-
-                if (retainedContactsError) throw retainedContactsError;
-
-                const retainedContactIds = new Set(
-                    (retainedContacts ?? []).map((contact) => contact.contact_id),
-                );
-                contactsToRemove = contactsToRemove.filter(
-                    (contact) => !retainedContactIds.has(contact.contact_id),
-                );
-            }
-
-            if (contactsToRemove && contactsToRemove.length > 0) {
-                await deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds({
-                    campaignId,
-                    contactIds: contactsToRemove.map((contact) => contact.contact_id),
-                });
-            }
-
-            return routeData({ success: true }, { headers });
-        }
-
-        return routeData({ error: "Method not allowed" }, { status: 405, headers });
-    } catch (error: unknown) {
-        logger.error("Error in campaign_audience action:", error);
-        return routeData(
-            { error: error instanceof Error ? error.message : "An unexpected error occurred" },
-            { status: 500, headers }
+      if (audienceContactIds.length > 0) {
+        const existingContactIds = new Set(
+          await getQueuedContactIdsForCampaign({
+            campaignId,
+            contactIds: audienceContactIds,
+          }),
         );
+        const contactIds = audienceContactIds.filter(
+          (contactId) => !existingContactIds.has(contactId),
+        );
+        skipped = audienceContactIds.length - contactIds.length;
+
+        if (contactIds.length === 0) {
+          return routeData(
+            {
+              success: true,
+              audienceLinked: true,
+              enqueued: 0,
+              skipped,
+            },
+            { headers },
+          );
+        }
+
+        try {
+          await enqueueContactsForCampaign(supabase, campaignId, contactIds, { requeue: false });
+          enqueued = contactIds.length;
+        } catch (enqueueError) {
+          logger.error("Audience linked but queue enqueue failed:", enqueueError);
+          warning =
+            "Audience was linked, but some contacts could not be added to the queue. Refresh and retry queue sync if needed.";
+        }
+      }
+
+      return routeData(
+        {
+          success: true,
+          partial: Boolean(warning),
+          warning,
+          audienceLinked: true,
+          enqueued,
+          skipped,
+        },
+        { headers },
+      );
     }
+
+    if (method === "DELETE") {
+      const { audience_id, campaign_id } = await safeParseJson<{
+        audience_id: string | number;
+        campaign_id: string | number;
+      }>(request);
+      const audienceId = Number(audience_id);
+      const campaignId = Number(campaign_id);
+      if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
+        return routeData({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
+      }
+
+      if (!(await campaignAndAudienceShareWorkspace(campaignId, audienceId))) {
+        return routeData({ error: "Campaign or audience not found" }, { status: 404, headers });
+      }
+
+      await deleteCampaignAudienceLink(campaignId, audienceId);
+
+      const remainingAudienceIds = (await listCampaignAudienceIds(campaignId)).filter(
+        (id) => id !== audienceId,
+      );
+
+      const removedAudienceContactIds = await listContactIdsForAudience(audienceId);
+      let contactsToRemove = removedAudienceContactIds;
+
+      if (remainingAudienceIds.length > 0 && contactsToRemove.length > 0) {
+        const retainedContactIds = new Set(await listContactIdsForAudiences(remainingAudienceIds));
+        contactsToRemove = contactsToRemove.filter(
+          (contactId) => !retainedContactIds.has(contactId),
+        );
+      }
+
+      if (contactsToRemove.length > 0) {
+        await deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds({
+          campaignId,
+          contactIds: contactsToRemove,
+        });
+      }
+
+      return routeData({ success: true }, { headers });
+    }
+
+    return routeData({ error: "Method not allowed" }, { status: 405, headers });
+  } catch (error: unknown) {
+    logger.error("Error in campaign_audience action:", error);
+    return routeData(
+      { error: error instanceof Error ? error.message : "An unexpected error occurred" },
+      { status: 500, headers },
+    );
+  }
 };

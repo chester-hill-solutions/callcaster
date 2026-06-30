@@ -14,7 +14,12 @@ import {
   listAllWorkspacesOrdered,
   listAllWorkspaceUsers,
   listPendingInvitesForUsername,
-  listUserWorkspaceMemberships,
+  listUserWorkspaceMembershipsWithWorkspace,
+  listWorkspaceInvitesEnriched,
+  listAdminWorkspaceUsersWithUser,
+  listWorkspaceNumbersForWorkspace,
+  getWorkspaceWithCampaigns,
+  getWorkspaceById,
   setWorkspaceDisabled,
   updateAdminWorkspaceMemberRole,
   updateUserAccessLevel,
@@ -186,15 +191,11 @@ export async function getAdminUserWorkspaces(
 
   const [allWorkspaces, membershipRows, pendingInviteRows] = await Promise.all([
     listAllWorkspacesOrdered(),
-    listUserWorkspaceMemberships(userId),
+    listUserWorkspaceMembershipsWithWorkspace(userId),
     listPendingInvitesForUsername(userResult.user.username),
   ]);
 
-  const workspaceById = new Map(allWorkspaces.map((row) => [row.id, row]));
-  const userWorkspaces = membershipRows.map((membership) => ({
-    ...membership,
-    workspace: workspaceById.get(membership.workspace_id) ?? null,
-  }));
+  const userWorkspaces = membershipRows;
   const pendingInvites = pendingInviteRows.map((row) => ({
     ...row.invite,
     workspace: row.workspace,
@@ -288,4 +289,65 @@ export async function cancelWorkspaceInviteAdmin(
       error: error instanceof Error ? error.message : "Failed to cancel invite",
     };
   }
+}
+
+export async function getAdminWorkspaceDetail(
+  _supabaseClient: Supabase,
+  workspaceId: string,
+) {
+  const workspace = await getWorkspaceWithCampaigns(workspaceId);
+  if (!workspace) {
+    return { ok: false as const, error: "Workspace not found", status: 404 };
+  }
+
+  const [workspaceUsers, phoneNumbers] = await Promise.all([
+    listAdminWorkspaceUsersWithUser(workspaceId),
+    listWorkspaceNumbersForWorkspace(workspaceId),
+  ]);
+
+  return {
+    ok: true as const,
+    workspace,
+    workspaceUsers,
+    phoneNumbers,
+  };
+}
+
+export async function loadAdminWorkspaceInvitePage(
+  workspaceId: string,
+  activeUserId: string,
+) {
+  const workspace = await getWorkspaceById(workspaceId);
+  if (!workspace) {
+    return { ok: false as const, error: "Workspace not found", status: 404 };
+  }
+
+  const [workspaceUsers, pendingInvites] = await Promise.all([
+    listAdminWorkspaceUsersWithUser(workspaceId),
+    listWorkspaceInvitesEnriched(workspaceId),
+  ]);
+
+  const users = workspaceUsers
+    .filter((member) => member.user != null)
+    .map((member) => ({
+      id: member.user!.id,
+      username: member.user!.username,
+      first_name: member.user!.first_name,
+      last_name: member.user!.last_name,
+      role: member.role,
+    }));
+
+  const activeMembership = workspaceUsers.find((member) => member.user_id === activeUserId);
+  const userRole = activeMembership?.role ?? null;
+  const hasAccess = userRole === "admin" || userRole === "owner";
+
+  return {
+    ok: true as const,
+    workspace: { id: workspace.id, name: workspace.name },
+    userRole,
+    users,
+    activeUserId,
+    pendingInvites,
+    hasAccess,
+  };
 }

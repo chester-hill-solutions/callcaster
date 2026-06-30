@@ -20,7 +20,7 @@ import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server"
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -118,11 +118,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (actionName === "run_billing_reconciliation") {
         try {
-            const { data: workspace } = await supabaseClient
-              .from("workspace")
-              .select("twilio_data")
-              .eq("id", workspaceId)
-              .single();
+            const workspace = await getWorkspaceById(workspaceId);
 
             const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
             if (!creds?.sid) {

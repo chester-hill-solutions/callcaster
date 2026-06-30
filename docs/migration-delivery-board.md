@@ -14,7 +14,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 |--------|------:|------|
 | Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
 | `app/lib/database/*.server.ts` on tenant-db | **8 / 13** | G2 |
-| App `supabase.from()` call sites in `app/` | **200** `.from("…")` in **97** files (admin routes, telephony API, hooks/realtime; server call-log/billing/onboarding on Drizzle) | G2 |
+| App `supabase.from()` call sites in `app/` | **153** `.from("…")` in **81** files (telephony API, hooks/realtime, create-with-script; **admin/** fully on Drizzle) | G2 |
 | `database.types` imports in `app/` | **162 files** | G2 (delete at exit) |
 | Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
 | E2E on review URL | Not run | G4 |
@@ -102,7 +102,7 @@ Inventory: [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventor
 | 2.12 | Delete `database.types.ts` | Todo | ~162 imports remain |
 | 2.13 | E2E factories → Drizzle | Todo | `e2e/fixtures/factories.ts` still references subtype tables |
 
-**Progress:** **9 done** · **3 in progress** · 1 todo (of 13 modules) · 162 `database.types` imports · **200** PostgREST `.from("…")` sites remain
+**Progress:** **9 done** · **3 in progress** · 1 todo (of 13 modules) · 162 `database.types` imports · **153** PostgREST `.from("…")` sites remain
 
 ---
 
@@ -202,11 +202,11 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **WS-B admin routes** — `admin+/route.loader`, users/workspaces loaders/actions → `workspace-members-db` + `adminDb`
-2. **WS-B telephony API stragglers** — `call.action`, `sms.action`, `inbound*`, IVR routes still PostgREST-heavy
-3. **WS-B 2.6** — Edge Function transaction-history paths (or document supabase fallback as intentional until Phase 3D)
+1. **WS-B telephony API** — `create-with-script`, `inbound*`, `sms/status`, `call.action` (largest remaining counts)
+2. **WS-B workspace route stragglers** — contacts, analytics, settings/numbers loaders
+3. **WS-B 2.6** — Edge Function transaction-history paths (app paths on Drizzle RPC)
 4. **WS-B 2.8** — Finish `workspace-twilio-sync` module
-5. **WS-B 2.11** — UI/hooks type cleanup (`database.types` drift); pre-existing typecheck failures in campaign-settings/contacts loaders
+5. **WS-B 2.11** — UI/hooks type cleanup; pre-existing typecheck drift in loaders
 
 ---
 
@@ -228,3 +228,5 @@ gantt
 | 2026-06-29 | agent | Plan sync: queue + survey ports reflected; metrics **308** PostgREST sites / **122** files / **162** `database.types` imports |
 | 2026-06-29 | agent | Platform/members batch: `workspace-members-db`, `platform-admin`, `platform-members`, settings utils; survey stragglers done |
 | 2026-06-29 | agent | Call-log + billing + onboarding persistence on Drizzle; `root.loader` + accept-invite on `workspace-members-db`; metrics **200** / **97** files |
+| 2026-06-29 | agent | `admin+/route` loader/action + `requireSudoAdmin` → `platform-admin` / `getUserById`; metrics **190** / **94** files |
+| 2026-06-29 | agent | Full **admin/** tree on Drizzle; `campaign-audience-db`, `campaign_audience` API, `platform-telephony` handset/campaign reads; metrics **153** / **81** files |

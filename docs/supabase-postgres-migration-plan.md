@@ -16,7 +16,7 @@
 | **0** — Ledger audit & local stack | **Done** | Ledger 34/34 on Railway `PostgreSQL 18` |
 | **1** — Schema transform | **Mostly applied** | 01–05, 08, 08b, 10 on review; baseline dumped; **06/07/09** pending (SSE/worker) |
 | **1D** — Scriptkit packages | Not started | CHS monorepo upstream |
-| **2** — Drizzle port | **In progress** | **9/13** modules done; **200** PostgREST `.from("…")` sites in **97** files remain (admin routes, telephony API, hooks/realtime) |
+| **2** — Drizzle port | **In progress** | **9/13** modules done; **153** PostgREST `.from("…")` sites in **81** files remain (telephony API, hooks/realtime, create-with-script) |
 | **3** — Staging stack (3A–3F) | Not started | **3D partial** — Remix sms-status live; Edge IVR unified `campaign` select |
 | **4** — Staging gate | Blocked | Requires Phases 2–3 |
 | **5** — Prod big-bang | Blocked | Requires Phase 4 |
@@ -101,7 +101,7 @@
 **Remaining (G2 exit):**
 
 - ~**162** `database.types` imports; delete [`database.types.ts`](app/lib/database.types.ts) last
-- **200** PostgREST `.from("…")` call sites across **97** `app/` modules (heavy: admin routes, telephony API routes, realtime hooks, audience-upload storage paths)
+- **153** PostgREST `.from("…")` call sites across **81** `app/` modules (heavy: telephony API routes, `create-with-script`, realtime hooks, workspace loaders)
 - **Server `campaign_queue` reads/writes:** Drizzle via [`campaign-queue-db.server.ts`](app/lib/campaign-queue-db.server.ts) — only [`useSupabaseRealtime.ts`](app/hooks/realtime/useSupabaseRealtime.ts) still PostgREST on `campaign_queue` (Phase 3B SSE)
 - **Enqueue/dequeue RPCs** (`dequeue_contact`, `select_and_update_campaign_contacts`, `enqueueContactsForCampaign`, …) stay Supabase until worker/RPC wrappers land
 - **Survey server PostgREST:** done — [`survey-db.server.ts`](app/lib/survey-db.server.ts)
@@ -269,7 +269,7 @@ Apply via [`scripts/schema-transform/apply-all.sh`](../scripts/schema-transform/
 | 2.12 | Delete `database.types.ts` | Todo — ~162 imports |
 | 2.13 | E2E factories → Drizzle | Todo |
 
-**Metrics:** 9/13 modules done · **200** PostgREST `.from("…")` sites in **97** files · **162** `database.types` imports (not zero)
+**Metrics:** 9/13 modules done · **153** PostgREST `.from("…")` sites in **81** files · **162** `database.types` imports (not zero)
 
 ### Sprint 2 telephony + messaging helpers
 
@@ -292,8 +292,8 @@ Shared modules introduced during dial/messaging port (use these patterns for rem
 
 ### Remaining port order
 
-1. **Admin routes** — `admin+/route.loader`, users/workspaces loaders/actions → `adminDb` / `workspace-members-db`
-2. **Telephony API stragglers** — `call.action`, `sms.action`, `inbound*`, IVR routes
+1. **Telephony API** — `create-with-script` (7), `inbound-verification` (5), `sms/status`, `call.action`, `inbound.action`
+2. **Workspace route stragglers** — contacts, analytics, settings/numbers loaders
 3. **2.6 Billing** — Edge Function transaction-history paths (app paths on Drizzle RPC)
 4. **2.8 Twilio sync** — `workspace-twilio-sync.server.ts`
 5. **2.11 UI types** — Drizzle row types vs `database.types` drift in loaders/components

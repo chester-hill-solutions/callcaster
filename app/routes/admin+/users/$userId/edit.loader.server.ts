@@ -1,40 +1,23 @@
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAdminUser } from "@/lib/platform-admin.server";
+import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const { supabaseClient, userData } = await requireSudoAdmin(request);
+  const userId = params.userId;
 
-    const { supabaseClient, user } = await verifyAuth(request);
+  if (!userId) {
+    throw redirect("/admin?tab=users");
+  }
 
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+  const result = await getAdminUser(supabaseClient, userId);
+  if (!result.ok) {
+    throw redirect("/admin?tab=users");
+  }
 
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const userId = params.userId;
-    
-    if (!userId) {
-        throw redirect("/admin?tab=users");
-    }
-
-    // Get the user to edit
-    const { data: targetUser } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-    if (!targetUser) {
-        throw redirect("/admin?tab=users");
-    }
-
-    return routeData({ 
-        currentUser: userData,
-        targetUser
-    });
-}
+  return routeData({
+    currentUser: userData,
+    targetUser: result.user,
+  });
+};

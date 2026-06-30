@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { and, eq, gt } from "drizzle-orm";
 import { checkSchedule, getHandsetNumberForWorkspace, getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import { findCampaignById } from "@/lib/campaign-audience-db.server";
 import {
   getCallScreenData,
   getInitialCallsList,
@@ -17,9 +19,8 @@ import {
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import type { Database } from "@/lib/database.types";
 import { resolveContactWorkspaceIdFromQueue } from "@/lib/campaign-queue-db.server";
-import { campaign as campaignTable } from "@/db/schema";
-import { db } from "@/server/db";
-import { eq } from "drizzle-orm";
+import { handset_session as handsetSessionTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { generateToken } from "@/lib/twilio-token.server";
 import { releaseAssignedQueueForUser } from "@/lib/queue-status";
@@ -38,7 +39,6 @@ export async function getWorkspaceCallLogApi(
   requestUrl: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -57,21 +57,20 @@ async function loadListeningState(
   userId: string,
 ) {
   const { data: handsetData } = await getHandsetNumberForWorkspace({
-    supabaseClient,
     workspaceId,
   });
   const handsetNumber = handsetData?.phone_number ?? null;
   const now = new Date().toISOString();
-  const { data: session } = await supabaseClient
-    .from("handset_session")
-    .select("client_identity")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .gt("expires_at", now)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const tdb = createTenantDb(workspaceId);
+  const session = await tdb.handset_session.findFirst({
+    where: and(
+      eq(handsetSessionTable.user_id, userId),
+      eq(handsetSessionTable.status, "active"),
+      gt(handsetSessionTable.expires_at, now),
+    ),
+    columns: { client_identity: true },
+    orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
+  });
 
   if (!session?.client_identity) {
     return {
@@ -102,7 +101,6 @@ export async function startCallListeningApi(
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user,
     workspaceId,
   });
@@ -138,7 +136,6 @@ export async function stopCallListeningApi(
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -153,7 +150,6 @@ export async function getHandsetSessionApi(
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -172,7 +168,6 @@ export async function deleteHandsetSessionApi(
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -186,19 +181,14 @@ export async function getCampaignCallSessionApi(
   userId: string,
   campaignId: string,
 ) {
-  const { data: campaignRow, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select("id, workspace, dial_type, title, status, schedule")
-    .eq("id", Number(campaignId))
-    .single();
+  const campaignRow = await findCampaignById(Number(campaignId));
 
-  if (campaignError || !campaignRow || !campaignRow.workspace) {
+  if (!campaignRow?.workspace) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
   const workspaceId = campaignRow.workspace;
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -264,19 +254,13 @@ export async function releaseCampaignCallSessionApi(
   userId: string,
   campaignId: string,
 ) {
-  const { data: campaignRow, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select("id, workspace")
-    .eq("id", Number(campaignId))
-    .single();
+  const workspaceId = await resolveCampaignWorkspaceId(supabaseClient, campaignId);
 
-  if (campaignError || !campaignRow || !campaignRow.workspace) {
+  if (!workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
-  const workspaceId = campaignRow.workspace;
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -299,12 +283,7 @@ export async function resolveCampaignWorkspaceId(
   _supabaseClient: SupabaseClient<Database>,
   campaignId: string | number,
 ) {
-  const [row] = await db
-    .select({ workspace: campaignTable.workspace })
-    .from(campaignTable)
-    .where(eq(campaignTable.id, Number(campaignId)))
-    .limit(1);
-
+  const row = await findCampaignById(Number(campaignId));
   return row?.workspace ?? null;
 }
 

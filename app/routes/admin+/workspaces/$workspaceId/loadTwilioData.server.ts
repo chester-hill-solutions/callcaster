@@ -10,6 +10,7 @@ import {
   type BillingReconciliationSnapshot,
 } from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
@@ -76,11 +77,7 @@ export async function loadTwilioData(
   });
 
   try {
-    const { data: workspace } = await supabaseClient
-      .from("workspace")
-      .select("*")
-      .eq("id", workspaceId)
-      .single();
+    const workspace = await getWorkspaceById(workspaceId);
 
     const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
     billingReconciliationSnapshot = getWorkspaceBillingReconciliationSnapshot(

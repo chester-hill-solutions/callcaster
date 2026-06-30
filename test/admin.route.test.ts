@@ -3,94 +3,56 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  verifyAuth: vi.fn(),
-  syncWorkspaceTwilioSnapshot: vi.fn(),
+  requireSudoAdmin: vi.fn(),
+  syncWorkspaceTwilio: vi.fn(),
+  toggleWorkspaceStatus: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
-  }),
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+vi.mock("../app/routes/admin+/requireSudoAdmin.server", () => ({
+  requireSudoAdmin: (...args: unknown[]) => mocks.requireSudoAdmin(...args),
 }));
 
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual("../app/lib/database.server");
-  return {
-    ...actual,
-    syncWorkspaceTwilioSnapshot: (...args: any[]) => mocks.syncWorkspaceTwilioSnapshot(...args),
-  };
-});
-
-function makeSupabase() {
-  const workspaceUpdateEq = vi.fn(async () => ({ error: null }));
-  const workspaceUpdate = vi.fn(() => ({ eq: workspaceUpdateEq }));
-
-  return {
-    from: vi.fn((table: string) => {
-      if (table === "user") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: vi.fn(async () => ({
-                data: { id: "u1", access_level: "sudo", username: "sudo@example.com" },
-                error: null,
-              })),
-            }),
-          }),
-        };
-      }
-
-      if (table === "workspace") {
-        return {
-          update: workspaceUpdate,
-        };
-      }
-
-      throw new Error(`Unexpected table: ${table}`);
-    }),
-    _spies: { workspaceUpdateEq },
-  };
-}
+vi.mock("@/lib/platform-admin.server", () => ({
+  syncWorkspaceTwilio: (...args: unknown[]) => mocks.syncWorkspaceTwilio(...args),
+  toggleWorkspaceStatus: (...args: unknown[]) => mocks.toggleWorkspaceStatus(...args),
+  disableUser: vi.fn(),
+  syncAllWorkspacesTwilio: vi.fn(),
+  getAdminDashboard: vi.fn(),
+}));
 
 describe("app/routes/admin+.tsx action", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.verifyAuth.mockReset();
-    mocks.syncWorkspaceTwilioSnapshot.mockReset();
+    mocks.requireSudoAdmin.mockReset();
+    mocks.syncWorkspaceTwilio.mockReset();
+    mocks.toggleWorkspaceStatus.mockReset();
+    mocks.requireSudoAdmin.mockResolvedValue({
+      supabaseClient: {},
+      user: { id: "u1" },
+      userData: { id: "u1", access_level: "sudo" },
+    });
   });
 
   test("sync_workspace_twilio runs direct sync helper", async () => {
-    const supabaseClient = makeSupabase();
-    mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
-      user: { id: "u1" },
-    });
-    mocks.syncWorkspaceTwilioSnapshot.mockResolvedValueOnce({});
+    mocks.syncWorkspaceTwilio.mockResolvedValueOnce({ ok: true });
 
     const mod = await import("../app/routes/admin+/route");
     const formData = new FormData();
     formData.set("_action", "sync_workspace_twilio");
     formData.set("workspaceId", "w1");
 
-    const res = await asRouteResponse(await mod.action({
-      request: new Request("http://x", { method: "POST", body: formData }),
-    } as any));
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: formData }),
+      } as any),
+    );
 
     expect(res.status).toBe(200);
-    expect(mocks.syncWorkspaceTwilioSnapshot).toHaveBeenCalledWith({
-      supabaseClient,
-      workspaceId: "w1",
-    });
+    expect(mocks.syncWorkspaceTwilio).toHaveBeenCalledWith({}, "w1");
   });
 
   test("toggle_workspace_status updates workspace disabled flag", async () => {
-    const supabaseClient = makeSupabase();
-    mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
-      user: { id: "u1" },
-    });
+    mocks.toggleWorkspaceStatus.mockResolvedValueOnce({ ok: true });
 
     const mod = await import("../app/routes/admin+/route");
     const formData = new FormData();
@@ -98,11 +60,13 @@ describe("app/routes/admin+.tsx action", () => {
     formData.set("workspaceId", "w2");
     formData.set("currentStatus", "false");
 
-    const res = await asRouteResponse(await mod.action({
-      request: new Request("http://x", { method: "POST", body: formData }),
-    } as any));
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: formData }),
+      } as any),
+    );
 
     expect(res.status).toBe(200);
-    expect(supabaseClient._spies.workspaceUpdateEq).toHaveBeenCalledWith("id", "w2");
+    expect(mocks.toggleWorkspaceStatus).toHaveBeenCalledWith({}, "w2", true);
   });
 });

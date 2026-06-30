@@ -1,39 +1,22 @@
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { getAdminWorkspaceDetail } from "@/lib/platform-admin.server";
+import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const { supabaseClient } = await requireSudoAdmin(request);
+  const workspaceId = params.workspaceId;
 
-    const { supabaseClient, user } = await verifyAuth(request);
+  if (!workspaceId) {
+    throw redirect("/admin?tab=workspaces");
+  }
 
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+  const result = await getAdminWorkspaceDetail(supabaseClient, workspaceId);
+  if (!result.ok) {
+    throw redirect("/admin?tab=workspaces");
+  }
 
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const workspaceId = params.workspaceId;
-    
-    if (!workspaceId) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    // Get workspace details with campaigns
-    const { data: workspace } = await supabaseClient
-        .from("workspace")
-        .select("*, campaign(*)")
-        .eq("id", workspaceId)
-        .single();
-
-    if (!workspace) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    return routeData({ 
-        workspace
-    });
-}
+  return routeData({
+    workspace: result.workspace,
+  });
+};
