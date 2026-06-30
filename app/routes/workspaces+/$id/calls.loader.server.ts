@@ -6,8 +6,10 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import type { User } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import { and, eq, gt } from "drizzle-orm";
+import { handset_session as handsetSessionTable, workspace as workspaceTable } from "@/db/schema";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb } from "@/server/tenant-db";
 
 const EMPTY_LISTENING = {
   active: false,
@@ -16,26 +18,25 @@ const EMPTY_LISTENING = {
 } as const;
 
 async function loadIncomingListeningState(args: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient: Parameters<typeof createHandsetAccessToken>[0]["supabaseClient"];
   workspaceId: string;
   userId: string;
 }) {
+  const tdb = createTenantDb(args.workspaceId);
   const { data: handsetData } = await getHandsetNumberForWorkspace({
-    supabaseClient: args.supabaseClient,
     workspaceId: args.workspaceId,
   });
   const handsetNumber = handsetData?.phone_number ?? null;
   const now = new Date().toISOString();
-  const { data: session } = await args.supabaseClient
-    .from("handset_session")
-    .select("client_identity")
-    .eq("workspace_id", args.workspaceId)
-    .eq("user_id", args.userId)
-    .eq("status", "active")
-    .gt("expires_at", now)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const session = await tdb.handset_session.findFirst({
+    where: and(
+      eq(handsetSessionTable.user_id, args.userId),
+      eq(handsetSessionTable.status, "active"),
+      gt(handsetSessionTable.expires_at, now),
+    ),
+    columns: { client_identity: true },
+    orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
+  });
 
   if (!session?.client_identity) {
     return {
@@ -141,25 +142,27 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
   }
 
-  const [{ data: workspace, error: workspaceError }, { data: campaigns, error: campaignsError }] =
-    await Promise.all([
-      supabaseClient
-        .from("workspace")
-        .select("id, name, credits")
-        .eq("id", workspaceId)
-        .single(),
-      supabaseClient
-        .from("campaign")
-        .select("id, title, status")
-        .eq("workspace", workspaceId)
-        .order("created_at", { ascending: false }),
-    ]);
+  const tdb = createTenantDb(workspaceId);
+  const [workspaceRow, campaigns] = await Promise.all([
+    adminDb
+      .select({
+        id: workspaceTable.id,
+        name: workspaceTable.name,
+        credits: workspaceTable.credits,
+      })
+      .from(workspaceTable)
+      .where(eq(workspaceTable.id, workspaceId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+    tdb.campaign.findMany({
+      columns: { id: true, title: true, status: true },
+      orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
+    }),
+  ]);
 
-  if (campaignsError) {
-    logger.error("Failed to load campaigns for call log nav:", campaignsError);
-  }
+  const workspace = workspaceRow;
 
-  if (workspaceError || !workspace) {
+  if (!workspace) {
     return routeData(
       {
         rows: [],
@@ -191,7 +194,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const [callLog, incomingState] = await Promise.all([
       loadCallLogPage({
-        supabaseClient,
         workspaceId,
         requestUrl: request.url,
       }),

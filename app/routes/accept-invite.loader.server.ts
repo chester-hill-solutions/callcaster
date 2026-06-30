@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
 import { getInvitesByUserId } from "@/lib/database.server";
+import { listUserInvitesWithWorkspace } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import type {
   EmailOtpType,
@@ -11,40 +12,12 @@ import type {
 import type {
   ExistingUserInvite,
   LoaderData,
-  RawInviteWithWorkspace,
   WorkspaceInviteRow,
 } from "./accept-invite.types";
-import type { Database } from "@/lib/database.types";
 import type { LoaderFunctionArgs } from "react-router";
 
-async function fetchInvitesWithWorkspace(
-  client: SupabaseClient<Database>,
-  userId: string,
-): Promise<ExistingUserInvite[]> {
-  const { data, error } = await client
-    .from("workspace_invite")
-    .select(`*, workspace(id, name)`)
-    .eq("user_id", userId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const invitesWithWorkspace = (data ?? []) as RawInviteWithWorkspace[];
-
-  return invitesWithWorkspace
-    .filter(
-      (invite): invite is RawInviteWithWorkspace & {
-        workspace: NonNullable<RawInviteWithWorkspace["workspace"]>;
-      } => invite.workspace !== null,
-    )
-    .map((invite) => ({
-      ...invite,
-      workspace: {
-        id: invite.workspace.id,
-        name: invite.workspace.name ?? "Unnamed workspace",
-      },
-    }));
+async function fetchInvitesWithWorkspace(userId: string): Promise<ExistingUserInvite[]> {
+  return listUserInvitesWithWorkspace(userId);
 }
 
 async function handleAuthenticatedUser(
@@ -71,7 +44,7 @@ async function handleAuthenticatedUser(
     );
   }
 
-  const invites = await fetchInvitesWithWorkspace(client, session.user.id);
+  const invites = await fetchInvitesWithWorkspace(session.user.id);
 
   return routeData<LoaderData>(
     {
@@ -144,7 +117,7 @@ async function handleTokenVerification(
       );
     }
 
-    const invites = await fetchInvitesWithWorkspace(client, sessionData.user.id);
+    const invites = await fetchInvitesWithWorkspace(sessionData.user.id);
 
     return routeData<LoaderData>(
       {

@@ -2,6 +2,14 @@ import { parseCSV } from "@/lib/csv";
 import { logger } from "@/lib/logger.server";
 import type { Database, Tables } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
+import {
+  audience as audienceTable,
+  audience_upload as audienceUploadTable,
+  contact_audience as contactAudienceTable,
+} from "@/db/schema";
+import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 
 interface StorageBucket {
   id: string;
@@ -101,6 +109,8 @@ export const processAudienceUpload = async (
     created_at: new Date().toISOString()
   };
 
+  const tdb = createTenantDb(workspaceId);
+
   try {
     // First verify the bucket exists
     const { data: buckets, error: bucketError } = await supabaseClient.storage
@@ -151,12 +161,10 @@ export const processAudienceUpload = async (
     }
 
     // Update total contacts count
-    await supabaseClient
-      .from("audience_upload")
-      .update({
-        total_contacts: parsedContacts.length
-      })
-      .eq("id", uploadId);
+    await tdb.audience_upload.update({
+      set: { total_contacts: parsedContacts.length },
+      where: eq(audienceUploadTable.id, uploadId),
+    });
 
     // Process contacts in chunks
     const CHUNK_SIZE = 100;
@@ -249,41 +257,28 @@ export const processAudienceUpload = async (
       }
 
       // Insert contacts
-      const { data: insertedContacts, error: insertError } = await supabaseClient
-        .from("contact")
-        .insert(mappedContacts as unknown as Partial<Tables<"contact">>[])
-        .select('id, firstname, surname, other_data');
+      const insertedContacts = await tdb.contact.insertMany(
+        mappedContacts.map((contact) => ({
+          ...contact,
+          other_data: contact.other_data ?? [],
+          created_at: new Date().toISOString(),
+        })) as Record<string, unknown>[],
+      );
 
-      if (insertError) {
-        const firstMappedContact = mappedContacts[0];
-        logger.error("Insert error details:", {
-          error: insertError,
-          firstContact: firstMappedContact,
-          mappingUsed: headerMapping,
-          sampleData: {
-            workspace: workspaceId,
-            created_by: userId,
-            mappedFields: firstMappedContact ? Object.keys(firstMappedContact) : []
-          }
-        });
-        throw new Error(`Error inserting contacts: ${insertError.message}`);
+      if (insertedContacts.length === 0) {
+        throw new Error("Error inserting contacts: no rows returned");
       }
 
       logger.debug('Inserted contacts sample:', insertedContacts[0]);
 
       // Link contacts to audience
-      const { error: linkError } = await supabaseClient
-        .from("contact_audience")
-        .insert(
-          insertedContacts.map((contact: { id: number }) => ({
-            contact_id: contact.id,
-            audience_id: audienceId
-          }))
-        );
-
-      if (linkError) {
-        throw new Error(`Error linking contacts to audience: ${linkError.message}`);
-      }
+      await db.insert(contactAudienceTable).values(
+        insertedContacts.map((contact) => ({
+          contact_id: contact.id,
+          audience_id: audienceId,
+          created_at: new Date().toISOString(),
+        })),
+      );
 
       // Update progress
       processedCount += chunk.length;
@@ -299,35 +294,34 @@ export const processAudienceUpload = async (
         }), { upsert: true });
 
       // Update upload record
-      await supabaseClient
-        .from("audience_upload")
-        .update({
+      await tdb.audience_upload.update({
+        set: {
           processed_contacts: processedCount,
-          status: "processing"
-        })
-        .eq("id", uploadId);
+          status: "processing",
+        },
+        where: eq(audienceUploadTable.id, uploadId),
+      });
 
       // Small delay to prevent overwhelming the database
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     // Update audience status
-    await supabaseClient
-      .from("audience")
-      .update({
+    await tdb.audience.update({
+      set: {
         status: "active",
-        total_contacts: processedCount
-      })
-      .eq("id", audienceId);
+        total_contacts: processedCount,
+      },
+      where: eq(audienceTable.id, audienceId),
+    });
 
-    // Update upload status to completed
-    await supabaseClient
-      .from("audience_upload")
-      .update({
+    await tdb.audience_upload.update({
+      set: {
         status: "completed",
-        processed_at: new Date().toISOString()
-      })
-      .eq("id", uploadId);
+        processed_at: new Date().toISOString(),
+      },
+      where: eq(audienceUploadTable.id, uploadId),
+    });
 
     // Update final status file
     await supabaseClient.storage
@@ -343,22 +337,21 @@ export const processAudienceUpload = async (
     logger.error("Upload processing error:", error);
     
     // Update audience status to error
-    await supabaseClient
-      .from("audience")
-      .update({
+    await tdb.audience.update({
+      set: {
         status: "error",
-        error_message: error instanceof Error ? error.message : "Unknown error"
-      })
-      .eq("id", audienceId);
+        error_message: error instanceof Error ? error.message : "Unknown error",
+      },
+      where: eq(audienceTable.id, audienceId),
+    });
 
-    // Update upload status to error
-    await supabaseClient
-      .from("audience_upload")
-      .update({
+    await tdb.audience_upload.update({
+      set: {
         status: "error",
-        error_message: error instanceof Error ? error.message : "Unknown error"
-      })
-      .eq("id", uploadId);
+        error_message: error instanceof Error ? error.message : "Unknown error",
+      },
+      where: eq(audienceUploadTable.id, uploadId),
+    });
 
     // Update status file
     await supabaseClient.storage

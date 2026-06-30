@@ -1,8 +1,18 @@
 import { data as routeData, redirect } from "react-router";
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Tables } from "../database.types";
+import type { Database } from "../database.types";
 import { getWorkspaceUsers } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import {
+  deleteWorkspaceById,
+  findUserIdByUsername,
+  findWorkspaceInviteForUser,
+  removeWorkspaceInviteForUser,
+  removeWorkspaceMemberRow,
+  transferWorkspaceOwnership,
+  updateWorkspaceMemberRoleRow,
+  upsertWorkspaceWebhookRow,
+} from "@/lib/workspace-members-db.server";
 
 export async function handleAddUser(
   formData: FormData,
@@ -27,20 +37,10 @@ export async function handleAddUser(
     return routeData({ user: null, error: "This user is already an agent in the workspace." }, 403);
   }
 
-  const { data: existingUser } = await supabaseClient
-    .from("user")
-    .select("id")
-    .eq("username", cleanedName)
-    .maybeSingle();
+  const existingUserId = await findUserIdByUsername(cleanedName);
 
-  if (existingUser?.id) {
-    const { data: pendingInvite } = await supabaseClient
-      .from("workspace_invite")
-      .select("id")
-      .eq("workspace", workspaceId)
-      .eq("user_id", existingUser.id)
-      .maybeSingle();
-
+  if (existingUserId) {
+    const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
     if (pendingInvite) {
       return routeData(
         {
@@ -63,13 +63,8 @@ export async function handleAddUser(
       },
     });
   if (inviteUserError) {
-    if (existingUser?.id) {
-      const { data: pendingInvite } = await supabaseClient
-        .from("workspace_invite")
-        .select("id")
-        .eq("workspace", workspaceId)
-        .eq("user_id", existingUser.id)
-        .maybeSingle();
+    if (existingUserId) {
+      const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
       if (pendingInvite) {
         return routeData(
           {
@@ -86,53 +81,61 @@ export async function handleAddUser(
   }
   return routeData({ data: user, error: null, success: true }, { headers });
 }
+
 export async function handleUpdateUser(
   formData: FormData,
   workspaceId: string,
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
   const updatedWorkspaceRole = formData.get("updated_workspace_role") as string;
-  const { data: updatedUser, error: errorUpdatingUser } = await supabaseClient
-    .from("workspace_users")
-    .update({ role: updatedWorkspaceRole as "owner" | "member" | "caller" | "admin" | undefined })
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .select()
-    .single();
-
-  return routeData(
-    { data: updatedUser, error: errorUpdatingUser?.message },
-    { headers },
-  );
+  try {
+    const updatedUser = await updateWorkspaceMemberRoleRow({
+      workspaceId,
+      userId,
+      role: updatedWorkspaceRole as "owner" | "member" | "caller" | "admin",
+    });
+    return routeData({ data: updatedUser, error: null }, { headers });
+  } catch (error) {
+    return routeData(
+      {
+        data: null,
+        error: error instanceof Error ? error.message : "Failed to update user",
+      },
+      { headers },
+    );
+  }
 }
 
 export async function handleDeleteUser(
   formData: FormData,
   workspaceId: string,
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
-  const { data: deletedUser, error: errorDeletingUser } = await supabaseClient
-    .from("workspace_users")
-    .delete()
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .select()
-    .single();
-
-  return routeData(
-    { data: deletedUser, error: errorDeletingUser?.message },
-    { headers },
-  );
+  try {
+    const deletedUser = await removeWorkspaceMemberRow({ workspaceId, userId });
+    return routeData(
+      { data: deletedUser, error: deletedUser ? null : "User not found" },
+      { headers },
+    );
+  } catch (error) {
+    return routeData(
+      {
+        data: null,
+        error: error instanceof Error ? error.message : "Failed to delete user",
+      },
+      { headers },
+    );
+  }
 }
 
 export async function handleDeleteSelf(
   formData: FormData,
   workspaceId: string,
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
@@ -140,113 +143,83 @@ export async function handleDeleteSelf(
     return routeData({ error: `User ${userId} not found` }, { headers });
   }
 
-  const { data: deletedSelf, error: errorDeletingSelf } = await supabaseClient
-    .from("workspace_users")
-    .delete()
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .select()
-    .single();
-  if (errorDeletingSelf) {
+  try {
+    await removeWorkspaceMemberRow({ workspaceId, userId });
+    return redirect("/workspaces", { headers });
+  } catch (errorDeletingSelf) {
     logger.error("Error deleting current user from workspace", errorDeletingSelf);
-    return { data: null, error: errorDeletingSelf.message };
+    return {
+      data: null,
+      error: errorDeletingSelf instanceof Error ? errorDeletingSelf.message : "Delete failed",
+    };
   }
-
-  return redirect("/workspaces", { headers });
 }
 
 export async function handleTransferWorkspace(
   formData: FormData,
   workspaceId: string,
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const currentOwnerUserId = formData.get("workspace_owner_id") as string;
   const newOwnerUserId = formData.get("user_id") as string;
-  const { data: updatedNewOwner, error: errorUpdatingNewOwner } =
-    await supabaseClient
-      .from("workspace_users")
-      .update({ role: "owner" })
-      .eq("workspace_id", workspaceId)
-      .eq("user_id", newOwnerUserId)
-      .select()
-      .single();
-
-  if (errorUpdatingNewOwner) {
-    return routeData({ error: errorUpdatingNewOwner.message }, { headers });
+  try {
+    const { previousOwner } = await transferWorkspaceOwnership({
+      workspaceId,
+      currentOwnerUserId,
+      newOwnerUserId,
+    });
+    return routeData({ data: previousOwner, error: null }, { headers });
+  } catch (error) {
+    return routeData(
+      { error: error instanceof Error ? error.message : "Transfer failed" },
+      { headers },
+    );
   }
-
-  const { data: updatedCurrentOwner, error: errorUpdatingCurrentOwner } =
-    await supabaseClient
-      .from("workspace_users")
-      .update({ role: "admin" })
-      .eq("workspace_id", workspaceId)
-      .eq("user_id", currentOwnerUserId)
-      .select()
-      .single();
-
-  if (errorUpdatingCurrentOwner) {
-    return routeData({ error: errorUpdatingCurrentOwner.message }, { headers });
-  }
-
-  return routeData(
-    { data: updatedCurrentOwner, error: errorUpdatingCurrentOwner },
-    { headers },
-  );
 }
 
 export async function handleDeleteWorkspace({
   workspaceId,
-  supabaseClient,
-  headers,
 }: {
   workspaceId: string;
   supabaseClient: SupabaseClient<Database>;
   headers: Headers;
 }) {
-  const { data: deleteWorkspaceData, error: deleteWorkspaceError } =
-    await supabaseClient
-      .from("workspace")
-      .delete()
-      .eq("id", workspaceId)
-      .select();
-
-  if (deleteWorkspaceError) {
+  try {
+    await deleteWorkspaceById(workspaceId);
+    return redirect("/workspaces");
+  } catch (deleteWorkspaceError) {
     logger.error("Error deleting workspace: ", deleteWorkspaceError);
-    return { data: null, error: deleteWorkspaceError };
+    return {
+      data: null,
+      error: deleteWorkspaceError instanceof Error ? deleteWorkspaceError.message : deleteWorkspaceError,
+    };
   }
-
-  return redirect("/workspaces");
 }
 
 export async function removeInvite({
   workspaceId,
-  supabaseClient,
   formData,
-  headers,
 }: {
   workspaceId: string;
   supabaseClient: SupabaseClient<Database>;
   formData: FormData;
   headers: Headers;
 }) {
-  const userId = formData.get("userId");
-  const { data, error } = await supabaseClient
-    .from("workspace_invite")
-    .delete()
-    .eq("workspace", workspaceId)
-    .eq("user_id", userId as string);
-  if (error) {
+  const userId = formData.get("userId") as string;
+  try {
+    const data = await removeWorkspaceInviteForUser({ workspaceId, userId });
+    return { data, error: null };
+  } catch (error) {
     logger.error("Error removing invite: ", error);
     return { data: null, error };
   }
-  return { data, error: null };
 }
 
 export async function handleUpdateWebhook(
   formData: FormData,
   workspaceId: string,
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
   const webhookId = formData.get("webhookId") as string;
@@ -254,32 +227,34 @@ export async function handleUpdateWebhook(
   const userId = formData.get("userId") as string;
   const customHeaders = formData.get("customHeaders") as string;
   const events = formData.get("events") as string;
-  
-  // Parse the events array from JSON
-  const parsedEvents = JSON.parse(events);
-  
-  const headersArray = JSON.parse(customHeaders);
+
+  const parsedEvents = JSON.parse(events) as string[];
+  const headersArray = JSON.parse(customHeaders) as Array<[string, string]>;
   const custom_headers: Record<string, string> = {};
-  headersArray.map((header: [string, string]) => (custom_headers[header[0]] = header[1]));
-  const updateData = {
-    id: parseInt(webhookId),
-    destination_url: destinationUrl,
-    updated_at: new Date().toISOString(),
-    updated_by: userId,
-    custom_headers,
-    events: parsedEvents,
-    workspace: workspaceId,
-  };
-  const { data: webhook, error: webhookError } = await supabaseClient
-    .from("webhook")
-    .upsert(updateData)
-    .select();
-  if (webhookError) {
+  headersArray.forEach(([key, value]) => {
+    if (key) custom_headers[key] = value;
+  });
+
+  try {
+    const webhook = await upsertWorkspaceWebhookRow({
+      workspaceId,
+      userId,
+      destinationUrl,
+      customHeaders: custom_headers,
+      events: parsedEvents,
+      webhookId: webhookId ? Number.parseInt(webhookId, 10) : undefined,
+    });
+    return routeData({ data: webhook ? [webhook] : [], error: null }, { headers });
+  } catch (webhookError) {
     logger.error("Error updating webhook", webhookError);
-    return routeData({ data: null, error: webhookError.message }, { headers });
+    return routeData(
+      {
+        data: null,
+        error: webhookError instanceof Error ? webhookError.message : "Webhook update failed",
+      },
+      { headers },
+    );
   }
-  
-  return routeData({ data: webhook, error: null }, { headers });
 }
 
 export async function testWebhook(
@@ -288,11 +263,10 @@ export async function testWebhook(
   custom_headers: string | Record<string, string>,
 ) {
   try {
-    // Handle possible string inputs (from form submissions)
-    const parsedTestData = typeof testData === 'string' ? JSON.parse(testData) : testData;
-    const parsedHeaders = typeof custom_headers === 'string' ? JSON.parse(custom_headers) : custom_headers;
-    
-    // Convert headers array to object if needed
+    const parsedTestData = typeof testData === "string" ? JSON.parse(testData) : testData;
+    const parsedHeaders =
+      typeof custom_headers === "string" ? JSON.parse(custom_headers) : custom_headers;
+
     const headersObject: Record<string, string> = {};
     if (Array.isArray(parsedHeaders)) {
       parsedHeaders.forEach(([key, value]: [string, string]) => {
@@ -311,7 +285,6 @@ export async function testWebhook(
       body: JSON.stringify(parsedTestData),
     });
 
-    // Try to parse response as JSON, fallback to text if not possible
     let data;
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -320,19 +293,19 @@ export async function testWebhook(
       data = await response.text();
     }
 
-    return { 
-      data, 
+    return {
+      data,
       status: response.status,
       statusText: response.statusText,
-      error: null 
+      error: null,
     };
   } catch (error: unknown) {
     logger.error("Error sending test data", error);
-    return { 
-      data: null, 
+    return {
+      data: null,
       status: 500,
       statusText: "Error sending webhook",
-      error: error instanceof Error ? error.message : String(error) 
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }

@@ -1,4 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { desc, eq } from "drizzle-orm";
+import {
+  workspace as workspaceTable,
+  workspace_users as workspaceUsersTable,
+} from "@/db/schema";
 import {
   getUserRole,
   getWorkspaceInfo,
@@ -11,23 +16,38 @@ import {
 import type { Database } from "@/lib/database.types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
+import { adminDb } from "@/server/admin-db";
 
 export async function listUserWorkspaces(
-  supabaseClient: SupabaseClient<Database>,
+  _supabaseClient: SupabaseClient<Database>,
   userId: string,
 ) {
-  const { data, error } = await supabaseClient
-    .from("workspace_users")
-    .select("last_accessed, role, workspace(id, name, credits, created_at)")
-    .eq("user_id", userId)
-    .order("last_accessed", { ascending: false });
+  try {
+    const rows = await adminDb
+      .select({
+        last_accessed: workspaceUsersTable.last_accessed,
+        role: workspaceUsersTable.role,
+        workspace: {
+          id: workspaceTable.id,
+          name: workspaceTable.name,
+          credits: workspaceTable.credits,
+          created_at: workspaceTable.created_at,
+        },
+      })
+      .from(workspaceUsersTable)
+      .innerJoin(workspaceTable, eq(workspaceUsersTable.workspace_id, workspaceTable.id))
+      .where(eq(workspaceUsersTable.user_id, userId))
+      .orderBy(desc(workspaceUsersTable.last_accessed));
 
-  if (error) {
+    return { ok: true as const, workspaces: rows };
+  } catch (error) {
     logger.error("listUserWorkspaces error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load workspaces",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, workspaces: data ?? [] };
 }
 
 export async function getWorkspaceDetail(
@@ -36,12 +56,11 @@ export async function getWorkspaceDetail(
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
-  const info = await getWorkspaceInfo({ supabaseClient, workspaceId });
+  const info = await getWorkspaceInfo({ workspaceId });
   if (info.error) {
     return { ok: false as const, error: String(info.error), status: 404 };
   }
@@ -56,7 +75,6 @@ export async function updateWorkspaceName(
   name: string,
 ) {
   const role = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -65,15 +83,19 @@ export async function updateWorkspaceName(
     return { ok: false as const, error: "Not authorized", status: 403 };
   }
 
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .update({ name })
-    .eq("id", workspaceId)
-    .select("id, name, credits, created_at")
-    .single();
+  const [data] = await adminDb
+    .update(workspaceTable)
+    .set({ name })
+    .where(eq(workspaceTable.id, workspaceId))
+    .returning({
+      id: workspaceTable.id,
+      name: workspaceTable.name,
+      credits: workspaceTable.credits,
+      created_at: workspaceTable.created_at,
+    });
 
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  if (!data) {
+    return { ok: false as const, error: "Workspace not found", status: 404 };
   }
 
   return { ok: true as const, workspace: data };

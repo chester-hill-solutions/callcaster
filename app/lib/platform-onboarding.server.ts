@@ -22,6 +22,7 @@ import {
 } from "@/lib/onboarding-actions.server";
 import { reviewWorkspaceEmergencyVoice } from "@/lib/onboarding/emergency-voice.server";
 import { persistWorkspaceOnboardingState } from "@/lib/onboarding/onboarding-persist.server";
+import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import {
   TWILIO_RCS_PROVIDER,
   getWorkspaceRcsBlockingIssues,
@@ -174,14 +175,13 @@ export async function getWorkspaceOnboardingDetail(
   | { ok: false; error: string; status: number }
 > {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
-  const [{ onboarding, phoneNumbers }, workspaceCredits] = await Promise.all([
+  const [{ onboarding, phoneNumbers }, credits] = await Promise.all([
     hydrateWorkspaceOnboarding(supabaseClient, workspaceId),
-    supabaseClient.from("workspace").select("credits").eq("id", workspaceId).single(),
+    getWorkspaceCredits(workspaceId),
   ]);
 
   const rcsBlockingIssues =
@@ -207,7 +207,7 @@ export async function getWorkspaceOnboardingDetail(
       a2p_blocking_issues: buildA2pBlockingIssues(onboarding),
       rcs_blocking_issues: rcsBlockingIssues,
       phone_numbers: phoneNumbers,
-      credits_balance: workspaceCredits.data?.credits ?? 0,
+      credits_balance: credits ?? 0,
     },
   };
 }

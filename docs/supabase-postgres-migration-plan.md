@@ -16,7 +16,7 @@
 | **0** — Ledger audit & local stack | **Done** | Ledger 34/34 on Railway `PostgreSQL 18` |
 | **1** — Schema transform | **Mostly applied** | 01–05, 08, 08b, 10 on review; baseline dumped; **06/07/09** pending (SSE/worker) |
 | **1D** — Scriptkit packages | Not started | CHS monorepo upstream |
-| **2** — Drizzle port | **In progress** | **8/13** modules done; `platform-data` + queue/survey routes on Drizzle; **308** PostgREST `.from("…")` sites in **122** files remain (admin, platform, hooks) |
+| **2** — Drizzle port | **In progress** | **9/13** modules done; **200** PostgREST `.from("…")` sites in **97** files remain (admin routes, telephony API, hooks/realtime) |
 | **3** — Staging stack (3A–3F) | Not started | **3D partial** — Remix sms-status live; Edge IVR unified `campaign` select |
 | **4** — Staging gate | Blocked | Requires Phases 2–3 |
 | **5** — Prod big-bang | Blocked | Requires Phase 4 |
@@ -101,10 +101,10 @@
 **Remaining (G2 exit):**
 
 - ~**162** `database.types` imports; delete [`database.types.ts`](app/lib/database.types.ts) last
-- **308** PostgREST `.from("…")` call sites across **122** `app/` modules (heavy: `platform-admin`, `platform-members`, `workspace-settings`, audience-upload/export, admin routes, realtime hooks)
+- **200** PostgREST `.from("…")` call sites across **97** `app/` modules (heavy: admin routes, telephony API routes, realtime hooks, audience-upload storage paths)
 - **Server `campaign_queue` reads/writes:** Drizzle via [`campaign-queue-db.server.ts`](app/lib/campaign-queue-db.server.ts) — only [`useSupabaseRealtime.ts`](app/hooks/realtime/useSupabaseRealtime.ts) still PostgREST on `campaign_queue` (Phase 3B SSE)
 - **Enqueue/dequeue RPCs** (`dequeue_contact`, `select_and_update_campaign_contacts`, `enqueueContactsForCampaign`, …) stay Supabase until worker/RPC wrappers land
-- **Survey server PostgREST stragglers:** `settings.loader.server.ts`, `platform-analytics.server.ts` (2 files)
+- **Survey server PostgREST:** done — [`survey-db.server.ts`](app/lib/survey-db.server.ts)
 - Supabase Auth/Realtime/Edge/Storage; Express runtime; transforms **06/07/09** on review
 
 ```mermaid
@@ -269,7 +269,7 @@ Apply via [`scripts/schema-transform/apply-all.sh`](../scripts/schema-transform/
 | 2.12 | Delete `database.types.ts` | Todo — ~162 imports |
 | 2.13 | E2E factories → Drizzle | Todo |
 
-**Metrics:** 8/13 modules done · **8/13** `app/lib/database/*.server.ts` use `createTenantDb` for tenant data · **92** queue/survey route tests green · **127** dial/messaging slice tests · **308** PostgREST `.from("…")` sites in **122** files (not zero)
+**Metrics:** 9/13 modules done · **200** PostgREST `.from("…")` sites in **97** files · **162** `database.types` imports (not zero)
 
 ### Sprint 2 telephony + messaging helpers
 
@@ -292,11 +292,11 @@ Shared modules introduced during dial/messaging port (use these patterns for rem
 
 ### Remaining port order
 
-1. **2.7 Telephony adjunct** — `agent-status`, handset, inbound queue loaders/actions
-2. **Survey stragglers** — `settings.loader.server.ts`, `platform-analytics.server.ts` → `survey-db.server.ts`
-3. **2.6 Billing** — transaction-history RPC wrappers (`insertTransactionHistoryIdempotent` callers)
-4. **2.8 Twilio** — `twilio-bootstrap` / open-sync module
-5. **Platform/admin bulk** — `platform-admin`, `platform-members`, `workspace-settings`, audience-upload/export paths
+1. **Admin routes** — `admin+/route.loader`, users/workspaces loaders/actions → `adminDb` / `workspace-members-db`
+2. **Telephony API stragglers** — `call.action`, `sms.action`, `inbound*`, IVR routes
+3. **2.6 Billing** — Edge Function transaction-history paths (app paths on Drizzle RPC)
+4. **2.8 Twilio sync** — `workspace-twilio-sync.server.ts`
+5. **2.11 UI types** — Drizzle row types vs `database.types` drift in loaders/components
 6. Typed RPC wrappers in `app/server/rpc/` where PostgREST RPC is unavoidable short-term
 7. Extend [`test/tenant-db.test.ts`](test/tenant-db.test.ts); PGlite per test file
 8. **Exit:** zero PostgREST `.from()` in `app/` (except Phase 3 client realtime until SSE); delete [`database.types.ts`](app/lib/database.types.ts)

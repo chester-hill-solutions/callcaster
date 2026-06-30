@@ -44,7 +44,6 @@ export async function getWorkspaceCallLogApi(
   });
 
   const callLog = await loadCallLogPage({
-    supabaseClient,
     workspaceId,
     requestUrl,
   });

@@ -1,5 +1,4 @@
 
-
 import { data as routeData, redirect } from "react-router";
 import { parseCSV } from "@/lib/utils";
 import { bulkCreateContacts, getWorkspacePhoneNumbers } from "@/lib/database.server";
@@ -12,17 +11,21 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { Contact } from "@/lib/types";
 import { Database } from "../database.types";
 import { logger } from "@/lib/logger.server";
+import { eq } from "drizzle-orm";
+import {
+  campaign_audience as campaignAudienceTable,
+} from "@/db/schema";
+import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 
 type CampaignType = "live_call" | "message" | "robocall";
 
 interface CampaignAudienceParams {
   campaignId: string;
   audienceId: string;
-  supabaseClient: SupabaseClient<Database>;
 }
 
 interface RemoveCampaignAudienceParams {
-  supabaseClient: SupabaseClient<Database>;
   id: string;
 }
 
@@ -44,19 +47,28 @@ interface NewCampaignParams {
   headers: Headers;
 }
 
-async function insertCampaignAudience({ campaignId, audienceId, supabaseClient }: CampaignAudienceParams) {
-  const { error } = await supabaseClient
-    .from("campaign_audience")
-    .insert([{ campaign_id: parseInt(campaignId), audience_id: parseInt(audienceId) }]);
-  return { error };
+async function insertCampaignAudience({ campaignId, audienceId }: CampaignAudienceParams) {
+  try {
+    await db.insert(campaignAudienceTable).values({
+      campaign_id: Number.parseInt(campaignId, 10),
+      audience_id: Number.parseInt(audienceId, 10),
+      created_at: new Date().toISOString(),
+    });
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
 }
 
-async function removeCampaignAudience({ supabaseClient, id }: RemoveCampaignAudienceParams) {
-  const { error } = await supabaseClient
-    .from("campaign_audience")
-    .delete()
-    .eq("id", id);
-  return { error };
+async function removeCampaignAudience({ id }: RemoveCampaignAudienceParams) {
+  try {
+    await db
+      .delete(campaignAudienceTable)
+      .where(eq(campaignAudienceTable.audience_id, Number.parseInt(id, 10)));
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
 }
 
 export async function handleNewAudience({
@@ -70,37 +82,32 @@ export async function handleNewAudience({
   userId,
 }: NewAudienceParams) {
   const newAudienceName = formData.get("audience-name") as string;
+  const tdb = createTenantDb(workspaceId);
 
   try {
-    // Create the audience
-    const { data: createAudienceData, error: createAudienceError } =
-      await supabaseClient
-        .from("audience")
-        .insert({
-          name: newAudienceName,
-          workspace: workspaceId,
-        })
-        .select()
-        .single();
-
-    if (createAudienceError) {
-      throw createAudienceError;
+    const createAudienceRows = await tdb.audience.insert({
+      name: newAudienceName,
+      created_at: new Date().toISOString(),
+      is_conditional: false,
+      status: "draft",
+      total_contacts: 0,
+    });
+    const createAudienceData = createAudienceRows[0];
+    if (!createAudienceData) {
+      throw new Error("Failed to create audience");
     }
 
-    // Link to campaign if provided
     if (campaignId) {
       const { error: campaignInsertError } = await insertCampaignAudience({
         campaignId,
         audienceId: createAudienceData.id.toString(),
-        supabaseClient,
       });
       if (campaignInsertError) {
-        await removeCampaignAudience({ supabaseClient, id: createAudienceData.id.toString() });
+        await removeCampaignAudience({ id: createAudienceData.id.toString() });
         throw campaignInsertError;
       }
     }
 
-    // Add contacts if provided - these are already mapped from the CSV UI
     if (contacts && contacts.length > 0) {
       const { insert } = await bulkCreateContacts(
         contacts,
@@ -108,14 +115,13 @@ export async function handleNewAudience({
         createAudienceData.id.toString(),
         userId,
       );
-      // Enqueue contacts for campaign when audience is linked to campaign
       if (campaignId && insert?.length) {
         const contactIds = insert.map((c) => c.id);
         await enqueueContactsForCampaign(
           supabaseClient,
           parseInt(campaignId, 10),
           contactIds,
-          { requeue: false }
+          { requeue: false },
         );
       }
     }
@@ -138,7 +144,7 @@ export async function handleNewAudience({
 }
 
 export async function handleNewCampaign({
-  supabaseClient,
+  supabaseClient: _supabaseClient,
   formData,
   workspaceId,
   headers,
@@ -149,7 +155,6 @@ export async function handleNewCampaign({
 
   const { start_date, end_date } = getDefaultCampaignDates();
   const phoneNumbersResult = await getWorkspacePhoneNumbers({
-    supabaseClient,
     workspaceId,
   });
   const workspaceNumbers = (phoneNumbersResult.data ?? []).filter(
@@ -160,35 +165,49 @@ export async function handleNewCampaign({
       ? String(workspaceNumbers[0]?.phone_number)
       : null;
 
-  const { data: campaignData, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .insert({
+  const tdb = createTenantDb(workspaceId);
+  try {
+    const rows = await tdb.campaign.insert({
       title: newCampaignName,
-      workspace: workspaceId,
       status: "draft",
       type: newCampaignType,
       start_date,
       end_date,
       schedule: DEFAULT_WEEKDAY_CALLING_SCHEDULE,
       caller_id,
-    })
-    .select()
-    .single();
-
-  if (campaignError) {
-    if (campaignError.code === '23505'){
+      created_at: new Date().toISOString(),
+      dial_ratio: 1,
+      next_queue_order: 0,
+      group_household_queue: false,
+      is_active: false,
+    });
+    const campaignData = rows[0];
+    if (!campaignData) {
       return routeData(
-        { campaignData: null, error: {message: "There is already a campaign with that name. Please use a unique campaign name."} },
+        { campaignData: null, error: { message: "Failed to create campaign" } },
         { headers },
-      );  
+      );
     }
-    return routeData(
-      { campaignData: null, error: campaignError },
-      { headers },
-    );
-  }
 
-  return redirect(
-    `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
-  );
+    return redirect(
+      `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
+    );
+  } catch (campaignError) {
+    const code =
+      campaignError && typeof campaignError === "object" && "code" in campaignError
+        ? String((campaignError as { code?: string }).code)
+        : null;
+    if (code === "23505") {
+      return routeData(
+        {
+          campaignData: null,
+          error: {
+            message: "There is already a campaign with that name. Please use a unique campaign name.",
+          },
+        },
+        { headers },
+      );
+    }
+    return routeData({ campaignData: null, error: campaignError }, { headers });
+  }
 }

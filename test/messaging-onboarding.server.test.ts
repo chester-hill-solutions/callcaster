@@ -1,5 +1,17 @@
 import { describe, expect, test, vi } from "vitest";
 
+const twilioDataMocks = vi.hoisted(() => ({
+  data: {} as unknown,
+  persist: vi.fn(async (_client: unknown, _workspaceId: string, next: unknown) => {
+    twilioDataMocks.data = next;
+  }),
+}));
+
+vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
+  loadWorkspaceTwilioData: vi.fn(async () => twilioDataMocks.data),
+  persistWorkspaceTwilioData: (...args: unknown[]) => twilioDataMocks.persist(...args),
+}));
+
 import {
   applyWorkspaceOnboardingChannelPolicy,
   buildOnboardingStepsForState,
@@ -13,30 +25,6 @@ import {
   updateWorkspaceMessagingOnboardingState,
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "../app/lib/messaging-onboarding.server";
-
-function makeSupabase(
-  twilioData: unknown,
-  options?: { selectError?: unknown; updateError?: unknown },
-) {
-  const updateEq = vi.fn(async () => ({ error: options?.updateError ?? null }));
-  return {
-    from: vi.fn((table: string) => {
-      if (table !== "workspace") throw new Error(`Unexpected table: ${table}`);
-      return {
-        select: () => ({
-          eq: () => ({
-            single: vi.fn(async () => ({
-              data: { twilio_data: twilioData },
-              error: options?.selectError ?? null,
-            })),
-          }),
-        }),
-        update: () => ({ eq: updateEq }),
-      };
-    }),
-    _updateEq: updateEq,
-  };
-}
 
 describe("messaging onboarding helpers", () => {
   test("normalizes a complete default onboarding state", () => {
@@ -273,19 +261,18 @@ describe("messaging onboarding helpers", () => {
     ]);
   });
 
-  test("get/update workspace onboarding state read and write through Supabase", async () => {
-    const supabase = makeSupabase({
+  test("get/update workspace onboarding state read and write through Postgres", async () => {
+    twilioDataMocks.data = {
       onboarding: DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-    });
+    };
+    twilioDataMocks.persist.mockClear();
 
     const loaded = await getWorkspaceMessagingOnboardingState({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
     });
     expect(loaded.currentStep).toBe("business_profile");
 
     const updated = await updateWorkspaceMessagingOnboardingState({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
       updates: {
         status: "collecting_business",
@@ -300,7 +287,7 @@ describe("messaging onboarding helpers", () => {
     expect(updated.status).toBe("collecting_business");
     expect(updated.lastUpdatedBy).toBe("u1");
     expect(updated.lastUpdatedAt).toMatch(/T/);
-    expect(supabase._updateEq).toHaveBeenCalled();
+    expect(twilioDataMocks.persist).toHaveBeenCalled();
   });
 
   test("applyWorkspaceOnboardingChannelPolicy strips rcs from selected channels", () => {
@@ -376,23 +363,21 @@ describe("messaging onboarding helpers", () => {
     );
   });
 
-  test("get/update workspace onboarding propagate Supabase errors", async () => {
+  test("get/update workspace onboarding propagate Postgres errors", async () => {
+    const { loadWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server");
+    vi.mocked(loadWorkspaceTwilioData).mockRejectedValueOnce(new Error("select failed"));
+
     await expect(
       getWorkspaceMessagingOnboardingState({
-        supabaseClient: makeSupabase(
-          {},
-          { selectError: new Error("select failed") },
-        ) as any,
         workspaceId: "w1",
       }),
     ).rejects.toThrow("select failed");
 
+    twilioDataMocks.data = { onboarding: DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE };
+    twilioDataMocks.persist.mockRejectedValueOnce(new Error("update failed"));
+
     await expect(
       updateWorkspaceMessagingOnboardingState({
-        supabaseClient: makeSupabase(
-          {},
-          { updateError: new Error("update failed") },
-        ) as any,
         workspaceId: "w1",
         updates: {},
         actorUserId: null,

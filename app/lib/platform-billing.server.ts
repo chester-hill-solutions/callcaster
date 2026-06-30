@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
+import { eq } from "drizzle-orm";
+import { workspace as workspaceTable } from "@/db/schema";
 import { createStripeContact } from "@/lib/database/stripe.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import type { Database } from "@/lib/database.types";
@@ -15,6 +17,8 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { stripeSessionKey } from "@/lib/billing-keys";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb } from "@/server/tenant-db";
 
 export const billingPricing = billingPricingSchema.parse({
   credit_price_cad: CREDIT_PRICE_CAD,
@@ -27,16 +31,15 @@ function createStripeClient() {
 }
 
 async function ensureStripeCustomer(
-  supabase: SupabaseClient<Database>,
   workspaceId: string,
 ): Promise<{ ok: true; stripeCustomerId: string } | { ok: false; error: string; status: number }> {
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspace")
-    .select("stripe_id")
-    .eq("id", workspaceId)
-    .single();
+  const [workspace] = await adminDb
+    .select({ stripe_id: workspaceTable.stripe_id })
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
 
-  if (workspaceError) {
+  if (!workspace) {
     return {
       ok: false,
       error: "We could not load billing for this workspace.",
@@ -44,7 +47,7 @@ async function ensureStripeCustomer(
     };
   }
 
-  let stripeCustomerId = workspace?.stripe_id ?? null;
+  let stripeCustomerId = workspace.stripe_id ?? null;
 
   if (!stripeCustomerId) {
     try {
@@ -53,10 +56,10 @@ async function ensureStripeCustomer(
       });
       stripeCustomerId = customer.id;
 
-      await supabase
-        .from("workspace")
-        .update({ stripe_id: stripeCustomerId })
-        .eq("id", workspaceId);
+      await adminDb
+        .update(workspaceTable)
+        .set({ stripe_id: stripeCustomerId })
+        .where(eq(workspaceTable.id, workspaceId));
     } catch {
       return {
         ok: false,
@@ -76,46 +79,43 @@ export async function getWorkspaceBilling(
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient: supabase,
     user: { id: userId },
     workspaceId,
   });
 
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspace")
-    .select("credits")
-    .eq("id", workspaceId)
-    .single();
+  const [workspace] = await adminDb
+    .select({ credits: workspaceTable.credits })
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
 
-  if (workspaceError) {
-    logger.error("getWorkspaceBilling workspace error", workspaceError);
+  if (!workspace) {
+    logger.error("getWorkspaceBilling workspace error", { workspaceId });
     return {
       ok: false as const,
-      error: workspaceError.message,
-      status: 500,
+      error: "Workspace not found",
+      status: 404,
     };
   }
 
-  const { data: history, error: historyError } = await supabase
-    .from("transaction_history")
-    .select("id, created_at, type, amount, note, idempotency_key")
-    .eq("workspace", workspaceId)
-    .order("created_at", { ascending: false })
-    .limit(500);
-
-  if (historyError) {
-    logger.error("getWorkspaceBilling history error", historyError);
-    return {
-      ok: false as const,
-      error: historyError.message,
-      status: 500,
-    };
-  }
+  const tdb = createTenantDb(workspaceId);
+  const history = await tdb.transaction_history.findMany({
+    columns: {
+      id: true,
+      created_at: true,
+      type: true,
+      amount: true,
+      note: true,
+      idempotency_key: true,
+    },
+    orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
+    limit: 500,
+  });
 
   return {
     ok: true as const,
-    balance: workspace?.credits ?? 0,
-    transactions: history ?? [],
+    balance: workspace.credits ?? 0,
+    transactions: history,
     pricing: billingPricing,
   };
 }
@@ -130,7 +130,6 @@ export async function createBillingCheckoutSession(args: {
   const { supabase, userId, workspaceId, amount, requestUrl } = args;
 
   await requireWorkspaceAccess({
-    supabaseClient: supabase,
     user: { id: userId },
     workspaceId,
   });
@@ -143,7 +142,7 @@ export async function createBillingCheckoutSession(args: {
     };
   }
 
-  const customerResult = await ensureStripeCustomer(supabase, workspaceId);
+  const customerResult = await ensureStripeCustomer(workspaceId);
   if (!customerResult.ok) {
     return customerResult;
   }
@@ -217,7 +216,6 @@ export async function pollBillingCheckoutSession(args: {
   const { supabase, userId, workspaceId, sessionId } = args;
 
   await requireWorkspaceAccess({
-    supabaseClient: supabase,
     user: { id: userId },
     workspaceId,
   });

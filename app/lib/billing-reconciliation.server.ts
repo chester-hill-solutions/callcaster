@@ -12,7 +12,7 @@ import {
 } from "@/lib/pricing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { and, gte, inArray, like, lte, ne } from "drizzle-orm";
+import { and, gte, inArray, like, lte, ne, eq } from "drizzle-orm";
 import {
   call as callTable,
   message as messageTable,

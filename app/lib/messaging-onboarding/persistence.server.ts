@@ -4,6 +4,10 @@ import type { TwilioAccountData, WorkspaceMessagingOnboardingState } from "@/lib
 import { isObject } from "@/lib/type-safety-utils";
 import { normalizeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding/normalize.server";
 import { mergeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding/merge.server";
+import {
+  loadWorkspaceTwilioData,
+  persistWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 
 export function getWorkspaceMessagingOnboardingFromTwilioData(
   twilioData: TwilioAccountData | unknown,
@@ -16,51 +20,30 @@ export function getWorkspaceMessagingOnboardingFromTwilioData(
 }
 
 export async function getWorkspaceMessagingOnboardingState({
-  supabaseClient,
+  supabaseClient: _supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient?: SupabaseClient<Database> | null;
   workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return getWorkspaceMessagingOnboardingFromTwilioData(
-    (data?.twilio_data ?? null) as TwilioAccountData,
-  );
+  const twilioData = await loadWorkspaceTwilioData(_supabaseClient ?? null, workspaceId);
+  return getWorkspaceMessagingOnboardingFromTwilioData(twilioData as TwilioAccountData);
 }
 
 export async function updateWorkspaceMessagingOnboardingState({
-  supabaseClient,
+  supabaseClient: _supabaseClient,
   workspaceId,
   updates,
   actorUserId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient?: SupabaseClient<Database> | null;
   workspaceId: string;
   updates: Partial<WorkspaceMessagingOnboardingState>;
   actorUserId: string | null;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  const currentTwilioData = isObject(data?.twilio_data) ? data.twilio_data : {};
+  const currentTwilioData = await loadWorkspaceTwilioData(_supabaseClient ?? null, workspaceId);
   const currentState = getWorkspaceMessagingOnboardingFromTwilioData(
-    (data?.twilio_data ?? null) as TwilioAccountData,
+    currentTwilioData as TwilioAccountData,
   );
   const nextState = mergeWorkspaceMessagingOnboardingState(currentState, {
     ...updates,
@@ -73,17 +56,7 @@ export async function updateWorkspaceMessagingOnboardingState({
     onboarding: nextState,
   };
 
-  const { error: updateError } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data:
-        nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (updateError) {
-    throw updateError;
-  }
+  await persistWorkspaceTwilioData(_supabaseClient ?? null, workspaceId, nextTwilioData);
 
   return nextState;
 }

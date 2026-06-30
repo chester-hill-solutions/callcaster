@@ -5,6 +5,10 @@ import type { Session } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { env as envUtil } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import {
+  listUserWorkspaceSummaries,
+  loadUserWithInvites,
+} from "@/lib/workspace-members-db.server";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 
 export type RootLoaderData = {
@@ -56,31 +60,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       { headers },
     );
   }
-  const { data: userData, error: userError } = await supabase
-    .from("user")
-    .select(`*, workspace_invite(workspace(id, name))`)
-    .eq("id", user.data.user.id)
-    .single();
-
-  const { data: workspaceData, error: workspacesError } = await supabase
-    .from("workspace_users")
-    .select("workspace ( id, name )")
-    .eq("user_id", user.data.user.id)
-    .order("last_accessed", { ascending: false });
-  if (workspacesError || userError) {
-    logger.error("Error loading workspaces or user data", {
-      workspacesError,
-      userError,
-    });
-  }
-  const workspaces = workspaceData?.map((data) => data.workspace);
+  const userData = await loadUserWithInvites(user.data.user.id);
+  const workspaces = await listUserWorkspaceSummaries(user.data.user.id);
 
   return routeData(
     {
       env,
       session,
-      workspaces,
-      user: userData,
+      workspaces: workspaces as WorkspaceData[] | null,
+      user: userData as (User & { workspace_invite: WorkspaceInvite[] }) | null,
       params,
     },
     { headers },

@@ -14,7 +14,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 |--------|------:|------|
 | Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
 | `app/lib/database/*.server.ts` on tenant-db | **8 / 13** | G2 |
-| App `supabase.from()` call sites in `app/` | **308** `.from("…")` in **122** files (admin/platform/hooks; server `campaign_queue` + survey routes on Drizzle) | G2 |
+| App `supabase.from()` call sites in `app/` | **200** `.from("…")` in **97** files (admin routes, telephony API, hooks/realtime; server call-log/billing/onboarding on Drizzle) | G2 |
 | `database.types` imports in `app/` | **162 files** | G2 (delete at exit) |
 | Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
 | E2E on review URL | Not run | G4 |
@@ -93,16 +93,16 @@ Inventory: [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventor
 | 2.3 | Queue/dial stack | **Done** | `telephony-db.server.ts`; auto-dial/dial/status/end/$roomId + `twilio-call-status`; 88 dial-stack tests green |
 | 2.4 | Contacts + audiences | **Done** | `contact.server.ts`, `contact-audience.server.ts` |
 | 2.5 | Messaging + chats | **Done** | sms-send, inbound-sms, auto-dial/dial credits+calls on tenant-db/telephony-db; Supabase kept for RPCs + realtime only |
-| 2.6 | Billing + ledger + RPC wrappers | **Partial** | `stripe.server.ts` + `billing-reconciliation.server.ts` on tenant-db; transaction-history RPC wrappers remain |
-| 2.7 | Telephony adjunct | Todo | `agent-status`, handset, inbound queue |
-| 2.8 | Twilio config modules | **Partial** | `merge-workspace-twilio-data`, portal config/snapshot on Drizzle; sync module remains |
-| 2.9 | Platform facades | **Done** | `platform-data.server.ts` on tenant-db/Drizzle; Supabase storage for audience-upload download only |
+| 2.6 | Billing + ledger + RPC wrappers | **Partial** | `platform-billing`, `billing-reconciliation` on Drizzle; `insertTransactionHistoryIdempotent` app paths done; Edge fallback remains |
+| 2.7 | Telephony adjunct | **Done** | `agent-status`, handset session, inbound queue on tenant-db; `call-log.server.ts` on Drizzle joins |
+| 2.8 | Twilio config modules | **Partial** | `merge-workspace-twilio-data`, messaging onboarding persistence, portal config/snapshot on Drizzle; sync module remains |
+| 2.9 | Platform facades | **Partial** | `platform-data`, `platform-workspace`, `platform-onboarding` credits on Drizzle; admin/telephony routes remain |
 | 2.10 | Route stragglers | **Done** | Queue UI + dial-path writes (`campaign-queue-db`); survey routes/loaders (`survey-db`); 92 queue/survey route tests green |
 | 2.11 | UI/hooks type cleanup | Todo | `LiveCampaign` / `IVRCampaign` / `MessageCampaign` in components |
 | 2.12 | Delete `database.types.ts` | Todo | ~162 imports remain |
 | 2.13 | E2E factories → Drizzle | Todo | `e2e/fixtures/factories.ts` still references subtype tables |
 
-**Progress:** **8 done** · **2 in progress** · 3 todo (of 13 modules) · 162 `database.types` imports · 308 PostgREST `.from("…")` sites remain
+**Progress:** **9 done** · **3 in progress** · 1 todo (of 13 modules) · 162 `database.types` imports · **200** PostgREST `.from("…")` sites remain
 
 ---
 
@@ -202,11 +202,11 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **WS-B 2.7** — Telephony adjunct (`agent-status`, handset, inbound queue)
-2. **WS-B survey stragglers** — `settings.loader.server.ts` + `platform-analytics.server.ts` → `survey-db.server.ts`
-3. **WS-B 2.6** — Transaction-history RPC wrappers
-4. **WS-B 2.8** — Finish Twilio sync module
-5. **WS-B platform/admin bulk** — `platform-admin`, `platform-members`, `workspace-settings`, audience-upload/export
+1. **WS-B admin routes** — `admin+/route.loader`, users/workspaces loaders/actions → `workspace-members-db` + `adminDb`
+2. **WS-B telephony API stragglers** — `call.action`, `sms.action`, `inbound*`, IVR routes still PostgREST-heavy
+3. **WS-B 2.6** — Edge Function transaction-history paths (or document supabase fallback as intentional until Phase 3D)
+4. **WS-B 2.8** — Finish `workspace-twilio-sync` module
+5. **WS-B 2.11** — UI/hooks type cleanup (`database.types` drift); pre-existing typecheck failures in campaign-settings/contacts loaders
 
 ---
 
@@ -226,3 +226,5 @@ gantt
 | 2026-06-29 | agent | Messaging port: `workspace-credits`, sms/inbound-sms/ivr/auto-dial tenant-db; test stubs; **127** dial+messaging tests green |
 | 2026-06-29 | agent | Platform-data: contacts, audiences, scripts, campaign status, audience upload on tenant-db/Drizzle; `buildContactSearchWhere` |
 | 2026-06-29 | agent | Plan sync: queue + survey ports reflected; metrics **308** PostgREST sites / **122** files / **162** `database.types` imports |
+| 2026-06-29 | agent | Platform/members batch: `workspace-members-db`, `platform-admin`, `platform-members`, settings utils; survey stragglers done |
+| 2026-06-29 | agent | Call-log + billing + onboarding persistence on Drizzle; `root.loader` + accept-invite on `workspace-members-db`; metrics **200** / **97** files |

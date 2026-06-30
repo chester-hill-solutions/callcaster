@@ -1,4 +1,4 @@
-import { acceptWorkspaceInvitations } from "@/lib/database.server";
+import { acceptWorkspaceInvitations, getInvitesByUserId } from "@/lib/database.server";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
@@ -50,12 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         throw new Error("Unable to retrieve updated user.");
       }
 
-      const { data: invites, error: inviteError } = await supabaseClient
-        .from("workspace_invite")
-        .select()
-        .eq("user_id", userData.user.id);
-
-      if (inviteError) throw inviteError;
+      const invites = await getInvitesByUserId(userData.user.id);
 
       return routeData<ActionData>(
         { status: "updated", invites: invites ?? [] },

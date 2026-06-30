@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, Tables } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
+import { getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
 
 type WebhookWithEvents = Tables<"webhook"> & {
   events?: Array<{ category: string; type: string }>;
@@ -12,31 +13,19 @@ export async function sendWorkspaceWebhookNotification({
   eventType,
   workspaceId,
   payload,
-  supabaseClient,
+  supabaseClient: _supabaseClient,
   optional = false,
 }: {
   eventCategory: string;
   eventType: "INSERT" | "UPDATE";
   workspaceId: string;
   payload: Record<string, unknown>;
-  supabaseClient: SupabaseClient<Database>;
+  supabaseClient?: SupabaseClient<Database>;
   /** When true, missing/disabled webhooks are treated as a no-op success. */
   optional?: boolean;
 }): Promise<{ success: boolean; error?: string | null }> {
   try {
-    const { data: webhook, error: webhookError } = await supabaseClient
-      .from("webhook")
-      .select("*")
-      .eq("workspace", workspaceId)
-      .single();
-
-    if (webhookError) {
-      logger.error(`No webhook configured for workspace ${workspaceId}`);
-      return {
-        success: false,
-        error: webhookError.message,
-      };
-    }
+    const webhook = await getWorkspaceWebhookRow(workspaceId);
 
     if (!webhook) {
       if (optional) {

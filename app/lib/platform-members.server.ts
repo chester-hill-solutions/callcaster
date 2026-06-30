@@ -12,6 +12,20 @@ import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
 import type {
   upsertWebhookBodySchema,
 } from "@/lib/schemas/api/platform-workspace-admin";
+import {
+  deleteWorkspaceApiKeyRow,
+  findUserIdByUsername,
+  findWorkspaceInviteForUser,
+  getWorkspaceWebhookRow,
+  insertWorkspaceApiKeyRow,
+  listWorkspaceApiKeyRows,
+  listWorkspaceInvitesEnriched,
+  listWorkspaceMembersEnriched,
+  removeWorkspaceInviteForUser,
+  removeWorkspaceMember as removeWorkspaceMemberRow,
+  updateWorkspaceMemberRole as updateWorkspaceMemberRoleRow,
+  upsertWorkspaceWebhookRow,
+} from "@/lib/workspace-members-db.server";
 import type { z } from "zod";
 
 const KEY_SECRET_LENGTH = 32;
@@ -76,33 +90,25 @@ export async function listWorkspaceMembers(
     workspaceId,
   });
 
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select(
-      "workspace_users(role, user(id, username, first_name, last_name)), workspace_invite(*, user(id, username, first_name, last_name))",
-    )
-    .eq("id", workspaceId)
-    .single();
+  try {
+    const [members, pending_invites] = await Promise.all([
+      listWorkspaceMembersEnriched(workspaceId),
+      listWorkspaceInvitesEnriched(workspaceId),
+    ]);
 
-  if (error) {
+    return {
+      ok: true as const,
+      members,
+      pending_invites,
+    };
+  } catch (error) {
     logger.error("listWorkspaceMembers error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load members",
+      status: 500,
+    };
   }
-
-  const members =
-    workspace.workspace_users?.map((entry) => ({
-      user_id: entry.user?.id ?? null,
-      username: entry.user?.username ?? null,
-      first_name: entry.user?.first_name ?? null,
-      last_name: entry.user?.last_name ?? null,
-      role: entry.role,
-    })) ?? [];
-
-  return {
-    ok: true as const,
-    members,
-    pending_invites: workspace.workspace_invite ?? [],
-  };
 }
 
 export async function inviteWorkspaceMember(
@@ -120,7 +126,7 @@ export async function inviteWorkspaceMember(
     supabaseClient,
     workspaceId,
   });
-  const existingMember = users?.find((user) => user.username === cleanedEmail);
+  const existingMember = users?.find((user: { username?: string | null }) => user.username === cleanedEmail);
   if (existingMember) {
     return {
       ok: false as const,
@@ -129,20 +135,10 @@ export async function inviteWorkspaceMember(
     };
   }
 
-  const { data: existingUser } = await supabaseClient
-    .from("user")
-    .select("id")
-    .eq("username", cleanedEmail)
-    .maybeSingle();
+  const existingUserId = await findUserIdByUsername(cleanedEmail);
 
-  if (existingUser?.id) {
-    const { data: pendingInvite } = await supabaseClient
-      .from("workspace_invite")
-      .select("id")
-      .eq("workspace", workspaceId)
-      .eq("user_id", existingUser.id)
-      .maybeSingle();
-
+  if (existingUserId) {
+    const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
     if (pendingInvite) {
       return {
         ok: true as const,
@@ -161,13 +157,8 @@ export async function inviteWorkspaceMember(
     });
 
   if (inviteUserError) {
-    if (existingUser?.id) {
-      const { data: pendingInvite } = await supabaseClient
-        .from("workspace_invite")
-        .select("id")
-        .eq("workspace", workspaceId)
-        .eq("user_id", existingUser.id)
-        .maybeSingle();
+    if (existingUserId) {
+      const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
       if (pendingInvite) {
         return {
           ok: true as const,
@@ -192,19 +183,23 @@ export async function updateWorkspaceMemberRole(
   const access = await requireMemberManager(supabaseClient, userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("workspace_users")
-    .update({ role })
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", targetUserId)
-    .select()
-    .single();
-
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  try {
+    const data = await updateWorkspaceMemberRoleRow({
+      workspaceId,
+      userId: targetUserId,
+      role,
+    });
+    if (!data) {
+      return { ok: false as const, error: "Member not found", status: 404 };
+    }
+    return { ok: true as const, member: data };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to update member",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, member: data };
 }
 
 export async function removeWorkspaceMember(
@@ -216,19 +211,22 @@ export async function removeWorkspaceMember(
   const access = await requireMemberManager(supabaseClient, userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("workspace_users")
-    .delete()
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", targetUserId)
-    .select()
-    .single();
-
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  try {
+    const data = await removeWorkspaceMemberRow({
+      workspaceId,
+      userId: targetUserId,
+    });
+    if (!data) {
+      return { ok: false as const, error: "Member not found", status: 404 };
+    }
+    return { ok: true as const, member: data };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to remove member",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, member: data };
 }
 
 export async function cancelWorkspaceInvite(
@@ -240,19 +238,20 @@ export async function cancelWorkspaceInvite(
   const access = await requireMemberManager(supabaseClient, userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("workspace_invite")
-    .delete()
-    .eq("workspace", workspaceId)
-    .eq("user_id", inviteUserId)
-    .select();
-
-  if (error) {
+  try {
+    const data = await removeWorkspaceInviteForUser({
+      workspaceId,
+      userId: inviteUserId,
+    });
+    return { ok: true as const, invites: data };
+  } catch (error) {
     logger.error("cancelWorkspaceInvite error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to cancel invite",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, invites: data };
 }
 
 export async function getWorkspaceWebhook(
@@ -263,17 +262,16 @@ export async function getWorkspaceWebhook(
   const access = await requireMemberManager(supabaseClient, userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("webhook")
-    .select("*")
-    .eq("workspace", workspaceId)
-    .maybeSingle();
-
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  try {
+    const data = await getWorkspaceWebhookRow(workspaceId);
+    return { ok: true as const, webhook: data ?? null };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load webhook",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, webhook: data };
 }
 
 export async function upsertWorkspaceWebhook(
@@ -293,32 +291,27 @@ export async function upsertWorkspaceWebhook(
     return { ok: false as const, error: message, status: 400 };
   }
 
-  const custom_headers = normalizeCustomHeaders(input.custom_headers);
-  const updateData: Database["public"]["Tables"]["webhook"]["Insert"] = {
-    destination_url: input.destination_url,
-    updated_at: new Date().toISOString(),
-    updated_by: userId,
-    custom_headers,
-    event: input.events,
-    workspace: workspaceId,
-  };
-
-  if (input.webhook_id !== undefined) {
-    updateData.id = input.webhook_id;
-  }
-
-  const { data, error } = await supabaseClient
-    .from("webhook")
-    .upsert(updateData)
-    .select()
-    .single();
-
-  if (error) {
+  try {
+    const data = await upsertWorkspaceWebhookRow({
+      workspaceId,
+      userId,
+      destinationUrl: input.destination_url,
+      customHeaders: normalizeCustomHeaders(input.custom_headers),
+      events: input.events,
+      webhookId: input.webhook_id,
+    });
+    if (!data) {
+      return { ok: false as const, error: "Failed to save webhook", status: 500 };
+    }
+    return { ok: true as const, webhook: data };
+  } catch (error) {
     logger.error("upsertWorkspaceWebhook error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to save webhook",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, webhook: data };
 }
 
 export async function testWorkspaceWebhook(
@@ -378,18 +371,17 @@ export async function listWorkspaceApiKeys(
   const access = await requireMemberManager(supabaseClient, userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data: keys, error } = await supabaseClient
-    .from("workspace_api_key")
-    .select("id, name, key_prefix, created_at, last_used_at")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
+  try {
+    const keys = await listWorkspaceApiKeyRows(workspaceId);
+    return { ok: true as const, keys };
+  } catch (error) {
     logger.error("listWorkspaceApiKeys error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to list API keys",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, keys: keys ?? [] };
 }
 
 export async function createWorkspaceApiKey(
@@ -403,28 +395,36 @@ export async function createWorkspaceApiKey(
 
   const { key, keyPrefix, keyHash } = generateApiKey();
 
-  const { data: row, error } = await supabaseClient
-    .from("workspace_api_key")
-    .insert({
-      workspace_id: workspaceId,
-      name: name.trim(),
-      key_prefix: keyPrefix,
-      key_hash: keyHash,
-      created_by: userId,
-    })
-    .select("id, name, key_prefix, created_at")
-    .single();
+  try {
+    const row = await insertWorkspaceApiKeyRow({
+      workspaceId,
+      userId,
+      name,
+      keyPrefix,
+      keyHash,
+    });
+    if (!row) {
+      return { ok: false as const, error: "Failed to create API key", status: 500 };
+    }
 
-  if (error) {
+    return {
+      ok: true as const,
+      key,
+      api_key: {
+        id: row.id,
+        name: row.name,
+        key_prefix: row.key_prefix,
+        created_at: row.created_at,
+      },
+    };
+  } catch (error) {
     logger.error("createWorkspaceApiKey error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to create API key",
+      status: 500,
+    };
   }
-
-  return {
-    ok: true as const,
-    key,
-    api_key: row,
-  };
 }
 
 export async function deleteWorkspaceApiKey(
@@ -436,16 +436,15 @@ export async function deleteWorkspaceApiKey(
   const access = await requireMemberManager(supabaseClient, userId, workspaceId);
   if (!access.ok) return access;
 
-  const { error } = await supabaseClient
-    .from("workspace_api_key")
-    .delete()
-    .eq("id", keyId)
-    .eq("workspace_id", workspaceId);
-
-  if (error) {
+  try {
+    await deleteWorkspaceApiKeyRow({ workspaceId, keyId });
+    return { ok: true as const };
+  } catch (error) {
     logger.error("deleteWorkspaceApiKey error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to delete API key",
+      status: 500,
+    };
   }
-
-  return { ok: true as const };
 }
