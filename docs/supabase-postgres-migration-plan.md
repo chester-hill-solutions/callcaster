@@ -1,4 +1,4 @@
-> **Canonical migration plan** — grilled 2026-06-29; orchestration started 2026-06-29; **Sprint 2 progress synced 2026-06-29**.  
+> **Canonical migration plan** — grilled 2026-06-29; orchestration started 2026-06-29; **Sprint 2 progress synced 2026-06-29 (queue + survey ports)**.  
 > **Branch:** `feat/supabase-postgres-migration`  
 > **Railway target:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
 > **Track progress:** [`migration-delivery-board.md`](./migration-delivery-board.md) · [`migration-orchestration.md`](./migration-orchestration.md)
@@ -16,7 +16,7 @@
 | **0** — Ledger audit & local stack | **Done** | Ledger 34/34 on Railway `PostgreSQL 18` |
 | **1** — Schema transform | **Mostly applied** | 01–05, 08, 08b, 10 on review; baseline dumped; **06/07/09** pending (SSE/worker) |
 | **1D** — Scriptkit packages | Not started | CHS monorepo upstream |
-| **2** — Drizzle port | **In progress** | **8/13** modules done; `platform-data.server.ts` complete (storage-only Supabase); queue loaders remain PostgREST |
+| **2** — Drizzle port | **In progress** | **8/13** modules done; `platform-data` + queue/survey routes on Drizzle; **308** PostgREST `.from("…")` sites in **122** files remain (admin, platform, hooks) |
 | **3** — Staging stack (3A–3F) | Not started | **3D partial** — Remix sms-status live; Edge IVR unified `campaign` select |
 | **4** — Staging gate | Blocked | Requires Phases 2–3 |
 | **5** — Prod big-bang | Blocked | Requires Phase 4 |
@@ -100,9 +100,11 @@
 
 **Remaining (G2 exit):**
 
-- ~**168** `database.types` imports; delete [`database.types.ts`](app/lib/database.types.ts) last
-- ~**40+** PostgREST `.from()` call sites in `app/` (concentrated in `platform-data.server.ts`, queue loaders, survey/admin paths)
-- `campaign_queue` + RPC paths intentionally stay on Supabase PostgREST until worker/RPC wrappers land
+- ~**162** `database.types` imports; delete [`database.types.ts`](app/lib/database.types.ts) last
+- **308** PostgREST `.from("…")` call sites across **122** `app/` modules (heavy: `platform-admin`, `platform-members`, `workspace-settings`, audience-upload/export, admin routes, realtime hooks)
+- **Server `campaign_queue` reads/writes:** Drizzle via [`campaign-queue-db.server.ts`](app/lib/campaign-queue-db.server.ts) — only [`useSupabaseRealtime.ts`](app/hooks/realtime/useSupabaseRealtime.ts) still PostgREST on `campaign_queue` (Phase 3B SSE)
+- **Enqueue/dequeue RPCs** (`dequeue_contact`, `select_and_update_campaign_contacts`, `enqueueContactsForCampaign`, …) stay Supabase until worker/RPC wrappers land
+- **Survey server PostgREST stragglers:** `settings.loader.server.ts`, `platform-analytics.server.ts` (2 files)
 - Supabase Auth/Realtime/Edge/Storage; Express runtime; transforms **06/07/09** on review
 
 ```mermaid
@@ -258,16 +260,16 @@ Apply via [`scripts/schema-transform/apply-all.sh`](../scripts/schema-transform/
 | 2.3 | Queue/dial stack | **Done** — see [Sprint 2 helpers](#sprint-2-telephony--messaging-helpers) |
 | 2.4 | Contacts + audiences | **Done** |
 | 2.5 | Messaging + chats | **Done** — sms-send, inbound-sms, credits gates |
-| 2.6 | Billing + ledger | **Partial** — `stripe.server.ts` done |
+| 2.6 | Billing + ledger | **Partial** — `stripe.server.ts` + `billing-reconciliation.server.ts` on tenant-db; transaction-history RPC wrappers remain |
 | 2.7 | Telephony adjunct | Todo — agent_status, handset, inbound queue |
 | 2.8 | Twilio config modules | **Partial** — merge/config/snapshot on Drizzle; sync module remains |
 | 2.9 | Platform facades | **Done** — `platform-data.server.ts` on tenant-db/Drizzle; Supabase storage for audience-upload download only |
-| 2.10 | Route stragglers | **Done** — targeted route/component PostgREST removed |
+| 2.10 | Route stragglers | **Done** — queue UI + dial-path writes; survey routes/loaders on [`survey-db.server.ts`](app/lib/survey-db.server.ts); deleted `queue-filter-search.server.ts` |
 | 2.11 | UI/hooks type cleanup | Todo |
-| 2.12 | Delete `database.types.ts` | Todo — ~168 imports |
+| 2.12 | Delete `database.types.ts` | Todo — ~162 imports |
 | 2.13 | E2E factories → Drizzle | Todo |
 
-**Metrics:** 8/13 modules done · **127** dial/messaging unit tests green · **7/13** `app/lib/database/*.server.ts` on tenant-db · ~35+ PostgREST `.from()` sites remain in `app/` (not zero)
+**Metrics:** 8/13 modules done · **8/13** `app/lib/database/*.server.ts` use `createTenantDb` for tenant data · **92** queue/survey route tests green · **127** dial/messaging slice tests · **308** PostgREST `.from("…")` sites in **122** files (not zero)
 
 ### Sprint 2 telephony + messaging helpers
 
@@ -284,19 +286,20 @@ Shared modules introduced during dial/messaging port (use these patterns for rem
 | [`user-audio.server.ts`](app/lib/user-audio.server.ts) | `adminDb` verified audio numbers for device checks |
 | [`campaign-ivr.server.ts`](app/lib/campaign-ivr.server.ts) | Unified campaign + script fetch for IVR |
 
-**Ported routes (high level):** auto-dial, dial, dial/status, auto-dial/status, auto-dial/end, auto-dial/$roomId, ivr response, inbound-sms (message/contact), sms dispatch, ivr initiate, `/api/queues`, `/api/hangup`, settings duplicate, campaign_audience enqueue checks, campaign export contact ids, create-with-script enqueue dedupe.
+**Ported routes (high level):** auto-dial, dial, dial/status, auto-dial/status, auto-dial/end, auto-dial/$roomId, ivr response, inbound-sms (message/contact), sms dispatch, ivr initiate, `/api/queues`, `/api/hangup`, settings duplicate, campaign_audience enqueue checks, campaign export contact ids, create-with-script enqueue dedupe; survey CRUD/taker (`/api/surveys`, `survey-answer`, `survey-responses`, `survey-complete`, workspace + public survey loaders).
 
-**Test coverage:** `test/auto-dial*.test.ts`, `test/dial-status.route.test.ts`, `test/call-screen.server.test.ts`, `test/inbound-sms.route.test.ts`, `test/sms.route.test.ts`, `test/ivr-block-response.route.test.ts`, `test/queues.route.test.ts`, `test/campaign-queue.route.test.ts`, `test/campaign-settings.route.test.ts` — stubs in `test/helpers/telephony-db-stub.ts`, `tenant-db-stub.ts`.
+**Test coverage:** queue/dial — `test/auto-dial*.test.ts`, `test/dial-status.route.test.ts`, `test/call-screen.server.test.ts`, `test/inbound-sms.route.test.ts`, `test/sms.route.test.ts`, `test/ivr-block-response.route.test.ts`, `test/queues.route.test.ts`, `test/campaign-queue.route.test.ts`, `test/campaign-settings.route.test.ts`; survey — `test/surveys.route.test.ts`, `test/survey-answer.route.test.ts`, `test/survey-complete.route.test.ts`, `test/survey-responses.route.test.ts`. Stubs: `test/helpers/telephony-db-stub.ts`, `tenant-db-stub.ts`.
 
 ### Remaining port order
 
-1. Telephony adjunct — `agent-status`, handset, inbound queue (2.7)
-2. Billing transaction-history RPC wrappers
-3. Twilio sync module (`twilio-bootstrap` / open-sync)
-4. `settings.loader.server.ts` survey reads + platform-analytics survey PostgREST
-5. Typed RPC wrappers in `app/server/rpc/` where PostgREST RPC is unavoidable short-term
-6. Extend [`test/tenant-db.test.ts`](test/tenant-db.test.ts); PGlite per test file
-7. **Exit:** zero PostgREST `.from()` in `app/` (except Phase 3 client realtime until SSE); delete [`database.types.ts`](app/lib/database.types.ts)
+1. **2.7 Telephony adjunct** — `agent-status`, handset, inbound queue loaders/actions
+2. **Survey stragglers** — `settings.loader.server.ts`, `platform-analytics.server.ts` → `survey-db.server.ts`
+3. **2.6 Billing** — transaction-history RPC wrappers (`insertTransactionHistoryIdempotent` callers)
+4. **2.8 Twilio** — `twilio-bootstrap` / open-sync module
+5. **Platform/admin bulk** — `platform-admin`, `platform-members`, `workspace-settings`, audience-upload/export paths
+6. Typed RPC wrappers in `app/server/rpc/` where PostgREST RPC is unavoidable short-term
+7. Extend [`test/tenant-db.test.ts`](test/tenant-db.test.ts); PGlite per test file
+8. **Exit:** zero PostgREST `.from()` in `app/` (except Phase 3 client realtime until SSE); delete [`database.types.ts`](app/lib/database.types.ts)
 
 **Ported in Sprint 2 (platform-data):** `listWorkspaceContactsApi`, `getContactDetailApi`, `deleteContactApi`, `listWorkspaceAudiencesApi`, `getAudienceDetailApi`, `listWorkspaceScriptsApi`, `getScriptDetailApi`, `transitionCampaignStatusApi`, `getAudienceUploadStatusApi`, `duplicateCampaignApi`, `getCampaignQueueApi`, `patchCampaignQueueApi`, `listWorkspaceSurveysApi`, `getSurveyDetailApi`, `getSurveyResponsesApi`, `exportSurveyResponsesCsv`, auth workspace resolvers.
 
@@ -422,11 +425,11 @@ Phase 0 (ledger audit)
 
 ### Next actions (orchestrator)
 
-1. **WS-B 2.6–2.8** — Billing reconciliation + Twilio config modules; port `campaign-stats.server.ts` queue counts to Drizzle.
-2. **WS-B 2.6–2.8** — Billing reconciliation + Twilio config modules.
-3. **WS-C 3D** — Delete Edge `sms-status`; finish Edge IVR handler tests + webhook repoint.
-4. **WS-B 2.11–2.12** — UI type cleanup + drop `database.types.ts`.
-5. **WS-A 1.12** — Apply transform **06, 07, 09** when SSE/worker schema lands.
+1. **WS-B 2.7** — Telephony adjunct (`agent-status`, handset, inbound queue)
+2. **WS-B survey stragglers** — `settings.loader` + `platform-analytics` → `survey-db.server.ts`
+3. **WS-B 2.6** — Transaction-history RPC wrappers
+4. **WS-B 2.8** — Finish Twilio sync module (`twilio-bootstrap` / open-sync)
+5. **WS-C 3D** — Delete Edge `sms-status`; finish IVR handler tests + webhook repoint on staging
 
 Full task checkboxes: [`migration-delivery-board.md`](./migration-delivery-board.md).
 

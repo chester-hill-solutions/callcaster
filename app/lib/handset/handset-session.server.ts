@@ -1,12 +1,17 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database, Tables } from "@/lib/database.types";
+import type { Database } from "@/lib/database.types";
+import { handset_session as handsetSessionTable } from "@/db/schema";
 import { getHandsetNumberForWorkspace } from "@/lib/database.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
-import { env } from "@/lib/env.server";
 import { getAgentStatus } from "@/lib/agent-status.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { and, desc, eq, gte } from "drizzle-orm";
+import { db } from "@/server/db";
 
 export const SESSION_EXPIRY_MINUTES = 60;
+
+type AgentStatusRow = Awaited<ReturnType<typeof getAgentStatus>>;
 
 export type HandsetLoaderData = {
   handsetNumber: string | null;
@@ -14,7 +19,7 @@ export type HandsetLoaderData = {
   workspaceId: string;
   token: string | null;
   tokenError: string | null;
-  agentStatus: Tables<"agent_status"> | null;
+  agentStatus: AgentStatusRow;
   userId: string;
 };
 
@@ -27,12 +32,13 @@ export async function getHandsetLoaderData({
   user: { id: string };
   workspaceId: string;
 }): Promise<HandsetLoaderData> {
+  const tdb = createTenantDb(workspaceId);
   const { data: handsetData } = await getHandsetNumberForWorkspace({
-    supabaseClient,
     workspaceId,
+    tdb,
   });
 
-  const agentStatus = await getAgentStatus(supabaseClient, workspaceId, user.id);
+  const agentStatus = await getAgentStatus(workspaceId, user.id, tdb);
 
   if (!handsetData?.phone_number) {
     return {
@@ -47,21 +53,19 @@ export async function getHandsetLoaderData({
   }
 
   const clientIdentity = `handset-${crypto.randomUUID()}`;
+  const now = new Date().toISOString();
   const expiresAt = new Date(
     Date.now() + SESSION_EXPIRY_MINUTES * 60 * 1000,
   ).toISOString();
 
-  const { error } = await supabaseClient.from("handset_session").insert({
+  await tdb.handset_session.insert({
+    id: crypto.randomUUID(),
     user_id: user.id,
-    workspace_id: workspaceId,
     client_identity: clientIdentity,
     status: "active",
+    created_at: now,
     expires_at: expiresAt,
   });
-
-  if (error) {
-    throw new Response("Failed to create handset session", { status: 500 });
-  }
 
   const tokenResult = await createHandsetAccessToken({
     supabaseClient,
@@ -80,6 +84,26 @@ export async function getHandsetLoaderData({
   };
 }
 
+export async function findActiveHandsetSessionClientIdentity(
+  workspaceId: string,
+): Promise<string | null> {
+  const now = new Date().toISOString();
+  const [session] = await db
+    .select({ client_identity: handsetSessionTable.client_identity })
+    .from(handsetSessionTable)
+    .where(
+      and(
+        eq(handsetSessionTable.workspace_id, workspaceId),
+        eq(handsetSessionTable.status, "active"),
+        gte(handsetSessionTable.expires_at, now),
+      ),
+    )
+    .orderBy(desc(handsetSessionTable.created_at))
+    .limit(1);
+
+  return session?.client_identity ?? null;
+}
+
 export async function endHandsetSession({
   workspaceId,
   userId,
@@ -87,15 +111,12 @@ export async function endHandsetSession({
   workspaceId: string;
   userId: string;
 }): Promise<void> {
-  const serviceSupabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
-  );
-
-  await serviceSupabase
-    .from("handset_session")
-    .update({ status: "ended" })
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .eq("status", "active");
+  const tdb = createTenantDb(workspaceId);
+  await tdb.handset_session.update({
+    set: { status: "ended" },
+    where: and(
+      eq(handsetSessionTable.user_id, userId),
+      eq(handsetSessionTable.status, "active"),
+    ),
+  });
 }

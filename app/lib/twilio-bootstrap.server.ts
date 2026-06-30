@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { env } from "@/lib/env.server";
+import { eq } from "drizzle-orm";
+import { workspace as workspaceTable } from "@/db/schema";
+import { adminDb } from "@/server/admin-db";
 import { logger } from "@/lib/logger.server";
 import {
   buildOnboardingStepsForState,
@@ -9,6 +11,7 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import { hydrateWorkspaceRcsOnboardingState } from "@/lib/rcs-onboarding.server";
 import type { TwilioAccountData, WorkspaceMessagingOnboardingState } from "@/lib/types";
+import { env } from "@/lib/env.server";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { presentTwilioError, twilioErrorUserMessage } from "@/lib/twilio-errors";
@@ -103,20 +106,24 @@ export async function ensureWorkspaceTwilioBootstrap({
   workspaceId: string;
   actorUserId: string | null;
 }): Promise<WorkspaceTwilioBootstrapResult> {
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("id, name, twilio_data")
-    .eq("id", workspaceId)
-    .single();
+  const [workspace] = await adminDb
+    .select({
+      id: workspaceTable.id,
+      name: workspaceTable.name,
+      twilio_data: workspaceTable.twilio_data,
+    })
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
 
-  if (error) {
-    throw error;
+  if (!workspace) {
+    throw new Error(`Workspace ${workspaceId} not found`);
   }
 
-  const currentTwilioData = isObject(workspace?.twilio_data)
+  const currentTwilioData = isObject(workspace.twilio_data)
     ? workspace.twilio_data
     : await loadWorkspaceTwilioData(supabaseClient, workspaceId);
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (workspace.twilio_data ?? null) as TwilioAccountData;
   const accountSid = parseOptionalString(currentTwilioData.sid);
   const authToken = parseOptionalString(currentTwilioData.authToken);
 

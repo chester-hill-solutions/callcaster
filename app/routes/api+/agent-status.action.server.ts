@@ -31,7 +31,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     const result = await updateAgentStatus(
-      supabase,
       body.workspace_id,
       auth.user.id,
       body.status,

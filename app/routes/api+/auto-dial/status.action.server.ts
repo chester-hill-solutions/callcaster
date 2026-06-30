@@ -192,7 +192,6 @@ const updateTransaction = async (call: Tables<"call">, duration: number) => {
   }
   const billingUnits = billingUnitsFromCallDurationSeconds(duration, "staffed");
   await insertTransactionHistoryIdempotent({
-    supabase,
     workspaceId: call.workspace,
     type: "DEBIT",
     amount: debitAmountFromCredits(billingUnits),

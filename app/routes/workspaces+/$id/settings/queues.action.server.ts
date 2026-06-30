@@ -1,20 +1,27 @@
 import { data as routeData } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  addInboundQueueMember,
+  createInboundQueue,
+  deleteInboundQueue,
+  removeInboundQueueMember,
+  updateInboundQueue,
+} from "@/lib/inbound-queue-db.server";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!user || !workspaceId) {
     return routeData({ error: "Unauthorized" }, { status: 401, headers });
   }
 
-  await requireWorkspaceAccess({ supabaseClient, user: { id: user.id }, workspaceId });
+  await requireWorkspaceAccess({ user: { id: user.id }, workspaceId });
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
+  const userRole = await getUserRole({ user, workspaceId });
   if (!userRole || userRole.role === MemberRole.Caller) {
     return routeData({ error: "Not authorized" }, { status: 403, headers });
   }
@@ -27,49 +34,43 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const { name, description } = body;
       if (!name) return routeData({ error: "name required" }, { status: 400, headers });
 
-      const { error } = await supabaseClient
-        .from("inbound_queue")
-        .insert({ name, description: description || null, workspace_id: workspaceId });
-
-      if (error) {
+      try {
+        await createInboundQueue({ workspaceId, name, description });
+        return routeData({ ok: true }, { headers });
+      } catch (error) {
         logger.error("Failed to create queue", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
       }
-      return routeData({ ok: true }, { headers });
     }
 
     case "update-queue": {
       const { id, name, description } = body;
       if (!id) return routeData({ error: "id required" }, { status: 400, headers });
 
-      const { error } = await supabaseClient
-        .from("inbound_queue")
-        .update({ name, description: description || null, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .eq("workspace_id", workspaceId);
-
-      if (error) {
+      try {
+        await updateInboundQueue({
+          workspaceId,
+          id: Number(id),
+          updates: { name, description: description || null },
+        });
+        return routeData({ ok: true }, { headers });
+      } catch (error) {
         logger.error("Failed to update queue", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
       }
-      return routeData({ ok: true }, { headers });
     }
 
     case "delete-queue": {
       const { id } = body;
       if (!id) return routeData({ error: "id required" }, { status: 400, headers });
 
-      const { error } = await supabaseClient
-        .from("inbound_queue")
-        .delete()
-        .eq("id", id)
-        .eq("workspace_id", workspaceId);
-
-      if (error) {
+      try {
+        await deleteInboundQueue({ workspaceId, id: Number(id) });
+        return routeData({ ok: true }, { headers });
+      } catch (error) {
         logger.error("Failed to delete queue", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
       }
-      return routeData({ ok: true }, { headers });
     }
 
     case "add-member": {
@@ -78,15 +79,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         return routeData({ error: "queue_id and user_id required" }, { status: 400, headers });
       }
 
-      const { error } = await supabaseClient
-        .from("inbound_queue_member")
-        .insert({ queue_id: Number(queue_id), user_id, workspace_id: workspaceId });
-
-      if (error) {
+      try {
+        await addInboundQueueMember({
+          workspaceId,
+          queueId: Number(queue_id),
+          userId: user_id,
+        });
+        return routeData({ ok: true }, { headers });
+      } catch (error) {
         logger.error("Failed to add member", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
       }
-      return routeData({ ok: true }, { headers });
     }
 
     case "remove-member": {
@@ -95,17 +98,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         return routeData({ error: "queue_id and user_id required" }, { status: 400, headers });
       }
 
-      const { error } = await supabaseClient
-        .from("inbound_queue_member")
-        .delete()
-        .eq("queue_id", Number(queue_id))
-        .eq("user_id", user_id);
-
-      if (error) {
+      try {
+        await removeInboundQueueMember({
+          workspaceId,
+          queueId: Number(queue_id),
+          userId: user_id,
+        });
+        return routeData({ ok: true }, { headers });
+      } catch (error) {
         logger.error("Failed to remove member", error);
-        return routeData({ error: error.message }, { status: 500, headers });
+        return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
       }
-      return routeData({ ok: true }, { headers });
     }
 
     default:

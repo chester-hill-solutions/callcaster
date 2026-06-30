@@ -1,5 +1,6 @@
-import { getServiceSupabase } from "@/lib/supabase.server";
+import { findActiveHandsetSessionClientIdentity } from "@/lib/handset/handset-session.server";
 import { logger } from "@/lib/logger.server";
+import { getServiceSupabase } from "@/lib/supabase.server";
 import { validateTwilioWebhookForPhoneNumber } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
@@ -33,18 +34,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const workspaceId = validation.workspaceId;
-  const now = new Date().toISOString();
-  const { data: session, error: sessionError } = await supabase
-    .from("handset_session")
-    .select("client_identity")
-    .eq("workspace_id", workspaceId)
-    .eq("status", "active")
-    .gte("expires_at", now)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const clientIdentity = await findActiveHandsetSessionClientIdentity(workspaceId);
 
-  if (sessionError || !session) {
+  if (!clientIdentity) {
     twiml.say("No one is available to take your call. Please try again later.");
     twiml.hangup();
     return new Response(twiml.toString(), {
@@ -52,7 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  twiml.dial().client(session.client_identity);
+  twiml.dial().client(clientIdentity);
 
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" },

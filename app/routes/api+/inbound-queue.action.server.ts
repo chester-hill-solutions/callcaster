@@ -2,7 +2,15 @@ import {
   getAuthSupabaseClient,
   requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database.server";
+import {
+  addInboundQueueMember,
+  createInboundQueue,
+  deleteInboundQueue,
+  loadInboundQueueSettings,
+  removeInboundQueueMember,
+  updateInboundQueue,
+} from "@/lib/inbound-queue-db.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
@@ -19,18 +27,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonError("workspace_id required", 400);
   }
 
-  await requireWorkspaceAccess({
-    supabaseClient,
-    user: { id: auth.user.id },
-    workspaceId,
-  });
-
   const userRole = await getUserRole({
     supabaseClient,
     user: { id: auth.user.id },
     workspaceId,
   });
-  if (userRole?.role === MemberRole.Caller) {
+  if (!userRole) {
+    return jsonError("Not a member", 403);
+  }
+  if (userRole.role === MemberRole.Caller) {
     return jsonError("Callers cannot manage queues", 403);
   }
 
@@ -39,63 +44,49 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const { name, description, hold_audio } = body;
       if (!name) return jsonError("name required", 400);
 
-      const { data, error } = await supabaseClient
-        .from("inbound_queue")
-        .insert({
+      try {
+        const queue = await createInboundQueue({
+          workspaceId,
           name,
           description,
-          hold_audio: hold_audio || null,
-          workspace_id: workspaceId,
-        })
-        .select()
-        .single();
-
-      if (error) {
+          hold_audio,
+        });
+        return jsonResponse({ queue }, 200);
+      } catch (error) {
         logger.error("Failed to create queue", error);
-        return jsonError(error.message, 500);
+        return jsonError(error instanceof Error ? error.message : "Failed to create queue", 500);
       }
-      return jsonResponse({ queue: data }, 200);
     }
 
     case "PUT": {
       const { id, name, description, hold_audio } = body;
       if (!id) return jsonError("id required", 400);
 
-      const updates: Record<string, unknown> = {};
-      if (name !== undefined) updates.name = name;
-      if (description !== undefined) updates.description = description;
-      if (hold_audio !== undefined) updates.hold_audio = hold_audio;
-
-      const { data, error } = await supabaseClient
-        .from("inbound_queue")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .eq("workspace_id", workspaceId)
-        .select()
-        .single();
-
-      if (error) {
+      try {
+        const queue = await updateInboundQueue({
+          workspaceId,
+          id: Number(id),
+          updates: { name, description, hold_audio },
+        });
+        if (!queue) return jsonError("Queue not found", 404);
+        return jsonResponse({ queue }, 200);
+      } catch (error) {
         logger.error("Failed to update queue", error);
-        return jsonError(error.message, 500);
+        return jsonError(error instanceof Error ? error.message : "Failed to update queue", 500);
       }
-      return jsonResponse({ queue: data }, 200);
     }
 
     case "DELETE": {
       const { id } = body;
       if (!id) return jsonError("id required", 400);
 
-      const { error } = await supabaseClient
-        .from("inbound_queue")
-        .delete()
-        .eq("id", id)
-        .eq("workspace_id", workspaceId);
-
-      if (error) {
+      try {
+        await deleteInboundQueue({ workspaceId, id: Number(id) });
+        return jsonResponse({ ok: true }, 200);
+      } catch (error) {
         logger.error("Failed to delete queue", error);
-        return jsonError(error.message, 500);
+        return jsonError(error instanceof Error ? error.message : "Failed to delete queue", 500);
       }
-      return jsonResponse({ ok: true }, 200);
     }
 
     case "PATCH": {
@@ -104,28 +95,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return jsonError("queue_id, user_id, and action required", 400);
       }
 
-      if (memberAction === "add") {
-        const { error } = await supabaseClient
-          .from("inbound_queue_member")
-          .insert({ queue_id, user_id, workspace_id: workspaceId });
-        if (error) {
-          logger.error("Failed to add member", error);
-          return jsonError(error.message, 500);
+      try {
+        if (memberAction === "add") {
+          await addInboundQueueMember({
+            workspaceId,
+            queueId: Number(queue_id),
+            userId: user_id,
+          });
+        } else if (memberAction === "remove") {
+          await removeInboundQueueMember({
+            workspaceId,
+            queueId: Number(queue_id),
+            userId: user_id,
+          });
+        } else {
+          return jsonError("action must be 'add' or 'remove'", 400);
         }
-      } else if (memberAction === "remove") {
-        const { error } = await supabaseClient
-          .from("inbound_queue_member")
-          .delete()
-          .eq("queue_id", queue_id)
-          .eq("user_id", user_id);
-        if (error) {
-          logger.error("Failed to remove member", error);
-          return jsonError(error.message, 500);
-        }
-      } else {
-        return jsonError("action must be 'add' or 'remove'", 400);
+        return jsonResponse({ ok: true }, 200);
+      } catch (error) {
+        logger.error("Failed to update queue member", error);
+        return jsonError(error instanceof Error ? error.message : "Failed to update member", 500);
       }
-      return jsonResponse({ ok: true }, 200);
     }
 
     default:

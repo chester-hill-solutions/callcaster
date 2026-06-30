@@ -128,7 +128,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ? `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${outreachAttemptId}`
         : `Call ${updateData.sid} (API/staffed dial)`;
       await insertTransactionHistoryIdempotent({
-        supabase,
         workspaceId: billingWorkspace,
         type: "DEBIT",
         amount: debitAmountFromCredits(billingUnits),

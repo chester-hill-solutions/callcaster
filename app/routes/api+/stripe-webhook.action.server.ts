@@ -66,7 +66,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
 
     const { inserted } = await insertTransactionHistoryIdempotent({
-      supabase,
       workspaceId,
       type: "CREDIT",
       amount: creditAmount,

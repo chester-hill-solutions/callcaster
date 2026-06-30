@@ -249,7 +249,6 @@ export async function purchaseWorkspaceNumber(
     });
 
     await insertTransactionHistoryIdempotent({
-      supabase,
       workspaceId,
       type: "DEBIT",
       amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),

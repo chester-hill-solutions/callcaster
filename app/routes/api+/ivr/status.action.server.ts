@@ -123,7 +123,6 @@ const debitIvrCallCredits = async (
 ): Promise<void> => {
     const credits = voiceCreditsFromDurationSeconds(args.durationSeconds, "ivr");
     await insertTransactionHistoryIdempotent({
-        supabase,
         workspaceId: args.workspaceId,
         type: "DEBIT",
         amount: debitAmountFromCredits(credits),

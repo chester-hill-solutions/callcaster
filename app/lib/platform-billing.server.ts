@@ -269,7 +269,6 @@ export async function pollBillingCheckoutSession(args: {
 
   try {
     const result = await insertTransactionHistoryIdempotent({
-      supabase,
       workspaceId,
       type: "CREDIT",
       amount: creditAmount,
@@ -320,7 +319,6 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
     }
 
     await insertTransactionHistoryIdempotent({
-      supabase,
       workspaceId,
       type: "CREDIT",
       amount: creditAmount,

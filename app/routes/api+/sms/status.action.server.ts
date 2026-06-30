@@ -118,7 +118,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           Number.parseInt(String(messageData.num_segments ?? "1"), 10) || 1,
         );
         await insertTransactionHistoryIdempotent({
-          supabase,
           workspaceId: messageData.workspace,
           type: "DEBIT",
           amount: debitAmountFromCredits(SMS_SEGMENT_CREDITS * numSegments),

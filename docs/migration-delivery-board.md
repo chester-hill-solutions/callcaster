@@ -13,9 +13,9 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 | Metric | Value | Gate |
 |--------|------:|------|
 | Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
-| `app/lib/database/*.server.ts` on tenant-db | **7 / 13** | G2 |
-| App `supabase.from()` call sites in `app/` | **~30+** (survey/admin/platform routes; `campaign_queue` server reads/writes on Drizzle; client realtime hook only) | G2 |
-| `database.types` imports in `app/` | **~168 files** | G2 (delete at exit) |
+| `app/lib/database/*.server.ts` on tenant-db | **8 / 13** | G2 |
+| App `supabase.from()` call sites in `app/` | **308** `.from("…")` in **122** files (admin/platform/hooks; server `campaign_queue` + survey routes on Drizzle) | G2 |
+| `database.types` imports in `app/` | **162 files** | G2 (delete at exit) |
 | Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
 | E2E on review URL | Not run | G4 |
 
@@ -97,12 +97,12 @@ Inventory: [`phase-2-drizzle-port-inventory.md`](./phase-2-drizzle-port-inventor
 | 2.7 | Telephony adjunct | Todo | `agent-status`, handset, inbound queue |
 | 2.8 | Twilio config modules | **Partial** | `merge-workspace-twilio-data`, portal config/snapshot on Drizzle; sync module remains |
 | 2.9 | Platform facades | **Done** | `platform-data.server.ts` on tenant-db/Drizzle; Supabase storage for audience-upload download only |
-| 2.10 | Route stragglers | **Done** | Queue UI + dial-path queue writes; survey routes/loaders on `survey-db.server.ts` |
+| 2.10 | Route stragglers | **Done** | Queue UI + dial-path writes (`campaign-queue-db`); survey routes/loaders (`survey-db`); 92 queue/survey route tests green |
 | 2.11 | UI/hooks type cleanup | Todo | `LiveCampaign` / `IVRCampaign` / `MessageCampaign` in components |
-| 2.12 | Delete `database.types.ts` | Todo | ~168 imports remain |
+| 2.12 | Delete `database.types.ts` | Todo | ~162 imports remain |
 | 2.13 | E2E factories → Drizzle | Todo | `e2e/fixtures/factories.ts` still references subtype tables |
 
-**Progress:** **8 done** · **2 in progress** · 3 todo (of 13 modules) · ~168 `database.types` imports · route auth test harness fixed
+**Progress:** **8 done** · **2 in progress** · 3 todo (of 13 modules) · 162 `database.types` imports · 308 PostgREST `.from("…")` sites remain
 
 ---
 
@@ -203,10 +203,10 @@ gantt
 ## Next 5 actions (orchestrator)
 
 1. **WS-B 2.7** — Telephony adjunct (`agent-status`, handset, inbound queue)
-2. **WS-B 2.6** — Transaction-history RPC wrappers
-3. **WS-B 2.8** — Finish Twilio sync module
-4. **WS-B settings loader** — `settings.loader.server.ts` survey PostgREST straggler
-5. **WS-B 2.11–2.12** — UI type cleanup + drop `database.types.ts`
+2. **WS-B survey stragglers** — `settings.loader.server.ts` + `platform-analytics.server.ts` → `survey-db.server.ts`
+3. **WS-B 2.6** — Transaction-history RPC wrappers
+4. **WS-B 2.8** — Finish Twilio sync module
+5. **WS-B platform/admin bulk** — `platform-admin`, `platform-members`, `workspace-settings`, audience-upload/export
 
 ---
 
@@ -221,6 +221,8 @@ gantt
 | 2026-06-29 | agent | Unified campaign: IVR Remix routes, export, create flow, `campaign-ivr.server.ts` |
 | 2026-06-29 | agent | Phase 2 B1: `campaign-stats.server.ts` → tenant-db |
 | 2026-06-29 | agent | Phase 2 B2 (partial): `call-screen`, `auto-dial`, settings readiness fix |
+| 2026-06-29 | agent | Dial-path `campaign_queue` → `campaign-queue-db.server.ts`; platform resolve on Drizzle; 64 queue/dial route tests green |
 | 2026-06-29 | agent | Survey routes/loaders → `survey-db.server.ts`; platform-data deduped; 28 survey route tests green |
-| 2026-06-29 | agent | Messaging port: `workspace-credits`, `sms-send`/inbound-sms/ivr/auto-dial tenant-db; test stubs; **127** dial+messaging tests green; route `supabase.from()` → 1 file |
+| 2026-06-29 | agent | Messaging port: `workspace-credits`, sms/inbound-sms/ivr/auto-dial tenant-db; test stubs; **127** dial+messaging tests green |
 | 2026-06-29 | agent | Platform-data: contacts, audiences, scripts, campaign status, audience upload on tenant-db/Drizzle; `buildContactSearchWhere` |
+| 2026-06-29 | agent | Plan sync: queue + survey ports reflected; metrics **308** PostgREST sites / **122** files / **162** `database.types` imports |

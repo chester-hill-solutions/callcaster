@@ -1,44 +1,35 @@
-import {
-  Audience,
-  Campaign,
-  Script,
-  WorkspaceNumbers,
-  Schedule,
-  WorkspaceData,
-  QueueItem,
-  LiveCampaign,
-  MessageCampaign,
-  IVRCampaign,
-  Survey,
-  TwilioAccountData,
-} from "@/lib/types";
+import { eq } from "drizzle-orm";
 import { data as routeData, redirect } from "react-router";
-import { deepEqual } from "@/lib/utils";
-import { fetchCampaignAudience, fetchCampaignDetails, fetchQueueCounts, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, parseActionRequest, updateCampaign } from "@/lib/database.server";
+import { campaign as campaignTable, workspace as workspaceTable } from "@/db/schema";
+import { fetchCampaignAudience, fetchCampaignDetails, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData } from "@/lib/database.server";
 import { loadCampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { loadActiveSurveysForWorkspace } from "@/lib/survey-db.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
+import type { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, QueueItem, TwilioAccountData } from "@/lib/types";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
   const { id: workspace_id, selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);
 
   if (!selected_id || !workspace_id) return redirect("/");
 
+  const tdb = createTenantDb(workspace_id);
+
   const [
     campaignWithAudience,
-    campaignTypeResult,
-    surveysResult,
+    campaignType,
+    surveys,
     workspaceAudioList,
     workspaceTwilioResult,
     phoneNumbersResult,
-    campaignCountResult,
+    campaignCount,
     campaignStatusResult,
   ] = await Promise.all([
     fetchCampaignAudience({
@@ -46,44 +37,29 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       campaignId: selected_id,
       supabaseClient,
     }),
-    supabaseClient
-      .from("campaign")
-      .select("*")
-      .eq("id", Number(selected_id))
-      .eq("workspace", workspace_id)
-      .single(),
-    supabaseClient
-      .from("survey")
-      .select("survey_id, title")
-      .eq("workspace", workspace_id)
-      .eq("is_active", true),
+    tdb.campaign.findFirst({
+      where: eq(campaignTable.id, Number(selected_id)),
+    }),
+    loadActiveSurveysForWorkspace(workspace_id),
     supabaseClient.storage.from("workspaceAudio").list(`${workspace_id}`),
-    supabaseClient
-      .from("workspace")
-      .select("twilio_data")
-      .eq("id", workspace_id)
-      .maybeSingle(),
+    adminDb
+      .select({ twilio_data: workspaceTable.twilio_data })
+      .from(workspaceTable)
+      .where(eq(workspaceTable.id, workspace_id))
+      .limit(1),
     getWorkspacePhoneNumbers({
-      supabaseClient,
       workspaceId: workspace_id,
     }),
-    supabaseClient
-      .from("campaign")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace", workspace_id),
-    supabaseClient
-      .from("campaign")
-      .select("status")
-      .eq("id", Number(selected_id))
-      .eq("workspace", workspace_id)
-      .single(),
+    tdb.campaign.count(),
+    tdb.campaign.findFirst({
+      where: eq(campaignTable.id, Number(selected_id)),
+      columns: { status: true },
+    }),
   ]);
 
-  const campaignType = campaignTypeResult.data;
-  const surveys = surveysResult.data;
   const mediaData = workspaceAudioList.data;
   let mediaLinks: string[] = [];
-  const twilioData = (workspaceTwilioResult.data?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (workspaceTwilioResult[0]?.twilio_data ?? null) as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const portalConfig = getWorkspaceTwilioPortalConfigFromTwilioData(twilioData);
   const defaultMessagingServiceSid = portalConfig.messagingServiceSid?.trim() ?? null;
@@ -159,8 +135,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     surveys,
     outboundEstimateInputs,
     isFirstDraftCampaign:
-      (campaignCountResult.count ?? 0) === 1 &&
-      campaignStatusResult.data?.status === "draft",
+      campaignCount === 1 &&
+      campaignStatusResult?.status === "draft",
     smsSendContext: {
       messagingServiceReady,
       defaultMessagingServiceSid,
@@ -170,4 +146,4 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     campaignBilling,
     readiness,
   });
-}
+};

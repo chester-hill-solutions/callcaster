@@ -25,7 +25,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await buildSurveyResponsesCsv({
-    supabaseClient,
     workspaceId,
     surveyId,
   });

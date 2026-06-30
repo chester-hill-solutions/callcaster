@@ -26,7 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       workspaceId,
     });
 
-    const status = await getAgentStatus(supabase, workspaceId, auth.user.id);
+    const status = await getAgentStatus(workspaceId, auth.user.id);
     return routeData({ status });
   } catch (error) {
     logger.error("agent-status loader error:", error);

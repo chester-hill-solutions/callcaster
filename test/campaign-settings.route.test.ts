@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
+});
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -34,8 +40,13 @@ vi.mock("@/lib/database.server", () => ({
   fetchCampaignDetails: (...args: any[]) => mocks.fetchCampaignDetails(...args),
   fetchQueueCounts: (...args: any[]) => mocks.fetchQueueCounts(...args),
   getSignedUrls: (...args: any[]) => mocks.getSignedUrls(...args),
+  getWorkspacePhoneNumbers: vi.fn(async () => ({ data: [], error: null })),
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
+}));
+
+vi.mock("@/lib/survey-db.server", () => ({
+  loadActiveSurveysForWorkspace: vi.fn(async () => []),
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));

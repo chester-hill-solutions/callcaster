@@ -1,4 +1,9 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
+});
 
 import { insertTransactionHistoryIdempotent } from "../app/lib/transaction-history.server";
 import {
