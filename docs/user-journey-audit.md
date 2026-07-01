@@ -2,13 +2,21 @@
 
 **Date:** 2026-06-30
 **Scope:** Full audit across all user types
-**Journeys mapped:** 40 | **Routes scanned:** 477 | **Components scanned:** 156
+**Journeys mapped:** 51 | **Routes scanned:** 477 | **Components scanned:** 156
 
 ---
 
 ## Executive Summary
 
-CallCaster serves three distinct user types across a React Router v7 application with 477 routes. This audit maps **40 distinct user journeys** spanning authentication, onboarding, campaign management, agent calling/SMS, admin oversight, billing, settings, analytics, and background jobs. The surface is large and feature-rich, but several friction points create drop-off risk—especially in the pre-value compliance funnel, the campaign creation/settings loop, and the agent call-screen complexity.
+CallCaster serves **six distinct user types** across a React Router v7 application with 477 routes. This audit maps **51 distinct user journeys** spanning authentication, onboarding, campaign management, agent calling/SMS, survey respondent experience, admin oversight, billing, settings, analytics, API documentation, marketing, and background jobs. The surface is large and feature-rich, but several friction points create drop-off risk—especially in the pre-value compliance funnel, the campaign creation/settings loop, and the agent call-screen complexity.
+
+**User Types:**
+1. **Campaign Manager / Admin** — Creates workspaces, campaigns, audiences; manages billing and settings
+2. **Caller / Agent** — Makes calls, sends SMS, handles inbound calls, dispositions contacts
+3. **System Admin** — Monitors system health, manages users/workspaces, reconciles Twilio billing
+4. **Integrator / Developer** — Browses API docs, generates API keys, configures webhooks
+5. **Prospect** — Visits marketing pages, explores services and pricing before signing up
+6. **Survey Respondent** — External contact who receives and completes public surveys
 
 **Top themes:**
 1. **Long time-to-value:** New users hit a 6-step compliance onboarding before they can send a message or place a call.
@@ -19,6 +27,8 @@ CallCaster serves three distinct user types across a React Router v7 application
 6. **Developer backdoors in production:** "Reset Campaign" button is hardcoded to 2 specific user IDs.
 7. **Real-time jank:** Campaign dashboard revalidates every 2 seconds; chat read-state flickers via custom window events.
 8. **Compliance gaps:** Opt-out is permanent with no re-opt-in; STOP conversation visibility not persisted across sessions.
+9. **Survey respondent experience is unowned:** No edit-after-submit, no resume-later, no token security on survey URLs.
+10. **Legacy surface still accessible:** The old WebSocket dashboard (`/dashboard/:id`) is reachable but undocumented and disconnected from modern flows.
 
 ---
 
@@ -29,6 +39,9 @@ CallCaster serves three distinct user types across a React Router v7 application
 | **Campaign Manager / Admin** | Create workspace → onboard → build campaign → manage queue → review results → manage billing |
 | **Caller / Agent** | Join campaign → dial/SMS contacts → disposition → repeat → handle inbound calls |
 | **System Admin** | Monitor workspaces/users → invite members → reconcile Twilio billing → manage system settings |
+| **Integrator / Developer** | Browse API docs → generate API keys → configure webhooks → build integrations |
+| **Prospect** | Visit marketing pages → explore services/pricing → contact sales or request demo |
+| **Survey Respondent** | Receive survey link → complete multi-page form → submit responses |
 
 ---
 
@@ -514,6 +527,138 @@ CallCaster serves three distinct user types across a React Router v7 application
 | **Outcome** | Webhook configured; external system receives workspace events |
 | **Pain points** | • No inline webhook test or "Send test payload" button.<br>• No delivery log or retry history visible in UI.<br>• Webhook URL validation is basic; no SSL/cert check warning.<br>• No webhook secret or signature verification guidance shown.<br>• Event type descriptions are technical; not all users understand them. |
 
+### 41. Landing / Marketing Site
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Understand CallCaster's value proposition and navigate to signup or signin |
+| **Trigger** | User visits `/` (root) or `/pricing` |
+| **Steps** | 1. Landing page loads → 2. View hero, features, pricing info → 3. Click "Get Started" or "Sign In" → 4. Navigate to `/signup` or `/signin` |
+| **Components** | `Navbar`, `TransparentBGImage`, `ServiceCard` |
+| **Actions** | Browse marketing content → Click CTA → Navigate to auth flow |
+| **Outcome** | User understands the product and enters the app |
+| **Pain points** | • Landing page is static; no interactive demo or sandbox.<br>• Pricing page may not clearly explain credit usage or per-message/call costs.<br>• No social proof (testimonials, case studies) visible in components scanned.<br>• CTA leads to `/signup` which is a lead form, creating an expectation mismatch. |
+
+### 42. Campaign Archive Browse
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Browse, search, and manage archived campaigns |
+| **Trigger** | User navigates to `/workspaces/{id}/campaigns/archive` |
+| **Steps** | 1. `/campaigns` → Click "Archive" tab → 2. `/campaigns/archive` → View archived campaigns table → 3. Filter/search → 4. Click campaign to view (read-only) → 5. Optionally unarchive or duplicate |
+| **Components** | `CampaignList`, `CampaignEmptyState`, `CampaignHeader` |
+| **Actions** | Switch to Archive tab → Browse archived campaigns → Filter by date/name → View archived campaign details → Unarchive or duplicate |
+| **Outcome** | Archived campaigns reviewed; optionally restored or cloned |
+| **Pain points** | • Archive tab is easy to miss in campaign navigation.<br>• No bulk unarchive action for multiple campaigns.<br>• Archived campaigns are read-only; no quick "Duplicate and revive" action.<br>• No search within archive separate from active campaigns. |
+
+### 43. Audio Library Browse & Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Browse, play, and manage uploaded audio files |
+| **Trigger** | User navigates to `/workspaces/{id}/audios` |
+| **Steps** | 1. `/audios` → View audio table with inline players → 2. Sort by name/date → 3. Paginate through files → 4. Click "Upload" to navigate to `/audios/new` |
+| **Components** | `DataTable`, `WorkspaceResourceListShell`, inline `<audio controls>` |
+| **Actions** | Browse audio files → Play preview → Sort → Navigate to upload page |
+| **Outcome** | Audio library reviewed; user knows what assets are available for campaigns |
+| **Pain points** | • No inline actions from the table (delete, rename, replace).<br>• No metadata shown (duration, file size, bitrate) despite columns being partially defined.<br>• No usage indicator showing which campaigns use each audio file.<br>• Upload is a separate page; no drag-and-drop or inline upload. |
+
+### 44. Forgot Password / Password Recovery
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Reset a forgotten password and regain account access |
+| **Trigger** | User clicks "I forgot my password" from `/signin` |
+| **Steps** | 1. `/signin` → Click "I forgot my password" → 2. `/remember` (enter email) → 3. Submit reset request → 4. Receive reset email → 5. Click reset link → 6. Enter new password → 7. Confirm → 8. Redirect to `/signin` |
+| **Components** | `AuthCard`, `EmailField`, `ErrorAlert` |
+| **Actions** | Enter email → Submit → Check email → Click link → Enter new password → Confirm → Sign in |
+| **Outcome** | Password reset; account access restored |
+| **Pain points** | • This flow was not explicitly visible in the route scan; verify it still exists and is functional.<br>• No clear "Check your email" confirmation message after submitting reset request.<br>• Reset link expiration duration not communicated to user.<br>• No resend option if email is delayed or lost.<br>• New password strength requirements not shown during entry. |
+
+### 45. API Documentation Browsing
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Explore CallCaster's API endpoints and integration options |
+| **Trigger** | Developer or integrator navigates to `/docs` |
+| **Steps** | 1. `/docs` loads → 2. Interactive OpenAPI documentation renders via Scalar → 3. Toggle between "Public API" spec (`/api/docs/openapi`) and "Complete API Surface" (`/api/docs/openapi/all`) → 4. Browse endpoints, schemas, and examples → 5. Follow links to human guides on GitHub |
+| **Components** | Scalar OpenAPI renderer |
+| **Actions** | Toggle API spec → Expand endpoint details → Copy code examples → Navigate to GitHub guides |
+| **Outcome** | Developer understands available API endpoints and how to integrate |
+| **Pain points** | • Only two API spec toggles; no granular filtering by endpoint category.<br>• No "Try it" or interactive request builder visible in the Scalar integration.<br>• No authentication helper to generate/test API keys inline.<br>• Human guides are external links; no embedded documentation. |
+
+### 46. Services Marketing Page
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Learn about CallCaster agency services beyond the software |
+| **Trigger** | Prospect navigates to `/services` (or `/other-services` which redirects) |
+| **Steps** | 1. `/services` loads → 2. Browse service cards: Data Management, Digital Ads, Web Development, Robocalls, Robosurveys, Texting → 3. Read descriptions → 4. Note contact email for inquiries |
+| **Components** | `ServiceCard`, `Navbar` |
+| **Actions** | Scroll service cards → Read service details → Contact via email |
+| **Outcome** | Prospect understands agency service offerings |
+| **Pain points** | • Static page with no pricing or package details for services.<br>• No CTA beyond email; no contact form or booking flow.<br>• No differentiation between software features and agency services.<br>• Page is not linked prominently from the main landing page. |
+
+### 47. Public Survey Taking (Respondent Experience)
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Complete a survey sent by a CallCaster campaign |
+| **Trigger** | Contact receives survey link and navigates to `/survey/:surveyId` |
+| **Steps** | 1. Public survey page loads → 2. View survey title/description → 3. Answer multi-page questions (text, textarea, radio, checkbox with write-in) → 4. See progress indicator → 5. Answers auto-save via debounced fetcher → 6. Submit final page → 7. Thank you / completion message |
+| **Components** | Survey public page renderer (anonymous, no auth required) |
+| **Actions** | Read question → Select/enter answer → Navigate pages → Submit survey |
+| **Outcome** | Survey responses collected and stored for campaign review |
+| **Pain points** | • Anonymous respondents have no way to edit responses after submission.<br>• No resume-later capability; partial responses rely on auto-save but no unique link to return.<br>• No confirmation email to respondent upon completion.<br>• Progress indicator is basic; no "X of Y questions" detail.<br>• Write-in options for radio/checkbox are plain text with no validation.<br>• Survey URL is guessable (`/survey/:surveyId`); no token-based security. |
+
+### 48. Legacy Call Dashboard (WebSocket Audio Streaming)
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Participate in a call using the legacy WebSocket-based audio streaming system |
+| **Trigger** | Agent navigates to `/dashboard/:id` |
+| **Steps** | 1. `/dashboard/:id` loads → 2. Initialize WebSocket to `wss://socketserver-production-2306.up.railway.app/${id}` → 3. Grant `getUserMedia` permission → 4. Start audio recording → 5. Stream audio outbound via WebSocket → 6. Receive and play inbound audio buffers via AudioContext → 7. Stop recording when done |
+| **Components** | Legacy WebSocket audio streaming interface |
+| **Actions** | Connect WebSocket → Grant mic permission → Start/stop recording |
+| **Outcome** | Audio call completed via legacy streaming infrastructure |
+| **Pain points** | • This route is legacy and may be deprecated; unclear if it's still in active use.<br>• WebSocket URL is hardcoded to a specific Railway instance.<br>• No fallback or error handling if WebSocket connection fails.<br>• No visual call state (connected, muted, etc.) beyond basic start/stop.<br>• No integration with the main call disposition or queue system.<br>• Users may accidentally use this instead of the modern `/call` route. |
+
+### 49. Phone Number Management & Configuration
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Configure, manage, and release rented phone numbers |
+| **Trigger** | User navigates to `/workspaces/:id/settings/numbers` |
+| **Steps** | 1. `/settings/numbers` → View `NumbersTable` → 2. Configure incoming activity per number → 3. Set incoming voice message → 4. Edit caller ID (friendly name) → 5. Toggle handset mode → 6. Set inbound ring count → 7. Link number to call queue → 8. Assign inbound script → 9. Release/remove number |
+| **Components** | `NumbersTable`, `NumberCallerId`, `NumberPurchase` (embedded widget), `NumberRentalCreditsAlert` |
+| **Actions** | View numbers → Edit configuration fields per row → Toggle handset → Link queue → Assign script → Release number |
+| **Outcome** | Phone numbers configured for inbound calls, messaging, and campaign use |
+| **Pain points** | • Number configuration is dense; many inline dropdowns on a single table row.<br>• Releasing a number may not warn about active campaigns using it.<br>• Caller ID editing and verification are separate from number management UI.<br>• Number purchase widget embedded on same page competes for attention.<br>• No bulk configuration (e.g., set same script for multiple numbers).<br>• No visual indicator of number health or recent call volume. |
+
+### 50. Audience Creation from Campaign Context
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create a new audience without leaving the campaign workflow |
+| **Trigger** | Organizer clicks "Add Audience" or similar from within a campaign |
+| **Steps** | 1. `/campaigns/:campaign_id/audiences/new` → 2. Enter audience name → 3. Optionally upload CSV file → 4. Note that contacts can be added later if no file uploaded → 5. Submit → 6. Audience created and optionally linked to campaign |
+| **Components** | `AudienceForm`, `AudienceUploader` |
+| **Actions** | Name audience → Upload CSV (optional) → Submit → Return to campaign |
+| **Outcome** | New audience created from within campaign context; keeps user in flow |
+| **Pain points** | • Same form as standalone `/audiences/new` but with different navigation context.<br>• No clear indication that the new audience is automatically linked to the current campaign.<br>• CSV upload validation and preview are missing here too.<br>• No audience segmentation or filtering at creation time.<br>• Created audience may not appear in the campaign queue until explicitly added. |
+
+### 51. Email Verification Confirmation
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Verify email address via token link |
+| **Trigger** | User clicks email verification link with `token_hash` and `type` params |
+| **Steps** | 1. Click verification link → 2. `/auth/confirm` validates token via Better Auth → 3. Authentication cookies set → 4. Redirect to `next` parameter (or `/workspaces` if none) → 5. On failure, redirect to `/auth/auth-code-error` |
+| **Components** | Better Auth confirmation handler |
+| **Actions** | Click email link → Wait for validation → Redirected to app |
+| **Outcome** | Email verified; user is authenticated and redirected |
+| **Pain points** | • No intermediate "Verifying..." page; user sees a brief blank or redirect flash.<br>• Failure redirect (`/auth/auth-code-error`) is generic; no specific error reason shown.<br>• No resend verification email option if token is expired.<br>• Token expiration duration not communicated in the verification email or on failure.<br>• Users may land on this route with an expired token and have no clear next step. |
+
 ---
 
 ## Pain Points Matrix
@@ -605,11 +750,51 @@ CallCaster serves three distinct user types across a React Router v7 application
 | Realtime reconnection not graceful | **Low** | 36 | All users |
 | Number settings have realtime but no visual indicator | **Low** | 36 | Campaign managers |
 | Export auto-poll every 5s is wasteful for completed jobs | **Low** | 32 | Campaign managers |
-| No campaign archive/unarchive bulk action | **Low** | 17 | Campaign managers |
+| No campaign archive/unarchive bulk action | **Low** | 17, 42 | Campaign managers |
 | Duplication doesn't copy queue contacts (unclear in UI) | **Low** | 37 | Campaign managers |
-| No "Duplicate from archive" option | **Low** | 37 | Campaign managers |
-| Password reset flow not explicitly mapped/verified | **Medium** | 15 | All users |
-| No "check your email" message after reset request | **Low** | 15 | All users |
+| No "Duplicate from archive" option | **Low** | 37, 42 | Campaign managers |
+| Password reset flow not explicitly mapped/verified | **Medium** | 15, 44 | All users |
+| No "check your email" message after reset request | **Low** | 15, 44 | All users |
+| Landing page has no interactive demo or sandbox | **Low** | 41 | All new users |
+| CTA leads to lead form creating expectation mismatch | **High** | 1, 41 | All new users |
+| Pricing page may not clearly explain credit usage | **Medium** | 41 | All new users |
+| Archive tab easy to miss in campaign navigation | **Medium** | 42 | Campaign managers |
+| No search within archive separate from active campaigns | **Low** | 42 | Campaign managers |
+| Archived campaigns read-only; no quick "Duplicate and revive" | **Medium** | 42 | Campaign managers |
+| Audio library has no inline actions (delete, rename, replace) | **Medium** | 43 | Campaign managers |
+| No metadata shown for audio files (duration, size) | **Low** | 43 | Campaign managers |
+| No usage indicator for which campaigns use each audio file | **Medium** | 43 | Campaign managers |
+| No drag-and-drop or inline upload on audio library page | **Low** | 43 | Campaign managers |
+| Reset link expiration duration not communicated | **Low** | 44 | All users |
+| No resend option for delayed reset emails | **Low** | 44 | All users |
+| Password strength requirements not shown during entry | **Low** | 44 | All users |
+| API docs have no "Try it" or interactive request builder | **Medium** | 45 | Integrators |
+| No authentication helper to generate/test API keys inline | **Medium** | 45 | Integrators |
+| Human API guides are external links; no embedded docs | **Low** | 45 | Integrators |
+| Services page has no pricing or package details | **Medium** | 46 | Prospects |
+| No CTA beyond email; no contact form or booking flow | **Medium** | 46 | Prospects |
+| No differentiation between software features and agency services | **Low** | 46 | Prospects |
+| Survey respondents cannot edit responses after submission | **High** | 47 | Survey respondents |
+| No resume-later capability for partial survey responses | **High** | 47 | Survey respondents |
+| No confirmation email to respondent upon completion | **Medium** | 47 | Survey respondents |
+| Survey URL is guessable; no token-based security | **High** | 47 | Survey respondents |
+| Write-in options have no validation | **Low** | 47 | Survey respondents |
+| Legacy dashboard may be deprecated but still accessible | **High** | 48 | Callers |
+| WebSocket URL hardcoded to specific Railway instance | **Medium** | 48 | Callers |
+| No fallback if WebSocket connection fails | **Medium** | 48 | Callers |
+| Legacy route not integrated with disposition/queue system | **High** | 48 | Callers |
+| Number management has dense inline dropdowns per row | **Medium** | 49 | Campaign managers |
+| Releasing number doesn't warn about active campaigns using it | **High** | 49 | Campaign managers |
+| Caller ID editing separate from number management UI | **Medium** | 49 | Campaign managers |
+| No bulk configuration for multiple numbers | **Low** | 49 | Campaign managers |
+| No visual indicator of number health or call volume | **Low** | 49 | Campaign managers |
+| Campaign audience creation form same as standalone but different context | **Low** | 50 | Campaign managers |
+| No clear indication audience is auto-linked to current campaign | **Medium** | 50 | Campaign managers |
+| Created audience may not appear in campaign queue until explicitly added | **Medium** | 50 | Campaign managers |
+| No "Verifying..." page during email confirmation | **Low** | 51 | All users |
+| Failure redirect is generic; no specific error reason | **Medium** | 51 | All users |
+| No resend verification email option if token expired | **Medium** | 51 | All users |
+| Token expiration duration not communicated | **Low** | 51 | All users |
 
 ---
 
@@ -848,6 +1033,23 @@ flowchart TD
 | **Could** | As a caller, I want to mute/unmute with a keyboard shortcut, so that I can quickly silence myself without looking for the button. |
 | **Could** | As a campaign manager, I want a campaign template library, so that I can start from pre-built campaign configurations. |
 | **Could** | As a campaign manager, I want to export opted-out contacts as a CSV, so that I can maintain compliance records externally. |
+| **Should** | As an integrator, I want an interactive "Try it" request builder in the API docs, so that I can test endpoints without leaving the documentation. |
+| **Should** | As an integrator, I want an inline API key generator and tester in the docs, so that I can authenticate and make test requests in one place. |
+| **Should** | As a prospect, I want clear pricing and package details on the services page, so that I understand agency costs before contacting sales. |
+| **Should** | As a prospect, I want a contact form or booking flow on the services page, so that I can inquire without writing an email manually. |
+| **Must** | As a survey respondent, I want to be able to edit my responses after submission, so that I can correct mistakes. |
+| **Must** | As a survey respondent, I want a unique link to resume a partially completed survey, so that I don't lose my progress if I get interrupted. |
+| **Should** | As a survey respondent, I want a confirmation email upon completion, so that I have proof of participation. |
+| **Must** | As a survey respondent, I want survey URLs to be secure with tokens, so that my responses can't be guessed or tampered with. |
+| **Must** | As a caller, I want the legacy dashboard to be clearly marked as deprecated or removed, so that I don't accidentally use an outdated interface. |
+| **Should** | As a campaign manager, I want releasing a number to warn me about active campaigns using it, so that I don't break running campaigns. |
+| **Should** | As a campaign manager, I want bulk configuration for multiple numbers (same script, same queue), so that I don't have to edit each one individually. |
+| **Should** | As a campaign manager, I want a visual indicator of number health and recent call volume, so that I can spot underperforming or unused numbers. |
+| **Should** | As a campaign manager, I want campaign audience creation to clearly show the audience is linked to the current campaign, so that I know it will be available immediately. |
+| **Should** | As a campaign manager, I want audience creation from campaign context to support segmentation and filtering, so that I can create targeted audiences on the fly. |
+| **Should** | As a user, I want a "Verifying your email..." page during confirmation, so that I know the system is working and I'm not just seeing a blank screen. |
+| **Should** | As a user, I want specific error reasons when email verification fails, so that I know whether to retry, resend, or contact support. |
+| **Should** | As a user, I want a "Resend verification email" button if my token expired, so that I can verify without starting over from scratch. |
 
 ---
 
