@@ -2,13 +2,13 @@
 
 **Date:** 2026-06-30
 **Scope:** Full audit across all user types
-**Journeys mapped:** 20 | **Routes scanned:** 477 | **Components scanned:** 156
+**Journeys mapped:** 40 | **Routes scanned:** 477 | **Components scanned:** 156
 
 ---
 
 ## Executive Summary
 
-CallCaster serves three distinct user types across a React Router v7 application with 477 routes. The surface is large and feature-rich, but several friction points create drop-off risk—especially in the pre-value compliance funnel, the campaign creation/settings loop, and the agent call-screen complexity.
+CallCaster serves three distinct user types across a React Router v7 application with 477 routes. This audit maps **40 distinct user journeys** spanning authentication, onboarding, campaign management, agent calling/SMS, admin oversight, billing, settings, analytics, and background jobs. The surface is large and feature-rich, but several friction points create drop-off risk—especially in the pre-value compliance funnel, the campaign creation/settings loop, and the agent call-screen complexity.
 
 **Top themes:**
 1. **Long time-to-value:** New users hit a 6-step compliance onboarding before they can send a message or place a call.
@@ -16,6 +16,9 @@ CallCaster serves three distinct user types across a React Router v7 application
 3. **Agent UX complexity:** The call screen composes ~15+ hooks; status, audio, and queue state can desync.
 4. **Invite-only signup mismatch:** `/signup` is a contact form, not self-service registration—users expect to create accounts.
 5. **Dead ends and missing CTAs:** Voicemails page has no upload button; analytics has no date picker; exports page cannot trigger exports.
+6. **Developer backdoors in production:** "Reset Campaign" button is hardcoded to 2 specific user IDs.
+7. **Real-time jank:** Campaign dashboard revalidates every 2 seconds; chat read-state flickers via custom window events.
+8. **Compliance gaps:** Opt-out is permanent with no re-opt-in; STOP conversation visibility not persisted across sessions.
 
 ---
 
@@ -271,6 +274,246 @@ CallCaster serves three distinct user types across a React Router v7 application
 | **Outcome** | Campaign performance analyzed; actionable insights for optimization |
 | **Pain points** | • Results screen only shows for admins; callers see `CampaignInstructions` instead.<br>• Disposition names are mapped to Material Design icons via `Result.IconMap.tsx`—inconsistent with Lucide icons used elsewhere.<br>• No drill-down from disposition summary to individual call records.<br>• Results are campaign-scoped; no cross-campaign comparison view. |
 
+### 21. Analytics & Reporting
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | View workspace-level analytics and caller performance metrics |
+| **Trigger** | User navigates to `/workspaces/{id}/analytics` |
+| **Steps** | 1. `/analytics` → View `WorkspaceAnalyticsPanel` with charts → 2. Filter by user (if not Caller role) → 3. Review caller performance data |
+| **Components** | `WorkspaceAnalyticsPanel`, `DataTable` |
+| **Actions** | View charts → Filter by user → Navigate back to workspace |
+| **Outcome** | Analytics data displayed for review |
+| **Pain points** | • Callers cannot filter by user (only see their own data).<br>• Error handling is minimal (just text, no retry button).<br>• No date range picker visible in the route file.<br>• Analytics are workspace-scoped only; no campaign-level drill-down. |
+
+### 22. Queue Settings (Workspace Level)
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create and manage call queues at the workspace level |
+| **Trigger** | User navigates to `/workspaces/{id}/settings/queues` |
+| **Steps** | 1. `/settings/queues` → View queue list → 2. Create new queue via inline form → 3. Edit queue name/description → 4. Assign/remove agents → 5. View linked numbers (read-only) |
+| **Components** | `QueueTable`, `QueueHeader`, `StatusDropdown` |
+| **Actions** | Create queue → Edit queue → Add agents via select dropdown → Remove agents → Delete queue (with `confirm()` dialog) |
+| **Outcome** | Queue created with assigned agents; linked to numbers in number settings |
+| **Pain points** | • Agent select shows truncated user IDs (`substring(0, 8)`) instead of names, making identification difficult.<br>• Linked numbers are read-only here; must edit in Numbers settings.<br>• No loading states for fetcher submissions.<br>• Delete uses browser `confirm()` instead of a styled dialog. |
+
+### 23. Admin: User Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Edit user details and manage workspace memberships |
+| **Trigger** | Admin navigates to `/admin/users/{userId}/edit` |
+| **Steps** | 1. `/admin` → Users tab → 2. Click user → 3. `/admin/users/{userId}/edit` → Edit user profile → 4. `/admin/users/{userId}/workspaces` → Manage workspace memberships |
+| **Components** | `AdminUsersPanel`, `TeamMember` |
+| **Actions** | Edit user info → Add/remove workspace memberships → Change roles per workspace |
+| **Outcome** | User profile updated; workspace access adjusted |
+| **Pain points** | • User edit and workspace membership are separate sub-routes, creating extra navigation.<br>• No bulk role changes across multiple workspaces.<br>• Truncated user IDs shown in membership lists. |
+
+### 24. Admin: Twilio Portal
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Deep-dive into Twilio health, billing, and configuration for a workspace |
+| **Trigger** | Admin navigates to `/admin/workspaces/{workspaceId}/twilio` |
+| **Steps** | 1. `/admin` → Workspaces tab → 2. Select workspace → 3. Twilio portal tab → 4. Review Health / Billing / Config Changes / Messaging Signals panels |
+| **Components** | `AdminTwilioPortal.HealthPanel`, `AdminTwilioPortal.BillingReconciliationPanel`, `AdminTwilioPortal.ConfigChangesPanel`, `AdminTwilioPortal.MessagingSignalsPanel` |
+| **Actions** | View health metrics → Review billing discrepancies → Check recent config changes → Monitor messaging signals |
+| **Outcome** | Twilio configuration audited; billing discrepancies identified |
+| **Pain points** | • Panels are read-only; no inline actions to fix issues.<br>• Billing reconciliation data may be stale without refresh.<br>• Config changes panel shows history but no rollback capability.<br>• Messaging signals are Twilio-specific; not all admins understand the terminology. |
+
+### 25. Campaign Readiness & Launch Gate
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Validate that a campaign is ready to launch before starting it |
+| **Trigger** | User clicks "Play" (Start) on campaign dashboard or settings |
+| **Steps** | 1. Campaign settings → Review readiness badges (Messaging, Voice, Phone Numbers) → 2. If issues exist, see `startDisabledReason` or `scheduleDisabledReason` → 3. Fix issues (add queue, add script, configure number) → 4. Save changes → 5. Retry start |
+| **Components** | `CampaignSetupGuide`, `CampaignDetailed.ActivateButtons`, `CampaignSettings` |
+| **Actions** | Review readiness checks → Fix missing requirements → Save → Start campaign |
+| **Outcome** | Campaign passes all readiness checks and transitions to `running` or `scheduled` |
+| **Pain points** | • Readiness checks block start if any unsaved changes exist anywhere in settings—user must save first.<br>• `startDisabledReason` is overridden by unsaved-changes check, masking the real reason.<br>• Readiness issues are spread across settings, queue, and script sub-routes with no unified checklist.<br>• Setup guide only appears for first draft campaign; disappears after dismissal. |
+
+### 26. Predictive / Auto-Dial Configuration
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Configure and monitor predictive dialing for a campaign |
+| **Trigger** | Campaign type supports predictive dialing; user enables it in settings |
+| **Steps** | 1. `/campaigns/{id}/settings` → Select dial type (predictive) → 2. Configure pacing/ratio → 3. Save → 4. `/campaigns/{id}/call` → Start predictive dialing → 5. System auto-assigns contacts and dials |
+| **Components** | `CampaignDetailed.Live.Switches`, `CallScreen.QueueList`, `OutboundDialer` |
+| **Actions** | Enable predictive dial → Configure settings → Start dialing → Monitor auto-assigned calls |
+| **Outcome** | Predictive dialer running; system manages contact assignment and dialing |
+| **Pain points** | • Predictive dial settings are buried in campaign detailed settings, not obvious.<br>• No predictive dial simulator or test mode before live launch.<br>• Agent cannot easily switch between predictive and manual mid-session.<br>• `auto-dial-status` route exists but unclear how agents view or control it in UI. |
+
+### 27. Call Session Lifecycle (Granular)
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Complete a single call from initialization to disposition |
+| **Trigger** | Agent clicks "Dial" or predictive system assigns a contact |
+| **Steps** | 1. Device initializes → 2. `Dialing...` status → 3. `Connected` → 4. Agent views contact info + household → 5. Agent reads script/questionnaire → 6. Agent presses DTMF if needed → 7. Call ends (hangup or disconnect) → 8. Agent selects disposition → 9. Clicks "Save & Next" → 10. Call attempt persisted → 11. Next contact loaded |
+| **Components** | `CallScreen.CallArea`, `CallScreen.Household`, `CallScreen.Questionnaire`, `CallScreen.DTMFPhone`, `CallScreen.Dialogs`, `SoftphoneAudioControls` |
+| **Actions** | Dial → Wait for connect → Read script → Press keys → Hang up → Select disposition → Save → Next contact |
+| **Outcome** | Call attempt saved with disposition, duration, and notes; agent moves to next contact |
+| **Pain points** | • If call drops unexpectedly, agent may not get a chance to set disposition.<br>• DTMF keypad is a separate overlay; not always visible when needed.<br>• Household panel and call area compete for screen space on smaller monitors.<br>• Audio controls (mute, speaker) are in a separate panel from the main call area.<br>• No "notes" field for free-text agent observations during the call. |
+
+### 28. Inbound Handset Session
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Receive and handle inbound calls routed to the workspace handset |
+| **Trigger** | Inbound call arrives to the workspace's handset number |
+| **Steps** | 1. Agent navigates to `/handset` → 2. Sets status to "Available" (requires mic permission) → 3. Waits for calls → 4. Incoming call rings → 5. `IncomingCallPanel` shows caller info → 6. Agent answers → 7. Call connected → 8. Call ends → 9. Session ends on page unmount |
+| **Components** | `HandsetCallPanel`, `SoftphonePanel`, `IncomingCallPanel`, `IncomingCallReceiver` |
+| **Actions** | Set Available → Grant mic permission → Wait → Answer call → Handle call → Hang up → Change status or end session |
+| **Outcome** | Inbound call handled; caller connected to agent; session logged |
+| **Pain points** | • Every "Available" click re-requests `getUserMedia` and immediately stops the stream—sluggish.<br>• Reason dropdown for Away/Offline is inline and easy to miss.<br>• Outbound dialing disabled when not Available; no quick callback capability.<br>• Session end on unmount uses fetcher; fast navigation may cancel the request.<br>• Two tabs open = two independent Twilio devices = duplicate registrations. |
+
+### 29. Caller ID Verification
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Verify a phone number as a valid outbound caller ID |
+| **Trigger** | User clicks "Verify new number" from call screen or number settings |
+| **Steps** | 1. Open `CallerIdVerificationDialog` → 2. Enter phone number → 3. System calls the number with PIN → 4. User answers and enters PIN → 5. Verification confirmed → 6. Number appears in verified caller IDs list |
+| **Components** | `CallerIdVerificationDialog`, `CallerIdVerificationForm`, `NumberCallerId` |
+| **Actions** | Enter number → Request verification call → Answer phone → Enter PIN → Verify |
+| **Outcome** | Number verified; can be used as outbound caller ID for campaigns |
+| **Pain points** | • Verification flow is nested inside the active call screen, interrupting campaign sessions.<br>• No retry option if PIN call is missed.<br>• Verified numbers list does not show verification status or expiration.<br>• No bulk verification for multiple numbers. |
+
+### 30. Voice Drop / Audio Drop
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Leave a pre-recorded voicemail when a call reaches voicemail |
+| **Trigger** | Agent detects voicemail during a call; or campaign configured for auto voice-drop |
+| **Steps** | 1. During call, detect voicemail/beep → 2. Click "Audio Drop" button → 3. Select pre-uploaded audio from workspace library → 4. System plays audio into the call → 5. Hang up → 6. Call disposition set to "Voicemail" or similar |
+| **Components** | `CallScreen.CallArea`, `CampaignDetailed.Voicemail`, `CampaignDetailed.Live.SelectVoiceDrop` |
+| **Actions** | Detect voicemail → Click Audio Drop → Select audio → Confirm → Hang up |
+| **Outcome** | Pre-recorded message left on contact's voicemail |
+| **Pain points** | • Audio drop button visibility depends on campaign configuration; not always clear why it's hidden.<br>• Agent must manually detect voicemail; no auto-detection.<br>• Audio library selection is a dropdown with no preview before confirming.<br>• No confirmation that the audio was fully played before hangup. |
+
+### 31. Stripe Payment Confirmation
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Complete a credit purchase via Stripe and return to the app |
+| **Trigger** | User completes or cancels Stripe checkout |
+| **Steps** | 1. `/billing` → Click "Purchase Credits" → 2. Redirect to Stripe checkout → 3. Complete payment → 4. Redirect back to `/billing?payment_status=success` → 5. Success banner shown → 6. Credits updated in balance |
+| **Components** | `QueryParamBanner`, `NumberRentalCreditsAlert` |
+| **Actions** | Complete checkout → Return to app → View success/error/canceled state → Verify credits |
+| **Outcome** | Credits purchased and added to workspace balance |
+| **Pain points** | • Full page redirect to Stripe; no embedded checkout or popup.<br>• Error/canceled states only show via query param banner; no detailed error messages.<br>• Credits update requires page refresh or navigation; not shown in real time.<br>• No receipt or invoice download visible in UI. |
+
+### 32. Async Export Job Tracking
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create, track, and download campaign data exports |
+| **Trigger** | Admin clicks "Export" from campaign dashboard |
+| **Steps** | 1. Campaign dashboard → Click "Export" → 2. Export job queued in background → 3. `/exports` → View export table → 4. Auto-poll every 5s for status → 5. Download when status = "completed" → 6. File expires after 24h |
+| **Components** | `AdminAsyncExportButton`, `AsyncExportButton`, `DataTable` |
+| **Actions** | Trigger export → Wait for processing → Download → Note expiration |
+| **Outcome** | CSV file downloaded with campaign data |
+| **Pain points** | • Export trigger is only from campaign dashboard; `/exports` page is read-only.<br>• No column selection or filter before export.<br>• 24-hour expiration cannot be renewed or extended.<br>• Auto-poll every 5s is wasteful for completed exports.<br>• No email notification when export is ready. |
+
+### 33. Contact Search & Enqueue
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Find existing workspace contacts and add them to a campaign queue |
+| **Trigger** | Organizer clicks "Add Contact" from campaign queue page |
+| **Steps** | 1. `/campaigns/{id}/queue` → Click "Add Contact" → 2. `ContactSearchDialog` opens → 3. Search by name/phone/email → 4. Select contact(s) → 5. Confirm enqueue → 6. Contact added to queue |
+| **Components** | `ContactSearchDialog`, `QueueContent`, `QueueTable` |
+| **Actions** | Open search dialog → Type search query → Select results → Confirm → Close |
+| **Outcome** | Contact(s) added to campaign queue with status "queued" |
+| **Pain points** | • Search is a modal with no inline preview of how many contacts will match.<br>• No bulk select from search results; must add one by one.<br>• Search results do not show existing queue status (may duplicate).<br>• No recent contacts or suggestions shown. |
+
+### 34. SMS Opt-out & STOP Handling
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Handle contact opt-out requests and maintain compliance |
+| **Trigger** | Contact replies "STOP" or agent manually opts out a contact |
+| **Steps** | 1. Contact sends "STOP" → 2. System auto-processes opt-out → 3. `ChatOptOutBanner` appears in chat thread → 4. Agent cannot send further messages → 5. "Hide STOP conversations" toggle available in sidebar |
+| **Components** | `ChatOptOutBanner`, `ChatThreadView` |
+| **Actions** | Contact texts STOP → System updates opt-out status → Agent sees banner → Agent hides STOP conversations |
+| **Outcome** | Contact opted out; no further messages sent; compliance maintained |
+| **Pain points** | • Opt-out is permanent with no admin override or re-opt-in flow visible.<br>• STOP conversations hidden by toggle, but toggle state not persisted across sessions.<br>• No export or report of opted-out contacts.<br>• Opt-out status not shown in contact detail page. |
+
+### 35. Message Campaign Results
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Review delivery and engagement metrics for message campaigns |
+| **Trigger** | User navigates to `/campaigns/{id}` for a message campaign (admin view) |
+| **Steps** | 1. `/campaigns/{id}` → View `MessageResultsScreen` instead of call results → 2. See sent count, delivered count, failed count → 3. Review opt-out rate → 4. Export message-level detail |
+| **Components** | `MessageResultsScreen`, `ResultsScreen.KeyMetrics` |
+| **Actions** | View message metrics → Filter by status → Export detail → Compare to call campaigns |
+| **Outcome** | Message delivery performance understood; issues identified |
+| **Pain points** | • Message results screen is different from call results screen; inconsistent UX.<br>• No click-through or reply tracking for MMS messages.<br>• Delivery status depends on Twilio callbacks; may lag or be inaccurate.<br>• No retry mechanism for failed messages visible to admins. |
+
+### 36. Workspace Realtime Events
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Receive live updates across the workspace without refreshing |
+| **Trigger** | User is in any workspace route with `useWorkspaceRealtime` enabled |
+| **Steps** | 1. Page loads → 2. WebSocket/SSE connection established → 3. Realtime events stream in → 4. UI updates: new messages, queue changes, number updates, credit changes |
+| **Components** | `useWorkspaceRealtime`, `ChatThreadView`, `QueueTable`, `NumbersTable` |
+| **Actions** | (Passive) Receive updates → Observe changes → Continue working |
+| **Outcome** | Workspace state stays synchronized across users and tabs |
+| **Pain points** | • Heavy revalidation every 2 seconds on campaign dashboard can cause jank.<br>• Chat sidebar and thread independently manage read-state via custom window events—can flicker.<br>• Number settings page has realtime but no visual indicator of live updates.<br>• Reconnection after disconnect is not always graceful. |
+
+### 37. Campaign Duplicate & Reset
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Clone an existing campaign or reset it to initial state |
+| **Trigger** | User clicks "Duplicate" or "Reset Campaign" in campaign settings |
+| **Steps** | 1. `/campaigns/{id}/settings` → Click "Duplicate" → 2. Confirm duplication → 3. New campaign created with copied name + "(Copy)" → 4. Edit new campaign settings → 5. Launch. OR: Click "Reset Campaign" (dev-only, hardcoded to 2 user IDs) → 6. Campaign queue and results cleared |
+| **Components** | `CampaignSettings`, `CampaignDetailed` |
+| **Actions** | Duplicate → Confirm → Edit copy → Launch. Or Reset → Confirm → Queue cleared |
+| **Outcome** | New campaign created from template; or existing campaign reset for reuse |
+| **Pain points** | • "Reset Campaign" button is gated to 2 hardcoded user IDs—obvious dev backdoor.<br>• Duplication copies settings but not queue contacts; not clear in UI.<br>• Duplicated campaign starts as "draft" with no guidance on what to configure next.<br>• No "Duplicate from archive" option. |
+
+### 38. Number Search & Purchase (Detailed)
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Search for and purchase a new phone number for the workspace |
+| **Trigger** | User navigates to `/workspaces/{id}/settings/numbers/purchase` |
+| **Steps** | 1. `/settings/numbers/purchase` → `NumberPurchase` component loads → 2. Enter search criteria (area code, contains, etc.) → 3. Submit search → 4. View results table → 5. Select number → 6. Confirm purchase (credits gate) → 7. Number added to workspace |
+| **Components** | `NumberPurchase`, `NumberPurchase.SearchForm`, `NumberPurchase.columns`, `NumberPurchase.ConfirmDialog` |
+| **Actions** | Enter search criteria → Submit → Review results → Select → Confirm → Purchase |
+| **Outcome** | Number purchased and immediately available in workspace |
+| **Pain points** | • Search requires credits to be sufficient before even searching; no "preview" search.<br>• Search results table has no preview of number features (SMS, voice, MMS capability).<br>• Confirm dialog shows price but no breakdown of rental vs. usage costs.<br>• No favorite or shortlist feature for comparing multiple numbers. |
+
+### 39. API Key Generation & Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Generate and manage workspace API keys for integrations |
+| **Trigger** | User navigates to `/workspaces/{id}/settings` and expands API Keys section |
+| **Steps** | 1. `/settings` → Scroll to API Keys → 2. Click "Generate" → 3. New key created → 4. Copy key to clipboard → 5. View existing keys → 6. Revoke if needed |
+| **Components** | `ApiKeysSection` |
+| **Actions** | Generate key → Copy → Store securely → Revoke old keys |
+| **Outcome** | API key generated for external integrations or scripts |
+| **Pain points** | • Key is shown only once after generation; no way to view full key again (security feature but can be confusing).<br>• No usage analytics on which key is being used.<br>• No IP restriction or scope limitation on keys.<br>• Callers cannot see API Keys section but UI doesn't explain why. |
+
+### 40. Webhook Configuration & Testing
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Configure webhooks to receive workspace event notifications |
+| **Trigger** | User navigates to `/workspaces/{id}/settings` and expands Webhook accordion |
+| **Steps** | 1. `/settings` → Expand Webhook section → 2. Enter webhook URL → 3. Select event types → 4. Save configuration → 5. (No inline test available) → 6. Trigger real event to verify |
+| **Components** | `WebhookEditor` |
+| **Actions** | Enter URL → Select events → Save → Verify via real events |
+| **Outcome** | Webhook configured; external system receives workspace events |
+| **Pain points** | • No inline webhook test or "Send test payload" button.<br>• No delivery log or retry history visible in UI.<br>• Webhook URL validation is basic; no SSL/cert check warning.<br>• No webhook secret or signature verification guidance shown.<br>• Event type descriptions are technical; not all users understand them. |
+
 ---
 
 ## Pain Points Matrix
@@ -310,6 +553,63 @@ CallCaster serves three distinct user types across a React Router v7 application
 | No IVR test/simulate mode | **Low** | 18 | Campaign managers |
 | Message scheduling not available | **Low** | 19 | Campaign managers |
 | No cross-campaign comparison view | **Low** | 20 | Campaign managers |
+| Readiness issues spread across sub-routes; no unified checklist | **High** | 25 | Campaign managers |
+| `startDisabledReason` masked by unsaved-changes check | **High** | 25 | Campaign managers |
+| No predictive dial simulator or test mode | **Medium** | 26 | Campaign managers |
+| Predictive dial settings buried in detailed settings | **Medium** | 26 | Campaign managers |
+| Call drop may prevent disposition entry | **High** | 27 | Callers |
+| No free-text notes field during calls | **Medium** | 27 | Callers |
+| DTMF keypad is an overlay; not always visible | **Medium** | 27 | Callers |
+| Handset status change re-requests mic permission every time | **Medium** | 28 | Callers |
+| Two tabs = two Twilio devices = duplicate registrations | **High** | 28 | Callers |
+| Caller ID verification interrupts active campaign session | **Medium** | 29 | Callers |
+| No retry for missed PIN verification call | **Medium** | 29 | Callers |
+| Audio drop button visibility is unclear | **Medium** | 30 | Callers |
+| No voicemail auto-detection | **Medium** | 30 | Callers |
+| Full page redirect to Stripe; no embedded checkout | **Medium** | 31 | Campaign managers |
+| No receipt or invoice download in UI | **Low** | 31 | Campaign managers |
+| Export trigger only from dashboard; `/exports` is read-only | **Medium** | 32 | Campaign managers |
+| 24-hour expiration cannot be renewed | **Medium** | 32 | Campaign managers |
+| No email notification when export completes | **Low** | 32 | Campaign managers |
+| Contact search modal has no bulk select | **Medium** | 33 | Campaign managers |
+| Search results don't show existing queue status | **Medium** | 33 | Campaign managers |
+| Opt-out is permanent with no re-opt-in flow | **Medium** | 34 | Campaign managers |
+| STOP toggle state not persisted across sessions | **Low** | 34 | Campaign managers |
+| Message results screen inconsistent with call results | **Medium** | 35 | Campaign managers |
+| No click-through or reply tracking for MMS | **Low** | 35 | Campaign managers |
+| Campaign dashboard revalidates every 2s causing jank | **Medium** | 36 | All users |
+| Chat read-state flickers via custom window events | **Medium** | 36 | Callers |
+| "Reset Campaign" button gated to 2 hardcoded user IDs | **High** | 37 | Campaign managers |
+| Duplicated campaign starts as draft with no guidance | **Medium** | 37 | Campaign managers |
+| Number search requires sufficient credits before searching | **Medium** | 38 | Campaign managers |
+| No number feature preview (SMS/voice/MMS) in search results | **Low** | 38 | Campaign managers |
+| API key shown only once; no way to view again | **Medium** | 39 | Campaign managers |
+| No IP restriction or scope on API keys | **Medium** | 39 | Campaign managers |
+| No inline webhook test or test payload | **Medium** | 40 | Campaign managers |
+| No webhook delivery log or retry history | **Medium** | 40 | Campaign managers |
+| No SSL/cert check warning for webhook URLs | **Low** | 40 | Campaign managers |
+| Analytics has no date picker visible in route | **Low** | 21 | Campaign managers |
+| Exports page cannot trigger exports | **Low** | 14, 32 | Campaign managers |
+| No audio trim or preview editing | **Low** | 11 | Campaign managers |
+| No script versioning or changelog | **Low** | 9 | Campaign managers |
+| No bulk invite (multiple emails) | **Low** | 13 | Campaign managers |
+| Truncated user IDs shown instead of names | **Low** | 5, 13, 22, 23 | All users |
+| Queue delete uses browser `confirm()` instead of styled dialog | **Low** | 22 | Campaign managers |
+| Linked numbers read-only in queue settings | **Low** | 22 | Campaign managers |
+| No campaign-level drill-down in analytics | **Low** | 21 | Campaign managers |
+| No number feature preview in search results | **Low** | 38 | Campaign managers |
+| No favorite/shortlist for comparing numbers | **Low** | 38 | Campaign managers |
+| Webhook event descriptions too technical | **Low** | 40 | Campaign managers |
+| No webhook secret/signature guidance | **Low** | 40 | Campaign managers |
+| Message results lack retry mechanism visibility | **Low** | 35 | Campaign managers |
+| Realtime reconnection not graceful | **Low** | 36 | All users |
+| Number settings have realtime but no visual indicator | **Low** | 36 | Campaign managers |
+| Export auto-poll every 5s is wasteful for completed jobs | **Low** | 32 | Campaign managers |
+| No campaign archive/unarchive bulk action | **Low** | 17 | Campaign managers |
+| Duplication doesn't copy queue contacts (unclear in UI) | **Low** | 37 | Campaign managers |
+| No "Duplicate from archive" option | **Low** | 37 | Campaign managers |
+| Password reset flow not explicitly mapped/verified | **Medium** | 15 | All users |
+| No "check your email" message after reset request | **Low** | 15 | All users |
 
 ---
 
@@ -392,6 +692,64 @@ flowchart TD
     P --> L
 ```
 
+### Campaign Readiness & Launch Gate
+
+```mermaid
+flowchart TD
+    A[/campaigns/{id}/settings] --> B{Unsaved changes?}
+    B -->|Yes| C[Save changes first]
+    C --> B
+    B -->|No| D[Review readiness badges]
+    D --> E{All checks pass?}
+    E -->|No| F[See startDisabledReason]
+    F --> G[Fix missing requirement]
+    G --> D
+    E -->|Yes| H[Click Play]
+    H --> I{Campaign running}
+```
+
+### Call Session Lifecycle (Granular)
+
+```mermaid
+flowchart TD
+    A[Initialize Twilio device] --> B[Dial or auto-assign]
+    B --> C[Dialing...]
+    C --> D{Connected?}
+    D -->|Yes| E[View contact + household]
+    E --> F[Read script/questionnaire]
+    F --> G[Press DTMF if needed]
+    G --> H[Call ends]
+    H --> I{Disposition set?}
+    I -->|No| J[Select disposition]
+    I -->|Yes| K[Save & Next]
+    J --> K
+    K --> L[Persist call attempt]
+    L --> M[Load next contact]
+    M --> B
+    D -->|No| N[Call failed]
+    N --> O[Log failure reason]
+    O --> M
+```
+
+### Inbound Handset Session
+
+```mermaid
+flowchart TD
+    A[/handset] --> B{Handset number configured?}
+    B -->|No| C[/settings/numbers]
+    B -->|Yes| D[Set status: Available]
+    D --> E[Grant mic permission]
+    E --> F[Waiting for calls...]
+    F -->|Incoming| G[IncomingCallPanel rings]
+    G --> H{Answer?}
+    H -->|Yes| I[Connected]
+    H -->|No| J[Declined]
+    I --> K[Handle call]
+    K --> L[Hang up]
+    L --> F
+    J --> F
+```
+
 ---
 
 ## Recommendations
@@ -426,6 +784,11 @@ flowchart TD
 | **Must** | As a campaign manager, I want a single wizard to create and launch a campaign, so that I don't have to navigate through 4 separate settings pages. |
 | **Must** | As a campaign manager, I want to send a test message or make a test call after basic workspace setup, so that I see value before finishing all compliance steps. |
 | **Must** | As a caller, I want the call screen to recover gracefully from Twilio or token errors, so that I am not trapped mid-session with no clear next step. |
+| **Must** | As a caller, I want a clear, persistent "Save and Next" button with strong visual prompting to select a disposition before the call ends, so that I don't forget to log the outcome. |
+| **Must** | As a campaign manager, I want a unified campaign readiness checklist that shows all blockers in one place, so that I know exactly what to fix before launching. |
+| **Must** | As a campaign manager, I want the real reason a campaign can't start to be visible even when I have unsaved changes, so that I'm not confused about what's blocking me. |
+| **Must** | As a caller, I want call drops to not prevent me from entering a disposition, so that no call outcomes are lost. |
+| **Must** | As a caller, I want only one Twilio device registration per agent regardless of how many tabs I have open, so that I don't miss calls or get duplicate registrations. |
 | **Should** | As a campaign manager, I want to buy credits without leaving the number purchase flow, so that I can complete setup in one session. |
 | **Should** | As a caller, I want a single place to handle inbound calls and call logs, so that I don't have to choose between `/calls` and `/handset`. |
 | **Should** | As a campaign manager, I want "Save" to save my script directly, and "Duplicate" to be a separate action, so that I am not interrupted by a modal on every edit. |
@@ -434,6 +797,35 @@ flowchart TD
 | **Should** | As a campaign manager, I want CSV upload to show a preview and validation errors before processing, so that I can fix issues before importing. |
 | **Should** | As a campaign manager, I want to upload audio files directly from campaign settings where I select voice drops, so that I don't have to navigate to a separate audio page. |
 | **Should** | As a campaign manager, I want to preview or test-send a message before launching a message campaign, so that I can verify content and formatting. |
+| **Should** | As a caller, I want predictive dialing to have a test or simulator mode, so that I can verify the pacing and behavior before going live. |
+| **Should** | As a caller, I want a free-text notes field during calls, so that I can jot down observations that don't fit the structured questionnaire. |
+| **Should** | As a caller, I want the DTMF keypad to be persistently visible during calls, so that I don't have to open an overlay when I need to press keys. |
+| **Should** | As a caller, I want caller ID verification to not interrupt my active campaign session, so that I can verify numbers without losing my place in the queue. |
+| **Should** | As a caller, I want a retry option if I miss the PIN verification call, so that I don't have to restart the entire verification flow. |
+| **Should** | As a caller, I want the audio drop button to always be visible when a campaign supports it, with a tooltip explaining why it's unavailable otherwise, so that I know what to expect. |
+| **Should** | As a caller, I want voicemail auto-detection so that the system can suggest an audio drop when voicemail is detected, so that I don't have to manually identify the beep. |
+| **Should** | As a campaign manager, I want Stripe checkout to open in a popup or embedded frame instead of a full page redirect, so that I don't lose my context in the app. |
+| **Should** | As a campaign manager, I want to download a receipt or invoice after purchasing credits, so that I have a record for accounting. |
+| **Should** | As a campaign manager, I want to trigger a campaign export directly from the `/exports` page, so that I don't have to go back to the campaign dashboard to start one. |
+| **Should** | As a campaign manager, I want exports to notify me by email when they're ready, so that I don't have to keep the exports page open and polling. |
+| **Should** | As a campaign manager, I want to select specific columns before exporting campaign data, so that I get only the data I need. |
+| **Should** | As a campaign manager, I want to bulk-select and enqueue contacts from search results, so that I can add multiple contacts to a queue at once. |
+| **Should** | As a campaign manager, I want search results to show whether a contact is already in the queue, so that I don't accidentally duplicate entries. |
+| **Should** | As a campaign manager, I want a re-opt-in flow for contacts who have previously opted out, so that I can manage consent changes over time. |
+| **Should** | As a campaign manager, I want STOP conversation visibility to persist across sessions, so that my preference to hide them is remembered. |
+| **Should** | As a campaign manager, I want message results to track click-throughs and replies for MMS, so that I can measure engagement beyond delivery. |
+| **Should** | As a campaign manager, I want message campaign results to use the same UI pattern as call results, so that the experience is consistent regardless of campaign type. |
+| **Should** | As an agent, I want the campaign dashboard to update smoothly without jank, so that I can read the screen while realtime data refreshes. |
+| **Should** | As an agent, I want chat read-state to be managed consistently without flicker, so that unread badges are reliable. |
+| **Should** | As a campaign manager, I want the "Reset Campaign" button to be available to all owners/admins (not hardcoded to 2 users), so that I can reset campaigns when needed. |
+| **Should** | As a campaign manager, I want duplicated campaigns to show a clear next-steps checklist, so that I know exactly what to configure before launching the copy. |
+| **Should** | As a campaign manager, I want to search for phone numbers without needing sufficient credits first, so that I can browse options before deciding to buy. |
+| **Should** | As a campaign manager, I want number search results to show capabilities (SMS, voice, MMS) inline, so that I can choose the right number for my needs. |
+| **Should** | As a campaign manager, I want API keys to have IP restrictions and scope limits, so that I can secure integrations more granularly. |
+| **Should** | As a campaign manager, I want to see API key usage analytics, so that I know which integrations are active. |
+| **Should** | As a campaign manager, I want an inline "Send test payload" button for webhooks, so that I can verify my endpoint without waiting for a real event. |
+| **Should** | As a campaign manager, I want a webhook delivery log with retry history, so that I can debug failed deliveries. |
+| **Should** | As a campaign manager, I want webhook event descriptions to be written in plain English, so that I understand what each event means without technical knowledge. |
 | **Could** | As a campaign manager, I want to upload a voicemail greeting directly from the voicemails page, so that I don't have to hunt for the upload action elsewhere. |
 | **Could** | As a campaign manager, I want to filter analytics by date range, so that I can review performance for specific periods. |
 | **Could** | As a system admin, I want the admin dashboard to show real system health metrics, so that I can spot issues without manually checking Twilio. |
@@ -442,6 +834,20 @@ flowchart TD
 | **Could** | As a campaign manager, I want to see a cross-campaign comparison view, so that I can compare performance across multiple campaigns. |
 | **Could** | As a workspace owner, I want to invite multiple team members at once, so that I can onboard my team faster. |
 | **Could** | As a campaign manager, I want script versioning, so that I can see what changed and revert to previous versions. |
+| **Could** | As a campaign manager, I want a favorite/shortlist feature for number search, so that I can compare multiple numbers before purchasing. |
+| **Could** | As a campaign manager, I want audio files to have trim and preview editing before save, so that I can clean up recordings without external tools. |
+| **Could** | As a campaign manager, I want campaign archive and unarchive bulk actions, so that I can manage multiple archived campaigns at once. |
+| **Could** | As a campaign manager, I want to duplicate campaigns directly from the archive, so that I can revive old campaigns as new copies. |
+| **Could** | As a caller, I want a "jump to bottom" button in chat threads, so that I can quickly return to the latest messages after scrolling up. |
+| **Could** | As an agent, I want a typing indicator in chat, so that I know when a contact is responding. |
+| **Could** | As a campaign manager, I want a delivery retry button for failed messages, so that I can resend without rebuilding the campaign. |
+| **Could** | As a system admin, I want webhook configuration to warn me if the URL lacks valid SSL, so that I don't configure insecure endpoints. |
+| **Could** | As a system admin, I want webhook secret/signature verification guidance in the UI, so that I can secure my endpoints properly. |
+| **Could** | As a new user, I want a "Request a demo" label instead of a fake signup form, so that my expectations are set correctly. |
+| **Could** | As a caller, I want a call timer visible during the call, so that I can gauge how long I've been talking. |
+| **Could** | As a caller, I want to mute/unmute with a keyboard shortcut, so that I can quickly silence myself without looking for the button. |
+| **Could** | As a campaign manager, I want a campaign template library, so that I can start from pre-built campaign configurations. |
+| **Could** | As a campaign manager, I want to export opted-out contacts as a CSV, so that I can maintain compliance records externally. |
 
 ---
 
