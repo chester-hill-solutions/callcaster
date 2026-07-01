@@ -10,9 +10,7 @@ import {
 
 export const action = async ({ request }: { request: Request }) => {
 
-    const {headers } = await await getSession(request);
-    const { data, error } = await adminDb.auth.getUser();
-    const user = data.user;
+    const { headers, user } = await getSession(request);
     if (!user) {
         return routeData({ error: "Unauthorized" }, { status: 401 });
     }
@@ -36,7 +34,6 @@ export const action = async ({ request }: { request: Request }) => {
 
     try {
         const twilio = await createWorkspaceTwilioInstance({
-            client,
             workspace_id: workspaceId,
         });
         // Call the user's phone and connect them to the campaign conference

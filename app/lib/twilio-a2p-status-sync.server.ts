@@ -38,7 +38,6 @@ export async function syncWorkspaceA2pStatus({
   }
 
   const twilio = await createWorkspaceTwilioClient({
-    client: null,
     workspaceId,
   });
 

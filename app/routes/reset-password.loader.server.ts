@@ -4,8 +4,7 @@ import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request }: LoaderFunctionArgs) {
 
-  await verifyAuth(request);
-  const { data: { session } } = await request.getSession();
-  if (!session) return redirect("/remember");
+  const result = await verifyAuth(request);
+  if (!result || !(result as any).user) return redirect("/remember");
   return routeData({});
 }

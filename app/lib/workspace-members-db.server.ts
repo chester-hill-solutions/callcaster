@@ -542,7 +542,7 @@ export async function mergeWorkspaceTwilioData(
 
   const [updated] = await adminDb
     .update(workspaceTable)
-    .set({ twilio_data: { ...existingTwilioData, ...patch } })
+    .set({ twilio_data: { ...existingTwilioData, ...patch } as unknown as string })
     .where(eq(workspaceTable.id, workspaceId))
     .returning();
 

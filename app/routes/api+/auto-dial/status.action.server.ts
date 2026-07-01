@@ -11,6 +11,7 @@ import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 import { db } from "@/server/db";
+import { adminDb } from "@/server/admin-db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
@@ -28,7 +29,7 @@ import type { ActionFunctionArgs } from "react-router";
 
 type TwilioClient = Twilio.Twilio;
 
-const getAdmin = () => null /* removed service client */;
+type RealtimeChannel = any;
 
 const updateCall = async (sid: string, workspaceId: string, update: Partial<Tables<"call">>) => {
   try {
@@ -124,11 +125,9 @@ const handleCallStatus = async (
   status: Tables<"call">["status"],
   duration: number
 ) => {
-  const client = getAdmin();
   try {
     const callSid = requireValue(parsedBody.CallSid, "CallSid");
     const callUpdate = await persistCallStatusFromParams({
-      client,
       params: parsedBody,
       disposition: status?.toLowerCase(),
       outreachAttemptId: dbCall.outreach_attempt_id
@@ -179,7 +178,6 @@ const handleCallStatus = async (
 };
 
 const updateTransaction = async (call: Tables<"call">, duration: number) => {
-  const client = getAdmin();
   if (!call.workspace) {
     logger.error("Skipping transaction update because call workspace is missing", {
       callSid: call.sid,
@@ -203,7 +201,6 @@ const handleParticipantLeave = async (
   twilio: TwilioClient,
   realtime: RealtimeChannel,
 ) => {
-  const client = getAdmin();
   const underCase = twilioParamsToUnderCase(parsedBody);
 
   try {
@@ -309,9 +306,7 @@ const handleParticipantJoin = async (
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const client = getAdmin();
-
-  let realtime;
+  let realtime: any;
   try {
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
@@ -326,7 +321,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const validation = await validateTwilioWebhookForCallSid({
       request,
-      client,
       callSid: callSidValue,
       params,
     });
@@ -341,7 +335,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
-    realtime = adminDb.channel(
+    realtime = (adminDb as any).channel(
       (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null) ??
         dbCall.conference_id ??
         "default",
@@ -393,7 +387,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   } finally {
     if (realtime) {
-      adminDb.removeChannel(realtime);
+      (adminDb as any).removeChannel(realtime);
     }
   }
 };

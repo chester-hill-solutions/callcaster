@@ -27,7 +27,7 @@ interface InitialState {
 }
 
 interface UseWorkspaceRealtimeProps {
-  user: AppUser | PostgresUser;
+  user: AppUser;
   init: InitialState;
   campaign_id: string | number;
   predictive: boolean;
@@ -60,7 +60,7 @@ export const useWorkspaceRealtime = ({
   } = useQueue({
     initialQueue: init.queue,
     initialPredictiveQueue: init.predictiveQueue,
-    user: user as PostgresUser,
+    user,
     isPredictive: predictive,
     campaign_id: String(campaign_id),
     setCallDuration,
@@ -130,7 +130,7 @@ export const useWorkspaceRealtime = ({
             if (Number(attemptCampaignId) !== Number(campaignIdRef.current)) return;
             updateAttempts(
               { new: payload.new as OutreachAttempt },
-              userRef.current as PostgresUser,
+              userRef.current,
               Number(campaignIdRef.current),
               callsListRef.current,
             );

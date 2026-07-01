@@ -35,7 +35,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await getConversationMessagesApi(
-    auth.client,
     workspaceId,
     decodedContactNumber,
     url.searchParams,

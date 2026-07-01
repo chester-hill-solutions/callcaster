@@ -43,7 +43,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("userId is required", 400);
   }
 
-  const result = await getAdminUserWorkspaces(auth.null, userId);
+  const result = await getAdminUserWorkspaces(userId);
   if (!result.ok) {
     return jsonError(result.error, result.status);
   }
@@ -78,7 +78,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   switch (parsed.action) {
     case "add_to_workspace": {
       const result = await addUserToWorkspaceAdmin(
-        auth.null,
         userId,
         parsed.workspace_id,
         parsed.role,
@@ -91,7 +90,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     case "update_role": {
       const result = await updateUserWorkspaceRoleAdmin(
-        auth.null,
         userId,
         parsed.workspace_id,
         parsed.role,
@@ -101,7 +99,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     case "remove_from_workspace": {
       const result = await removeUserFromWorkspaceAdmin(
-        auth.null,
         userId,
         parsed.workspace_id,
       );
@@ -113,7 +110,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     case "cancel_invite": {
       const result = await cancelWorkspaceInviteAdmin(
-        auth.null,
         parsed.invite_id,
       );
       if (!result.ok) return jsonError(result.error, 500);

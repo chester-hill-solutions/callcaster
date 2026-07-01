@@ -8,6 +8,7 @@ import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
+import { env } from "@/lib/env.server";
 import type {
   upsertWebhookBodySchema,
 } from "@/lib/schemas/api/platform-workspace-admin";
@@ -139,14 +140,29 @@ export async function inviteWorkspaceMember(
     }
   }
 
-  const { data: inviteData, error: inviteUserError } =
-    await null.functions.invoke("invite-user-by-email", {
-      body: {
-        workspaceId,
-        email: cleanedEmail,
-        role,
+  let inviteData: unknown = null;
+  let inviteUserError: Error | null = null;
+  try {
+    const response = await fetch(
+      `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/invite-user-by-email`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          email: cleanedEmail,
+          role,
+        }),
       },
-    });
+    );
+    if (!response.ok) {
+      inviteUserError = new Error(`HTTP ${response.status}`);
+    } else {
+      inviteData = await response.json();
+    }
+  } catch (e) {
+    inviteUserError = e instanceof Error ? e : new Error(String(e));
+  }
 
   if (inviteUserError) {
     if (existingUserId) {

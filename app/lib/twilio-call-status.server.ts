@@ -74,12 +74,13 @@ export function buildCallUpsertFromTwilioParams(
     forwarded_from: getString(underCaseData.forwarded_from),
     caller_name: getString(underCaseData.caller_name),
     price: getString(underCaseData.price),
-    campaign_id: getNumber(underCaseData.campaign_id),
-    contact_id: getNumber(underCaseData.contact_id),
+    campaign_id: getNumber(underCaseData.campaign_id) ?? undefined,
+    contact_id: getNumber(underCaseData.contact_id) ?? undefined,
     call_duration: getNumber(underCaseData.call_duration),
     recording_duration: getString(underCaseData.recording_duration),
     recording_sid: getString(underCaseData.recording_sid),
     recording_url: getString(underCaseData.recording_url),
+    is_last: false,
   };
 }
 

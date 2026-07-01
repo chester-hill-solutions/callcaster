@@ -27,7 +27,6 @@ export function useAgentStatus({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef = useRef<ReturnType<never["channel"]> | null>(null);
   const currentStatusRef = useRef<string>("offline");
 
   const refreshStatus = useCallback(async () => {
@@ -81,27 +80,8 @@ export function useAgentStatus({
     if (!workspaceId || !userId) return;
     refreshStatus();
 
-    const channel = adminDb.channel(`agent-status:${workspaceId}`);
-    channelRef.current = channel;
-
-    channel
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "agent_status",
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
-        (payload) => {
-          const row = payload.new as Tables<"agent_status"> | null;
-          if (row?.user_id === userId) {
-            setAgentStatus(row);
-            currentStatusRef.current = row.status;
-          }
-        },
-      )
-      .subscribe();
+    // TODO: Re-implement realtime agent_status updates via SSE
+    // (useWorkspaceEventSubscription or EventSource to /api/workspaces/{workspaceId}/events)
 
     heartbeatRef.current = setInterval(async () => {
       try {
@@ -119,10 +99,6 @@ export function useAgentStatus({
     }, 30_000);
 
     return () => {
-      if (channelRef.current) {
-        adminDb.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;

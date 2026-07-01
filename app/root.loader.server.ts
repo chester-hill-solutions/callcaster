@@ -59,7 +59,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     {
       env,
       session: session ? { token: session.token } : null,
-      workspaces: workspaces as WorkspaceData[] | null,
+      workspaces: workspaces as unknown as WorkspaceData[] | null,
       user: userData as (User & { workspace_invite: WorkspaceInvite[] }) | null,
       params,
     },

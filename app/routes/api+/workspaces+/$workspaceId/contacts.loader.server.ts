@@ -30,7 +30,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await listWorkspaceContactsApi(
-    auth.client,
     workspaceId,
     url.searchParams,
   );

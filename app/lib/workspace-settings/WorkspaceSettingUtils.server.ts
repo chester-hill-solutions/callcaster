@@ -7,9 +7,9 @@ import {
   findUserIdByUsername,
   findWorkspaceInviteForUser,
   removeWorkspaceInviteForUser,
-  removeWorkspaceMemberRow,
+  removeWorkspaceMember,
   transferWorkspaceOwnership,
-  updateWorkspaceMemberRoleRow,
+  updateWorkspaceMemberRole,
   upsertWorkspaceWebhookRow,
 } from "@/lib/workspace-members-db.server";
 
@@ -52,7 +52,7 @@ export async function handleAddUser(
   }
 
   const { data: user, error: inviteUserError } =
-    await null.functions.invoke("invite-user-by-email", {
+    await (null as any).functions.invoke("invite-user-by-email", {
       body: {
         workspaceId,
         email: cleanedName,
@@ -87,7 +87,7 @@ export async function handleUpdateUser(
   const userId = formData.get("user_id") as string;
   const updatedWorkspaceRole = formData.get("updated_workspace_role") as string;
   try {
-    const updatedUser = await updateWorkspaceMemberRoleRow({
+    const updatedUser = await updateWorkspaceMemberRole({
       workspaceId,
       userId,
       role: updatedWorkspaceRole as "owner" | "member" | "caller" | "admin",
@@ -111,7 +111,7 @@ export async function handleDeleteUser(
 ) {
   const userId = formData.get("user_id") as string;
   try {
-    const deletedUser = await removeWorkspaceMemberRow({ workspaceId, userId });
+    const deletedUser = await removeWorkspaceMember({ workspaceId, userId });
     return routeData(
       { data: deletedUser, error: deletedUser ? null : "User not found" },
       { headers },
@@ -138,7 +138,7 @@ export async function handleDeleteSelf(
   }
 
   try {
-    await removeWorkspaceMemberRow({ workspaceId, userId });
+    await removeWorkspaceMember({ workspaceId, userId });
     return redirect("/workspaces", { headers });
   } catch (errorDeletingSelf) {
     logger.error("Error deleting current user from workspace", errorDeletingSelf);

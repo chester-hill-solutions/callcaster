@@ -25,7 +25,6 @@ import Twilio from "twilio";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
 import type { TwilioInboundCallWebhook } from "@/lib/twilio.types";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
 
 function dispatchInboundCallWebhookNotification(args: {
   workspaceId: string;
@@ -65,10 +64,6 @@ function dispatchInboundCallWebhookNotification(args: {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
-  const client = createClient<Database>(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
   const formData = await request.formData();
   const data = Object.fromEntries(
     formData,
@@ -86,8 +81,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const workspaceId = number.workspaceId;
 
   const twilioData = (await resolveWorkspaceTwilioData(
-    client,
-    workspaceId, 
+    workspaceId,
+    null,
     logger,
   )) as Record<string, unknown> | null | undefined;
 
@@ -121,7 +116,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     number.inbound_ring_count ?? null,
   );
   const voicemail = await resolveInboundVoicemailAudio({
-    client,
     workspaceId,
     inboundAudio: number.inbound_audio ?? null,
   });

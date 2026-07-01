@@ -38,6 +38,15 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
     mocks.fetchCampaignByIdForWorkspace(...args),
 }));
 
+const dialStatusStorageState = vi.hoisted(() => ({ error: null as Error | null, signedUrl: "https://signed" as string | null }));
+
+vi.mock("@/lib/object-storage.server", () => ({
+  createSignedObjectUrl: async () => {
+    if (dialStatusStorageState.error) throw dialStatusStorageState.error;
+    return dialStatusStorageState.signedUrl;
+  },
+}));
+
 vi.mock("@/lib/telephony-db.server", async () => {
   const stub = await import("./helpers/telephony-db-stub");
   return {
@@ -225,6 +234,8 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
         authToken: "tok",
       }),
     );
+    dialStatusStorageState.error = null;
+    dialStatusStorageState.signedUrl = "https://signed";
   });
 
   test("validates CallSid", async () => {
@@ -239,7 +250,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
 
   test("callStatus missing covers null branch; callError/campaignError/voicemailError bubble to outer catch (Error message)", async () => {
     const { client, twilio } = makeDbClient();
-    adminDb._set.callError(new Error("call"));
+    client._set.callError(new Error("call"));
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
@@ -258,7 +269,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: false, error: "camp" });
 
     const { client: sup3, twilio: tw3 } = makeDbClient();
-    sup3._set.voicemailError(new Error("vm"));
+    dialStatusStorageState.error = new Error("vm");
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
     res = await asRouteResponse(await mod.action({
@@ -287,7 +298,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
 
   test("handles call not found and workspace auth missing", async () => {
     const { client, twilio } = makeDbClient();
-    adminDb._set.callRow(null);
+    client._set.callRow(null);
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
@@ -322,13 +333,13 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(adminDb._callUpdate).toHaveBeenCalledWith(
+    expect(client._callUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
     );
 
     // voicemail missing signedUrl => hangup + no-answer
     const { client: sup2, twilio: tw2 } = makeDbClient();
-    sup2._set.signedUrl(null);
+    dialStatusStorageState.signedUrl = null;
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
     res = await asRouteResponse(await mod.action({
@@ -405,8 +416,8 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
 
     // campaign not found
     const { client, twilio } = makeDbClient();
-    adminDb._set.callRow({ campaign_id: 1, outreach_attempt_id: 10, workspace: "w1" });
-    adminDb._set.campaignRow(null);
+    client._set.callRow({ campaign_id: 1, outreach_attempt_id: 10, workspace: "w1" });
+    client._set.campaignRow(null);
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     let res = await asRouteResponse(await mod.action({

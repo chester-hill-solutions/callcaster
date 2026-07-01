@@ -88,7 +88,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       },
       sorting: {
         sortKey: detailResult.sorting.sort_key,
-        sortDirection: detailResult.sorting.sort_direction,
+        sortDirection: detailResult.sorting.sort_direction as "asc" | "desc",
       },
       latestUpload: detailResult.latest_upload
         ? {

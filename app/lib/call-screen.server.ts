@@ -65,7 +65,7 @@ export async function getCallScreenData(
     attempts = attemptRows.map((attempt) => ({
       ...attempt,
       call: callRows.filter((call) => call.outreach_attempt_id === attempt.id),
-    })) as OutreachAttempt[];
+    })) as unknown as OutreachAttempt[];
   }
 
   const errors = [

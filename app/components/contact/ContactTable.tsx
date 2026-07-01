@@ -50,14 +50,20 @@ const ContactTable: React.FC<ContactTableProps> = ({
   // Extract unique headers from other_data with better type safety
   const otherDataHeaders = Array.from(
     new Set(
-      contacts.flatMap((contact) =>
-        contact.other_data.flatMap((data: Json) => {
+      contacts.flatMap((contact) => {
+        let parsed: Json[] = [];
+        try {
+          parsed = JSON.parse(contact.other_data) as Json[];
+        } catch {
+          return [];
+        }
+        return parsed.flatMap((data: Json) => {
           if (data && typeof data === 'object' && !Array.isArray(data)) {
             return Object.keys(data as Record<string, unknown>);
           }
           return [];
-        }),
-      ),
+        });
+      }),
     ),
   );
 

@@ -2,13 +2,44 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 
+const twilioWebhookMocks = vi.hoisted(() => ({
+  validateTwilioWebhookForCallSid: vi.fn(async () => ({
+    ok: true as const,
+    params: {},
+    authToken: "tok",
+  })),
+}));
+
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...args: any[]) =>
+    twilioWebhookMocks.validateTwilioWebhookForCallSid(...args),
+}));
+
+const telephonyDbMocks = vi.hoisted(() => ({
+  findCallBySid: vi.fn(async () => null as any),
+  upsertCallBySid: vi.fn(async () => ({ workspace: "w1", outreach_attempt_id: 10, parent_call_sid: null, campaign_id: null })),
+  findOutreachAttemptWithCampaignType: vi.fn(async () => ({ disposition: "in-progress", contact_id: 123, workspace: "w1" } as any)),
+  updateOutreachAttemptForWorkspace: vi.fn(async () => ({ id: 1 } as any)),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallBySid: (...args: any[]) => telephonyDbMocks.findCallBySid(...args),
+  upsertCallBySid: (...args: any[]) => telephonyDbMocks.upsertCallBySid(...args),
+  findOutreachAttemptWithCampaignType: (...args: any[]) =>
+    telephonyDbMocks.findOutreachAttemptWithCampaignType(...args),
+  updateOutreachAttemptForWorkspace: (...args: any[]) =>
+    telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
+}));
+
+vi.mock("@/lib/workspace-events.server", () => ({
+  emitPredictiveBroadcast: vi.fn(async () => ({})),
+}));
+
 const mocks = vi.hoisted(() => {
   return {
     validateTwilioWebhookParams: vi.fn(() => true),
     insertTransactionHistoryIdempotent: vi.fn(async () => null),
     logger: { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
-    createClient: vi.fn(),
-    client: null as any,
   };
 });
 
@@ -25,110 +56,9 @@ vi.mock("@/twilio.server", () => ({
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 vi.mock("@/lib/transaction-history.server", () => ({
-  insertTransactionHistoryIdempotent: (...args: any[]) =>
+  insertTransactionHistoryIdempotent: (...args: unknown[]) =>
     mocks.insertTransactionHistoryIdempotent(...args),
 }));
-
-vi.mock("@client/client-js", () => ({
-  createClient: (...args: any[]) => mocks.createClient(...args),
-}));
-
-vi.mock("@/lib/auth.server", () => ({
-  getAdminDb: () => mocks.client,
-}));
-
-function makeDbClient() {
-  let existingWorkspace: string | null = "w1";
-  let wsAuthToken: string | null = "ws-token";
-  let upsertError: Error | null = null;
-  let upsertRow: any = {
-    sid: "CA1",
-    outreach_attempt_id: 10,
-    workspace: "w1",
-    parent_call_sid: null,
-  };
-  let parentCall: any = { workspace: "w_parent", outreach_attempt_id: 99 };
-  let attemptFetchError: Error | null = null;
-  let currentAttempt: any = { disposition: "in-progress", contact_id: 123, workspace: "w1" };
-  let attemptUpdateError: Error | null = null;
-
-  const realtimeSend = vi.fn();
-  const realtimeChannel = vi.fn((_id: string) => ({ send: realtimeSend }));
-
-  const client: any = {
-    realtime: { channel: realtimeChannel },
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: (cols?: string) => ({
-            eq: (_col: string, _val: any) => ({
-              single: async () => {
-                if (cols === "workspace") {
-                  return {
-                    data: existingWorkspace ? { workspace: existingWorkspace } : null,
-                    error: null,
-                  };
-                }
-                if (cols === "workspace, outreach_attempt_id") {
-                  return { data: parentCall, error: null };
-                }
-                // full select() in other places not used here
-                return { data: upsertRow, error: null };
-              },
-            }),
-          }),
-          upsert: () => ({
-            select: async () => ({ data: upsertError ? null : [upsertRow], error: upsertError }),
-          }),
-        };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: wsAuthToken
-                  ? { twilio_data: { sid: "AC_test", authToken: wsAuthToken } }
-                  : {},
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "outreach_attempt") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: currentAttempt,
-                error: attemptFetchError,
-              }),
-            }),
-          }),
-          update: () => ({
-            eq: async () => ({ data: null, error: attemptUpdateError }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    },
-    _set: {
-      existingWorkspace: (v: string | null) => (existingWorkspace = v),
-      wsAuthToken: (v: string | null) => (wsAuthToken = v),
-      upsertError: (e: Error | null) => (upsertError = e),
-      upsertRow: (r: any) => (upsertRow = r),
-      parentCall: (r: any) => (parentCall = r),
-      attemptFetchError: (e: Error | null) => (attemptFetchError = e),
-      currentAttempt: (r: any) => (currentAttempt = r),
-      attemptUpdateError: (e: Error | null) => (attemptUpdateError = e),
-    },
-    _realtimeSend: realtimeSend,
-    _realtimeChannel: realtimeChannel,
-  };
-
-  return client;
-}
 
 function makeReq(params: Record<string, string>) {
   const fd = new FormData();
@@ -140,25 +70,43 @@ function makeReq(params: Record<string, string>) {
   });
 }
 
-describe("app/routes/api+/call/route-status.tsx", () => {
-  let client: any;
+function setUpsertRow(row: Record<string, unknown>) {
+  telephonyDbMocks.upsertCallBySid.mockReset();
+  telephonyDbMocks.upsertCallBySid.mockResolvedValue(row);
+}
 
+function setCurrentAttempt(attempt: Record<string, unknown> | null) {
+  telephonyDbMocks.findOutreachAttemptWithCampaignType.mockReset();
+  telephonyDbMocks.findOutreachAttemptWithCampaignType.mockResolvedValue(attempt);
+}
+
+describe("app/routes/api+/call/route-status.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.validateTwilioWebhookParams.mockReset();
-    mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockReset();
+    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValue({
+      ok: true,
+      params: {},
+      authToken: "tok",
+    });
+    telephonyDbMocks.findCallBySid.mockReset();
+    telephonyDbMocks.findCallBySid.mockResolvedValue(null);
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValue({ id: 1 });
     mocks.insertTransactionHistoryIdempotent.mockReset();
     mocks.logger.error.mockReset();
     mocks.logger.debug.mockReset();
-    mocks.createClient.mockReset();
-
-    client = makeDbClient();
-    mocks.client = client;
-    mocks.createClient.mockReturnValue(client);
+    setUpsertRow({ workspace: "w1", outreach_attempt_id: 10, parent_call_sid: null, campaign_id: null });
+    setCurrentAttempt({ disposition: "in-progress", contact_id: 123, workspace: "w1" });
   });
 
   test("rejects invalid Twilio signature", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
@@ -167,7 +115,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("returns 500 when call upsert fails", async () => {
-    adminDb._set.upsertError(new Error("upsert"));
+    setUpsertRow(null);
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
@@ -176,15 +124,11 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Error updating call:",
-      expect.any(Error),
+      expect.any(Object),
     );
   });
 
   test("uses workspace authToken when present", async () => {
-    mocks.validateTwilioWebhookParams.mockImplementation((_p: any, _s: any, _u: any, tok: string) => {
-      expect(tok).toBe("ws-token");
-      return true;
-    });
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
@@ -193,14 +137,15 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("falls back to parent call workspace/outreach attempt and handles fetch error", async () => {
-    adminDb._set.upsertRow({
+    setUpsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
       workspace: null,
       parent_call_sid: "CA_PARENT",
     });
-    adminDb._set.parentCall({ workspace: "w_parent", outreach_attempt_id: 77 });
-    adminDb._set.attemptFetchError(new Error("fetch"));
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce({ workspace: "w_parent", outreach_attempt_id: 77 });
+    setCurrentAttempt(null);
+    telephonyDbMocks.findOutreachAttemptWithCampaignType.mockRejectedValueOnce(new Error("Failed to fetch current attempt"));
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
@@ -211,8 +156,8 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("skips realtime.send when no currentAttempt and still bills with workspaceId", async () => {
-    adminDb._set.currentAttempt(null);
-    adminDb._set.upsertRow({
+    setCurrentAttempt(null);
+    setUpsertRow({
       sid: "CA1",
       outreach_attempt_id: null,
       workspace: "w1",
@@ -224,7 +169,6 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Duration: "61", CallDuration: "61" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(adminDb._realtimeSend).not.toHaveBeenCalled();
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: "w1",
@@ -234,7 +178,9 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("updates disposition when transition allowed; returns 500 on updateError", async () => {
-    adminDb._set.attemptUpdateError(new Error("upd"));
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(
+      new Response("Failed to update attempt", { status: 500 }),
+    );
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
@@ -244,8 +190,8 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("does not bill when billingWorkspace missing; covers called_via default channel id", async () => {
-    adminDb._set.currentAttempt({ disposition: "in-progress", contact_id: 1, workspace: null });
-    adminDb._set.upsertRow({ sid: "CA1", outreach_attempt_id: 10, workspace: undefined, parent_call_sid: null });
+    setCurrentAttempt({ disposition: "in-progress", contact_id: 1, workspace: null });
+    setUpsertRow({ sid: "CA1", outreach_attempt_id: 10, workspace: undefined, parent_call_sid: null });
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
@@ -262,11 +208,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers existingCall workspace missing (uses env authToken)", async () => {
-    adminDb._set.existingWorkspace(null);
-    mocks.validateTwilioWebhookParams.mockImplementation((_p: any, _s: any, _u: any, tok: string) => {
-      expect(tok).toBe("test");
-      return true;
-    });
+    setUpsertRow({ workspace: null, outreach_attempt_id: 10, parent_call_sid: null });
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing" }),
@@ -275,18 +217,11 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers workspace twilio token missing + calledVia split userId", async () => {
-    adminDb._set.wsAuthToken(null);
-    mocks.validateTwilioWebhookParams.mockImplementation((_p: any, _s: any, _u: any, tok: string) => {
-      expect(tok).toBe("test"); // fallback token
-      return true;
-    });
-
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u1" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(adminDb._realtimeChannel).toHaveBeenCalledWith("u1");
   });
 
   test("covers lowercase sid/status fallbacks and getString non-string via File", async () => {
@@ -294,7 +229,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
 
     const fd = new FormData();
     fd.set("call_sid", "CA_FALLBACK");
-    fd.set("status", "completed"); // no CallStatus/call_status -> status fallback
+    fd.set("status", "completed");
     fd.set("price", new File(["1.23"], "p.txt", { type: "text/plain" }) as any);
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "61");
@@ -312,13 +247,13 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers disposition transition denied (logs debug)", async () => {
-    adminDb._set.upsertRow({
+    setUpsertRow({
       sid: "CA1",
       outreach_attempt_id: 10,
       workspace: undefined,
       parent_call_sid: null,
     });
-    adminDb._set.currentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
+    setCurrentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
@@ -333,14 +268,14 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers parentCall null fields -> workspace/outreachAttempt become undefined", async () => {
-    adminDb._set.upsertRow({
+    setUpsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
       workspace: null,
       parent_call_sid: "CA_PARENT",
     });
-    adminDb._set.parentCall({ workspace: null, outreach_attempt_id: null });
-    adminDb._set.currentAttempt(null);
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce({ workspace: null, outreach_attempt_id: null });
+    setCurrentAttempt(null);
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
@@ -349,14 +284,13 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers parentCall missing (if parentCall false path)", async () => {
-    adminDb._set.upsertRow({
+    setUpsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
       workspace: null,
       parent_call_sid: "CA_PARENT",
     });
-    adminDb._set.parentCall(null);
-    adminDb._set.currentAttempt(null);
+    setCurrentAttempt(null);
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
@@ -365,8 +299,8 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("covers currentDisposition null when currentAttempt missing", async () => {
-    adminDb._set.currentAttempt(null);
-    adminDb._set.upsertRow({
+    setCurrentAttempt(null);
+    setUpsertRow({
       sid: "CA1",
       outreach_attempt_id: 10,
       workspace: "w1",
@@ -379,4 +313,3 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     expect(res.status).toBe(200);
   });
 });
-

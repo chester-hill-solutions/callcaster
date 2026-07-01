@@ -41,6 +41,30 @@ vi.mock("../app/lib/database.server", () => ({
 vi.mock("../app/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 
+const testState = vi.hoisted(() => ({ client: null as any }));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcAutoDialQueue: async (_db: any) => {
+    const client = testState.client;
+    const result = await client.rpc("auto_dial_queue");
+    if (result?.error) throw result.error;
+    return result?.data?.[0] ?? null;
+  },
+  rpcCreateOutreachAttempt: async (_db: any) => {
+    const client = testState.client;
+    const result = await client.rpc("create_outreach_attempt");
+    if (result?.error) throw result.error;
+    const id = result?.data ?? null;
+    if (id == null) throw new Error("create_outreach_attempt returned no id");
+    return id;
+  },
+  rpcDequeueContact: async (_db: any) => {
+    const client = testState.client;
+    const result = await client.rpc("dequeue_contact");
+    if (result?.error) throw result.error;
+  },
+}));
+
 function makeDbClient() {
   const channel = vi.fn(() => ({ send: vi.fn() }));
   const removeChannel = vi.fn();
@@ -69,8 +93,9 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
   test("happy path: gets contact, creates attempt + twilio call, dequeues, saves call, returns success", async () => {
     const client = makeDbClient();
+    testState.client = client;
 
-    adminDb.rpc.mockImplementation(async (fn: string) => {
+    client.rpc.mockImplementation(async (fn: string) => {
       if (fn === "auto_dial_queue") {
         return {
           data: [
@@ -89,7 +114,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       throw new Error(`unexpected rpc ${fn}`);
     });
 
-    adminDb.from.mockImplementation((table: string) => {
+    client.from.mockImplementation((table: string) => {
       throw new Error(`unexpected table ${table}`);
     });
 
@@ -121,12 +146,12 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(twilioCallsCreate).toHaveBeenCalled();
     expect(mocks.callInsert).toHaveBeenCalled();
-    expect(adminDb.removeChannel).toHaveBeenCalled();
   });
 
   test("saves call: logs and continues when sid is missing", async () => {
     const client = makeDbClient();
-    adminDb.rpc.mockImplementation(async (fn: string) => {
+    testState.client = client;
+    client.rpc.mockImplementation(async (fn: string) => {
       if (fn === "auto_dial_queue") {
         return {
           data: [{ queue_id: 1, contact_id: 2, contact_phone: "5555550100", caller_id: "+1555" }],
@@ -137,8 +162,8 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       if (fn === "dequeue_contact") return { data: {}, error: null };
       throw new Error(`unexpected rpc ${fn}`);
     });
-    adminDb.from.mockImplementation(() => {
-      throw new Error("unexpected adminDb.from during saveCallToDatabase sid-missing test");
+    client.from.mockImplementation(() => {
+      throw new Error("unexpected client.from during saveCallToDatabase sid-missing test");
     });
     mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
@@ -160,7 +185,8 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
   test("no queued contacts: completes conferences and returns message", async () => {
     const client = makeDbClient();
-    adminDb.rpc.mockResolvedValueOnce({ data: [], error: null }); // auto_dial_queue
+    testState.client = client;
+    client.rpc.mockResolvedValueOnce({ data: [], error: null }); // auto_dial_queue
     mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
@@ -185,8 +211,9 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
   test("returns 500-style JSON response when dequeue_contact rpc errors", async () => {
     const client = makeDbClient();
+    testState.client = client;
 
-    adminDb.rpc.mockImplementation(async (fn: string) => {
+    client.rpc.mockImplementation(async (fn: string) => {
       if (fn === "auto_dial_queue") {
         return { data: [{ queue_id: 1, contact_id: 2, contact_phone: "5555550100", caller_id: "+1555" }], error: null };
       }
@@ -194,7 +221,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       if (fn === "dequeue_contact") return { data: null, error: new Error("dq") };
       throw new Error(`unexpected rpc ${fn}`);
     });
-    adminDb.from.mockImplementation((table: string) => {
+    client.from.mockImplementation((table: string) => {
       if (table === "call") return { upsert: () => ({ select: async () => ({ error: null }) }) };
       throw new Error(`unexpected table ${table}`);
     });
@@ -218,7 +245,8 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
   test("error formatting: non-Error thrown becomes Unknown error", async () => {
     const client = makeDbClient();
-    adminDb.rpc.mockRejectedValueOnce("nope");
+    testState.client = client;
+    client.rpc.mockRejectedValueOnce("nope");
     mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
@@ -235,7 +263,8 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
   test("normalizePhoneNumber throws invalid length (covered by catch)", async () => {
     const client = makeDbClient();
-    adminDb.rpc.mockResolvedValueOnce({
+    testState.client = client;
+    client.rpc.mockResolvedValueOnce({
       data: [{ queue_id: 1, contact_id: 2, contact_phone: "+123", caller_id: "+1555" }],
       error: null,
     });
@@ -260,22 +289,23 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     expect(helpers.normalizePhoneNumber("1+5555550100")).toBe("+15555550100");
 
     // getNextContact: throws when rpc returns error
-    await expect(
-      helpers.getNextContact(
-        {
-          rpc: async () => ({ data: [], error: new Error("q") }),
-        } as any,
-        1,
-        "u1",
-      ),
-    ).rejects.toThrow("q");
+    testState.client = {
+      rpc: vi.fn(async (fn: string) => {
+        if (fn === "auto_dial_queue") return { data: [], error: new Error("q") };
+        return { data: null, error: null };
+      }),
+    };
+    await expect(helpers.getNextContact(1, "u1")).rejects.toThrow("q");
 
     // createOutreachAttempt: throws when rpc returns error
+    testState.client = {
+      rpc: vi.fn(async (fn: string) => {
+        if (fn === "create_outreach_attempt") return { data: null, error: new Error("oa") };
+        return { data: null, error: null };
+      }),
+    };
     await expect(
       helpers.createOutreachAttempt(
-        {
-          rpc: async () => ({ data: null, error: new Error("oa") }),
-        } as any,
         { queue_id: 1, contact_id: 2, contact_phone: "+15555550100" },
         1,
         "w1",

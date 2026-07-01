@@ -1,6 +1,6 @@
 import Twilio from "twilio";
 import { env } from "@/lib/env.server";
-import type { Database } from "@/lib/db-types";
+import { createSignedObjectUrl, listObjects } from "@/lib/object-storage.server";
 
 export async function resolveInboundVoicemailAudio(args: {
   workspaceId: string;
@@ -10,37 +10,38 @@ export async function resolveInboundVoicemailAudio(args: {
     return null;
   }
 
-  const { data: signedByPath } = await args.adminDb.storage
-    .from("workspaceAudio")
-    .createSignedUrl(`${args.workspaceId}/${args.inboundAudio}`, 3600);
-
-  if (signedByPath?.signedUrl) {
-    return { signedUrl: signedByPath.signedUrl };
+  try {
+    const signedUrl = await createSignedObjectUrl(
+      "workspaceAudio",
+      `${args.workspaceId}/${args.inboundAudio}`,
+      3600,
+    );
+    return { signedUrl };
+  } catch {
+    // fall through to search
   }
 
-  const { data: files } = await args.adminDb.storage
-    .from("workspaceAudio")
-    .list(args.workspaceId, {
-      search: args.inboundAudio,
-      limit: 20,
-      offset: 0,
-    });
+  try {
+    const objects = await listObjects("workspaceAudio", args.workspaceId);
+    const file = objects.find(
+      (entry) =>
+        String(entry.id) === String(args.inboundAudio) ||
+        entry.name === args.inboundAudio,
+    );
 
-  const file = files?.find(
-    (entry) =>
-      String(entry.id) === String(args.inboundAudio) ||
-      entry.name === args.inboundAudio,
-  );
+    if (!file) {
+      return null;
+    }
 
-  if (!file) {
+    const signedUrl = await createSignedObjectUrl(
+      "workspaceAudio",
+      `${args.workspaceId}/${file.name}`,
+      3600,
+    );
+    return { signedUrl };
+  } catch {
     return null;
   }
-
-  const { data: signed } = await args.adminDb.storage
-    .from("workspaceAudio")
-    .createSignedUrl(`${args.workspaceId}/${file.name}`, 3600);
-
-  return signed?.signedUrl ? { signedUrl: signed.signedUrl } : null;
 }
 
 export function appendInboundVoicemailTwiml(args: {

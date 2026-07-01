@@ -87,6 +87,6 @@ export function withWorkspaceApiAction(
       }
     }
 
-    return handler({ ...auth, workspaceId, client: auth.client }, args);
+    return handler({ ...auth, workspaceId }, args);
   };
 }

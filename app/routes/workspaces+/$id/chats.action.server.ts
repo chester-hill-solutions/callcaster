@@ -38,7 +38,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     to: contact_number as string,
     from: data["from"] as string,
     media: data["media"] as string,
-    client: null,
     workspace: workspaceId as string,
     contact_id: data.contact_id as string,
     user: user as unknown as BaseUser,

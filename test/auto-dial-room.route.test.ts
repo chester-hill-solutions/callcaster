@@ -67,6 +67,24 @@ vi.mock("../app/lib/env.server", () => ({
 
 vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 
+const roomRpcState = vi.hoisted(() => ({ client: null as any }));
+const roomStorageState = vi.hoisted(() => ({ error: null as Error | null }));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcDequeueContact: async (_db: any) => {
+    const client = roomRpcState.client;
+    const result = await client.rpc("dequeue_contact");
+    if (result?.error) throw result.error;
+  },
+}));
+
+vi.mock("@/lib/object-storage.server", () => ({
+  createSignedObjectUrl: async () => {
+    if (roomStorageState.error) throw roomStorageState.error;
+    return "https://signed";
+  },
+}));
+
 vi.mock("@/lib/twilio-webhook.server", () => ({
   validateTwilioWebhookForCallSid: vi.fn(async (args: {
     params?: Record<string, string>;
@@ -172,13 +190,15 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       workspace: "w1",
       conference_id: "u1",
     });
+    roomStorageState.error = null;
     vi.stubGlobal("fetch", mocks.fetch);
   });
 
   test("device-check path: verified device joins conference and triggers dialer", async () => {
     const client = makeDbClient({});
+    roomRpcState.client = client;
 
-    adminDb.from.mockImplementation((table: string) => {
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -268,7 +288,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -335,10 +356,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       throw new Error(`unexpected table ${table}`);
     });
 
-    adminDb.storage.from.mockReturnValueOnce({
+    client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    adminDb.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
+    client.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
 
     useRoomPostgres(client);
 
@@ -358,17 +379,22 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
     );
     expect(mocks.fetch).toHaveBeenCalled();
-    expect(adminDb.removeChannel).toHaveBeenCalled();
   });
 
   test("machine answer with no voicemail signedUrl returns Hangup response", async () => {
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_file: null,
+      group_household_queue: true,
+      caller_id: "+1555",
+    });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ update: vi.fn() }),
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -452,7 +478,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -521,7 +548,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected table ${table}`);
     });
-    adminDb.storage.from.mockReturnValueOnce({
+    client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
     useRoomPostgres(client);
@@ -548,7 +575,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -563,10 +591,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    adminDb.storage.from.mockReturnValueOnce({
+    client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    adminDb.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
+    client.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
     useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
@@ -583,13 +611,15 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("machine answer: outreach_attempt update error is caught", async () => {
+    configureTelephonyStub({ outreachUpdateError: new Error("oa") });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ update: vi.fn() }),
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -604,7 +634,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    adminDb.storage.from.mockReturnValueOnce({
+    client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
     useRoomPostgres(client);
@@ -625,7 +655,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   test("user device lookup error is caught", async () => {
     roomDbMocks.getUserVerifiedAudioNumbers.mockRejectedValueOnce(new Error("user"));
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 1, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -656,7 +687,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -701,7 +733,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -728,10 +761,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    adminDb.storage.from.mockReturnValueOnce({
+    client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    adminDb.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
+    client.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
     useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
@@ -759,7 +792,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
     const outreachSelect = vi.fn(async () => ({ data: [{ ok: 1 }], error: null }));
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -823,7 +857,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
   test("errors are caught and return Hangup response", async () => {
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: new Error("call") }) }) }) };
       }
@@ -847,7 +882,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
   test("device-check: called equals campaign caller_id", async () => {
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -894,7 +930,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
   test("device-check: no contactId but verified_audio_numbers includes called", async () => {
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return {
           select: () => ({
@@ -938,7 +975,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -966,13 +1004,15 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("machine answer: voicemail storage error is caught", async () => {
+    roomStorageState.error = new Error("storage");
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ update: vi.fn() }),
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -987,7 +1027,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    adminDb.storage.from.mockReturnValueOnce({
+    client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: null, error: new Error("storage") }),
     });
     useRoomPostgres(client);
@@ -1006,7 +1046,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("machine answer: group_household_queue=false uses campaign_queue update and handles its error", async () => {
-    mocks.fetchCampaignByIdForWorkspace.mockResolvedValueOnce({
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
       voicemail_file: "vm.mp3",
       group_household_queue: false,
       caller_id: "+1555",
@@ -1018,7 +1058,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
     roomDbMocks.dequeueCampaignQueueByContact.mockRejectedValueOnce(new Error("q"));
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
@@ -1030,7 +1071,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       }
       throw new Error(`unexpected ${table}`);
     });
-    adminDb.storage.from.mockReturnValueOnce({
+    client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
     useRoomPostgres(client);
@@ -1056,7 +1097,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
     const outreachSelect = vi.fn(async () => ({ data: [{ ok: 1 }], error: null }));
     const client = makeDbClient({});
-    adminDb.from.mockImplementation((table: string) => {
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
       if (table === "call") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }

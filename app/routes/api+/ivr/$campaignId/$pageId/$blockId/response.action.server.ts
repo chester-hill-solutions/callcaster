@@ -10,8 +10,6 @@ import { redirect } from "react-router";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
-
 const getOutreach = async (workspaceId: string, outreachId: number) => {
   const row = await findOutreachAttemptById(workspaceId, outreachId);
   if (!row) throw new Error("Outreach attempt not found");
@@ -107,10 +105,6 @@ const handleNextStep = (
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const baseUrl = env.BASE_URL();
 
-  const client = createClient(
-    env.BASE_URL(),
-    env.BASE_URL()
-  );
   const twiml = new Twilio.twiml.VoiceResponse();
 
   const pageId = params.pageId;
@@ -141,7 +135,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    client,
     callSid,
     params: formParams,
   });
@@ -152,7 +145,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   try {
     const [call, campaignData] = await Promise.all([
       findCallBySid(callSid),
-      fetchCampaignWithScript(client, campaignId),
+      fetchCampaignWithScript(campaignId),
     ]);
 
     if (!call?.workspace) {

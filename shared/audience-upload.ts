@@ -91,12 +91,15 @@ export function parseCsvRecords(csvString: string): Record<string, string>[] {
   if (currentLine) lines.push(currentLine);
   if (lines.length === 0) return [];
 
-  const headers = parseCsvLine(lines[0]);
+  const firstLine = lines[0];
+  if (!firstLine) return [];
+  const headers = parseCsvLine(firstLine);
   const records: Record<string, string>[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const values = parseCsvLine(lines[i]);
+    const line = lines[i];
+    if (!line || !line.trim()) continue;
+    const values = parseCsvLine(line);
     if (values.length !== headers.length) {
       while (values.length < headers.length) values.push("");
       if (values.length > headers.length) values.length = headers.length;

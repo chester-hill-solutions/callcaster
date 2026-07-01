@@ -1,5 +1,5 @@
 import { Call, Campaign, OutreachAttempt, Script, type Block } from "@/lib/types";
-import { resolveCampaignScript } from "@/lib/campaign-ivr.server";
+import { resolveCampaignScript, fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
@@ -17,6 +17,8 @@ import {
   persistCallStatusFromParams,
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
+import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import type Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -55,15 +57,14 @@ export interface CallEvent {
     FromState: string;
   }
 
-  const updateResult = async (outreach_attempt_id: number | null | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
+  const updateResult = async (workspaceId: string, outreach_attempt_id: number | null | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
     if (!outreach_attempt_id) {
         throw new Error("outreach_attempt_id is undefined");
     }
-    const { error } = await client
-        .from('outreach_attempt')
-        .update(update)
-        .eq('id', outreach_attempt_id);
-    if (error) throw error;
+    const result = await updateOutreachAttemptForWorkspace(workspaceId, outreach_attempt_id, update);
+    if (result instanceof Response) {
+        throw new Error("Failed to update outreach attempt");
+    }
 };
 
 interface ScriptSteps {
@@ -87,7 +88,7 @@ function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: 
 
 const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { script: Script | Script[] | null }): Promise<void> => {
     const call = twilio.calls(callSid);
-    await updateResult(client, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
+    await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
     const scriptSteps = (resolveCampaignScript(campaign)?.steps as unknown) as ScriptSteps | null | undefined;
     const step = findVoicemailPage(scriptSteps?.pages);
     if (!step) {
@@ -99,14 +100,12 @@ const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: C
             if (!campaign.voicemail_file) {
                 throw new Error("Voicemail file is undefined");
             }
-            const { data, error } = await adminDb.storage
-                .from(`workspaceAudio`)
-                .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600);
-            if (error) throw { 'Status_Error': error };
-            if (!data?.signedUrl) {
-                throw new Error("Failed to create signed URL for voicemail file");
-            }
-            await call.update({ twiml: pausePlayTwiml(data.signedUrl) });
+            const signedUrl = await createSignedObjectUrl(
+                "workspaceAudio",
+                `${dbCall.workspace}/${campaign.voicemail_file}`,
+                3600,
+            );
+            await call.update({ twiml: pausePlayTwiml(signedUrl) });
         }
     }
 };
@@ -131,7 +130,6 @@ const debitIvrCallCredits = async (
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const client = createClient(env.BASE_URL(), env.BASE_URL());
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const underCase = twilioParamsToUnderCase(params);
@@ -143,7 +141,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         const validation = await validateTwilioWebhookForCallSid({
             request,
-            client,
             callSid,
             params,
         });
@@ -151,15 +148,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return validation.response;
         }
 
-        const { data: dbCall, error: callError } = await client
-            .from('call')
-            .select('outreach_attempt_id, workspace, campaign(*, script:script(*))')
-            .eq('sid', callSid)
-            .single();
-        if (callError) throw callError;
+        const dbCall = await findCallBySid(callSid);
         if (!dbCall) throw new Error("Call not found");
+        if (!dbCall.workspace) throw new Error("Call missing workspace");
+        const campaignData = await fetchCampaignWithScript(dbCall.campaign_id);
 
-        const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace as string});
+        const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace });
 
         const callStatus = typeof underCase.call_status === "string" ? underCase.call_status : "";
         const timestamp = typeof underCase.timestamp === "string" ? underCase.timestamp : '';
@@ -176,49 +170,42 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 twilio,
                 callSid,
                 dbCall as unknown as Call,
-                dbCall.campaign as unknown as Campaign & { script: Script | Script[] | null },
-                client,
+                campaignData as unknown as Campaign & { script: Script | Script[] | null },
             );
         } else {
             switch (callStatus) {
                 case 'failed': {
                     await persistCallStatusFromParams({
-                        client,
                         params,
                         disposition: 'failed',
-                        outreachAttemptId: dbCall.outreach_attempt_id as number | null,
+                        outreachAttemptId: dbCall.outreach_attempt_id ?? null,
                     });
                     break;
                 }
                 case 'no-answer': {
                     await persistCallStatusFromParams({
-                        client,
                         params,
                         disposition: 'no-answer',
-                        outreachAttemptId: dbCall.outreach_attempt_id as number | null,
+                        outreachAttemptId: dbCall.outreach_attempt_id ?? null,
                     });
                     break;
                 }
                 case 'completed': {
                     await persistCallStatusFromParams({
-                        client,
                         params,
                         disposition: 'completed',
-                        outreachAttemptId: dbCall.outreach_attempt_id as number | null,
+                        outreachAttemptId: dbCall.outreach_attempt_id ?? null,
                     });
                     const durationSeconds = Math.max(
                         Number(underCase.call_duration) || 0,
                         Number(underCase.duration) || 0,
                     );
-                    if (dbCall.workspace) {
-                        const campaign = dbCall.campaign as { name?: string } | null;
-                        await debitIvrCallCredits(client, {
-                            callSid,
-                            workspaceId: String(dbCall.workspace),
-                            campaignName: campaign?.name ?? "unknown",
-                            durationSeconds,
-                        });
-                    }
+                    await debitIvrCallCredits({
+                        callSid,
+                        workspaceId: String(dbCall.workspace),
+                        campaignName: campaignData.title ?? "unknown",
+                        durationSeconds,
+                    });
                     break;
                 }
                 default:

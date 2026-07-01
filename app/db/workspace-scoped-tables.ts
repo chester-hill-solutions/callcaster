@@ -7,6 +7,7 @@ import {
   call,
   campaign,
   contact,
+  contact_audience,
   handset_session,
   households,
   inbound_queue,

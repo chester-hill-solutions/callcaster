@@ -73,7 +73,7 @@ async function handleTokenVerification(
       returnHeaders: true,
     });
     const mergedHeaders = mergeBetterAuthSetCookieHeaders(result?.headers, headers);
-    const payload = result?.response ?? result;
+    const payload = (result?.response ?? result) as any;
 
     if (!payload?.user) {
       return routeData<LoaderData>(

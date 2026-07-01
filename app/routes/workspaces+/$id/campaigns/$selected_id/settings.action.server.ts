@@ -181,7 +181,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             workspaceId: workspace_id,
             campaignId: selected_id,
           });
-          const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as CampaignDetails, {
+          const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as unknown as CampaignDetails, {
             queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
           });
           const readinessError =

@@ -50,7 +50,7 @@ async function handleQueueInsert(
 ) {
   const queuedEntries: number[] = [];
   for (const contactId of contactIds) {
-    const { data, error } = await adminDb.rpc("handle_campaign_queue_entry", {
+    const { data, error } = await client.rpc("handle_campaign_queue_entry", {
       p_contact_id: contactId,
       p_campaign_id: campaignId,
       p_requeue: true,

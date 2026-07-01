@@ -5,7 +5,6 @@ import {
 import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { getSession } from "@/lib/auth.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
@@ -14,7 +13,6 @@ import {
   updateCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import type { Database } from "@/lib/db-types";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -22,7 +20,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (auth instanceof Response) return auth;
 
   const { headers } = await getSession(request);
-  const userPostgres = null /* removed */ (auth);
   const user = auth.user;
 
   const url = new URL(request.url);
@@ -35,11 +32,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       { status: 400, headers },
     );
   }
-
-  const servicePostgres = createClient<Database>(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
 
   const dbCall = await findCallBySid(callSid);
 
@@ -60,7 +52,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       workspaceId,
     });
 
-    const twilio = await createWorkspaceTwilioInstance({ servicePostgres,
+    const twilio = await createWorkspaceTwilioInstance({
       workspace_id: dbCall.workspace,
     });
 

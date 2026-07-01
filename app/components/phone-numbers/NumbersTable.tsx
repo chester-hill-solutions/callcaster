@@ -111,7 +111,7 @@ export const NumbersTable = ({
 
   const handleInboundQueueChange = useCallback(
     (numberId: number, queueId: string) => {
-      updateNumber(numberId, { inbound_queue_id: queueId ? Number(queueId) : null });
+      updateNumber(numberId, { inbound_queue_id: queueId ? Number(queueId) : undefined });
       onInboundQueueChange?.(numberId, queueId);
     },
     [updateNumber, onInboundQueueChange],

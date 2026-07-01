@@ -10,8 +10,8 @@ import {
   findCallBySid,
   updateCallRecordingUrlBySid,
 } from "@/lib/telephony-db.server";
+import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const resend = new Resend(env.RESEND_API_KEY());
@@ -32,14 +32,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Missing or invalid CallSid");
     }
 
-    const client = createClient<Database>(
-      env.BASE_URL(),
-      env.BASE_URL(),
-    );
-
     const validation = await validateTwilioWebhookForCallSid({
       request,
-      client,
       callSid,
       params,
     });
@@ -102,27 +96,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const recording = await recordingResponse.blob();
 
     const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
-    const { error: uploadError } = await adminDb.storage
-      .from("workspaceAudio")
-      .upload(fileName, recording, {
-        cacheControl: "60",
-        upsert: false,
-        contentType: "audio/mpeg",
-      });
-
-    if (uploadError) {
-      throw new Error(`Error uploading to Postgres: ${uploadError.message}`);
+    try {
+      await uploadObject(
+        "workspaceAudio",
+        fileName,
+        recording,
+        {
+          contentType: "audio/mpeg",
+          cacheControl: "60",
+        },
+      );
+    } catch (error) {
+      throw new Error(`Error uploading to storage: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    const { data: signedUrlData, error: signedUrlError } = await adminDb.storage
-      .from("workspaceAudio")
-      .createSignedUrl(fileName, 8640000, { download: true });
-
-    if (signedUrlError) {
-      throw new Error(`Error creating signed URL: ${signedUrlError.message}`);
+    let signedUrl: string;
+    try {
+      signedUrl = await createSignedObjectUrl("workspaceAudio", fileName, 8640000);
+    } catch (error) {
+      throw new Error(`Error creating signed URL: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    const signedUrl = signedUrlData.signedUrl;
 
     const result = await resend.emails.send({
       from: "Callcaster <info@callcaster.ca>",

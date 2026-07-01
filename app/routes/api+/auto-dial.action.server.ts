@@ -133,8 +133,8 @@ export const action = async ({
     from: caller_id,
     to: targetDevice,
     status: "initiated",
-    campaign_id: typeof campaign_id === "number" ? campaign_id : null,
-    conference_id: authenticatedUser.id,
+      campaign_id: typeof campaign_id === "number" ? campaign_id : undefined,
+      conference_id: authenticatedUser.id,
     direction: "outbound-api",
   });
 
@@ -185,7 +185,7 @@ export const action = async ({
       group_sid: call.groupSid ?? null,
       caller_name: call.callerName ?? null,
       uri: call.uri ?? null,
-      campaign_id: typeof campaign_id === "number" ? campaign_id : null,
+    campaign_id: typeof campaign_id === "number" ? campaign_id : undefined,
       conference_id: authenticatedUser.id,
     });
 

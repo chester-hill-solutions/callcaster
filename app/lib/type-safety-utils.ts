@@ -104,8 +104,7 @@ export function getOptionalEnvVar(key: string): string | undefined {
   return process.env[key];
 }
 
-// Type-safe Postgres client typing
-export type never = import('@client/client-js').never;
+// Type-safe Postgres client typing (deprecated with Drizzle migration)
 
 // Type-safe Twilio client typing
 export type TwilioClient = import('twilio').Twilio;

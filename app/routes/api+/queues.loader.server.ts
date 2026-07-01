@@ -23,7 +23,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const campaignWorkspace = await resolveCampaignWorkspaceId(client, campaignId);
+    const campaignWorkspace = await resolveCampaignWorkspaceId(campaignId);
     if (!campaignWorkspace) {
       return jsonError("Campaign not found", 404);
     }

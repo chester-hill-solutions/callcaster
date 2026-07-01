@@ -4,7 +4,6 @@ import { loadInboundIvrPageContext } from "@/lib/inbound-ivr-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -12,10 +11,6 @@ interface Script {
 }
 
 export const action = async ({ params, request }: ActionFunctionArgs) => {
-  const client = createClient<Database>(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
   const twiml = new Twilio.twiml.VoiceResponse();
   const { numberId, pageId } = params as { numberId: string; pageId: string };
   const formData = await request.formData();
@@ -28,7 +23,6 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    client,
     callSid,
     params: paramsObj,
   });

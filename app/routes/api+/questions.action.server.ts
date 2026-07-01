@@ -5,9 +5,12 @@ import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
+import { outreach_attempt as outreachAttemptTable } from "@/db/schema";
+import { and, eq, gte, desc } from "drizzle-orm";
 
-import type { ActionFunctionArgs } from "react-router";
 import type { Json } from "@/lib/db-types";
+import type { ActionFunctionArgs } from "react-router";
 
 interface RequestData {
   update?: Json;
@@ -159,68 +162,56 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await requireWorkspaceAccess({ user, workspaceId: workspace });
     const typedFields = extractTypedOutreachFields(update);
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const { data: recentOutreach, error: searchError } = await client
-        .from('outreach_attempt')
-        .select()
-        .eq('contact_id', contact_id)
-        .eq("campaign_id", campaign_id)
-        .gte('created_at', tenMinutesAgo)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-    if (searchError && searchError.code !== 'PGRST116') {
-        logger.error("Error searching for recent outreach:", searchError);
-        return routeData({ error: searchError }, { status: 500, headers });
-    }
+    const tdb = createTenantDb(workspace);
+    const recentOutreach = await tdb.outreach_attempt.findFirst({
+      where: and(
+        eq(outreachAttemptTable.contact_id, contact_id),
+        eq(outreachAttemptTable.campaign_id, campaign_id),
+        gte(outreachAttemptTable.created_at, tenMinutesAgo),
+      ),
+      orderBy: desc(outreachAttemptTable.created_at),
+    });
 
     let outreachAttemptId: number | null = null;
 
     if (recentOutreach) {
-        const { data, error } = await client
-            .from('outreach_attempt')
-            .update({
-                ...(update !== undefined ? { result: update as Json } : {}),
-                disposition,
-                user_id: user.id,
-                ...typedFields,
-            })
-            .eq('id', recentOutreach.id)
-            .select();
-
-        if (error) {
-            logger.error("Error updating outreach attempt:", error);
-            return routeData({ error }, { status: 500, headers });
-        }
-        outreachAttemptId = data[0]?.id ?? null;
+      const [updated] = await tdb.outreach_attempt.update({
+        set: {
+          ...(update !== undefined ? { result: update } : {}),
+          disposition,
+          user_id: user.id,
+          ...typedFields,
+        },
+        where: eq(outreachAttemptTable.id, recentOutreach.id),
+      });
+      outreachAttemptId = updated?.id ?? recentOutreach.id ?? null;
     } else {
-        try {
-          outreachAttemptId = await rpcCreateOutreachAttempt(db, {
-            contactId: Number(contact_id),
-            campaignId: Number(campaign_id),
-            userId: user.id,
-            workspaceId: workspace,
-            queueId: Number(queue_id),
-          });
-        } catch (error) {
-            logger.error("Error creating outreach attempt:", error);
-            return routeData({ error }, { status: 500, headers });
-        }
-    }
-    const { data: updatedOutreach, error: updateError } = await client
-        .from('outreach_attempt')
-        .update({
-            ...(update !== undefined ? { result: update as Json } : {}),
-            disposition,
-            ...typedFields,
-        })
-        .eq('id', outreachAttemptId as number)
-        .select();
-
-    if (updateError) {
-        logger.error("Error updating outreach attempt:", updateError);
-        return routeData({ error: updateError }, { status: 500, headers });
+      try {
+        outreachAttemptId = await rpcCreateOutreachAttempt(db, {
+          contactId: Number(contact_id),
+          campaignId: Number(campaign_id),
+          userId: user.id,
+          workspaceId: workspace,
+          queueId: Number(queue_id),
+        });
+      } catch (error) {
+        logger.error("Error creating outreach attempt:", error);
+        return routeData({ error }, { status: 500, headers });
+      }
     }
 
-    return routeData(updatedOutreach[0], { headers });
+    if (!outreachAttemptId) {
+      return routeData({ error: "Failed to create or update outreach attempt" }, { status: 500, headers });
+    }
+
+    const [finalUpdated] = await tdb.outreach_attempt.update({
+      set: {
+        ...(update !== undefined ? { result: update } : {}),
+        disposition,
+        ...typedFields,
+      },
+      where: eq(outreachAttemptTable.id, outreachAttemptId),
+    });
+
+    return routeData(finalUpdated, { headers });
 }

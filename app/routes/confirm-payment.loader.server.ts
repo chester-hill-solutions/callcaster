@@ -28,7 +28,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   await verifyAuth(request, nextUrl);
 
   const result = await confirmStripeCheckoutSessionForRedirect({
-    client: null,
     sessionId,
   });
 

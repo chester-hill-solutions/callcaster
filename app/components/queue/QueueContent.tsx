@@ -4,6 +4,7 @@ import { QueueTable } from "@/components/queue/QueueTable";
 import { useEffect, useState, useRef } from "react";
 
 interface QueueContentProps {
+  client?: unknown;
   queueValue: {
     queueData: QueueItem[] | null;
     queueError: Error | null;
@@ -77,59 +78,6 @@ export function QueueContent({
             pendingUpdates.current.delete(id);
         }
     }
-
-    const handleAddRealtimeQueue = async (payload: RealtimeChangePayload<CampaignQueue>) => {
-        const campaignIdNum = Number(campaignId);
-        if (payload.new && (payload.new as CampaignQueue & { campaign_id?: number }).campaign_id !== campaignIdNum) return;
-        if (payload.old && (payload.old as CampaignQueue & { campaign_id?: number }).campaign_id !== campaignIdNum) return;
-
-        if (payload.eventType === 'INSERT') {
-            const contact = await fetchContactById(payload.new.contact_id);
-            if (contact) {
-                setQueueData(curr => (curr.length >= 50 ? curr : [...curr, { ...payload.new, contact }].slice(0, 50)));
-            }
-        }
-        if (payload.eventType === 'DELETE') {
-            setQueueData(curr => curr.filter(item => item.id !== payload.old.id));
-        }
-        if (payload.eventType === 'UPDATE' && payload.new) {
-            setQueueData(curr => {
-                const idx = curr.findIndex(item => item.id === payload.new.id);
-                if (idx < 0) return curr;
-                const currentItem = curr[idx];
-                if (!currentItem) return curr;
-                const updated = { ...currentItem, ...payload.new, contact: currentItem.contact };
-                return [...curr.slice(0, idx), updated, ...curr.slice(idx + 1)];
-            });
-        }
-    }
-
-    useEffect(() => {
-        const channel = adminDb.channel(`campaign_queue_${campaignId}`)
-            .on('postgres_changes' as const, {
-                event: '*',
-                schema: 'public',
-                table: 'campaign_queue',
-                filter: `campaign_id=eq.${campaignId}`,
-            }, (payload: RealtimeChangePayload<CampaignQueue>) => {
-                setQueueCount(curr => {
-                    if (payload.eventType === 'DELETE') {
-                        return Math.max(0, curr - 1);
-                    }
-                    if (payload.eventType === 'INSERT') {
-                        return curr + 1;
-                    }
-                    return curr;
-                });
-                handleAddRealtimeQueue(payload);
-            })
-            .subscribe();
-
-        return () => {
-            pendingUpdates.current.clear();
-            adminDb.removeChannel(channel);
-        }
-    }, [campaignId, client]);
 
     // Update queue data when parent data changes
     useEffect(() => {

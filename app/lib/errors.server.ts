@@ -107,7 +107,7 @@ export function createErrorResponse(
 /**
  * Handle database errors
  */
-export function handleDatabaseError(error: PostgrestError | null, context?: string): never {
+export function handleDatabaseError(error: { code?: string; message?: string; details?: string } | null, context?: string): never {
   if (!error) {
     throw new AppError(
       "Database operation failed",

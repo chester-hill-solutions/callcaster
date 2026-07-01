@@ -16,7 +16,7 @@ export default function SelectPhase({
   handleInputChange,
   campaignData,
 }: CampaignBasicInfoSelectPhaseProps) {
-  const value = campaignData.phase ?? "identification";
+  const value = (campaignData as Campaign & { phase?: string }).phase ?? "identification";
 
   return (
     <Select

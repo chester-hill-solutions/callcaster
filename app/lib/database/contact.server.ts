@@ -289,6 +289,7 @@ export const createContact = async (
     await db.insert(contact_audience).values({
       contact_id: inserted.id,
       audience_id: Number(audience_id),
+      created_at: new Date().toISOString(),
     });
   }
 
@@ -318,6 +319,7 @@ export const bulkCreateContacts = async (
   const audienceMap = insert.map((row) => ({
     contact_id: row.id,
     audience_id: Number(audience_id),
+    created_at: new Date().toISOString(),
   }));
 
   try {

@@ -1,4 +1,4 @@
-import type { TwilioSmsStatus } from "./sms-status-logic.ts";
+import type { TwilioSmsStatus } from "./sms-status-logic";
 
 export const TWILIO_OPEN_SYNC_MIN_DATE_CREATED = "2026-04-01";
 

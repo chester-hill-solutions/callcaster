@@ -17,7 +17,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const url = new URL(request.url);
   const result = await getAudienceDetailApi(
-    auth.client,
     workspaceId,
     audienceId,
     url.searchParams,

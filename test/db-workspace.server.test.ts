@@ -49,6 +49,27 @@ const tdbMocks = vi.hoisted(() => ({
   },
 }));
 
+const authApiMocks = vi.hoisted(() => ({
+  verifyEmail: vi.fn(),
+}));
+
+vi.mock("@/server/auth-instance", () => ({
+  auth: { api: authApiMocks },
+}));
+
+vi.mock("@/lib/better-auth-headers.server", () => ({
+  mergeBetterAuthSetCookieHeaders: vi.fn((headers) => headers ?? new Headers()),
+}));
+
+const rpcMocks = vi.hoisted(() => ({
+  rpcCreateNewWorkspace: vi.fn(),
+  rpcFindContactsByPhones: vi.fn(),
+  rpcGetWorkspaceUsers: vi.fn(),
+  rpcUpdateUserWorkspaceLastAccessTime: vi.fn(),
+}));
+
+vi.mock("@/lib/db-rpc.server", () => rpcMocks);
+
 function mockConversationTenantData({
   workspaceNumbers = [{ phone_number: "+15551111111" }],
   messageRows = [],
@@ -61,6 +82,7 @@ function mockConversationTenantData({
   tdbMocks.workspace_number.findMany.mockResolvedValue(workspaceNumbers);
   tdbMocks.message.findMany.mockResolvedValue(messageRows);
   tdbMocks.contact.findMany.mockResolvedValue(contactRows);
+  rpcMocks.rpcFindContactsByPhones.mockResolvedValue(contactRows);
 }
 
 describe("app/lib/database/workspace.server.ts", () => {
@@ -76,6 +98,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     adminDbMocks.workspaceFindFirst.mockReset();
     adminDbMocks.selectChain.mockReset();
     adminDbMocks.updateWhere.mockReset();
+    authApiMocks.verifyEmail.mockReset();
+    for (const fn of Object.values(rpcMocks)) {
+      fn.mockReset();
+    }
     for (const table of Object.values(tdbMocks)) {
       for (const fn of Object.values(table)) {
         (fn as ReturnType<typeof vi.fn>).mockReset();
@@ -107,6 +133,7 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     vi.doMock("@/server/tenant-db", () => ({
       createTenantDb: vi.fn(() => tdbMocks),
+      withAppCurrentUser: vi.fn((userId, fn) => fn({} as any)),
     }));
 
     vi.doMock("@/components/workspace/TeamMember", () => ({
@@ -130,7 +157,12 @@ describe("app/lib/database/workspace.server.ts", () => {
       env: new Proxy(
         {},
         {
-          get: (_target, _prop: string) => () => "test",
+          get: (_target, prop: string) => () => {
+            if (prop === "BETTER_AUTH_URL" || prop === "BASE_URL") {
+              return "http://localhost";
+            }
+            return "test";
+          },
         },
       ),
     }));
@@ -194,23 +226,15 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const postgresNoSession: any = {
-      auth: { getSession: async () => ({ data: { session: null } }) },
-    };
     await expect(
-      mod.getUserWorkspaces({ null: postgresNoSession }),
+      mod.getUserWorkspaces({ userId: "" }),
     ).resolves.toEqual({
       data: null,
       error: "No user session found",
     });
 
-    const postgresErr: any = {
-      auth: {
-        getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
-      },
-    };
     adminDbMocks.selectChain.mockRejectedValueOnce(new Error("x"));
-    const res = await mod.getUserWorkspaces({ null: postgresErr });
+    const res = await mod.getUserWorkspaces({ userId: "u1" });
     expect(res.data).toBeNull();
     expect(logger.error).toHaveBeenCalled();
   }, 30000);
@@ -219,13 +243,8 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const postgresOk: any = {
-      auth: {
-        getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
-      },
-    };
     adminDbMocks.selectChain.mockResolvedValueOnce([{ workspace: { id: 1 } }]);
-    const res = await mod.getUserWorkspaces({ null: postgresOk });
+    const res = await mod.getUserWorkspaces({ userId: "u1" });
     expect(res).toEqual({ data: [{ id: 1 }], error: null });
     expect(logger.error).not.toHaveBeenCalled();
   });
@@ -268,13 +287,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     const stripe = await import("../app/lib/database/stripe.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const client: any = {
-      rpc: vi.fn(async () => ({ data: "w_new", error: null })),
-    };
+    rpcMocks.rpcCreateNewWorkspace.mockResolvedValue("w_new");
 
     await expect(
       mod.createNewWorkspace({
-        null: client,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -286,12 +302,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(stripe.createStripeContact).toHaveBeenCalled();
 
     // rpc error now aborts before any provisioning
-    const postgresRpcErr: any = {
-      rpc: vi.fn(async () => ({ data: "w_new", error: new Error("rpc") })),
-    };
+    rpcMocks.rpcCreateNewWorkspace.mockRejectedValueOnce(new Error("rpc"));
     await expect(
       mod.createNewWorkspace({
-        null: postgresRpcErr,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -299,13 +312,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(logger.error).toHaveBeenCalled();
 
     // metadata update error is non-fatal; workspace is still created with a warning
-    const postgresUpdateErr: any = {
-      rpc: vi.fn(async () => ({ data: "w_new", error: null })),
-    };
+    rpcMocks.rpcCreateNewWorkspace.mockResolvedValue("w_new");
     adminDbMocks.updateWhere.mockRejectedValueOnce(new Error("upd"));
     await expect(
       mod.createNewWorkspace({
-        null: postgresUpdateErr,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -320,10 +330,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     const Twilio = (await import("twilio")).default as any;
 
     // Subaccount creation fails => workspace still created with warning
+    rpcMocks.rpcCreateNewWorkspace.mockResolvedValue("w_new");
     Twilio.__mocks.accountsCreate.mockRejectedValueOnce(new Error("nope"));
     await expect(
       mod.createNewWorkspace({
-        null: client,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -337,7 +347,6 @@ describe("app/lib/database/workspace.server.ts", () => {
     Twilio.__mocks.newKeysCreate.mockResolvedValueOnce(undefined);
     await expect(
       mod.createNewWorkspace({
-        null: client,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -348,14 +357,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     });
 
     // Non-Error throws => generic message branch
-    const postgresThrows: any = {
-      rpc: vi.fn(async () => {
-        throw "boom";
-      }),
-    };
+    rpcMocks.rpcCreateNewWorkspace.mockRejectedValueOnce("boom");
     await expect(
       mod.createNewWorkspace({
-        null: postgresThrows,
         workspaceName: "W",
         user_id: "u1",
       }),
@@ -443,13 +447,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const client: any = {
-      rpc: async () => ({ data: [{ id: 1 }], error: new Error("x") }),
-    };
+    rpcMocks.rpcGetWorkspaceUsers.mockRejectedValueOnce(new Error("x"));
     tdbMocks.workspace_number.findMany.mockRejectedValueOnce(new Error("y"));
 
     await mod.getWorkspaceUsers({
-      null: client,
       workspaceId: "w1",
     });
     await mod.getWorkspacePhoneNumbers({
@@ -462,13 +463,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    const client: any = {
-      rpc: async () => ({ data: [{ id: 1 }], error: null }),
-    };
+    rpcMocks.rpcGetWorkspaceUsers.mockResolvedValue([{ id: 1 }]);
     tdbMocks.workspace_number.findMany.mockResolvedValueOnce([{ id: 1 }]);
 
     await mod.getWorkspaceUsers({
-      null: client,
       workspaceId: "w1",
     });
     await mod.getWorkspacePhoneNumbers({
@@ -554,12 +552,12 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("updateUserWorkspaceAccessDate logs on rpc error", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
-    const client: any = {
-      rpc: async () => ({ data: null, error: new Error("x") }),
-    };
+    rpcMocks.rpcUpdateUserWorkspaceLastAccessTime.mockRejectedValue(
+      new Error("x"),
+    );
     await mod.updateUserWorkspaceAccessDate({
-      null: client,
       workspaceId: "w1",
+      userId: "u1",
     });
     expect(logger.error).toHaveBeenCalled();
   });
@@ -567,12 +565,10 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("updateUserWorkspaceAccessDate success does not log", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
-    const client: any = {
-      rpc: async () => ({ data: { ok: 1 }, error: null }),
-    };
+    rpcMocks.rpcUpdateUserWorkspaceLastAccessTime.mockResolvedValue(undefined);
     await mod.updateUserWorkspaceAccessDate({
-      null: client,
       workspaceId: "w1",
+      userId: "u1",
     });
     expect(logger.error).not.toHaveBeenCalled();
   });
@@ -584,7 +580,6 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     adminDbMocks.selectChain.mockRejectedValueOnce(new Error("x"));
     const r1 = await asRouteResponse(await mod.handleExistingUserSession(
-      {} as any,
       serverSession,
       headers,
     ));
@@ -593,7 +588,6 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
     const r2 = await asRouteResponse(await mod.handleExistingUserSession(
-      {} as any,
       serverSession,
       headers,
     ));
@@ -607,91 +601,52 @@ describe("app/lib/database/workspace.server.ts", () => {
     const mod = await import("../app/lib/database/workspace.server");
     const headers = new Headers();
 
-    const postgresNoHash: any = { auth: {} };
-    const r0 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      postgresNoHash,
-      "",
-      "signup" as any,
-      headers,
-    ));
-    expect(await r0.json()).toEqual({ error: "Invalid invitation link" });
+    const makeRequest = () =>
+      new Request("http://localhost/verify", { headers: new Headers() });
 
-    const postgresVerifyErr: any = {
-      auth: { verifyOtp: async () => ({ data: null, error: new Error("x") }) },
-    };
-    const r1 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      postgresVerifyErr,
-      "th",
-      "signup" as any,
-      headers,
-    ));
+    const r0 = await asRouteResponse(
+      await mod.handleNewUserOTPVerification(makeRequest(), "", "signup", headers),
+    );
+    expect(await r0.json()).toEqual({ error: "Invalid invitation link" });
+    expect(authApiMocks.verifyEmail).not.toHaveBeenCalled();
+
+    authApiMocks.verifyEmail.mockRejectedValueOnce(new Error("verify"));
+    const r1 = await asRouteResponse(
+      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    );
     expect(((await r1.json()) as any).error).toBeTruthy();
 
-    const postgresNoSession: any = {
-      auth: {
-        verifyOtp: async () => ({ data: { session: null }, error: null }),
-      },
-    };
-    const r2 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      postgresNoSession,
-      "th",
-      "signup" as any,
-      headers,
-    ));
+    authApiMocks.verifyEmail.mockResolvedValueOnce({ response: null });
+    const r2 = await asRouteResponse(
+      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    );
     expect(await r2.json()).toEqual({ error: "Failed to create session" });
 
-    const postgresSessionErr: any = {
-      auth: {
-        verifyOtp: async () => ({
-          data: { session: { user: { id: "u1" } } },
-          error: null,
-        }),
-        setSession: async () => ({ error: new Error("set") }),
-      },
-    };
-    const r3 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      postgresSessionErr,
-      "th",
-      "signup" as any,
-      headers,
-    ));
+    authApiMocks.verifyEmail.mockResolvedValueOnce({
+      response: { user: { id: "u1" } },
+    });
+    adminDbMocks.selectChain.mockRejectedValueOnce(new Error("inv"));
+    const r3 = await asRouteResponse(
+      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    );
     expect(((await r3.json()) as any).error).toBeTruthy();
 
-    const postgresInviteErr: any = {
-      auth: {
-        verifyOtp: async () => ({
-          data: { session: { user: { id: "u1" } } },
-          error: null,
-        }),
-        setSession: async () => ({ error: null }),
-      },
-    };
-    adminDbMocks.selectChain.mockRejectedValueOnce(new Error("inv"));
-    const r4 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      postgresInviteErr,
-      "th",
-      "signup" as any,
-      headers,
-    ));
-    expect(((await r4.json()) as any).error).toBeTruthy();
-
-    const postgresOk: any = {
-      auth: {
-        verifyOtp: async () => ({
-          data: { session: { user: { id: "u1" } } },
-          error: null,
-        }),
-        setSession: async () => ({ error: null }),
-      },
-    };
+    authApiMocks.verifyEmail.mockResolvedValueOnce({
+      response: { user: { id: "u1" } },
+    });
     adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
-    const r5 = await asRouteResponse(await mod.handleNewUserOTPVerification(
-      postgresOk,
-      "th",
-      "signup" as any,
-      headers,
-    ));
-    expect(await r5.json()).toMatchObject({ invites: [{ id: 1 }] });
+    const r4 = await asRouteResponse(
+      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    );
+    expect(await r4.json()).toMatchObject({
+      newSession: { user: { id: "u1" } },
+      invites: [{ id: 1 }],
+    });
+    expect(authApiMocks.verifyEmail).toHaveBeenLastCalledWith({
+      query: { token: "th" },
+      headers: expect.any(Headers),
+      returnHeaders: true,
+    });
   });
 
   test("createWorkspaceTwilioInstance throws on query error and returns twilio instance on success", async () => {
@@ -979,7 +934,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       ],
     });
 
-    const result = await mod.fetchConversationSummary({ rpc: vi.fn() } as any, "w1", "1", {
+    const result = await mod.fetchConversationSummary("w1", "1", {
       limit: 1,
       offset: 0,
       sort: "recent",
@@ -1038,7 +993,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       ],
     });
 
-    const result = await mod.fetchConversationSummary({ rpc: vi.fn() } as any, "w1", null, {
+    const result = await mod.fetchConversationSummary("w1", null, {
       limit: 1,
       offset: 0,
       sort: "hasReplied",
@@ -1093,7 +1048,9 @@ describe("app/lib/database/workspace.server.ts", () => {
       ],
     });
 
-    const result = await mod.fetchConversationSummary({ rpc: vi.fn() } as any, "w1", null, {
+    rpcMocks.rpcFindContactsByPhones.mockResolvedValue([]);
+
+    const result = await mod.fetchConversationSummary("w1", null, {
       limit: 20,
       offset: 0,
       sort: "hasUnreadReply",
@@ -1133,15 +1090,11 @@ describe("app/lib/database/workspace.server.ts", () => {
       ],
     });
 
-    const result = await mod.fetchConversationSummary(
-      { rpc: vi.fn(async () => ({ data: [], error: null })) } as any,
-      "w1",
-      {
-        limit: 20,
-        offset: 0,
-        sort: "recent",
-      },
-    );
+    const result = await mod.fetchConversationSummary("w1", null, {
+      limit: 20,
+      offset: 0,
+      sort: "recent",
+    });
 
     expect(result.chats).toEqual([
       expect.objectContaining({
@@ -1170,34 +1123,25 @@ describe("app/lib/database/workspace.server.ts", () => {
       contactRows: [],
     });
 
-    const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
-      expect(fn).toBe("find_contacts_by_phones");
-      expect(args.p_workspace_id).toBe("w1");
-      expect((args.p_phone_numbers as string[]).length).toBeGreaterThanOrEqual(
-        1,
-      );
-      expect(args.p_phone_numbers as string[]).toContain("+15550000001");
+    rpcMocks.rpcFindContactsByPhones.mockResolvedValue([
+      {
+        id: 44,
+        firstname: "Jamie",
+        surname: "Fallback",
+        phone: "+15550000001",
+      },
+    ]);
 
-      return {
-        data: [
-          {
-            id: 44,
-            firstname: "Jamie",
-            surname: "Fallback",
-            phone: "+15550000001",
-          },
-        ],
-        error: null,
-      };
-    });
-
-    const result = await mod.fetchConversationSummary({ rpc } as any, "w1", null, {
+    const result = await mod.fetchConversationSummary("w1", null, {
       limit: 20,
       offset: 0,
       sort: "recent",
     });
 
-    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpcMocks.rpcFindContactsByPhones).toHaveBeenCalledTimes(1);
+    expect(rpcMocks.rpcFindContactsByPhones).toHaveBeenCalledWith("w1", [
+      "+15550000001",
+    ]);
     expect(result.chats).toEqual([
       expect.objectContaining({
         contact_phone: "+15550000001",

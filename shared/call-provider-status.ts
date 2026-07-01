@@ -1,4 +1,4 @@
-import { TERMINAL_BILLABLE_CALL_STATUSES } from "./pricing.ts";
+import { TERMINAL_BILLABLE_CALL_STATUSES } from "./pricing";
 
 export type CallStatusEnum =
   | "queued"

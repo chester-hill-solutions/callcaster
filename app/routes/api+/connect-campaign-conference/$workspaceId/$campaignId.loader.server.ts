@@ -11,9 +11,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const campaignId = params.campaignId;
   if (!workspaceId || !campaignId) {
     return twilioWebhookForbidden("Missing workspace or campaign");
-  }  const validation = await validateTwilioWebhookForWorkspace({
+  }
+
+  const validation = await validateTwilioWebhookForWorkspace({
     request,
-    client,
     workspaceId,
   });
   if (!validation.ok) {

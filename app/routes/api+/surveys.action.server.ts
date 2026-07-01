@@ -53,7 +53,7 @@ async function handleCreateSurvey(
     const survey = await createSurveyWithStructure({ workspaceId, surveyData });
     return routeData({ success: true, survey });
   } catch (error) {
-    handleDatabaseError(error, "Error creating survey");
+    handleDatabaseError(error as { code?: string; message?: string; details?: string } | null, "Error creating survey");
   }
 }
 

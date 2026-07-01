@@ -21,7 +21,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("userId is required", 400);
   }
 
-  const result = await getAdminUser(auth.null, userId);
+  const result = await getAdminUser(userId);
   if (!result.ok) {
     return jsonError(result.error, result.status);
   }
@@ -45,7 +45,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, updateUserSchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await updateAdminUser(auth.null, userId, parsed);
+  const result = await updateAdminUser(userId, parsed);
   if (!result.ok) {
     return jsonError(result.error, 500);
   }

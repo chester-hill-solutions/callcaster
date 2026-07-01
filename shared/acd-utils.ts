@@ -17,7 +17,7 @@ export function makeQueueName(queueId: number): string {
 export function parseQueueIdFromName(name: string | null): number | null {
   if (!name) return null;
   const match = name.match(/^inbound_q_(\d+)$/);
-  return match ? parseInt(match[1], 10) : null;
+  return match && match[1] ? parseInt(match[1], 10) : null;
 }
 
 export function buildHoldMusicTwiml(args: {

@@ -18,7 +18,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   if (url.searchParams.get("export") === "csv") {
     const result = await exportSurveyResponsesCsv(
-      auth.client,
       surveyId,
       auth.workspaceId,
     );
@@ -29,7 +28,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await getSurveyResponsesApi(
-    auth.client,
     surveyId,
     auth.workspaceId,
   );

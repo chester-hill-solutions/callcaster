@@ -9,7 +9,6 @@ import { logger } from "@/lib/logger.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
-import type { Database } from "@/lib/db-types";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import { db } from "@/server/db";
 export type InitiateIvrContact = {
@@ -35,18 +34,12 @@ export type InitiateIvrCallResult =
 export async function initiateIvrCall(
   input: InitiateIvrCallInput,
 ): Promise<InitiateIvrCallResult> {
-  const client = createClient<Database>(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
-
   await requireWorkspaceAccess({
     user: input.user,
     workspaceId: input.workspace_id,
   });
 
   const twilio = await createWorkspaceTwilioInstance({
-    client,
     workspace_id: input.workspace_id,
   });
 

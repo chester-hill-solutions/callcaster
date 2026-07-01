@@ -38,7 +38,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const workspaceId = parsed.data.workspace_id;
     const phoneNumber = parsed.data.phone_number ?? parsed.data.phoneNumber!;
 
-    const result = await purchaseWorkspaceNumber(      auth.user.id,
+    const result = await purchaseWorkspaceNumber(
+      auth.user.id,
       workspaceId,
       phoneNumber,
     );

@@ -18,6 +18,7 @@ import { eq } from "drizzle-orm";
 import { campaign as campaignTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
+import { downloadObject, listObjects } from "@/lib/object-storage.server";
 
 export type SerializedExportItem = {
   id: string;
@@ -116,34 +117,25 @@ export async function listWorkspaceExportsApi(
     workspaceId,
   });
 
-  const { data: files, error: listError } = await null.storage
-    .from("campaign-exports")
-    .list(workspaceId, {
+  let files: Awaited<ReturnType<typeof listObjects>>;
+  try {
+    files = await listObjects("campaign-exports", workspaceId, {
       sortBy: { column: "created_at", order: "desc" },
     });
-
-  if (listError) {
-    logger.error("listWorkspaceExportsApi error", listError);
-    return { ok: false as const, error: listError.message, status: 500 };
+  } catch (error) {
+    logger.error("listWorkspaceExportsApi error", error);
+    return { ok: false as const, error: error instanceof Error ? error.message : "Failed to list exports", status: 500 };
   }
 
   const now = Date.now();
-  const statusFiles = (files ?? []).filter((file) => file.name.endsWith(".json"));
+  const statusFiles = files.filter((file) => file.name.endsWith(".json"));
 
   const processedExports = await Promise.all(
     statusFiles.map(async (file) => {
       try {
-        const { data: statusData, error: downloadError } = await null.storage
-          .from("campaign-exports")
-          .download(`${workspaceId}/${file.name}`);
-
-        if (downloadError) {
-          logger.error(`Error downloading export status ${file.name}`, downloadError);
-          return null;
-        }
-
-        const content = JSON.parse(await statusData.text());
-        const createdAt = new Date(content.created_at || file.created_at || Date.now());
+        const statusData = await downloadObject("campaign-exports", `${workspaceId}/${file.name}`);
+        const content = JSON.parse(statusData.toString("utf-8")) as Record<string, unknown>;
+        const createdAt = new Date((content.created_at as string | undefined) || file.created_at || Date.now());
         const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
 
         return {

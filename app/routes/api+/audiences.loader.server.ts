@@ -86,10 +86,12 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
         if (!audienceWorkspace) {
           return routeData({ error: "Audience not found" }, { status: 404, headers });
         }
-        await d.requireWorkspaceAccess({
-          user,
-          workspaceId: audienceWorkspace,
-        });
+        if (user) {
+          await d.requireWorkspaceAccess({
+            user,
+            workspaceId: audienceWorkspace,
+          });
+        }
 
         const rawData = await listAudienceContactsForExport(audienceWorkspace, id, {
           q: q || undefined,

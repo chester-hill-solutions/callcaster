@@ -149,7 +149,6 @@ export async function ensureWorkspaceTwilioBootstrap({
   });
 
   const twilio = await createWorkspaceTwilioClient({
-    client: null,
     workspaceId,
   });
 
@@ -349,7 +348,6 @@ export async function repairWorkspaceTwilioWebhooks({
   const urls = buildBootstrapUrls(baseUrl);
 
   const twilio = await createWorkspaceTwilioClient({
-    client: null,
     workspaceId,
   });
 

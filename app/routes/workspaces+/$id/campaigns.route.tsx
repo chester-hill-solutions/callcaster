@@ -15,7 +15,7 @@ import {
 
 export default function WorkspaceCampaignsPage() {
   const outlet = useOutlet();
-  const { audiences, campaigns, phoneNumbers, userRole, workspace, client } =
+  const { audiences, campaigns, phoneNumbers, userRole, workspace } =
     useOutletContext<{
       audiences: Audience[];
       campaigns: Campaign[];

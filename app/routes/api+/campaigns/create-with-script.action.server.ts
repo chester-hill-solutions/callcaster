@@ -56,10 +56,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } = body;
 
   let workspaceId: string;
-  const client =
-    authResult.authType === "api_key"
-      ? authResult.client
-      : authResult.null;
 
   if (authResult.authType === "api_key") {
     workspaceId = authResult.workspaceId;
@@ -131,7 +127,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const { audiencesLinked, contactsEnqueued } = await linkAudiencesToNewCampaign({
-    client,
     campaignId: campaign.id,
     audienceIds: audience_ids,
     enqueueAudienceContacts: enqueue_audience_contacts,

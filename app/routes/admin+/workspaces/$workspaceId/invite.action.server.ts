@@ -16,7 +16,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   const access = await requireSudoOrWorkspaceAdmin(request, workspaceId);
-  if (access instanceof Response) {
+  if (!("user" in access)) {
     return access;
   }
 

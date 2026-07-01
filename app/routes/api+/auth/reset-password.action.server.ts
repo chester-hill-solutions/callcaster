@@ -16,7 +16,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, resetPasswordBodySchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await resetPassword(null /* removed */ (auth), parsed);
+  const result = await resetPassword(request, parsed);
   if (!result.ok) {
     return jsonError(result.error, result.status);
   }

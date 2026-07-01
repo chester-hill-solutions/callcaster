@@ -26,7 +26,6 @@ export default function ChatScreen() {
 
   return (
     <ChatThreadView
-      client={client}
       workspace={workspace}
       registerChatActions={registerChatActions}
       contactOptOut={contactOptOut}

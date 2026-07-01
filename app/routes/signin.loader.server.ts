@@ -1,12 +1,10 @@
-import { getSession, verifyAuth } from "@/lib/auth.server";
+import { getSession } from "@/lib/auth.server";
 import { data as routeData, redirect } from "react-router";
-import { logger } from "@/lib/logger.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
-  const { headers} = await getSession(request);
-  const { data: { user } } = await request.getUser();
+  const { headers, user } = await getSession(request);
 
   if (user) {
     return redirect("/workspaces", { headers });

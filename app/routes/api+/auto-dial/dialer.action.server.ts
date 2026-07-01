@@ -12,7 +12,6 @@ import { logger } from "@/lib/logger.server";
 import type { Call } from "@/lib/types";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 import { db } from "@/server/db";
-import type { Database } from "@/lib/db-types";
 
 export {
   completeAllConferences,
@@ -25,10 +24,6 @@ export {
 } from "@/lib/auto-dial.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const client = createClient<Database>(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
   const body = await safeParseJson<{
     user_id: string;
     campaign_id: number;
@@ -38,7 +33,6 @@ export const action = async ({ request }: { request: Request }) => {
   const { user_id, campaign_id, workspace_id, selected_device } = body;
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id,
   });
-  const realtime = adminDb.channel(user_id);
 
   try {
     const contactRecord = await getNextAutoDialQueueContact(
@@ -70,12 +64,6 @@ export const action = async ({ request }: { request: Request }) => {
         dequeuedById: user_id,
         dequeuedReasonText: "Predictive Dialer called contact",
       });
-      realtime.send({
-        type: "broadcast",
-        event: "message",
-        payload: { contact_id: contactRecord.contact_id, status: "dialing" },
-      });
-
       const callData = {
         sid: call.sid,
         date_updated: call.dateUpdated,
@@ -104,7 +92,6 @@ export const action = async ({ request }: { request: Request }) => {
       };
 
       await saveCallToDatabase(workspace_id, callData as unknown as Partial<Call>);
-      adminDb.removeChannel(realtime);
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
       });

@@ -15,7 +15,7 @@ import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSetti
 import { inArray } from "drizzle-orm";
 import { contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
-import type { ActionFunctionArgs } from "react-router";
+import { uploadObject } from "@/lib/object-storage.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -23,11 +23,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (missingHeader) {
     return missingHeader;
   }
-
-  const client = createClient<Database>(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
 
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
@@ -111,20 +106,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const newMedia = await mediaResponse.blob();
       const fileName = `${workspaceNumber.workspace}/sms-${messageSid}-${i}-${now.toISOString()}`;
-      const { data: uploadData, error: uploadError } = await adminDb.storage
-        .from("messageMedia")
-        .upload(fileName, newMedia, {
+      try {
+        await uploadObject("messageMedia", fileName, newMedia, {
           cacheControl: "60",
-          upsert: false,
           contentType: data[`MediaContentType${i}`] as string,
         });
-
-      if (uploadError) {
+        media.push(fileName);
+      } catch (uploadError) {
         logger.error("Upload error:", uploadError);
         continue;
-      }
-      if (uploadData?.path) {
-        media.push(uploadData.path);
       }
     } catch (error) {
       logger.error(`Error processing media ${i}:`, error);
@@ -132,7 +122,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const matchingContactIds = await findMatchingContactIds(
-    client,
     workspaceNumber.workspace,
     fromNumber,
   );

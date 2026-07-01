@@ -1,10 +1,7 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import {
-  makeApplyLedgerEntryRpcStub,
-  type TransactionRow,
-} from "./helpers/transaction-history-stub";
+import { type TransactionRow } from "./helpers/transaction-history-stub";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -12,106 +9,99 @@ vi.mock("@/lib/env.server", () => {
   return { env: new Proxy({}, handler) };
 });
 
-const twilioMocks = vi.hoisted(() => {
-  return {
-    validateTwilioWebhookParams: vi.fn(() => true),
-  };
-});
-vi.mock("@/twilio.server", () => {
-  return {
-    validateTwilioWebhookParams: twilioMocks.validateTwilioWebhookParams,
-    shouldValidateTwilioWebhooks: () => true,
-  };
-});
-
-function makeDbClientStub() {
-  const transactionRows: TransactionRow[] = [];
-
-  const realtime = {
-    channel: () => ({ send: vi.fn() }),
-  };
-
-  const from = (table: string) => {
-    if (table === "call") {
-      return {
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: null, error: null }),
-          }),
-        }),
-        upsert: (rows: any[]) => ({
-          select: async () => ({
-            data: [
-              {
-                ...rows[0],
-                workspace: "w1",
-                outreach_attempt_id: null,
-                parent_call_sid: null,
-              },
-            ],
-            error: null,
-          }),
-        }),
-      };
-    }
-
-    if (table === "workspace") {
-      return {
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: { twilio_data: { sid: "AC_test", authToken: "twilio-token" } },
-              error: null,
-            }),
-          }),
-        }),
-      };
-    }
-
-    if (table === "outreach_attempt") {
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = () => builder;
-      builder.single = async () => ({ data: null, error: null });
-      builder.update = () => builder;
-      return builder;
-    }
-
-    if (table === "transaction_history") {
-      return makeApplyLedgerEntryRpcStub(transactionRows) as any;
-    }
-
-    throw new Error(`unexpected table ${table}`);
-  };
-
-  return { realtime, from, rpc: makeApplyLedgerEntryRpcStub(transactionRows), _transactionRows: transactionRows };
-}
-
-let postgresStub: ReturnType<typeof makeDbClientStub>;
-
-const clientState = vi.hoisted(() => {
-  return { client: null as any };
-});
-vi.mock("@/lib/auth.server", () => ({
-  getAdminDb: () => clientState.client,
+const twilioWebhookMocks = vi.hoisted(() => ({
+  validateTwilioWebhookForCallSid: vi.fn(async () => ({
+    ok: true as const,
+    params: {},
+    authToken: "tok",
+  })),
 }));
-vi.mock("@client/client-js", () => {
-  return {
-    createClient: () => clientState.client,
-  };
-});
+
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...args: any[]) =>
+    twilioWebhookMocks.validateTwilioWebhookForCallSid(...args),
+}));
+
+const telephonyDbMocks = vi.hoisted(() => ({
+  findCallBySid: vi.fn(async () => null),
+  upsertCallBySid: vi.fn(async () => ({
+    workspace: "w1",
+    outreach_attempt_id: null,
+    parent_call_sid: null,
+    campaign_id: null,
+  })),
+  findOutreachAttemptWithCampaignType: vi.fn(async () => null),
+  updateOutreachAttemptForWorkspace: vi.fn(async () => ({ id: 1 })),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallBySid: (...args: any[]) => telephonyDbMocks.findCallBySid(...args),
+  upsertCallBySid: (...args: any[]) => telephonyDbMocks.upsertCallBySid(...args),
+  findOutreachAttemptWithCampaignType: (...args: any[]) =>
+    telephonyDbMocks.findOutreachAttemptWithCampaignType(...args),
+  updateOutreachAttemptForWorkspace: (...args: any[]) =>
+    telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
+}));
+
+const transactionRowsState = vi.hoisted(() => ({ rows: [] as TransactionRow[] }));
+
+vi.mock("@/lib/transaction-history.server", () => ({
+  insertTransactionHistoryIdempotent: vi.fn(async (args: any) => {
+    const existing = transactionRowsState.rows.find(
+      (r) =>
+        r.workspace === args.workspaceId &&
+        r.idempotency_key === args.idempotencyKey,
+    );
+    if (existing) {
+      return { inserted: false, existingId: existing.id };
+    }
+    const row: TransactionRow = {
+      id: transactionRowsState.rows.length + 1,
+      workspace: args.workspaceId,
+      type: args.type,
+      amount: args.amount,
+      note: args.note,
+      idempotency_key: args.idempotencyKey,
+      created_at: new Date().toISOString(),
+    };
+    transactionRowsState.rows.push(row);
+    return { inserted: true, existingId: row.id };
+  }),
+}));
+
+function resetTransactionRows() {
+  transactionRowsState.rows = [];
+}
 
 describe("api.call-status billing + idempotency", () => {
   beforeEach(() => {
     vi.resetModules();
-    postgresStub = makeDbClientStub();
-    clientState.client = postgresStub as any;
-    twilioMocks.validateTwilioWebhookParams.mockReset();
-    twilioMocks.validateTwilioWebhookParams.mockReturnValue(true);
+    resetTransactionRows();
+    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockReset();
+    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValue({
+      ok: true,
+      params: {},
+      authToken: "tok",
+    });
+    telephonyDbMocks.findCallBySid.mockReset();
+    telephonyDbMocks.upsertCallBySid.mockReset();
+    telephonyDbMocks.findOutreachAttemptWithCampaignType.mockReset();
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
+    telephonyDbMocks.upsertCallBySid.mockResolvedValue({
+      workspace: "w1",
+      outreach_attempt_id: null,
+      parent_call_sid: null,
+      campaign_id: null,
+    });
   });
 
   test("rejects invalid Twilio signature", async () => {
-    twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
     const mod = await import("../app/routes/api+/call-status");
     const fd = new FormData();
     fd.set("CallSid", "CA_BAD");
@@ -152,7 +142,7 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: makeReq("CA60", "60") } as any);
     await mod.action({ request: makeReq("CA61", "61") } as any);
 
-    const amounts = postgresStub._transactionRows.map((r) => r.amount);
+    const amounts = transactionRowsState.rows.map((r) => r.amount);
     expect(amounts).toEqual([-4, -4, -9]);
   });
 
@@ -175,7 +165,7 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: req.clone() } as any);
     await mod.action({ request: req.clone() } as any);
 
-    const matching = postgresStub._transactionRows.filter(
+    const matching = transactionRowsState.rows.filter(
       (r) => r.idempotency_key === "call:CA_DUP:staffed",
     );
     expect(matching.length).toBe(1);

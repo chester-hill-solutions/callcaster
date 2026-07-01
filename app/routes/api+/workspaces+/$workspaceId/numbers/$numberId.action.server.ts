@@ -23,7 +23,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (parsed instanceof Response) return parsed;
 
     const result = await patchWorkspaceNumber(
-      client,
       auth.user.id,
       workspaceId,
       numberId,
@@ -39,7 +38,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (request.method === "DELETE") {
     const result = await deleteWorkspaceNumber(
-      client,
       auth.user.id,
       workspaceId,
       numberId,

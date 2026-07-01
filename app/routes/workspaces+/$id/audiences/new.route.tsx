@@ -30,8 +30,7 @@ export default function AudiencesNew() {
   const [currentStep, setCurrentStep] = useState(1);
   const [audienceName, setAudienceName] = useState("");
   
-  // Get the Postgres client from context
-  const { client } = useOutletContext<{ }>();
+  useOutletContext<{ }>();
 
   const handleCreateAudience = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,7 +144,6 @@ export default function AudiencesNew() {
               <div className="space-y-6">
                 <AudienceUploader 
                   audienceName={audienceName}
-                  client={client}
                 />
                 
                 <div className="flex items-center justify-between gap-4">

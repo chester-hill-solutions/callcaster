@@ -1,5 +1,5 @@
-import { canTransitionOutreachDisposition } from "./ivr-status-logic.ts";
-import { buildCanceledQueueUpdate } from "./queue-writes.ts";
+import { canTransitionOutreachDisposition } from "./ivr-status-logic";
+import { buildCanceledQueueUpdate } from "./queue-writes";
 
 export type TwilioSmsStatus =
   | "accepted"
@@ -99,16 +99,27 @@ export function coerceWebhookHeaders(
   return out;
 }
 
+type SelectQueryBuilder = {
+  eq: (col: string, val: unknown) => SelectQueryBuilder;
+  filter: (col: string, op: string, val: string) => SelectQueryBuilder;
+  then: (
+    onfulfilled?: (value: { data: unknown[] | null; error: unknown | null }) => unknown,
+    onrejected?: (reason: unknown) => unknown,
+  ) => Promise<{ data: unknown[] | null; error: unknown | null }>;
+};
+
+type UpdateQueryBuilder = {
+  eq: (col: string, val: unknown) => UpdateQueryBuilder;
+  then: (
+    onfulfilled?: (value: { data: unknown | null; error: unknown | null }) => unknown,
+    onrejected?: (reason: unknown) => unknown,
+  ) => Promise<{ data: unknown | null; error: unknown | null }>;
+};
+
 type QueueDbLike = {
   from: (table: string) => {
-    select: (columns?: string) => {
-      eq: (col: string, val: unknown) => Promise<{ data: unknown[] | null; error: unknown }>;
-    };
-    update: (patch: Record<string, unknown>) => {
-      eq: (col: string, val: unknown) => {
-        eq: (col2: string, val2: unknown) => Promise<{ data: unknown; error: unknown }>;
-      };
-    };
+    select: (columns?: string) => SelectQueryBuilder;
+    update: (patch: Record<string, unknown>) => UpdateQueryBuilder;
   };
 };
 
@@ -133,19 +144,7 @@ export async function cancelQueuedMessages(args: {
 }
 
 export async function sendOutboundSmsWebhookIfConfigured(args: {
-  client: QueueDbLike & {
-    from: (table: string) => {
-      select: (columns?: string) => {
-        eq: (col: string, val: unknown) => {
-          filter: (
-            col: string,
-            op: string,
-            val: string,
-          ) => Promise<{ data: unknown[] | null; error: unknown }>;
-        };
-      };
-    };
-  };
+  client: QueueDbLike;
   workspaceId: string;
   message: OutboundSmsWebhookMessage;
   fetchImpl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;

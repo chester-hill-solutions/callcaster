@@ -1,6 +1,6 @@
 import { data as routeData, redirect } from "react-router";
 import { getAdminUserWorkspaces } from "@/lib/platform-admin.server";
-import { requireSudoAdmin } from "../requireSudoAdmin.server";
+import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {

@@ -11,10 +11,31 @@ const twilioMocks = vi.hoisted(() => {
   };
 });
 
-const postgresMocks = vi.hoisted(() => {
+const loggerMocks = vi.hoisted(() => ({ warn: vi.fn() }));
+
+const handsetState = vi.hoisted(() => ({
+  activeSession: true,
+  handsetNumber: null as string | null,
+}));
+
+vi.mock("@/lib/handset/handset-session.server", () => ({
+  findActiveHandsetSession: vi.fn(async () =>
+    handsetState.activeSession ? { workspace_id: "w1" } : null,
+  ),
+}));
+
+vi.mock("@/lib/database.server", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/database.server")>(
+    "@/lib/database.server",
+  );
   return {
-    createClient: vi.fn(),
-    logger: { warn: vi.fn() },
+    ...actual,
+    getHandsetNumberForWorkspace: vi.fn(async () => ({
+      data: handsetState.handsetNumber
+        ? { id: 1, phone_number: handsetState.handsetNumber }
+        : null,
+      error: null,
+    })),
   };
 });
 
@@ -54,71 +75,7 @@ vi.mock("@/lib/env.server", () => {
   };
 });
 
-vi.mock("@client/client-js", () => ({
-  createClient: (...args: any[]) => postgresMocks.createClient(...args),
-}));
-
-vi.mock("@/lib/logger.server", () => ({ logger: postgresMocks.logger }));
-
-function makeDbClient(options?: {
-  activeSession?: boolean;
-  handsetNumber?: string | null;
-  fallbackNumber?: string | null;
-}) {
-  const activeSession = options?.activeSession ?? true;
-  const handsetNumber = options?.handsetNumber ?? null;
-  const fallbackNumber = options?.fallbackNumber ?? null;
-
-  const from = (table: string) => {
-    if (table === "handset_session") {
-      return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              eq: () => ({
-                gt: () => ({
-                  maybeSingle: async () => ({
-                    data: activeSession ? { workspace_id: "w1" } : null,
-                  }),
-                }),
-              }),
-            }),
-          }),
-        }),
-      };
-    }
-    if (table === "workspace_number") {
-      return {
-        select: () => {
-          const state = { handsetEnabledFilter: false };
-          const chain = {
-            eq: (col: string, value: any) => {
-              if (col === "handset_enabled" && value === true) {
-                state.handsetEnabledFilter = true;
-              }
-              return chain;
-            },
-            limit: () => ({
-              maybeSingle: async () => ({
-                data: state.handsetEnabledFilter
-                  ? handsetNumber
-                    ? { phone_number: handsetNumber }
-                    : null
-                  : fallbackNumber
-                    ? { phone_number: fallbackNumber }
-                    : null,
-              }),
-            }),
-          };
-          return chain;
-        },
-      };
-    }
-    throw new Error(`Unexpected table ${table}`);
-  };
-
-  return { from };
-}
+vi.mock("@/lib/logger.server", () => ({ logger: loggerMocks }));
 
 describe("app/routes/api+/call/route.tsx", () => {
   beforeEach(() => {
@@ -126,8 +83,9 @@ describe("app/routes/api+/call/route.tsx", () => {
     twilioMocks.say.mockReset();
     twilioMocks.dial.mockReset();
     twilioMocks.toString.mockClear();
-    postgresMocks.createClient.mockReset();
-    postgresMocks.logger.warn.mockReset();
+    loggerMocks.warn.mockReset();
+    handsetState.activeSession = true;
+    handsetState.handsetNumber = null;
     vi.resetModules();
   });
 
@@ -176,9 +134,8 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("handset flow rejects when no active handset session", async () => {
-    postgresMocks.createClient.mockReturnValue(
-      makeDbClient({ activeSession: false, handsetNumber: "+15551230000" }),
-    );
+    handsetState.activeSession = false;
+    handsetState.handsetNumber = "+15551230000";
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
@@ -196,16 +153,11 @@ describe("app/routes/api+/call/route.tsx", () => {
       "Your handset session has expired. Please refresh the page.",
     );
     expect(twilioMocks.dial).not.toHaveBeenCalled();
-    expect(postgresMocks.logger.warn).toHaveBeenCalled();
+    expect(loggerMocks.warn).toHaveBeenCalled();
   });
 
   test("handset flow dials with workspace caller id and normalized destination", async () => {
-    postgresMocks.createClient.mockReturnValue(
-      makeDbClient({
-        activeSession: true,
-        handsetNumber: "+15559876543",
-      }),
-    );
+    handsetState.handsetNumber = "+15559876543";
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
@@ -235,13 +187,7 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("handset flow says no caller id when workspace has no valid number", async () => {
-    postgresMocks.createClient.mockReturnValue(
-      makeDbClient({
-        activeSession: true,
-        handsetNumber: null,
-        fallbackNumber: "bad",
-      }),
-    );
+    handsetState.handsetNumber = null;
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");

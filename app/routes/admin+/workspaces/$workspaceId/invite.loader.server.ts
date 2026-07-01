@@ -31,7 +31,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const access = await requireSudoOrWorkspaceAdmin(request, workspaceId);
-  if (access instanceof Response) {
+  if (!("user" in access)) {
     return access;
   }
 

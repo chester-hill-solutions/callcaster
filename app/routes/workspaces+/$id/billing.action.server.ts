@@ -12,7 +12,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const amount = Math.floor(Number(formData.get("amount")));
 
   const result = await createBillingCheckoutSession({
-    client: null,
     userId: user.id,
     workspaceId,
     amount,

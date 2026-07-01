@@ -11,6 +11,7 @@ import ContactFields from "./ContactDetailsFields";
 import OtherDataFields from "./ContactDetailsOtherFields";
 import RecentContacts from "./RecentContacts";
 import type { Audience, Contact, ContactAudience } from "@/lib/types";
+import type { Json } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions
@@ -161,7 +162,14 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
         </div>
 
         <OtherDataFields
-          otherData={contact?.other_data}
+          otherData={(() => {
+            try {
+              const parsed = JSON.parse(contact?.other_data ?? '[]') as Json[];
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })()}
           editMode={editMode}
           setContact={(data: ContactUpdateData) => {
             try {

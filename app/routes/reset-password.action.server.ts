@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { verifyAuth } from "@/lib/auth.server";
+import { auth } from "@/server/auth-instance";
 import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -20,8 +21,13 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
-  const { data: updateUser, error: updateUserError } =
-    await request.updateUser({ password: newPassword });
-
-  return routeData({ success: updateUser, error: updateUserError }, { headers });
+  try {
+    const result = await (auth.api as any).updateUser({
+      body: { password: newPassword },
+      headers: request.headers,
+    });
+    return routeData({ success: result, error: null }, { headers });
+  } catch (error: any) {
+    return routeData({ success: null, error: { message: error?.message || "Update failed" } }, { headers });
+  }
 }

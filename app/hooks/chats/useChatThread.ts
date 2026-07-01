@@ -34,7 +34,7 @@ export function useChatThread({
     workspace,
   registerChatActions,
   contactOptOut = false,
-}: Pick<ChatThreadOutletContext, "client" | "workspace" | "registerChatActions"> & {
+}: Pick<ChatThreadOutletContext, "workspace" | "registerChatActions"> & {
   contactOptOut?: boolean;
 }) {
   const {

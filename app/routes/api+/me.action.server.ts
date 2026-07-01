@@ -30,7 +30,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const parsed = await parseJsonBodyOrResponse(request, updateMeBodySchema);
     if (parsed instanceof Response) return parsed;
 
-    const result = await updateMeProfile(client, parsed);
+    const result = await updateMeProfile(request, parsed);
     if (!result.ok) {
       return jsonError(result.error, result.status);
     }

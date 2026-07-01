@@ -17,7 +17,7 @@ const EMPTY_LISTENING = {
   tokenError: null,
 } as const;
 
-async function loadIncomingListeningState(args: {}) {
+async function loadIncomingListeningState(args: { workspaceId: string; userId: string }) {
   const tdb = createTenantDb(args.workspaceId);
   const { data: handsetData } = await getHandsetNumberForWorkspace({
     workspaceId: args.workspaceId,

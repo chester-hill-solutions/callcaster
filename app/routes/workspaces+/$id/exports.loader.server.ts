@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
+import { listObjects, downloadObject } from "@/lib/object-storage.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 interface ExportItem {
@@ -45,15 +46,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   try {
     // List all files in the workspace's exports directory
-    const { data: files, error: listError } = await null.storage
-      .from("campaign-exports")
-      .list(workspaceId, {
-        sortBy: { column: 'created_at', order: 'desc' }
-      });
-
-    if (listError) {
-      throw listError;
-    }
+    const files = await listObjects(
+      "campaign-exports",
+      workspaceId,
+      { sortBy: { column: "created_at", order: "desc" } },
+    );
 
     // Filter and process export files
     const now = Date.now();
@@ -64,16 +61,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     // Process all export files
     const processedExports = await Promise.all(statusFiles.map(async (file) => {
       try {
-        const { data: statusData, error: downloadError } = await null.storage
-          .from("campaign-exports")
-          .download(`${workspaceId}/${file.name}`);
-
-        if (downloadError) {
+        let content: any;
+        try {
+          const buffer = await downloadObject(
+            "campaign-exports",
+            `${workspaceId}/${file.name}`,
+          );
+          content = JSON.parse(buffer.toString("utf-8"));
+        } catch (downloadError) {
           logger.error(`Error downloading status file ${file.name}:`, downloadError);
           return null;
         }
-
-        const content = JSON.parse(await statusData.text());
         const createdAt = new Date(content.created_at || file.created_at || Date.now());
         const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
 

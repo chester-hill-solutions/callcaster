@@ -72,7 +72,6 @@ export async function auditWorkspaceTwilioWebhooks({
   const driftMessages: string[] = [];
 
   const twilio = await createWorkspaceTwilioClient({
-    client: null,
     workspaceId,
   });
 

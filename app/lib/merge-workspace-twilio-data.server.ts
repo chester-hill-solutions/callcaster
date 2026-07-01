@@ -18,7 +18,17 @@ export async function loadWorkspaceTwilioData(
     throw new Error(`Workspace ${workspaceId} not found`);
   }
 
-  return isObject(row.twilio_data) ? row.twilio_data : {};
+  const raw = row.twilio_data;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return isObject(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return isObject(raw) ? raw : {};
 }
 
 export async function persistWorkspaceTwilioData(
@@ -27,7 +37,7 @@ export async function persistWorkspaceTwilioData(
 ): Promise<void> {
   await adminDb
     .update(workspaceTable)
-    .set({ twilio_data: twilioData })
+    .set({ twilio_data: JSON.stringify(twilioData) })
     .where(eq(workspaceTable.id, workspaceId));
 }
 

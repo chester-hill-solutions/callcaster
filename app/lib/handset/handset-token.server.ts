@@ -27,7 +27,12 @@ export async function createHandsetAccessToken({
     return { token: null, error: "Workspace not found" };
   }
 
-  const twilioData = (data.twilio_data ?? {}) as Record<string, unknown>;
+  const rawTwilioData = data.twilio_data;
+  const twilioData = (
+    typeof rawTwilioData === "string"
+      ? JSON.parse(rawTwilioData)
+      : rawTwilioData ?? {}
+  ) as Record<string, unknown>;
   const twilioAccountSid =
     typeof twilioData.sid === "string" ? twilioData.sid : "";
   const twilioApiKey = (data.key ?? "") as string;

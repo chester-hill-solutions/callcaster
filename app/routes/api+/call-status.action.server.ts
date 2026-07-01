@@ -18,7 +18,7 @@ import {
   updateOutreachAttemptForWorkspace,
   upsertCallBySid,
 } from "@/lib/telephony-db.server";
-import { insertPredictiveBroadcast } from "@/lib/workspace-events.server";
+import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -56,7 +56,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
   if (currentAttempt && workspaceId) {
-    await insertPredictiveBroadcast(workspaceId, {
+    await emitPredictiveBroadcast(workspaceId, {
       contact_id: currentAttempt.contact_id,
       status: String(underCaseData.call_status ?? ""),
     });

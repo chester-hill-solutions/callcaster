@@ -11,6 +11,7 @@ import {
   outreach_attempt as outreachAttemptTable,
 } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
+import { db } from "@/server/db";
 import { eq, inArray } from "drizzle-orm";
 import type { Audience, Contact } from "@/lib/types";
 import type { LoaderFunctionArgs } from "react-router";
@@ -84,7 +85,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             });
       const campaignsById = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
 
-      const contactAudiences = await tdb.contact_audience.findMany({
+      const contactAudiences = await db.query.contact_audience.findMany({
         where: eq(contactAudienceTable.contact_id, contactId),
       });
 

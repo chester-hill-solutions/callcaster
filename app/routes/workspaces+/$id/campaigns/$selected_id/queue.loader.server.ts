@@ -70,7 +70,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const selectedAudienceIds = selectedAudiences.map((row) => row.audience_id);
     const queueResponse: QueueResponse = {
       queueData: queueResult.items.map(
-        (item) => mapCampaignQueueItemForUi(item) as QueueItem & { contact: Contact; audiences: Audience[] },
+        (item) => mapCampaignQueueItemForUi(item) as unknown as QueueItem & { contact: Contact; audiences: Audience[] },
       ),
       queueError: null,
       totalCount: queueResult.totalCount,

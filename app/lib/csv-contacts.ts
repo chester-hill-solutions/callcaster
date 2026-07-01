@@ -90,8 +90,9 @@ type ParsedCsvContact = Pick<
   | "postal"
   | "province"
   | "country"
-  | "other_data"
->;
+> & {
+  other_data: Json[];
+};
 
 const parseCSVData = (data: string[][], parsedHeaders: string[]) => {
   return data.slice(1).map((row) => {

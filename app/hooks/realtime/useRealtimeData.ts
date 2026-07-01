@@ -74,137 +74,26 @@ interface RealtimePayload {
  * );
  * ```
  */
-export function useRealtimeData<T extends { id: number | string }>(workspace_id: string, table: string, initialData: (T | null)[] | null = null) {
-    const channelRef = useRef<ReturnType<never['channel']> | null>(null);
-    const [data, setData] = useState<Record<string, T[]>>(() => ({
-        [table]: initialData?.filter((item): item is T => Boolean(item)) || []
-    }));
-    const workspaceColumn = useMemo(() => getWorkspaceColumn(table), [table]);
-    // Initialize isSyncing to true if initialData is not provided (we need to fetch)
-    const [state, setState] = useState<ContactState>({
-        isSyncing: !initialData,
-        error: null
-    });
+export function useRealtimeData<T extends { id: number | string }>(
+  _client: unknown,
+  workspace_id: string,
+  table: string,
+  initialData: (T | null)[] | null = null,
+) {
+  const [data] = useState<Record<string, T[]>>(() => ({
+    [table]: initialData?.filter((item): item is T => Boolean(item)) || [],
+  }));
 
-    // Fetch initial data if not provided
-    useEffect(() => {
-        if (!initialData) {
-            setState(prev => ({ ...prev, isSyncing: true }));
-            const column = workspaceColumn;
-            
-            client
-                .from(table)
-                .select('*')
-                .eq(column, workspace_id)
-                .then(({ data: fetchedData, error }) => {
-                    if (error) {
-                        setState(prev => ({ ...prev, error: new Error(error.message) }));
-                    } else if (fetchedData) {
-                        setData(prev => ({ ...prev, [table]: fetchedData as T[] }));
-                    }
-                    setState(prev => ({ ...prev, isSyncing: false }));
-                });
-        }
-    }, [client, table, workspace_id, initialData, workspaceColumn]);
+  const [state] = useState<ContactState>({
+    isSyncing: false,
+    error: null,
+  });
 
-    // Memoize filter to avoid recreating on every render
-    const filter = useMemo(() => {
-        return `${workspaceColumn}=eq.${workspace_id}`;
-    }, [workspaceColumn, workspace_id]);
+  // Stub: realtime subscription removed during Supabase -> Drizzle migration.
+  // Consumers should migrate to useWorkspaceEventSubscription for SSE-based updates.
+  void workspace_id;
+  void table;
 
-    useEffect(() => {
-        const channelKey = `${workspace_id}-${table}`;
-        const channel = adminDb.channel(channelKey);
-        channelRef.current = channel;
-
-        function handlePayload(payload: RealtimePayload) {
-            try {
-                switch (payload.eventType) {
-                    case 'INSERT':
-                        setData(prev => {
-                            const newItem = payload.new as T;
-                            const currentTableData = prev[table] || [];
-                            // Early return if item already exists
-                            if (currentTableData.some(item => item.id === newItem.id)) {
-                                return prev;
-                            }
-                            return { 
-                                ...prev, 
-                                [table]: [...currentTableData, newItem] 
-                            };
-                        });
-                        break;
-                    case 'UPDATE':
-                        setData(prev => {
-                            const updatedItem = payload.new as T;
-                            const currentTableData = prev[table] || [];
-                            // Early return if item not found
-                            if (!currentTableData.some(item => item.id === updatedItem.id)) {
-                                return prev;
-                            }
-                            return { 
-                                ...prev, 
-                                [table]: currentTableData.map(item => 
-                                    item.id === updatedItem.id ? updatedItem : item
-                                )
-                            };
-                        });
-                        break;
-                    case 'DELETE':
-                        setData(prev => {
-                            const deletedItem = payload.old as T;
-                            const currentTableData = prev[table] || [];
-                            // Early return if item not found
-                            if (!currentTableData.some(item => item.id === deletedItem.id)) {
-                                return prev;
-                            }
-                            return { 
-                                ...prev, 
-                                [table]: currentTableData.filter(item => 
-                                    item.id !== deletedItem.id
-                                )
-                            };
-                        });
-                        break;
-                }
-            } catch (error) {
-                logger.error('Error processing realtime update:', error);
-                setState(prev => ({ ...prev, error: error as Error }));
-            }
-        }
-
-        channel
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: table,
-                filter: filter
-            }, handlePayload)
-            .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    setState(prev => ({ ...prev, isSyncing: false, error: null }));
-                } else if (status === 'CLOSED') {
-                    // Subscription closed - no need to log in production
-                    setState(prev => ({ ...prev, isSyncing: false }));
-                } else if (status === 'CHANNEL_ERROR') {
-                    const error = new Error(`Failed to subscribe to realtime updates for ${table}`);
-                    logger.error(error.message);
-                    setState(prev => ({ ...prev, error, isSyncing: false }));
-                } else if (status === 'TIMED_OUT') {
-                    const error = new Error(`Subscription to ${table} timed out`);
-                    logger.error(error.message);
-                    setState(prev => ({ ...prev, error, isSyncing: false }));
-                }
-            });
-
-        return () => {
-            if (channelRef.current) {
-                adminDb.removeChannel(channelRef.current);
-                channelRef.current = null;
-            }
-        };
-    }, [client, workspace_id, table, filter]);
-
-    return { data: data[table], ...state };
+  return { data: data[table], ...state };
 }
 

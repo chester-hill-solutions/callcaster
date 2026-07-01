@@ -4,7 +4,7 @@ import {
   configuredDispatcherVoiceCps,
   normalizePortalThroughputConfig,
   type WorkspaceThroughputPortalConfig,
-} from "../../shared/throughput-portal-config.ts";
+} from "../../../shared/throughput-portal-config";
 import { DISPATCH_TICK_MS } from "@/lib/throughput-config";
 
 export type { WorkspaceThroughputPortalConfig };

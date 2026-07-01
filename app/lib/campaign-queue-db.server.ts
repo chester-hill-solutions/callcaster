@@ -18,7 +18,7 @@ export function buildQueueStatusUpdatePayload(status: string) {
     return buildQueuedQueueUpdate({ includeNormalizedFields: true });
   }
   if (status === QUEUE_STATUS_DEQUEUED) {
-    return buildDequeuedQueueUpdate("api", { includeNormalizedFields: true });
+    return buildDequeuedQueueUpdate(null, "api", { includeNormalizedFields: true });
   }
   return { status };
 }
@@ -244,7 +244,6 @@ export async function dequeueCampaignQueueByContact(args: {
 }
 
 export async function releaseAssignedQueueForUser(
-  _unusedClient: unknown,
   userId: string,
   campaignId: string | number,
 ): Promise<{ ok: true; released: number } | { ok: false; error: string }> {

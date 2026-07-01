@@ -51,7 +51,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (parsed instanceof Response) return parsed;
 
     const result = await createWorkspaceApiKey(
-      client,
       auth.user.id,
       parsed.workspace_id,
       parsed.name,
@@ -78,7 +77,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (parsed instanceof Response) return parsed;
 
     const result = await deleteWorkspaceApiKey(
-      client,
       auth.user.id,
       parsed.workspace_id,
       parsed.id,

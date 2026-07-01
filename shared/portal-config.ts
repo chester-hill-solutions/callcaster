@@ -1,7 +1,7 @@
 import {
   normalizePortalThroughputConfig,
   type WorkspaceThroughputPortalConfig,
-} from "./throughput-portal-config.ts";
+} from "./throughput-portal-config";
 
 export const TWILIO_MESSAGE_INTENTS = new Set([
   "otp",

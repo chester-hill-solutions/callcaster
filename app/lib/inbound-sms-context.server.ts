@@ -72,7 +72,11 @@ async function lookupWorkspaceNumberByPhone(phone: string): Promise<
       ok: true,
       ctx: {
         workspace: row.workspaceId,
-        twilio_data: row.twilioData as InboundWorkspaceContext["twilio_data"],
+        twilio_data: (
+          typeof row.twilioData === "string"
+            ? JSON.parse(row.twilioData)
+            : row.twilioData
+        ) as InboundWorkspaceContext["twilio_data"],
         webhook: webhooks as InboundWorkspaceContext["webhook"],
       },
     };
@@ -204,7 +208,11 @@ export async function resolveInboundWorkspaceContext(
       ok: true,
       ctx: {
         workspace: row.id,
-        twilio_data: row.twilio_data as InboundWorkspaceContext["twilio_data"],
+        twilio_data: (
+          typeof row.twilio_data === "string"
+            ? JSON.parse(row.twilio_data)
+            : row.twilio_data
+        ) as InboundWorkspaceContext["twilio_data"],
         webhook: webhooks as InboundWorkspaceContext["webhook"],
       },
       attributionPath: "matched_by_messaging_service_sid",

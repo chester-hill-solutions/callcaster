@@ -59,7 +59,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           .map((item: string | { id: string }) =>
             typeof item === "object" ? Number(item.id) : Number(item),
           )
-          .filter((id): id is number => Number.isFinite(id));
+          .filter((id: unknown): id is number => typeof id === "number" && Number.isFinite(id));
 
         await updateCampaignQueueStatusByIds(updateIds, newStatus);
       }
@@ -135,7 +135,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           .map((item: string | { id: string }) =>
             typeof item === "object" ? Number(item.id) : Number(item),
           )
-          .filter((id): id is number => Number.isFinite(id));
+          .filter((id: unknown): id is number => typeof id === "number" && Number.isFinite(id));
 
         await deleteCampaignQueueByIds(removeIds);
       }

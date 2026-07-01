@@ -6,6 +6,7 @@ import {
   findCampaignMessageMedia,
   updateCampaignMessageMedia,
 } from "@/lib/campaign-ivr.server";
+import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -44,15 +45,15 @@ export async function action({ request }: ActionFunctionArgs) {
         const campaignId = campaignIdRaw == null ? null : Number(campaignIdRaw);
         const safeFileName = sanitizeFilename(encodedMediaName);
 
-        const { error: uploadError } = await adminDb.storage
-            .from("messageMedia")
-            .upload(`${workspaceIdStr}/${safeFileName}`, mediaToUpload as any, {
-                cacheControl: "60",
-                upsert: false,
-            });
-        if (uploadError && (uploadError as any).statusCode !== '409') {
+        try {
+          await uploadObject("messageMedia", `${workspaceIdStr}/${safeFileName}`, mediaToUpload as any, {
+            cacheControl: "60",
+          });
+        } catch (uploadError: any) {
+          if (uploadError?.statusCode !== '409') {
             logger.error("Message media upload error:", uploadError);
             return routeData({ success: false, error: uploadError }, { headers });
+          }
         }
         if (campaignId) {
             let campaignUpdate;
@@ -74,26 +75,26 @@ export async function action({ request }: ActionFunctionArgs) {
               return routeData({ success: false, error }, { headers });
             }
 
-            const { data: signedUrlData, error: signedUrlError } = await adminDb.storage
-                .from("messageMedia")
-                .createSignedUrl(`${workspaceIdStr}/${safeFileName}`, 3600);
-
-            if (signedUrlError) {
+            try {
+              const signedUrl = await createSignedObjectUrl("messageMedia", `${workspaceIdStr}/${safeFileName}`, 3600);
+              return routeData({
+                  success: true,
+                  error: null,
+                  campaignUpdate: [campaignUpdate],
+                  uploadedFileName: safeFileName,
+                  url: signedUrl,
+              }, { headers });
+            } catch (signedUrlError) {
                 logger.error("Error signing uploaded message media:", signedUrlError);
                 return routeData({ success: false, error: signedUrlError }, { headers });
             }
-
-            return routeData({
-                success: true,
-                error: null,
-                campaignUpdate: [campaignUpdate],
-                uploadedFileName: safeFileName,
-                url: signedUrlData.signedUrl,
-            }, { headers });
         } else {
-            const { data, error: imageError } = await adminDb.storage.from('messageMedia').createSignedUrl(`${workspaceIdStr}/${safeFileName}`, 3600);
-            if (imageError) return routeData({ success: false, error: imageError }, { headers });
-            return routeData({ success: true, error: null, url: data.signedUrl }, { headers });
+            try {
+              const signedUrl = await createSignedObjectUrl("messageMedia", `${workspaceIdStr}/${safeFileName}`, 3600);
+              return routeData({ success: true, error: null, url: signedUrl }, { headers });
+            } catch (imageError) {
+              return routeData({ success: false, error: imageError }, { headers });
+            }
         }
     } else if (method === "DELETE") {
         const campaignIdRaw = formData.get("campaignId");

@@ -8,7 +8,6 @@ import {
 } from "@/lib/inbound-voicemail-twiml.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -95,7 +94,6 @@ const renderTerminalTarget = async (
 
   if (target.startsWith("voicemail:")) {
     const voicemail = await resolveInboundVoicemailAudio({
-      client,
       workspaceId: workspace,
       inboundAudio: null,
     });
@@ -125,7 +123,6 @@ const renderTerminalTarget = async (
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const baseUrl = env.BASE_URL();
-  const client = createClient(env.BASE_URL(), env.BASE_URL());
   const twiml = new Twilio.twiml.VoiceResponse();
 
   const pageId = params.pageId;
@@ -156,7 +153,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    client,
     callSid,
     params: formParams,
   });
@@ -182,7 +178,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       nextStep,
       numberId,
       number.workspaceId,
-      client,
       baseUrl,
     );
   } catch (e) {

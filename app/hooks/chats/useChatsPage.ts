@@ -39,7 +39,7 @@ import type {
 } from "@/lib/chats/types";
 
 export function useChatsPage() {
-  const { client, workspace } = useOutletContext<ChatsWorkspaceContextType>();
+  const { workspace } = useOutletContext<ChatsWorkspaceContextType>();
   const {
     chats,
     chatsError,
@@ -430,7 +430,6 @@ export function useChatsPage() {
   } as const;
 
   return {
-    client,
     workspace,
     workspaceNumbers,
     registerChatActions,

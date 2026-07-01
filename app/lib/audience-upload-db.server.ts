@@ -15,10 +15,10 @@ export async function findAudienceInWorkspace(
   audienceId: number,
 ): Promise<Pick<AudienceRow, "id"> | null> {
   const tdb = createTenantDb(workspaceId);
-  return tdb.audience.findFirst({
+  return (await tdb.audience.findFirst({
     where: eq(audienceTable.id, audienceId),
     columns: { id: true },
-  });
+  })) ?? null;
 }
 
 export async function markAudienceUpdating(
@@ -77,9 +77,9 @@ export async function findAudienceUploadById(
   uploadId: number,
 ): Promise<AudienceUploadRow | null> {
   const tdb = createTenantDb(workspaceId);
-  return tdb.audience_upload.findFirst({
+  return (await tdb.audience_upload.findFirst({
     where: eq(audienceUploadTable.id, uploadId),
-  });
+  })) ?? null;
 }
 
 export async function findAudienceWorkspaceById(

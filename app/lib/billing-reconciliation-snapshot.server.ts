@@ -76,7 +76,6 @@ export async function persistWorkspaceBillingReconciliationSnapshot(args: {
 }): Promise<BillingReconciliationSnapshot> {
   const snapshot = buildBillingReconciliationSnapshot(args.report, args.source);
   await patchWorkspaceTwilioData(
-    args.null,
     args.workspaceId,
     {
       billingReconciliationSnapshot: snapshot,

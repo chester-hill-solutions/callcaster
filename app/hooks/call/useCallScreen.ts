@@ -39,7 +39,7 @@ import type {
 } from "@/lib/types";
 
 export function useCallScreen() {
-  const { client } = useOutletContext<{ }>();
+  useOutletContext<{ }>();
   const { state: navState } = useNavigation();
   const isBusy = navState !== "idle";
   const {
@@ -118,7 +118,6 @@ export function useCallScreen() {
     users: onlineUsers,
     predictiveState,
   } = useCallRoom({
-    client,
     workspace: workspaceId,
     campaign: campaign?.id,
     userId: user.id,

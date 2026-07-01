@@ -11,12 +11,19 @@ import {
 import {
   Audience,
   Campaign,
+  Contact,
   Flags,
-  Survey,
+  IVRCampaign,
+  LiveCampaign,
+  MessageCampaign,
+  QueueItem,
   Script,
+  Survey,
+  User,
   WorkspaceNumbers,
   WorkspaceTwilioOpsConfig,
   WorkspaceTwilioSyncSnapshot,
+  FileObject,
 } from "@/lib/types";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
@@ -28,13 +35,7 @@ import { CampaignCostPanel } from "./CampaignCostPanel";
 import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { formatCredits, formatCurrency } from "@/lib/billing-format";
 import { CREDIT_PRICE_CAD } from "@/lib/billing-format";
-import { Tables } from "@/lib/db-types";
 
-type Contact = Tables<"contact">;
-type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
-type LiveCampaign = Tables<"live_campaign"> & { script: Script };
-type MessageCampaign = Tables<"message_campaign">;
-type IVRCampaign = Tables<"ivr_campaign"> & { script: Script };
 
 export type CampaignSettingsProps = {
   campaignData: Campaign;
@@ -338,7 +339,7 @@ export const CampaignSettings = ({
                 scripts={scripts}
                 handleActivateButton={handleStatusButton}
                 handleScheduleButton={handleScheduleButton}
-                details={campaignDetails}
+                details={campaignDetails!}
                 mediaLinks={mediaLinks}
                 isChanged={isChanged}
                 isBusy={formFetcher.state !== "idle"}

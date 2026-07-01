@@ -1,9 +1,9 @@
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import {
   findCallBySid,
   updateCallBySid,
@@ -12,10 +12,6 @@ import {
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const client = createClient(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
   const callSidValue = formData.get("CallSid");
@@ -33,7 +29,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const validation = await validateTwilioWebhookForCallSid({
       request,
-      client,
       callSid,
       params,
     });
@@ -47,7 +42,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const twilio = await createWorkspaceTwilioInstance({
-      client,
       workspace_id: dbCall.workspace,
     });
     const campaign = await fetchCampaignByIdForWorkspace(
@@ -55,12 +49,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       dbCall.campaign_id ?? 0,
     );
 
-    const { data: voicemailData, error: voicemailError } = campaign.voicemail_file
-      ? await adminDb.storage
-          .from(`workspaceAudio`)
-          .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600)
-      : { data: null, error: null };
-    if (voicemailError) throw voicemailError;
+    let voicemailData: { signedUrl: string } | null = null;
+    if (campaign.voicemail_file) {
+      try {
+        const signedUrl = await createSignedObjectUrl(
+          "workspaceAudio",
+          `${dbCall.workspace}/${campaign.voicemail_file}`,
+          3600,
+        );
+        voicemailData = { signedUrl };
+      } catch (error) {
+        throw error;
+      }
+    }
 
     const call = twilio.calls(callSid);
 

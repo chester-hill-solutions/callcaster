@@ -63,8 +63,8 @@ export async function getScriptExportFields(
   scriptId: number,
 ): Promise<Pick<ScriptRow, "name" | "steps"> | null> {
   const tdb = createTenantDb(workspaceId);
-  return tdb.script.findFirst({
+  return (await tdb.script.findFirst({
     where: eq(scriptTable.id, scriptId),
     columns: { name: true, steps: true },
-  });
+  })) ?? null;
 }

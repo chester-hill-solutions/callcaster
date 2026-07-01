@@ -37,8 +37,7 @@ export const NumberPurchase = ({
   const [query, setQuery] = useState("");
   const [filterVoice, setFilterVoice] = useState(false);
   const [filterSms, setFilterSms] = useState(false);
-  const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(
-  );
+  const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(null);
   const [lastQuery, setLastQuery] = useState("");
 
   const canAfford = hasCreditsForNumberRental(creditsBalance);

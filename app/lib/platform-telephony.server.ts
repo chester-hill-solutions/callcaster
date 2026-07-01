@@ -193,16 +193,17 @@ export async function getCampaignCallSessionApi(
     attempts,
   } = await getCallScreenData(campaignId, workspaceId, userId);
 
-  const twilioData = workspaceData.twilio_data as { sid: string };
+  const ws = workspaceData!;
+  const twilioData = (ws.twilio_data as unknown) as { sid: string };
   const queue = await getQueueByDialType(
     campaignId,
-    campaign.dial_type,
+    campaign.dial_type ?? "",
     userId,
   );
   const token = await generateToken({
     twilioAccountSid: twilioData.sid,
-    twilioApiKey: workspaceData.key as string,
-    twilioApiSecret: workspaceData.token as string,
+    twilioApiKey: ws.key as string,
+    twilioApiSecret: ws.token as string,
     identity: userId,
   });
   const verifiedNumbers = await getVerifiedNumbers(userId);
@@ -223,14 +224,14 @@ export async function getCampaignCallSessionApi(
     audiences,
     queue,
     contacts: queue.map((queueItem) => queueItem.contact),
-    next_recipient: getNextRecipient(queue, campaign?.dial_type, userId),
+    next_recipient: getNextRecipient(queue, campaign.dial_type ?? "", userId),
     calls: getInitialCallsList(attempts || []),
     recent_call: getInitialRecentCall(attempts || []),
     recent_attempt: getInitialRecentAttempt(attempts || []),
     token,
     queue_count: queueCount,
     completed_count: completedCount,
-    credits: workspaceData.credits,
+    credits: ws.credits,
     is_active: isActive,
     has_access: hasAccess,
     verified_numbers: verifiedNumbers,

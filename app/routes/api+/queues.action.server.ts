@@ -23,7 +23,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     if (request.method === "POST") {
       const { contact_id, household }: DequeueRequest = await safeParseJson(request);
-      const workspaceId = await resolveContactWorkspaceId(client, contact_id);
+      const workspaceId = await resolveContactWorkspaceId(contact_id);
 
       if (!workspaceId) {
         return jsonError("Contact queue entry not found", 404);
@@ -45,7 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (request.method === "DELETE") {
       const { campaignId }: ResetRequest = await safeParseJson(request);
-      const workspaceId = await resolveCampaignWorkspaceId(client, campaignId);
+      const workspaceId = await resolveCampaignWorkspaceId(campaignId);
 
       if (!workspaceId) {
         return jsonError("Campaign not found", 404);

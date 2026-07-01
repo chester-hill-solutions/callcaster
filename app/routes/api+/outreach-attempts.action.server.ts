@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
+import { getSession } from "@/lib/auth.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { db } from "@/server/db";
 import type { ActionFunctionArgs } from "react-router";

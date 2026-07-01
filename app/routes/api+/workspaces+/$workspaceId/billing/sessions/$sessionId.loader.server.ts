@@ -20,7 +20,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const result = await pollBillingCheckoutSession({
-    client: null /* removed */ (auth),
     userId: auth.user.id,
     workspaceId,
     sessionId,

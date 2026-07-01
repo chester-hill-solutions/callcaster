@@ -19,7 +19,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (request.method === "POST") {
       const result = await startCallListeningApi(
-        client,
         auth.user,
         workspaceId,
       );
@@ -42,7 +41,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (request.method === "DELETE") {
       const result = await stopCallListeningApi(
-        client,
         auth.user.id,
         workspaceId,
       );

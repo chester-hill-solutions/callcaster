@@ -70,10 +70,6 @@ export const action = async ({ request }: { request: Request }) => {
     });
   }
 
-  const client =
-    authResult.authType === "api_key"
-      ? authResult.client
-      : authResult.null;
   const user = authResult.authType === "session" ? authResult.user : null;
   const portalConfig = await getWorkspaceTwilioPortalConfig({workspaceId: workspace_id,
   });
@@ -101,7 +97,6 @@ export const action = async ({ request }: { request: Request }) => {
       media: media ?? "",
       to,
       from: caller_id,
-      client,
       workspace: workspace_id,
       contact_id: contact_id ?? "",
       user,

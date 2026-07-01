@@ -12,6 +12,7 @@ const MAX_PAGE_SIZE = 100;
 
 import type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
 export type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
+import { MemberRole } from "@/lib/member-role";
 
 function errorPayload(
   partial: Omit<ContactsLoaderData, "pagination"> & {
@@ -101,7 +102,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       listWorkspaceContactsApi(workspaceId, url.searchParams),
     ]);
 
-    const userRole = userRoleResult?.role || null;
+    const userRole = (userRoleResult?.role || null) as MemberRole | null;
     const flags = workspace ? { feature_flags: workspace.feature_flags } : null;
 
     if (!userRole) {

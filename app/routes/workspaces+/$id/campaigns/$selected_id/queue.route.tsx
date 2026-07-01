@@ -8,7 +8,7 @@ import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { Audience, QueueItem, Contact } from "@/lib/types";
+import { Audience, QueueItem, Contact, Campaign, IVRCampaign, MessageCampaign, LiveCampaign } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
 import type { AppError } from "@/lib/errors.server";
@@ -209,7 +209,6 @@ function QueueResolvedContent({
                 setIsAllFilteredSelected={setIsAllFilteredSelected}
                 selectedAudienceIds={selectedAudienceIds}
                 campaignId={campaignId}
-                client={client}
                 handleFilterChange={queueActions.handleFilterChange}
                 clearFilter={queueActions.clearFilter}
                 addContactToQueue={queueActions.handleAddContactToQueue}
@@ -221,7 +220,7 @@ function QueueResolvedContent({
 }
 
 export default function Queue() {
-    const { campaignData, campaignDetails, audiences, client } = useOutletContext<{
+    const { campaignData, campaignDetails, audiences } = useOutletContext<{
         campaignData: NonNullable<Campaign> & { workspace: string },
         campaignDetails: IVRCampaign | MessageCampaign | LiveCampaign,
         audiences: NonNullable<Audience>[],
@@ -242,7 +241,6 @@ export default function Queue() {
                             campaignId={campaignId}
                             selectedAudienceIds={selectedAudienceIds}
                             audiences={audiences}
-                            client={client}
                             campaignWorkspace={campaignData.workspace}
                             isSelectingAudience={isSelectingAudience}
                             selectedAudience={selectedAudience}

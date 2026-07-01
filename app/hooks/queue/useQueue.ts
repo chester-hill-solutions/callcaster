@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Tables } from "@/lib/db-types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
-import { Contact, QueueItem } from "@/lib/types";
+import { Contact, QueueItem, User } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import {
   getAssignedUserId,
@@ -114,7 +114,7 @@ export const useQueue = ({
       const isRemoval =
         (!isPredictive &&
           !isQueued(payload.new) &&
-          assignedUserId !== user.id) ||
+          assignedUserId !== user?.id) ||
         isDequeued(payload.new);
 
       setQueue((currentQueue) => {
@@ -126,12 +126,12 @@ export const useQueue = ({
           const newQueueItem = payload.new;
 
           if (isPredictive) {
-            if (assignedUserId === user.id || isQueued(newQueueItem)) {
+            if (assignedUserId === user?.id || isQueued(newQueueItem)) {
               if (!isDuplicate(newQueueItem, updatedQueue)) {
                 updatedQueue = updatedQueue.length
                   ? sortQueue([...updatedQueue, newQueueItem])
                   : [newQueueItem];
-                if (assignedUserId === user.id) {
+                if (assignedUserId === user?.id) {
                   setNextRecipient(newQueueItem);
                   setCallDuration(0);
                 }
@@ -140,7 +140,7 @@ export const useQueue = ({
               updatedQueue = updatedQueue.filter((item) => item.id !== payload.new.id);
             }
           } else {
-            if (assignedUserId === user.id) {
+            if (assignedUserId === user?.id) {
               updatedQueue = updatedQueue.filter(
                 (item) => item.contact_id !== payload.new.contact_id,
               );

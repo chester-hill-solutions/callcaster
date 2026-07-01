@@ -3,13 +3,15 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { downloadObject } from "@/lib/object-storage.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const { headers } = await getSession(request);  const user = getDualAuthUser(auth);
+  const { headers } = await getSession(request);
+  const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
   }
@@ -39,16 +41,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     let statusFileData: Record<string, unknown> = {};
-    const { data: statusData, error: statusError } = await adminDb.storage
-      .from("audience-uploads")
-      .download(`${workspaceId}/${uploadId}.json`);
-
-    if (!statusError) {
-      try {
-        statusFileData = JSON.parse(await statusData.text()) as Record<string, unknown>;
-      } catch (error) {
-        logger.error("Error parsing upload status file:", error);
-      }
+    try {
+      const statusBuffer = await downloadObject(
+        "audience-uploads",
+        `${workspaceId}/${uploadId}.json`,
+      );
+      statusFileData = JSON.parse(statusBuffer.toString()) as Record<string, unknown>;
+    } catch (error) {
+      // Object may not exist yet; ignore parse/download errors
     }
 
     return routeData({

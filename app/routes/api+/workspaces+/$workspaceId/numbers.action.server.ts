@@ -22,7 +22,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const parsed = await parseJsonBodyOrResponse(request, purchaseNumberBodySchema);
   if (parsed instanceof Response) return parsed;
 
-  const result = await purchaseWorkspaceNumber(    auth.user.id,
+  const result = await purchaseWorkspaceNumber(
+    auth.user.id,
     workspaceId,
     parsed.phone_number,
   );

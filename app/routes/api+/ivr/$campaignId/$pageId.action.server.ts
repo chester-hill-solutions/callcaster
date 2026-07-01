@@ -33,7 +33,6 @@ const getCallWithRetry = async (
 };
 
 export const action = async ({ params, request }: ActionFunctionArgs) => {
-  const client = createClient(env.BASE_URL(), env.BASE_URL());
   const twiml = new Twilio.twiml.VoiceResponse();
   const { pageId, campaignId } = params as { pageId: string; campaignId: string };
   const formData = await request.formData();
@@ -46,7 +45,6 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    client,
     callSid,
     params: paramsObj,
   });

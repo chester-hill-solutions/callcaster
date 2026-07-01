@@ -1,6 +1,7 @@
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
 import type { Database } from "@/lib/db-types";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database.server";
+import { env } from "@/lib/env.server";
 import {
   deleteAdminWorkspaceMember,
   deleteWorkspaceInviteById,
@@ -27,7 +28,7 @@ import {
 
 type UserRow = Database["public"]["Tables"]["user"]["Row"];
 
-export async function getAdminDashboard(_unusedClient: Postgres) {
+export async function getAdminDashboard() {
   const [workspaces, users, workspaceUsers, workspaceNumbers, allCampaigns] =
     await Promise.all([
       listAllWorkspacesOrdered(),
@@ -74,7 +75,6 @@ export async function getAdminDashboard(_unusedClient: Postgres) {
 }
 
 export async function toggleWorkspaceStatus(
-  _unusedClient: Postgres,
   workspaceId: string,
   disabled: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -94,15 +94,20 @@ export async function toggleWorkspaceStatus(
 
 export async function syncAllWorkspacesTwilio(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { error } = await null.functions.invoke(
-    "workspace-twilio-sync",
-    { body: {} },
-  );
-
-  if (error) {
-    return { ok: false, error: error.message };
+  try {
+    const url = `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/workspace-twilio-sync`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (!response.ok) {
+      return { ok: false, error: `Edge function returned ${response.status}` };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Failed to sync" };
   }
-  return { ok: true };
 }
 
 export async function syncWorkspaceTwilio(
@@ -120,7 +125,6 @@ export async function syncWorkspaceTwilio(
 }
 
 export async function disableUser(
-  _unusedClient: Postgres,
   userId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
@@ -138,7 +142,6 @@ export async function disableUser(
 }
 
 export async function getAdminUser(
-  _unusedClient: Postgres,
   userId: string,
 ): Promise<
   | { ok: true; user: UserRow }
@@ -153,7 +156,6 @@ export async function getAdminUser(
 }
 
 export async function updateAdminUser(
-  _unusedClient: Postgres,
   userId: string,
   updates: {
     first_name?: string | null;
@@ -206,7 +208,6 @@ export async function getAdminUserWorkspaces(
 }
 
 export async function addUserToWorkspaceAdmin(
-  _unusedClient: Postgres,
   userId: string,
   workspaceId: string,
   role: "owner" | "member" | "caller" | "admin",
@@ -232,7 +233,6 @@ export async function addUserToWorkspaceAdmin(
 }
 
 export async function updateUserWorkspaceRoleAdmin(
-  _unusedClient: Postgres,
   userId: string,
   workspaceId: string,
   role: "owner" | "member" | "caller" | "admin",
@@ -256,7 +256,6 @@ export async function updateUserWorkspaceRoleAdmin(
 }
 
 export async function removeUserFromWorkspaceAdmin(
-  _unusedClient: Postgres,
   userId: string,
   workspaceId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -272,7 +271,6 @@ export async function removeUserFromWorkspaceAdmin(
 }
 
 export async function cancelWorkspaceInviteAdmin(
-  _unusedClient: Postgres,
   inviteId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
@@ -287,7 +285,6 @@ export async function cancelWorkspaceInviteAdmin(
 }
 
 export async function getAdminWorkspaceDetail(
-  _unusedClient: Postgres,
   workspaceId: string,
 ) {
   const workspace = await getWorkspaceWithCampaigns(workspaceId);

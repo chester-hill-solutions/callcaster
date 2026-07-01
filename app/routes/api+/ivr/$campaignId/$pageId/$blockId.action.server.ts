@@ -2,9 +2,9 @@ import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campa
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -14,12 +14,12 @@ interface Script {
 const handleAudio = async (twiml: Twilio.twiml.VoiceResponse, block: { type: string; audioFile: string }, workspace: string) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
-    const { data: signedUrlData, error: signedUrlError } =
-      await adminDb.storage
-        .from("workspaceAudio")
-        .createSignedUrl(`${workspace}/${audioFile}`, 3600);
-    if (signedUrlError) throw signedUrlError;
-    twiml.play(signedUrlData.signedUrl);
+    const signedUrl = await createSignedObjectUrl(
+      "workspaceAudio",
+      `${workspace}/${audioFile}`,
+      3600,
+    );
+    twiml.play(signedUrl);
   } else {
     twiml.say(audioFile);
   }
@@ -100,7 +100,7 @@ const handleBlock = async (
   workspace: string,
   baseUrl: string,
 ) => {
-  await handleAudio(client, twiml, block, workspace);
+  await handleAudio(twiml, block, workspace);
   handleOptions(twiml, block, campaignId, pageId, blockId, script, baseUrl);
 };
 
@@ -108,10 +108,6 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   const baseUrl = env.BASE_URL();
 
-  const client = createClient(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
   const twiml = new Twilio.twiml.VoiceResponse();
 
   const { pageId, blockId, campaignId } = params as { pageId: string; blockId: string; campaignId: string };
@@ -130,7 +126,6 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForCallSid({
     request,
-    client,
     callSid,
     params: formParams,
   });
@@ -139,7 +134,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   }
 
   try {
-    const campaignData = await fetchCampaignWithScript(client, campaignId);
+    const campaignData = await fetchCampaignWithScript(campaignId);
     const script = ivrScriptStepsFromCampaign(campaignData) as Script;
     if (!script || !script.blocks || !script.pages) {
       throw new Error("Invalid script structure");
@@ -149,7 +144,6 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
 
     if (currentBlock) {
       await handleBlock(
-        client,
         twiml,
         currentBlock,
         campaignId,

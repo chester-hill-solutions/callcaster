@@ -7,6 +7,7 @@ import {
   markConversationRead,
 } from "@/lib/chats/messaging-client";
 import { useWorkspaceEventSubscription } from "./useWorkspaceEventSubscription";
+import { type RealtimeChangePayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.client";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
@@ -283,27 +284,30 @@ export const useConversationSummaryRealTime = ({
   // Handle new messages and message status changes
   const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
     const typedPayload = payload as RealtimeChangePayload<Tables<"message">>;
-    if (typedPayload.eventType === 'INSERT' && typedPayload.new?.workspace === workspace) {
+    const newRow = typedPayload.new;
+    if (typedPayload.eventType === 'INSERT' && newRow?.workspace === workspace) {
+      if (!newRow) return;
+
       // For new messages, we need to update unread counts
-      if (typedPayload.new.status === "received") {
+      if (newRow.status === "received") {
         // Check if this is for the active contact
-        const isForActiveContact = activeContactRef.current && 
-          (phoneNumbersMatch(typedPayload.new.from, activeContactRef.current) || 
-           phoneNumbersMatch(typedPayload.new.to, activeContactRef.current));
-        
+        const isForActiveContact = activeContactRef.current &&
+          (phoneNumbersMatch(newRow.from, activeContactRef.current) ||
+           phoneNumbersMatch(newRow.to, activeContactRef.current));
+
         // If it's not for the active contact, we need to increment unread count
         if (!isForActiveContact) {
           // Find the conversation for this contact
           setConversations(prevConversations => {
             // Determine the contact phone number (the one that's not a workspace number)
             const contactPhone =
-              (typedPayload.new.direction === 'inbound' ? typedPayload.new.from : typedPayload.new.to) ?? "";
-            
+              (newRow.direction === 'inbound' ? newRow.from : newRow.to) ?? "";
+
             // Check if we already have a conversation for this contact
-            const existingConversationIndex = prevConversations.findIndex(conv => 
+            const existingConversationIndex = prevConversations.findIndex(conv =>
               phoneNumbersMatch(conv.contact_phone, contactPhone)
             );
-            
+
             if (existingConversationIndex >= 0) {
               // Update existing conversation
               const updatedConversations = [...prevConversations];
@@ -314,7 +318,7 @@ export const useConversationSummaryRealTime = ({
               updatedConversations[existingConversationIndex] = {
                 ...existingConversation,
                 unread_count: existingConversation.unread_count + 1,
-                conversation_last_update: typedPayload.new.date_created || new Date().toISOString(),
+                conversation_last_update: newRow.date_created || new Date().toISOString(),
                 message_count: existingConversation.message_count + 1
               };
               return updatedConversations;
@@ -323,46 +327,46 @@ export const useConversationSummaryRealTime = ({
               const newConversation: ConversationSummary = {
                 contact_phone: contactPhone,
                 user_phone:
-                  (typedPayload.new.direction === 'inbound'
-                    ? typedPayload.new.to
-                    : typedPayload.new.from) ?? "",
-                conversation_start: typedPayload.new.date_created || new Date().toISOString(),
-                conversation_last_update: typedPayload.new.date_created || new Date().toISOString(),
+                  (newRow.direction === 'inbound'
+                    ? newRow.to
+                    : newRow.from) ?? "",
+                conversation_start: newRow.date_created || new Date().toISOString(),
+                conversation_last_update: newRow.date_created || new Date().toISOString(),
                 message_count: 1,
                 unread_count: 1,
                 contact_firstname: '',  // We don't have this info yet
                 contact_surname: ''     // We don't have this info yet
               };
-              
+
               // Add the new conversation and sort by most recent
               const updatedConversations = [...prevConversations, newConversation].sort(
                 compareByRecentActivity,
               );
-              
+
               return updatedConversations;
             }
           });
         }
       }
-      
+
       // For status changes, refresh the conversation summary
-      if (typedPayload.new.status === "delivered" || typedPayload.new.status === "read") {
+      if (newRow.status === "delivered" || newRow.status === "read") {
         // For delivered/read status, we need to update unread counts
         setConversations(prevConversations => {
           // Early return if no conversations match
-          const hasMatchingConversation = prevConversations.some(conv => 
-            phoneNumbersMatch(conv.contact_phone, typedPayload.new.from) || 
-            phoneNumbersMatch(conv.contact_phone, typedPayload.new.to)
+          const hasMatchingConversation = prevConversations.some(conv =>
+            phoneNumbersMatch(conv.contact_phone, newRow.from) ||
+            phoneNumbersMatch(conv.contact_phone, newRow.to)
           );
-          
+
           if (!hasMatchingConversation) {
             return prevConversations;
           }
-          
+
           return prevConversations.map(conv => {
             // Check if this message is from/to this conversation's contact
-            if (phoneNumbersMatch(conv.contact_phone, typedPayload.new.from) || 
-                phoneNumbersMatch(conv.contact_phone, typedPayload.new.to)) {
+            if (phoneNumbersMatch(conv.contact_phone, newRow.from) ||
+                phoneNumbersMatch(conv.contact_phone, newRow.to)) {
               // Decrement unread count (but not below 0)
               return {
                 ...conv,
@@ -373,15 +377,15 @@ export const useConversationSummaryRealTime = ({
           });
         });
       }
-      
+
       // Store the last time we received a message change
       lastUpdateTimeRef.current = Date.now();
-      
+
       // Clear any existing timeout to prevent multiple calls
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
+
       // Use a longer delay to allow multiple messages to be processed together
       // and prevent excessive refreshes
       timeoutRef.current = setTimeout(() => {

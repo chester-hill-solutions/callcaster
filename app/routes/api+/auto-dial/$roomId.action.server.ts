@@ -15,6 +15,7 @@ import {
 } from "@/lib/telephony-db.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import Twilio from "twilio";
 
 const getAdmin = () => null /* removed service client */;
@@ -37,11 +38,12 @@ const fetchCampaignData = async (campaignId: string, workspaceId: string) => {
 };
 
 const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) => {
-  const client = getAdmin();
     if (!voicemailFile) return null;
-    const { data, error } = await adminDb.storage.from('workspaceAudio').createSignedUrl(`${workspace}/${voicemailFile}`, 3600);
-    if (error) throw new Error(`Error fetching voicemail file: ${error.message}`);
-    return data.signedUrl;
+    try {
+      return await createSignedObjectUrl("workspaceAudio", `${workspace}/${voicemailFile}`, 3600);
+    } catch (error) {
+      throw new Error(`Error fetching voicemail file: ${error instanceof Error ? error.message : String(error)}`);
+    }
 };
 
 const dequeueContact = async (
@@ -184,10 +186,7 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
 }
 
 export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
-  const client = getAdmin();
-
     const conferenceName = params.roomId;
-    const realtime = adminDb.realtime.channel(conferenceName)
     const formData = await request.formData();
     const parsedBody = Object.fromEntries(formData) as Record<string, string>;
     const callSid = formData.get('CallSid') as string;
@@ -200,7 +199,6 @@ export const action = async ({ request, params }: { request: Request, params: { 
     try {
         const validation = await validateTwilioWebhookForCallSid({
             request,
-            client,
             callSid,
             params: parsedBody,
         });
@@ -219,12 +217,6 @@ export const action = async ({ request, params }: { request: Request, params: { 
             //This is a non-client device (outbound call)
             const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace ?? '' });
             const call: CallContext = twilio.calls(callSid);
-            realtime.send({
-                type: "broadcast", event: "message", payload: {
-                    contact_id: dbCall.contact_id,
-                    status: callStatus
-                }
-            });
 
             if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
                 //This is an answering machine
@@ -235,7 +227,6 @@ export const action = async ({ request, params }: { request: Request, params: { 
                   dbCall.workspace?.toString() ?? "",
                   { disposition: "voicemail" },
                 );
-                adminDb.removeChannel(realtime);
                 if (signedUrl) {
                     response = await handleMachineAnswer(call, twilio, dbCall, campaign, signedUrl, outreachStatus);
                 } else {

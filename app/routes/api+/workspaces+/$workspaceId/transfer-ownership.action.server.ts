@@ -25,11 +25,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   );
   if (parsed instanceof Response) return parsed;
 
-  const { headers } = await getSession(request);
-  const result = await transferWorkspaceOwnershipApi(    auth.user.id,
+  const result = await transferWorkspaceOwnershipApi(
+    auth.user.id,
     workspaceId,
     parsed.new_owner_user_id,
-    headers,
+    new Headers(),
   );
 
   if (!result.ok) {

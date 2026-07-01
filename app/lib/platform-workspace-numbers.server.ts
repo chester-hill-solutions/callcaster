@@ -84,7 +84,6 @@ export async function listWorkspaceNumbers(
 }
 
 export async function purchaseWorkspaceNumber(
-  _userPostgres: never,
   userId: string,
   workspaceId: string,
   phoneNumber: string,
@@ -108,7 +107,7 @@ export async function purchaseWorkspaceNumber(
     }
 
     const owner = users.find((u) => u.user_workspace_role === "owner");
-    const workspaceCredits = await getWorkspaceCredits(workspaceId);
+    const workspaceCredits = (await getWorkspaceCredits(workspaceId)) ?? 0;
 
     if (!hasCreditsForNumberRental(workspaceCredits)) {
       return {

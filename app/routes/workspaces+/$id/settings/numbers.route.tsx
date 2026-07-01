@@ -79,7 +79,7 @@ const WorkspaceSettings = () => {
     scripts,
     creditsBalance,
   } = useLoaderData<LoaderData>();
-  const { client } = useOutletContext<{ }>();
+  useOutletContext<{ }>();
   const actionData = useActionData<CallerIDResponse>();
   const [isDialogOpen, setDialog] = useState<boolean>(
     !!actionData?.validationRequest,

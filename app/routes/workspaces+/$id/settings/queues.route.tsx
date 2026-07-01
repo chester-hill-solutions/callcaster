@@ -44,7 +44,7 @@ type QueueFormData = {
 
 export default function QueueSettings() {
   const { queues, members, numbers, workspaceId } = useLoaderData<LoaderData>();
-  const { client } = useOutletContext<{ }>();
+  useOutletContext<{ }>();
   const fetcher = useFetcher();
   const [editing, setEditing] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);

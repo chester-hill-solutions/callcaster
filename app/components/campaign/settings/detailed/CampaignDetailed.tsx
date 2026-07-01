@@ -21,6 +21,7 @@ import {
 } from "./live/CampaignDetailed.Live.Switches";
 import {
   Campaign,
+  FileObject,
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
@@ -31,16 +32,15 @@ import {
   WorkspaceTwilioSyncSnapshot,
 } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
-import { Tables } from "@/lib/db-types";
 import {
   estimateIvrCampaignOutbound,
   estimateMessageCampaignOutbound,
 } from "@/lib/campaign-outbound-estimate";
 import { getCampaignContentReadinessIssues } from "@/lib/campaign-readiness";
 
-type LiveCampaignDetails = Tables<"live_campaign"> & { script: Script };
-type MessageCampaignDetails = Tables<"message_campaign">;
-type IVRCampaignDetails = Tables<"ivr_campaign"> & { script: Script };
+type LiveCampaignDetails = NonNullable<LiveCampaign>;
+type MessageCampaignDetails = NonNullable<MessageCampaign>;
+type IVRCampaignDetails = NonNullable<IVRCampaign>;
 
 const TWILIO_THROUGHPUT_DOCS_URL =
   "https://www.twilio.com/docs/messaging/guides/best-practices-at-scale";

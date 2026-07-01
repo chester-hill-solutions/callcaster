@@ -205,11 +205,11 @@ export async function refreshTokens(
   | { ok: false; error: string; status: number }
 > {
   try {
-    const result = await auth.api.refreshToken({
+    const result = await (auth.api.refreshToken as any)({
       body: { refreshToken: body.refresh_token },
       headers: request.headers,
     });
-    const payload = result?.response ?? result;
+    const payload = (result as any)?.response ?? result as any;
     if (!payload?.accessToken || !payload?.user) {
       return { ok: false, error: "Invalid refresh token", status: 401 };
     }
@@ -269,7 +269,7 @@ export async function resetPassword(
     await auth.api.resetPassword({
       body: {
         newPassword: body.password,
-        token: body.token ?? "",
+        token: (body as any).token ?? "",
       },
       headers: request.headers,
     });
@@ -294,8 +294,9 @@ export async function verifyEmailOtp(
     const result = await auth.api.verifyEmail({
       query: { token: body.token_hash },
       headers: request.headers,
+      returnHeaders: true,
     });
-    const payload = result?.response ?? result;
+    const payload = (result?.response ?? result) as any;
     if (!payload?.user) {
       return { ok: false, error: "Verification failed", status: 400 };
     }
@@ -354,8 +355,10 @@ export async function updateMeProfile(
     const result = await auth.api.updateUser({
       body: updateBody,
       headers: request.headers,
+      returnHeaders: true,
     });
-    const user = result?.user;
+    const payload = (result?.response ?? result) as any;
+    const user = payload?.user;
     if (!user) {
       return { ok: false, error: "Update failed", status: 400 };
     }
@@ -364,7 +367,7 @@ export async function updateMeProfile(
       await auth.api.changePassword({
         body: {
           newPassword: body.password,
-          currentPassword: body.current_password ?? body.password,
+          currentPassword: (body as any).current_password ?? body.password,
         },
         headers: request.headers,
       });

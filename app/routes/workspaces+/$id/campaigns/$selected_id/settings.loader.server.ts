@@ -9,7 +9,8 @@ import { logger } from "@/lib/logger.server";
 import { loadActiveSurveysForWorkspace } from "@/lib/survey-db.server";
 import { verifyAuth } from "@/lib/auth.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
-import type { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, QueueItem, TwilioAccountData } from "@/lib/types";
+import type { Campaign, FileObject, IVRCampaign, LiveCampaign, MessageCampaign, QueueItem, TwilioAccountData } from "@/lib/types";
+import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
@@ -40,7 +41,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       where: eq(campaignTable.id, Number(selected_id)),
     }),
     loadActiveSurveysForWorkspace(workspace_id),
-    null.storage.from("workspaceAudio").list(`${workspace_id}`),
+    listWorkspaceAudiosApi(user.id, workspace_id),
     adminDb
       .select({ twilio_data: workspaceTable.twilio_data })
       .from(workspaceTable)
@@ -56,7 +57,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }),
   ]);
 
-  const mediaData = workspaceAudioList.data;
+  const mediaData: FileObject[] = workspaceAudioList.ok
+    ? workspaceAudioList.audios.map((audio) => ({
+        name: audio.name,
+        id: audio.id,
+        created_at: audio.created_at,
+        updated_at: audio.updated_at,
+        signedUrl: audio.signed_url,
+      }))
+    : [];
   let mediaLinks: string[] = [];
   const twilioData = (workspaceTwilioResult[0]?.twilio_data ?? null) as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
@@ -65,7 +74,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const messagingServiceReady = workspaceMessagingServiceHasAvailableSenders({
     messagingServiceSid: defaultMessagingServiceSid,
     attachedSenderPhoneNumbers: onboarding.messagingService.attachedSenderPhoneNumbers,
-    workspaceNumbers: phoneNumbersResult.data ?? [],
+    workspaceNumbers: (phoneNumbersResult.data ?? []).map((n) => ({
+      phone_number: n.phone_number,
+      capabilities: n.capabilities as import("@/lib/db-types").Json | null,
+    })),
   });
   const outboundEstimateInputs = {
     portalConfig,
@@ -126,8 +138,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     queueCount: campaignWithAudience.queue_count,
     dequeuedCount: campaignWithAudience.dequeued_count,
     totalCount: campaignWithAudience.total_count,
-    scripts: campaignWithAudience.scripts.filter((s): s is NonNullable<typeof s> => s !== null),
-    mediaData: mediaData?.filter((media) => !media.name.startsWith("voicemail-")),
+    scripts: campaignWithAudience.scripts.filter((s: unknown): s is NonNullable<typeof s> => s !== null),
+    mediaData: mediaData.filter((media: FileObject) => !media.name.startsWith("voicemail-")),
     user: user,
     mediaLinks,
     surveys,

@@ -1,6 +1,5 @@
 import { data as routeData } from "react-router";
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { generateToken } from "@/lib/twilio-token.server";
@@ -19,7 +18,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return routeData({ error: "workspace is required" }, { status: 400 });
   }
 
-  try {    await requireWorkspaceAccess({ user: auth.user,
+  try {
+    await requireWorkspaceAccess({
+      user: auth.user,
       workspaceId: workspace,
     });
 
@@ -29,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return routeData({ error: "workspace not found" }, { status: 404 });
     }
 
-    const twilioData = (data.twilio_data ?? {}) as Record<string, unknown>;
+    const twilioData = (data.twilio_data ? JSON.parse(data.twilio_data) : {}) as Record<string, unknown>;
     const twilioAccountSid =
       typeof twilioData["sid"] === "string" ? twilioData["sid"] : "";
     const twilioApiKey = (data.key ?? "") as string;

@@ -46,7 +46,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (parsed instanceof Response) return parsed;
 
     const result = await upsertWorkspaceWebhook(
-      client,
       auth.user.id,
       workspaceId,
       parsed,

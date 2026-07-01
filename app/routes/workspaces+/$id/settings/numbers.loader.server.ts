@@ -8,6 +8,7 @@ import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { listObjects } from "@/lib/object-storage.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -23,7 +24,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       getWorkspaceUsers({ workspaceId }),
       getWorkspacePhoneNumbers({ workspaceId }),
       getWorkspaceCredits(workspaceId),
-      null.storage.from("workspaceAudio").list(workspaceId),
+      listObjects("workspaceAudio", workspaceId),
       tdb.inbound_queue.findMany({
         columns: { id: true, name: true },
         orderBy: (queue, { asc: ascFn }) => [ascFn(queue.name)],
@@ -45,7 +46,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     {
       phoneNumbers,
       workspaceId,
-      mediaNames: mediaNames.data,
+      mediaNames,
       users,
       queues,
       scripts,

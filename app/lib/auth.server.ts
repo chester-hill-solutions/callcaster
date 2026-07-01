@@ -23,8 +23,9 @@ export async function getSession(request: Request): Promise<SessionResult> {
     returnHeaders: true,
   });
 
-  const headers = mergeBetterAuthSetCookieHeaders(result?.headers);
-  const payload = result?.response ?? result;
+  const resultAny = result as any;
+  const headers = mergeBetterAuthSetCookieHeaders(resultAny?.headers);
+  const payload = resultAny?.response ?? resultAny;
 
   if (!payload?.session || !payload?.user) {
     return { session: null, user: null, headers };

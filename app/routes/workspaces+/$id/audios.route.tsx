@@ -7,7 +7,7 @@ import {
   useOutlet,
   useOutletContext,
 } from "react-router";
-import type { ContextType } from "@/lib/types";
+import type { ContextType, FileObject } from "@/lib/types";
 import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { mediaColumns } from "@/components/file-assets/columns";
 import { DataTable } from "@/components/workspace/tables/DataTable";

@@ -68,6 +68,7 @@ import {
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
+import { downloadObject } from "@/lib/object-storage.server";
 
 const AUDIENCE_CONTACT_SORT_KEYS = [
   "id",
@@ -147,7 +148,6 @@ export async function resolveDataPlaneAuth(
 }
 
 async function getCampaignWorkspaceId(
-  _,
   campaignId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -159,7 +159,6 @@ async function getCampaignWorkspaceId(
 }
 
 async function getContactWorkspaceId(
-  _,
   contactId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -171,7 +170,6 @@ async function getContactWorkspaceId(
 }
 
 async function getScriptWorkspaceId(
-  _,
   scriptId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -183,7 +181,6 @@ async function getScriptWorkspaceId(
 }
 
 async function getSurveyWorkspaceId(
-  _,
   surveyId: string,
 ): Promise<string | null> {
   const rows = await db
@@ -302,7 +299,7 @@ export async function authForSurvey(
 export async function authForOutreachAttempt(
   request: Request,
   outreachAttemptId: number,
-): Promise<{user: { id: string; email?: string } } | Response> {
+): Promise<{user: { id: string; email?: string }; workspaceId: string } | Response> {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;  const rows = await db
     .select({ workspace: outreachAttemptTable.workspace })
@@ -482,7 +479,7 @@ export async function transitionCampaignStatusApi(
     const queueCounts = await fetchQueueCounts({ workspaceId, campaignId });
     const readiness = getCampaignReadiness(
       campaignRecord as Campaign,
-      campaignDetails,
+      campaignDetails as Parameters<typeof getCampaignReadiness>[1],
       {
         queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
       },
@@ -526,7 +523,7 @@ export async function transitionCampaignStatusApi(
 }
 
 export async function getCampaignQueueApi(
-  _,
+  _request: Request,
   campaignId: string,
   workspaceId: string,
   searchParams: URLSearchParams,
@@ -654,7 +651,6 @@ export async function patchCampaignQueueApi(
 }
 
 export async function listWorkspaceContactsApi(
-  _,
   workspaceId: string,
   searchParams: URLSearchParams,
 ) {
@@ -708,7 +704,6 @@ export async function listWorkspaceContactsApi(
 }
 
 export async function getContactDetailApi(
-  _,
   contactId: string,
   workspaceId: string,
 ) {
@@ -771,7 +766,6 @@ export async function getContactDetailApi(
 }
 
 export async function deleteContactApi(
-  _,
   contactId: string,
   workspaceId: string,
 ) {
@@ -799,7 +793,6 @@ export async function deleteContactApi(
 }
 
 export async function listWorkspaceAudiencesApi(
-  _,
   workspaceId: string,
 ) {
   const tdb = createTenantDb(workspaceId);
@@ -819,7 +812,6 @@ export async function listWorkspaceAudiencesApi(
 }
 
 export async function getAudienceDetailApi(
-  _,
   workspaceId: string,
   audienceId: string,
   searchParams: URLSearchParams,
@@ -902,7 +894,6 @@ export async function getAudienceDetailApi(
 }
 
 export async function listWorkspaceScriptsApi(
-  _,
   workspaceId: string,
 ) {
   const tdb = createTenantDb(workspaceId);
@@ -922,7 +913,6 @@ export async function listWorkspaceScriptsApi(
 }
 
 export async function getScriptDetailApi(
-  _,
   scriptId: string,
   workspaceId: string,
 ) {
@@ -946,7 +936,6 @@ export async function getScriptDetailApi(
 }
 
 export async function listWorkspaceSurveysApi(
-  _,
   workspaceId: string,
 ) {
   const tdb = createTenantDb(workspaceId);
@@ -974,7 +963,6 @@ export async function listWorkspaceSurveysApi(
 }
 
 export async function getSurveyDetailApi(
-  _,
   surveyId: string,
   workspaceId: string,
 ) {
@@ -994,7 +982,6 @@ export async function getSurveyDetailApi(
 }
 
 export async function getSurveyResponsesApi(
-  _,
   surveyId: string,
   workspaceId: string,
 ) {
@@ -1002,7 +989,6 @@ export async function getSurveyResponsesApi(
 }
 
 export async function exportSurveyResponsesCsv(
-  _,
   surveyId: string,
   workspaceId: string,
 ): Promise<PlatformResult<Response>> {
@@ -1093,16 +1079,12 @@ export async function getAudienceUploadStatusApi(
   }
 
   let statusFileData: Record<string, unknown> = {};
-  const { data: statusData, error: statusError } = await adminDb.storage
-    .from("audience-uploads")
-    .download(`${workspaceId}/${parsedUploadId}.json`);
-
-  if (!statusError && statusData) {
-    try {
-      statusFileData = JSON.parse(await statusData.text()) as Record<string, unknown>;
-    } catch (error) {
-      logger.error("getAudienceUploadStatusApi parse status file", error);
-    }
+  try {
+    const statusData = await downloadObject("audience-uploads", `${workspaceId}/${parsedUploadId}.json`);
+    statusFileData = JSON.parse(statusData.toString("utf-8")) as Record<string, unknown>;
+  } catch (error) {
+    // Object may not exist; that's okay
+    logger.error("getAudienceUploadStatusApi download status file", error);
   }
 
   return {

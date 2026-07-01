@@ -16,8 +16,19 @@ const workspaceMembersMocks = vi.hoisted(() => ({
     id: string;
     workspace_id: string;
     key_hash: string;
+    key_prefix: string;
   },
   touchWorkspaceApiKeyLastUsed: vi.fn(),
+}));
+
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  findWorkspaceApiKeyByPrefix: vi.fn((keyPrefix: string) => {
+    return workspaceMembersMocks.apiKeyRow?.key_prefix === keyPrefix
+      ? workspaceMembersMocks.apiKeyRow
+      : null;
+  }),
+  touchWorkspaceApiKeyLastUsed: (...args: unknown[]) =>
+    workspaceMembersMocks.touchWorkspaceApiKeyLastUsed(...args),
 }));
 
 let sessionUser: { id: string; email?: string } | null = null;
@@ -60,6 +71,7 @@ describe("verifyApiKeyOrSession", () => {
       id: "key-1",
       workspace_id: "w1",
       key_hash: hashApiKeyForStorage(key),
+      key_prefix: key.slice(0, API_KEY_PREFIX_LENGTH),
     };
 
     const req = new Request("http://localhost/api/chat_sms", {
@@ -81,6 +93,7 @@ describe("verifyApiKeyOrSession", () => {
       id: "key-1",
       workspace_id: "w1",
       key_hash: "wrong-hash",
+      key_prefix: key.slice(0, API_KEY_PREFIX_LENGTH),
     };
 
     const req = new Request("http://localhost/api/chat_sms", {
@@ -127,6 +140,7 @@ describe("verifyApiKeyOrSession", () => {
       id: "key-2",
       workspace_id: "w2",
       key_hash: hashApiKeyForStorage(key),
+      key_prefix: key.slice(0, API_KEY_PREFIX_LENGTH),
     };
     authJsMocks.rejectApiKeyLastUsedUpdate = true;
 

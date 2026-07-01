@@ -32,6 +32,10 @@ export async function insertWorkspaceEvent(
       })
       .returning();
 
+    if (!event) {
+      throw new Error("Failed to insert workspace event");
+    }
+
     if (notify) {
       await tx.execute(
         sql`select pg_notify(${WORKSPACE_EVENTS_NOTIFY_CHANNEL}, ${JSON.stringify({

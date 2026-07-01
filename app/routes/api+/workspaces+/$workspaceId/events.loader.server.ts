@@ -126,7 +126,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
               void flushEvents();
             },
           );
-          listenUnsubscribe = listenResult.unsubscribe;
+          listenUnsubscribe = (listenResult as unknown as { unsubscribe: () => Promise<void> }).unsubscribe;
         } catch {
           // LISTEN unavailable (e.g. pooled connection); polling fallback only.
         }

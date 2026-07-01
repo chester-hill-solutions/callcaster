@@ -134,7 +134,7 @@ export async function getWorkspaceCampaigns({
     return { data, error: null };
   } catch (error) {
     logger.error("Error on function getWorkspaceCampaigns", error);
-    return { data: null, error: error as PostgrestError };
+    return { data: null, error: error as Error };
   }
 }
 

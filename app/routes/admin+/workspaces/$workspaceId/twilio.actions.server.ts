@@ -1,4 +1,5 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
+import { env } from "@/lib/env.server";
 
 import {
   createWorkspaceTwilioInstance,
@@ -21,6 +22,7 @@ import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -160,22 +162,23 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (actionName === "trigger_twilio_open_sync") {
         try {
-            const { data, error } = await null.functions.invoke(
-              "twilio-open-sync",
-              {
-                body: {
-                  workspaceId,
-                  callLimit: 50,
-                  messageLimit: 50,
-                  maxAgeMinutes: 120,
-                },
-              },
-            );
+            const url = `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/twilio-open-sync`;
+            const response = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workspaceId,
+                callLimit: 50,
+                messageLimit: 50,
+                maxAgeMinutes: 120,
+              }),
+            });
 
-            if (error) {
-              return routeData({ error: error.message }, { status: 500 });
+            if (!response.ok) {
+              return routeData({ error: `Edge function returned ${response.status}` }, { status: 500 });
             }
 
+            const data = await response.json();
             const summary =
               data && typeof data === "object"
                 ? JSON.stringify(data)

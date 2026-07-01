@@ -28,6 +28,7 @@ import {
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { db } from "@/server/db";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
 
@@ -190,11 +191,6 @@ export const action = async ({ request }: { request: Request }) => {
     });
   }
 
-  const client = createClient(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
-
   try {
     const parsed = await parseJsonBodyOrResponse(
       request,
@@ -277,10 +273,7 @@ export const action = async ({ request }: { request: Request }) => {
     const media = campaign.message_media?.length 
       ? await Promise.all(
           campaign.message_media.map(mediaItem =>
-            adminDb.storage
-              .from("messageMedia")
-              .createSignedUrl(`${workspace_id}/${mediaItem}`, 3600)
-              .then(({ data }) => data?.signedUrl)
+            createSignedObjectUrl("messageMedia", `${workspace_id}/${mediaItem}`, 3600)
           )
         )
       : [];

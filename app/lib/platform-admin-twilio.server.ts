@@ -27,6 +27,7 @@ import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.ser
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { env } from "@/lib/env.server";
 
 
 export type AdminTwilioActionResult =
@@ -189,22 +190,29 @@ export async function dispatchAdminTwilioAction({
 
     case "trigger_twilio_open_sync":
       try {
-        const { data, error } = await null.functions.invoke(
-          "twilio-open-sync",
+        const response = await fetch(
+          `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/twilio-open-sync`,
           {
-            body: {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
               workspaceId,
               callLimit: 50,
               messageLimit: 50,
               maxAgeMinutes: 120,
-            },
+            }),
           },
         );
 
-        if (error) {
-          return { ok: false, error: error.message, status: 500 };
+        if (!response.ok) {
+          return {
+            ok: false,
+            error: `Twilio open sync failed: HTTP ${response.status}`,
+            status: 500,
+          };
         }
 
+        const data = (await response.json()) as unknown;
         const summary =
           data && typeof data === "object"
             ? JSON.stringify(data)

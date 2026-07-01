@@ -9,13 +9,12 @@ import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
-  const { headers } = await getSession(request);
-  const { data: serverSession } = await request.getSession();
+  const { headers, user } = await getSession(request);
 
-  if (serverSession?.session) {
+  if (user) {
     return redirect("/workspaces", { headers });
   }
-  return routeData({ serverSession }, { headers });
+  return routeData({ user }, { headers });
 };
 
 type ActionData = {

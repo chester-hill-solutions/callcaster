@@ -55,7 +55,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (parsed instanceof Response) return parsed;
 
     const result = await inviteWorkspaceMember(
-      client,
       auth.user.id,
       workspaceId,
       parsed.email,
@@ -81,7 +80,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (parsed instanceof Response) return parsed;
 
     const result = await updateWorkspaceMemberRole(
-      client,
       auth.user.id,
       workspaceId,
       parsed.user_id,
@@ -101,7 +99,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (parsed.target === "invite") {
       const inviteResult = await cancelWorkspaceInvite(
-        client,
         auth.user.id,
         workspaceId,
         parsed.user_id,
@@ -113,7 +110,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const removeResult = await removeWorkspaceMember(
-      client,
       auth.user.id,
       workspaceId,
       parsed.user_id,
@@ -123,7 +119,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const inviteResult = await cancelWorkspaceInvite(
-      client,
       auth.user.id,
       workspaceId,
       parsed.user_id,

@@ -26,7 +26,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const userRole = await getUserRole({ user, workspaceId: workspace_id });
   const scripts = await getWorkspaceScripts({
     workspace: workspace_id,
-    client: null,
   }) || [];
 
   const campaignData = await fetchCampaignForScriptEdit(workspace_id, parseInt(selected_id, 10));

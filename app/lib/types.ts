@@ -9,6 +9,14 @@ export type ContextType = {
   env: ENV;
 };
 
+export type FileObject = {
+  name: string;
+  id: string;
+  created_at: string;
+  updated_at?: string;
+  signedUrl?: string | null;
+};
+
 export type Audience = Tables<"audience">;
 export type Campaign = Tables<"campaign">;
 export type Contact = Tables<"contact">;

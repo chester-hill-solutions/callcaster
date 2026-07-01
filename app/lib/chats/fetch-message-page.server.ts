@@ -7,37 +7,12 @@ import type { TenantDb } from "@/server/tenant-db";
 
 const MESSAGES_PAGE_SIZE = 50;
 
-const getMessageMedia = async ({
-  messages,
-}: {
-  messages: Message[];
-}): Promise<Message[]> => {
-  return Promise.all(
-    (messages ?? []).map(async (message: Message) => {
-      const inboundMedia = message?.inbound_media ?? [];
-      if (inboundMedia.filter(Boolean).length > 0) {
-        const urls = await Promise.all(
-          inboundMedia.map(async (file) => {
-            const { data } = await null.storage
-              .from("messageMedia")
-              .createSignedUrl(file, 3600);
-            return data?.signedUrl;
-          }),
-        );
-        return { ...message, signedUrls: urls } as Message;
-      }
-      return { ...message, signedUrls: [] } as Message;
-    }),
-  );
-};
-
 export async function fetchMessagePage({
   workspaceId,
   contactFilter,
   before,
   tdb,
 }: {
-  null?: never | null;
   workspaceId: string;
   contactFilter: string;
   before?: string | null;
@@ -51,16 +26,10 @@ export async function fetchMessagePage({
       { tdb, pageSize: MESSAGES_PAGE_SIZE },
     );
     const chronological = [...rows].reverse() as Message[];
-    if (!null) {
-      return {
-        messages: chronological.map((message) => ({ ...message, signedUrls: [] })),
-        hasMore,
-      };
-    }
-    const withMedia = await getMessageMedia({
-      messages: chronological,
-    });
-    return { messages: withMedia, hasMore };
+    return {
+      messages: chronological.map((message) => ({ ...message, signedUrls: [] })) as unknown as Message[],
+      hasMore,
+    };
   } catch (error) {
     logger.error("Error fetching messages:", error);
     return { messages: [], hasMore: false };

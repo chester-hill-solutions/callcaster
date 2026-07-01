@@ -9,7 +9,19 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const requireWorkspaceAccess = vi.fn(async () => undefined);
-const postgresMockState = vi.hoisted(() => ({ lastnever: null as any }));
+
+const audienceExportMocks = vi.hoisted(() => ({
+  findAudienceWorkspaceById: vi.fn(async () => "w1"),
+  listAudienceContactsForExport: vi.fn(async () => [
+    {
+      id: 1,
+      firstname: "=1+1",
+      surname: 'Doe, "Jr"',
+      opt_out: false,
+      other_data: [{ key: "custom", value: "@SUM(1,1)" }],
+    },
+  ]),
+}));
 
 vi.mock("@/lib/database.server", async () => {
   const actual = await vi.importActual<typeof import("@/lib/database.server")>(
@@ -18,62 +30,15 @@ vi.mock("@/lib/database.server", async () => {
   return { ...actual, requireWorkspaceAccess };
 });
 
-function buildMockDb() {
-  const mockClient: any = {};
-  const contactAudienceCalls: any[] = [];
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceWorkspaceById: (...args: any[]) =>
+    audienceExportMocks.findAudienceWorkspaceById(...args),
+}));
 
-  null.from = (table: string) => {
-    if (table === "audience") {
-      return {
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: { workspace: "w1" },
-              error: null,
-            }),
-          }),
-        }),
-      };
-    }
-
-    if (table === "contact_audience") {
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = (col: string, val: any) => {
-        contactAudienceCalls.push({ op: "eq", col, val });
-        return builder;
-      };
-      builder.or = (q: string) => {
-        contactAudienceCalls.push({ op: "or", q });
-        return builder;
-      };
-      builder.order = (key: string, opts: any) => {
-        contactAudienceCalls.push({ op: "order", key, opts });
-        return builder;
-      };
-      builder.then = (resolve: any, reject: any) =>
-        Promise.resolve({
-          data: [
-            {
-              id: 1,
-              firstname: "=1+1",
-              surname: 'Doe, "Jr"',
-              opt_out: false,
-              other_data: [{ key: "custom", value: "@SUM(1,1)" }],
-            },
-          ],
-          error: null,
-        }).then(resolve, reject);
-      (null as any).__contactAudienceCalls = contactAudienceCalls;
-      return builder;
-    }
-
-    throw new Error(`unexpected table ${table}`);
-  };
-
-  postgresMockState.lastnever = null;
-  return null;
-}
+vi.mock("@/lib/database/contact-audience.server", () => ({
+  listAudienceContactsForExport: (...args: any[]) =>
+    audienceExportMocks.listAudienceContactsForExport(...args),
+}));
 
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers(),
@@ -83,6 +48,18 @@ vi.mock("@/lib/auth.server", () => ({
 describe("api.audiences CSV export contract", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
+    audienceExportMocks.findAudienceWorkspaceById.mockReset();
+    audienceExportMocks.listAudienceContactsForExport.mockReset();
+    audienceExportMocks.findAudienceWorkspaceById.mockResolvedValue("w1");
+    audienceExportMocks.listAudienceContactsForExport.mockResolvedValue([
+      {
+        id: 1,
+        firstname: "=1+1",
+        surname: 'Doe, "Jr"',
+        opt_out: false,
+        other_data: [{ key: "custom", value: "@SUM(1,1)" }],
+      },
+    ]);
     setDualAuthSession({
             headers: new Headers(),
       user: { id: "u1" },
@@ -133,19 +110,14 @@ describe("api.audiences CSV export contract", () => {
       "surname",
     ]);
 
-    const calls = postgresMockState.lastnever?.__contactAudienceCalls as
-      | any[]
-      | undefined;
-    expect(Array.isArray(calls)).toBe(true);
-    expect(calls.some((c) => c.op === "or" && String(c.q).includes("contact.firstname.ilike")))
-      .toBe(true);
-    expect(
-      calls.some(
-        (c) =>
-          c.op === "order" &&
-          c.key === "contact(firstname)" &&
-          c.opts?.ascending === false,
-      ),
-    ).toBe(true);
+    expect(audienceExportMocks.listAudienceContactsForExport).toHaveBeenCalledWith(
+      "w1",
+      123,
+      expect.objectContaining({
+        q: "doe",
+        sortKey: "firstname",
+        sortDirection: "desc",
+      }),
+    );
   });
 });

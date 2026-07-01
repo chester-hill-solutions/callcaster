@@ -12,7 +12,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (auth instanceof Response) return auth;
 
   const result = await getSurveyDetailApi(
-    auth.client,
     surveyId,
     auth.workspaceId,
   );

@@ -36,6 +36,7 @@ export function matchesPostgresChangeFilter(
   if (!match) return true;
 
   const [, column, expected] = match;
+  if (!column) return true;
   const row =
     payload.eventType === "DELETE"
       ? payload.old

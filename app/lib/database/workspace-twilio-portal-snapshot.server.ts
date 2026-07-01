@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/db-types";
+import type { Database, MessageStatus } from "@/lib/db-types";
 import { desc, eq } from "drizzle-orm";
 import {
   message as messageTable,
@@ -133,8 +133,9 @@ export async function getWorkspaceTwilioPortalSnapshot({workspaceId,
   const statusCounts = recentMessages.reduce<
     WorkspaceTwilioPortalMetrics["statusCounts"]
   >((acc, message) => {
-    if (message.status) {
-      acc[message.status] = (acc[message.status] ?? 0) + 1;
+    const status = message.status as MessageStatus | null;
+    if (status) {
+      acc[status] = (acc[status] ?? 0) + 1;
     }
     return acc;
   }, {});

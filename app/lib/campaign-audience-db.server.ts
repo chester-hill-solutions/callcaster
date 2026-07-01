@@ -24,7 +24,7 @@ export async function findCampaignAudienceLink(campaignId: number, audienceId: n
 export async function insertCampaignAudienceLink(campaignId: number, audienceId: number) {
   await db
     .insert(campaignAudienceTable)
-    .values({ campaign_id: campaignId, audience_id: audienceId });
+    .values({ campaign_id: campaignId, audience_id: audienceId, created_at: new Date().toISOString() });
 }
 
 export async function deleteCampaignAudienceLink(campaignId: number, audienceId: number) {

@@ -28,7 +28,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     `billing:checkout:${workspaceId}`,
     async () => {
       const result = await createBillingCheckoutSession({
-        client: null /* removed */ (auth),
         userId: auth.user.id,
         workspaceId,
         amount: parsed.amount,

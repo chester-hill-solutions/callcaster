@@ -83,7 +83,7 @@ const useCallRoom = ({
       try {
         const record = parseWorkspaceEventData(message.data);
         if (record.event_type === "predictive_broadcast") {
-          setPredictiveState(record.payload as PredictiveState);
+          setPredictiveState(record.payload as unknown as PredictiveState);
           return;
         }
         if (record.event_type === "presence_sync") {

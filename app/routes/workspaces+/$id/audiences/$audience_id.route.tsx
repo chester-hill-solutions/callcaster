@@ -20,7 +20,7 @@ export default function AudienceView() {
   const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
     useLoaderData<AudienceDetailLoaderData>();
   const navigate = useNavigate();
-  const { client } = useOutletContext<{ }>();
+  useOutletContext<{ }>();
   const [activeTab, setActiveTab] = useState("contacts");
   const revalidator = useRevalidator();
 
@@ -117,7 +117,6 @@ export default function AudienceView() {
             </h2>
             <AudienceUploader
               existingAudienceId={audience_id}
-              client={client}
               onUploadComplete={handleUploadComplete}
             />
           </div>
@@ -130,8 +129,7 @@ export default function AudienceView() {
             </h2>
             <AudienceUploadHistory
               audienceId={Number(audience_id)}
-              workspaceId={workspace_id}
-              client={client}
+              workspaceId={workspace_id ?? ""}
             />
           </div>
         </TabsContent>

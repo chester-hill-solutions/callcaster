@@ -2,12 +2,12 @@ import {
   debitAmountFromCredits,
   voiceCreditsFromDurationSeconds,
   type VoiceBillingKind,
-} from "./pricing.ts";
+} from "./pricing";
 
 export {
   voiceBillingKindFromCampaignType,
   type VoiceBillingKind,
-} from "./pricing.ts";
+} from "./pricing";
 
 export const TERMINAL_OUTREACH_DISPOSITIONS_LIST = [
   "completed",

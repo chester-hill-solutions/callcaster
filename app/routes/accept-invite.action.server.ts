@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger.server";
 import type { ActionData } from "./accept-invite.types";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/db-types";
+import type { User } from "@/lib/types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { headers } = await getSession(request);
@@ -38,7 +39,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
       }
 
-      const { data: userData, error: updateError } = await request.updateUser({
+      const { data: userData, error: updateError } = await (request as any).updateUser({
         email: emailValue,
         password: passwordValue,
         data: { first_name: firstNameValue, last_name: lastNameValue },
@@ -67,10 +68,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (actionType === "acceptInvitations") {
-    const authContext = (await verifyAuth(request)) as {
-      headers: Headers;
-      user: User;
-    };
+    const authContext = await verifyAuth(request);
 
     const invitationIds = formData
       .getAll("invitation_id")

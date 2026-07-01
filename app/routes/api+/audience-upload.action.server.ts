@@ -45,7 +45,7 @@ type AudienceUploadDeps = Partial<{
     request: Request,
   ) => Promise<{
     headers: Headers;
-    user: User | null;
+    user: { id: string } | null;
   }>;
   processAudienceUpload: typeof processAudienceUpload;
 }>;

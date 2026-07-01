@@ -246,6 +246,10 @@ export async function createSurveyWithStructure(args: {
     updated_at: now,
   });
 
+  if (!survey) {
+    throw new Error("Failed to insert survey");
+  }
+
   if (args.surveyData.pages?.length) {
     for (const page of args.surveyData.pages) {
       const [surveyPage] = await db
@@ -360,7 +364,7 @@ async function getOrCreateSurveyResponse(args: {
       .values({
         survey_id: args.surveyInternalId,
         result_id: args.resultId,
-        contact_id: args.contactId,
+        contact_id: args.contactId ?? undefined,
         started_at: args.startedAt,
         completed_at: args.completedAt ?? null,
         last_page_completed: args.lastPageCompleted,

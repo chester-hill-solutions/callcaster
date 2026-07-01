@@ -14,7 +14,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const auth = await resolveDataPlaneAuth(request, workspaceId);
   if (auth instanceof Response) return auth;
 
-  const result = await listWorkspaceScriptsApi(auth.client, workspaceId);
+  const result = await listWorkspaceScriptsApi(workspaceId);
   if (!result.ok) {
     return jsonError(result.error, result.status);
   }

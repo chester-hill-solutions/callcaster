@@ -3,7 +3,7 @@ import { data as routeData, redirect } from "react-router";
 import { getAdminWorkspaceDetail } from "@/lib/platform-admin.server";
 import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { requireSudoAdmin } from "../../requireSudoAdmin.server";
+import { requireSudoAdmin } from "../requireSudoAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 interface TwilioPhoneNumber {

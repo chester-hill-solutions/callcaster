@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
+import { getSession } from "@/lib/auth.server";
 import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { insertVerificationSession } from "@/lib/verification-db.server";

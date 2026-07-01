@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../app/lib/adminDb.server", () => ({
+vi.mock("../app/lib/client.server", () => ({
   getSession: (...args: any[]) => mocks.getSession(...args),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
@@ -285,7 +285,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
 
   test("logs when call upsert fails", async () => {
     const { client } = makeDbClientStub(10);
-    adminDb.from = (table: string) => {
+    client.from = (table: string) => {
       if (table === "workspace") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { credits: 10 }, error: null }) }) }) };
       }
@@ -330,7 +330,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
 
   test("blocks emergency-compliant dialing when caller id is not emergency-ready", async () => {
     const { client } = makeDbClientStub(10);
-    adminDb.from = (table: string) => {
+    client.from = (table: string) => {
       if (table === "workspace") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { credits: 10 }, error: null }) }) }) };
       }
@@ -381,7 +381,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
 
   test("does not enforce emergency voice when the voice track is not selected", async () => {
     const { client } = makeDbClientStub(10);
-    adminDb.from = (table: string) => {
+    client.from = (table: string) => {
       if (table === "workspace") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { credits: 10 }, error: null }) }) }) };
       }

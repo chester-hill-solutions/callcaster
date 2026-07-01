@@ -628,15 +628,15 @@ export async function handleNewUserOTPVerification(
   }
 
   try {
-    const result = await auth.api.verifyEmail({
+    const result = (await auth.api.verifyEmail({
       query: { token: token_hash },
       headers: request.headers,
       returnHeaders: true,
-    });
+    })) as unknown as { headers?: Headers; response?: { user?: { id: string } } };
     const mergedHeaders = mergeBetterAuthSetCookieHeaders(result?.headers, headers);
-    const payload = result?.response ?? result;
+    const user = result?.response?.user;
 
-    if (!payload?.user) {
+    if (!user) {
       return routeData({ error: "Failed to create session" }, { headers: mergedHeaders });
     }
 
@@ -644,9 +644,9 @@ export async function handleNewUserOTPVerification(
       const invites = await adminDb
         .select()
         .from(workspace_invite)
-        .where(eq(workspace_invite.user_id, payload.user.id));
+        .where(eq(workspace_invite.user_id, user.id));
       return routeData(
-        { newSession: { user: payload.user }, invites },
+        { newSession: { user }, invites },
         { headers: mergedHeaders },
       );
     } catch (inviteError) {

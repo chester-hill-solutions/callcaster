@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { isRecent, updateAttemptWithCall } from "@/lib/utils";
-import { Call, OutreachAttempt, QueueItem } from "@/lib/types";
+import { Call, OutreachAttempt, QueueItem, User } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 
 /**

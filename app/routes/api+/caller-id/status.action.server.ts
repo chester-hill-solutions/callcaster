@@ -46,11 +46,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
-  const client = createClient(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
-
   try {
     const candidateNumbers = await listWorkspaceNumberTwilioCandidatesByPhone(
       parsedBody.To,
@@ -84,7 +79,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const numberRequest = await updateWorkspaceNumberCapabilitiesByPhone(
         parsedBody.To,
-        capabilities,
+        capabilities as unknown as Record<string, unknown>,
       );
 
       if (numberRequest.length === 0) {
@@ -92,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       if (parsedBody.VerificationStatus === "success") {
-        const updatedNumber = numberRequest[0];
+        const updatedNumber = numberRequest[0]!;
         const workspaceId = updatedNumber.workspace;
         if (workspaceId) {
           const [current, phoneNumbersResult] = await Promise.all([

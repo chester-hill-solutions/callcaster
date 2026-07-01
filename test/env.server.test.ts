@@ -3,14 +3,11 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 function seedRequiredEnv() {
   process.env.NODE_ENV = "test";
   process.env.BASE_URL = "http://localhost";
-  process.env.BETTER_AUTH_SECRET = "a";
-  process.env.BETTER_AUTH_SECRET = "b";
-  process.env.BASE_URL = "c";
+  process.env.BETTER_AUTH_SECRET = "test-better-auth-secret";
   process.env.TWILIO_SID = "d";
   process.env.TWILIO_AUTH_TOKEN = "e";
   process.env.TWILIO_APP_SID = "f";
   process.env.TWILIO_PHONE_NUMBER = "+15555550100";
-  process.env.BASE_URL = "http://localhost";
   process.env.STRIPE_SECRET_KEY = "sk";
   process.env.RESEND_API_KEY = "re";
 }
@@ -28,7 +25,7 @@ describe("env.server", () => {
     try {
       const mod = await import("../app/lib/env.server");
       expect(() => mod.env.BASE_URL()).toThrow(
-        /Missing required environment variable: AUTH_URL/,
+        /Missing required environment variable: BASE_URL/,
       );
     } finally {
       err.mockRestore();
@@ -84,19 +81,20 @@ describe("env.server", () => {
     const mod = await import("../app/lib/env.server");
 
     expect(mod.env.BASE_URL()).toBe("http://localhost");
-    expect(mod.env.BASE_URL()).toBe("a");
-    expect(mod.env.BASE_URL()).toBe("b");
-    expect(mod.env.BASE_URL()).toBe("c");
     expect(mod.env.TWILIO_SID()).toBe("d");
     expect(mod.env.TWILIO_AUTH_TOKEN()).toBe("e");
     expect(mod.env.TWILIO_APP_SID()).toBe("f");
     expect(mod.env.TWILIO_PHONE_NUMBER()).toBe("+15555550100");
-    expect(mod.env.BASE_URL()).toBe("http://localhost");
     expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk");
     expect(mod.env.RESEND_API_KEY()).toBe("re");
     expect(mod.env.OPENAI_API_KEY()).toBe("oa");
     expect(mod.env.STRIPE_WEBHOOK_SECRET()).toBe("whsec_1");
     expect(mod.env.VERIFICATION_PHONE_NUMBER()).toBe("+15551234567");
+
+    // env reads process.env on every call; it does not cache.
+    process.env.BASE_URL = "https://example.com";
+    expect(mod.env.BASE_URL()).toBe("https://example.com");
+    process.env.BASE_URL = "http://localhost";
 
     expect(() => mod.revalidateEnv()).not.toThrow();
   });

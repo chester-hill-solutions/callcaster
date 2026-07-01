@@ -71,7 +71,7 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
   test("normalizes the upload before storing a canonical mp3", async () => {
     const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      null: adminDb.client,
+      null: client.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockResolvedValueOnce({
@@ -100,7 +100,7 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     expect(response.headers.get("Location")).toBe("../audios?uploaded=1");
     expect(mocks.normalizeUploadedAudio).toHaveBeenCalledTimes(1);
     expect(mocks.getSafeMediaBaseName).toHaveBeenCalledWith(" Greeting ");
-    expect(adminDb.upload).toHaveBeenCalledWith(
+    expect(client.upload).toHaveBeenCalledWith(
       "w1/Greeting.mp3",
       Buffer.from("normalized-audio"),
       {
@@ -114,7 +114,7 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
   test("returns a validation error when no file is provided", async () => {
     const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      null: adminDb.client,
+      null: client.client,
       headers: new Headers(),
     });
 
@@ -136,13 +136,13 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Please choose an audio file to upload.",
     });
     expect(mocks.normalizeUploadedAudio).not.toHaveBeenCalled();
-    expect(adminDb.upload).not.toHaveBeenCalled();
+    expect(client.upload).not.toHaveBeenCalled();
   });
 
   test("returns helper failures without uploading invalid audio", async () => {
     const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      null: adminDb.client,
+      null: client.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockRejectedValueOnce(
@@ -171,6 +171,6 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Unsupported audio format.",
     });
     expect(mocks.logger.error).toHaveBeenCalled();
-    expect(adminDb.upload).not.toHaveBeenCalled();
+    expect(client.upload).not.toHaveBeenCalled();
   });
 });

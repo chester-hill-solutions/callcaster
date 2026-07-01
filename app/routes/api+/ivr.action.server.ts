@@ -15,7 +15,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
   const user = auth.user;
-  const client = createClient(env.BASE_URL(), env.BASE_URL());
   const formData = await request.formData();
 
   const to_number = formData.get("to_number") as string;

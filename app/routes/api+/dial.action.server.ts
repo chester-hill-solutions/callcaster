@@ -144,7 +144,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             campaign_id: campaignId,
             contact_id: contactId,
             workspace: workspace_id,
-            outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : null,
+            outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : undefined,
             queue_id: queueId,
         });
     } catch (error) {

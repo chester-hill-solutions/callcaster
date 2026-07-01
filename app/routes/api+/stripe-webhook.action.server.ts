@@ -4,7 +4,6 @@ import { stripeEventKey } from "@/lib/billing-keys";
 import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
@@ -58,11 +57,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
       return new Response("OK", { status: 200 });
     }
-
-    const client = createClient<Database>(
-      env.BASE_URL(),
-      env.BASE_URL(),
-    );
 
     const { inserted } = await insertTransactionHistoryIdempotent({
       workspaceId,

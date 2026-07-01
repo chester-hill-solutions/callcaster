@@ -81,7 +81,7 @@ describe("audience → campaign queue sync", () => {
     });
 
     expect(res).toEqual([2, 3]);
-    expect(adminDb._queue).toEqual([
+    expect(client._queue).toEqual([
       { campaign_id: 99, contact_id: 1 },
       { campaign_id: 99, contact_id: 1 },
       { campaign_id: 99, contact_id: 2 },
@@ -105,7 +105,7 @@ describe("audience → campaign queue sync", () => {
       old_record: { audience_id: 10, campaign_id: 99 },
     });
 
-    expect(adminDb._queue).toEqual([{ campaign_id: 99, contact_id: 3 }]);
+    expect(client._queue).toEqual([{ campaign_id: 99, contact_id: 3 }]);
   });
 });
 

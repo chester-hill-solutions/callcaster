@@ -40,7 +40,7 @@ function ExistingUser({ invites, state }: ExistingUserProps) {
       </div>
     );
   }
-  return <ExistingUserInvites invites={invites} state={state} />;
+  return <ExistingUserInvites invites={invites as any} state={state} />;
 }
 
 function NotSignedIn() {

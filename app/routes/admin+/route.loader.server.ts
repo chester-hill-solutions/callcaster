@@ -5,7 +5,7 @@ import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { userData } = await requireSudoAdmin(request);
-  const dashboard = await getAdminDashboard(null);
+  const dashboard = await getAdminDashboard();
 
   return routeData({
     user: userData,

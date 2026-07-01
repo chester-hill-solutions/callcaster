@@ -7,7 +7,7 @@ import {
   parseQueueIdFromName,
   type QueueRecord,
   type TwilioCredentials,
-} from "../../../shared/acd-utils.ts";
+} from "../../../shared/acd-utils";
 import {
   inbound_queue as inboundQueueTable,
   inbound_queue_entry as inboundQueueEntryTable,
@@ -37,7 +37,7 @@ export {
   buildHoldMusicTwiml,
   makeQueueName,
   parseQueueIdFromName,
-} from "../../../shared/acd-utils.ts";
+} from "../../../shared/acd-utils";
 
 export const INBOUND_OFFER_TIMEOUT_SECONDS = 25;
 export const POLL_INTERVAL_MS = 3000;

@@ -18,7 +18,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const headers = mergeBetterAuthSetCookieHeaders(result?.headers);
       const payload = result?.response ?? result;
 
-      if (payload?.user) {
+      if ((payload as any)?.user) {
         return redirect(next, { headers });
       }
     } catch {

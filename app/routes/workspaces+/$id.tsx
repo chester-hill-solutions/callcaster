@@ -69,25 +69,25 @@ function WorkspaceResolvedView({
     (resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>
   ).filter(Boolean);
   const { data: workspaceData } = useRealtimeData(
-    context.client,
+    null,
     workspace.id,
     "workspace",
     workspace ? [workspace] : [],
   );
   const { data: campaignsData } = useRealtimeData(
-    context.client,
+    null,
     workspace.id,
     "campaign",
     campaigns,
   );
   const { data: phoneNumbersData } = useRealtimeData(
-    context.client,
+    null,
     workspace.id,
     "workspace_numbers",
     phoneNumbers,
   );
   const { data: audiencesData } = useRealtimeData(
-    context.client,
+    null,
     workspace.id,
     "audience",
     audiences,

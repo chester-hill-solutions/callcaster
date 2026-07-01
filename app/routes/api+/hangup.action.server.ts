@@ -34,26 +34,17 @@ export const action = async ({ request }: { request: Request }) => {
             (await findCallConferenceIdForWorkspace(workspaceId, callSid)) ?? null;
         }
 
-        const realtime = resolvedConferenceId
-            ? adminDb.realtime.channel(resolvedConferenceId)
-            : null;
         const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
         try {
             await twilio.calls(callSid).update({ twiml: hangupTwiml() });
         } catch (twilioErr: unknown) {
             const code = (twilioErr as { code?: number })?.code;
             if (code === 21220) {
-                // Call already ended (e.g. caller hung up); continue to broadcast + optional dequeue
+                // Call already ended (e.g. caller hung up); continue to optional dequeue
             } else {
                 throw twilioErr;
             }
         }
-        realtime?.send({
-            type: "broadcast", event: "message", payload: {
-                contact_id: null,
-                status: 'idle'
-            }
-        });
         const queue = await findActiveAssignedQueueForUser(user.id);
         if (queue) {
             await rpcDequeueContact(db, {
@@ -67,9 +58,6 @@ export const action = async ({ request }: { request: Request }) => {
                 queue.contact_id,
                 "completed",
             );
-        }
-        if (realtime) {
-            adminDb.removeChannel(realtime);
         }
         return routeData({ success: true });
    

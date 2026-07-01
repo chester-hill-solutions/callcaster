@@ -48,7 +48,6 @@ export async function verifyWorkspaceMessagingSenderPool({
   }
 
   const twilio = await createWorkspaceTwilioClient({
-    client: null,
     workspaceId,
   });
 

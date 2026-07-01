@@ -5,7 +5,6 @@ import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
-    createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     normalizeProviderStatus: vi.fn(),
@@ -18,17 +17,28 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+const telephonyDbMocks = vi.hoisted(() => ({
+  findCallBySid: vi.fn(async () => null),
+  updateCallBySid: vi.fn(async () => null),
+  updateOutreachAttemptForWorkspace: vi.fn(async () => null),
+}));
+
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers(),
   }),
 }));
-vi.mock("@client/client-js", () => ({ createClient: (...args: any[]) => mocks.createClient(...args) }));
 vi.mock("@/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
   requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/call-status", () => ({
   normalizeProviderStatus: (...args: any[]) => mocks.normalizeProviderStatus(...args),
+}));
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallBySid: (...args: any[]) => telephonyDbMocks.findCallBySid(...args),
+  updateCallBySid: (...args: any[]) => telephonyDbMocks.updateCallBySid(...args),
+  updateOutreachAttemptForWorkspace: (...args: any[]) =>
+    telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
 }));
 vi.mock("@/lib/env.server", () => {
   return {
@@ -52,43 +62,22 @@ function makeUserPostgres({ membership }: { membership: any | null }) {
   return { from: () => chain, maybeSingle };
 }
 
-function makeServicePostgres(opts: {
-  callSingle: { data: any; error: any };
-  updateCallError?: any;
-  updateAttemptError?: any;
-}) {
-  const callSingle = vi.fn(async () => opts.callSingle);
-  const updateCall = vi.fn(async () => ({ error: opts.updateCallError ?? null }));
-  const updateAttempt = vi.fn(async () => ({ error: opts.updateAttemptError ?? null }));
-
-  return {
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({ eq: () => ({ single: callSingle }) }),
-          update: (_data: any) => ({ eq: updateCall }),
-        };
-      }
-      if (table === "outreach_attempt") {
-        return { update: () => ({ eq: updateAttempt }) };
-      }
-      throw new Error(`unexpected table ${table}`);
-    },
-    callSingle,
-    updateCall,
-    updateAttempt,
-  };
+function setCallRow(row: Record<string, unknown> | null) {
+  telephonyDbMocks.findCallBySid.mockReset();
+  telephonyDbMocks.findCallBySid.mockResolvedValue(row);
 }
 
 describe("app/routes/api+/call/route-status-poll.tsx", () => {
   beforeEach(() => {
-    mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.normalizeProviderStatus.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
+    telephonyDbMocks.findCallBySid.mockReset();
+    telephonyDbMocks.updateCallBySid.mockReset();
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
     vi.resetModules();
   });
 
@@ -124,8 +113,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: { id: "u1" },
     });
 
-    const svc = makeServicePostgres({ callSingle: { data: null, error: null } });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow(null);
 
     const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
@@ -143,10 +131,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w2", status: null }, error: null },
-    });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow({ workspace: "w2", status: null });
 
     const mod = await import("../app/routes/api+/call-status-poll");
 
@@ -164,10 +149,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.requireWorkspaceAccess.mockRejectedValueOnce(
       new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND),
     );
-    const svc2 = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: null }, error: null },
-    });
-    mocks.createClient.mockReturnValueOnce(svc2);
+    setCallRow({ workspace: "w1", status: null });
     const resNoMembership = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -181,10 +163,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: null }, error: null },
-    });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow({ workspace: "w1", status: null });
 
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ fetch: async () => ({ status: undefined }) }),
@@ -206,10 +185,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: "completed", outreach_attempt_id: null }, error: null },
-    });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow({ workspace: "w1", status: "completed", outreach_attempt_id: null });
 
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ fetch: async () => ({ status: "completed" }) }),
@@ -222,7 +198,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: "completed" });
-    expect(svc.updateCall).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.updateCallBySid).not.toHaveBeenCalled();
   }, 30000);
 
   test("status changed updates call (covers endTime/duration true branch) and returns 500 on update error", async () => {
@@ -232,11 +208,8 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: "queued", outreach_attempt_id: null }, error: null },
-      updateCallError: new Error("u"),
-    });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow({ workspace: "w1", status: "queued", outreach_attempt_id: null });
+    telephonyDbMocks.updateCallBySid.mockResolvedValueOnce(null);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({
         fetch: async () => ({ status: "completed", endTime: new Date(0), duration: 12 }),
@@ -259,11 +232,11 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: "queued", outreach_attempt_id: 1 }, error: null },
-      updateAttemptError: new Error("a"),
-    });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow({ workspace: "w1", status: "queued", outreach_attempt_id: 1 });
+    telephonyDbMocks.updateCallBySid.mockResolvedValueOnce({ workspace: "w1", sid: "CA" });
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(
+      new Response("Failed to update attempt", { status: 500 }),
+    );
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({
         fetch: async () => ({ status: "completed", endTime: null, duration: null }),
@@ -277,7 +250,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: "completed" });
-    expect(svc.updateCall).toHaveBeenCalled();
+    expect(telephonyDbMocks.updateCallBySid).toHaveBeenCalled();
     expect(mocks.logger.error).toHaveBeenCalled(); // attempt update error is logged
   }, 30000);
 
@@ -288,10 +261,8 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: null, outreach_attempt_id: null }, error: null },
-    });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow({ workspace: "w1", status: null, outreach_attempt_id: null });
+    telephonyDbMocks.updateCallBySid.mockResolvedValueOnce({ workspace: "w1", sid: "CA" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ fetch: async () => ({ status: "completed", endTime: null, duration: null }) }),
     });
@@ -302,7 +273,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
     expect(res.status).toBe(200);
-    expect(svc.updateAttempt).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   }, 30000);
 
   test("status changed updates outreach_attempt when attempt id present and no update error", async () => {
@@ -312,11 +283,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: "queued", outreach_attempt_id: 1 }, error: null },
-      updateAttemptError: null,
-    });
-    mocks.createClient.mockReturnValueOnce(svc);
+    setCallRow({ workspace: "w1", status: "queued", outreach_attempt_id: 1 });
+    telephonyDbMocks.updateCallBySid.mockResolvedValueOnce({ workspace: "w1", sid: "CA" });
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce({ id: 1 });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ fetch: async () => ({ status: "completed", endTime: null, duration: null }) }),
     });
@@ -327,15 +296,12 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
     expect(res.status).toBe(200);
-    expect(svc.updateAttempt).toHaveBeenCalled();
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalled();
   }, 30000);
 
   test("catch block returns 500 and formats error message for Error vs non-Error", async () => {
     const userPostgres = makeUserPostgres({ membership: { id: "w1" } });
-    const svc = makeServicePostgres({
-      callSingle: { data: { workspace: "w1", status: null, outreach_attempt_id: null }, error: null },
-    });
-    mocks.createClient.mockReturnValue(svc);
+    setCallRow({ workspace: "w1", status: null, outreach_attempt_id: null });
 
     queueJsonAuthSession({
       null: userPostgres,

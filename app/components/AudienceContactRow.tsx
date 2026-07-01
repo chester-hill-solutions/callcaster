@@ -27,10 +27,19 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
   onSelect,
   onRemove
 }) => {
+  const otherDataArray = (() => {
+    try {
+      const parsed = JSON.parse(contact.other_data) as Json[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+
   // Helper function to safely extract other_data values
   const getOtherDataValue = (header: string): string => {
     try {
-      const data = contact.other_data.find((item: Json) => {
+      const data = otherDataArray.find((item: Json) => {
         if (item && typeof item === 'object' && !Array.isArray(item)) {
           return (item as OtherDataItem)[header] !== undefined;
         }

@@ -11,7 +11,6 @@ import {
 } from "@/lib/call-screen.server";
 import { redirect } from "react-router";
 import { verifyAuth } from "@/lib/auth.server";
-import type { BaseUser } from "@/lib/types";
 import type { LoaderFunctionArgs } from "react-router";
 import { MemberRole } from "@/lib/member-role";
 
@@ -30,22 +29,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     completedCount,
     attempts,
   } = await getCallScreenData(id, workspaceId, user.id);
-  const twilioData = workspaceData.twilio_data as { sid: string };
-  const queue = await getQueueByDialType(id, campaign.dial_type, user.id);
+  if (!workspaceData || !campaign) throw redirect("/signin");
+  const twilioData = JSON.parse(workspaceData.twilio_data) as { sid: string };
+  const queue = await getQueueByDialType(id, campaign.dial_type ?? "", user.id);
   const token = await generateToken({
     twilioAccountSid: twilioData.sid,
     twilioApiKey: workspaceData.key as string,
     twilioApiSecret: workspaceData.token as string,
     identity: user.id,
   });
-  const nextRecipient = getNextRecipient(queue, campaign?.dial_type, user.id);
+  const nextRecipient = getNextRecipient(queue, campaign.dial_type ?? "", user.id);
   const initalCallsList = getInitialCallsList(attempts || []);
   const initialRecentCall = getInitialRecentCall(attempts || []);
   const initialRecentAttempt = getInitialRecentAttempt(attempts || []);
 
-  const userRole = await getUserRole({user: user as unknown as BaseUser,
-    workspaceId,
-  });
+  const userRole = await getUserRole({ user, workspaceId: workspaceId! });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole);
   const isActive = campaign ? checkSchedule(campaign) : false;
 

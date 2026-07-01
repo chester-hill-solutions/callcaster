@@ -69,7 +69,7 @@ export function useAsyncState<T>(
           isIdle: false,
         }));
         onSuccess?.(data);
-        onSettled?.(data);
+        onSettled?.(data, null);
         return data;
       } catch (error) {
         if (!mountedRef.current) {
@@ -85,7 +85,7 @@ export function useAsyncState<T>(
           isIdle: false,
         }));
         onError?.(err);
-        onSettled?.(err);
+        onSettled?.(null, err);
         throw err;
       }
     },

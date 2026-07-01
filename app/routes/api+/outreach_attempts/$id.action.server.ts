@@ -1,5 +1,6 @@
 import { authForOutreachAttempt } from "@/lib/platform-data.server";
 import { data as routeData } from "react-router";
+import { getSession } from "@/lib/auth.server";
 import { safeParseJson } from "@/lib/database.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import type { OutreachAttempt } from "@/lib/types";

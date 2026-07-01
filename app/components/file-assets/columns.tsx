@@ -1,5 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDateToLocale } from "@/lib/utils";
+import type { FileObject } from "@/lib/types";
 
 export const mediaColumns: ColumnDef<FileObject>[] = [
   {

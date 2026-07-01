@@ -179,7 +179,6 @@ export async function loadCallLogPage(args: {
       id: entry.user_id,
       label:
         formatCallLogAgentName({
-          id: entry.user_id,
           username: entry.username,
           first_name: entry.first_name,
         }) ?? entry.username,

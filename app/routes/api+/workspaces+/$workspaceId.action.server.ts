@@ -54,7 +54,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const result = await updateWorkspaceName(
-      client,
       auth.user.id,
       workspaceId,
       parsed.name,
@@ -69,7 +68,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (request.method === "DELETE") {
     const result = await deleteWorkspaceApi(
-      client,
       auth.user.id,
       workspaceId,
       headers,

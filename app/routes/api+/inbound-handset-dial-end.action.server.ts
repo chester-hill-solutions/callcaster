@@ -8,17 +8,11 @@ import { findWorkspaceNumberInboundFallbackByPhone } from "@/lib/inbound-call-db
 import { validateTwilioWebhookForPhoneNumber } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/db-types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
-    return new Response({ status: 405 });
+    return new Response(null, { status: 405 });
   }
-
-  const client = createClient<Database>(
-    env.BASE_URL(),
-    env.BASE_URL(),
-  );
 
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
@@ -27,7 +21,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const validation = await validateTwilioWebhookForPhoneNumber({
     request,
-    client,
     phoneNumber: called,
     params,
   });
@@ -44,7 +37,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (workspaceId && inboundAction && isEmail(inboundAction)) {
       const voicemail = await resolveInboundVoicemailAudio({
-        client,
         workspaceId,
         inboundAudio: number?.inbound_audio ?? null,
       });

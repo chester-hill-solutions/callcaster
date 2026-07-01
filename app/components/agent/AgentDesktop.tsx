@@ -36,7 +36,7 @@ const STATUS_REASONS: Record<string, string[]> = {
 
 export default function AgentDesktop() {
   const loaderData = useLoaderData<HandsetLoaderData>();
-  const { client } = useOutletContext<OutletContext>();
+  useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const sessionEndedRef = useRef(false);

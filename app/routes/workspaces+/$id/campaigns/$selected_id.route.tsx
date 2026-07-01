@@ -26,6 +26,7 @@ import {
   WorkspaceData,
   WorkspaceNumbers,
 } from "@/lib/types";
+import type { CampaignStatus } from "@/lib/db-types";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 
@@ -53,7 +54,7 @@ export default function CampaignScreen() {
     joinDisabled,
     scheduleDisabled,
   } = useLoaderData();
-  const { audiences, campaigns, phoneNumbers, workspace, client } =
+  const { audiences, campaigns, phoneNumbers, workspace } =
     useOutletContext<{
       audiences: Audience[];
       campaigns: Campaign[];
@@ -74,7 +75,8 @@ export default function CampaignScreen() {
     queuedCount: queueCounts.queuedCount ?? 0,
   };
   const { data: campaignDetailsArray } = useRealtimeData(
-        workspaceRouteId,
+    null,
+    workspaceRouteId,
     realtimeTable,
     [
       initialCampaignDetails
@@ -100,14 +102,14 @@ export default function CampaignScreen() {
     <div className="flex h-full w-full flex-col">
       <CampaignHeader
         title={campaignData?.title || ""}
-        status={campaignData?.status || "pending"}
+        status={(campaignData?.status as CampaignStatus) || "pending"}
         isDesktop={false}
       />
       <div className="flex flex-col items-start justify-between gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center">
         <CampaignHeader
           title={campaignData?.title || ""}
           isDesktop
-          status={campaignData?.status || "pending"}
+          status={(campaignData?.status as CampaignStatus) || "pending"}
         />
         <NavigationLinks
           hasAccess={hasAccess}
