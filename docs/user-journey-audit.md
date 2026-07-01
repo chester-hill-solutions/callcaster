@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-30
 **Scope:** Full audit across all user types
-**Routes scanned:** 477 | **Components scanned:** 156
+**Journeys mapped:** 20 | **Routes scanned:** 477 | **Components scanned:** 156
 
 ---
 
@@ -103,6 +103,174 @@ CallCaster serves three distinct user types across a React Router v7 application
 | **Outcome** | Credits added; number rented and active in workspace |
 | **Pain points** | • No inline top-up from number purchase page; must leave to `/billing`.<br>• Custom amount input silently disables button below minimum with no inline error.<br>• Back button on numbers page is disabled during any fetcher update.<br>• Usage log is read-only with no filtering or pagination. |
 
+### 7. Contact Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | View, create, edit, and search workspace contacts |
+| **Trigger** | User navigates to `/workspaces/{id}/contacts` |
+| **Steps** | 1. `/contacts` (contact table with filters) → 2. Click contact row → 3. `/contacts/{contactId}` (detail view with edit form) → 4. Save or cancel |
+| **Components** | `ContactTable`, `ContactDetails`, `ContactDetailsFields`, `ContactForm`, `RecentContacts` |
+| **Actions** | Filter by name/phone/email → Click contact → Edit fields → Save → Navigate back |
+| **Outcome** | Contact information updated; agents see updated details during calls |
+| **Pain points** | • Contact creation is not available from `/contacts` route; only from audience upload or campaign queue.<br>• Contact detail page has no quick-action to start a call or SMS to this contact.<br>• Recent contacts list is a separate component not integrated into the main contacts table. |
+
+### 8. Audience Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create and manage contact audiences for campaigns |
+| **Trigger** | User navigates to `/workspaces/{id}/audiences` |
+| **Steps** | 1. `/audiences` (audience table) → 2. Click "Add Audience" → 3. `/audiences/new` (name + CSV upload) → 4. Upload contacts → 5. View upload history → 6. Click audience row → 7. `/audiences/{audience_id}` (view contacts in audience) |
+| **Components** | `AudienceTable`, `AudienceForm`, `AudienceUploader`, `AudienceUploadHistory`, `DataTable` |
+| **Actions** | Name audience → Upload CSV → Map columns → View progress → View audience contacts → Add audience to campaign queue |
+| **Outcome** | Audience created with contacts; available for campaign queue assignment |
+| **Pain points** | • No inline audience creation from the campaigns queue page; must navigate to `/audiences` first.<br>• CSV upload has no preview or validation before processing.<br>• Upload history shows status but no retry action for failed uploads.<br>• Audience detail view has no bulk actions on contacts. |
+
+### 9. Script Management (Standalone)
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create reusable scripts outside of campaign context |
+| **Trigger** | User navigates to `/workspaces/{id}/scripts` |
+| **Steps** | 1. `/scripts` (script table) → 2. Click "Add a Script" → 3. `/scripts/new` (script editor) → 4. Edit pages/questions → 5. Save → 6. Download as JSON |
+| **Components** | `CampaignSettings.Script`, `CampaignSettings.Script.QuestionBlock`, `CampaignSettings.Script.IVRQuestionBlock`, `Result` |
+| **Actions** | Name script → Add pages → Add question blocks → Configure options/dispositions → Save → Download JSON |
+| **Outcome** | Reusable script created; can be assigned to campaigns |
+| **Pain points** | • Script editor is the same component as campaign script editor but with different save behavior (no campaign context).<br>• Download uses a fetcher POST then `downloadBlobPart`, which is inconsistent with other export patterns.<br>• No script versioning or changelog visible to users. |
+
+### 10. Survey Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create surveys and collect responses |
+| **Trigger** | User navigates to `/workspaces/{id}/surveys` |
+| **Steps** | 1. `/surveys` (survey table) → 2. Click "New Survey" → 3. `/surveys/new` (create form) → 4. `/surveys/{surveyId}` (view survey) → 5. `/surveys/{surveyId}/edit` (edit questions) → 6. `/surveys/{surveyId}/responses` (view responses) → 7. `/surveys/{surveyId}/responses/export` (export responses) |
+| **Components** | `QuestionCard.ResponseTable.EditModal`, `DataTable`, `WorkspaceResourceListShell` |
+| **Actions** | Name survey → Add/edit questions → View responses table → Export to CSV |
+| **Outcome** | Survey created with responses collected; data exportable |
+| **Pain points** | • Survey creation and editing is separate from the main campaign flow; not obvious how surveys connect to campaigns.<br>• Response export is a separate sub-route; no one-click export from the responses table.<br>• No response analytics or summary stats visible in the responses view. |
+
+### 11. Audio/Voice Drop Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Upload and manage audio files for voicemail drops and IVR |
+| **Trigger** | User navigates to `/workspaces/{id}/audios` |
+| **Steps** | 1. `/audios` (audio file table with inline player) → 2. Click "Upload" → 3. `/audios/new` (upload form with file picker) → 4. File is normalized to MP3 via ffmpeg → 5. Audio appears in table |
+| **Components** | `DataTable`, `WorkspaceResourceListShell`, inline `<audio controls>` |
+| **Actions** | Select file → Upload → Wait for normalization → Play preview |
+| **Outcome** | Audio file uploaded and available for campaigns |
+| **Pain points** | • Upload only available from `/audios/new`; no inline upload from campaign settings where audio is actually used.<br>• No audio trim or preview editing before save.<br>• ffmpeg normalization is server-side with no progress indicator in UI. |
+
+### 12. Voicemail Review
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Listen to voicemail recordings left by contacts |
+| **Trigger** | User navigates to `/workspaces/{id}/voicemails` |
+| **Steps** | 1. `/voicemails` (audio table with inline players) → 2. Click play on a voicemail |
+| **Components** | `DataTable`, inline `<audio controls>` |
+| **Actions** | Play voicemail → Sort/filter table → Paginate |
+| **Outcome** | User listens to voicemails |
+| **Pain points** | • Empty state says "Add a voicemail greeting" but there is no upload button on this page.<br>• No delete, rename, or download actions on voicemails.<br>• Metadata like duration is commented out in column definitions. |
+
+### 13. Team & Invite Management
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Invite team members and manage workspace access |
+| **Trigger** | User navigates to `/workspaces/{id}/settings` |
+| **Steps** | 1. `/settings` (team section) → 2. Enter email + select role → 3. Submit invite → 4. View pending invites → 5. Member accepts via `/accept-invite` or `/admin/workspaces/{id}/invite` (admin) |
+| **Components** | `TeamMember`, `InviteCheckbox`, `ExistingUserInvites`, `NewUserSignUp`, `EmailField`, `NameFields`, `PasswordFields` |
+| **Actions** | Enter email → Select role (Member/Admin, no Owner) → Submit invite → Accept invitation → Set password (new users) |
+| **Outcome** | Team member added to workspace with appropriate role |
+| **Pain points** | • Role dropdown excludes "Owner" and conditionally excludes "Admin" based on current user's role, which is not explained in UI.<br>• Truncated user IDs shown instead of names in member lists.<br>• No bulk invite (multiple emails at once).<br>• Invite acceptance for new users requires password setup even after email verification via token. |
+
+### 14. Campaign Export
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Export campaign results and queue data |
+| **Trigger** | User clicks "Export" from campaign dashboard or navigates to `/workspaces/{id}/exports` |
+| **Steps** | 1. Campaign dashboard → Click "Export" (admin only) → 2. Export queued in background → 3. `/exports` (view export table) → 4. Auto-poll every 5s for status → 5. Download completed export |
+| **Components** | `AdminAsyncExportButton`, `AsyncExportButton`, `DataTable` |
+| **Actions** | Click Export → Wait for processing → Download file → Refresh status |
+| **Outcome** | CSV export downloaded with campaign data |
+| **Pain points** | • Export trigger is only available from campaign dashboard, not from `/exports` page itself.<br>• 24-hour expiration is hardcoded with no renewal option.<br>• Manual refresh button exists despite auto-polling every 5 seconds.<br>• No export preview or column selection before download. |
+
+### 15. Password Reset / Forgot Password
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Recover access when password is forgotten |
+| **Trigger** | User clicks "I forgot my password" from `/signin` |
+| **Steps** | 1. `/signin` → Click "I forgot my password" → 2. `/remember` (enter email) → 3. Submit → 4. Receive reset email → 5. Click reset link → 6. Set new password |
+| **Components** | `AuthCard`, `EmailField` |
+| **Actions** | Enter email → Submit → Click email link → Enter new password → Confirm |
+| **Outcome** | Password reset; user can sign in with new password |
+| **Pain points** | • Not explicitly mapped in the route scan; verify this flow still exists and is functional.<br>• No clear success state after submitting reset request (no "check your email" message visible in route code). |
+
+### 16. API Keys & Webhooks
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Configure workspace API keys and webhook endpoints |
+| **Trigger** | User navigates to `/workspaces/{id}/settings` and expands API/Webhook section |
+| **Steps** | 1. `/settings` → Scroll to API Keys section → 2. Generate/copy API key → 3. Expand Webhook accordion → 4. Configure webhook URL and events → 5. Save |
+| **Components** | `ApiKeysSection`, `WebhookEditor` |
+| **Actions** | Generate key → Copy to clipboard → Enter webhook URL → Select events → Test webhook → Save |
+| **Outcome** | API key generated; webhook configured for workspace events |
+| **Pain points** | • API keys are only visible to owners/admins but the UI doesn't explain why callers can't see them.<br>• Webhook test is not available inline; must trigger a real event to verify.<br>• No webhook delivery log or retry status visible. |
+
+### 17. Campaign Archive & Duplication
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Archive old campaigns or duplicate existing ones |
+| **Trigger** | User navigates to `/workspaces/{id}/campaigns/archive` or clicks "Duplicate" in campaign settings |
+| **Steps** | 1. `/campaigns` → Click "Archive" tab → 2. `/campaigns/archive` (view archived campaigns) → 3. Or: Campaign settings → Click "Duplicate" → 4. Confirm duplication → 5. New campaign created with copied settings |
+| **Components** | `CampaignList`, `CampaignSettings`, `CampaignDetailed.ActivateButtons` |
+| **Actions** | View archive → Select campaign → Unarchive (if needed) → Or duplicate → Configure new campaign → Launch |
+| **Outcome** | Archived campaigns hidden from active list; duplicated campaign ready for editing |
+| **Pain points** | • Archive tab is easy to miss in the campaign navigation.<br>• Duplication copies settings but doesn't clearly indicate what is/isn't copied (e.g., queue contacts are not duplicated).<br>• No bulk archive/unarchive action. |
+
+### 18. IVR-Specific Flows
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create and manage Interactive Voice Response campaigns |
+| **Trigger** | User selects "Interactive Voice Recording" campaign type |
+| **Steps** | 1. `/campaigns/new` → Select "IVR" type → 2. `/campaigns/{id}/settings` → Configure IVR settings → 3. `/campaigns/{id}/script/edit` → Build IVR question tree with keypad options → 4. `/campaigns/{id}/queue` → Add contacts → 5. Launch |
+| **Components** | `CampaignDetailed.Voicemail`, `CampaignSettings.Script.IVRQuestionBlock`, `VoxTypeSelector` |
+| **Actions** | Select IVR type → Configure voice drops → Build question tree with options → Map keypad presses to actions → Add contacts → Launch |
+| **Outcome** | IVR campaign running; contacts hear automated questions and press keys to respond |
+| **Pain points** | • IVR editor (`IVRQuestionBlock`) is different from live call script editor, creating inconsistency.<br>• No IVR test/simulate mode before launching.<br>• IVR results and analytics are mixed with live call data, making it hard to distinguish.<br>• Voice drop selection is buried in campaign detailed settings, not in the script editor. |
+
+### 19. Message Campaign Specific
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Create and manage SMS/MMS message campaigns |
+| **Trigger** | User selects "Message" campaign type |
+| **Steps** | 1. `/campaigns/new` → Select "Message" type → 2. `/campaigns/{id}/settings` → Configure message settings → 3. `/campaigns/{id}/script/edit` → Write message body + add media links → 4. `/campaigns/{id}/queue` → Add contacts → 5. Launch |
+| **Components** | `MessageSettings`, `CampaignDetailed` |
+| **Actions** | Select Message type → Write message body → Add media URLs → Configure opt-out handling → Add contacts → Launch |
+| **Outcome** | Message campaign running; SMS/MMS sent to queued contacts |
+| **Pain points** | • Message campaign uses `MessageSettings` component instead of `CampaignSettings.Script`, creating a disjointed experience.<br>• No message preview or test send before launching.<br>• Media links are plain text URLs; no image preview or validation.<br>• Message scheduling is not available; campaigns send immediately when started. |
+
+### 20. Call Disposition & Results
+
+| Field | Detail |
+|-------|--------|
+| **Goal** | Review and analyze call outcomes and dispositions |
+| **Trigger** | User navigates to campaign dashboard `/campaigns/{id}` (admin view) |
+| **Steps** | 1. `/campaigns/{id}` → View `ResultsScreen` with key metrics → 2. Scroll to disposition breakdown → 3. Click export for detailed results → 4. Filter by date range or caller |
+| **Components** | `ResultsScreen`, `ResultsScreen.Disposition`, `ResultsScreen.KeyMetrics`, `ResultsScreen.TotalCalls`, `CampaignResultDisplay` |
+| **Actions** | View metrics → Filter by disposition → Export detailed results → Review caller performance |
+| **Outcome** | Campaign performance analyzed; actionable insights for optimization |
+| **Pain points** | • Results screen only shows for admins; callers see `CampaignInstructions` instead.<br>• Disposition names are mapped to Material Design icons via `Result.IconMap.tsx`—inconsistent with Lucide icons used elsewhere.<br>• No drill-down from disposition summary to individual call records.<br>• Results are campaign-scoped; no cross-campaign comparison view. |
+
 ---
 
 ## Pain Points Matrix
@@ -118,10 +286,30 @@ CallCaster serves three distinct user types across a React Router v7 application
 | Two inbound call surfaces (`/calls` vs `/handset`) | **Medium** | 4 | Callers |
 | Chat auto-scroll interrupts reading | **Medium** | 4 | Callers |
 | Credits required mid-onboarding with no inline top-up | **Medium** | 1, 6 | Campaign managers |
+| Contact creation not available from `/contacts` route | **Medium** | 7 | Campaign managers |
+| No quick-action to call/SMS from contact detail | **Medium** | 7 | Campaign managers |
+| CSV upload has no preview or validation | **Medium** | 8 | Campaign managers |
+| No inline audience creation from campaign queue | **Medium** | 8 | Campaign managers |
+| Script save behavior differs between standalone and campaign context | **Medium** | 9 | Campaign managers |
+| Survey creation disconnected from campaign flow | **Medium** | 10 | Campaign managers |
+| No audio upload from campaign settings where audio is used | **Medium** | 11 | Campaign managers |
+| Invite acceptance requires password after email verification | **Medium** | 13 | All new users |
+| Export trigger not available from `/exports` page | **Medium** | 14 | Campaign managers |
+| IVR editor inconsistent with live call script editor | **Medium** | 18 | Campaign managers |
+| No message preview or test send before launch | **Medium** | 19 | Campaign managers |
+| Results only visible to admins; callers see instructions | **Medium** | 20 | Campaign managers |
 | System status hardcoded in admin dashboard | **Low** | 5 | System admins |
-| Voicemails page has no upload CTA | **Low** | — | Campaign managers |
+| Voicemails page has no upload CTA | **Low** | 12 | Campaign managers |
+| Voicemails have no delete/rename/download actions | **Low** | 12 | Campaign managers |
 | Analytics has no date picker visible in route | **Low** | — | Campaign managers |
 | Exports page cannot trigger exports | **Low** | — | Campaign managers |
+| Truncated user IDs shown instead of names | **Low** | 5, 13 | All users |
+| No audio trim or preview editing | **Low** | 11 | Campaign managers |
+| No script versioning or changelog | **Low** | 9 | Campaign managers |
+| No bulk invite (multiple emails) | **Low** | 13 | Campaign managers |
+| No IVR test/simulate mode | **Low** | 18 | Campaign managers |
+| Message scheduling not available | **Low** | 19 | Campaign managers |
+| No cross-campaign comparison view | **Low** | 20 | Campaign managers |
 
 ---
 
@@ -242,9 +430,18 @@ flowchart TD
 | **Should** | As a caller, I want a single place to handle inbound calls and call logs, so that I don't have to choose between `/calls` and `/handset`. |
 | **Should** | As a campaign manager, I want "Save" to save my script directly, and "Duplicate" to be a separate action, so that I am not interrupted by a modal on every edit. |
 | **Should** | As an agent, I want chat history to stop auto-scrolling when I am reading old messages, so that I can review context without losing my place. |
+| **Should** | As a campaign manager, I want to create contacts directly from the contacts page, so that I don't have to upload a CSV or add them through a campaign queue. |
+| **Should** | As a campaign manager, I want CSV upload to show a preview and validation errors before processing, so that I can fix issues before importing. |
+| **Should** | As a campaign manager, I want to upload audio files directly from campaign settings where I select voice drops, so that I don't have to navigate to a separate audio page. |
+| **Should** | As a campaign manager, I want to preview or test-send a message before launching a message campaign, so that I can verify content and formatting. |
 | **Could** | As a campaign manager, I want to upload a voicemail greeting directly from the voicemails page, so that I don't have to hunt for the upload action elsewhere. |
 | **Could** | As a campaign manager, I want to filter analytics by date range, so that I can review performance for specific periods. |
 | **Could** | As a system admin, I want the admin dashboard to show real system health metrics, so that I can spot issues without manually checking Twilio. |
+| **Could** | As a campaign manager, I want an IVR test/simulate mode, so that I can verify my question tree before launching to real contacts. |
+| **Could** | As a campaign manager, I want to schedule message campaigns for a specific time, so that I can send messages during optimal hours. |
+| **Could** | As a campaign manager, I want to see a cross-campaign comparison view, so that I can compare performance across multiple campaigns. |
+| **Could** | As a workspace owner, I want to invite multiple team members at once, so that I can onboard my team faster. |
+| **Could** | As a campaign manager, I want script versioning, so that I can see what changed and revert to previous versions. |
 
 ---
 
