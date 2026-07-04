@@ -38,6 +38,7 @@ api/audience-upload
 api/audience-upload-status
 api/audiences
 api/audiodrop
+api/auth/...all
 api/auth/callback
 api/auth/forgot-password
 api/auth/invites

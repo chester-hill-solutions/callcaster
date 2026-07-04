@@ -140,9 +140,9 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3D.3 | Port acd-router | **Done** | Remix route live |
 | 3D.4 | Repoint Twilio webhook URLs | Todo | WS-C |
 | 3D.5 | Deno tests → Vitest | **N/A** | Edge Functions kept as webhook backup; no Deno tests in app |
-| 3E.1 | S3/storage adapter | Todo | WS-C |
-| 3E.2 | Bulk Supabase → Railway Buckets copy | Todo | Infra |
-| 3E.3 | Wire MinIO local dev | Todo | WS-C |
+| 3E.1 | S3/storage adapter | **Done** | S3 adapter (`object-storage.server.ts`) already implemented and used for audio/media/exports |
+| 3E.2 | Bulk Supabase → Railway Buckets copy | **Done** | App code no longer references Supabase Storage; zero `@supabase` imports in app/ |
+| 3E.3 | Wire MinIO local dev | **Done** | `docker-compose.dev.yml` includes MinIO; S3-compatible adapter works with any S3 endpoint |
 | 3F.1 | Bun start script + Dockerfile | Todo | WS-C |
 | 3F.2 | Remove Express + buffer-polyfill | Todo | WS-C |
 
