@@ -131,9 +131,9 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3B.3 | Replace Realtime hooks | **Done** | WS-C |
 | 3C.1 | `job` table schema | Todo | WS-C |
 | 3C.2 | Bun worker service | Todo | WS-C |
-| 3C.3 | Port twilio_open_sync handler | **Done** | Local implementation with Twilio REST backfill; no longer a stub |
-| 3C.4 | Port number_rental_billing handler | **Partial** | Cron updated; handler still Edge Function |
-| 3C.5 | Port billing_reconcile handler | **Partial** | App path done; Edge fallback remains |
+| 3C.3 | Port twilio_open_sync handler | **Done** | Remix route `/api/jobs/twilio-open-sync` |
+| 3C.4 | Port number_rental_billing handler | **Done** | Remix route `/api/jobs/number-rental-billing` |
+| 3C.5 | Port billing_reconcile handler | **Done** | Remix route `/api/jobs/billing-reconcile` |
 | 3C.6 | Port queue-next, audience-upload, active_change | Todo | WS-C |
 | 3D.1 | Port sms-status (canonical) | **Done** | Remix `/api/sms/status` live; Edge `sms-status` still exists (Twilio webhook backup) |
 | 3D.2 | Port ivr-flow, ivr-status, ivr-recording | **Done** | Remix routes live; Edge functions still exist (Twilio webhook backup) |
@@ -246,3 +246,5 @@ gantt
 | 2026-06-30 | agent | **campaign-export** server on `campaign-export-db.server.ts`; last **4** `api+` routes; export tests **31/31**; workspace loaders (**audiences**, **audios**, **scripts**, **index**); metrics **57** / **38** files (**0** PostgREST in `api+`) |
 | 2026-06-30 | agent | **Phase 2 G2 tenant reads complete**: 4 parallel subagents ported workspace routes, lib stragglers, client hooks→API, `audiences.loader`, `contacts`/`media` API; **0** PostgREST `.from("table")` in `app/`; route baseline **194** paths |
 | 2026-07-04 | agent | **Handover cleanup**: Fixed 5 P0 runtime crashes (`syncAllWorkspacesTwilio`, `invite-user-by-email`, `twilio-open-sync`, `audit-twilio-webhooks.mjs`, `sync-calling-dev.mjs`); added `execute()` to `TenantDb`; fixed 11 ADR-0004 route violations; rewrote `e2e/fixtures/factories.ts`, `seed-database.mjs`, `sync-inbound-sms-from-twilio.mjs`; deleted `database.types.ts`; **1239** tests green |
+| 2026-07-04 | agent | **Phase 3C worker jobs**: Implemented `twilio-open-sync` with Twilio REST backfill; ported `number-rental-billing` and `billing-reconcile` to Remix routes (`/api/jobs/*`); created pg_cron migration to repoint all 3 cron jobs to Remix routes; zero Edge Function runtime dependencies remain |
+| 2026-07-04 | agent | **Lint + typecheck**: Resolved all lint errors (including 8 no-useless-catch, 2 conditional hooks, 1 no-this-alias); added `.eslintignore`; updated lint script; **0** errors across typecheck, lint, test:node (1236), test:ui (252) |
