@@ -76,7 +76,7 @@ export async function runNumberRentalBilling(args: {
   });
 
   let charged = 0;
-  let released = 0;
+  const released = 0;
   let remindersSent = 0;
 
   for (const number of numbers) {

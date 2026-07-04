@@ -53,7 +53,7 @@ export async function auditWorkspaceTwilioWebhooks({
 }): Promise<TwilioWebhookAuditResult> {
   const baseUrl = env.BASE_URL().replace(/\/$/, "");
   const expectedSmsStatus = `${baseUrl}/api/sms/status`;
-  const edgeSmsStatus = `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/sms-status`;
+  const legacyEdgeSmsStatus = `${baseUrl}/functions/v1/sms-status`;
 
   const twilioData = (await loadWorkspaceTwilioData(
     workspaceId,
@@ -64,8 +64,6 @@ export async function auditWorkspaceTwilioWebhooks({
     inboundSms: `${baseUrl}/api/inbound-sms`,
     callerIdStatus: `${baseUrl}/api/caller-id/status`,
     ivrRemixStatus: `${baseUrl}/api/ivr/status`,
-    ivrEdgeFlow: `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/ivr-flow`,
-    ivrEdgeStatus: `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/ivr-status`,
   };
 
   const entries: TwilioWebhookDriftEntry[] = [];
@@ -120,7 +118,7 @@ export async function auditWorkspaceTwilioWebhooks({
   for (const number of numbers) {
     if (!number.sid) continue;
     const liveStatus = normalizeUrl(number.statusCallback);
-    if (liveStatus === edgeSmsStatus) {
+    if (liveStatus === legacyEdgeSmsStatus) {
       compareField(entries, driftMessages, {
         resourceType: "phone_number",
         resourceSid: number.sid,
