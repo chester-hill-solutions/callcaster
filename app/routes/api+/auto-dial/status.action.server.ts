@@ -11,8 +11,8 @@ import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
-// eslint-disable-next-line no-restricted-imports
 // adminDb is used for Supabase Realtime channels (not available via tdb).
+// eslint-disable-next-line no-restricted-imports
 import { adminDb } from "@/server/admin-db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";

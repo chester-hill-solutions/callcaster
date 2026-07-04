@@ -11,8 +11,8 @@ import {
   outreach_attempt as outreachAttemptTable,
 } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
-// eslint-disable-next-line no-restricted-imports
 // contact_audience is a join table without a workspace column; tdb cannot scope it.
+// eslint-disable-next-line no-restricted-imports
 import { db } from "@/server/db";
 import { eq, inArray } from "drizzle-orm";
 import type { Audience, Contact } from "@/lib/types";

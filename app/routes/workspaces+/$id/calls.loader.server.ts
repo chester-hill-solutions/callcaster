@@ -8,8 +8,8 @@ import type { LoaderFunctionArgs } from "react-router";
 import type { User } from "@/lib/types";
 import { and, eq, gt } from "drizzle-orm";
 import { handset_session as handsetSessionTable, workspace as workspaceTable } from "@/db/schema";
-// eslint-disable-next-line no-restricted-imports
 // workspace is the global tenancy root table; tdb cannot scope it.
+// eslint-disable-next-line no-restricted-imports
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 

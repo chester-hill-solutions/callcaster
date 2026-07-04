@@ -131,7 +131,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3B.3 | Replace Realtime hooks | **Done** | WS-C |
 | 3C.1 | `job` table schema | Todo | WS-C |
 | 3C.2 | Bun worker service | Todo | WS-C |
-| 3C.3 | Port twilio_open_sync handler | **Partial** | Local stub created; full port deferred to worker |
+| 3C.3 | Port twilio_open_sync handler | **Done** | Local implementation with Twilio REST backfill; no longer a stub |
 | 3C.4 | Port number_rental_billing handler | **Partial** | Cron updated; handler still Edge Function |
 | 3C.5 | Port billing_reconcile handler | **Partial** | App path done; Edge fallback remains |
 | 3C.6 | Port queue-next, audience-upload, active_change | Todo | WS-C |
