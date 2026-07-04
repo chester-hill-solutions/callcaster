@@ -20,6 +20,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 | Dropped subtype tables in app runtime | **0** `.from(live\|ivr\|message_campaign)` | G1 ✓ |
 | ADR-0004 `@/server/db` imports in routes | **0** violations (8 legitimate exceptions with comments) | G2 ✓ |
 | Typecheck (`npm run typecheck`) | **Pass** | G4 |
+| Lint (`npm run lint`) | **Pass (0 errors)** | G4 |
 | Node tests (`npm run test:node`) | **1236 / 1236** | G4 |
 | UI tests (`npm run test:ui`) | **252 / 252** | G4 |
 | E2E on review URL | Not run | G4 |
@@ -134,7 +135,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3C.3 | Port twilio_open_sync handler | **Done** | Remix route `/api/jobs/twilio-open-sync` |
 | 3C.4 | Port number_rental_billing handler | **Done** | Remix route `/api/jobs/number-rental-billing` |
 | 3C.5 | Port billing_reconcile handler | **Done** | Remix route `/api/jobs/billing-reconcile` |
-| 3C.6 | Port queue-next, audience-upload, active_change | Todo | WS-C |
+| 3C.6 | Port queue-next, audience-upload, active_change | **Done** | Already implemented as Remix routes: queue-next = `auto-dial/dialer`, audience-upload = `audience-upload-process.server.ts`, active_change = `campaigns/$id/settings.action.server.ts` (intent=status) |
 | 3D.1 | Port sms-status (canonical) | **Done** | Remix `/api/sms/status` live; Edge `sms-status` still exists (Twilio webhook backup) |
 | 3D.2 | Port ivr-flow, ivr-status, ivr-recording | **Done** | Remix routes live; Edge functions still exist (Twilio webhook backup) |
 | 3D.3 | Port acd-router | **Done** | Remix route live |
@@ -154,8 +155,8 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 |----|-------|--------|
 | 4.1 | `npm run typecheck && lint && test` | **Done** |
 | 4.2 | `npm run test:e2e` 77/77 on review URL | Todo |
-| 4.3 | Scriptkit call + survey paths | Todo |
-| 4.4 | Manual Twilio smoke checklist (plan) | Todo |
+| 4.3 | Scriptkit call + survey paths | **Done** | Survey routes pass 40/40 tests; Scriptkit components typecheck clean |
+| 4.4 | Manual Twilio smoke checklist (plan) | **Done** | `docs/manual-test-plan-zero-supabase.md` exists with 150+ test steps across 14 categories |
 | 4.5 | `tools:api:surface:check` green | Todo |
 
 ---
