@@ -1,0 +1,14 @@
+# Vendored third-party code
+vendor/
+
+# Build artifacts
+dist/
+build/
+
+# Coverage
+coverage/
+
+# Local tooling
+.opencode/
+.agents/
+.cursor/

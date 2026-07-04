@@ -41,6 +41,7 @@ export function createWorkspaceEventSourceMock() {
 
     constructor(url: string) {
       this.url = url;
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       lastInstance = this;
       queueMicrotask(() => this.onopen?.(new Event("open")));
     }

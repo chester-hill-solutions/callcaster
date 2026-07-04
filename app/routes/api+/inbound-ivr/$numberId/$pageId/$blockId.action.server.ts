@@ -23,16 +23,12 @@ const handleAudio = async (
 ) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
-    try {
-      const signedUrl = await createSignedObjectUrl(
-        "workspaceAudio",
-        `${workspace}/${audioFile}`,
-        3600,
-      );
-      twiml.play(signedUrl);
-    } catch (error) {
-      throw error;
-    }
+    const signedUrl = await createSignedObjectUrl(
+      "workspaceAudio",
+      `${workspace}/${audioFile}`,
+      3600,
+    );
+    twiml.play(signedUrl);
   } else {
     twiml.say(audioFile);
   }

@@ -362,47 +362,43 @@ export async function getWorkspaceInfoWithDetails({
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
 
-  try {
-    const workspaceRow = await adminDb.query.workspace.findFirst({
-      where: eq(workspace.id, workspaceId),
-      columns: { id: true, name: true, credits: true },
-    });
-    if (!workspaceRow) {
-      throw notFoundError();
-    }
-
-    const membership = await tdb.workspace_users.findFirst({
-      where: eq(workspace_users.user_id, userId),
-      columns: { id: true, role: true },
-    });
-    if (!membership) {
-      throw notFoundError();
-    }
-
-    const [campaigns, phoneNumbers, audiences] = await Promise.all([
-      tdb.campaign.findMany(),
-      tdb.workspace_number.findMany({
-        columns: { id: true, phone_number: true, capabilities: true },
-      }),
-      tdb.audience.findMany({
-        columns: { id: true, name: true },
-      }),
-    ]);
-
-    const workspace_users_list = [{ role: membership.role as MemberRole }];
-
-    return {
-      workspace: {
-        ...workspaceRow,
-        workspace_users: workspace_users_list,
-      },
-      campaigns,
-      phoneNumbers,
-      audiences,
-    } as unknown as WorkspaceInfoWithDetails;
-  } catch (error) {
-    throw error;
+  const workspaceRow = await adminDb.query.workspace.findFirst({
+    where: eq(workspace.id, workspaceId),
+    columns: { id: true, name: true, credits: true },
+  });
+  if (!workspaceRow) {
+    throw notFoundError();
   }
+
+  const membership = await tdb.workspace_users.findFirst({
+    where: eq(workspace_users.user_id, userId),
+    columns: { id: true, role: true },
+  });
+  if (!membership) {
+    throw notFoundError();
+  }
+
+  const [campaigns, phoneNumbers, audiences] = await Promise.all([
+    tdb.campaign.findMany(),
+    tdb.workspace_number.findMany({
+      columns: { id: true, phone_number: true, capabilities: true },
+    }),
+    tdb.audience.findMany({
+      columns: { id: true, name: true },
+    }),
+  ]);
+
+  const workspace_users_list = [{ role: membership.role as MemberRole }];
+
+  return {
+    workspace: {
+      ...workspaceRow,
+      workspace_users: workspace_users_list,
+    },
+    campaigns,
+    phoneNumbers,
+    audiences,
+  } as unknown as WorkspaceInfoWithDetails;
 }
 
 export async function getWorkspaceUsers({

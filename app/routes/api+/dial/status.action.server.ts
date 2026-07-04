@@ -51,16 +51,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     let voicemailData: { signedUrl: string } | null = null;
     if (campaign.voicemail_file) {
-      try {
-        const signedUrl = await createSignedObjectUrl(
-          "workspaceAudio",
-          `${dbCall.workspace}/${campaign.voicemail_file}`,
-          3600,
-        );
-        voicemailData = { signedUrl };
-      } catch (error) {
-        throw error;
-      }
+      const signedUrl = await createSignedObjectUrl(
+        "workspaceAudio",
+        `${dbCall.workspace}/${campaign.voicemail_file}`,
+        3600,
+      );
+      voicemailData = { signedUrl };
     }
 
     const call = twilio.calls(callSid);

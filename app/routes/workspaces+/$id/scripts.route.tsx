@@ -63,10 +63,6 @@ export default function WorkspaceScripts() {
   const outlet = useOutlet();
   const parentContext = useOutletContext<ContextType>();
   const loaderData = useLoaderData<LoaderData>();
-
-  if (outlet) {
-    return <Outlet context={parentContext} />;
-  }
   const downloadFetcher = useFetcher<{
     fileContent?: string;
     contentType?: string;
@@ -100,8 +96,12 @@ export default function WorkspaceScripts() {
         });
       },
       successMessage: undefined,
-    },
+    }
   );
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
 
   const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const isWorkspaceAudioEmpty = !scripts || scripts.length === 0;

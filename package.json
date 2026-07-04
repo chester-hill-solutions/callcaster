@@ -32,7 +32,7 @@
     "tools:api:surface:check": "tsx --tsconfig tsconfig.json scripts/check-api-surface-coverage.ts",
     "tools:components:move-settings": "node scripts/move-component-settings.mjs",
     "tools:prune:hygiene": "node scripts/prune-repo-hygiene.mjs",
-    "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
+    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "node ./server/index.js",
     "typecheck": "react-router typegen && tsc",
     "typecheck:deno": "node scripts/check-deno-functions.mjs",

@@ -32,12 +32,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const tdb = createTenantDb(workspace_id);
 
-  let data;
-  try {
-    data = await rpcGetCampaignQueue(tdb, campaign_id);
-  } catch (error) {
-    throw error;
-  }
+  const data = await rpcGetCampaignQueue(tdb, campaign_id);
 
   logger.debug("Campaign queue data:", data);
   for (let i = 0; i < (data?.length ?? 0); i++) {
