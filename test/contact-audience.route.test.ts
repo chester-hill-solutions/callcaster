@@ -26,9 +26,8 @@ vi.mock("@/lib/api-auth.server", () => ({
   getDualAuthUser: vi.fn(),
 }));
 
-vi.mock("../app/lib/adminDb.server", () => ({
-  getSession: () => ({ headers: postgresServerMocks.headers,
-  }),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: postgresServerMocks.headers }),
 }));
 vi.mock("../app/lib/database.server", () => ({
   parseActionRequest: (...args: unknown[]) => mocks.parseActionRequest(...args),

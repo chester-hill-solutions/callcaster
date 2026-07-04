@@ -19,6 +19,11 @@ vi.mock("../app/lib/adminDb.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: vi.fn(async () => undefined),
+  createSignedObjectUrl: vi.fn(async () => "https://public"),
+}));
+
 vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
   return {
@@ -27,20 +32,6 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
       mocks.updateCampaignVoicedropAudio(...args),
   };
 });
-
-function makeDbClient(opts?: { uploadError?: any }) {
-  return {
-    storage: {
-      from: () => ({
-        upload: async (_name: string, _buf: any, _opts: any) => ({
-          data: opts?.uploadError ? null : { path: "p1" },
-          error: opts?.uploadError ?? null,
-        }),
-        getPublicUrl: (_path: string) => ({ data: { publicUrl: "https://public" } }),
-      }),
-    },
-  };
-}
 
 describe("app/routes/api+/media/route.tsx", () => {
   beforeEach(() => {
@@ -51,7 +42,7 @@ describe("app/routes/api+/media/route.tsx", () => {
   });
 
   test("uploads media and updates campaign, returning public url", async () => {
-    queueDualAuthSession({ null: makeDbClient(), user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
@@ -64,7 +55,9 @@ describe("app/routes/api+/media/route.tsx", () => {
   });
 
   test("returns 500 on upload/update error", async () => {
-    queueDualAuthSession({ null: makeDbClient({ uploadError: new Error("up") }), user: { id: "u1" } });
+    const { uploadObject, createSignedObjectUrl } = await import("@/lib/object-storage.server");
+    queueDualAuthSession({ user: { id: "u1" } });
+    vi.mocked(uploadObject).mockRejectedValueOnce(new Error("up"));
     const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
@@ -72,7 +65,9 @@ describe("app/routes/api+/media/route.tsx", () => {
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
 
-    queueDualAuthSession({ null: makeDbClient(), user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
+    vi.mocked(uploadObject).mockResolvedValueOnce(undefined);
+    vi.mocked(createSignedObjectUrl).mockResolvedValueOnce("https://public");
     mocks.updateCampaignVoicedropAudio.mockResolvedValueOnce(null);
     const fd2 = new FormData();
     fd2.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));

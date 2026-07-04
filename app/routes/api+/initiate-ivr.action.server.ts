@@ -6,7 +6,7 @@ import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { rpcGetCampaignQueue } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -30,9 +30,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "Campaign not found in workspace" };
   }
 
+  const tdb = createTenantDb(workspace_id);
+
   let data;
   try {
-    data = await rpcGetCampaignQueue(db, campaign_id);
+    data = await rpcGetCampaignQueue(tdb, campaign_id);
   } catch (error) {
     throw error;
   }

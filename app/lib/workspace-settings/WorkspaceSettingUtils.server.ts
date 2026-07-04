@@ -1,6 +1,8 @@
 import { data as routeData, redirect } from "react-router";
 import type { Database } from "@/lib/db-types";
 import { getWorkspaceUsers } from "@/lib/database.server";
+import { env } from "@/lib/env.server";
+import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import { logger } from "@/lib/logger.server";
 import {
   deleteWorkspaceById,
@@ -51,32 +53,20 @@ export async function handleAddUser(
     }
   }
 
-  const { data: user, error: inviteUserError } =
-    await (null as any).functions.invoke("invite-user-by-email", {
-      body: {
-        workspaceId,
-        email: cleanedName,
-        role: newUserRole,
-      },
-    });
-  if (inviteUserError) {
-    if (existingUserId) {
-      const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
-      if (pendingInvite) {
-        return routeData(
-          {
-            data: user,
-            error: null,
-            success: true,
-            warning: "Invite was created but email delivery may have failed.",
-          },
-          { headers },
-        );
-      }
-    }
-    return routeData({ user: null, error: inviteUserError.message }, { headers });
+  const result = await inviteUserByEmail({
+    workspaceId,
+    email: cleanedName,
+    role: newUserRole,
+  });
+
+  if (!result.ok) {
+    return routeData({ user: null, error: result.error }, { headers });
   }
-  return routeData({ data: user, error: null, success: true }, { headers });
+
+  return routeData(
+    { data: result.invite, error: null, success: true },
+    { headers },
+  );
 }
 
 export async function handleUpdateUser(

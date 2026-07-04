@@ -12,6 +12,8 @@ import { eq } from "drizzle-orm";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AppError } from "@/lib/errors.server";
 import type { LoaderFunctionArgs } from "react-router";
+// eslint-disable-next-line no-restricted-imports
+// campaign_audience is a join table without a workspace column; tdb cannot scope it.
 import { db } from "@/server/db";
 
 interface QueueResponse {

@@ -35,7 +35,7 @@ export default defineConfig({
     resolveAppModuleSuffix(".server"),
     resolveAppModuleSuffix(".client"),
     reactRouter(),
-    tsconfigPaths(),
+    tsconfigPaths({ projects: ["./tsconfig.json"] }),
   ],
   server: {
     port: Number(process.env.PORT ?? 3000),

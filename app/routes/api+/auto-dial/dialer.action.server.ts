@@ -11,7 +11,7 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import type { Call } from "@/lib/types";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 
 export {
   completeAllConferences,
@@ -33,6 +33,7 @@ export const action = async ({ request }: { request: Request }) => {
   const { user_id, campaign_id, workspace_id, selected_device } = body;
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id,
   });
+  const tdb = createTenantDb(workspace_id);
 
   try {
     const contactRecord = await getNextAutoDialQueueContact(
@@ -58,7 +59,7 @@ export const action = async ({ request }: { request: Request }) => {
         selected_device,
       );
 
-      await rpcDequeueContact(db, {
+      await rpcDequeueContact(tdb, {
         contactId: contactRecord.contact_id,
         groupOnHousehold: true,
         dequeuedById: user_id,

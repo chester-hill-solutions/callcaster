@@ -31,7 +31,7 @@ vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
     }
     return mocks.twilioData;
   }),
-  persistWorkspaceTwilioData: vi.fn(async (_client: unknown, _workspaceId: string, data: unknown) => {
+  persistWorkspaceTwilioData: vi.fn(async (_workspaceId: string, data: unknown) => {
     if (mocks.persistError) {
       throw mocks.persistError;
     }
@@ -412,7 +412,9 @@ describe("twilio A2P service", () => {
   test("throws select and update errors from Postgres", async () => {
     const selectError = new Error("select failed");
     const updateError = new Error("update failed");
-    const base = makeWorkspaceTwilioData();
+    configureTwilioData(makeWorkspaceTwilioData(), {
+      selectError,
+    });
     const mod = await import("../app/lib/twilio-a2p.server");
 
     await expect(
@@ -422,6 +424,9 @@ describe("twilio A2P service", () => {
       }),
     ).rejects.toThrow("select failed");
 
+    configureTwilioData(makeWorkspaceTwilioData(), {
+      updateError,
+    });
     await expect(
       mod.syncWorkspaceA2PStatus({
                 workspaceId: "w1",

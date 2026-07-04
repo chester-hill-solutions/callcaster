@@ -95,7 +95,7 @@ function makeDbClientForValidations(opts: {
       if (table === "script") {
         return {
           select: () => {
-            let requestedId: number | null = null;
+            let requestedId: number | dbClient = null;
             const builder = {
               eq: (col: string, value: unknown) => {
                 if (col === "id") {
@@ -188,7 +188,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("session auth requires workspace_id", async () => {
-    const null = makeDbClientForValidations({});
+    const dbClient = makeDbClientForValidations({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
       user: { id: "u1" },
@@ -613,7 +613,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     const caller_id = "+1555";
     const audience_ids = [1, 2, 3, 4, 5, 6];
     const campaignId = 777;
-    const null = {};
+    const dbClient = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
@@ -649,7 +649,6 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     expect(body.audiences_linked).toBe(3);
     expect(body.contacts_enqueued).toBe(1);
     expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
-      client: null,
       campaignId,
       audienceIds: audience_ids,
       enqueueAudienceContacts: true,
@@ -690,7 +689,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   test("passes enqueue flag through to linkAudiencesToNewCampaign", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const null = {};
+    const dbClient = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
@@ -722,7 +721,6 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     expect(body.audiences_linked).toBe(1);
     expect(body.contacts_enqueued).toBe(1);
     expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
-      client: null,
       campaignId: 7,
       audienceIds: [1],
       enqueueAudienceContacts: true,
@@ -732,7 +730,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   test("skips enqueue when enqueue_audience_contacts is false", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const null = {};
+    const dbClient = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
@@ -765,7 +763,6 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       contacts_enqueued: 0,
     });
     expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
-      client: null,
       campaignId: 7,
       audienceIds: [1],
       enqueueAudienceContacts: false,
@@ -775,7 +772,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   test("returns linkAudiencesToNewCampaign counts in response", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const null = {};
+    const dbClient = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",

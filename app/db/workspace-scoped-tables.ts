@@ -7,7 +7,6 @@ import {
   call,
   campaign,
   contact,
-  contact_audience,
   handset_session,
   households,
   inbound_queue,
@@ -20,6 +19,7 @@ import {
   transaction_history,
   webhook,
   workspace_api_key,
+  workspace_events,
   workspace_invite,
   workspace_number,
   workspace_users,
@@ -69,6 +69,10 @@ export const WORKSPACE_SCOPED_TABLES = {
   workspace_api_key: {
     table: workspace_api_key,
     workspaceColumn: workspace_api_key.workspace_id,
+  },
+  workspace_events: {
+    table: workspace_events,
+    workspaceColumn: workspace_events.workspace_id,
   },
 } as const;
 

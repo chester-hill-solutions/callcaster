@@ -26,29 +26,11 @@ let userPresent = true;
 let statusJsonText = JSON.stringify({ status: "processing" });
 let downloadThrows: unknown = null;
 
-function buildMockDb() {
-  return {
-    storage: {
-      from: () => ({
-        download: async () => {
-          if (downloadThrows != null) throw downloadThrows;
-          if (downloadBehavior === "not_found") {
-            return { data: null, error: new Error("Object not found") };
-          }
-          if (downloadBehavior === "other_error") {
-            return { data: null, error: new Error("Storage exploded") };
-          }
-          return {
-            data: new Blob([statusJsonText], {
-              type: "application/json",
-            }),
-            error: null,
-          };
-        },
-      }),
-    },
-  };
-}
+const downloadObjectMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/object-storage.server", () => ({
+  downloadObject: downloadObjectMock,
+}));
 
 function applyDualAuth() {
   if (!userPresent) {
@@ -68,6 +50,17 @@ vi.mock("@/lib/auth.server", () => ({
 describe("api.campaign-export-status error handling", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
+    downloadObjectMock.mockReset();
+    downloadObjectMock.mockImplementation(async () => {
+      if (downloadThrows != null) throw downloadThrows;
+      if (downloadBehavior === "not_found") {
+        throw new Error("Object not found");
+      }
+      if (downloadBehavior === "other_error") {
+        throw new Error("Storage exploded");
+      }
+      return Buffer.from(statusJsonText, "utf-8");
+    });
     downloadBehavior = "ok";
     userPresent = true;
     statusJsonText = JSON.stringify({ status: "processing" });

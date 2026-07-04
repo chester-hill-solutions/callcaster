@@ -52,17 +52,31 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       { headers },
     );
   }
-  const userData = await loadUserWithInvites(authUser.id);
-  const workspaces = await listUserWorkspaceSummaries(authUser.id);
+  try {
+    const userData = await loadUserWithInvites(authUser.id);
+    const workspaces = await listUserWorkspaceSummaries(authUser.id);
 
-  return routeData(
-    {
-      env,
-      session: session ? { token: session.token } : null,
-      workspaces: workspaces as unknown as WorkspaceData[] | null,
-      user: userData as (User & { workspace_invite: WorkspaceInvite[] }) | null,
-      params,
-    },
-    { headers },
-  );
+    return routeData(
+      {
+        env,
+        session: session ? { token: session.token } : null,
+        workspaces: workspaces as unknown as WorkspaceData[] | null,
+        user: userData as (User & { workspace_invite: WorkspaceInvite[] }) | null,
+        params,
+      },
+      { headers },
+    );
+  } catch (error) {
+    logger.error("Error loading workspaces or user data", error);
+    return routeData(
+      {
+        env,
+        session: session ? { token: session.token } : null,
+        workspaces: null,
+        user: null,
+        params,
+      },
+      { headers },
+    );
+  }
 };

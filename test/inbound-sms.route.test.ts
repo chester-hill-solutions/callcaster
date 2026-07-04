@@ -41,6 +41,9 @@ vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: vi.fn(async () => undefined),
+}));
 
 const inboundContextMocks = vi.hoisted(() => ({
   contacts: [] as Array<{ id: number }>,
@@ -443,7 +446,9 @@ describe("app/routes/api+/inbound-sms", () => {
     expect(res.status).toBe(201);
     expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        payload: expect.objectContaining({ media_urls: ["m1"] }),
+        payload: expect.objectContaining({
+          media_urls: expect.arrayContaining([expect.stringContaining("sms-SM1-0-")]),
+        }),
       }),
     );
   });

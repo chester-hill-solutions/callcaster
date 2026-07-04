@@ -14,7 +14,7 @@ vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
     }
     return twilioDataMocks.data;
   }),
-  persistWorkspaceTwilioData: vi.fn(async (_client: unknown, _workspaceId: string, data: unknown) => {
+  persistWorkspaceTwilioData: vi.fn(async (_workspaceId: string, data: unknown) => {
     if (twilioDataMocks.persistError) {
       throw twilioDataMocks.persistError;
     }
@@ -220,6 +220,7 @@ describe("RCS onboarding helpers", () => {
   test("updateWorkspaceRcsOnboarding throws on read/write errors", async () => {
     const selectError = new Error("select failed");
     const updateError = new Error("update failed");
+    configureTwilioData({}, { selectError });
 
     await expect(
       updateWorkspaceRcsOnboarding({
@@ -245,6 +246,7 @@ describe("RCS onboarding helpers", () => {
       }),
     ).rejects.toThrow("select failed");
 
+    configureTwilioData({}, { updateError });
     await expect(
       updateWorkspaceRcsOnboarding({
                 workspaceId: "w1",

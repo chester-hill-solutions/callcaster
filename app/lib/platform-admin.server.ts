@@ -95,14 +95,9 @@ export async function toggleWorkspaceStatus(
 export async function syncAllWorkspacesTwilio(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const url = `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/workspace-twilio-sync`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    if (!response.ok) {
-      return { ok: false, error: `Edge function returned ${response.status}` };
+    const workspaces = await listAllWorkspacesOrdered();
+    for (const ws of workspaces) {
+      await syncWorkspaceTwilioSnapshot({ workspaceId: ws.id });
     }
     return { ok: true };
   } catch (error) {

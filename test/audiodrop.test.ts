@@ -45,9 +45,6 @@ describe("api.audiodrop action", () => {
 
     telephonyMocks.findCallSidByParentCallSid.mockResolvedValueOnce(null);
 
-    const mockClient: any = {
-      storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
-    };
     const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
     fd.set("callId", "c1");
@@ -55,7 +52,7 @@ describe("api.audiodrop action", () => {
     fd.set("campaignId", "1");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
-      deps: { verifyAuth: vi.fn(async () => ({ null })), createWorkspaceTwilioInstance },
+      deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
     expect(res).toMatchObject({ success: false, error: { call: expect.any(Error) } });
   });
@@ -66,9 +63,6 @@ describe("api.audiodrop action", () => {
     telephonyMocks.findCallSidByParentCallSid.mockResolvedValueOnce("CA1");
     telephonyMocks.loadCampaignVoicedropAudio.mockRejectedValueOnce(new Error("campaign"));
 
-    const mockClient: any = {
-      storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
-    };
 
     const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
@@ -77,7 +71,7 @@ describe("api.audiodrop action", () => {
     fd.set("campaignId", "1");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
-      deps: { verifyAuth: vi.fn(async () => ({ null })), createWorkspaceTwilioInstance },
+      deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
     expect(res).toMatchObject({ success: false, error: { campaign: expect.any(Error) } });
   });
@@ -89,9 +83,6 @@ describe("api.audiodrop action", () => {
     telephonyMocks.findCallSidByParentCallSid.mockResolvedValueOnce("CA1");
     telephonyMocks.loadCampaignVoicedropAudio.mockResolvedValueOnce(null);
 
-    const mockClient: any = {
-      storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
-    };
 
     const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
@@ -100,7 +91,7 @@ describe("api.audiodrop action", () => {
     fd.set("campaignId", "1");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
-      deps: { verifyAuth: vi.fn(async () => ({ null })), createWorkspaceTwilioInstance },
+      deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
     expect(res).toMatchObject({ success: false, error: "No audio found" });
     expect(update).toHaveBeenCalledWith({ status: "completed" });
@@ -113,10 +104,9 @@ describe("api.audiodrop action", () => {
     telephonyMocks.findCallSidByParentCallSid.mockResolvedValue("CA1");
     telephonyMocks.loadCampaignVoicedropAudio.mockResolvedValue("a.mp3");
 
-    const createSignedUrl = vi.fn();
-    const mockClient: any = {
-      storage: { from: () => ({ createSignedUrl }) },
-    };
+    const createSignedObjectUrl = vi.fn();
+    const verifyAuth = vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() }));
+    const baseDeps = { verifyAuth, createWorkspaceTwilioInstance, createSignedObjectUrl };
 
     const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
@@ -125,35 +115,25 @@ describe("api.audiodrop action", () => {
     fd.set("campaignId", "1");
     const makeReq = () => new Request("http://localhost/api/audiodrop", { method: "POST", body: fd });
 
-    createSignedUrl.mockResolvedValueOnce({ data: null, error: new Error("vm") });
+    createSignedObjectUrl.mockRejectedValueOnce(new Error("vm"));
     const r1 = await asRouteResponse(await mod.action({
       request: makeReq(),
-      deps: { verifyAuth: vi.fn(async () => ({ null })), createWorkspaceTwilioInstance },
+      deps: baseDeps,
     } as any));
-    expect(r1).toMatchObject({ success: false, error: "No audio found" });
-    expect(update).toHaveBeenCalledWith({ status: "completed" });
+    expect(r1).toMatchObject({ success: false, error: { voicemail: expect.any(Error) } });
 
-    createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: "" }, error: null });
+    createSignedObjectUrl.mockResolvedValueOnce("");
     const r2 = await asRouteResponse(await mod.action({
       request: makeReq(),
-      deps: { verifyAuth: vi.fn(async () => ({ null })), createWorkspaceTwilioInstance },
+      deps: baseDeps,
     } as any));
-    expect(r2).toMatchObject({ success: false, error: "No signed URL found" });
+    expect(r2).toMatchObject({ success: false, error: "No audio found" });
+    expect(update).toHaveBeenCalledWith({ status: "completed" });
 
-    createSignedUrl.mockResolvedValueOnce({
-      data: { signedUrl: "https://s" },
-      error: new Error("vm"),
-    });
-    const r2b = await asRouteResponse(await mod.action({
-      request: makeReq(),
-      deps: { verifyAuth: vi.fn(async () => ({ null })), createWorkspaceTwilioInstance },
-    } as any));
-    expect(r2b).toMatchObject({ success: false, error: { voicemail: expect.any(Error) } });
-
-    createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: "https://s" }, error: null });
+    createSignedObjectUrl.mockResolvedValueOnce("https://s");
     const r3 = await asRouteResponse(await mod.action({
       request: makeReq(),
-      deps: { verifyAuth: vi.fn(async () => ({ null })), createWorkspaceTwilioInstance },
+      deps: baseDeps,
     } as any));
     expect(r3).toMatchObject({ success: true });
     expect(update).toHaveBeenCalledWith(

@@ -11,6 +11,8 @@ import { verifyAuth } from "@/lib/auth.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { Campaign, FileObject, IVRCampaign, LiveCampaign, MessageCampaign, QueueItem, TwilioAccountData } from "@/lib/types";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
+// eslint-disable-next-line no-restricted-imports
+// workspace is the global tenancy root table; tdb cannot scope it.
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";

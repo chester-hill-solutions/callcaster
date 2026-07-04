@@ -4,7 +4,6 @@ import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { outreach_attempt as outreachAttemptTable } from "@/db/schema";
 import { and, eq, gte, desc } from "drizzle-orm";
@@ -187,7 +186,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       outreachAttemptId = updated?.id ?? recentOutreach.id ?? null;
     } else {
       try {
-        outreachAttemptId = await rpcCreateOutreachAttempt(db, {
+        outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
           contactId: Number(contact_id),
           campaignId: Number(campaign_id),
           userId: user.id,

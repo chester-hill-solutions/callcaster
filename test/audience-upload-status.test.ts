@@ -66,6 +66,12 @@ function buildMockDb() {
   };
 }
 
+const downloadObjectMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/object-storage.server", () => ({
+  downloadObject: downloadObjectMock,
+}));
+
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers({ "set-cookie": "x=y" }),
   }),
@@ -94,6 +100,13 @@ describe("api.audience-upload-status loader", () => {
         error_message: null,
       },
     };
+    downloadObjectMock.mockReset();
+    downloadObjectMock.mockImplementation(async () => {
+      if (downloadMode.kind === "throw") throw downloadMode.value;
+      if (downloadMode.kind === "error")
+        return { data: null, error: new Error(downloadMode.message) };
+      return Buffer.from(JSON.stringify(downloadMode.statusJson), "utf-8");
+    });
 
     if (user) {
       setDualAuthSession({
@@ -210,7 +223,7 @@ describe("api.audience-upload-status loader", () => {
     });
   });
 
-  test("returns 500 with Unknown error when thrown value is not Error", async () => {
+  test("returns upload record fields when download throws non-Error", async () => {
     downloadMode = { kind: "throw", value: "boom" };
     setDualAuthSession({
             headers: new Headers({ "set-cookie": "x=y" }),
@@ -222,11 +235,15 @@ describe("api.audience-upload-status loader", () => {
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
     } as any));
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "Unknown error" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      uploadId: 1,
+      file_name: "f.csv",
+      processed_contacts: 1,
+    });
   });
 
-  test("returns 500 with error.message when thrown value is Error", async () => {
+  test("returns upload record fields when download throws Error", async () => {
     downloadMode = { kind: "throw", value: new Error("boom") };
     setDualAuthSession({
             headers: new Headers({ "set-cookie": "x=y" }),
@@ -238,7 +255,11 @@ describe("api.audience-upload-status loader", () => {
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
     } as any));
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "boom" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      uploadId: 1,
+      file_name: "f.csv",
+      processed_contacts: 1,
+    });
   });
 });

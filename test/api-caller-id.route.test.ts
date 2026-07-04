@@ -152,7 +152,6 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     expect(body.validationRequest).toMatchObject({ sid: "VR1" });
     expect(body.numberRequest).toEqual([{ id: 1 }]);
     expect(mocks.verifyWorkspaceCallerId).toHaveBeenCalledWith(
-      {},
       "u1",
       "00000000-0000-4000-8000-000000000001",
       "1+5555550100",

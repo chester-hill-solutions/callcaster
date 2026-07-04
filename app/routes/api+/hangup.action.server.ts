@@ -8,7 +8,7 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 
 
@@ -46,8 +46,9 @@ export const action = async ({ request }: { request: Request }) => {
             }
         }
         const queue = await findActiveAssignedQueueForUser(user.id);
+        const tdb = createTenantDb(workspaceId);
         if (queue) {
-            await rpcDequeueContact(db, {
+            await rpcDequeueContact(tdb, {
                 contactId: queue.contact_id,
                 groupOnHousehold: queue.group_household_queue,
                 dequeuedById: user.id,

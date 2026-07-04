@@ -82,6 +82,41 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   };
 });
 
+const objectStorageUploads: Array<{ path: string; body: any; opts?: any }> = [];
+let objectStorageUploadBehaviors: UploadBehavior[] | undefined;
+let objectStorageUploadBehavior: ((path: string, idx: number) => UploadBehavior) | undefined;
+let objectStorageUploadCallIndex = 0;
+let objectStorageSignedUrlBehavior: "ok" | "error" | undefined;
+const uploadObjectMock = vi.hoisted(() =>
+  vi.fn(async (_bucket: string, path: string, body: any, opts?: any) => {
+    objectStorageUploads.push({ path, body, opts });
+    objectStorageUploadCallIndex += 1;
+    const behavior =
+      objectStorageUploadBehavior?.(path, objectStorageUploadCallIndex) ??
+      objectStorageUploadBehaviors?.[objectStorageUploadCallIndex - 1] ??
+      "ok";
+    if (behavior === "throw" || behavior === "error")
+      throw new Error("upload error");
+    if (behavior === "throwNonError") throw "upload throw";
+    return;
+  }),
+);
+const createSignedObjectUrlMock = vi.hoisted(() =>
+  vi.fn(async () => {
+    if (objectStorageSignedUrlBehavior === "error") {
+      throw new Error("signed url error");
+    }
+    return "https://signed.example/csv";
+  }),
+);
+
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: uploadObjectMock,
+  createSignedObjectUrl: createSignedObjectUrlMock,
+  deleteObject: vi.fn(),
+  listObjects: vi.fn(async () => []),
+}));
+
 const loggerError = vi.fn();
 vi.mock("@/lib/logger.server", () => {
   return {
@@ -474,6 +509,11 @@ function makeDbClient(config: ExportPostgresConfig) {
     },
   };
 
+  objectStorageUploadBehaviors = config.uploadBehaviors;
+  objectStorageUploadBehavior = config.uploadBehavior;
+  objectStorageUploadCallIndex = 0;
+  objectStorageSignedUrlBehavior = config.signedUrlBehavior;
+
   return { uploads, storageBucket };
 }
 
@@ -506,6 +546,13 @@ describe("api.campaign-export", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     loggerError.mockClear();
+    uploadObjectMock.mockClear();
+    createSignedObjectUrlMock.mockClear();
+    objectStorageUploads.length = 0;
+    objectStorageUploadCallIndex = 0;
+    objectStorageUploadBehaviors = undefined;
+    objectStorageUploadBehavior = undefined;
+    objectStorageSignedUrlBehavior = undefined;
     authUser = { id: "u1" };
     postgresForAuth = null;
     applyDualAuth();
@@ -527,7 +574,7 @@ describe("api.campaign-export", () => {
   }, 60000);
 
   test("returns 400 when campaignId/workspaceId missing", async () => {
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
     postgresForAuth = null;
@@ -538,7 +585,7 @@ describe("api.campaign-export", () => {
   }, 60000);
 
   test("returns 404 when campaign not found", async () => {
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
       campaignError: "not found",
     });
@@ -552,7 +599,7 @@ describe("api.campaign-export", () => {
   });
 
   test("returns 404 when campaign belongs to different workspace", async () => {
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: { id: 1, workspace: "w2", type: "message", title: "T" },
     });
     postgresForAuth = null;
@@ -566,7 +613,7 @@ describe("api.campaign-export", () => {
   });
 
   test("returns 400 on invalid campaign type", async () => {
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "nope", title: "T" },
     });
     postgresForAuth = null;
@@ -579,7 +626,7 @@ describe("api.campaign-export", () => {
   });
 
   test("returns 500 when request.formData throws, and Unknown error when non-Error thrown", async () => {
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
     postgresForAuth = null;
@@ -608,7 +655,7 @@ describe("api.campaign-export", () => {
 
   test("message export runs to completion (covers matching + non-matching messages)", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",
@@ -667,7 +714,7 @@ describe("api.campaign-export", () => {
 
     await vi.runAllTimersAsync();
     // final status upload should include "completed"
-    const completed = (null.__uploads as any[]).some((u) => {
+    const completed = (objectStorageUploads as any[]).some((u) => {
       if (!String(u.path).endsWith(".json")) return false;
       try {
         const obj = JSON.parse(String(u.body));
@@ -681,7 +728,7 @@ describe("api.campaign-export", () => {
 
   test("message export excludes same-phone messages from other campaigns", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 81,
         workspace: "w1",
@@ -732,7 +779,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     const csvUpload = (
-      null.__uploads as Array<{ path: string; body: unknown }>
+      objectStorageUploads as Array<{ path: string; body: unknown }>
     ).find((u) => String(u.path).endsWith(".csv"));
     expect(csvUpload).toBeTruthy();
     const csvText =
@@ -745,7 +792,7 @@ describe("api.campaign-export", () => {
 
   test("message export catch uses Unknown error when a non-Error is thrown", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 5,
         workspace: "w1",
@@ -772,7 +819,7 @@ describe("api.campaign-export", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const { null: sbMsg } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 6,
         workspace: "w1",
@@ -786,14 +833,13 @@ describe("api.campaign-export", () => {
       messageCount: 0,
       messages: [],
     });
-    postgresForAuth = sbMsg;
     applyDualAuth();
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "6", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
 
-    const { null: sbCall } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 7,
         workspace: "w1",
@@ -805,7 +851,6 @@ describe("api.campaign-export", () => {
       outreachAttemptCount: 0,
       outreachAttempts: [],
     });
-    postgresForAuth = sbCall;
     applyDualAuth();
     const res2 = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "7", workspaceId: "w1" }),
@@ -817,7 +862,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers opt_out=true and message_date branches (date_sent and fallback)", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 8,
         workspace: "w1",
@@ -860,7 +905,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers contactBatch null branch", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 9,
         workspace: "w1",
@@ -886,7 +931,7 @@ describe("api.campaign-export", () => {
 
   test("message export final status upload error triggers catch", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 4,
         workspace: "w1",
@@ -921,7 +966,7 @@ describe("api.campaign-export", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 10,
         workspace: "w1",
@@ -945,7 +990,7 @@ describe("api.campaign-export", () => {
     );
 
     loggerError.mockClear();
-    const { null: sb2 } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 11,
         workspace: "w1",
@@ -956,7 +1001,6 @@ describe("api.campaign-export", () => {
       },
       campaignExportMissing: true,
     });
-    postgresForAuth = sb2;
     applyDualAuth();
     const res2 = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "11", workspaceId: "w1" }),
@@ -982,68 +1026,63 @@ describe("api.campaign-export", () => {
     };
 
     // campaign_queue error
-    const { null: sbQueueErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 20, ...baseCampaign } as any,
       campaignQueueError: "queue err",
     });
-    postgresForAuth = sbQueueErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "20", workspaceId: "w1" }),
     } as any);
 
     // no contacts found
-    const { null: sbNoContacts } = makeDbClient({
+    makeDbClient({
       campaign: { id: 21, ...baseCampaign } as any,
       campaignQueueContactIds: [],
     });
-    postgresForAuth = sbNoContacts;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "21", workspaceId: "w1" }),
     } as any);
 
     // contact batch error
-    const { null: sbContactErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 22, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contactsError: "contact err",
     });
-    postgresForAuth = sbContactErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "22", workspaceId: "w1" }),
     } as any);
 
     // message count error
-    const { null: sbCountErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 23, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contacts: [{ id: 1, phone: "+1 (333) 333-3333", workspace: "w1" }],
       messageCountError: "count err",
     });
-    postgresForAuth = sbCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "23", workspaceId: "w1" }),
     } as any);
 
     // messages chunk error
-    const { null: sbMsgErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 24, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contacts: [{ id: 1, phone: "+1 (444) 444-4444", workspace: "w1" }],
       messageCount: 1,
       messagesError: "messages err",
     });
-    postgresForAuth = sbMsgErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "24", workspaceId: "w1" }),
     } as any);
 
     // CSV upload error
-    const { null: sbCsvErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 25, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contacts: [{ id: 1, phone: "+1 (555) 555-5555", workspace: "w1" }],
@@ -1053,7 +1092,6 @@ describe("api.campaign-export", () => {
       ],
       uploadBehavior: (path) => (path.endsWith(".csv") ? "error" : "ok"),
     });
-    postgresForAuth = sbCsvErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "25", workspaceId: "w1" }),
@@ -1068,7 +1106,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers no-matches and empty-messages break, and signed-url error path", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",
@@ -1100,7 +1138,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers opt_out=true match and from/to empty-string fallbacks", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 50,
         workspace: "w1",
@@ -1145,7 +1183,7 @@ describe("api.campaign-export", () => {
     const mod = await import("../app/routes/api+/campaign-export");
 
     // campaign_queue error -> uses "Error fetching campaign contacts"
-    const { null: sbQueueErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 60,
         workspace: "w1",
@@ -1156,7 +1194,6 @@ describe("api.campaign-export", () => {
       },
       campaignQueueError: "",
     });
-    postgresForAuth = sbQueueErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "60", workspaceId: "w1" }),
@@ -1164,7 +1201,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // contact batch error -> uses `Error fetching contact batch ${i}`
-    const { null: sbBatchErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 61,
         workspace: "w1",
@@ -1176,7 +1213,6 @@ describe("api.campaign-export", () => {
       campaignQueueContactIds: [1],
       contactsError: "",
     });
-    postgresForAuth = sbBatchErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "61", workspaceId: "w1" }),
@@ -1184,7 +1220,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // message count error -> uses "Error counting messages"
-    const { null: sbCountErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 62,
         workspace: "w1",
@@ -1197,7 +1233,6 @@ describe("api.campaign-export", () => {
       contacts: [{ id: 1, phone: "5550000000", workspace: "w1" }],
       messageCountError: "",
     });
-    postgresForAuth = sbCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "62", workspaceId: "w1" }),
@@ -1205,7 +1240,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // messages chunk error -> uses `Error fetching messages chunk at offset ${offset}`
-    const { null: sbMsgsErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 63,
         workspace: "w1",
@@ -1219,7 +1254,6 @@ describe("api.campaign-export", () => {
       messageCount: 1,
       messagesError: "",
     });
-    postgresForAuth = sbMsgsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "63", workspaceId: "w1" }),
@@ -1234,7 +1268,7 @@ describe("api.campaign-export", () => {
 
   test("call export runs and covers result parsing (string/object/invalid), visited pages, and credits", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 2,
         workspace: "w1",
@@ -1330,7 +1364,7 @@ describe("api.campaign-export", () => {
 
     await vi.runAllTimersAsync();
 
-    const completed = (null.__uploads as any[]).some((u) => {
+    const completed = (objectStorageUploads as any[]).some((u) => {
       if (!String(u.path).endsWith(".json")) return false;
       try {
         const obj = JSON.parse(String(u.body));
@@ -1348,7 +1382,7 @@ describe("api.campaign-export", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 40,
         workspace: "w1",
@@ -1372,7 +1406,7 @@ describe("api.campaign-export", () => {
     );
 
     loggerError.mockClear();
-    const { null: sb2 } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 41,
         workspace: "w1",
@@ -1383,7 +1417,6 @@ describe("api.campaign-export", () => {
       },
       campaignExportMissing: true,
     });
-    postgresForAuth = sb2;
     applyDualAuth();
     const res2 = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "41", workspaceId: "w1" }),
@@ -1398,7 +1431,7 @@ describe("api.campaign-export", () => {
 
   test("call export CSV upload error triggers catch", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 42,
         workspace: "w1",
@@ -1428,7 +1461,7 @@ describe("api.campaign-export", () => {
 
   test("call export covers unified campaign script selection and errors (script/count/calls)", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 3,
         workspace: "w1",
@@ -1469,81 +1502,75 @@ describe("api.campaign-export", () => {
     };
 
     // status upload error (call export)
-    const { null: sbStatusErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 30, ...baseCampaign } as any,
       uploadBehaviors: ["error"],
     });
-    postgresForAuth = sbStatusErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "30", workspaceId: "w1" }),
     } as any);
 
     // attempt count error
-    const { null: sbAttemptCountErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 31, ...baseCampaign } as any,
       outreachAttemptCountError: "attempt count err",
     });
-    postgresForAuth = sbAttemptCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "31", workspaceId: "w1" }),
     } as any);
 
     // attempts error
-    const { null: sbAttemptsErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 32, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttemptsError: "attempts err",
     });
-    postgresForAuth = sbAttemptsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "32", workspaceId: "w1" }),
     } as any);
 
     // break when attempts empty + signed url error after upload
-    const { null: sbAttemptsEmpty } = makeDbClient({
+    makeDbClient({
       campaign: { id: 33, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [],
       signedUrlBehavior: "error",
     });
-    postgresForAuth = sbAttemptsEmpty;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "33", workspaceId: "w1" }),
     } as any);
 
     // contacts error
-    const { null: sbContactsErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 34, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [{ id: "a1", contact_id: "c1", campaign_id: 34 }],
       contactsError: "contacts err",
     });
-    postgresForAuth = sbContactsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "34", workspaceId: "w1" }),
     } as any);
 
     // calls error
-    const { null: sbCallsErr } = makeDbClient({
+    makeDbClient({
       campaign: { id: 35, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [{ id: "a1", contact_id: "c1", campaign_id: 35 }],
       contacts: [{ id: "c1" }],
       callsError: "calls err",
     });
-    postgresForAuth = sbCallsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "35", workspaceId: "w1" }),
     } as any);
 
     // CSV upload error and nested catch logging (error status upload throws)
-    const { null: sbNested } = makeDbClient({
+    makeDbClient({
       campaign: { id: 36, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [],
@@ -1553,7 +1580,6 @@ describe("api.campaign-export", () => {
         return "ok";
       },
     });
-    postgresForAuth = sbNested;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "36", workspaceId: "w1" }),
@@ -1573,7 +1599,7 @@ describe("api.campaign-export", () => {
       created_at: new Date().toISOString(),
     }));
 
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 70,
         workspace: "w1",
@@ -1615,7 +1641,7 @@ describe("api.campaign-export", () => {
     const mod = await import("../app/routes/api+/campaign-export");
 
     // script pages/blocks fallbacks via null script
-    const { null: sbNullScript } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 71,
         workspace: "w1",
@@ -1628,7 +1654,6 @@ describe("api.campaign-export", () => {
       outreachAttemptCount: 0,
       outreachAttempts: [],
     });
-    postgresForAuth = sbNullScript;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "71", workspaceId: "w1" }),
@@ -1636,7 +1661,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // script error default message: "Error fetching script"
-    const { null: sbScriptErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 72,
         workspace: "w1",
@@ -1647,7 +1672,6 @@ describe("api.campaign-export", () => {
       },
       scriptError: "",
     });
-    postgresForAuth = sbScriptErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "72", workspaceId: "w1" }),
@@ -1655,7 +1679,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // attempts count default message: "Error counting attempts"
-    const { null: sbCountErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 73,
         workspace: "w1",
@@ -1666,7 +1690,6 @@ describe("api.campaign-export", () => {
       },
       outreachAttemptCountError: "",
     });
-    postgresForAuth = sbCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "73", workspaceId: "w1" }),
@@ -1674,7 +1697,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // attempts chunk default message: `Error fetching attempts chunk at offset ${offset}`
-    const { null: sbAttemptsErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 74,
         workspace: "w1",
@@ -1686,7 +1709,6 @@ describe("api.campaign-export", () => {
       outreachAttemptCount: 1,
       outreachAttemptsError: "",
     });
-    postgresForAuth = sbAttemptsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "74", workspaceId: "w1" }),
@@ -1694,7 +1716,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // contacts/calls default messages
-    const { null: sbContactsErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 75,
         workspace: "w1",
@@ -1707,14 +1729,13 @@ describe("api.campaign-export", () => {
       outreachAttempts: [{ id: "a1", contact_id: "c1", campaign_id: 75 }],
       contactsError: "",
     });
-    postgresForAuth = sbContactsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "75", workspaceId: "w1" }),
     } as any);
     await vi.runAllTimersAsync();
 
-    const { null: sbCallsErr } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 76,
         workspace: "w1",
@@ -1728,7 +1749,6 @@ describe("api.campaign-export", () => {
       contacts: [{ id: "c1" }],
       callsError: "",
     });
-    postgresForAuth = sbCallsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "76", workspaceId: "w1" }),
@@ -1736,7 +1756,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // non-Error throw -> error status should use "Unknown error"
-    const { null: sbNonError } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 77,
         workspace: "w1",
@@ -1747,14 +1767,13 @@ describe("api.campaign-export", () => {
       },
       uploadBehaviors: ["throwNonError", "ok"],
     });
-    postgresForAuth = sbNonError;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "77", workspaceId: "w1" }),
     } as any);
     await vi.runAllTimersAsync();
 
-    const wroteUnknown = (sbNonError.__uploads as any[]).some((u) => {
+    const wroteUnknown = (objectStorageUploads as any[]).some((u) => {
       if (!String(u.path).endsWith(".json")) return false;
       try {
         const obj = JSON.parse(String(u.body));
@@ -1768,7 +1787,7 @@ describe("api.campaign-export", () => {
 
   test("call export covers null contacts/calls else branches", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 78,
         workspace: "w1",
@@ -1797,7 +1816,7 @@ describe("api.campaign-export", () => {
 
   test("message export initial status upload error logs and error status upload returns error", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",
@@ -1835,7 +1854,7 @@ describe("api.campaign-export", () => {
 
   test("message export initial status upload error logs and error status upload throws", async () => {
     vi.useFakeTimers();
-    const { null } = makeDbClient({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",

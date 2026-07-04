@@ -1,29 +1,35 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
+import { queueJsonAuthSession, setJsonAuthSession } from "./helpers/route-auth-mock";
 
-const mocks = vi.hoisted(() => {
-  return {
-    verifyAuth: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
-  };
-});
-
-vi.mock("@/lib/auth.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+const mocks = vi.hoisted(() => ({
+  rpcResetCampaign: vi.fn(),
+  logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
+
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcResetCampaign: (...args: unknown[]) => mocks.rpcResetCampaign(...args),
+}));
+vi.mock("@/lib/platform-telephony.server", () => ({
+  resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
+}));
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    execute: vi.fn(async () => []),
+  }),
+}));
 
 describe("app/routes/api+/reset_campaign/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
+    mocks.rpcResetCampaign.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("returns error when campaign_id missing or not string", async () => {
-    const null = { rpc: vi.fn() };
-    setDualAuthSession({ user: { id: "u1" } });
+    setJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/reset_campaign");
 
     const r1 = await asRouteResponse(await mod.action({
@@ -32,7 +38,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     await expect(r1.json()).resolves.toEqual({ error: "Missing campaign_id" });
 
     const fd2 = new FormData();
-    fd2.set("campaign_id", new File(["x"], "x.txt"));
+    fd2.set("campaign_id", new File(["x"], "x.txt") as any);
     const r2 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd2 }),
     } as any));
@@ -40,8 +46,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
   }, 30000);
 
   test("returns error when campaign_id is not a number", async () => {
-    const null = { rpc: vi.fn() };
-    queueDualAuthSession({ user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "nope");
     const mod = await import("../app/routes/api+/reset_campaign");
@@ -51,9 +56,9 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "Invalid campaign_id" });
   }, 30000);
 
-  test("throws when client rpc errors", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ error: { message: "bad" } });
-    queueDualAuthSession({ user: { id: "u1" } });
+  test("throws when rpc errors", async () => {
+    mocks.rpcResetCampaign.mockRejectedValueOnce({ message: "bad" });
+    queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
@@ -64,8 +69,8 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
   }, 30000);
 
   test("returns success true when rpc succeeds", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ error: null });
-    queueDualAuthSession({ user: { id: "u1" } });
+    mocks.rpcResetCampaign.mockResolvedValueOnce(undefined);
+    queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
@@ -73,7 +78,6 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(rpc).toHaveBeenCalledWith("reset_campaign", { campaign_id_prop: 10 });
+    expect(mocks.rpcResetCampaign).toHaveBeenCalledWith(expect.anything(), 10);
   }, 30000);
 });
-

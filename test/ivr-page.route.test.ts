@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
 
 const mocks = vi.hoisted(() => {
   return {
-    createClient: vi.fn(),
     validateTwilioWebhookForCallSid: vi.fn(),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
@@ -15,11 +15,15 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@client/client-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
   validateTwilioWebhookForCallSid: (...a: unknown[]) =>
     mocks.validateTwilioWebhookForCallSid(...a),
 }));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallWithCampaignScriptBySid: vi.fn(),
+}));
+
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -42,32 +46,9 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeDbClient(sequence: Array<{ data: unknown; error: unknown }>) {
-  let i = 0;
-  return {
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => {
-                const r = sequence[Math.min(i, sequence.length - 1)];
-                i += 1;
-                return r;
-              },
-            }),
-          }),
-        };
-      }
-      throw new Error("unexpected table");
-    },
-  };
-}
-
 describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
     mocks.validateTwilioWebhookForCallSid.mockReset();
     mocks.validateTwilioWebhookForCallSid.mockResolvedValue({
       ok: true,
@@ -75,10 +56,10 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       authToken: "tok",
     });
     mocks.logger.error.mockReset();
+    vi.mocked(findCallWithCampaignScriptBySid).mockReset();
   });
 
   test("returns 400 when required params missing", async () => {
-    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: null, error: null }]));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const res = await asRouteResponse(await mod.action({
       params: {},
@@ -94,8 +75,6 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
         status: 403,
       }),
     });
-    const callData = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
-    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData, error: null }]));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -108,12 +87,12 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
   test("redirects to first block; says error when page invalid; catch path for invalid script and retry failure", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
 
     // success
     const callData = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
-    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData, error: null }]));
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData as any);
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -122,7 +101,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // page missing blocks => say+hangup
     const callData2 = { workspace: "w1", campaign: { script: { steps: { pages: { page_1: { blocks: [] } } } } } };
-    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData2, error: null }]));
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData2 as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -131,7 +110,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // invalid script => catch
     const callData3 = { workspace: "w1", campaign: { script: { steps: null } } };
-    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: callData3, error: null }]));
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData3 as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -140,7 +119,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // retry failure without waiting (fake timers)
     vi.useFakeTimers();
-    mocks.createClient.mockReturnValueOnce(makeDbClient([{ data: null, error: new Error("no") }]));
+    vi.mocked(findCallWithCampaignScriptBySid).mockRejectedValueOnce(new Error("no"));
     const p = mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),

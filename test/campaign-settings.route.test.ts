@@ -111,7 +111,7 @@ function makeDbClientForSettingsRoute(options?: {
     return { id: 123 };
   });
 
-  const null = {};
+  const dbClient = {};
 
   return null;
 }
@@ -140,7 +140,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("blocks invalid start requests with the shared readiness message", async () => {
-    const null = makeDbClientForSettingsRoute();
+    const dbClient = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -166,7 +166,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("updates status when the campaign is ready", async () => {
-    const null = makeDbClientForSettingsRoute();
+    const dbClient = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -189,7 +189,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("returns a save-specific error when save payload is incomplete", async () => {
-    const null = makeDbClientForSettingsRoute();
+    const dbClient = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -212,7 +212,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   });
 
   test("returns a duplicate-specific error when cloning fails", async () => {
-    const null = makeDbClientForSettingsRoute({
+    const dbClient = makeDbClientForSettingsRoute({
       duplicateInsertError: new Error("duplicate failed"),
     });
     mocks.verifyAuth.mockResolvedValueOnce({

@@ -2,27 +2,73 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession } from "./helpers/route-auth-mock";
-const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
+
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
     enqueueContactsForCampaign: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
 
-vi.mock("@/lib/auth.server", () => ({
-  getSession: () => ({ headers: postgresServerMocks.headers,
-  }),
+const audienceDbMocks = vi.hoisted(() => ({
+  campaignAndAudienceShareWorkspace: vi.fn(async () => true),
+  findCampaignAudienceLink: vi.fn(async () => null),
+  insertCampaignAudienceLink: vi.fn(async () => {}),
+  deleteCampaignAudienceLink: vi.fn(async () => {}),
+  listCampaignAudienceIds: vi.fn(async () => []),
+  listContactIdsForAudience: vi.fn(async () => []),
+  listContactIdsForAudiences: vi.fn(async () => []),
 }));
+
+const queueDbMocks = vi.hoisted(() => ({
+  getQueuedContactIdsForCampaign: vi.fn(async () => []),
+  deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds: vi.fn(async () => {}),
+}));
+
+vi.mock("@/lib/api-auth.server", () => ({
+  getDualAuthUser: (auth: any) => auth,
+  requireDualAuth: vi.fn(async () => ({ user: { id: "u1" } })),
+}));
+
+vi.mock("@/lib/auth.server", () => ({
+  getSession: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })),
+}));
+
 vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
+
 vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: any[]) =>
     mocks.enqueueContactsForCampaign(...args),
 }));
+
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+
+vi.mock("@/lib/campaign-audience-db.server", () => ({
+  campaignAndAudienceShareWorkspace: (...args: unknown[]) =>
+    audienceDbMocks.campaignAndAudienceShareWorkspace(...args),
+  findCampaignAudienceLink: (...args: unknown[]) =>
+    audienceDbMocks.findCampaignAudienceLink(...args),
+  insertCampaignAudienceLink: (...args: unknown[]) =>
+    audienceDbMocks.insertCampaignAudienceLink(...args),
+  deleteCampaignAudienceLink: (...args: unknown[]) =>
+    audienceDbMocks.deleteCampaignAudienceLink(...args),
+  listCampaignAudienceIds: (...args: unknown[]) =>
+    audienceDbMocks.listCampaignAudienceIds(...args),
+  listContactIdsForAudience: (...args: unknown[]) =>
+    audienceDbMocks.listContactIdsForAudience(...args),
+  listContactIdsForAudiences: (...args: unknown[]) =>
+    audienceDbMocks.listContactIdsForAudiences(...args),
+}));
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  getQueuedContactIdsForCampaign: (...args: unknown[]) =>
+    queueDbMocks.getQueuedContactIdsForCampaign(...args),
+  deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds: (...args: unknown[]) =>
+    queueDbMocks.deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds(...args),
+}));
 
 describe("app/routes/api+/campaign_audience/route.tsx", () => {
   beforeEach(() => {
@@ -30,23 +76,24 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     mocks.safeParseJson.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
     mocks.logger.error.mockReset();
+    audienceDbMocks.campaignAndAudienceShareWorkspace.mockReset();
+    audienceDbMocks.findCampaignAudienceLink.mockReset();
+    audienceDbMocks.insertCampaignAudienceLink.mockReset();
+    audienceDbMocks.deleteCampaignAudienceLink.mockReset();
+    audienceDbMocks.listCampaignAudienceIds.mockReset();
+    audienceDbMocks.listContactIdsForAudience.mockReset();
+    audienceDbMocks.listContactIdsForAudiences.mockReset();
+    queueDbMocks.getQueuedContactIdsForCampaign.mockReset();
+    queueDbMocks.deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds.mockReset();
+
+    audienceDbMocks.campaignAndAudienceShareWorkspace.mockResolvedValue(true);
+    audienceDbMocks.findCampaignAudienceLink.mockResolvedValue(null);
+    audienceDbMocks.listContactIdsForAudience.mockResolvedValue([]);
   });
 
   test("POST returns message when audience already linked", async () => {
-    const headers = new Headers({ "Set-Cookie": "a=1" });
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi.fn().mockReturnValueOnce({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({ data: { id: 1 }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
+    audienceDbMocks.findCampaignAudienceLink.mockResolvedValue({ id: 1 });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -57,7 +104,6 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({
       success: true,
       message: "Audience already added to campaign",
@@ -65,51 +111,12 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("POST inserts link and enqueues when contacts found", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        // existing check
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: null,
-                  error: { code: "PGRST116" },
-                }),
-              }),
-            }),
-          }),
-        })
-        // insert campaign_audience
-        .mockReturnValueOnce({
-          insert: async () => ({ error: null }),
-        })
-        // contact_audience select
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({
-              data: [{ contact_id: 1 }, { contact_id: 2 }],
-              error: null,
-            }),
-          }),
-        })
-        // existing campaign_queue rows
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: () => ({
-              in: async () => ({ data: [], error: null }),
-            }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.listContactIdsForAudience.mockResolvedValue([1, 2]);
 
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
@@ -129,75 +136,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("POST skips enqueue when no contacts found", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: null,
-                  error: { code: "PGRST116" },
-                }),
-              }),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({ insert: async () => ({ error: null }) })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: [], error: null }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
-    mocks.safeParseJson.mockResolvedValueOnce({
-      audience_id: 10,
-      campaign_id: 20,
-    });
-
-    const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
-      request: new Request("http://x", { method: "POST" }),
-    } as any));
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toMatchObject({
-      success: true,
-      audienceLinked: true,
-      enqueued: 0,
-    });
-    expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
-  }, 30000);
-
-  test("POST treats null contact lookup data as empty list", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: null,
-                  error: { code: "PGRST116" },
-                }),
-              }),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({ insert: async () => ({ error: null }) })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: null, error: null }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
@@ -217,32 +156,12 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("POST returns 500 with Error.message when insert fails (addError)", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: null,
-                  error: { code: "PGRST116" },
-                }),
-              }),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          insert: async () => ({ error: new Error("add boom") }),
-        }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.insertCampaignAudienceLink.mockRejectedValue(new Error("add boom"));
 
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
@@ -254,35 +173,12 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("POST returns 500 when contact lookup errors (contactsError)", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: null,
-                  error: { code: "PGRST116" },
-                }),
-              }),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({ insert: async () => ({ error: null }) })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: null, error: new Error("contacts boom") }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.listContactIdsForAudience.mockRejectedValue(new Error("contacts boom"));
 
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
@@ -294,94 +190,36 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("DELETE removes audience and queued contacts (when any)", async () => {
-    const headers = new Headers({ "Set-Cookie": "b=2" });
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        // delete campaign_audience
-        .mockReturnValueOnce({
-          delete: () => ({
-            eq: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          }),
-        })
-        // campaignAudiences lookup
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: [{ audience_id: 99 }], error: null }),
-          }),
-        })
-        // contactsToRemove lookup
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: [{ contact_id: 1 }], error: null }),
-          }),
-        })
-        // retained contacts from remaining audiences
-        .mockReturnValueOnce({
-          select: () => ({
-            in: async () => ({ data: [], error: null }),
-          }),
-        })
-        // campaign_queue delete queued contacts
-        .mockReturnValueOnce({
-          delete: () => ({
-            eq: () => ({
-              in: () => ({
-                eq: () => ({
-                  eq: async () => ({ error: null }),
-                }),
-              }),
-            }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.listCampaignAudienceIds.mockResolvedValue([99]);
+    audienceDbMocks.listContactIdsForAudience.mockResolvedValue([1]);
+    audienceDbMocks.listContactIdsForAudiences.mockResolvedValue([]);
 
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(res.headers.get("Set-Cookie")).toBe("b=2");
     await expect(res.json()).resolves.toEqual({ success: true });
+    expect(queueDbMocks.deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds).toHaveBeenCalledWith({
+      campaignId: 20,
+      contactIds: [1],
+    });
   }, 30000);
 
   test("DELETE returns success when no contacts to remove", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce({
-          delete: () => ({
-            eq: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: [{ audience_id: 99 }], error: null }),
-          }),
-        })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: [], error: null }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.listCampaignAudienceIds.mockResolvedValue([99]);
+    audienceDbMocks.listContactIdsForAudience.mockResolvedValue([]);
+
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
@@ -391,22 +229,13 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("DELETE returns 500 when delete link errors", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi.fn().mockReturnValueOnce({
-        delete: () => ({
-          eq: () => ({
-            eq: async () => ({ error: new Error("del boom") }),
-          }),
-        }),
-      }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.deleteCampaignAudienceLink.mockRejectedValue(new Error("del boom"));
+
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
@@ -415,91 +244,17 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "del boom" });
   }, 30000);
 
-  test("DELETE covers campaignAudiences null fallback and contacts lookup error", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce({
-          delete: () => ({
-            eq: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: null, error: null }),
-          }),
-        })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({
-              data: null,
-              error: new Error("contacts del boom"),
-            }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
-    mocks.safeParseJson.mockResolvedValueOnce({
-      audience_id: 10,
-      campaign_id: 20,
-    });
-    const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
-      request: new Request("http://x", { method: "DELETE" }),
-    } as any));
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "contacts del boom" });
-  }, 30000);
-
   test("DELETE returns 500 when removing queued contacts errors (removeError)", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce({
-          delete: () => ({
-            eq: () => ({
-              eq: async () => ({ error: null }),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: [{ audience_id: 99 }], error: null }),
-          }),
-        })
-        .mockReturnValueOnce({
-          select: () => ({
-            eq: async () => ({ data: [{ contact_id: 1 }], error: null }),
-          }),
-        })
-        .mockReturnValueOnce({
-          select: () => ({
-            in: async () => ({ data: [], error: null }),
-          }),
-        })
-        .mockReturnValueOnce({
-          delete: () => ({
-            eq: () => ({
-              in: () => ({
-                eq: () => ({
-                  eq: async () => ({ error: new Error("remove boom") }),
-                }),
-              }),
-            }),
-          }),
-        }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.listCampaignAudienceIds.mockResolvedValue([99]);
+    audienceDbMocks.listContactIdsForAudience.mockResolvedValue([1]);
+    audienceDbMocks.listContactIdsForAudiences.mockResolvedValue([]);
+    queueDbMocks.deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds.mockRejectedValue(new Error("remove boom"));
+
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
@@ -509,9 +264,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("returns 405 on unsupported method", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    queueDualAuthSession({ null: {}, headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "PUT" }),
@@ -520,27 +273,12 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   }, 30000);
 
   test("catch returns 500 and logs (Error vs non-Error)", async () => {
-    const headers = new Headers();
-    postgresServerMocks.headers = headers;
-    const null = {
-      from: vi.fn().mockReturnValueOnce({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: null,
-                error: { code: "X", message: "boom" },
-              }),
-            }),
-          }),
-        }),
-      }),
-    };
-    queueDualAuthSession({ headers });
+    queueDualAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({
       audience_id: 10,
       campaign_id: 20,
     });
+    audienceDbMocks.campaignAndAudienceShareWorkspace.mockRejectedValue("boom");
 
     const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({

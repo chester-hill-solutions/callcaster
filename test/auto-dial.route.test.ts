@@ -45,7 +45,7 @@ vi.mock("@/server/tenant-db", () => ({
 }));
 
 const authDeps = {
-  getAuthenticatedUser: async () => ({ id: "u1" }),
+  getSession: async () => ({ headers: new Headers(), user: { id: "u1" } }),
   requireWorkspaceAccess: async () => undefined,
 };
 
@@ -74,8 +74,6 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -98,8 +96,6 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({ user_id: "u1", caller_id: "+1555" }),
       },
     } as any));
@@ -122,18 +118,16 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         request: new Request("http://localhost/api/auto-dial", {
           method: "POST",
         }),
-        deps: {
-          ...authDeps,
-          getSession: () =>
-            ({ headers: new Headers() }) as any,
-          safeParseJson: async () => ({
-            user_id: "u1",
-            caller_id: "+1555",
-            campaign_id: 1,
-            workspace_id: "w1",
-            selected_device: "computer",
-          }),
-        },
+      deps: {
+        ...authDeps,
+        safeParseJson: async () => ({
+          user_id: "u1",
+          caller_id: "+1555",
+          campaign_id: 1,
+          workspace_id: "w1",
+          selected_device: "computer",
+        }),
+      },
       } as any),
     ).rejects.toThrow("db");
   });
@@ -161,8 +155,6 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -212,8 +204,6 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -244,8 +234,6 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
       deps: {
         ...authDeps,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -260,8 +248,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     } as any));
 
     expect(res.status).toEqual(expect.any(Number));
-    expect(autoDialMocks.insertCalls[0]).toMatchObject({ campaign_id: null });
-    expect(autoDialMocks.insertCalls[1]).toMatchObject({ campaign_id: null });
+    expect(autoDialMocks.insertCalls[0]).toMatchObject({ campaign_id: undefined });
+    expect(autoDialMocks.insertCalls[1]).toMatchObject({ campaign_id: undefined });
   });
 
   test("returns success:false Response when twilio call create throws", async () => {
@@ -275,8 +263,6 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       deps: {
         ...authDeps,
         logger: logger as any,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -310,15 +296,8 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     const callsCreate = vi.fn(async () => ({ sid: "CA1" }));
     const callsUpdate = vi.fn(async () => ({}));
 
-    vi.doMock("../app/lib/adminDb.server", () => ({
-      getSession: () => ({
-        null: {
-          auth: {
-            getUser: async () => ({ data: { user: { id: "u1" } }, error: null }),
-          },
-        },
-        headers: new Headers(),
-      }),
+    vi.doMock("../app/lib/auth.server", () => ({
+      getSession: async () => ({ headers: new Headers(), user: { id: "u1" } }),
     }));
     vi.doMock("../app/lib/database.server", () => ({
       requireWorkspaceAccess: async () => undefined,
@@ -339,7 +318,11 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       }),
     }));
     vi.doMock("@/lib/env.server", () => ({
-      env: { BASE_URL: () => "https://base.example" },
+      env: {
+        BASE_URL: () => "https://base.example",
+        BETTER_AUTH_URL: () => "http://auth.test",
+        BETTER_AUTH_SECRET: () => "secret",
+      },
     }));
     vi.doMock("@/lib/logger.server", () => ({ logger }));
 
@@ -365,9 +348,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         method: "POST",
       }),
       deps: {
-        getAuthenticatedUser: async () => null,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
+        getSession: async () => ({ headers: new Headers(), user: null }),
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
@@ -388,13 +369,11 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         method: "POST",
       }),
       deps: {
-        getAuthenticatedUser: async () => ({ id: "u1" }),
+        getSession: async () => ({ headers: new Headers(), user: { id: "u1" } }),
         requireWorkspaceAccess: async () => {
           throw new Error("forbidden");
         },
         logger: { warn: vi.fn(), error: vi.fn() , info: vi.fn(), debug: vi.fn()} as any,
-        getSession: () =>
-          ({ headers: new Headers() }) as any,
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",

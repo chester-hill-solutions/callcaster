@@ -42,6 +42,10 @@ vi.mock("@/lib/env.server", () => {
   return { env: new Proxy({}, handler) };
 });
 
+vi.mock("@/lib/object-storage.server", () => ({
+  downloadObject: vi.fn(async () => Buffer.from(JSON.stringify({ status: "processing" }))),
+}));
+
 vi.mock("@/lib/database.server", async () => {
   const actual = await vi.importActual<typeof import("@/lib/database.server")>(
     "@/lib/database.server",
@@ -66,7 +70,7 @@ function buildMockDb() {
     },
   };
 
-  null.from = (table: string) => {
+  mockClient.from = (table: string) => {
     if (table === "audience") {
       return {
         select: () => ({

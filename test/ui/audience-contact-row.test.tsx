@@ -20,7 +20,7 @@ function renderRow(overrides: Partial<any> = {}) {
     address: "",
     city: "",
     created_at: null,
-    other_data: [{ foo: "bar" }, "nope", null],
+    other_data: JSON.stringify([{ foo: "bar" }, "nope", null]),
     ...overrides,
   };
 
@@ -72,7 +72,7 @@ describe("AudienceContactRow", () => {
       address: null,
       city: null,
       created_at: null,
-      other_data: [],
+      other_data: JSON.stringify([]),
     } as any;
     const onSelect = vi.fn();
     const onRemove = vi.fn();
@@ -108,7 +108,7 @@ describe("AudienceContactRow", () => {
       address: "a",
       city: "c",
       created_at: null,
-      other_data: [{ foo: null }],
+      other_data: JSON.stringify([{ foo: null }]),
     } as any;
 
     render(
@@ -183,14 +183,10 @@ describe("AudienceContactRow", () => {
     timeSpy.mockRestore();
   });
 
-  test("getOtherDataValue catch logs and returns '-' when other_data is broken", () => {
-    renderRow({ other_data: null });
-    // missing header falls back to '-' (rendered via `|| '-'`)
+  test("getOtherDataValue returns '-' when other_data is broken", () => {
+    renderRow({ other_data: "not-json" });
+    // failed parse yields empty array; missing header falls back to '-'
     expect(screen.getAllByText("-").length).toBeGreaterThan(0);
-    expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error extracting other_data value:",
-      expect.anything()
-    );
   });
 });
 

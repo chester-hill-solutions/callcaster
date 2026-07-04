@@ -20,6 +20,22 @@ vi.mock("@/lib/database.server", () => ({
   getWorkspaceTwilioSyncSnapshotFromTwilioData: vi.fn(),
 }));
 
+vi.mock("@/server/admin-db", () => ({
+  adminDb: {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(async () => [{
+            twilio_data: {
+              portalSync: { tollFreeVerificationBlocked: true },
+            },
+          }]),
+        })),
+      })),
+    })),
+  },
+}));
+
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import {
@@ -48,7 +64,7 @@ describe("twilio-readiness.server", () => {
       livePhoneNumbers: ["+18885551212"],
     } as never);
 
-    const null = {
+    const dbClient = {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
@@ -80,7 +96,6 @@ describe("twilio-readiness.server", () => {
 
     await expect(
       assertWorkspaceCanSendSms({
-        null: null as never,
         workspaceId: "w1",
       }),
     ).rejects.toBeInstanceOf(WorkspaceSmsNotReadyError);

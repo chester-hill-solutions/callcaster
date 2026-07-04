@@ -46,6 +46,37 @@ vi.mock("../app/lib/rcs-onboarding.server", () => ({
   TWILIO_RCS_SENDERS_URL: "https://console.twilio.com/us1/develop/rcs/senders",
 }));
 
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  getWorkspaceById: vi.fn(async () => ({
+    id: "w1",
+    twilio_data: { sid: "AC123", authToken: "test-token" },
+  })),
+}));
+
+vi.mock("@/lib/billing-reconciliation.server", () => ({
+  loadBillingReconciliationReport: vi.fn(async () => null),
+}));
+
+vi.mock("@/lib/billing-reconciliation-snapshot.server", () => ({
+  getWorkspaceBillingReconciliationSnapshot: vi.fn(() => null),
+}));
+
+let currentAccessLevel = "sudo";
+let currentUsername = "ops@example.com";
+
+vi.mock("../app/routes/admin+/requireSudoAdmin.server", () => ({
+  requireSudoAdmin: vi.fn(async () => {
+    const auth = await mocks.verifyAuth();
+    if (currentAccessLevel !== "sudo") {
+      throw { status: 302 };
+    }
+    return {
+      user: auth.user,
+      userData: { id: auth.user.id, access_level: currentAccessLevel, username: currentUsername },
+    };
+  }),
+}));
+
 function makePortalSnapshot() {
   return {
     onboarding: {
@@ -156,7 +187,7 @@ function makePortalSnapshot() {
   };
 }
 
-function makeDbClient(accessLevel: string, workspaceTwilioSid: string | null = null) {
+function makeDbClient(accessLevel: string, workspaceTwilioSid: string | dbClient = null) {
   return {
     from: vi.fn((table: string) => {
       if (table === "user") {
@@ -196,6 +227,8 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.useRealTimers();
+    currentAccessLevel = "sudo";
+    currentUsername = "ops@example.com";
     mocks.verifyAuth.mockReset();
     mocks.updateWorkspaceTwilioPortalConfig.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
@@ -212,7 +245,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   });
 
   test("action redirects non-sudo users", async () => {
-    const null = makeDbClient("admin");
+    currentAccessLevel = "admin";
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -229,7 +262,6 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   });
 
   test("action updates Twilio portal settings", async () => {
-    const null = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -284,7 +316,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   });
 
   test("action syncs workspace snapshot directly", async () => {
-    const null = makeDbClient("sudo");
+    const dbClient = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -306,7 +338,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   });
 
   test("action bootstraps workspace messaging", async () => {
-    const null = makeDbClient("sudo");
+    const dbClient = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -336,7 +368,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   });
 
   test("action provisions workspace A2P and updates RCS state", async () => {
-    const null = makeDbClient("sudo");
+    const dbClient = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -421,7 +453,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       },
     ]);
 
-    const null = makeDbClient("sudo", "AC123");
+    const dbClient = makeDbClient("sudo", "AC123");
     mocks.getWorkspaceTwilioPortalSnapshot.mockResolvedValueOnce(makePortalSnapshot());
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       api: {
@@ -450,7 +482,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const { loadTwilioData } = await import(
       "../app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server",
     );
-    const data = await loadTwilioData(null as any, "w1");
+    const data = await loadTwilioData("w1");
 
     expect(usageList).toHaveBeenCalledWith();
     expect(data.twilioUsage).toEqual([

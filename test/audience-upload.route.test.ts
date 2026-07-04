@@ -363,6 +363,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       "u1",
       Buffer.from("csv", "utf-8").toString("base64"),
       { Missing: "email" },
+      null,
       { parseCSV: vi.fn(() => ({ headers: ["Email"], contacts: [] })) as any },
     );
     expect(uploads.some((u) => u.body.includes('"status":"error"'))).toBe(true);
@@ -376,6 +377,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       "u1",
       Buffer.from("csv", "utf-8").toString("base64"),
       { Email: "email" },
+      null,
       { parseCSV: vi.fn(() => ({ headers: ["Email"], contacts: [{ Email: "a@b.co" }] })) as any },
     );
     expect(uploads.some((u) => u.body.includes("Error inserting contacts"))).toBe(true);

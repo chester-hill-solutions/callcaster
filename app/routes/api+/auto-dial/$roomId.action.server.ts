@@ -4,7 +4,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
@@ -50,10 +50,12 @@ const dequeueContact = async (
   contactId: string,
   groupOnHousehold: boolean,
   userId: string,
+  workspace: string,
   campaignId?: number | null,
 ) => {
     if (groupOnHousehold) {
-        return await rpcDequeueContact(db, {
+        const tdb = createTenantDb(workspace);
+        return await rpcDequeueContact(tdb, {
             contactId: Number(contactId),
             groupOnHousehold,
             dequeuedById: userId,
@@ -121,6 +123,7 @@ const handleMachineAnswer = async (
       dbCall.contact_id?.toString() ?? "",
       campaign.group_household_queue ?? false,
       firstOutreachStatus.user_id?.toString() ?? "",
+      dbCall.workspace?.toString() ?? "",
       dbCall.campaign_id ?? null,
     );
 

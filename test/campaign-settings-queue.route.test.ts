@@ -6,8 +6,20 @@ const mocks = vi.hoisted(() => {
     verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     enqueueContactsForCampaign: vi.fn(),
+    searchCampaignQueueIds: vi.fn(),
+    updateCampaignQueueStatusByIds: vi.fn(),
+    deleteAllCampaignQueueForCampaign: vi.fn(),
+    deleteCampaignQueueByIds: vi.fn(),
+    fetchCampaignQueuePage: vi.fn(),
+    countCampaignQueueRows: vi.fn(),
+    countQueuedCampaignQueueRows: vi.fn(),
+    requireWorkspaceLoaderContext: vi.fn(),
   };
 });
+
+const dbMocks = vi.hoisted(() => ({
+  selectChain: vi.fn(),
+}));
 
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers(),
@@ -30,33 +42,78 @@ vi.mock("@/lib/queue.server", () => ({
     mocks.enqueueContactsForCampaign(...args),
 }));
 
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  deleteAllCampaignQueueForCampaign: (...args: any[]) =>
+    mocks.deleteAllCampaignQueueForCampaign(...args),
+  deleteCampaignQueueByIds: (...args: any[]) =>
+    mocks.deleteCampaignQueueByIds(...args),
+  updateCampaignQueueStatusByIds: (...args: any[]) =>
+    mocks.updateCampaignQueueStatusByIds(...args),
+}));
+
+vi.mock("@/lib/campaign-queue-search.server", () => ({
+  searchCampaignQueueIds: (...args: any[]) =>
+    mocks.searchCampaignQueueIds(...args),
+  fetchCampaignQueuePage: (...args: any[]) =>
+    mocks.fetchCampaignQueuePage(...args),
+  countCampaignQueueRows: (...args: any[]) =>
+    mocks.countCampaignQueueRows(...args),
+  countQueuedCampaignQueueRows: (...args: any[]) =>
+    mocks.countQueuedCampaignQueueRows(...args),
+}));
+
+vi.mock("@/lib/workspace-route.server", () => ({
+  requireWorkspaceLoaderContext: (...args: any[]) =>
+    mocks.requireWorkspaceLoaderContext(...args),
+}));
+
+vi.mock("@/server/db", () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        where: () => dbMocks.selectChain(),
+      }),
+    }),
+  },
+}));
+
 describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.parseActionRequest.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
+    mocks.searchCampaignQueueIds.mockReset();
+    mocks.updateCampaignQueueStatusByIds.mockReset();
+    mocks.deleteAllCampaignQueueForCampaign.mockReset();
+    mocks.deleteCampaignQueueByIds.mockReset();
+    mocks.fetchCampaignQueuePage.mockReset();
+    mocks.countCampaignQueueRows.mockReset();
+    mocks.countQueuedCampaignQueueRows.mockReset();
+    mocks.requireWorkspaceLoaderContext.mockReset();
+    dbMocks.selectChain.mockReset();
+    mocks.verifyAuth.mockResolvedValue({
+      user: { id: "u1" },
+    });
+    mocks.searchCampaignQueueIds.mockResolvedValue([]);
+    mocks.updateCampaignQueueStatusByIds.mockResolvedValue(undefined);
+    mocks.deleteAllCampaignQueueForCampaign.mockResolvedValue(undefined);
+    mocks.deleteCampaignQueueByIds.mockResolvedValue(undefined);
+    mocks.fetchCampaignQueuePage.mockResolvedValue({ items: [], totalCount: 0 });
+    mocks.countCampaignQueueRows.mockResolvedValue(0);
+    mocks.countQueuedCampaignQueueRows.mockResolvedValue(0);
+    mocks.requireWorkspaceLoaderContext.mockResolvedValue({
+      ok: true,
+      context: { user: { id: "u1" }, workspace: { id: "w1" } },
+    });
+    dbMocks.selectChain.mockResolvedValue([]);
   });
 
   test("add_from_audience routes contacts through enqueue helper", async () => {
-    const null = {
-      from: vi.fn((table: string) => {
-        if (table !== "contact_audience") {
-          throw new Error(`unexpected table ${table}`);
-        }
-        return {
-          select: () => ({
-            eq: async () => ({
-              data: [{ contact_id: 11 }, { contact_id: 12 }],
-              error: null,
-            }),
-          }),
-        };
-      }),
-    };
+    dbMocks.selectChain.mockResolvedValueOnce([
+      { contact_id: 11 },
+      { contact_id: 12 },
+    ]);
 
-    mocks.verifyAuth.mockResolvedValueOnce({
-      user: { id: "u1" },
-    });
     mocks.parseActionRequest.mockResolvedValueOnce({
       intent: "add_from_audience",
       audienceId: "5",
@@ -80,7 +137,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("add_contacts routes direct contacts through enqueue helper", async () => {
-    const null = {
+    const dbClient = {
       from: vi.fn(() => {
         throw new Error("unexpected from()");
       }),
@@ -112,20 +169,8 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("add_from_audience returns contact lookup errors before enqueueing", async () => {
-    const null = {
-      from: vi.fn(() => ({
-        select: () => ({
-          eq: async () => ({
-            data: null,
-            error: { message: "lookup failed" },
-          }),
-        }),
-      })),
-    };
+    dbMocks.selectChain.mockRejectedValueOnce(new Error("lookup failed"));
 
-    mocks.verifyAuth.mockResolvedValueOnce({
-      user: { id: "u1" },
-    });
     mocks.parseActionRequest.mockResolvedValueOnce({
       intent: "add_from_audience",
       audienceId: "5",
@@ -168,29 +213,10 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       then: (resolve: (value: typeof queueQueryResult) => unknown) =>
         Promise.resolve(resolve(queueQueryResult)),
     };
-    const null = {
-      from: vi.fn((table: string) => {
-        if (table === "campaign_audience") {
-          return {
-            select: () => ({
-              eq: async () => ({
-                data: [],
-                error: null,
-              }),
-            }),
-          };
-        }
 
-        if (table === "campaign_queue") {
-          return queueChain;
-        }
-
-        throw new Error(`unexpected table ${table}`);
-      }),
-    };
-
-    mocks.verifyAuth.mockResolvedValueOnce({
-      user: { id: "u1" },
+    mocks.fetchCampaignQueuePage.mockImplementationOnce(async () => {
+      queueChain.eq("campaign_id", "99");
+      return { items: [], totalCount: 0 };
     });
 
     const mod = await import(
@@ -209,43 +235,9 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("bulk status update no longer filters rows by outreach-attempt campaign id", async () => {
-    const queueEqCalls: Array<[string, unknown]> = [];
-    const filteredRows = [{ id: 11 }, { id: 12 }];
-    const updateIn = vi.fn(async () => ({ error: null }));
-    const queueQueryResult = { data: filteredRows, error: null, count: filteredRows.length };
-    const queueChain: any = {
-      select: () => queueChain,
-      eq: (column: string, value: unknown) => {
-        queueEqCalls.push([column, value]);
-        return queueChain;
-      },
-      or: () => queueChain,
-      ilike: () => queueChain,
-      like: () => queueChain,
-      in: () => queueChain,
-      is: () => queueChain,
-      not: () => queueChain,
-      neq: () => queueChain,
-      limit: () => queueChain,
-      then: (resolve: (value: typeof queueQueryResult) => unknown) =>
-        Promise.resolve(resolve(queueQueryResult)),
-      update: () => ({
-        in: updateIn,
-      }),
-    };
-    const null = {
-      from: vi.fn((table: string) => {
-        if (table === "campaign_queue") {
-          return queueChain;
-        }
+    mocks.searchCampaignQueueIds.mockResolvedValueOnce([11, 12]);
+    mocks.updateCampaignQueueStatusByIds.mockResolvedValueOnce(undefined);
 
-        throw new Error(`unexpected table ${table}`);
-      }),
-    };
-
-    mocks.verifyAuth.mockResolvedValueOnce({
-      user: { id: "u1" },
-    });
     mocks.parseActionRequest.mockResolvedValueOnce({
       intent: "update_status",
       status: "paused",
@@ -271,10 +263,21 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(queueEqCalls).not.toContainEqual([
-      "contact.outreach_attempt.campaign_id",
-      "99",
-    ]);
-    expect(updateIn).toHaveBeenCalledWith("id", [11, 12]);
+    expect(mocks.searchCampaignQueueIds).toHaveBeenCalledWith({
+      campaignId: 99,
+      filters: {
+        name: "",
+        phone: "",
+        email: "",
+        address: "",
+        audiences: "",
+        disposition: "",
+        queueStatus: "",
+      },
+    });
+    expect(mocks.updateCampaignQueueStatusByIds).toHaveBeenCalledWith(
+      [11, 12],
+      "paused",
+    );
   });
 });

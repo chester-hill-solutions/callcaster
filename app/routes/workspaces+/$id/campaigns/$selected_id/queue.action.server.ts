@@ -12,6 +12,8 @@ import { parseActionRequest } from "@/lib/database.server";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 import { verifyAuth } from "@/lib/auth.server";
 import { contact_audience as contactAudienceTable } from "@/db/schema";
+// eslint-disable-next-line no-restricted-imports
+// contact_audience is a join table without a workspace column; tdb cannot scope it.
 import { db } from "@/server/db";
 import type { Contact } from "@/lib/types";
 

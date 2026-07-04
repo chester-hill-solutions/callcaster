@@ -37,6 +37,8 @@ export type ScopedTableApi<K extends WorkspaceScopedTableName> = {
  */
 export type TenantDb = {
   [K in WorkspaceScopedTableName]: ScopedTableApi<K>;
+} & {
+  execute: (query: SQL) => Promise<unknown[]>;
 };
 
 type TableFor<K extends WorkspaceScopedTableName> = (typeof WORKSPACE_SCOPED_TABLES)[K]["table"];
@@ -114,6 +116,8 @@ export function createTenantDb(workspaceId: string, dbInstance: Database = db): 
           .then((rows: { value: number }[]) => rows[0]?.value ?? 0),
     };
   }
+
+  (api as Record<string, unknown>).execute = (query: SQL) => dbInstance.execute(query);
 
   return api as unknown as TenantDb;
 }

@@ -8,7 +8,7 @@ import {
 } from "@/lib/platform-telephony.server";
 import { requeueAllCampaignQueueForCampaign } from "@/lib/campaign-queue-db.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 import { jsonError } from "@/lib/platform-api.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
@@ -33,7 +33,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         workspaceId,
       });
 
-      await rpcDequeueContact(db, {
+      const tdb = createTenantDb(workspaceId);
+
+      await rpcDequeueContact(tdb, {
         contactId: Number(contact_id),
         groupOnHousehold: household,
         dequeuedById: auth.user.id,

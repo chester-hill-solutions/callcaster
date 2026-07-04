@@ -3,6 +3,7 @@
 
 import "dotenv/config";
 
+import postgres from "postgres";
 import Twilio from "twilio";
 
 const LOCAL_APP_URL = process.env.LOCAL_APP_URL ?? "http://127.0.0.1:3000";
@@ -236,35 +237,29 @@ async function syncWorkspaceTargets({ allWorkspaces, workspaceIds, baseUrl }) {
     return [];
   }
 
-  const client = createClient(
-    requireEnv("BETTER_AUTH_URL"),
-    requireEnv("BETTER_AUTH_SERVICE_KEY"),
-  );
-  const workspaces = await loadWorkspaces({
-    allWorkspaces,
-    client,
-    workspaceIds,
-  });
-  const results = [];
+  const sql = postgres(requireEnv("DATABASE_URL"));
+  try {
+    const workspaces = await loadWorkspaces({
+      allWorkspaces,
+      sql,
+      workspaceIds,
+    });
+    const results = [];
 
-  for (const workspace of workspaces) {
-    results.push(await syncWorkspace({ baseUrl, client, workspace }));
+    for (const workspace of workspaces) {
+      results.push(await syncWorkspace({ baseUrl, sql, workspace }));
+    }
+
+    return results;
+  } finally {
+    await sql.end();
   }
-
-  return results;
 }
 
-async function loadWorkspaces({ allWorkspaces, client, workspaceIds }) {
-  const query = adminDb.from("workspace").select("id, name, twilio_data");
-  const response = allWorkspaces
-    ? await query
-    : await query.in("id", workspaceIds);
-
-  if (response.error) {
-    throw response.error;
-  }
-
-  const rawWorkspaces = Array.isArray(response.data) ? response.data : [];
+async function loadWorkspaces({ allWorkspaces, sql, workspaceIds }) {
+  const rawWorkspaces = allWorkspaces
+    ? await sql`SELECT id, name, twilio_data FROM workspace`
+    : await sql`SELECT id, name, twilio_data FROM workspace WHERE id = ANY(${workspaceIds})`;
 
   if (!allWorkspaces) {
     const loadedWorkspaceIds = new Set(rawWorkspaces.map((workspace) => workspace.id));
@@ -310,7 +305,7 @@ function hasTwilioCredentials(twilioData) {
   );
 }
 
-async function syncWorkspace({ baseUrl, client, workspace }) {
+async function syncWorkspace({ baseUrl, sql, workspace }) {
   const result = {
     errors: [],
     id: workspace.id,
@@ -324,14 +319,9 @@ async function syncWorkspace({ baseUrl, client, workspace }) {
       workspace.twilioData.sid,
       workspace.twilioData.authToken,
     );
-    const { data: workspaceNumbers, error } = await client
-      .from("workspace_number")
-      .select("phone_number")
-      .eq("workspace", workspace.id);
-
-    if (error) {
-      throw error;
-    }
+    const workspaceNumbers = await sql`
+      SELECT phone_number FROM workspace_number WHERE workspace = ${workspace.id}
+    `;
 
     const phoneNumbers = Array.isArray(workspaceNumbers) ? workspaceNumbers : [];
 
@@ -366,7 +356,7 @@ async function syncWorkspace({ baseUrl, client, workspace }) {
 
     await updateWorkspaceOnboardingMetadata({
       baseUrl,
-      client,
+      sql,
       workspace,
     });
   } catch (error) {
@@ -376,7 +366,7 @@ async function syncWorkspace({ baseUrl, client, workspace }) {
   return result;
 }
 
-async function updateWorkspaceOnboardingMetadata({ baseUrl, client, workspace }) {
+async function updateWorkspaceOnboardingMetadata({ baseUrl, sql, workspace }) {
   const currentTwilioData = workspace.twilioData;
   const onboarding = asRecord(currentTwilioData.onboarding);
   const subaccountBootstrap = asRecord(onboarding.subaccountBootstrap);
@@ -396,14 +386,11 @@ async function updateWorkspaceOnboardingMetadata({ baseUrl, client, workspace })
     },
   };
 
-  const { error } = await client
-    .from("workspace")
-    .update({ twilio_data: nextTwilioData })
-    .eq("id", workspace.id);
-
-  if (error) {
-    throw error;
-  }
+  await sql`
+    UPDATE workspace
+    SET twilio_data = ${JSON.stringify(nextTwilioData)}
+    WHERE id = ${workspace.id}
+  `;
 }
 
 function asRecord(value) {

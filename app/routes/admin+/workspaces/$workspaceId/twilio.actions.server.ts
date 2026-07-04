@@ -1,5 +1,6 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
+import { triggerTwilioOpenSync } from "@/lib/twilio-open-sync.server";
 
 import {
   createWorkspaceTwilioInstance,
@@ -161,33 +162,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (actionName === "trigger_twilio_open_sync") {
-        try {
-            const url = `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/twilio-open-sync`;
-            const response = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                workspaceId,
-                callLimit: 50,
-                messageLimit: 50,
-                maxAgeMinutes: 120,
-              }),
-            });
-
-            if (!response.ok) {
-              return routeData({ error: `Edge function returned ${response.status}` }, { status: 500 });
-            }
-
-            const data = await response.json();
-            const summary =
-              data && typeof data === "object"
-                ? JSON.stringify(data)
-                : "Open sync completed";
-            return routeData({ success: `Twilio open sync triggered: ${summary}` });
-        } catch (error) {
-            logger.error("Twilio open sync trigger failed:", error);
-            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
-        }
+      const result = await triggerTwilioOpenSync({
+        workspaceId,
+        callLimit: 50,
+        messageLimit: 50,
+        maxAgeMinutes: 120,
+      });
+      return result.ok
+        ? routeData({ success: result.message })
+        : routeData({ error: result.error }, { status: 500 });
     }
 
     if (actionName === "sync_a2p_status") {

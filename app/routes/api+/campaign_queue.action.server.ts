@@ -9,6 +9,8 @@ import { parseRequestData } from "@/lib/database.server";
 import { safeNumber } from "@/lib/type-safety-utils";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { campaign_queue as campaignQueueTable } from "@/db/schema";
+// eslint-disable-next-line no-restricted-imports
+// campaign_queue is a join table without a workspace column; tdb cannot scope it.
 import { db } from "@/server/db";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 

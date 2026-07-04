@@ -19,6 +19,15 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+const tenantDbMocks = vi.hoisted(() => ({
+  message: {
+    insert: vi.fn(async () => [{ id: 1 }]),
+  },
+  contact: {
+    findFirst: vi.fn(async () => null),
+  },
+}));
+
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: any[]) => mocks.verifyApiKeyOrSession(...args),
 }));
@@ -56,6 +65,10 @@ vi.mock("@/lib/twilio-readiness.server", () => ({
 }));
 vi.mock("@/lib/twilio-client.server", () => ({
   withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => tenantDbMocks),
 }));
 
 function makeDbClientStub(opts: {
@@ -126,6 +139,10 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.processTemplateTags.mockClear();
     mocks.env.BETTER_AUTH_URL.mockClear();
     mocks.logger.error.mockReset();
+    tenantDbMocks.message.insert.mockReset();
+    tenantDbMocks.message.insert.mockResolvedValue([{ id: 1 }]);
+    tenantDbMocks.contact.findFirst.mockReset();
+    tenantDbMocks.contact.findFirst.mockResolvedValue(null);
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
       trafficClass: "unknown",
       throughputProduct: "none",
@@ -350,6 +367,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   test("sendMessage throws when message insert fails", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
     const client = makeDbClientStub({ messageInsertError: { message: "db" }, webhookRows: [] });
+    tenantDbMocks.message.insert.mockRejectedValueOnce(new Error("db"));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
@@ -519,7 +537,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("action session requires workspace access and returns 404 on invalid phone number", async () => {
-    const null = makeDbClientStub({});
+    const dbClient = makeDbClientStub({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "123",
@@ -538,7 +556,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action skips template processing when contact lookup errors", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const null = makeDbClientStub({
+    const dbClient = makeDbClientStub({
       contactRow: null,
       contactError: { message: "nope" },
       webhookRows: [],
@@ -565,10 +583,11 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action processes template tags when contact found and returns 201", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const null = makeDbClientStub({
+    const dbClient = makeDbClientStub({
       contactRow: { firstname: "A" },
       webhookRows: [],
     });
+    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ firstname: "A" });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+1 (555) 123-4567",
@@ -593,7 +612,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action uses messaging service mode and message intent overrides", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const null = makeDbClientStub({
+    const dbClient = makeDbClientStub({
       contactRow: { firstname: "A" },
       webhookRows: [],
     });
@@ -659,7 +678,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("action returns 500 when createWorkspaceTwilioInstance throws", async () => {
-    const null = makeDbClientStub({});
+    const dbClient = makeDbClientStub({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",

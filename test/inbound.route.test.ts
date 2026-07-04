@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { resolveInboundVoicemailAudio } from "@/lib/inbound-voicemail-twiml.server";
 
 const mocks = vi.hoisted(() => {
   process.env.DATABASE_URL =
@@ -56,6 +57,18 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
 vi.mock("@/lib/handset/handset-session.server", () => ({
   findActiveHandsetSessionClientIdentity: (...a: unknown[]) =>
     mocks.findActiveHandsetSessionClientIdentity(...a),
+}));
+vi.mock("@/lib/inbound-voicemail-twiml.server", () => ({
+  resolveInboundVoicemailAudio: vi.fn(),
+  appendInboundVoicemailTwiml: vi.fn(({ twiml, voicemailAudioUrl, phoneNumber }: any) => {
+    if (voicemailAudioUrl) {
+      twiml.play(voicemailAudioUrl);
+    } else {
+      twiml.say(`Thank you for calling ${phoneNumber ?? ""}, we're unable to answer your call at the moment. Please leave us a message and we'll get back to you as soon as possible.`);
+    }
+    twiml.pause({ length: 1 });
+    twiml.record({ transcribe: true, timeout: 10, playBeep: true });
+  }),
 }));
 vi.mock("@/lib/twilio-webhook.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/twilio-webhook.server")>();
@@ -193,6 +206,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     );
     mocks.logger.error.mockReset();
     mocks.logger.warn.mockReset();
+    vi.mocked(resolveInboundVoicemailAudio).mockReset();
   });
 
   test("returns 400 when Called missing", async () => {
@@ -288,12 +302,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         inbound_audio: "vm.mp3",
       }),
     );
-    mocks.createClient.mockReturnValueOnce(
-      makeDbClient({
-        voicemailSignedUrl: "https://signed",
-        voicemailList: [{ name: "vm.mp3", id: "vm.mp3" }],
-      }),
-    );
+    vi.mocked(resolveInboundVoicemailAudio).mockResolvedValueOnce({ signedUrl: "https://signed" });
     res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
@@ -311,22 +320,11 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         inbound_audio: "vm.mp3",
       }),
     );
-    const fallbackListSpy = vi.fn();
-    mocks.createClient.mockReturnValueOnce(
-      makeDbClient({
-        voicemailSignedUrl: null,
-        voicemailListSpy: fallbackListSpy,
-      }),
-    );
+    vi.mocked(resolveInboundVoicemailAudio).mockResolvedValueOnce(null);
     res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     expect(await res.text()).toContain("leave us a message");
-    expect(fallbackListSpy).toHaveBeenCalledWith("w1", {
-      search: "vm.mp3",
-      limit: 20,
-      offset: 0,
-    });
 
     // else path => say "try again later"
     mocks.isPhoneNumber.mockReturnValue(false);

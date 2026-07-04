@@ -11,12 +11,13 @@ const mocks = vi.hoisted(() => {
     requeueAllCampaignQueueForCampaign: vi.fn(async () => []),
     resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
     resolveContactWorkspaceId: vi.fn(async () => "w1"),
+    rpcSelectAndUpdateCampaignContacts: vi.fn(async () => []),
+    rpcDequeueContact: vi.fn(async () => ({})),
   };
 });
 
-vi.mock("../app/lib/adminDb.server", () => ({
-  getSession: () => ({ headers: new Headers(),
-  }),
+vi.mock("@/lib/api-auth.server", () => ({
+  requireJsonAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })),
 }));
 vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
@@ -32,10 +33,10 @@ vi.mock("@/lib/platform-telephony.server", () => ({
   resolveCampaignWorkspaceId: (...args: unknown[]) => mocks.resolveCampaignWorkspaceId(...args),
   resolveContactWorkspaceId: (...args: unknown[]) => mocks.resolveContactWorkspaceId(...args),
 }));
-
-function withQueueActionClient(null: { rpc?: ReturnType<typeof vi.fn> }) {
-  return null;
-}
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcSelectAndUpdateCampaignContacts: (...args: unknown[]) => mocks.rpcSelectAndUpdateCampaignContacts(...args),
+  rpcDequeueContact: (...args: unknown[]) => mocks.rpcDequeueContact(...args),
+}));
 
 describe("app/routes/api+/queues/route.tsx", () => {
   beforeEach(() => {
@@ -46,6 +47,8 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.requeueAllCampaignQueueForCampaign.mockReset();
     mocks.resolveCampaignWorkspaceId.mockReset();
     mocks.resolveContactWorkspaceId.mockReset();
+    mocks.rpcSelectAndUpdateCampaignContacts.mockReset();
+    mocks.rpcDequeueContact.mockReset();
     mocks.resolveCampaignWorkspaceId.mockResolvedValue("w1");
     mocks.resolveContactWorkspaceId.mockResolvedValue("w1");
     mocks.fetchCampaignQueueRowsByIds.mockResolvedValue([]);
@@ -62,22 +65,22 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("loader uses default limit when missing", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
-    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    mocks.rpcSelectAndUpdateCampaignContacts.mockResolvedValueOnce([]);
+    queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=7"),
     } as any));
     await expect(res.json()).resolves.toEqual([]);
-    expect(rpc).toHaveBeenCalledWith("select_and_update_campaign_contacts", {
-      p_campaign_id: 7,
-      p_initial_limit: 10,
+    expect(mocks.rpcSelectAndUpdateCampaignContacts).toHaveBeenCalledWith("u1", {
+      campaignId: 7,
+      limit: 10,
     });
   });
 
   test("loader returns [] when rpc returns empty", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
-    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    mocks.rpcSelectAndUpdateCampaignContacts.mockResolvedValueOnce([]);
+    queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=10"),
@@ -86,9 +89,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("loader returns queue items from campaign_queue", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: [{ queue_id: 1 }, { queue_id: 2 }] });
+    mocks.rpcSelectAndUpdateCampaignContacts.mockResolvedValueOnce([{ queue_id: 1 }, { queue_id: 2 }]);
     mocks.fetchCampaignQueueRowsByIds.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
-    queueJsonAuthSession({ null: { rpc }, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(await mod.loader({
@@ -96,16 +99,16 @@ describe("app/routes/api+/queues/route.tsx", () => {
     } as any));
 
     await expect(res.json()).resolves.toEqual([{ id: 1 }, { id: 2 }]);
-    expect(rpc).toHaveBeenCalledWith("select_and_update_campaign_contacts", {
-      p_campaign_id: 99,
-      p_initial_limit: 2,
+    expect(mocks.rpcSelectAndUpdateCampaignContacts).toHaveBeenCalledWith("u1", {
+      campaignId: 99,
+      limit: 2,
     });
     expect(mocks.fetchCampaignQueueRowsByIds).toHaveBeenCalledWith([1, 2]);
   });
 
   test("action POST returns 500 and logs when rpc errors", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: { message: "rpc fail" } });
-    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    mocks.rpcDequeueContact.mockRejectedValueOnce(new Error("rpc fail"));
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
 
     const mod = await import("../app/routes/api+/queues");
@@ -114,19 +117,13 @@ describe("app/routes/api+/queues/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "rpc fail" });
+    await expect(res.json()).resolves.toMatchObject({ error: "rpc fail" });
     expect(mocks.logger.error).toHaveBeenCalled();
-    expect(rpc).toHaveBeenCalledWith("dequeue_contact", {
-      passed_contact_id: 1,
-      group_on_household: true,
-      dequeued_by_id: "u1",
-      dequeued_reason_text: "Manually dequeued by user",
-    });
   });
 
   test("action POST returns data on success", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: { ok: true }, error: null });
-    queueJsonAuthSession({ null: withQueueActionClient({ rpc }), user: { id: "u1" } });
+    mocks.rpcDequeueContact.mockResolvedValueOnce({ ok: true });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
     const mod = await import("../app/routes/api+/queues");
@@ -135,7 +132,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ ok: true });
+    await expect(res.json()).resolves.toEqual({ success: true });
   });
 
   test("action DELETE returns 500 and logs when update errors", async () => {

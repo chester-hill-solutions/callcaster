@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { uploadObject } from "@/lib/object-storage.server";
+
 const mocks = vi.hoisted(() => {
   class AudioUploadError extends Error {
     status: number;
@@ -35,29 +37,14 @@ vi.mock("@/lib/audio.server", () => ({
   normalizeUploadedAudio: (...args: unknown[]) => mocks.normalizeUploadedAudio(...args),
 }));
 vi.mock("@/lib/auth.server", () => ({
-  getSession: () => ({ headers: new Headers(),
-  }),
+  getSession: () => ({ headers: new Headers() }),
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-
-function makeDbClient(opts?: { uploadError?: unknown }) {
-  const upload = vi.fn(async () => ({
-    data: opts?.uploadError ? null : { path: "workspaceAudio/w1/greeting.mp3" },
-    error: opts?.uploadError ?? null,
-  }));
-
-  return {
-    upload,
-    client: {
-      storage: {
-        from: () => ({
-          upload,
-        }),
-      },
-    },
-  };
-}
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: vi.fn().mockResolvedValue(undefined),
+  createSignedObjectUrl: vi.fn().mockResolvedValue("https://signed"),
+}));
 
 describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
   beforeEach(() => {
@@ -66,12 +53,12 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     mocks.normalizeUploadedAudio.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
+    vi.mocked(uploadObject).mockReset();
+    vi.mocked(uploadObject).mockResolvedValue(undefined);
   });
 
   test("normalizes the upload before storing a canonical mp3", async () => {
-    const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      null: client.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockResolvedValueOnce({
@@ -100,21 +87,16 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     expect(response.headers.get("Location")).toBe("../audios?uploaded=1");
     expect(mocks.normalizeUploadedAudio).toHaveBeenCalledTimes(1);
     expect(mocks.getSafeMediaBaseName).toHaveBeenCalledWith(" Greeting ");
-    expect(client.upload).toHaveBeenCalledWith(
+    expect(vi.mocked(uploadObject)).toHaveBeenCalledWith(
+      "workspaceAudio",
       "w1/Greeting.mp3",
       Buffer.from("normalized-audio"),
-      {
-        cacheControl: "60",
-        upsert: false,
-        contentType: "audio/mpeg",
-      },
+      { contentType: "audio/mpeg" },
     );
   });
 
   test("returns a validation error when no file is provided", async () => {
-    const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      null: client.client,
       headers: new Headers(),
     });
 
@@ -136,13 +118,11 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Please choose an audio file to upload.",
     });
     expect(mocks.normalizeUploadedAudio).not.toHaveBeenCalled();
-    expect(client.upload).not.toHaveBeenCalled();
+    expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
   });
 
   test("returns helper failures without uploading invalid audio", async () => {
-    const client = makeDbClient();
     mocks.verifyAuth.mockResolvedValueOnce({
-      null: client.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockRejectedValueOnce(
@@ -171,6 +151,6 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Unsupported audio format.",
     });
     expect(mocks.logger.error).toHaveBeenCalled();
-    expect(client.upload).not.toHaveBeenCalled();
+    expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
   });
 });

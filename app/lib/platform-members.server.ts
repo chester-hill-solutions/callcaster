@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
 import { env } from "@/lib/env.server";
+import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import type {
   upsertWebhookBodySchema,
 } from "@/lib/schemas/api/platform-workspace-admin";
@@ -140,45 +141,17 @@ export async function inviteWorkspaceMember(
     }
   }
 
-  let inviteData: unknown = null;
-  let inviteUserError: Error | null = null;
-  try {
-    const response = await fetch(
-      `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/invite-user-by-email`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId,
-          email: cleanedEmail,
-          role,
-        }),
-      },
-    );
-    if (!response.ok) {
-      inviteUserError = new Error(`HTTP ${response.status}`);
-    } else {
-      inviteData = await response.json();
-    }
-  } catch (e) {
-    inviteUserError = e instanceof Error ? e : new Error(String(e));
+  const result = await inviteUserByEmail({
+    workspaceId,
+    email: cleanedEmail,
+    role,
+  });
+
+  if (!result.ok) {
+    return { ok: false as const, error: result.error, status: 400 };
   }
 
-  if (inviteUserError) {
-    if (existingUserId) {
-      const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
-      if (pendingInvite) {
-        return {
-          ok: true as const,
-          invite: inviteData,
-          warning: "Invite was created but email delivery may have failed.",
-        };
-      }
-    }
-    return { ok: false as const, error: inviteUserError.message, status: 400 };
-  }
-
-  return { ok: true as const, invite: inviteData };
+  return { ok: true as const, invite: result.invite };
 }
 
 export async function updateWorkspaceMemberRole(

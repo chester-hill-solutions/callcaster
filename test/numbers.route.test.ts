@@ -237,7 +237,6 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     expect(res.status).toBe(200);
     expect(mocks.requireWorkspaceAccess).toHaveBeenCalled();
     expect(mocks.createWorkspaceTwilioInstance).toHaveBeenCalledWith({
-      client: {},
       workspace_id: "w1",
     });
     expect(twilioCtor).not.toHaveBeenCalled();

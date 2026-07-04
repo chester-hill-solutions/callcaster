@@ -83,6 +83,14 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
   getUserById: (...args: unknown[]) => workspaceMembersMocks.getUserById(...args),
 }));
 
+const rpcMocks = vi.hoisted(() => ({
+  rpcGetAudiencesByCampaign: vi.fn(async () => ({ data: [], error: null })),
+}));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcGetAudiencesByCampaign: (...args: unknown[]) => rpcMocks.rpcGetAudiencesByCampaign(...args),
+}));
+
 import {
   getCallScreenData,
   getInitialCallsList,
@@ -99,6 +107,8 @@ describe("call-screen.server", () => {
     adminDbMocks.workspaceRows = [{ id: "ws-1" }];
     adminDbMocks.workspaceError = null;
     workspaceMembersMocks.getUserById.mockReset();
+    rpcMocks.rpcGetAudiencesByCampaign.mockReset();
+    rpcMocks.rpcGetAudiencesByCampaign.mockResolvedValue({ data: [], error: null });
     queueSearchMocks.countCampaignQueueRows.mockResolvedValue(10);
     queueSearchMocks.countCompletedCampaignQueueRows.mockResolvedValue(4);
     queueSearchMocks.fetchActiveCampaignQueueWithContacts.mockResolvedValue([]);
@@ -165,10 +175,8 @@ describe("call-screen.server", () => {
   test("getCallScreenData throws when any query errors", async () => {
     tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockRejectedValue(new Error("boom"));
     tenantDbMocks.outreachFindMany.mockResolvedValue([]);
-    const client = {
-      rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
-    };
-    await expect(getCallScreenData(client as never, "1", "ws-1", "user-1")).rejects.toThrow(
+    rpcMocks.rpcGetAudiencesByCampaign.mockResolvedValue({ data: [], error: null });
+    await expect(getCallScreenData("1", "ws-1", "user-1")).rejects.toThrow(
       "Error fetching campaign data",
     );
   });
@@ -183,12 +191,9 @@ describe("call-screen.server", () => {
     tenantDbMocks.callFindMany.mockResolvedValue([]);
     queueSearchMocks.countCampaignQueueRows.mockResolvedValue(10);
     queueSearchMocks.countCompletedCampaignQueueRows.mockResolvedValue(4);
+    rpcMocks.rpcGetAudiencesByCampaign.mockResolvedValue({ data: [{ id: "aud-1" }], error: null });
 
-    const client = {
-      rpc: vi.fn().mockResolvedValue({ data: [{ id: "aud-1" }], error: null }),
-    };
-
-    const result = await getCallScreenData(client as never, "1", "ws-1", "user-1");
+    const result = await getCallScreenData("1", "ws-1", "user-1");
     expect(result.workspaceData).toEqual({ id: "ws-1" });
     expect(result.campaign).toEqual({ id: 1, script: null });
     expect(result.audiences).toEqual([{ id: "aud-1" }]);

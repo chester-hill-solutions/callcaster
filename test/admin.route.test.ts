@@ -46,7 +46,7 @@ describe("app/routes/admin+.tsx action", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mocks.syncWorkspaceTwilio).toHaveBeenCalledWith({}, "w1");
+    expect(mocks.syncWorkspaceTwilio).toHaveBeenCalledWith("w1");
   });
 
   test("toggle_workspace_status updates workspace disabled flag", async () => {
@@ -65,6 +65,6 @@ describe("app/routes/admin+.tsx action", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mocks.toggleWorkspaceStatus).toHaveBeenCalledWith({}, "w2", true);
+    expect(mocks.toggleWorkspaceStatus).toHaveBeenCalledWith("w2", true);
   });
 });

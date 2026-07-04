@@ -3,7 +3,7 @@ import { rowsToCsv } from "@/lib/rpc-csv.server";
 import { db, type Database as DbInstance } from "@/server/db";
 import { withAppCurrentUser } from "@/server/tenant-db";
 
-export type RpcExecutor = typeof db | DbInstance;
+export type RpcExecutor = { execute: (query: SQL) => Promise<unknown[]> };
 
 async function queryRows<T extends Record<string, unknown>>(
   executor: RpcExecutor,

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
+import { rpcGetCampaignQueue } from "@/lib/db-rpc.server";
 
 const WORKSPACE_ID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -21,6 +22,14 @@ vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...a: any[]) => mocks.safeParseJson(...a),
   requireWorkspaceAccess: (...a: any[]) => mocks.requireWorkspaceAccess(...a),
 }));
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignByIdForWorkspace: vi.fn(async () => ({ id: 1 })),
+}));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcGetCampaignQueue: vi.fn(),
+}));
 vi.mock("../app/lib/adminDb.server", () => ({
   verifyAuth: (...a: any[]) => mocks.verifyAuth(...a),
 }));
@@ -29,24 +38,6 @@ vi.mock("../app/lib/utils", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
-
-function makenever(rpcImpl: () => Promise<{ data: unknown; error: unknown }>) {
-  return {
-    from: (table: string) => {
-      if (table !== "campaign") throw new Error(`unexpected table ${table}`);
-      return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: { id: 1 }, error: null }),
-            }),
-          }),
-        }),
-      };
-    },
-    rpc: rpcImpl,
-  };
-}
 
 describe("app/routes/api+/initiate-ivr/route.tsx", () => {
   beforeEach(() => {
@@ -67,10 +58,8 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       user_id: { id: "u1" },
       workspace_id: WORKSPACE_ID,
     });
-    queueJsonAuthSession({
-      null: makenever(async () => ({ data: null, error: new Error("rpc") })),
-      user: { id: "u1" },
-    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+    vi.mocked(rpcGetCampaignQueue).mockRejectedValueOnce(new Error("rpc"));
     const mod = await import("../app/routes/api+/initiate-ivr");
     await expect(mod.action({ request: new Request("http://x", { method: "POST" }) } as any)).rejects.toThrow("rpc");
   });
@@ -81,13 +70,10 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       user_id: { id: "u1" },
       workspace_id: WORKSPACE_ID,
     });
-    queueJsonAuthSession({
-      null: makenever(async () => ({
-        data: [{ id: "q1", contact_id: "c1", caller_id: "+1", phone: "555" }],
-        error: null,
-      })),
-      user: { id: "u1" },
-    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+    vi.mocked(rpcGetCampaignQueue).mockResolvedValueOnce([
+      { id: "q1", contact_id: "c1", caller_id: "+1", phone: "555" },
+    ]);
     mocks.fetch.mockResolvedValueOnce({
       json: async () => ({ creditsError: true }),
     } as any);
@@ -103,10 +89,8 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       user_id: { id: "u1" },
       workspace_id: WORKSPACE_ID,
     });
-    queueJsonAuthSession({
-      null: makenever(async () => ({ data: queue, error: null })),
-      user: { id: "u1" },
-    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+    vi.mocked(rpcGetCampaignQueue).mockResolvedValueOnce(queue);
     mocks.fetch.mockRejectedValueOnce(new Error("net"));
 
     const mod = await import("../app/routes/api+/initiate-ivr");

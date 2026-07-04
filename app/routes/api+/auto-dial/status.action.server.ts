@@ -10,7 +10,9 @@ import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
+// eslint-disable-next-line no-restricted-imports
+// adminDb is used for Supabase Realtime channels (not available via tdb).
 import { adminDb } from "@/server/admin-db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
@@ -153,7 +155,9 @@ const handleCallStatus = async (
     }
     await updateTransaction(callUpdate, duration);
 
-    await rpcDequeueContact(db, {
+    const workspace = requireValue(dbCall.workspace, "workspace");
+    const tdb = createTenantDb(workspace);
+    await rpcDequeueContact(tdb, {
       contactId: outreachStatus.contact_id,
       groupOnHousehold: true,
       dequeuedById: callUpdate.conference_id ?? "",

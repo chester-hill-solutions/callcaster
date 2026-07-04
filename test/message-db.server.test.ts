@@ -44,6 +44,7 @@ describe("app/lib/message-db.server.ts", () => {
     const result = await mod.fetchMessagePageForContact(
       "w1",
       "+15550001111",
+      null,
       { pageSize: 2 },
     );
 

@@ -58,7 +58,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   });
 
   test("POST enqueues contact ids (string->number), with defaults", async () => {
-    const null = {};
+    const dbClient = {};
     queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: ["1", 2], campaign_id: "10" });
 

@@ -27,7 +27,7 @@ import {
 } from "@/lib/throughput-config.server";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
@@ -167,8 +167,9 @@ const createOutreachAttempt = async ({
   workspace: string;
   user_id: string;
 }) => {
+  const tdb = createTenantDb(workspace);
   try {
-    return await rpcCreateOutreachAttempt(db, {
+    return await rpcCreateOutreachAttempt(tdb, {
       contactId: Number(contact_id),
       campaignId: Number(campaign_id),
       userId: user_id,

@@ -13,9 +13,12 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+vi.mock("@/lib/api-auth.server", () => ({
+  getDualAuthUser: (auth: any) => auth,
+  requireDualAuth: vi.fn(async () => ({ user: { id: "u1" } })),
+}));
 vi.mock("@/lib/auth.server", () => ({
-  getSession: () => ({ headers: new Headers({ "X": "1" }),
-  }),
+  getSession: vi.fn(async (request: Request) => ({ user: { id: "u1" }, headers: new Headers(request.headers) })),
 }));
 vi.mock("@/lib/database.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
@@ -27,7 +30,7 @@ vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
 }));
 
-function authSession(null: unknown, headers = new Headers()) {
+function authSession(_session: unknown, headers = new Headers()) {
   return queueDualAuthSession({
     headers,
     user: { id: "u1" },
@@ -54,9 +57,8 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
 
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/campaigns", { method: "PATCH" }),
+      request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
-    expect(res.headers.get("X")).toBe("1");
     await expect(res.json()).resolves.toMatchObject({ campaign: { id: 1 } });
   });
 

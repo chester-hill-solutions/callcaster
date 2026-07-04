@@ -3,7 +3,8 @@ import { safeParseJson } from "@/lib/database.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { getSession } from "@/lib/auth.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
+import { resolveContactWorkspaceId } from "@/lib/platform-telephony.server";
 import type { ActionFunctionArgs } from "react-router";
 
 interface OutreachAttemptRequest {
@@ -21,12 +22,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest =
       await safeParseJson(request);
 
+    const workspaceId = await resolveContactWorkspaceId(contact_id);
+    if (!workspaceId) {
+      return routeData({ error: "Contact not found" }, { headers });
+    }
+    const tdb = createTenantDb(workspaceId);
+
     try {
-      const data = await rpcCreateOutreachAttempt(db, {
+      const data = await rpcCreateOutreachAttempt(tdb, {
         contactId: Number(contact_id),
         campaignId: Number(campaign_id),
         userId: user?.id ?? "",
-        workspaceId: "",
+        workspaceId,
         queueId: Number(queue_id),
       });
       return routeData(data, { headers });

@@ -94,7 +94,22 @@ vi.mock("@/server/admin-db", () => ({
         }),
       })),
     })),
+    execute: vi.fn(async (query: unknown) => {
+      const sql = typeof query === "object" && query !== null ? String(query) : String(query ?? "");
+      if (sql.includes("from call")) {
+        return [{ id: 1 }];
+      }
+      if (sql.includes("from message")) {
+        return [{ id: "m1" }];
+      }
+      return [];
+    }),
   },
+}));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcCancelOutreachAttemptsByCallIds: vi.fn(async () => ({})),
+  rpcCancelMessages: vi.fn(async () => ({})),
 }));
 
 vi.mock("twilio", () => {
@@ -275,7 +290,6 @@ describe("database.server helpers", () => {
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        null: {} as any,
       }),
     ).rejects.toThrow("no row");
 
@@ -285,7 +299,6 @@ describe("database.server helpers", () => {
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        null: {} as any,
       }),
     ).rejects.toThrow("No workspace found");
 
@@ -299,7 +312,6 @@ describe("database.server helpers", () => {
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "",
-        null: {} as any,
       }),
     ).rejects.toThrow("User ID is required");
   });
@@ -339,7 +351,6 @@ describe("database.server helpers", () => {
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        null: {} as any,
       }),
     ).resolves.toBeUndefined();
 
@@ -366,7 +377,6 @@ describe("database.server helpers", () => {
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        null: {} as any,
       }),
     ).resolves.toBeUndefined();
     expect(loggerMocks.error).toHaveBeenCalled();
@@ -374,10 +384,6 @@ describe("database.server helpers", () => {
 
   test("cancelQueuedCalls returns canceled IDs, aggregates per-call errors, and handles list() failures", async () => {
     const mod = await import("../app/lib/database.server");
-
-    const client = {
-      rpc: vi.fn(async () => ({})),
-    } as any;
 
     const update = vi
       .fn()
@@ -400,7 +406,7 @@ describe("database.server helpers", () => {
       ),
     } as any;
 
-    const res = await mod.cancelQueuedCalls(twilio, client, 2);
+    const res = await mod.cancelQueuedCalls(twilio, 2);
     expect(res.canceledCalls).toEqual(["CA1"]);
     expect(res.errors.join("\n")).toMatch(
       /Error canceling call CA2: Unknown error/,
@@ -412,28 +418,24 @@ describe("database.server helpers", () => {
     const twilioFail = {
       calls: { list: async () => Promise.reject(new Error("list failed")) },
     } as any;
-    const res2 = await mod.cancelQueuedCalls(twilioFail, client, 100);
+    const res2 = await mod.cancelQueuedCalls(twilioFail, 100);
     expect(res2.canceledCalls).toEqual([]);
     expect(res2.errors[0]).toMatch(/Error retrieving calls: list failed/);
 
     const twilioFailUnknown = {
       calls: { list: async () => Promise.reject("nope") },
     } as any;
-    const res3 = await mod.cancelQueuedCalls(twilioFailUnknown, client, 100);
+    const res3 = await mod.cancelQueuedCalls(twilioFailUnknown, 100);
     expect(res3.errors[0]).toMatch(/Error retrieving calls: Unknown error/);
 
     // Covers default batchSize = 100
     const twilioEmpty = { calls: { list: async () => [] } } as any;
-    const res4 = await mod.cancelQueuedCalls(twilioEmpty, client);
+    const res4 = await mod.cancelQueuedCalls(twilioEmpty);
     expect(res4).toEqual({ canceledCalls: [], errors: [] });
   });
 
   test("cancelQueuedMessages returns canceled IDs, aggregates per-message errors, and handles list() failures", async () => {
     const mod = await import("../app/lib/database.server");
-
-    const client = {
-      rpc: vi.fn(async () => ({})),
-    } as any;
 
     const update = vi
       .fn()
@@ -456,7 +458,7 @@ describe("database.server helpers", () => {
       ),
     } as any;
 
-    const res = await mod.cancelQueuedMessages(twilio, client, 2);
+    const res = await mod.cancelQueuedMessages(twilio, 2);
     expect(res.canceledMessages).toEqual(["SM1"]);
     expect(res.errors.join("\n")).toMatch(
       /Error canceling call SM2: msg update failed/,
@@ -468,19 +470,19 @@ describe("database.server helpers", () => {
     const twilioFail = {
       messages: { list: async () => Promise.reject("nope") },
     } as any;
-    const res2 = await mod.cancelQueuedMessages(twilioFail, client, 100);
+    const res2 = await mod.cancelQueuedMessages(twilioFail, 100);
     expect(res2.canceledMessages).toEqual([]);
     expect(res2.errors[0]).toMatch(/Error retrieving messages: Unknown error/);
 
     const twilioFailErr = {
       messages: { list: async () => Promise.reject(new Error("list failed")) },
     } as any;
-    const res2b = await mod.cancelQueuedMessages(twilioFailErr, client, 100);
+    const res2b = await mod.cancelQueuedMessages(twilioFailErr, 100);
     expect(res2b.errors[0]).toMatch(/Error retrieving messages: list failed/);
 
     // Covers default batchSize = 100
     const twilioEmpty = { messages: { list: async () => [] } } as any;
-    const res3 = await mod.cancelQueuedMessages(twilioEmpty, client);
+    const res3 = await mod.cancelQueuedMessages(twilioEmpty);
     expect(res3).toEqual({ canceledMessages: [], errors: [] });
   });
 
@@ -496,10 +498,6 @@ describe("database.server helpers", () => {
     adminDbMocks.messageSelectCalls = 0;
     adminDbMocks.nextQueryKind = "message";
 
-    const client = {
-      rpc: vi.fn(async () => ({})),
-    } as any;
-
     const twilio = {
       messages: ((sid: string) => ({
         update: async () => update(sid),
@@ -508,19 +506,16 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      client,
       77,
       10,
     );
     expect(res).toEqual({ canceledMessages: ["SM1", "SM2"], errors: [] });
     expect(update).toHaveBeenCalledTimes(2);
-    expect(adminDb.rpc).toHaveBeenCalledTimes(2);
 
     adminDbMocks.messageRows = [];
     adminDbMocks.messageSelectCalls = 0;
     const resDefault = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      client,
       99,
     );
     expect(resDefault).toEqual({ canceledMessages: [], errors: [] });
@@ -537,7 +532,6 @@ describe("database.server helpers", () => {
     adminDbMocks.messageSelectCalls = 0;
     const queryErrorRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      {} as any,
       1,
       5,
     );
@@ -550,7 +544,6 @@ describe("database.server helpers", () => {
     adminDbMocks.messageSelectCalls = 0;
     const unknownMessageRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      {} as any,
       1,
       5,
     );
@@ -563,7 +556,6 @@ describe("database.server helpers", () => {
     adminDbMocks.messageSelectCalls = 0;
     const thrownRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      {} as any,
       1,
       5,
     );
@@ -576,7 +568,6 @@ describe("database.server helpers", () => {
     adminDbMocks.messageSelectCalls = 0;
     const unknownThrownRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      {} as any,
       1,
       5,
     );
@@ -603,7 +594,6 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      client,
       55,
       2,
     );
@@ -623,7 +613,6 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      {} as any,
       12,
       3,
     );

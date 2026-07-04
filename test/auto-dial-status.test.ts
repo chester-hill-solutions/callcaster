@@ -43,6 +43,7 @@ const twilioValidation = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
   validateTwilioWebhookForCallSid: vi.fn(),
 }));
+const rpcDequeueContactMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/twilio-webhook.server", () => ({
   validateTwilioWebhookForCallSid: (...args: unknown[]) =>
     twilioValidation.validateTwilioWebhookForCallSid(...args),
@@ -62,6 +63,10 @@ vi.mock("@/lib/telephony-db.server", async () => {
     insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
   };
 });
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcDequeueContact: rpcDequeueContactMock,
+}));
 
 const twilioClientMock = {
   conferences: Object.assign(
@@ -205,6 +210,32 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
       }
       return { data: null, error: rpcDequeueError };
     }),
+    execute: vi.fn(async (query: any) => {
+      const sqlText = typeof query === "string"
+        ? query
+        : typeof query?.toSQL === "function"
+          ? JSON.stringify(query.toSQL())
+          : JSON.stringify(query);
+      if (sqlText.includes("apply_ledger_entry_and_sync_credits")) {
+        const values = query?.queryChunks?.filter((_: unknown, i: number) => i % 2 === 1) ?? [];
+        const [workspace, type, amount, idempotencyKey, note, campaignId, callSid, messageSid] = values;
+        const result = await makeApplyLedgerEntryRpcStub(transactionRows)(
+          "apply_ledger_entry_and_sync_credits",
+          {
+            p_workspace_id: workspace,
+            p_type: type,
+            p_amount: amount,
+            p_idempotency_key: idempotencyKey,
+            p_description: note,
+            p_campaign_id: campaignId,
+            p_call_sid: callSid,
+            p_message_sid: messageSid,
+          },
+        );
+        return result.data ? [result.data] : [];
+      }
+      return [];
+    }),
     channel: () => ({ send: vi.fn() }),
     removeChannel: vi.fn(),
     _transactionRows: transactionRows,
@@ -217,6 +248,7 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
       outreachFetchError,
       outreachUpdateError,
       outreachUpdateThrows,
+      rpcDequeueError,
     },
   };
 }
@@ -226,6 +258,30 @@ const clientState = vi.hoisted(() => ({ client: null as any }));
 
 vi.mock("@/lib/auth.server", () => ({
   getAdminDb: () => clientState.client,
+}));
+
+vi.mock("@/server/admin-db", () => ({
+  adminDb: new Proxy({} as any, {
+    get(_target, prop) {
+      const client = clientState.client;
+      return client?.[prop];
+    },
+  }),
+}));
+
+vi.mock("@/server/db", () => ({
+  db: new Proxy({} as any, {
+    get(_target, prop) {
+      const client = clientState.client;
+      return client?.[prop];
+    },
+  }),
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    execute: vi.fn(async () => []),
+  }),
 }));
 
 async function usePostgresStub(args?: Parameters<typeof makeDbClientStub>[0]) {
@@ -259,6 +315,8 @@ describe("api.auto-dial.status", () => {
     campaignQueueDbMocks.updateError = null;
     campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockReset();
     loggerMocks.info.mockReset();
+    rpcDequeueContactMock.mockReset();
+    rpcDequeueContactMock.mockImplementation(async () => {});
     vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
   });
 
@@ -336,9 +394,10 @@ describe("api.auto-dial.status", () => {
 
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
-    expect(postgresStub.rpc).toHaveBeenCalledWith("dequeue_contact", expect.objectContaining({
-      passed_contact_id: 1,
-    }));
+    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ contactId: 1 }),
+    );
   });
 
   test("returns 500 when call lookup fails", async () => {
@@ -554,7 +613,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rpc dequeue_contact error returns 500", async () => {
-    postgresStub = await usePostgresStub({ rpcDequeueError: new Error("dq") } as any);
+    rpcDequeueContactMock.mockRejectedValue(new Error("dq"));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -571,7 +630,11 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith("Error dequeing contact", expect.any(Error));
+    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ contactId: 1 }),
+    );
+    expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
 
   test("participant-leave outreach fetch error returns 500", async () => {

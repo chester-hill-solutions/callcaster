@@ -6,6 +6,8 @@ import {
   WORKSPACE_EVENTS_NOTIFY_CHANNEL,
   fetchWorkspaceEventsAfter,
 } from "@/lib/workspace-events.server";
+// eslint-disable-next-line no-restricted-imports
+// directPool is required for Postgres LISTEN/NOTIFY; tdb cannot provide raw pool access.
 import { directPool } from "@/server/db";
 
 const POLL_INTERVAL_MS = 2_000;

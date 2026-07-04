@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => {
     loadCampaignSmsDispatchData: vi.fn(),
     countCampaignMessagesToPhone: vi.fn(),
     updateOutreachAttemptForWorkspace: vi.fn(),
+    rpcCreateOutreachAttempt: vi.fn(),
     env: {
       BETTER_AUTH_URL: vi.fn(() => "http://client"),
       BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service-key"),
@@ -106,6 +107,13 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
 
 vi.mock("@/lib/sms-campaign-db.server", () => ({
   loadCampaignSmsDispatchData: (...args: unknown[]) => mocks.loadCampaignSmsDispatchData(...args),
+}));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
+}));
+vi.mock("@/lib/object-storage.server", () => ({
+  createSignedObjectUrl: (...args: unknown[]) => Promise.resolve("http://signed-1"),
 }));
 
 vi.mock("@/lib/message-db.server", async (importOriginal) => {
@@ -240,6 +248,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.loadCampaignSmsDispatchData.mockReset();
     mocks.countCampaignMessagesToPhone.mockReset();
     mocks.updateOutreachAttemptForWorkspace.mockReset();
+    mocks.rpcCreateOutreachAttempt.mockReset();
     mocks.logger.error.mockReset();
     mocks.createClient.mockClear();
     mocks.verifyApiKeyOrSession.mockResolvedValue({
@@ -248,6 +257,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       client: {},
     });
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue(defaultPortalConfig);
+    mocks.rpcCreateOutreachAttempt.mockResolvedValue("oa1");
 
     (globalThis as any).fetch = vi.fn(async () => ({ ok: true, text: async () => "http://tiny" }));
   });
@@ -446,9 +456,9 @@ describe("app/routes/api+/sms/route.tsx", () => {
 
   test("createOutreachAttempt rpc error returns per-member success=false", async () => {
     currentClient = makeDbClient({
-      rpcResult: { data: null, error: { message: "rpc-bad" } },
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
+    mocks.rpcCreateOutreachAttempt.mockRejectedValueOnce(new Error("rpc-bad"));
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c4",
       workspace_id: TEST_WORKSPACE_ID,

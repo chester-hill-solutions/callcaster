@@ -73,7 +73,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
   test("parses contact_ids[] string/array, filters NaN, and returns success payload", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
     postgresServerMocks.headers = headers;
-    const null = {};
+    const dbClient = {};
     queueJsonAuthSession({
       headers,
       user: { id: "u1" },

@@ -1,3 +1,5 @@
+process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+
 import { beforeAll, vi } from "vitest";
 import "./setup-route-auth-mock";
 import "./helpers/route-auth-mock";

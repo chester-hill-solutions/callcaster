@@ -7,7 +7,7 @@ import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -34,7 +34,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     await requireWorkspaceAccess({ user, workspaceId: workspace_id });
-    outreachAttemptId = await rpcCreateOutreachAttempt(db, {
+    const tdb = createTenantDb(workspace_id);
+    outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
       contactId: Number(contact_id),
       campaignId: Number(campaign_id),
       userId: user_id,

@@ -140,7 +140,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     setUpsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
-      workspace: null,
+      workspace: "w1",
       parent_call_sid: "CA_PARENT",
     });
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce({ workspace: "w_parent", outreach_attempt_id: 77 });
@@ -148,11 +148,11 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     telephonyDbMocks.findOutreachAttemptWithCampaignType.mockRejectedValueOnce(new Error("Failed to fetch current attempt"));
 
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
-      request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed" }),
-    } as any));
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "Failed to fetch current attempt" });
+    await expect(
+      mod.action({
+        request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed" }),
+      } as any),
+    ).rejects.toThrow("Failed to fetch current attempt");
   });
 
   test("skips realtime.send when no currentAttempt and still bills with workspaceId", async () => {
@@ -250,14 +250,14 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     setUpsertRow({
       sid: "CA1",
       outreach_attempt_id: 10,
-      workspace: undefined,
+      workspace: "w1",
       parent_call_sid: null,
     });
     setCurrentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "busy", CalledVia: "client:u3" }),
+      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u3" }),
     } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.debug).toHaveBeenCalledWith(

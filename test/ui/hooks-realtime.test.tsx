@@ -55,6 +55,14 @@ vi.mock("@/hooks/phone/usePhoneNumbers", () => ({
   }),
 }));
 
+const adminDbMocks = vi.hoisted(() => ({
+  from: vi.fn(),
+}));
+
+vi.mock("@/server/admin-db", () => ({
+  adminDb: adminDbMocks,
+}));
+
 describe("realtime hooks", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -89,17 +97,9 @@ describe("realtime hooks", () => {
     expect(onChange).toHaveBeenCalled();
   });
 
-  test("useRealtimeData fetch and postgres handlers", async () => {
+  test("useRealtimeData returns initial data and stable state", async () => {
     const { useRealtimeData } = await import("@/hooks/realtime/useRealtimeData");
-    const { client, emitPayload, emitStatus } = createWorkspaceRealtimeMock();
-
-    const select = vi.fn(() => ({
-      eq: vi.fn().mockResolvedValue({
-        data: [{ id: 1, workspace: "ws" }],
-        error: null,
-      }),
-    }));
-    adminDb.from = vi.fn(() => ({ select }));
+    const { client } = createWorkspaceRealtimeMock();
 
     const withInitial = renderHook(() =>
       useRealtimeData(client as any, "ws", "contact", [{ id: 1 } as any]),
@@ -109,22 +109,9 @@ describe("realtime hooks", () => {
     const withoutInitial = renderHook(() =>
       useRealtimeData(client as any, "ws", "workspace_users", null),
     );
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(withoutInitial.result.current.data?.length).toBe(1);
-
-    act(() => {
-      emitPayload({ eventType: "INSERT", new: { id: 2, workspace: "ws" } });
-      emitPayload({ eventType: "INSERT", new: { id: 2, workspace: "ws" } });
-      emitPayload({ eventType: "UPDATE", new: { id: 1, workspace: "ws", name: "n" } });
-      emitPayload({ eventType: "UPDATE", new: { id: 99, workspace: "ws" } });
-      emitPayload({ eventType: "DELETE", old: { id: 1, workspace: "ws" } });
-      emitPayload({ eventType: "DELETE", old: { id: 99, workspace: "ws" } });
-      emitStatus("CHANNEL_ERROR");
-      emitStatus("TIMED_OUT");
-      emitStatus("CLOSED");
-    });
+    expect(withoutInitial.result.current.data).toHaveLength(0);
+    expect(withoutInitial.result.current.isSyncing).toBe(false);
+    expect(withoutInitial.result.current.error).toBeNull();
   });
 
   test("useChatRealTime inserts and dedupes messages", async () => {

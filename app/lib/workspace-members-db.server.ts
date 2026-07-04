@@ -33,7 +33,7 @@ export async function findWorkspaceInviteForUser(
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   return tdb.workspace_invite.findFirst({
     where: eq(workspaceInviteTable.user_id, userId),
-    columns: { id: true },
+    columns: { id: true, role: true, created_at: true, isNew: true },
   });
 }
 

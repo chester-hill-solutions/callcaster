@@ -4,7 +4,8 @@ import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  getWorkspaceById: vi.fn(),
+  mergeWorkspaceTwilioData: vi.fn(),
   verifyAuth: vi.fn(),
   safeParseJson: vi.fn(),
   requireWorkspaceAccess: vi.fn(),
@@ -21,8 +22,9 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@client/client-js", () => ({
-  createClient: mocks.createClient,
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  getWorkspaceById: mocks.getWorkspaceById,
+  mergeWorkspaceTwilioData: mocks.mergeWorkspaceTwilioData,
 }));
 vi.mock("@/lib/auth.server", () => ({
   verifyAuth: mocks.verifyAuth,
@@ -40,7 +42,8 @@ vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 describe("app/routes/api+/workspace/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
+    mocks.getWorkspaceById.mockReset();
+    mocks.mergeWorkspaceTwilioData.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.createErrorResponse.mockClear();
@@ -52,20 +55,11 @@ describe("app/routes/api+/workspace/route.tsx", () => {
   });
 
   test("does not wipe twilio_data when update object is empty", async () => {
-    const selectSingle = vi.fn(async () => ({
-      data: { id: "w1", twilio_data: { authToken: "token" } },
-      error: null,
-    }));
-    const updateSpy = vi.fn();
-
-    mocks.createClient.mockReturnValue({
-      from: () => ({
-        select: () => ({
-          eq: () => ({ single: selectSingle }),
-        }),
-        update: updateSpy,
-      }),
+    mocks.getWorkspaceById.mockResolvedValue({
+      id: "w1",
+      twilio_data: { authToken: "token" },
     });
+    mocks.mergeWorkspaceTwilioData.mockResolvedValue(null);
     mocks.safeParseJson.mockResolvedValue({ workspace_id: "w1", update: {} });
 
     const mod = await import("../app/routes/api+/workspace");
@@ -73,7 +67,7 @@ describe("app/routes/api+/workspace/route.tsx", () => {
       request: new Request("http://x", { method: "POST" }),
     } as any));
 
-    expect(updateSpy).not.toHaveBeenCalled();
+    expect(mocks.mergeWorkspaceTwilioData).not.toHaveBeenCalled();
     expect(response.status).toEqual(expect.any(Number));
     await expect(response.json()).resolves.toMatchObject({
       id: "w1",
@@ -82,58 +76,33 @@ describe("app/routes/api+/workspace/route.tsx", () => {
   });
 
   test("merges update fields into existing twilio_data", async () => {
-    const selectSingle = vi.fn(async () => ({
-      data: {
-        id: "w1",
-        twilio_data: { authToken: "token", accountSid: "AC1" },
-      },
-      error: null,
-    }));
-    const updatePayloads: unknown[] = [];
-    const updateSingle = vi.fn(async () => ({
-      data: {
-        id: "w1",
-        twilio_data: {
-          authToken: "token",
-          accountSid: "AC1",
-          onboardingStatus: "enabled",
-        },
-      },
-      error: null,
-    }));
-
-    mocks.createClient.mockReturnValue({
-      from: () => ({
-        select: () => ({
-          eq: () => ({ single: selectSingle }),
-        }),
-        update: (payload: unknown) => {
-          updatePayloads.push(payload);
-          return {
-            eq: () => ({
-              select: () => ({ single: updateSingle }),
-            }),
-          };
-        },
-      }),
+    mocks.getWorkspaceById.mockResolvedValue({
+      id: "w1",
+      twilio_data: { authToken: "token", accountSid: "AC1" },
     });
+    const mergedWorkspace = {
+      id: "w1",
+      twilio_data: {
+        authToken: "token",
+        accountSid: "AC1",
+        onboardingStatus: "enabled",
+      },
+    };
+    mocks.mergeWorkspaceTwilioData.mockResolvedValue(mergedWorkspace);
     mocks.safeParseJson.mockResolvedValue({
       workspace_id: "w1",
       update: { onboardingStatus: "enabled" },
     });
 
     const mod = await import("../app/routes/api+/workspace");
-    await mod.action({
+    const response = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
 
-    expect(updatePayloads).toHaveLength(1);
-    expect(updatePayloads[0]).toEqual({
-      twilio_data: {
-        authToken: "token",
-        accountSid: "AC1",
-        onboardingStatus: "enabled",
-      },
-    });
+    expect(mocks.mergeWorkspaceTwilioData).toHaveBeenCalledWith(
+      "w1",
+      { onboardingStatus: "enabled" },
+    );
+    await expect(response.json()).resolves.toEqual(mergedWorkspace);
   });
 });

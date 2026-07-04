@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   env: {
     TWILIO_AUTH_TOKEN: () => "main-dev-token",
   },
+  findCallBySid: vi.fn(),
+  findWorkspaceNumberByPhoneNumber: vi.fn(),
+  getWorkspaceById: vi.fn(),
+  loadWorkspaceTwilioData: vi.fn(),
 }));
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -16,6 +20,19 @@ vi.mock("@/twilio.server", () => ({
     mocks.validateTwilioWebhookParams(...args),
   shouldValidateTwilioWebhooks: () => mocks.shouldValidateTwilioWebhooks(),
 }));
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallBySid: (...args: unknown[]) => mocks.findCallBySid(...args),
+}));
+vi.mock("@/lib/inbound-call-db.server", () => ({
+  findWorkspaceNumberByPhoneNumber: (...args: unknown[]) =>
+    mocks.findWorkspaceNumberByPhoneNumber(...args),
+}));
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  getWorkspaceById: (...args: unknown[]) => mocks.getWorkspaceById(...args),
+}));
+vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
+  loadWorkspaceTwilioData: (...args: unknown[]) => mocks.loadWorkspaceTwilioData(...args),
+}));
 
 import {
   resolveWorkspaceTwilioData,
@@ -23,60 +40,6 @@ import {
   validateTwilioWebhookForCallSid,
   validateTwilioWebhookForPhoneNumber,
 } from "@/lib/twilio-webhook.server";
-
-function makeDbClient(opts?: {
-  callWorkspace?: string | null;
-  workspaceTwilioData?: unknown;
-  numberRow?: {
-    workspace: string | { id: string; twilio_data?: unknown };
-    handset_enabled?: boolean;
-  } | null;
-  numberError?: unknown;
-}) {
-  return {
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: opts?.callWorkspace
-                  ? { workspace: opts.callWorkspace }
-                  : null,
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { twilio_data: opts?.workspaceTwilioData ?? null },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "workspace_number") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({
-                data: opts?.numberRow ?? null,
-                error: opts?.numberError ?? null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    },
-  };
-}
 
 function makeRequest(url = "http://localhost/api/test", headers?: Record<string, string>) {
   const fd = new FormData();
@@ -95,6 +58,10 @@ describe("twilio-webhook.server", () => {
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
     mocks.shouldValidateTwilioWebhooks.mockReturnValue(true);
     mocks.logger.info.mockReset();
+    mocks.findCallBySid.mockReset();
+    mocks.findWorkspaceNumberByPhoneNumber.mockReset();
+    mocks.getWorkspaceById.mockReset();
+    mocks.loadWorkspaceTwilioData.mockReset();
     vi.stubEnv("NODE_ENV", "development");
   });
 
@@ -105,12 +72,11 @@ describe("twilio-webhook.server", () => {
   });
 
   test("resolveWorkspaceTwilioData fetches workspace twilio_data when join lacks token", async () => {
-    const client = makeDbClient({
-      workspaceTwilioData: { sid: "AC1", authToken: "fetched-token" },
+    mocks.getWorkspaceById.mockResolvedValueOnce({
+      twilio_data: { sid: "AC1", authToken: "fetched-token" },
     });
 
     const result = await resolveWorkspaceTwilioData(
-      client as never,
       "w1",
       { sid: "AC1" },
       mocks.logger,
@@ -124,10 +90,8 @@ describe("twilio-webhook.server", () => {
   });
 
   test("validateTwilioWebhookForPhoneNumber rejects empty phone", async () => {
-    const client = makeDbClient();
     const result = await validateTwilioWebhookForPhoneNumber({
       request: makeRequest(),
-      client: client as never,
       phoneNumber: "   ",
       params: { Called: "   " },
     });
@@ -142,14 +106,13 @@ describe("twilio-webhook.server", () => {
   });
 
   test("validateTwilioWebhookForCallSid uses dev auth token when call row missing", async () => {
-    const client = makeDbClient({ callWorkspace: null });
+    mocks.findCallBySid.mockResolvedValueOnce(null);
     mocks.validateTwilioWebhookParams.mockImplementation(
       (_params, _sig, _url, token: string) => token === "main-dev-token",
     );
 
     const result = await validateTwilioWebhookForCallSid({
       request: makeRequest(),
-      client: client as never,
       callSid: "CA_UNKNOWN",
       params: { CallSid: "CA_UNKNOWN" },
     });
@@ -162,11 +125,10 @@ describe("twilio-webhook.server", () => {
 
   test("validateTwilioWebhookForCallSid rejects unknown call in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    const client = makeDbClient({ callWorkspace: null });
+    mocks.findCallBySid.mockResolvedValueOnce(null);
 
     const result = await validateTwilioWebhookForCallSid({
       request: makeRequest(),
-      client: client as never,
       callSid: "CA_UNKNOWN",
       params: { CallSid: "CA_UNKNOWN" },
     });
@@ -178,16 +140,16 @@ describe("twilio-webhook.server", () => {
   });
 
   test("validateTwilioWebhookForPhoneNumber returns numberRow with handset_enabled", async () => {
-    const client = makeDbClient({
-      numberRow: {
-        workspace: { id: "w1", twilio_data: { sid: "AC1", authToken: "tok" } },
-        handset_enabled: true,
-      },
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce({
+      workspaceId: "w1",
+      handset_enabled: true,
+    });
+    mocks.getWorkspaceById.mockResolvedValueOnce({
+      twilio_data: { sid: "AC1", authToken: "tok" },
     });
 
     const result = await validateTwilioWebhookForPhoneNumber({
       request: makeRequest("http://localhost/api/inbound-handset"),
-      client: client as never,
       phoneNumber: "+15551234567",
       params: { Called: "+15551234567" },
     });

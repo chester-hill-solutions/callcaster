@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
   validateTwilioWebhookForPhoneNumber: vi.fn(),
   env: {
     BETTER_AUTH_URL: () => "https://sb.example",
@@ -12,15 +11,20 @@ const mocks = vi.hoisted(() => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@client/client-js", () => ({
-  createClient: (...args: unknown[]) => mocks.createClient(...args),
+const handsetSessionMocks = vi.hoisted(() => ({
+  findActiveHandsetSessionClientIdentity: vi.fn(async () => "agent-1"),
 }));
+
 vi.mock("@/lib/twilio-webhook.server", () => ({
   validateTwilioWebhookForPhoneNumber: (...args: unknown[]) =>
     mocks.validateTwilioWebhookForPhoneNumber(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/handset/handset-session.server", () => ({
+  findActiveHandsetSessionClientIdentity: (...args: unknown[]) =>
+    handsetSessionMocks.findActiveHandsetSessionClientIdentity(...args),
+}));
 
 vi.mock("twilio", () => {
   class VoiceResponse {
@@ -45,36 +49,6 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeDbClient(opts?: {
-  session?: { client_identity: string } | null;
-}) {
-  return {
-    from: (table: string) => {
-      if (table === "handset_session") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                gte: () => ({
-                  order: () => ({
-                    limit: () => ({
-                      maybeSingle: async () => ({
-                        data: opts?.session ?? { client_identity: "agent-1" },
-                        error: null,
-                      }),
-                    }),
-                  }),
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    },
-  };
-}
-
 function makeRequest(called = "+15551234567") {
   const fd = new FormData();
   fd.set("Called", called);
@@ -84,7 +58,8 @@ function makeRequest(called = "+15551234567") {
 describe("app/routes/api+/inbound-handset", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
+    handsetSessionMocks.findActiveHandsetSessionClientIdentity.mockReset();
+    handsetSessionMocks.findActiveHandsetSessionClientIdentity.mockResolvedValue("agent-1");
     mocks.validateTwilioWebhookForPhoneNumber.mockReset();
     mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValue({
       ok: true,
@@ -103,7 +78,6 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }),
     });
-    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const res = await asRouteResponse(
       await mod.action({ request: makeRequest() } as never),
@@ -118,7 +92,6 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }),
     });
-    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const fd = new FormData();
     const res = await asRouteResponse(
@@ -139,7 +112,6 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }),
     });
-    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const res = await asRouteResponse(
       await mod.action({ request: makeRequest("+19999999999") } as never),
@@ -148,7 +120,6 @@ describe("app/routes/api+/inbound-handset", () => {
   });
 
   test("returns TwiML dialing client on happy path", async () => {
-    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound-handset");
     const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");

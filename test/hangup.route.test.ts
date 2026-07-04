@@ -23,6 +23,23 @@ vi.mock("../app/lib/database.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  findActiveAssignedQueueForUser: vi.fn(),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallConferenceIdForWorkspace: vi.fn(),
+  updateOutreachDispositionByContactId: vi.fn(),
+}));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcDequeueContact: vi.fn(),
+}));
+
+import { findActiveAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
+import { findCallConferenceIdForWorkspace, updateOutreachDispositionByContactId } from "@/lib/telephony-db.server";
+import { rpcDequeueContact } from "@/lib/db-rpc.server";
+
 function makeDbClient(options?: {
   queueError?: any;
   rpcError?: any;
@@ -102,10 +119,13 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.logger.error.mockReset();
+    vi.mocked(findActiveAssignedQueueForUser).mockReset();
+    vi.mocked(findCallConferenceIdForWorkspace).mockReset();
+    vi.mocked(updateOutreachDispositionByContactId).mockReset();
+    vi.mocked(rpcDequeueContact).mockReset();
   });
 
-  test("hangs up, broadcasts idle, dequeues, updates outreach, removes channel", async () => {
-    const { client, realtimeSend, removeChannel } = makeDbClient();
+  test("hangs up, dequeues, and updates outreach", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({
       conference_id: "conf",
@@ -114,18 +134,19 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     });
     const callUpdate = vi.fn(async () => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
+    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce({
+      contact_id: 2,
+      group_household_queue: true,
+    });
 
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(realtimeSend).toHaveBeenCalledWith(
-      expect.objectContaining({ payload: expect.objectContaining({ status: "idle" }) }),
-    );
-    expect(removeChannel).toHaveBeenCalled();
+    expect(rpcDequeueContact).toHaveBeenCalled();
+    expect(updateOutreachDispositionByContactId).toHaveBeenCalledWith("w1", 2, "completed");
   });
 
   test("returns 200 when Twilio returns 21220 (call already ended)", async () => {
-    const { client, realtimeSend } = makeDbClient();
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     const err21220 = new Error("Call is not in-progress. Cannot redirect.") as Error & { code: number };
@@ -137,17 +158,18 @@ describe("app/routes/api+/hangup/route.tsx", () => {
         },
       }),
     });
+    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce({
+      contact_id: 2,
+      group_household_queue: false,
+    });
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(realtimeSend).toHaveBeenCalledWith(
-      expect.objectContaining({ payload: expect.objectContaining({ status: "idle" }) }),
-    );
+    expect(rpcDequeueContact).toHaveBeenCalled();
   });
 
   test("returns 500 when Twilio throws non-21220", async () => {
-    const { client } = makeDbClient();
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
@@ -164,11 +186,11 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   });
 
   test("returns 200 when no queue entry (handset mode)", async () => {
-    const { client } = makeDbClient({ queueRows: [] });
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "conf", workspaceId: "w1", callSid: "CA1" });
     const callUpdate = vi.fn(async () => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
+    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
@@ -176,10 +198,14 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   });
 
   test("outreach update error is thrown and returns 500", async () => {
-    const { client } = makeDbClient({ outreachError: new Error("outreach") });
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce({
+      contact_id: 2,
+      group_household_queue: false,
+    });
+    vi.mocked(updateOutreachDispositionByContactId).mockRejectedValueOnce(new Error("outreach"));
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);

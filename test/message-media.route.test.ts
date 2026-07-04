@@ -7,6 +7,7 @@ vi.hoisted(() => {
 
 import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession } from "./helpers/route-auth-mock";
+import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
 const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
@@ -19,6 +20,7 @@ const campaignMocks = vi.hoisted(() => ({
   updateCampaignMessageMedia: vi.fn(),
 }));
 
+
 vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
   return {
@@ -30,11 +32,15 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   };
 });
 
-vi.mock("../app/lib/adminDb.server", () => ({
-  getSession: () => ({ headers: postgresServerMocks.headers,
-  }),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: postgresServerMocks.headers }),
+  requireDualAuth: vi.fn(),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: vi.fn(),
+  createSignedObjectUrl: vi.fn(),
+}));
 
 function makeDbClient(opts?: {
   uploadError?: any;
@@ -43,6 +49,18 @@ function makeDbClient(opts?: {
   updateError?: any;
   campaign?: any;
 }) {
+  vi.mocked(uploadObject).mockImplementation(async () => {
+    if (opts?.uploadError) {
+      throw opts.uploadError;
+    }
+    return undefined;
+  });
+  vi.mocked(createSignedObjectUrl).mockImplementation(async () => {
+    if (opts?.signedUrlError) {
+      throw opts.signedUrlError;
+    }
+    return "https://signed";
+  });
   const hasCampaignOverride = Boolean(opts && Object.prototype.hasOwnProperty.call(opts, "campaign"));
   campaignMocks.findCampaignMessageMedia.mockImplementation(async () => {
     if (opts?.campaignError) {
@@ -71,7 +89,7 @@ function makeDbClient(opts?: {
       }),
     },
   };
-  return null;
+  return mockClient;
 }
 
 function req(method: string, fd: FormData) {
@@ -84,6 +102,8 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     mocks.logger.error.mockReset();
     campaignMocks.findCampaignMessageMedia.mockReset();
     campaignMocks.updateCampaignMessageMedia.mockReset();
+    vi.mocked(uploadObject).mockReset();
+    vi.mocked(createSignedObjectUrl).mockReset();
   });
 
   test("requires workspaceId", async () => {

@@ -79,7 +79,7 @@ describe("app/routes/api+/token/route.tsx", () => {
 
   test("loader generates token with authenticated user identity and logs debug", async () => {
     mocks.getWorkspaceById.mockResolvedValueOnce({
-      twilio_data: { sid: "AC1" },
+      twilio_data: JSON.stringify({ sid: "AC1" }),
       key: "K",
       token: "S",
     });
@@ -104,7 +104,7 @@ describe("app/routes/api+/token/route.tsx", () => {
 
   test("loader handles non-string sid and null key/token", async () => {
     mocks.getWorkspaceById.mockResolvedValueOnce({
-      twilio_data: { sid: 123 },
+      twilio_data: JSON.stringify({ sid: 123 }),
       key: null,
       token: undefined,
     });
@@ -125,7 +125,7 @@ describe("app/routes/api+/token/route.tsx", () => {
 
   test("loader returns error response when requireWorkspaceAccess throws", async () => {
     mocks.getWorkspaceById.mockResolvedValueOnce({
-      twilio_data: { sid: "AC1" },
+      twilio_data: JSON.stringify({ sid: "AC1" }),
       key: "K",
       token: "S",
     });

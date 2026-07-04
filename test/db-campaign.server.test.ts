@@ -27,6 +27,20 @@ const dbMocks = vi.hoisted(() => ({
   select: vi.fn(),
 }));
 
+const rpcMocks = vi.hoisted(() => ({
+  rpcGetCampaignStats: vi.fn(),
+}));
+
+const queueSearchMocks = vi.hoisted(() => ({
+  countCampaignQueueRows: vi.fn(),
+  countQueuedCampaignQueueRows: vi.fn(),
+  countDialableCampaignQueueRows: vi.fn(),
+  countDialableCompletedCampaignQueueRows: vi.fn(),
+  countDialableQueuedCampaignQueueRows: vi.fn(),
+  fetchCampaignQueueWithContacts: vi.fn(),
+  fetchDialableCampaignQueueWithContacts: vi.fn(),
+}));
+
 describe("app/lib/database/campaign.server.ts", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -50,6 +64,29 @@ describe("app/lib/database/campaign.server.ts", () => {
     vi.doMock("../app/lib/database/workspace.server", () => ({
       getSignedUrls: vi.fn(async () => ["signed-1"]),
     }));
+    vi.doMock("../app/lib/db-rpc.server", () => ({
+      rpcGetCampaignStats: rpcMocks.rpcGetCampaignStats,
+    }));
+    vi.doMock("../app/lib/campaign-queue-search.server", () => ({
+      countCampaignQueueRows: queueSearchMocks.countCampaignQueueRows,
+      countQueuedCampaignQueueRows: queueSearchMocks.countQueuedCampaignQueueRows,
+      countDialableCampaignQueueRows: queueSearchMocks.countDialableCampaignQueueRows,
+      countDialableCompletedCampaignQueueRows: queueSearchMocks.countDialableCompletedCampaignQueueRows,
+      countDialableQueuedCampaignQueueRows: queueSearchMocks.countDialableQueuedCampaignQueueRows,
+      fetchCampaignQueueWithContacts: queueSearchMocks.fetchCampaignQueueWithContacts,
+      fetchDialableCampaignQueueWithContacts: queueSearchMocks.fetchDialableCampaignQueueWithContacts,
+    }));
+    rpcMocks.rpcGetCampaignStats.mockReset();
+    for (const fn of Object.values(queueSearchMocks)) {
+      fn.mockReset();
+    }
+    queueSearchMocks.countCampaignQueueRows.mockResolvedValue(0);
+    queueSearchMocks.countQueuedCampaignQueueRows.mockResolvedValue(0);
+    queueSearchMocks.countDialableCampaignQueueRows.mockResolvedValue(0);
+    queueSearchMocks.countDialableCompletedCampaignQueueRows.mockResolvedValue(0);
+    queueSearchMocks.countDialableQueuedCampaignQueueRows.mockResolvedValue(0);
+    queueSearchMocks.fetchCampaignQueueWithContacts.mockResolvedValue([]);
+    queueSearchMocks.fetchDialableCampaignQueueWithContacts.mockResolvedValue([]);
   });
 
   test("getCampaignTableKey maps types and throws for invalid", async () => {
@@ -349,14 +386,11 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchBasicResults logs on error and returns []", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const client: any = {
-      rpc: vi.fn(async () => ({ data: null, error: new Error("x") })),
-    };
+    rpcMocks.rpcGetCampaignStats.mockRejectedValueOnce(new Error("x"));
     tdbMocks.campaign.findFirst.mockResolvedValueOnce({ type: "live_call" });
     const out = await mod.fetchBasicResults({
       workspaceId: "w1",
       campaignId: "1",
-      null: client,
     });
     expect(out).toEqual([]);
     expect(logger.error).toHaveBeenCalled();
@@ -365,14 +399,11 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchBasicResults success returns data", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const client: any = {
-      rpc: vi.fn(async () => ({ data: [{ ok: 1 }], error: null })),
-    };
+    rpcMocks.rpcGetCampaignStats.mockResolvedValueOnce([{ ok: 1 }]);
     tdbMocks.campaign.findFirst.mockResolvedValueOnce({ type: "live_call" });
     const out = await mod.fetchBasicResults({
       workspaceId: "w1",
       campaignId: "1",
-      null: client,
     });
     expect(out).toEqual([{ ok: 1 }]);
     expect(logger.error).not.toHaveBeenCalled();
@@ -382,38 +413,24 @@ describe("app/lib/database/campaign.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
 
-    const client: any = {
-      from: () => ({
-        select: (_s: any, _o: any) => ({
-          eq: async () => ({ count: 1, error: new Error("a") }),
-        }),
-      }),
-    };
+    queueSearchMocks.countCampaignQueueRows.mockRejectedValueOnce(new Error("a"));
     tdbMocks.outreach_attempt.count.mockRejectedValueOnce(new Error("b"));
     const res = await mod.fetchCampaignCounts({
       workspaceId: "w1",
       campaignId: "1",
-      null: client,
     });
-    expect(res).toEqual({ callCount: 1, completedCount: null });
+    expect(res).toEqual({ callCount: null, completedCount: null });
     expect(logger.error).toHaveBeenCalledTimes(2);
   });
 
   test("fetchCampaignCounts success does not log", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const client: any = {
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ count: 1, error: null }),
-        }),
-      }),
-    };
+    queueSearchMocks.countCampaignQueueRows.mockResolvedValueOnce(1);
     tdbMocks.outreach_attempt.count.mockResolvedValueOnce(2);
     const res = await mod.fetchCampaignCounts({
       workspaceId: "w1",
       campaignId: "1",
-      null: client,
     });
     expect(res).toEqual({ callCount: 1, completedCount: 2 });
     expect(logger.error).not.toHaveBeenCalled();
@@ -472,159 +489,43 @@ describe("app/lib/database/campaign.server.ts", () => {
     ).resolves.toMatchObject({ campaign_id: 1, script_id: 2, body_text: "hi" });
   });
 
-  test("fetchQueueCounts throws with helpful messages and returns counts on success", async () => {
+  test("fetchQueueCounts propagates queue count helper errors and returns counts on success", async () => {
     const mod = await import("../app/lib/database/campaign.server");
 
-    let mode: "ok" | "fullErr" | "queuedErr" = "ok";
-    const makeCampaignQueueQuery = () => {
-      const state = { hasQueueStateFilter: false };
-      const chain: any = {
-        select: () => chain,
-        eq: (k: string, v: any) => {
-          if (k === "queue_state" && v === "queued") state.hasQueueStateFilter = true;
-          return chain;
-        },
-        not: () => chain,
-        neq: () => chain,
-        is: () => chain,
-        limit: async () => {
-          if (mode === "fullErr" && !state.hasQueueStateFilter) {
-            return { error: { message: "full" }, count: null };
-          }
-          if (mode === "queuedErr" && state.hasQueueStateFilter) {
-            return { error: { message: "queued" }, count: null };
-          }
-          return { error: null, count: state.hasQueueStateFilter ? 3 : 10 };
-        },
-      };
-      return chain;
-    };
-
-    const client: any = { from: () => makeCampaignQueueQuery() };
-
-    mode = "fullErr";
-    await expect(
-      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", null: client }),
-    ).rejects.toThrow("Error fetching full count");
-
-    mode = "queuedErr";
-    await expect(
-      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", null: client }),
-    ).rejects.toThrow(
-      "Error fetching queued count",
+    queueSearchMocks.countDialableCampaignQueueRows.mockRejectedValueOnce(
+      new Error("full"),
     );
-
-    // Missing message branches => "Unknown error ..."
-    mode = "fullErr";
-    const postgresNoMsg: any = {
-      from: () => {
-        const state = { hasQueueStateFilter: false };
-        const chain: any = {
-          select: () => chain,
-          eq: (k: string, v: any) => {
-            if (k === "queue_state" && v === "queued") state.hasQueueStateFilter = true;
-            return chain;
-          },
-          not: () => chain,
-          neq: () => chain,
-          is: () => chain,
-          limit: async () => ({
-            error: state.hasQueueStateFilter ? null : ({} as any),
-            count: null,
-          }),
-        };
-        return chain;
-      },
-    };
     await expect(
-      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1", null: postgresNoMsg }),
-    ).rejects.toThrow(
-      "Unknown error fetching full count",
-    );
+      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1" }),
+    ).rejects.toThrow("full");
 
-    const postgresNoQueuedMsg: any = {
-      from: () => {
-        const state = { hasQueueStateFilter: false };
-        const chain: any = {
-          select: () => chain,
-          eq: (k: string, v: any) => {
-            if (k === "queue_state" && v === "queued") state.hasQueueStateFilter = true;
-            return chain;
-          },
-          not: () => chain,
-          neq: () => chain,
-          is: () => chain,
-          limit: async () =>
-            state.hasQueueStateFilter
-              ? ({ error: {} as any, count: null } as any)
-              : { error: null, count: 10 },
-        };
-        return chain;
-      },
-    };
+    queueSearchMocks.countDialableCampaignQueueRows.mockResolvedValueOnce(10);
+    queueSearchMocks.countDialableQueuedCampaignQueueRows.mockRejectedValueOnce(
+      new Error("queued"),
+    );
     await expect(
-      mod.fetchQueueCounts({
-        workspaceId: "w1",
-        campaignId: "1",
-        null: postgresNoQueuedMsg,
-      }),
-    ).rejects.toThrow(
-      "Unknown error fetching queued count",
-    );
+      mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1" }),
+    ).rejects.toThrow("queued");
 
-    mode = "ok";
-    const ok = await mod.fetchQueueCounts({
-      workspaceId: "w1",
-      campaignId: "1",
-      null: client,
-    });
+    queueSearchMocks.countDialableCampaignQueueRows.mockResolvedValueOnce(10);
+    queueSearchMocks.countDialableQueuedCampaignQueueRows.mockResolvedValueOnce(3);
+    const ok = await mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1" });
     expect(ok).toEqual({ fullCount: 10, queuedCount: 3 });
   });
 
   test("fetchCampaignAudience returns data and throws for any query error", async () => {
     const mod = await import("../app/lib/database/campaign.server");
 
-    const makeClient = (
-      errs: { queue?: any; queued?: any; dequeued?: any } = {},
-    ) => ({
-      from: (table: string) => {
-        if (table === "campaign_queue") {
-          const state = { isQueuedQuery: false, isDequeuedQuery: false, limit: 0 };
-          const chain: any = {
-            select: () => chain,
-            eq: (k: string, v: any) => {
-              if (k === "queue_state" && v === "queued") state.isQueuedQuery = true;
-              return chain;
-            },
-            or: () => {
-              state.isDequeuedQuery = true;
-              return chain;
-            },
-            not: () => chain,
-            neq: () => chain,
-            is: () => chain,
-            limit: async (n: number) => {
-              state.limit = n;
-              if (n === 25) {
-                return { data: [{ id: 1 }], count: 25, error: errs.queue ?? null };
-              }
-              if (state.isDequeuedQuery) {
-                return { data: [{ id: 1 }], count: 2, error: errs.dequeued ?? null };
-              }
-              return { data: [{ id: 1 }], count: 1, error: errs.queued ?? null };
-            },
-          };
-          return chain;
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    });
-
+    queueSearchMocks.fetchDialableCampaignQueueWithContacts.mockResolvedValueOnce([
+      { id: 1 },
+    ]);
+    queueSearchMocks.countDialableQueuedCampaignQueueRows.mockResolvedValueOnce(1);
+    queueSearchMocks.countDialableCompletedCampaignQueueRows.mockResolvedValueOnce(2);
+    queueSearchMocks.countDialableCampaignQueueRows.mockResolvedValueOnce(25);
     tdbMocks.script.findMany.mockResolvedValueOnce([{ id: 1 }]);
     const ok = await mod.fetchCampaignAudience({
       workspaceId: "w1",
       campaignId: "1",
-      null: makeClient(),
     });
     expect(ok).toMatchObject({
       campaign_queue: [{ id: 1 }],
@@ -634,27 +535,37 @@ describe("app/lib/database/campaign.server.ts", () => {
       scripts: [{ id: 1 }],
     });
 
+    queueSearchMocks.fetchDialableCampaignQueueWithContacts.mockRejectedValueOnce(
+      new Error("q"),
+    );
     await expect(
       mod.fetchCampaignAudience({
         workspaceId: "w1",
         campaignId: "1",
-        null: makeClient({ queue: { message: "q" } }),
       }),
-    ).rejects.toThrow("Error fetching queue data");
+    ).rejects.toThrow("q");
+
+    queueSearchMocks.fetchDialableCampaignQueueWithContacts.mockResolvedValueOnce([]);
+    queueSearchMocks.countDialableQueuedCampaignQueueRows.mockRejectedValueOnce(
+      new Error("qc"),
+    );
     await expect(
       mod.fetchCampaignAudience({
         workspaceId: "w1",
         campaignId: "1",
-        null: makeClient({ queued: { message: "qc" } }),
       }),
-    ).rejects.toThrow("Error fetching queued count");
+    ).rejects.toThrow("qc");
+
+    queueSearchMocks.countDialableQueuedCampaignQueueRows.mockResolvedValueOnce(1);
+    queueSearchMocks.countDialableCompletedCampaignQueueRows.mockRejectedValueOnce(
+      new Error("dc"),
+    );
     await expect(
       mod.fetchCampaignAudience({
         workspaceId: "w1",
         campaignId: "1",
-        null: makeClient({ dequeued: { message: "dc" } }),
       }),
-    ).rejects.toThrow("Error fetching dequeued count");
+    ).rejects.toThrow("dc");
   });
 
   test("fetchAdvancedCampaignDetails handles unified campaign row and message media signed urls", async () => {
@@ -739,26 +650,18 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("getCampaignQueueById returns data and throws on error", async () => {
     const mod = await import("../app/lib/database/campaign.server");
 
-    const postgresOk: any = {
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: [{ id: 1 }], error: null }),
-        }),
-      }),
-    };
+    queueSearchMocks.fetchCampaignQueueWithContacts.mockResolvedValueOnce([
+      { id: 1 },
+    ]);
     await expect(
-      mod.getCampaignQueueById({ null: postgresOk, campaign_id: "1" }),
+      mod.getCampaignQueueById({ campaign_id: "1" }),
     ).resolves.toEqual([{ id: 1 }]);
 
-    const postgresErr: any = {
-      from: () => ({
-        select: () => ({
-          eq: async () => ({ data: null, error: new Error("x") }),
-        }),
-      }),
-    };
+    queueSearchMocks.fetchCampaignQueueWithContacts.mockRejectedValueOnce(
+      new Error("x"),
+    );
     await expect(
-      mod.getCampaignQueueById({ null: postgresErr, campaign_id: "1" }),
+      mod.getCampaignQueueById({ campaign_id: "1" }),
     ).rejects.toThrow("x");
   });
 

@@ -28,6 +28,7 @@ import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { env } from "@/lib/env.server";
+import { triggerTwilioOpenSync } from "@/lib/twilio-open-sync.server";
 
 
 export type AdminTwilioActionResult =
@@ -188,40 +189,17 @@ export async function dispatchAdminTwilioAction({
         return { ok: false, error: twilioErrorUserMessage(error), status: 500 };
       }
 
-    case "trigger_twilio_open_sync":
-      try {
-        const response = await fetch(
-          `${env.BASE_URL().replace(/\/$/, "")}/functions/v1/twilio-open-sync`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              workspaceId,
-              callLimit: 50,
-              messageLimit: 50,
-              maxAgeMinutes: 120,
-            }),
-          },
-        );
-
-        if (!response.ok) {
-          return {
-            ok: false,
-            error: `Twilio open sync failed: HTTP ${response.status}`,
-            status: 500,
-          };
-        }
-
-        const data = (await response.json()) as unknown;
-        const summary =
-          data && typeof data === "object"
-            ? JSON.stringify(data)
-            : "Open sync completed";
-        return { ok: true, message: `Twilio open sync triggered: ${summary}` };
-      } catch (error) {
-        logger.error("Twilio open sync trigger failed:", error);
-        return { ok: false, error: twilioErrorUserMessage(error), status: 500 };
-      }
+    case "trigger_twilio_open_sync": {
+      const result = await triggerTwilioOpenSync({
+        workspaceId,
+        callLimit: 50,
+        messageLimit: 50,
+        maxAgeMinutes: 120,
+      });
+      return result.ok
+        ? { ok: true, message: result.message }
+        : { ok: false, error: result.error, status: 500 };
+    }
 
     case "sync_a2p_status":
       try {
