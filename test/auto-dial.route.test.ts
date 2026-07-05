@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 
 const autoDialMocks = vi.hoisted(() => ({
@@ -20,6 +24,15 @@ vi.mock("@/lib/workspace-credits.server", () => ({
   }),
 }));
 
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  findCampaignInWorkspace: vi.fn(async () => ({
+    id: 1,
+    schedule: { monday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] } },
+    start_date: new Date(Date.now() - 86400000).toISOString(),
+    end_date: new Date(Date.now() + 86400000).toISOString(),
+  })),
+}));
+
 vi.mock("@/lib/telephony-db.server", () => ({
   insertCallForWorkspace: vi.fn(async (_workspaceId: string, payload: unknown) => {
     autoDialMocks.insertCalls.push(payload);
@@ -34,12 +47,29 @@ vi.mock("@/lib/telephony-db.server", () => ({
   }),
 }));
 
+vi.mock("@/lib/database.server", () => ({
+  requireWorkspaceAccess: async () => undefined,
+  checkSchedule: async () => true,
+  safeParseJson: async () => ({}),
+  createWorkspaceTwilioInstance: async () => ({
+    calls: { create: async () => ({ sid: "CA1" }) },
+  }),
+}));
+
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => ({
     call: {
       delete: vi.fn(async (opts: unknown) => {
         autoDialMocks.deleteCallCalls.push(opts);
       }),
+    },
+    campaign: {
+      findFirst: vi.fn(async () => ({
+        id: 1,
+        schedule: { monday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] } },
+        start_date: new Date(Date.now() - 86400000).toISOString(),
+        end_date: new Date(Date.now() + 86400000).toISOString(),
+      })),
     },
   })),
 }));
@@ -173,15 +203,15 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     expect(res.status).toEqual(expect.any(Number));
     const response = res as Response;
     expect(response.headers.get("Content-Type")).toBe("application/json");
-    await expect(response.json()).resolves.toEqual({
-      success: true,
-      conferenceName: "u1",
-    });
+    const json = await response.json();
+    expect(json.success).toBe(true);
+    expect(typeof json.conferenceName).toBe("string");
+    expect(json.conferenceName).toMatch(/^u1~/);
     expect(callsCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "client:u1",
         from: "+1555",
-        url: "https://base.example/api/auto-dial/u1",
+        url: expect.stringMatching(/^https:\/\/base\.example\/api\/auto-dial\/u1~/),
       }),
     );
     expect(autoDialMocks.insertCalls).toHaveLength(2);
@@ -225,7 +255,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     );
   });
 
-  test("stores null campaign_id when payload campaign_id is not a number", async () => {
+  test("stores null campaign_id when payload campaign_id is null", async () => {
     const mod = await import("../app/routes/api+/auto-dial");
 
     const res = await asRouteResponse(await mod.action({
@@ -237,7 +267,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         safeParseJson: async () => ({
           user_id: "u1",
           caller_id: "+1555",
-          campaign_id: "1",
+          campaign_id: null,
           workspace_id: "w1",
           selected_device: "computer",
         }),
@@ -301,6 +331,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     }));
     vi.doMock("../app/lib/database.server", () => ({
       requireWorkspaceAccess: async () => undefined,
+      checkSchedule: async () => true,
       safeParseJson: async () => ({
         user_id: "u1",
         caller_id: "+1555",
@@ -338,6 +369,43 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       "Error saving the call to the database:",
       expect.objectContaining({ callSid: "CA1" }),
     );
+  });
+
+  test("generates unique conference names for different users", async () => {
+    const mod = await import("../app/routes/api+/auto-dial");
+
+    const makeReq = async (userId: string) =>
+      asRouteResponse(
+        await mod.action({
+          request: new Request("http://localhost/api/auto-dial", {
+            method: "POST",
+          }),
+          deps: {
+            ...authDeps,
+            getSession: async () => ({
+              headers: new Headers(),
+              user: { id: userId },
+            }),
+            safeParseJson: async () => ({
+              user_id: userId,
+              caller_id: "+1555",
+              campaign_id: 1,
+              workspace_id: "w1",
+              selected_device: "computer",
+            }),
+            createWorkspaceTwilioInstance: async () =>
+              ({ calls: { create: async () => ({ sid: "CA1" }) } }) as any,
+            env: { BASE_URL: () => "https://base.example" } as any,
+          },
+        } as any),
+      );
+
+    const [res1, res2] = await Promise.all([makeReq("u1"), makeReq("u2")]);
+    const json1 = await res1.json();
+    const json2 = await res2.json();
+    expect(json1.conferenceName).not.toBe(json2.conferenceName);
+    expect(json1.conferenceName).toMatch(/^u1~/);
+    expect(json2.conferenceName).toMatch(/^u2~/);
   });
 
   test("returns 401 when no authenticated user is found", async () => {

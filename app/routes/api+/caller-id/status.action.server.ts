@@ -1,14 +1,8 @@
-import {
-  rejectMissingTwilioSignatureHeader,
-  validateTwilioWebhookForPhoneCandidates,
-} from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database.server";
-import {
-  listWorkspaceNumberTwilioCandidatesByPhone,
-  updateWorkspaceNumberCapabilitiesByPhone,
-} from "@/lib/inbound-call-db.server";
+import { updateWorkspaceNumberCapabilitiesByPhone } from "@/lib/inbound-call-db.server";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   getWorkspaceMessagingOnboardingState,
@@ -38,28 +32,12 @@ interface Capabilities {
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const missingHeader = rejectMissingTwilioSignatureHeader(request);
-  if (missingHeader) {
-    return missingHeader;
-  }
-
-  const formData = await request.formData();
+  const formData = await request.clone().formData();
   const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
   try {
-    const candidateNumbers = await listWorkspaceNumberTwilioCandidatesByPhone(
-      parsedBody.To,
-    );
-
-    const isValidTwilioRequest = validateTwilioWebhookForPhoneCandidates({
-      request,
-      params: parsedBody,
-      candidates: candidateNumbers,
-    });
-
-    if (!isValidTwilioRequest) {
-      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
-    }
+    const forbidden = await requireTwilioSignature(request, { phoneNumber: parsedBody.To });
+    if (forbidden) return forbidden;
 
     if (
       parsedBody.VerificationStatus === "success" ||

@@ -3,6 +3,8 @@ import { getHandsetNumberForWorkspace } from "@/lib/database.server";
 import { findActiveHandsetSession } from "@/lib/handset/handset-session.server";
 import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -11,11 +13,18 @@ function isAValidPhoneNumber(number: string): boolean {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const formData = await request.formData();
+  const formData = await request.clone().formData();
   const toNumber = (formData.get("To") as string) ?? "";
   const workspaceId = formData.get("workspace_id") as string | null;
   const clientIdentity = formData.get("client_identity") as string | null;
+  const callSid = String(formData.get("CallSid") ?? "");
   const baseUrl = env.BASE_URL();
+
+  const forbidden = await requireTwilioSignature(
+    request,
+    workspaceId ? { workspaceId } : {},
+  );
+  if (forbidden) return forbidden;
   const twiml = new Twilio.twiml.VoiceResponse();
 
   // Handset outbound: validate session and use workspace handset number as callerId
@@ -44,6 +53,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const normalizedTo = normalizePhoneNumber(toNumber);
+
+    if (callSid) {
+      await insertCallForWorkspace(workspaceId, {
+        sid: callSid,
+        workspace: workspaceId,
+        user_id: session.user_id,
+        to: normalizedTo,
+        from: callerId,
+        status: "initiated",
+        direction: "outbound",
+        is_last: false,
+      });
+    }
+
     const dial = twiml.dial({
       callerId,
       record: "record-from-answer",

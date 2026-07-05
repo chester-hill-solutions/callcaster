@@ -229,8 +229,12 @@ export async function refreshTokens(
   }
 }
 
-export async function signOutUser(request: Request): Promise<void> {
-  await auth.api.signOut({ headers: request.headers });
+export async function signOutUser(request: Request): Promise<Headers> {
+  const result = await auth.api.signOut({
+    headers: request.headers,
+    returnHeaders: true,
+  });
+  return mergeBetterAuthSetCookieHeaders(result?.headers);
 }
 
 export async function forgotPassword(
@@ -351,6 +355,16 @@ export async function updateMeProfile(
     updateBody.name = [body.first_name, body.last_name].filter(Boolean).join(" ");
   }
 
+  if (body.password) {
+    if (
+      !body.current_password ||
+      typeof body.current_password !== "string" ||
+      body.current_password.trim() === ""
+    ) {
+      return { ok: false, error: "Current password is required", status: 400 };
+    }
+  }
+
   try {
     const result = await auth.api.updateUser({
       body: updateBody,
@@ -367,7 +381,7 @@ export async function updateMeProfile(
       await auth.api.changePassword({
         body: {
           newPassword: body.password,
-          currentPassword: (body as any).current_password ?? body.password,
+          currentPassword: body.current_password,
         },
         headers: request.headers,
       });

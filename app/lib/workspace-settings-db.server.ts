@@ -1,5 +1,6 @@
 import { MemberRole } from "@/lib/member-role";
 import type { User, WorkspaceInvite, WorkspaceWebhook } from "@/lib/types";
+import { requireWorkspaceAccess } from "@/lib/database.server";
 import {
   getWorkspaceById,
   getWorkspaceWebhookRow,
@@ -26,6 +27,8 @@ export async function getWorkspaceSettingsPageData(
   workspaceId: string,
   userId: string,
 ): Promise<WorkspaceSettingsPageData> {
+  await requireWorkspaceAccess({ user: { id: userId }, workspaceId });
+
   const workspace = await getWorkspaceById(workspaceId);
   if (!workspace) {
     throw new Error("Workspace not found");

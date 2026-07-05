@@ -17,6 +17,7 @@ import {
   deleteWorkspaceApiKeyRow,
   findUserIdByUsername,
   findWorkspaceInviteForUser,
+  findWorkspaceMembership,
   getWorkspaceWebhookRow,
   insertWorkspaceApiKeyRow,
   listWorkspaceApiKeyRows,
@@ -29,8 +30,9 @@ import {
 } from "@/lib/workspace-members-db.server";
 import type { z } from "zod";
 
-const KEY_SECRET_LENGTH = 32;
 const KEY_PREFIX = "cc_live_";
+const KEY_PREFIX_RANDOM_LENGTH = 16;
+const KEY_SECRET_LENGTH = 48;
 
 type UpsertWebhookInput = z.infer<typeof upsertWebhookBodySchema>;
 
@@ -55,6 +57,53 @@ async function requireMemberManager(
   return { ok: true };
 }
 
+async function getWorkspaceOwners(workspaceId: string) {
+  const members = await listWorkspaceMembersEnriched(workspaceId);
+  return members.filter((member) => member.role === MemberRole.Owner);
+}
+
+async function requireOwnerForOwnerChange(
+  actorUserId: string,
+  workspaceId: string,
+  targetUserId: string,
+  newRole?: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const targetMembership = await findWorkspaceMembership(workspaceId, targetUserId);
+  if (!targetMembership) {
+    return { ok: false, error: "Member not found", status: 404 };
+  }
+
+  const isOwnerChange =
+    newRole === MemberRole.Owner || targetMembership.role === MemberRole.Owner;
+  if (!isOwnerChange) {
+    return { ok: true };
+  }
+
+  const actorMembership = await findWorkspaceMembership(workspaceId, actorUserId);
+  if (actorMembership?.role !== MemberRole.Owner) {
+    return { ok: false, error: "Only workspace owners can change owner roles", status: 403 };
+  }
+
+  return { ok: true };
+}
+
+async function requireSoleOwnerProtection(
+  workspaceId: string,
+  targetUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const targetMembership = await findWorkspaceMembership(workspaceId, targetUserId);
+  if (targetMembership?.role !== MemberRole.Owner) {
+    return { ok: true };
+  }
+
+  const owners = await getWorkspaceOwners(workspaceId);
+  if (owners.length <= 1) {
+    return { ok: false, error: "Cannot remove the sole owner", status: 403 };
+  }
+
+  return { ok: true };
+}
+
 function normalizeCustomHeaders(
   customHeaders: UpsertWebhookInput["custom_headers"],
 ): Record<string, string> {
@@ -71,8 +120,10 @@ function normalizeCustomHeaders(
 
 function generateApiKey(): { key: string; keyPrefix: string; keyHash: string } {
   const secret = randomBytes(KEY_SECRET_LENGTH).toString("base64url");
-  const key = `${KEY_PREFIX}${secret}`;
-  const keyPrefix = key.slice(0, API_KEY_PREFIX_LENGTH);
+  const prefixPart = secret.slice(0, KEY_PREFIX_RANDOM_LENGTH);
+  const restPart = secret.slice(KEY_PREFIX_RANDOM_LENGTH);
+  const key = `${KEY_PREFIX}${prefixPart}_${restPart}`;
+  const keyPrefix = `${KEY_PREFIX}${prefixPart}`;
   const keyHash = hashApiKeyForStorage(key);
   return { key, keyPrefix, keyHash };
 }
@@ -163,6 +214,12 @@ export async function updateWorkspaceMemberRole(
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
+  const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId, role);
+  if (!ownerCheck.ok) return ownerCheck;
+
+  const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
+  if (!soleOwnerCheck.ok) return soleOwnerCheck;
+
   try {
     const data = await updateWorkspaceMemberRoleRow({
       workspaceId,
@@ -189,6 +246,12 @@ export async function removeWorkspaceMember(
 ) {
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
+
+  const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId);
+  if (!ownerCheck.ok) return ownerCheck;
+
+  const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
+  if (!soleOwnerCheck.ok) return soleOwnerCheck;
 
   try {
     const data = await removeWorkspaceMemberRow({
@@ -260,7 +323,7 @@ export async function upsertWorkspaceWebhook(
   if (!access.ok) return access;
 
   try {
-    assertSafeOutboundUrl(input.destination_url);
+    await assertSafeOutboundUrl(input.destination_url);
   } catch (urlError) {
     const message =
       urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
@@ -296,7 +359,7 @@ export async function testWorkspaceWebhook(
   testData: Record<string, unknown>,
 ) {
   try {
-    assertSafeOutboundUrl(destinationUrl);
+    await assertSafeOutboundUrl(destinationUrl);
   } catch (urlError) {
     const message =
       urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
@@ -313,6 +376,8 @@ export async function testWorkspaceWebhook(
         ...headersObject,
       },
       body: JSON.stringify(testData),
+      redirect: "error",
+      signal: AbortSignal.timeout(10000),
     });
 
     let data: unknown;

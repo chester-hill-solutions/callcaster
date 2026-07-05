@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
+import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
@@ -143,18 +144,37 @@ export async function transferWorkspaceOwnership(args: {
   workspaceId: string;
   currentOwnerUserId: string;
   newOwnerUserId: string;
-  tdb?: TenantDb;
 }) {
-  const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const [newOwner] = await tdb.workspace_users.update({
-    set: { role: "owner" },
-    where: eq(workspaceUsersTable.user_id, args.newOwnerUserId),
+  return db.transaction(async (tx) => {
+    const tdb = createTenantDb(args.workspaceId, tx as unknown as typeof db);
+
+    const newOwnerMembership = await findWorkspaceMembership(
+      args.workspaceId,
+      args.newOwnerUserId,
+      tdb,
+    );
+    if (!newOwnerMembership) {
+      throw new Error("New owner must be an existing workspace member");
+    }
+
+    const [newOwner] = await tdb.workspace_users.update({
+      set: { role: "owner" },
+      where: eq(workspaceUsersTable.user_id, args.newOwnerUserId),
+    });
+    if (!newOwner) {
+      throw new Error("Failed to promote the new owner");
+    }
+
+    const [previousOwner] = await tdb.workspace_users.update({
+      set: { role: "admin" },
+      where: eq(workspaceUsersTable.user_id, args.currentOwnerUserId),
+    });
+    if (!previousOwner) {
+      throw new Error("Failed to demote the previous owner");
+    }
+
+    return { newOwner, previousOwner };
   });
-  const [previousOwner] = await tdb.workspace_users.update({
-    set: { role: "admin" },
-    where: eq(workspaceUsersTable.user_id, args.currentOwnerUserId),
-  });
-  return { newOwner, previousOwner };
 }
 
 export async function getWorkspaceWebhookRow(workspaceId: string, tdbIn?: TenantDb) {

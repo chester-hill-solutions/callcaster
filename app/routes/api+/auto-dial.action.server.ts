@@ -1,4 +1,5 @@
 import {
+  checkSchedule,
   createWorkspaceTwilioInstance,
   requireWorkspaceAccess,
   safeParseJson,
@@ -13,6 +14,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import type TwilioSDK from "twilio";
 
 type TwilioClient = TwilioSDK.Twilio;
@@ -27,6 +29,8 @@ type AutoDialDeps = Partial<{
     user: { id: string };
     workspaceId: string;
   }) => Promise<void>;
+  findCampaignInWorkspace: typeof findCampaignInWorkspace;
+  checkSchedule: typeof checkSchedule;
   env: typeof env;
   logger: typeof logger;
 }>;
@@ -54,6 +58,9 @@ export const action = async ({
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
     requireWorkspaceAccess:
       deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
+    findCampaignInWorkspace:
+      deps?.findCampaignInWorkspace ?? findCampaignInWorkspace,
+    checkSchedule: deps?.checkSchedule ?? checkSchedule,
     env: deps?.env ?? env,
     logger: deps?.logger ?? logger,
   };
@@ -120,8 +127,48 @@ export const action = async ({
     };
   }
 
+  const parsedCampaignId =
+    typeof campaign_id === "number"
+      ? campaign_id
+      : typeof campaign_id === "string" && campaign_id !== ""
+        ? Number(campaign_id)
+        : null;
+
+  if (parsedCampaignId != null && !Number.isFinite(parsedCampaignId)) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid campaign_id" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  if (parsedCampaignId != null) {
+    const campaign = await d.findCampaignInWorkspace(
+      workspace_id,
+      parsedCampaignId,
+    );
+    if (!campaign) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Campaign not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (!d.checkSchedule(campaign)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Campaign is not currently active",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  }
+
   const twilio = await d.createWorkspaceTwilioInstance({ workspace_id });
-  const conferenceName = authenticatedUser.id;
+  const conferenceName = `${authenticatedUser.id}~${
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.round(Math.random() * 1_000_000)}`
+  }`;
   const targetDevice =
     selectedDevice && selectedDevice !== "computer"
       ? selectedDevice
@@ -133,8 +180,8 @@ export const action = async ({
     from: caller_id,
     to: targetDevice,
     status: "initiated",
-      campaign_id: typeof campaign_id === "number" ? campaign_id : undefined,
-      conference_id: authenticatedUser.id,
+    campaign_id: parsedCampaignId ?? undefined,
+    conference_id: conferenceName,
     direction: "outbound-api",
   });
 
@@ -185,8 +232,8 @@ export const action = async ({
       group_sid: call.groupSid ?? null,
       caller_name: call.callerName ?? null,
       uri: call.uri ?? null,
-    campaign_id: typeof campaign_id === "number" ? campaign_id : undefined,
-      conference_id: authenticatedUser.id,
+    campaign_id: parsedCampaignId ?? undefined,
+    conference_id: conferenceName,
     });
 
     if (!savedCall) {

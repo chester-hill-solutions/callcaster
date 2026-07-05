@@ -3,6 +3,7 @@ import {
   getUserRole,
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
+  requireWorkspaceAccess,
 } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/auth.server";
@@ -16,6 +17,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const workspaceId = params.id;
   if (!user || !workspaceId) {
     return redirect("/signin");
+  }
+
+  try {
+    await requireWorkspaceAccess({ user, workspaceId });
+  } catch {
+    return routeData(
+      { error: "Workspace not found" },
+      { headers, status: 404 },
+    );
   }
 
   const tdb = createTenantDb(workspaceId);

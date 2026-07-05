@@ -81,6 +81,19 @@ ADRs live in [`adr/`](adr/) and document hard-to-reverse, surprising, trade-off-
 - `live-transcription-coaching-plan.md` — Live transcription (Deepgram) + live coaching (Cohere Command A) + post-call golden transcript (Cohere batch) implementation plan for v2
 - `CHANGELOG.md`
 
+## Remediation plans
+
+- [`remediation/README.md`](remediation/README.md) — Status tracker and entry point
+- [`remediation/bring-it-all-together.md`](remediation/bring-it-all-together.md) — Cross-cutting themes and master priority order
+- [`remediation/decisions.md`](remediation/decisions.md) — Architecture decisions from the grilling session
+- [`remediation/auth-identity.md`](remediation/auth-identity.md)
+- [`remediation/workspace-billing.md`](remediation/workspace-billing.md)
+- [`remediation/telephony-dialer.md`](remediation/telephony-dialer.md)
+- [`remediation/ivr-inbound-sms.md`](remediation/ivr-inbound-sms.md)
+- [`remediation/data-plane.md`](remediation/data-plane.md)
+- [`remediation/public-api-webhooks.md`](remediation/public-api-webhooks.md)
+- [`remediation/infrastructure-admin.md`](remediation/infrastructure-admin.md)
+
 ## Archive
 
 Historical root-level planning/checklist/report docs were moved into:

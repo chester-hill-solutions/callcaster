@@ -8,7 +8,7 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const twilioMocks = vi.hoisted(() => ({
-  validateTwilioWebhookForCallSid: vi.fn(async () => ({ ok: true as const })),
+  requireTwilioSignature: vi.fn(async () => (null)),
 }));
 
 const telephonyMocks = vi.hoisted(() => ({
@@ -24,7 +24,7 @@ const telephonyMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: twilioMocks.validateTwilioWebhookForCallSid,
+  requireTwilioSignature: twilioMocks.requireTwilioSignature,
 }));
 
 vi.mock("@/lib/telephony-db.server", () => ({
@@ -45,8 +45,8 @@ vi.mock("@/lib/workspace-events.server", () => ({
 describe("outreach disposition transitions", () => {
   beforeEach(() => {
     vi.resetModules();
-    twilioMocks.validateTwilioWebhookForCallSid.mockReset();
-    twilioMocks.validateTwilioWebhookForCallSid.mockResolvedValue({ ok: true });
+    twilioMocks.requireTwilioSignature.mockReset();
+    twilioMocks.requireTwilioSignature.mockResolvedValue(null);
     Object.values(telephonyMocks).forEach((fn) => {
       if (typeof fn === "function" && "mockReset" in fn) {
         (fn as ReturnType<typeof vi.fn>).mockReset();

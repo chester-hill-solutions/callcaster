@@ -4,17 +4,41 @@ import { useEffect, useState, useRef } from "react";
 import * as wavefile from "wavefile";
 
 import { logger } from "@/lib/logger.client";
+import { env } from "@/lib/env.server";
+import { createMediaStreamToken } from "@/lib/media-stream-token.server";
+import { requireSessionUserId } from "@/lib/auth.server";
 
 interface LoaderData {
   success: boolean;
   message: string;
   id: string;
+  mediaStreamUrl: string;
+  token: string;
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id } = params;
   try {
-    return routeData({ success: true, message: "Call initiated", id });
+    const sessionId = id ?? "unknown";
+    const userId = await requireSessionUserId(request);
+    const url = new URL(request.url);
+    const workspaceId = url.searchParams.get("workspaceId") ?? sessionId;
+    const campaignId = url.searchParams.get("campaignId") ?? "unknown";
+    const token = createMediaStreamToken({
+      workspaceId,
+      campaignId,
+      userId,
+      sessionId,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const mediaStreamUrl = `wss://${env.MEDIA_STREAM_HOST()}/${sessionId}?token=${token}`;
+    return routeData({
+      success: true,
+      message: "Call initiated",
+      id: sessionId,
+      mediaStreamUrl,
+      token,
+    });
   } catch (error) {
     return routeData({
       success: false,
@@ -25,7 +49,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function DashboardCallPage() {
-  const { id } = useLoaderData<LoaderData>();
+  const { id, mediaStreamUrl } = useLoaderData<LoaderData>();
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -36,9 +60,7 @@ export default function DashboardCallPage() {
 
   useEffect(() => {
     audioContext.current = new window.AudioContext();
-    const ws = new WebSocket(
-      `wss://socketserver-production-2306.up.railway.app/${id}`,
-    );
+    const ws = new WebSocket(mediaStreamUrl);
 
     ws.onopen = () => logger.debug("WebSocket connection established");
     ws.onerror = (event) => logger.error("WebSocket error:", event);
@@ -60,7 +82,7 @@ export default function DashboardCallPage() {
       ws.close();
       audioContext.current?.close();
     };
-  }, [id]);
+  }, [id, mediaStreamUrl]);
 
   function createWavFileFromBuffers(wavFiles: ArrayBuffer[], sampleRate: number) {
     // Implementation for creating WAV file from buffers

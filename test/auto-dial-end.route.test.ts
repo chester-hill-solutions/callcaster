@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { setJsonAuthSession } from "./helpers/route-auth-mock";
 import { configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
@@ -9,6 +13,7 @@ vi.mock("@/lib/telephony-db.server", async () => {
   return {
     findCallBySid: stub.telephonyDbMocks.findCallBySid,
     findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    findActiveConferenceIdsForUser: stub.telephonyDbMocks.findActiveConferenceIdsForUser,
     updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
     findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
     updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
@@ -21,19 +26,17 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     configureTelephonyStub();
   });
 
-  test("returns 500 with message when conference listing throws", async () => {
+  test("returns 500 with message when conference lookup throws", async () => {
     const mod = await import("../app/routes/api+/auto-dial/end.route");
 
-    const mockClient: any = {};
+    telephonyDbMocks.findActiveConferenceIdsForUser.mockRejectedValueOnce(new Error("list"));
+
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         verifyAuth: async () => ({ user: { id: "u1" } } as any),
         safeParseJson: async () => ({ workspaceId: "w1" }),
-        createWorkspaceTwilioInstance: async () =>
-          ({
-            conferences: { list: async () => Promise.reject(new Error("list")) },
-          }) as any,
+        createWorkspaceTwilioInstance: async () => ({}) as any,
       },
     } as any));
 
@@ -43,6 +46,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
 
   test("handles conference/call update errors and still returns success", async () => {
     configureTelephonyStub({
+      activeConferenceIds: ["u1~00000000-0000-0000-0000-000000000000"],
       callsByConference: [
         { sid: "CA1", outreach_attempt_id: 1, contact_id: 1 },
         { sid: "CA2", outreach_attempt_id: 2, contact_id: 2 },
@@ -85,8 +89,8 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   });
 
   test("returns success when there are no in-progress conferences", async () => {
+    configureTelephonyStub({ activeConferenceIds: [] });
     const mod = await import("../app/routes/api+/auto-dial/end.route");
-    const mockClient: any = {};
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
@@ -114,15 +118,6 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
       return [{ sid: "CA1", outreach_attempt_id: null, contact_id: 1 }];
     });
 
-    const mockClient: any = {};
-
-    const conferencesList = vi
-      .fn()
-      .mockResolvedValueOnce([{ sid: "CONF_BAD" }]) // conf update error
-      .mockResolvedValueOnce([{ sid: "CONF_CALL" }]) // call select error
-      .mockResolvedValueOnce([{ sid: "CONF_EMPTY" }]) // empty calls
-      .mockResolvedValueOnce([{ sid: "CONF_NO_ATTEMPT" }]); // missing attempt id
-
     const confUpdate = vi.fn((sid: string) => {
       if (sid === "CONF_BAD") throw new Error("conf");
       return {};
@@ -131,7 +126,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     const twilio: any = {
       conferences: Object.assign(
         (sid: string) => ({ update: async () => confUpdate(sid) }),
-        { list: conferencesList },
+        { list: async ({ friendlyName }: { friendlyName: string }) => [{ sid: friendlyName }] },
       ),
       calls: () => ({ update: async () => ({}) }),
     };
@@ -139,8 +134,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     const makeReq = () =>
       new Request("http://localhost/api/auto-dial/end", { method: "POST" });
 
-    // 1) conf update throws => logged in per-conf catch
-    await expect(
+    const run = () =>
       mod.action({
         request: makeReq(),
         deps: {
@@ -149,44 +143,27 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
           safeParseJson: async () => ({ workspaceId: "w1" }),
           createWorkspaceTwilioInstance: async () => twilio,
         },
-      } as any),
-    ).resolves.toBeTruthy();
+      } as any);
+
+    // 1) conf update throws => logged in per-conf catch
+    callMode = "empty";
+    telephonyDbMocks.findActiveConferenceIdsForUser.mockResolvedValueOnce(["CONF_BAD"]);
+    await expect(run()).resolves.toBeTruthy();
 
     // 2) call select error => thrown and logged in per-conf catch
     callMode = "error";
-    await mod.action({
-      request: makeReq(),
-      deps: {
-        logger: logger as any,
-        verifyAuth: async () => ({ user: { id: "u1" } } as any),
-        safeParseJson: async () => ({ workspaceId: "w1" }),
-        createWorkspaceTwilioInstance: async () => twilio,
-      },
-    } as any);
+    telephonyDbMocks.findActiveConferenceIdsForUser.mockResolvedValueOnce(["CONF_CALL"]);
+    await run();
 
     // 3) empty data => returns early (no error)
     callMode = "empty";
-    await mod.action({
-      request: makeReq(),
-      deps: {
-        logger: logger as any,
-        verifyAuth: async () => ({ user: { id: "u1" } } as any),
-        safeParseJson: async () => ({ workspaceId: "w1" }),
-        createWorkspaceTwilioInstance: async () => twilio,
-      },
-    } as any);
+    telephonyDbMocks.findActiveConferenceIdsForUser.mockResolvedValueOnce(["CONF_EMPTY"]);
+    await run();
 
     // 4) call without outreach_attempt_id => returns early inside calls.map
     callMode = "missingAttempt";
-    await mod.action({
-      request: makeReq(),
-      deps: {
-        logger: logger as any,
-        verifyAuth: async () => ({ user: { id: "u1" } } as any),
-        safeParseJson: async () => ({ workspaceId: "w1" }),
-        createWorkspaceTwilioInstance: async () => twilio,
-      },
-    } as any);
+    telephonyDbMocks.findActiveConferenceIdsForUser.mockResolvedValueOnce(["CONF_NO_ATTEMPT"]);
+    await run();
 
     expect(logger.error).toHaveBeenCalled();
   });
@@ -197,9 +174,11 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     setJsonAuthSession({ user: { id: "u1" } });
     vi.doMock("../app/lib/database.server", () => ({
       safeParseJson: async () => ({ workspaceId: "w1" }),
-      createWorkspaceTwilioInstance: async () => ({
-        conferences: { list: async () => Promise.reject("nope") },
-      }),
+      createWorkspaceTwilioInstance: async () => ({}) as any,
+    }));
+    vi.doMock("@/lib/telephony-db.server", () => ({
+      findActiveConferenceIdsForUser: async () => Promise.reject("nope"),
+      findCallsByConferenceId: async () => [],
     }));
     const logger = { error: vi.fn(), debug: vi.fn() };
     vi.doMock("@/lib/logger.server", () => ({ logger }));

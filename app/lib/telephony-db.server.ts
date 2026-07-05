@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   call as callTable,
   campaign as campaignTable,
@@ -6,6 +6,7 @@ import {
   script as scriptTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
+import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { logger } from "@/lib/logger.server";
@@ -61,6 +62,23 @@ export async function findCallsByConferenceId(
     where: eq(callTable.conference_id, conferenceId),
     columns: { sid: true, outreach_attempt_id: true, contact_id: true },
   });
+}
+
+export async function findActiveConferenceIdsForUser(
+  workspaceId: string,
+  userId: string,
+): Promise<string[]> {
+  const rows = await adminDb.execute(sql`
+    SELECT DISTINCT c.conference_id
+    FROM call c
+    JOIN outreach_attempt oa ON c.outreach_attempt_id = oa.id
+    WHERE c.workspace = ${workspaceId}
+      AND oa.user_id = ${userId}
+      AND c.conference_id IS NOT NULL
+      AND c.conference_id != ''
+      AND c.status = ANY(ARRAY['initiated', 'queued', 'ringing', 'in-progress'])
+  `);
+  return (rows as unknown as { conference_id: string }[]).map((row) => row.conference_id);
 }
 
 export async function updateCallBySid(
@@ -148,9 +166,9 @@ export async function insertCallForWorkspace(
 export async function upsertCallBySid(
   values: Partial<CallRow> & { sid: string },
 ): Promise<CallRow | null> {
-  const existing = await findCallBySid(values.sid);
-  if (existing?.workspace) {
-    return updateCallBySid(existing.workspace, values.sid, values);
+  const existingWorkspace = values.workspace ?? null;
+  if (existingWorkspace) {
+    return updateCallBySid(existingWorkspace, values.sid, values as Partial<CallRow>);
   }
 
   const [row] = await db
@@ -191,6 +209,19 @@ export async function findOutreachAttemptWithCampaignType(
     ...(attempt as OutreachRow),
     campaign: campaign ? { type: campaign.type } : null,
   };
+}
+
+export async function findCampaignTypeByCampaignId(
+  campaignId: number,
+  workspaceId: string,
+  tdb?: TenantDb,
+): Promise<string | null> {
+  const tenant = tdb ?? createTenantDb(workspaceId);
+  const campaign = await tenant.campaign.findFirst({
+    where: eq(campaignTable.id, campaignId),
+    columns: { type: true },
+  });
+  return campaign?.type ?? null;
 }
 
 export async function findCallSidByParentCallSid(

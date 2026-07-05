@@ -1,10 +1,8 @@
-import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
+import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-
-  const result = await verifyAuth(request);
-  if (!result || !(result as any).user) return redirect("/remember");
-  return routeData({});
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token") ?? null;
+  return routeData({ token });
 }

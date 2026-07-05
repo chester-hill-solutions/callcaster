@@ -3,6 +3,8 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
+import { AppError } from "@/lib/errors.server";
 import { downloadObject } from "@/lib/object-storage.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -34,6 +36,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
+    await requireWorkspaceAccess({ user, workspaceId });
+
     const uploadData = await findAudienceUploadById(workspaceId, uploadId);
 
     if (!uploadData) {
@@ -73,6 +77,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   } catch (error) {
     logger.error("Error fetching upload status:", error);
+    if (error instanceof AppError) {
+      return routeData({ error: error.message }, { status: error.statusCode, headers });
+    }
     return routeData({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500, headers });

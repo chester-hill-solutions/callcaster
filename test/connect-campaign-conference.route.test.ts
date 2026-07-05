@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  validateTwilioWebhookForWorkspace: vi.fn(),
+  requireTwilioSignature: vi.fn(),
   getAdminDb: vi.fn(),
   findCampaignInWorkspace: vi.fn(),
 }));
@@ -13,8 +13,8 @@ vi.mock("@/lib/env.server", () => ({
 }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForWorkspace: (...args: unknown[]) =>
-    mocks.validateTwilioWebhookForWorkspace(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
   twilioWebhookForbidden: (message: string) =>
     new Response(JSON.stringify({ error: message }), {
       status: 403,
@@ -56,12 +56,7 @@ vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
 describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.validateTwilioWebhookForWorkspace.mockResolvedValue({
-      ok: true,
-      params: {},
-      authToken: "token",
-      workspaceId: "w1",
-    });
+    mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.getAdminDb.mockReturnValue({});
     mocks.findCampaignInWorkspace.mockResolvedValue({ id: 1 });
   });
@@ -87,13 +82,10 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
   });
 
   test("rejects unauthenticated Twilio requests", async () => {
-    mocks.validateTwilioWebhookForWorkspace.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
         headers: { "Content-Type": "application/json" },
-      }),
-    });
+      }));
 
     const mod = await import(
       "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"

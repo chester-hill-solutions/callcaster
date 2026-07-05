@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import Twilio from "twilio";
 import {
   buildAgentBridgeTwiml,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/db-rpc.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import {
   readTwilioWorkspaceCredentials,
   resolveTwilioWebhookAuthToken,
@@ -41,6 +42,48 @@ export {
 
 export const INBOUND_OFFER_TIMEOUT_SECONDS = 25;
 export const POLL_INTERVAL_MS = 3000;
+export const MAX_QUEUE_TIME_SECONDS = 3600;
+export const MAX_OFFER_ATTEMPTS = 5;
+
+export type InboundQueueEntryRow = {
+  id: number;
+  queue_id: number;
+  workspace_id: string;
+  call_sid: string | null;
+  caller_number: string | null;
+  status: string;
+  offered_to_user_id: string | null;
+};
+
+export async function findExistingInboundQueueEntry(args: {
+  queueId: number;
+  callSid: string;
+}): Promise<InboundQueueEntryRow | null> {
+  const rows = await adminDb.execute(sql`
+    select id, queue_id, workspace_id, call_sid, caller_number, status, offered_to_user_id
+    from ${inboundQueueEntryTable}
+    where queue_id = ${args.queueId}
+      and call_sid = ${args.callSid}
+      and status not in ('completed', 'abandoned', 'failed')
+    limit 1
+  `);
+  return (rows[0] as InboundQueueEntryRow | undefined) ?? null;
+}
+
+export async function countInboundQueueOfferAttempts(args: {
+  queueId: number;
+  callSid: string;
+}): Promise<number> {
+  const rows = await adminDb.execute(sql`
+    select count(*) as count
+    from ${inboundQueueEntryTable}
+    where queue_id = ${args.queueId}
+      and call_sid = ${args.callSid}
+      and status in ('offered', 'declined', 'timed_out')
+  `);
+  const value = (rows[0] as { count: number } | undefined)?.count ?? 0;
+  return typeof value === "string" ? parseInt(value, 10) : value;
+}
 
 function parseTwilioData(raw: unknown): Record<string, unknown> | null {
   if (isObject(raw)) return raw;
@@ -288,7 +331,27 @@ async function handleWaitUrl(
 
   const queueName = makeQueueName(queueId);
   const parsedQueueTime = parseInt(queueTime, 10);
-  if (parsedQueueTime >= 0) {
+  if (parsedQueueTime >= MAX_QUEUE_TIME_SECONDS) {
+    return new Response(hangupTwiml(), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  const existingEntry = await findExistingInboundQueueEntry({
+    queueId,
+    callSid,
+  });
+  if (!existingEntry) {
+    const offerAttempts = await countInboundQueueOfferAttempts({
+      queueId,
+      callSid,
+    });
+    if (offerAttempts >= MAX_OFFER_ATTEMPTS) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
     const claimed = await claimAgentForQueue({
       queueId,
       workspaceId: queue.workspace_id,

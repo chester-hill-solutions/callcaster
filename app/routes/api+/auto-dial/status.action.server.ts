@@ -1,12 +1,11 @@
 import {
-  billingUnitsFromCallDurationSeconds,
-  persistCallStatusFromParams,
+  buildCallUpsertFromTwilioParams,
+  processCallStatusWebhook,
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
@@ -14,19 +13,18 @@ import { createTenantDb } from "@/server/tenant-db";
 // adminDb is used for Supabase Realtime channels (not available via tdb).
 // eslint-disable-next-line no-restricted-imports
 import { adminDb } from "@/server/admin-db";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/db-types";
 import type Twilio from "twilio";
 import {
   findCallBySid,
+  findCampaignTypeByCampaignId,
   findOutreachAttemptById,
   updateCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import { callKey } from "@/lib/billing-keys";
-import { debitAmountFromCredits } from "@/lib/pricing";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import type { ActionFunctionArgs } from "react-router";
 
 type TwilioClient = Twilio.Twilio;
@@ -95,15 +93,23 @@ const updateCampaignQueue = async (
   }
 };
 
+function resolveUserIdFromConferenceName(conferenceId: string | null): string {
+  if (!conferenceId) return "";
+  const sep = conferenceId.indexOf("~");
+  if (sep === -1) return conferenceId;
+  return conferenceId.slice(0, sep);
+}
+
 const triggerAutoDialer = async (callData: Tables<"call">) => {
   try {
+    const userId = resolveUserIdFromConferenceName(callData.conference_id);
     const response = await fetch(
       `${env.BASE_URL()}/api/auto-dial/dialer`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: callData.conference_id,
+          user_id: userId,
           campaign_id: callData.campaign_id,
           workspace_id: callData.workspace,
           conference_id: callData.conference_id,
@@ -125,37 +131,41 @@ const handleCallStatus = async (
   twilio: TwilioClient,
   realtime: RealtimeChannel,
   status: Tables<"call">["status"],
-  duration: number
 ) => {
   try {
     const callSid = requireValue(parsedBody.CallSid, "CallSid");
-    const callUpdate = await persistCallStatusFromParams({
-      params: parsedBody,
-      disposition: status?.toLowerCase(),
-      outreachAttemptId: dbCall.outreach_attempt_id
-        ? Number(dbCall.outreach_attempt_id)
-        : null,
-      selectResult: true,
-    });
-    if (!callUpdate) {
-      throw new Error("persistCallStatusFromParams returned no call row");
+    const updateData = buildCallUpsertFromTwilioParams(parsedBody);
+    if (status) {
+      updateData.status = status;
     }
+
+    const workspace = requireValue(dbCall.workspace, "workspace");
+    const campaignType = dbCall.campaign_id
+      ? await findCampaignTypeByCampaignId(dbCall.campaign_id, workspace)
+      : null;
+
+    const { call: callUpdate } = await processCallStatusWebhook(updateData, {
+      campaignType,
+      workspaceId: workspace,
+      campaignId: dbCall.campaign_id ?? null,
+      contactId: dbCall.contact_id ?? null,
+      outreachAttemptId: dbCall.outreach_attempt_id ?? null,
+    });
+
     if (!callUpdate.outreach_attempt_id) {
       throw new Error("Missing outreach_attempt_id for auto-dial status update");
     }
     const outreachStatus = resolveOutreachUpdate(
       await updateOutreachAttempt(
         String(callUpdate.outreach_attempt_id),
-        requireValue(callUpdate.workspace, "workspace"),
+        workspace,
         { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
       ),
     );
     if (!outreachStatus) {
       return;
     }
-    await updateTransaction(callUpdate, duration);
 
-    const workspace = requireValue(dbCall.workspace, "workspace");
     const tdb = createTenantDb(workspace);
     await rpcDequeueContact(tdb, {
       contactId: outreachStatus.contact_id,
@@ -180,25 +190,6 @@ const handleCallStatus = async (
     throw error;
   }
 };
-
-const updateTransaction = async (call: Tables<"call">, duration: number) => {
-  if (!call.workspace) {
-    logger.error("Skipping transaction update because call workspace is missing", {
-      callSid: call.sid,
-    });
-    return null;
-  }
-  const billingUnits = billingUnitsFromCallDurationSeconds(duration, "staffed");
-  await insertTransactionHistoryIdempotent({
-    workspaceId: call.workspace,
-    type: "DEBIT",
-    amount: debitAmountFromCredits(billingUnits),
-    note: `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`,
-    idempotencyKey: callKey(call.sid, "staffed"),
-    callSid: call.sid,
-  });
-  return null;
-}
 
 const handleParticipantLeave = async (
   parsedBody: { [x: string]: string },
@@ -266,7 +257,11 @@ const handleParticipantJoin = async (
         requireValue(typeof underCase.call_sid === "string" ? underCase.call_sid : null, "CallSid"),
         workspaceId,
         {
-          conference_id: requireValue(typeof underCase.conference_sid === "string" ? underCase.conference_sid : null, "ConferenceSid"),
+          conference_id: requireValue(
+          (typeof underCase.friendly_name === "string" ? underCase.friendly_name : null) ??
+            (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null),
+          "ConferenceSid",
+        ),
           start_time: new Date(requireValue(typeof underCase.timestamp === "string" ? underCase.timestamp : null, "Timestamp")).toISOString(),
         },
       );
@@ -323,14 +318,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Missing CallSid");
     }
 
-    const validation = await validateTwilioWebhookForCallSid({
-      request,
-      callSid: callSidValue,
-      params,
-    });
-    if (!validation.ok) {
-      return validation.response;
-    }
+    const forbidden = await requireTwilioSignature(request, { callSid: callSidValue });
+    if (forbidden) return forbidden;
 
     const dbCall = await findCallBySid(callSidValue);
     if (!dbCall?.workspace) {
@@ -357,10 +346,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           twilio,
           realtime,
           callStatusValue?.toLowerCase() as Tables<"call">["status"],
-          Math.max(
-            Number(underCase.call_duration) || 0,
-            Number(underCase.duration) || 0,
-          )
         );
         break;
       default:

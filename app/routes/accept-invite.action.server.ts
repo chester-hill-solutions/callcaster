@@ -1,5 +1,7 @@
 import { acceptWorkspaceInvitations, getInvitesByUserId } from "@/lib/database.server";
 import { getSession, verifyAuth } from "@/lib/auth.server";
+import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
+import { auth } from "@/server/auth-instance";
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import type { ActionData } from "./accept-invite.types";
@@ -39,25 +41,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
       }
 
-      const { data: userData, error: updateError } = await (request as any).updateUser({
-        email: emailValue,
-        password: passwordValue,
-        data: { first_name: firstNameValue, last_name: lastNameValue },
+      const name = [firstNameValue, lastNameValue].filter(Boolean).join(" ").trim() || emailValue;
+      const signUpResult = await auth.api.signUpEmail({
+        body: {
+          email: emailValue,
+          password: passwordValue,
+          name,
+        },
+        headers: request.headers,
+        returnHeaders: true,
       });
 
-      if (updateError) throw updateError;
-      if (!userData?.user) {
+      const payload = signUpResult?.response ?? signUpResult;
+      const user = payload?.user;
+      if (!user) {
         throw new Error("Unable to retrieve updated user.");
       }
 
-      const invites = await getInvitesByUserId(userData.user.id);
+      const responseHeaders = mergeBetterAuthSetCookieHeaders(
+        signUpResult?.headers,
+        headers,
+      );
+      const invites = await getInvitesByUserId(user.id);
 
       return routeData<ActionData>(
         { status: "updated", invites: invites ?? [] },
-        { headers },
+        { headers: responseHeaders },
       );
     } catch (error) {
-      logger.error("Error in updateUser:", error);
+      logger.error("Error in signUpEmail:", error);
       const message =
         error instanceof Error ? error.message : "An unexpected error occurred";
       return routeData<ActionData>(

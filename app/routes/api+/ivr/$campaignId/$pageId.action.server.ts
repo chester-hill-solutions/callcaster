@@ -1,8 +1,8 @@
 import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
@@ -18,7 +18,7 @@ type IvrScriptSteps = { pages: Record<string, { blocks: string[] }> };
 const getCallWithRetry = async (
   callSid: string,
   retries = 0,
-) => {
+): Promise<ReturnType<typeof findCallWithCampaignScriptBySid> | null> => {
   const data = await findCallWithCampaignScriptBySid(callSid);
 
   if (!data) {
@@ -26,7 +26,7 @@ const getCallWithRetry = async (
       await sleep(RETRY_DELAY);
       return getCallWithRetry(callSid, retries + 1);
     }
-    throw new Error("Failed to retrieve call after multiple attempts");
+    return null;
   }
 
   return data;
@@ -43,17 +43,21 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
     return new Response("Missing required parameters", { status: 400 });
   }
 
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    callSid,
-    params: paramsObj,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { callSid });
+  if (forbidden) return forbidden;
 
   try {
     const callData = await getCallWithRetry(callSid);
+    if (!callData) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+    if (callData.campaign_id !== Number(campaignId)) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
     const script = ivrScriptStepsFromCampaign(callData.campaign) as
       | IvrScriptSteps
       | null

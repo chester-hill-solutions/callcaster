@@ -146,6 +146,7 @@ export async function transferWorkspaceOwnershipApi(
     formData,
     workspaceId,
     headers,
+    userId,
   );
 
   if (result && typeof result === "object" && "error" in result && result.error) {

@@ -1,9 +1,8 @@
 import {
-  resolveWorkspaceTwilioData,
+  requireTwilioSignature,
   twilioWebhookBadRequest,
   twilioWebhookInternalError,
   twilioWebhookNotFound,
-  validateWorkspaceTwilioWebhook,
 } from "@/lib/twilio-webhook.server";
 import { env } from "@/lib/env.server";
 import { isEmail, isPhoneNumber } from "@/lib/utils";
@@ -64,7 +63,7 @@ function dispatchInboundCallWebhookNotification(args: {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
-  const formData = await request.formData();
+  const formData = await request.clone().formData();
   const data = Object.fromEntries(
     formData,
   ) as Partial<TwilioInboundCallWebhook>;
@@ -73,6 +72,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return twilioWebhookBadRequest("Missing Called parameter");
   }
 
+  const forbidden = await requireTwilioSignature(request, { phoneNumber: data.Called });
+  if (forbidden) return forbidden;
+
   const number = await findWorkspaceNumberByPhoneNumber(data.Called);
   if (!number) {
     return twilioWebhookNotFound();
@@ -80,37 +82,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const workspaceId = number.workspaceId;
 
-  const twilioData = (await resolveWorkspaceTwilioData(
-    workspaceId,
-    null,
-    logger,
-  )) as Record<string, unknown> | null | undefined;
-
-  const params = data as Record<string, string>;
-  const validation = validateWorkspaceTwilioWebhook({
-    request,
-    params,
-    twilioData,
-  });
-  const authTokenSource = validation.ok ? "validated" : "missing";
-
   logger.info("api.inbound webhook received", {
     Called: data.Called,
     CallSid: data.CallSid,
     workspaceId,
-    authTokenSource,
+    authTokenSource: "validated",
     hasSignature: Boolean(request.headers.get("x-twilio-signature")),
     requestUrl: new URL(request.url).href,
   });
-
-  if (!validation.ok) {
-    logger.warn("api.inbound Twilio signature validation failed", {
-      Called: data.Called,
-      CallSid: data.CallSid,
-      workspaceId,
-    });
-    return validation.response;
-  }
 
   const dialTimeout = inboundRingCountToDialTimeoutSeconds(
     number.inbound_ring_count ?? null,

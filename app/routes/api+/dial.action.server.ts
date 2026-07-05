@@ -144,6 +144,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             campaign_id: campaignId,
             contact_id: contactId,
             workspace: workspace_id,
+            user_id: user_id,
             outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : undefined,
             queue_id: queueId,
         });

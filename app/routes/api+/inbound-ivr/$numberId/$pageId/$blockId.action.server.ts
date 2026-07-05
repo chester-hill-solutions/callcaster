@@ -1,8 +1,10 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -129,23 +131,29 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
     return new Response("Missing CallSid parameter", { status: 400 });
   }
 
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    callSid,
-    params: formParams,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { callSid });
+  if (forbidden) return forbidden;
 
   try {
+    const call = await findCallBySid(callSid);
+    if (!call?.to) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
     const context = await loadInboundIvrBlockContext(Number(numberId));
-    if (!context) {
-      throw new Error("Number has no inbound script");
+    if (!context || call.to !== context.number.phoneNumber) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
     }
 
     const { script, number } = context;
-    const currentBlock = script.blocks[blockId] as Script["blocks"][string] | undefined;
+    const currentPage = script.pages[pageId];
+    const currentBlock = currentPage?.blocks.includes(blockId)
+      ? (script.blocks[blockId] as Script["blocks"][string] | undefined)
+      : undefined;
 
     if (currentBlock) {
       await handleBlock(

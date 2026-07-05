@@ -18,7 +18,7 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
-    validateTwilioWebhookParams: vi.fn(() => true),
+    requireTwilioSignature: vi.fn(),
     sendWebhookNotification: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     env: {
@@ -32,9 +32,8 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@client/client-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
-vi.mock("@/twilio.server", () => ({
-  validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a),
-  shouldValidateTwilioWebhooks: () => true,
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  requireTwilioSignature: (...a: any[]) => mocks.requireTwilioSignature(...a),
 }));
 vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...a: any[]) => mocks.sendWebhookNotification(...a),
@@ -255,8 +254,8 @@ describe("app/routes/api+/inbound-sms", () => {
     inboundContextMocks.contactError = null;
     inboundContextMocks.resolveInboundWorkspaceContext.mockReset();
     mocks.createClient.mockReset();
-    mocks.validateTwilioWebhookParams.mockReset();
-    mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.sendWebhookNotification.mockReset();
     mocks.logger.error.mockReset();
     mocks.logger.info.mockReset();
@@ -266,7 +265,7 @@ describe("app/routes/api+/inbound-sms", () => {
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }));
     const number = {
       workspace: "w1",
       twilio_data: { sid: "sid", authToken: "workspace-tok" },
@@ -280,15 +279,14 @@ describe("app/routes/api+/inbound-sms", () => {
       } as any),
     );
     expect(res.status).toBe(403);
-    expect(mocks.validateTwilioWebhookParams).toHaveBeenCalledWith(
-      expect.objectContaining({ To: "+1555" }),
-      "test-sig",
-      expect.any(String),
-      "workspace-tok",
+    expect(mocks.requireTwilioSignature).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "http://x/inbound-sms" }),
+      { workspaceId: "w1" },
     );
   });
 
   test("returns 403 when Twilio signature header is missing", async () => {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Missing Twilio signature" }), { status: 403 }));
     const number = {
       workspace: "w1",
       twilio_data: { sid: "sid", authToken: "workspace-tok" },
@@ -368,30 +366,15 @@ describe("app/routes/api+/inbound-sms", () => {
     expect(res.status).toBe(409);
   });
 
-  test("uses env Twilio creds for MMS when workspace twilio_data is missing in dev", async () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "test";
-    mocks.fetch.mockResolvedValueOnce({
-      ok: true,
-      statusText: "OK",
-      blob: async () => new Blob(["x"]),
-    } as any);
+  test("returns 500 when workspace Twilio credentials are missing", async () => {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Workspace Twilio credentials missing" }), { status: 500 }));
     const number = { workspace: "w1", twilio_data: null, webhook: [] };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
     const res = await asRouteResponse(
       await mod.action({ request: makeInboundSmsRequest({ NumMedia: "1" }) } as any),
     );
-    process.env.NODE_ENV = originalNodeEnv;
-    expect(res.status).toBe(201);
-    expect(mocks.fetch).toHaveBeenCalledWith(
-      "https://m/0",
-      expect.objectContaining({
-        headers: {
-          Authorization: `Basic ${Buffer.from("AC_MAIN:tok").toString("base64")}`,
-        },
-      }),
-    );
+    expect(res.status).toBe(500);
   });
 
   test("processes media (handles fetch/upload failures), inserts message, opt-out stop/start, and sends webhook", async () => {

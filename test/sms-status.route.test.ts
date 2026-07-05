@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  validateTwilioWebhookForMessageSid: vi.fn(),
+  requireTwilioSignature: vi.fn(),
   findMessageBySid: vi.fn(),
   updateMessageBySid: vi.fn(),
   findOutreachAttemptById: vi.fn(),
@@ -25,8 +25,8 @@ const twilioCtor = vi.fn(function (this: unknown) {
 
 vi.mock("twilio", () => ({ default: { Twilio: twilioCtor } }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForMessageSid: (...args: unknown[]) =>
-    mocks.validateTwilioWebhookForMessageSid(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
 }));
 vi.mock("@/lib/message-db.server", () => ({
   findMessageBySid: (...args: unknown[]) => mocks.findMessageBySid(...args),
@@ -77,14 +77,10 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     twilioCtor.mockClear();
-    mocks.validateTwilioWebhookForMessageSid.mockReset();
-    mocks.validateTwilioWebhookForMessageSid.mockImplementation(async (args: {
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockImplementation(async (args: {
       params?: Record<string, string>;
-    }) => ({
-      ok: true,
-      params: args.params ?? {},
-      authToken: "workspace-token",
-    }));
+    }) => (null));
     mocks.findMessageBySid.mockReset();
     mocks.updateMessageBySid.mockReset();
     mocks.findOutreachAttemptById.mockReset();
@@ -100,12 +96,9 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
   });
 
   test("returns 403 when webhook validation fails", async () => {
-    mocks.validateTwilioWebhookForMessageSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
 
     const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(
@@ -142,11 +135,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       campaign_id: null,
     });
 
-    mocks.validateTwilioWebhookForMessageSid.mockResolvedValueOnce({
-      ok: true,
-      params: { SmsSid: "SM1", MessageStatus: "delivered" },
-      authToken: "workspace-token",
-    });
+    mocks.requireTwilioSignature.mockResolvedValueOnce(null);
 
     const formData = new FormData();
     formData.set("SmsSid", "SM1");
@@ -163,11 +152,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
 
   test("returns 500 when message lookup fails after validation", async () => {
     mocks.findMessageBySid.mockResolvedValueOnce(null);
-    mocks.validateTwilioWebhookForMessageSid.mockResolvedValueOnce({
-      ok: true,
-      params: { SmsSid: "SM1", SmsStatus: "sent" },
-      authToken: "workspace-token",
-    });
+    mocks.requireTwilioSignature.mockResolvedValueOnce(null);
 
     const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(
@@ -185,11 +170,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       direction: "inbound",
       status: "received",
     });
-    mocks.validateTwilioWebhookForMessageSid.mockResolvedValueOnce({
-      ok: true,
-      params: { SmsSid: "SM1", SmsStatus: "sent" },
-      authToken: "workspace-token",
-    });
+    mocks.requireTwilioSignature.mockResolvedValueOnce(null);
 
     const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(

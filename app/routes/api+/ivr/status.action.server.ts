@@ -4,17 +4,15 @@ import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import { voiceCreditsFromDurationSeconds, debitAmountFromCredits } from "@/lib/pricing";
-import { callKey } from "@/lib/billing-keys";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import {
   hangupTwiml,
   pausePlayTwiml,
   pauseSayTwiml,
 } from "@/lib/twilio-twiml.server";
 import {
-  persistCallStatusFromParams,
+  buildCallUpsertFromTwilioParams,
+  processCallStatusWebhook,
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
@@ -110,25 +108,6 @@ const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: C
     }
 };
 
-const debitIvrCallCredits = async (
-        args: {
-        callSid: string;
-        workspaceId: string;
-        campaignName: string;
-        durationSeconds: number;
-    },
-): Promise<void> => {
-    const credits = voiceCreditsFromDurationSeconds(args.durationSeconds, "ivr");
-    await insertTransactionHistoryIdempotent({
-        workspaceId: args.workspaceId,
-        type: "DEBIT",
-        amount: debitAmountFromCredits(credits),
-        note: `IVR Call ${args.callSid}, Campaign ${args.campaignName}, Duration ${args.durationSeconds}s`,
-        idempotencyKey: callKey(args.callSid, "ivr"),
-        callSid: args.callSid,
-    });
-};
-
 export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
@@ -139,14 +118,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (!callSid) {
             throw new Error("Missing CallSid");
         }
-        const validation = await validateTwilioWebhookForCallSid({
-            request,
-            callSid,
-            params,
-        });
-        if (!validation.ok) {
-            return validation.response;
-        }
+        const forbidden = await requireTwilioSignature(request, { callSid });
+        if (forbidden) return forbidden;
 
         const dbCall = await findCallBySid(callSid);
         if (!dbCall) throw new Error("Call not found");
@@ -172,45 +145,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 dbCall as unknown as Call,
                 campaignData as unknown as Campaign & { script: Script | Script[] | null },
             );
-        } else {
-            switch (callStatus) {
-                case 'failed': {
-                    await persistCallStatusFromParams({
-                        params,
-                        disposition: 'failed',
-                        outreachAttemptId: dbCall.outreach_attempt_id ?? null,
-                    });
-                    break;
-                }
-                case 'no-answer': {
-                    await persistCallStatusFromParams({
-                        params,
-                        disposition: 'no-answer',
-                        outreachAttemptId: dbCall.outreach_attempt_id ?? null,
-                    });
-                    break;
-                }
-                case 'completed': {
-                    await persistCallStatusFromParams({
-                        params,
-                        disposition: 'completed',
-                        outreachAttemptId: dbCall.outreach_attempt_id ?? null,
-                    });
-                    const durationSeconds = Math.max(
-                        Number(underCase.call_duration) || 0,
-                        Number(underCase.duration) || 0,
-                    );
-                    await debitIvrCallCredits({
-                        callSid,
-                        workspaceId: String(dbCall.workspace),
-                        campaignName: campaignData.title ?? "unknown",
-                        durationSeconds,
-                    });
-                    break;
-                }
-                default:
-                    break;
-            }
+        } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
+            const updateData = buildCallUpsertFromTwilioParams(params);
+            await processCallStatusWebhook(updateData, {
+                campaignType: campaignData.type ?? null,
+                workspaceId: String(dbCall.workspace),
+                campaignId: dbCall.campaign_id ?? null,
+                contactId: dbCall.contact_id ?? null,
+                outreachAttemptId: dbCall.outreach_attempt_id ?? null,
+                userId: dbCall.user_id ?? null,
+                note: `IVR Call ${callSid}, Campaign ${campaignData.title ?? "unknown"}`,
+            });
         }
     } catch (error) {
         logger.error("Error processing IVR status:", error);

@@ -51,14 +51,23 @@ npm install
 supabase start
 ```
 
-3. Start the app:
+3. Start the media-stream Bun service (optional; needed for the dashboard audio stream):
+
+```bash
+bun run services/media-stream/index.ts
+```
+
+The service listens on `MEDIA_STREAM_PORT` (default `3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you want to change defaults.
+
+4. Start the app:
 
 ```bash
 npm run dev
 ```
 
-4. Confirm the local services are up:
+5. Confirm the local services are up:
    - app at `http://localhost:3000`
+   - media-stream at `http://localhost:3001/healthz`
    - Supabase Studio at `http://127.0.0.1:54323`
    - Inbucket at `http://127.0.0.1:54324`
 

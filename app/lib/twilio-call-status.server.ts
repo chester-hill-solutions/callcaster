@@ -2,8 +2,10 @@
 import type { Database, Tables, TablesInsert } from "@/lib/db-types";
 import {
   findCallBySid,
+  upsertCallBySid,
   updateCallBySid,
   updateOutreachAttemptForWorkspace,
+  findCampaignTypeByCampaignId,
 } from "@/lib/telephony-db.server";
 import {
   voiceBillingKindFromCampaignType,
@@ -11,6 +13,10 @@ import {
   TERMINAL_BILLABLE_CALL_STATUSES,
   type VoiceBillingKind,
 } from "../../shared/pricing";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { callKey } from "@/lib/billing-keys";
+import { debitAmountFromCredits } from "@/lib/pricing";
+import { logger } from "@/lib/logger.server";
 
 export {
   voiceBillingKindFromCampaignType,
@@ -80,6 +86,7 @@ export function buildCallUpsertFromTwilioParams(
     recording_duration: getString(underCaseData.recording_duration),
     recording_sid: getString(underCaseData.recording_sid),
     recording_url: getString(underCaseData.recording_url),
+    user_id: getString(underCaseData.user_id) ?? undefined,
     is_last: false,
   };
 }
@@ -119,6 +126,129 @@ export function billingUnitsFromCallDurationSeconds(
 }
 
 export const TERMINAL_CALL_STATUSES = TERMINAL_BILLABLE_CALL_STATUSES;
+
+type ProcessCallStatusOptions = {
+  campaignType?: string | null;
+  workspaceId?: string;
+  campaignId?: number | null;
+  contactId?: number | null;
+  outreachAttemptId?: number | null;
+  userId?: string | null;
+  note?: string;
+};
+
+/**
+ * Single source of truth for call status persistence and billing.
+ *
+ * - Upserts the call row from Twilio status-callback params.
+ * - Enriches missing workspace/campaign/user from the parent call leg so
+ *   status callbacks for child legs (manual dial, handset dial) can resolve
+ *   the workspace.
+ * - Guards against regressing a terminal status to a non-terminal status.
+ * - Debits credits only for terminal statuses with a non-zero duration, using
+ *   the billing kind derived from the campaign type.
+ */
+export async function processCallStatusWebhook(
+  updateData: TablesInsert<"call">,
+  options: ProcessCallStatusOptions = {},
+): Promise<{
+  call: Tables<"call">;
+  billingResult: { inserted: boolean; existingId?: number } | null;
+}> {
+  if (!updateData.sid) {
+    throw new Error("Missing CallSid in processCallStatusWebhook");
+  }
+
+  const update: Partial<TablesInsert<"call">> = { ...updateData };
+
+  // Enrich from explicit options if the webhook payload is missing them.
+  if (options.workspaceId && !update.workspace) {
+    update.workspace = options.workspaceId;
+  }
+  if (options.campaignId != null && update.campaign_id == null) {
+    update.campaign_id = options.campaignId;
+  }
+  if (options.contactId != null && update.contact_id == null) {
+    update.contact_id = options.contactId;
+  }
+  if (options.outreachAttemptId != null && update.outreach_attempt_id == null) {
+    update.outreach_attempt_id = options.outreachAttemptId;
+  }
+  if (options.userId != null && update.user_id == null) {
+    update.user_id = options.userId;
+  }
+
+  // If we still do not know the workspace, try to inherit it from the parent
+  // call leg. This is the normal path for manual dial child legs whose parent
+  // was created by /api/dial, and for handset dial child legs whose parent
+  // was created by /api/call.
+  if (!update.workspace && update.parent_call_sid) {
+    const parent = await findCallBySid(update.parent_call_sid);
+    if (parent) {
+      if (!update.workspace) update.workspace = parent.workspace ?? undefined;
+      if (update.campaign_id == null && parent.campaign_id != null) {
+        update.campaign_id = parent.campaign_id;
+      }
+      if (update.contact_id == null && parent.contact_id != null) {
+        update.contact_id = parent.contact_id;
+      }
+      if (update.outreach_attempt_id == null && parent.outreach_attempt_id != null) {
+        update.outreach_attempt_id = parent.outreach_attempt_id;
+      }
+      if (update.user_id == null && parent.user_id != null) {
+        update.user_id = parent.user_id;
+      }
+    }
+  }
+
+  const newStatus = update.status ? String(update.status).toLowerCase() : null;
+
+  const call = await upsertCallBySid(update as Partial<Tables<"call">> & { sid: string });
+  if (!call) {
+    throw new Error(`Failed to upsert call ${updateData.sid}`);
+  }
+
+  const status = String(update.status ?? "").toLowerCase();
+  const duration = Math.max(
+    Number(update.duration) || 0,
+    Number(update.call_duration) || 0,
+  );
+  const isTerminal = TERMINAL_BILLABLE_CALL_STATUSES.includes(
+    status as (typeof TERMINAL_BILLABLE_CALL_STATUSES)[number],
+  );
+
+  let billingResult: { inserted: boolean; existingId?: number } | null = null;
+
+  if (call.workspace && isTerminal && duration > 0) {
+    let campaignType = options.campaignType ?? null;
+    if (campaignType == null && call.campaign_id != null) {
+      try {
+        campaignType = await findCampaignTypeByCampaignId(call.campaign_id, call.workspace);
+      } catch (e) {
+        logger.error("Failed to resolve campaign type for billing", e);
+      }
+    }
+    const billingKind = voiceBillingKindFromCampaignType(campaignType);
+    const credits = billingUnitsFromCallDurationSeconds(duration, billingKind);
+    const note =
+      options.note ??
+      (call.contact_id
+        ? `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
+        : `Call ${call.sid} (API/staffed dial)`);
+
+    billingResult = await insertTransactionHistoryIdempotent({
+      workspaceId: call.workspace,
+      type: "DEBIT",
+      amount: debitAmountFromCredits(credits),
+      note,
+      idempotencyKey: callKey(call.sid, billingKind),
+      callSid: call.sid,
+      campaignId: call.campaign_id ?? null,
+    });
+  }
+
+  return { call, billingResult };
+}
 
 /**
  * Persist a call status update from Twilio status-callback form params.

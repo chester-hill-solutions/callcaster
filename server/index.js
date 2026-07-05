@@ -9,6 +9,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequestHandler } from "@react-router/express";
 import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
+import { tsImport } from "tsx/esm/api";
+import { Readable } from "node:stream";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +26,181 @@ const PROBE_PATHS = new Set(["/healthz", "/readyz"]);
 const FATAL_ON_REJECTION =
   process.env.PROCESS_FATAL_ON_REJECTION === "1" ||
   process.env.PROCESS_FATAL_ON_REJECTION === "true";
+
+const TWILIO_WEBHOOK_PATH_PREFIXES = [
+  "/api/call",
+  "/api/dial",
+  "/api/inbound",
+  "/api/inbound-handset",
+  "/api/inbound-ivr",
+  "/api/ivr",
+  "/api/call-status",
+  "/api/auto-dial",
+  "/api/acd-router",
+  "/api/recording",
+  "/api/sms/status",
+  "/api/caller-id/status",
+  "/api/email-vm",
+  "/api/connect-campaign-conference",
+];
+
+const MAX_RAW_BODY_BYTES = 1 * 1024 * 1024;
+
+const HANGUP_TWIML =
+  '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>';
+
+let requireTwilioSignature;
+
+async function loadRequireTwilioSignature() {
+  if (!requireTwilioSignature) {
+    const mod = await tsImport(
+      "../app/lib/twilio-webhook.server.ts",
+      import.meta.url,
+    );
+    requireTwilioSignature = mod.requireTwilioSignature;
+  }
+  return requireTwilioSignature;
+}
+
+function isTwilioWebhookPath(pathname) {
+  return TWILIO_WEBHOOK_PATH_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix),
+  );
+}
+
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_RAW_BODY_BYTES) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+    req.on("aborted", () => reject(new Error("Request aborted")));
+  });
+}
+
+function createRequestFromRaw(req, body) {
+  const protocol = req.protocol || "http";
+  const host = req.get("host") || "localhost";
+  const url = new URL(`${protocol}://${host}${req.originalUrl}`);
+  return new Request(url.href, {
+    method: req.method,
+    headers: req.headers,
+    body: req.method === "GET" || req.method === "HEAD" ? undefined : body,
+    duplex: "half",
+  });
+}
+
+function resolveTwilioWebhookOptions(request, body) {
+  const pathname = new URL(request.url).pathname;
+  const params =
+    request.method === "GET" || request.method === "HEAD"
+      ? new URL(request.url).searchParams
+      : new URLSearchParams(body.toString());
+
+  if (
+    pathname.startsWith("/api/caller-id/status") ||
+    pathname.startsWith("/api/inbound")
+  ) {
+    const phone = params.get("Called") || params.get("To") || "";
+    if (phone) return { phoneNumber: phone };
+  }
+
+  if (pathname.startsWith("/api/sms/status")) {
+    const sid = params.get("SmsSid") || params.get("MessageSid") || "";
+    if (sid) return { messageSid: sid };
+  }
+
+  const callSid = params.get("CallSid") || "";
+  if (callSid) return { callSid };
+
+  return {};
+}
+
+function createReqWithBody(originalReq, body) {
+  const stream = new Readable();
+  stream.push(body);
+  stream.push(null);
+  return new Proxy(stream, {
+    get(target, prop, receiver) {
+      if (typeof prop === "symbol") {
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+      const streamValue = Reflect.get(target, prop, receiver);
+      if (streamValue !== undefined || prop in target) {
+        return typeof streamValue === "function"
+          ? streamValue.bind(target)
+          : streamValue;
+      }
+      const originalValue = originalReq[prop];
+      return typeof originalValue === "function"
+        ? originalValue.bind(originalReq)
+        : originalValue;
+    },
+  });
+}
+
+function createTwilioWebhookMiddleware(handleRemixRequest) {
+  return async (req, res, next) => {
+    const pathname = req.path ?? req.url;
+    if (!isTwilioWebhookPath(pathname)) {
+      return next();
+    }
+
+    if (pathname.startsWith("/api/docs")) {
+      return next();
+    }
+
+    if (
+      req.method !== "GET" &&
+      req.method !== "POST" &&
+      req.method !== "HEAD"
+    ) {
+      return next();
+    }
+
+    try {
+      const body =
+        req.method === "GET" || req.method === "HEAD"
+          ? Buffer.from("")
+          : await readRawBody(req);
+      const request = createRequestFromRaw(req, body);
+      const options = resolveTwilioWebhookOptions(request, body);
+      const fn = await loadRequireTwilioSignature();
+      const forbidden = await fn(request, options);
+
+      if (forbidden) {
+        const bodyText = await forbidden.text();
+        res
+          .status(forbidden.status)
+          .set(
+            "Content-Type",
+            forbidden.headers.get("Content-Type") || "text/xml",
+          )
+          .send(bodyText);
+        return;
+      }
+
+      const newReq = createReqWithBody(req, body);
+      await handleRemixRequest(newReq, res, next);
+    } catch (error) {
+      log("error", "Twilio webhook middleware error", {
+        path: pathname,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(403).set("Content-Type", "text/xml").send(HANGUP_TWIML);
+    }
+  };
+}
 
 export function validateEnvironment(env = process.env) {
   validateRequiredEnv(env);
@@ -157,6 +334,7 @@ export function createApp({
       mode,
     });
 
+  app.use(createTwilioWebhookMiddleware(handleRemixRequest));
   app.all("*", handleRemixRequest);
 
   return app;
@@ -184,9 +362,23 @@ export async function startServer({
 } = {}) {
   validateEnvironment(env);
 
-  const readyState = { acceptingTraffic: true, buildReady: false };
+  const readyState = { acceptingTraffic: false, buildReady: false };
   const build = await loadBuild(buildPath);
   readyState.buildReady = true;
+
+  // DB schema health check: fail loudly if required RPC/triggers are missing/wrong.
+  try {
+    await import("tsx");
+    const { assertRequiredDbFunctions } = await import("../app/server/db-health.server.ts");
+    await assertRequiredDbFunctions();
+  } catch (error) {
+    log("error", "database schema health check failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
+  }
+
+  readyState.acceptingTraffic = true;
 
   const app = createApp({ build, mode: env.NODE_ENV ?? "production", readyState });
   const server = createHttpServer(app);

@@ -1,9 +1,5 @@
-import { findActiveAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
-import {
-  findCallConferenceIdForWorkspace,
-  updateOutreachDispositionByContactId,
-} from "@/lib/telephony-db.server";
+import { findCallBySid, updateOutreachDispositionByContactId } from "@/lib/telephony-db.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
@@ -17,8 +13,6 @@ export const action = async ({ request }: { request: Request }) => {
     const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;  const user = auth.user;
     const data = await parseActionRequest(request);
-    const conferenceId =
-        typeof data.conference_id === "string" ? data.conference_id : null;
     const workspaceId =
         typeof data.workspaceId === "string" ? data.workspaceId : null;
     const callSid = typeof data.callSid === "string" ? data.callSid : null;
@@ -28,12 +22,12 @@ export const action = async ({ request }: { request: Request }) => {
     try {
         await requireWorkspaceAccess({ user, workspaceId });
 
-        let resolvedConferenceId = conferenceId;
-        if (!resolvedConferenceId) {
-          resolvedConferenceId =
-            (await findCallConferenceIdForWorkspace(workspaceId, callSid)) ?? null;
+        const call = await findCallBySid(callSid);
+        if (!call || call.workspace !== workspaceId) {
+            return routeData({ success: false, message: "Call not found" }, { status: 404 });
         }
 
+        const tdb = createTenantDb(workspaceId);
         const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
         try {
             await twilio.calls(callSid).update({ twiml: hangupTwiml() });
@@ -45,18 +39,16 @@ export const action = async ({ request }: { request: Request }) => {
                 throw twilioErr;
             }
         }
-        const queue = await findActiveAssignedQueueForUser(user.id);
-        const tdb = createTenantDb(workspaceId);
-        if (queue) {
+        if (call.contact_id) {
             await rpcDequeueContact(tdb, {
-                contactId: queue.contact_id,
-                groupOnHousehold: queue.group_household_queue,
+                contactId: call.contact_id,
+                groupOnHousehold: true,
                 dequeuedById: user.id,
                 dequeuedReasonText: "Call completed",
             });
             await updateOutreachDispositionByContactId(
                 workspaceId,
-                queue.contact_id,
+                call.contact_id,
                 "completed",
             );
         }

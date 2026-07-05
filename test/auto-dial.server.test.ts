@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 const envMock = vi.hoisted(() => ({
   BASE_URL: vi.fn(() => "https://example.test"),
 }));
@@ -10,18 +14,22 @@ vi.mock("@/lib/logger.server", () => ({
 }));
 
 const rpcMocks = vi.hoisted(() => ({
-  rpcAutoDialQueue: vi.fn(),
   rpcCreateOutreachAttempt: vi.fn(),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
-  rpcAutoDialQueue: (...args: unknown[]) => rpcMocks.rpcAutoDialQueue(...args),
   rpcCreateOutreachAttempt: (...args: unknown[]) => rpcMocks.rpcCreateOutreachAttempt(...args),
+}));
+
+const claimNextQueueContactMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
 }));
 
 const tenantDbMocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   update: vi.fn(),
   insert: vi.fn(),
+  execute: vi.fn(),
 }));
 
 vi.mock("@/server/tenant-db", () => ({
@@ -31,6 +39,7 @@ vi.mock("@/server/tenant-db", () => ({
       update: (...args: unknown[]) => tenantDbMocks.update(...args),
       insert: (...args: unknown[]) => tenantDbMocks.insert(...args),
     },
+    execute: (...args: unknown[]) => tenantDbMocks.execute(...args),
   })),
 }));
 
@@ -46,8 +55,8 @@ import {
 describe("auto-dial.server", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    rpcMocks.rpcAutoDialQueue.mockReset();
     rpcMocks.rpcCreateOutreachAttempt.mockReset();
+    claimNextQueueContactMock.mockReset();
   });
 
   test("normalizePhoneNumber re-exports shared helper", () => {
@@ -55,22 +64,19 @@ describe("auto-dial.server", () => {
   });
 
   test("getNextAutoDialQueueContact returns first record", async () => {
-    rpcMocks.rpcAutoDialQueue.mockResolvedValueOnce({ queue_id: 1 });
+    claimNextQueueContactMock.mockResolvedValueOnce({ queue_id: 1 });
     const result = await getNextAutoDialQueueContact(1, "user-1");
     expect(result).toEqual({ queue_id: 1 });
-    expect(rpcMocks.rpcAutoDialQueue).toHaveBeenCalledWith(expect.anything(), {
-      campaignId: 1,
-      userId: "user-1",
-    });
+    expect(claimNextQueueContactMock).toHaveBeenCalledWith(expect.anything(), 1, "user-1");
   });
 
   test("getNextAutoDialQueueContact returns null when empty", async () => {
-    rpcMocks.rpcAutoDialQueue.mockResolvedValueOnce(null);
+    claimNextQueueContactMock.mockResolvedValueOnce(null);
     expect(await getNextAutoDialQueueContact(1, "user-1")).toBeNull();
   });
 
   test("getNextAutoDialQueueContact throws on rpc error", async () => {
-    rpcMocks.rpcAutoDialQueue.mockRejectedValueOnce(new Error("rpc fail"));
+    claimNextQueueContactMock.mockRejectedValueOnce(new Error("rpc fail"));
     await expect(
       getNextAutoDialQueueContact(1, "user-1"),
     ).rejects.toThrow("rpc fail");
@@ -101,14 +107,14 @@ describe("auto-dial.server", () => {
       client as never,
       "+15551234567",
       "+15557654321",
-      "user-1",
+      "conf-1",
       "device-1",
     );
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "+15551234567",
         from: "+15557654321",
-        url: "https://example.test/api/auto-dial/user-1",
+        url: "https://example.test/api/auto-dial/conf-1",
         statusCallback: "https://example.test/api/auto-dial/status",
       }),
     );

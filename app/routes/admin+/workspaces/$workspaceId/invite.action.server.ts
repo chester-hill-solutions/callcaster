@@ -29,13 +29,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return handleAddUser(formData, workspaceId,  headers);
     }
     case "updateUser": {
-      return handleUpdateUser(formData, workspaceId,  headers);
+      return handleUpdateUser(formData, workspaceId, headers, access.user.id);
     }
     case "deleteUser": {
-      return handleDeleteUser(formData, workspaceId,  headers);
+      return handleDeleteUser(formData, workspaceId, headers, access.user.id);
     }
     case "deleteSelf": {
-      return handleDeleteSelf(formData, workspaceId,  headers);
+      return handleDeleteSelf(formData, workspaceId, headers, access.user.id);
     }
     case "cancelInvite": {
       return removeInvite({ workspaceId,  formData, headers });

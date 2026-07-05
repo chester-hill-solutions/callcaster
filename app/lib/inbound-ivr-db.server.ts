@@ -12,6 +12,7 @@ export type InboundIvrNumberContext = {
   id: number;
   inbound_script_id: number;
   inbound_audio: string | null;
+  phoneNumber: string | null;
   workspaceId: string;
 };
 
@@ -21,6 +22,7 @@ async function findWorkspaceNumberById(numberId: number) {
       id: workspaceNumberTable.id,
       inbound_script_id: workspaceNumberTable.inbound_script_id,
       inbound_audio: workspaceNumberTable.inbound_audio,
+      phoneNumber: workspaceNumberTable.phone_number,
       workspaceId: workspaceNumberTable.workspace,
     })
     .from(workspaceNumberTable)
@@ -35,6 +37,7 @@ async function findWorkspaceNumberById(numberId: number) {
     id: row.id,
     inbound_script_id: row.inbound_script_id,
     inbound_audio: row.inbound_audio,
+    phoneNumber: row.phoneNumber,
     workspaceId: row.workspaceId,
   } satisfies InboundIvrNumberContext;
 }
@@ -57,6 +60,7 @@ async function loadScriptSteps(
 
 export async function loadInboundIvrPageContext(numberId: number): Promise<{
   inbound_script_id: number;
+  phoneNumber: string | null;
   steps: InboundIvrScriptSteps;
 } | null> {
   const number = await findWorkspaceNumberById(numberId);
@@ -69,7 +73,7 @@ export async function loadInboundIvrPageContext(numberId: number): Promise<{
     return null;
   }
 
-  return { inbound_script_id: number.inbound_script_id, steps };
+  return { inbound_script_id: number.inbound_script_id, phoneNumber: number.phoneNumber, steps };
 }
 
 export async function loadInboundIvrBlockContext(numberId: number): Promise<{

@@ -334,7 +334,7 @@ export async function deleteSurveyByPublicId(workspaceId: string, surveyPublicId
 
 export async function getSurveyByInternalId(surveyInternalId: number) {
   const [row] = await db
-    .select({ id: surveyTable.id, is_active: surveyTable.is_active })
+    .select({ id: surveyTable.id, is_active: surveyTable.is_active, workspace: surveyTable.workspace })
     .from(surveyTable)
     .where(eq(surveyTable.id, surveyInternalId))
     .limit(1);
@@ -343,7 +343,7 @@ export async function getSurveyByInternalId(surveyInternalId: number) {
 
 export async function getActiveSurveyByPublicId(surveyPublicId: string) {
   const [row] = await db
-    .select({ id: surveyTable.id, is_active: surveyTable.is_active })
+    .select({ id: surveyTable.id, is_active: surveyTable.is_active, workspace: surveyTable.workspace })
     .from(surveyTable)
     .where(and(eq(surveyTable.survey_id, surveyPublicId), eq(surveyTable.is_active, true)))
     .limit(1);
@@ -385,7 +385,12 @@ async function getOrCreateSurveyResponse(args: {
   const [existing] = await db
     .select()
     .from(surveyResponseTable)
-    .where(eq(surveyResponseTable.result_id, args.resultId))
+    .where(
+      and(
+        eq(surveyResponseTable.survey_id, args.surveyInternalId),
+        eq(surveyResponseTable.result_id, args.resultId),
+      ),
+    )
     .limit(1);
 
   if (!existing) {
@@ -613,15 +618,10 @@ export async function submitSurveyResponse(args: {
 }
 
 export async function completeSurveyResponse(args: {
-  surveyPublicId: string;
+  surveyInternalId: number;
   resultId: string;
   completed: boolean;
 }) {
-  const survey = await getActiveSurveyByPublicId(args.surveyPublicId);
-  if (!survey) {
-    return { ok: false as const, error: "Survey not found", status: 404 };
-  }
-
   const nowIso = new Date().toISOString();
   try {
     await db
@@ -630,7 +630,12 @@ export async function completeSurveyResponse(args: {
         completed_at: args.completed ? nowIso : null,
         updated_at: nowIso,
       })
-      .where(eq(surveyResponseTable.result_id, args.resultId));
+      .where(
+        and(
+          eq(surveyResponseTable.survey_id, args.surveyInternalId),
+          eq(surveyResponseTable.result_id, args.resultId),
+        ),
+      );
   } catch (error) {
     logger.error("Error completing survey:", error);
     return { ok: false as const, error: "Failed to complete survey", status: 500 };

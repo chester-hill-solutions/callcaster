@@ -1,8 +1,10 @@
 import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { parseActionRequest, removeContactsFromAudience } from "@/lib/database.server";
+import { parseActionRequest, removeContactsFromAudience, requireWorkspaceAccess } from "@/lib/database.server";
+import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
+import { AppError } from "@/lib/errors.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -41,6 +43,12 @@ export async function action({ request }: ActionFunctionArgs) {
     const audienceId = parseInt(audienceIdStr, 10);
     const contactIds = contactIdsStr.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
 
+    const workspaceId = await findAudienceWorkspaceById(audienceId);
+    if (!workspaceId) {
+      return routeData({ error: "Audience not found" }, { status: 404, headers });
+    }
+    await requireWorkspaceAccess({ user, workspaceId });
+
     const { removed_count, new_total } = await removeContactsFromAudience(
       audienceId,
       contactIds,
@@ -57,6 +65,9 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   } catch (error) {
     logger.error("Error removing contacts from audience:", error);
+    if (error instanceof AppError) {
+      return routeData({ error: error.message }, { status: error.statusCode, headers });
+    }
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
     return routeData({ error: errorMessage }, { status: 500, headers });
   }

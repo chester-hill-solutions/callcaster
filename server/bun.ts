@@ -123,6 +123,18 @@ function getMimeType(filePath) {
 
 async function createServer() {
   const build = await loadBuild();
+
+  // DB schema health check: fail loudly if required RPC/triggers are missing/wrong.
+  try {
+    const { assertRequiredDbFunctions } = await import("../app/server/db-health.server.ts");
+    await assertRequiredDbFunctions();
+  } catch (error) {
+    log("error", "database schema health check failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
+  }
+
   const requestHandler = createRequestHandler({
     build,
     mode: "production",

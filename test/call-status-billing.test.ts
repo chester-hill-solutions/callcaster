@@ -1,5 +1,9 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { type TransactionRow } from "./helpers/transaction-history-stub";
 
@@ -10,25 +14,22 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const twilioWebhookMocks = vi.hoisted(() => ({
-  validateTwilioWebhookForCallSid: vi.fn(async () => ({
-    ok: true as const,
-    params: {},
-    authToken: "tok",
-  })),
+  requireTwilioSignature: vi.fn(async () => (null)),
 }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...args: any[]) =>
-    twilioWebhookMocks.validateTwilioWebhookForCallSid(...args),
+  requireTwilioSignature: (...args: any[]) =>
+    twilioWebhookMocks.requireTwilioSignature(...args),
 }));
 
 const telephonyDbMocks = vi.hoisted(() => ({
   findCallBySid: vi.fn(async () => null),
-  upsertCallBySid: vi.fn(async () => ({
+  upsertCallBySid: vi.fn(async (values: any) => ({
     workspace: "w1",
     outreach_attempt_id: null,
     parent_call_sid: null,
     campaign_id: null,
+    sid: values.sid,
   })),
   findOutreachAttemptWithCampaignType: vi.fn(async () => null),
   updateOutreachAttemptForWorkspace: vi.fn(async () => ({ id: 1 })),
@@ -77,31 +78,25 @@ describe("api.call-status billing + idempotency", () => {
   beforeEach(() => {
     vi.resetModules();
     resetTransactionRows();
-    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockReset();
-    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValue({
-      ok: true,
-      params: {},
-      authToken: "tok",
-    });
+    twilioWebhookMocks.requireTwilioSignature.mockReset();
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValue(null);
     telephonyDbMocks.findCallBySid.mockReset();
     telephonyDbMocks.upsertCallBySid.mockReset();
     telephonyDbMocks.findOutreachAttemptWithCampaignType.mockReset();
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
-    telephonyDbMocks.upsertCallBySid.mockResolvedValue({
+    telephonyDbMocks.upsertCallBySid.mockImplementation(async (values: any) => ({
       workspace: "w1",
       outreach_attempt_id: null,
       parent_call_sid: null,
       campaign_id: null,
-    });
+      sid: values.sid,
+    }));
   });
 
   test("rejects invalid Twilio signature", async () => {
-    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/call-status");
     const fd = new FormData();
     fd.set("CallSid", "CA_BAD");
@@ -120,7 +115,7 @@ describe("api.call-status billing + idempotency", () => {
     expect(res.status).toBe(403);
   });
 
-  test("bills staffed rates: 4 credits for 0-60s, 9 credits for 61s", async () => {
+  test("bills staffed rates: 4 credits for 1-60s, 9 credits for 61s", async () => {
     const mod = await import("../app/routes/api+/call-status");
 
     const makeReq = (sid: string, duration: string) => {
@@ -138,12 +133,36 @@ describe("api.call-status billing + idempotency", () => {
       });
     };
 
-    await mod.action({ request: makeReq("CA0", "0") } as any);
+    await mod.action({ request: makeReq("CA1", "1") } as any);
     await mod.action({ request: makeReq("CA60", "60") } as any);
     await mod.action({ request: makeReq("CA61", "61") } as any);
 
     const amounts = transactionRowsState.rows.map((r) => r.amount);
     expect(amounts).toEqual([-4, -4, -9]);
+  });
+
+  test("does not bill zero-duration terminal staffed calls (failed/busy/no-answer)", async () => {
+    const mod = await import("../app/routes/api+/call-status");
+
+    const makeReq = (sid: string, status: string) => {
+      const fd = new FormData();
+      fd.set("CallSid", sid);
+      fd.set("CallStatus", status);
+      fd.set("Timestamp", new Date().toISOString());
+      fd.set("Duration", "0");
+      fd.set("CallDuration", "0");
+      return new Request("http://localhost/api/call-status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      });
+    };
+
+    await mod.action({ request: makeReq("CA_FAILED", "failed") } as any);
+    await mod.action({ request: makeReq("CA_BUSY", "busy") } as any);
+    await mod.action({ request: makeReq("CA_NOANSWER", "no-answer") } as any);
+
+    expect(transactionRowsState.rows).toHaveLength(0);
   });
 
   test("is idempotent across duplicate webhook deliveries (same CallSid)", async () => {
@@ -169,6 +188,64 @@ describe("api.call-status billing + idempotency", () => {
       (r) => r.idempotency_key === "call:CA_DUP:staffed",
     );
     expect(matching.length).toBe(1);
+  });
+});
+
+describe("processCallStatusWebhook single source of truth", () => {
+  beforeEach(() => {
+    resetTransactionRows();
+  });
+
+  function makeParams(status: string, duration: string, sid: string) {
+    const fd = new FormData();
+    fd.set("CallSid", sid);
+    fd.set("CallStatus", status);
+    fd.set("Duration", duration);
+    fd.set("CallDuration", duration);
+    fd.set("Timestamp", new Date().toISOString());
+    return Object.fromEntries(fd.entries()) as Record<string, string>;
+  }
+
+  test("same CallSid is billed exactly once across multiple terminal callbacks", async () => {
+    const {
+      processCallStatusWebhook,
+      buildCallUpsertFromTwilioParams,
+    } = await import("../app/lib/twilio-call-status.server");
+
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("completed", "10", "CA_MULTI")),
+      { campaignType: "predictive" },
+    );
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("busy", "0", "CA_MULTI")),
+      { campaignType: "predictive" },
+    );
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("no-answer", "0", "CA_MULTI")),
+      { campaignType: "predictive" },
+    );
+
+    expect(transactionRowsState.rows).toHaveLength(1);
+    expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_MULTI:staffed");
+  });
+
+  test("IVR completed calls are billed once with the ivr idempotency key", async () => {
+    const {
+      processCallStatusWebhook,
+      buildCallUpsertFromTwilioParams,
+    } = await import("../app/lib/twilio-call-status.server");
+
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("completed", "10", "CA_IVR")),
+      { campaignType: "robocall" },
+    );
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("completed", "10", "CA_IVR")),
+      { campaignType: "robocall" },
+    );
+
+    expect(transactionRowsState.rows).toHaveLength(1);
+    expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_IVR:ivr");
   });
 });
 

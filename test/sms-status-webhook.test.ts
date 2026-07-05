@@ -9,7 +9,7 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const mocks = vi.hoisted(() => ({
-  validateTwilioWebhookForMessageSid: vi.fn(),
+  requireTwilioSignature: vi.fn(),
   findMessageBySid: vi.fn(),
   updateMessageBySid: vi.fn(),
   insertTransactionHistoryIdempotent: vi.fn(),
@@ -26,8 +26,8 @@ const tenantDbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForMessageSid: (...args: any[]) =>
-    mocks.validateTwilioWebhookForMessageSid(...args),
+  requireTwilioSignature: (...args: any[]) =>
+    mocks.requireTwilioSignature(...args),
 }));
 vi.mock("@/lib/message-db.server", () => ({
   findMessageBySid: (...args: any[]) => mocks.findMessageBySid(...args),
@@ -99,7 +99,7 @@ function makeMessage(overrides?: any) {
 describe("api.sms.status webhook behavior", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.validateTwilioWebhookForMessageSid.mockReset();
+    mocks.requireTwilioSignature.mockReset();
     mocks.findMessageBySid.mockReset();
     mocks.updateMessageBySid.mockReset();
     mocks.insertTransactionHistoryIdempotent.mockReset();
@@ -113,11 +113,7 @@ describe("api.sms.status webhook behavior", () => {
     tenantDbMocks.campaignFindFirst.mockReset();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
 
-    mocks.validateTwilioWebhookForMessageSid.mockImplementation(async (args: { params: Record<string, string> }) => ({
-      ok: true,
-      params: args.params,
-      authToken: "token",
-    }));
+    mocks.requireTwilioSignature.mockImplementation(async (args: { params: Record<string, string> }) => (null));
     mocks.findMessageBySid.mockResolvedValue(makeMessage());
     mocks.updateMessageBySid.mockImplementation((_ws, _sid, patch) => {
       const message = makeMessage(patch);
@@ -135,10 +131,7 @@ describe("api.sms.status webhook behavior", () => {
   });
 
   test("rejects invalid Twilio signature", async () => {
-    mocks.validateTwilioWebhookForMessageSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }),
-    });
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }));
     const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(
       await mod.action({ request: makeRequest({ SmsSid: "SM_BAD", SmsStatus: "delivered" }) } as any),

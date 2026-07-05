@@ -12,6 +12,12 @@ import type { ActionFunctionArgs } from "react-router";
  * Called by pg_cron via `net.http_post`.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const cronSecret = process.env.CRON_SECRET;
+  const headerSecret = request.headers.get("x-cron-secret");
+  if (!cronSecret || headerSecret !== cronSecret) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 

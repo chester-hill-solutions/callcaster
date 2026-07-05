@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   readTwilioWorkspaceCredentials,
   resolveTwilioWebhookAuthToken,
@@ -46,27 +46,13 @@ describe("readTwilioWorkspaceCredentials", () => {
 });
 
 describe("resolveTwilioWebhookAuthToken", () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-
-  afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
-    vi.unstubAllEnvs();
-  });
-
   test("returns workspace token when creds present", () => {
     expect(
       resolveTwilioWebhookAuthToken({ sid: "AC01", authToken: "workspace-tok" }),
     ).toBe("workspace-tok");
   });
 
-  test("returns null in production when creds missing", () => {
-    process.env.NODE_ENV = "production";
+  test("returns null when creds missing", () => {
     expect(resolveTwilioWebhookAuthToken(null)).toBeNull();
-  });
-
-  test("falls back to main token outside production when creds missing", () => {
-    vi.stubEnv("TWILIO_AUTH_TOKEN", "main-tok");
-    process.env.NODE_ENV = "test";
-    expect(resolveTwilioWebhookAuthToken(null)).toBe("main-tok");
   });
 });

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
@@ -7,11 +11,18 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     getSession: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
+    checkSchedule: vi.fn(() => true),
+    getHandsetNumberForWorkspace: vi.fn(async () => ({ data: { phone_number: "+15550000000" }, error: null })),
+    getUserVerifiedAudioNumbers: vi.fn(async () => ["+15551112222"]),
+    findCampaignInWorkspace: vi.fn(async () => ({
+      id: 1,
+      schedule: { monday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] } },
+    })),
+    getWorkspaceCreditsBalance: vi.fn(async () => 10),
     createWorkspaceTwilioInstance: vi.fn(),
     twilioCreate: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: {
-      TWILIO_PHONE_NUMBER: () => "+15550000000",
       BASE_URL: () => "https://base.example",
     },
   };
@@ -20,11 +31,22 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
   requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+  checkSchedule: (...args: any[]) => mocks.checkSchedule(...args),
+  getHandsetNumberForWorkspace: (...args: any[]) => mocks.getHandsetNumberForWorkspace(...args),
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
 }));
 vi.mock("@/lib/auth.server", () => ({
   getSession: (...args: any[]) => mocks.getSession(...args),
+}));
+vi.mock("@/lib/user-audio.server", () => ({
+  getUserVerifiedAudioNumbers: (...args: any[]) => mocks.getUserVerifiedAudioNumbers(...args),
+}));
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  findCampaignInWorkspace: (...args: any[]) => mocks.findCampaignInWorkspace(...args),
+}));
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: (...args: any[]) => mocks.getWorkspaceCreditsBalance(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   twilio: { calls: { create: (...args: any[]) => mocks.twilioCreate(...args) } },
@@ -42,6 +64,14 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.twilioCreate.mockReset();
     mocks.logger.error.mockReset();
+    mocks.checkSchedule.mockReset().mockReturnValue(true);
+    mocks.getHandsetNumberForWorkspace.mockReset().mockResolvedValue({ data: { phone_number: "+15550000000" }, error: null });
+    mocks.getUserVerifiedAudioNumbers.mockReset().mockResolvedValue(["+15551112222"]);
+    mocks.findCampaignInWorkspace.mockReset().mockResolvedValue({
+      id: 1,
+      schedule: { monday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] } },
+    });
+    mocks.getWorkspaceCreditsBalance.mockReset().mockResolvedValue(10);
   });
 
   test("returns 401 when no user", async () => {
@@ -52,7 +82,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({
       phoneNumber: "+1555",
       workspaceId: "w1",
-      campaignId: "c1",
+      campaignId: "1",
     });
 
     const mod = await import("../app/routes/api+/connect-phone-device");
@@ -75,7 +105,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({
       phoneNumber: "+15551112222",
       workspaceId: "w1",
-      campaignId: "c1",
+      campaignId: "1",
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
@@ -99,7 +129,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
       expect.objectContaining({
         to: "+15551112222",
         from: "+15550000000",
-        url: "https://base.example/api/connect-campaign-conference/w1/c1",
+        url: "https://base.example/api/connect-campaign-conference/w1/1",
         method: "GET",
       }),
     );
@@ -113,7 +143,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({
       phoneNumber: "+15551112222",
       workspaceId: "w1",
-      campaignId: "c1",
+      campaignId: "1",
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({

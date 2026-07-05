@@ -103,7 +103,7 @@ export async function findActiveHandsetSessionClientIdentity(
 export async function findActiveHandsetSession(args: {
   workspaceId: string;
   clientIdentity: string;
-}): Promise<{ workspace_id: string } | null> {
+}): Promise<{ workspace_id: string; user_id: string } | null> {
   const tdb = createTenantDb(args.workspaceId);
   const now = new Date().toISOString();
   const session = await tdb.handset_session.findFirst({
@@ -112,7 +112,7 @@ export async function findActiveHandsetSession(args: {
       eq(handsetSessionTable.status, "active"),
       gt(handsetSessionTable.expires_at, now),
     ),
-    columns: { workspace_id: true },
+    columns: { workspace_id: true, user_id: true },
   });
   return session ?? null;
 }

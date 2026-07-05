@@ -46,6 +46,7 @@ export const updateMeBodySchema = z.object({
   last_name: z.string().min(1).optional(),
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
+  current_password: z.string().min(1).optional(),
 });
 
 export const createWorkspaceBodySchema = z.object({

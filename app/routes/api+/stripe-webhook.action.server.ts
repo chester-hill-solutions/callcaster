@@ -1,6 +1,6 @@
 import { env } from "@/lib/env.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import { stripeEventKey } from "@/lib/billing-keys";
+import { stripeSessionKey } from "@/lib/billing-keys";
 import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
 import type { ActionFunctionArgs } from "react-router";
@@ -50,9 +50,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const workspaceId = session.metadata?.["workspaceId"] ?? null;
     const creditAmount = Number(session.metadata?.["creditAmount"]);
 
-    if (!workspaceId || !Number.isFinite(creditAmount) || creditAmount <= 0) {
-      logger.warn("Stripe webhook checkout.session.completed with invalid metadata", {
+    if (
+      session.status !== "complete" ||
+      session.payment_status !== "paid" ||
+      !workspaceId ||
+      !Number.isFinite(creditAmount) ||
+      creditAmount <= 0
+    ) {
+      logger.warn("Stripe webhook checkout.session.completed not eligible for credit", {
         workspaceId,
+        status: session.status,
+        paymentStatus: session.payment_status,
         creditAmount: session.metadata?.["creditAmount"],
       });
       return new Response("OK", { status: 200 });
@@ -62,15 +70,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       workspaceId,
       type: "CREDIT",
       amount: creditAmount,
-      note: `Added ${creditAmount} credits, stripe_evt:${event.id}`,
-      idempotencyKey: stripeEventKey(event.id),
+      note: `Added ${creditAmount} credits, stripe_session:${session.id}`,
+      idempotencyKey: stripeSessionKey(session.id),
     });
 
     if (inserted) {
       logger.debug("Stripe webhook: credited workspace from checkout.session.completed", {
         workspaceId,
         creditAmount,
-        eventId: event.id,
+        sessionId: session.id,
       });
     }
   }

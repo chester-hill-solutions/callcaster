@@ -9,8 +9,18 @@ CREATE TABLE IF NOT EXISTS job (
   user_id uuid,
   idempotency_key text,
   error text,
+  error_message text,
   result jsonb,
+  claimed_by text,
   claimed_until timestamptz,
+  attempt_count integer DEFAULT 0,
+  max_attempts integer DEFAULT 3,
+  retry_at timestamptz,
+  progress integer,
+  started_at timestamptz,
+  completed_at timestamptz,
+  failed_at timestamptz,
+  dead_letter_reason text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

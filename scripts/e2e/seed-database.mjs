@@ -591,7 +591,7 @@ async function seed() {
   ];
   for (const row of messages) {
     await sql`
-      INSERT INTO message (sid, workspace, contact_id, body, direction, from, to, status, date_created)
+      INSERT INTO message (sid, workspace, contact_id, body, direction, "from", "to", status, date_created)
       VALUES (
         ${row.sid},
         ${row.workspace},

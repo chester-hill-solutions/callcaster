@@ -5,7 +5,7 @@ import {
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
 import { findWorkspaceNumberInboundFallbackByPhone } from "@/lib/inbound-call-db.server";
-import { validateTwilioWebhookForPhoneNumber } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -14,19 +14,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response(null, { status: 405 });
   }
 
-  const formData = await request.formData();
+  const formData = await request.clone().formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
   const called = (params.Called ?? params.To ?? "").trim();
   const dialCallStatus = String(params.DialCallStatus ?? "").toLowerCase();
 
-  const validation = await validateTwilioWebhookForPhoneNumber({
-    request,
-    phoneNumber: called,
-    params,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { phoneNumber: called });
+  if (forbidden) return forbidden;
 
   const twiml = new Twilio.twiml.VoiceResponse();
 

@@ -8,7 +8,7 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
 import { logger } from "@/lib/logger.server";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
-import { validateTwilioWebhookForMessageSid } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import {
   isTerminalSmsStatus,
   normalizeSmsStatus,
@@ -36,7 +36,7 @@ import type { ActionFunctionArgs } from "react-router";
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
-    const previewFormData = await request.formData();
+    const previewFormData = await request.clone().formData();
     const previewPayload = Object.fromEntries(
       previewFormData.entries(),
     ) as Partial<TwilioSmsStatusWebhook>;
@@ -50,16 +50,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    const validation = await validateTwilioWebhookForMessageSid({
-      request,
-      smsSid: previewSid,
-      params: previewPayload as Record<string, string>,
+    const forbidden = await requireTwilioSignature(request, {
+      messageSid: previewSid,
     });
-    if (!validation.ok) {
-      return validation.response;
-    }
+    if (forbidden) return forbidden;
 
-    const payload = validation.params as Partial<TwilioSmsStatusWebhook>;
+    const payload = previewPayload;
     const sid = payload.SmsSid;
     const rawStatus = pickRawTwilioSmsStatus(payload);
 

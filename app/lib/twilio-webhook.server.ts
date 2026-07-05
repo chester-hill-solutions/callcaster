@@ -1,17 +1,14 @@
 /**
  * Twilio webhook validation helpers.
  *
- * Auth policy asymmetry (callSid vs messageSid):
- * - validateTwilioWebhookForCallSid: when no `call` row exists yet, validation falls
- *   back to resolveTwilioWebhookAuthToken(null), which uses the main-account
- *   TWILIO_AUTH_TOKEN in non-production. This supports early lifecycle callbacks
- *   (e.g. first status before upsert) during local/dev testing.
- * - validateTwilioWebhookForMessageSid: when no `message` row exists, validation
- *   fails closed (403). Inbound SMS must attribute workspace before persisting the
- *   message, so there is no dev fallback for unknown MessageSid.
+ * Webhooks are validated against the workspace subaccount auth token. There is no
+ * main-account fallback in any environment; credentials must be resolved from the
+ * workspace's `twilio_data`.
  */
 
 import type { Database } from "@/lib/db-types";
+import { env } from "@/lib/env.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { findMessageBySid } from "@/lib/message-db.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { findWorkspaceNumberByPhoneNumber } from "@/lib/inbound-call-db.server";
@@ -99,242 +96,109 @@ export function twilioWebhookMissingCredentials(
   return twilioWebhookJsonResponse(message, 500);
 }
 
-/** Reject before DB when signature header is required but absent. */
-export function rejectMissingTwilioSignatureHeader(request: Request): Response | null {
+/** 403 short-circuit response for Twilio-facing voice routes: hang up the call. */
+export function twilioWebhookForbiddenHangup(): Response {
+  return new Response(hangupTwiml(), {
+    status: 403,
+    headers: { "Content-Type": "text/xml" },
+  });
+}
+
+/** Build the canonical validation URL from BASE_URL + request pathname. */
+export function resolveCanonicalTwilioWebhookUrl(request: Request): string {
+  const url = new URL(request.url);
+  const baseUrl = env.BASE_URL().replace(/\/$/, "");
+  return `${baseUrl}${url.pathname}`;
+}
+
+async function parseTwilioWebhookParams(request: Request): Promise<Record<string, string>> {
+  if (request.method === "GET" || request.method === "HEAD") {
+    const url = new URL(request.url);
+    return Object.fromEntries(url.searchParams.entries());
+  }
+
+  const formData = await request.clone().formData();
+  return Object.fromEntries(formData.entries()) as Record<string, string>;
+}
+
+/**
+ * Route-level Twilio webhook signature check.
+ *
+ * Returns a 403 hangup TwiML Response on failure, or `null` on success.
+ *
+ * - If a workspace option is provided (`workspaceId`, `callSid`, `messageSid`, or
+ *   `phoneNumber`), the request is validated against that workspace's subaccount auth
+ *   token. If the workspace or its credentials cannot be resolved, validation fails.
+ * - If no workspace option is provided, the request is treated as a global
+ *   main-account webhook and validated against the main account token.
+ *
+ * There is no fallback to the main account token when a workspace is resolved but its
+ * credentials are missing.
+ */
+export async function requireTwilioSignature(
+  request: Request,
+  options?: {
+    callSid?: string;
+    messageSid?: string;
+    phoneNumber?: string;
+    workspaceId?: string;
+  },
+): Promise<Response | null> {
   if (!shouldValidateTwilioWebhooks()) {
     return null;
   }
+
   if (!request.headers.get("x-twilio-signature")) {
-    return twilioWebhookForbidden("Missing Twilio signature");
-  }
-  return null;
-}
-
-export async function resolveWorkspaceTwilioData(
-    workspaceId: string | null,
-  joinedTwilioData: unknown,
-  logger?: { info: (message: string, ...args: unknown[]) => void },
-): Promise<unknown> {
-  if (!workspaceId) {
-    return joinedTwilioData;
+    return twilioWebhookForbiddenHangup();
   }
 
-  const joinedRecord =
-    joinedTwilioData && typeof joinedTwilioData === "object" && !Array.isArray(joinedTwilioData)
-      ? (joinedTwilioData as Record<string, unknown>)
-      : null;
-  const joinedHasToken =
-    typeof joinedRecord?.authToken === "string" ||
-    typeof joinedRecord?.auth_token === "string";
+  const params = await parseTwilioWebhookParams(request);
+  const canonicalUrl = resolveCanonicalTwilioWebhookUrl(request);
 
-  if (joinedHasToken) {
-    return joinedTwilioData;
-  }
+  let attemptedWorkspace = false;
+  let twilioData: unknown = null;
 
-  const workspace = await getWorkspaceById(workspaceId);
-  const fetched = workspace?.twilio_data ?? null;
-  const fetchedRecord =
-    fetched && typeof fetched === "object" && !Array.isArray(fetched)
-      ? (fetched as Record<string, unknown>)
-      : null;
-  const fetchedHasToken =
-    typeof fetchedRecord?.authToken === "string" ||
-    typeof fetchedRecord?.auth_token === "string";
-
-  if (fetchedHasToken) {
-    logger?.info("Fetched workspace twilio_data (join did not include it)", {
-      workspaceId,
-    });
-    return fetched;
-  }
-
-  return joinedTwilioData;
-}
-
-export function validateWorkspaceTwilioWebhook(args: {
-  request: Request;
-  params: Record<string, string>;
-  twilioData: unknown;
-}): TwilioWebhookValidationResult {
-  const authToken = resolveWorkspaceWebhookAuthToken(args.twilioData);
-  return validateParamsWithToken({
-    request: args.request,
-    params: args.params,
-    authToken,
-    missingCredentialsResponse: twilioWebhookMissingCredentials,
-  });
-}
-
-export function validateTwilioWebhookForPhoneCandidates(args: {
-  request: Request;
-  params: Record<string, string>;
-  candidates: Array<{ twilioData: unknown }>;
-}): boolean {
-  const signature = args.request.headers.get("x-twilio-signature");
-  const url = resolveTwilioWebhookRequestUrl(args.request);
-
-  return args.candidates.some((row) => {
-    const authToken = resolveWorkspaceWebhookAuthToken(row.twilioData);
-    return (
-      authToken != null &&
-      validateTwilioWebhookParams(args.params, signature, url, authToken)
-    );
-  });
-}
-
-export async function validateTwilioWebhookForWorkspace(args: {
-  request: Request;
-  workspaceId: string;
-}): Promise<
-  | ({ ok: true; params: Record<string, string>; authToken: string } & { workspaceId: string })
-  | { ok: false; response: Response }
-> {
-  const missingHeader = rejectMissingTwilioSignatureHeader(args.request);
-  if (missingHeader) {
-    return { ok: false, response: missingHeader };
-  }
-
-  const url = new URL(args.request.url);
-  const params = Object.fromEntries(url.searchParams.entries());
-
-  const twilioData = await loadWorkspaceTwilioData(args.workspaceId);
-
-  const validation = validateWorkspaceTwilioWebhook({
-    request: args.request,
-    params,
-    twilioData,
-  });
-  if (!validation.ok) {
-    return validation;
-  }
-
-  return { ...validation, workspaceId: args.workspaceId };
-}
-
-export async function validateTwilioWebhookForCallSid(args: {
-  request: Request;
-  callSid: string;
-  params?: Record<string, string>;
-}): Promise<TwilioWebhookValidationResult> {
-  const missingHeader = rejectMissingTwilioSignatureHeader(args.request);
-  if (missingHeader) {
-    return { ok: false, response: missingHeader };
-  }
-
-  const params =
-    args.params ??
-    (Object.fromEntries((await args.request.formData()).entries()) as Record<string, string>);
-
-  const existingCall = await findCallBySid(args.callSid);
-
-  if (!existingCall?.workspace) {
-    const authToken = resolveWorkspaceWebhookAuthToken(null);
-    return validateParamsWithToken({
-      request: args.request,
-      params,
-      authToken,
-    });
-  }
-
-  const twilioData = await loadWorkspaceTwilioData(
-        existingCall.workspace,
-  );
-
-  return validateParamsWithToken({
-    request: args.request,
-    params,
-    authToken: resolveWorkspaceWebhookAuthToken(twilioData),
-  });
-}
-
-export async function validateTwilioWebhookForMessageSid(args: {
-  request: Request;
-  smsSid: string;
-  params?: Record<string, string>;
-}): Promise<TwilioWebhookValidationResult> {
-  const missingHeader = rejectMissingTwilioSignatureHeader(args.request);
-  if (missingHeader) {
-    return { ok: false, response: missingHeader };
-  }
-
-  const params =
-    args.params ??
-    (Object.fromEntries((await args.request.formData()).entries()) as Record<string, string>);
-
-  const messageRow = await findMessageBySid(args.smsSid);
-
-  if (!messageRow?.workspace) {
-    return { ok: false, response: twilioWebhookForbidden() };
-  }
-
-  const twilioData = await loadWorkspaceTwilioData(
-    messageRow.workspace,
-  );
-
-  return validateParamsWithToken({
-    request: args.request,
-    params,
-    authToken: resolveWorkspaceWebhookAuthToken(twilioData),
-  });
-}
-
-export type TwilioWebhookPhoneValidationResult =
-  | {
-      ok: true;
-      params: Record<string, string>;
-      authToken: string;
-      workspaceId: string;
-      twilioData: unknown;
-      numberRow: TwilioWebhookNumberRow;
+  if (options?.workspaceId) {
+    attemptedWorkspace = true;
+    twilioData = await loadWorkspaceTwilioData(options.workspaceId);
+  } else if (options?.callSid) {
+    attemptedWorkspace = true;
+    const existingCall = await findCallBySid(options.callSid);
+    if (existingCall?.workspace) {
+      twilioData = await loadWorkspaceTwilioData(existingCall.workspace);
     }
-  | { ok: false; response: Response };
-
-export async function validateTwilioWebhookForPhoneNumber(args: {
-  request: Request;
-  phoneNumber: string;
-  params: Record<string, string>;
-  logger?: { info: (message: string, ...args: unknown[]) => void };
-}): Promise<TwilioWebhookPhoneValidationResult> {
-  const missingHeader = rejectMissingTwilioSignatureHeader(args.request);
-  if (missingHeader) {
-    return { ok: false, response: missingHeader };
+  } else if (options?.messageSid) {
+    attemptedWorkspace = true;
+    const messageRow = await findMessageBySid(options.messageSid);
+    if (messageRow?.workspace) {
+      twilioData = await loadWorkspaceTwilioData(messageRow.workspace);
+    }
+  } else if (options?.phoneNumber) {
+    attemptedWorkspace = true;
+    const resolved = await resolveTwilioDataForPhoneNumber(options.phoneNumber);
+    if (resolved) {
+      twilioData = resolved.twilioData;
+    }
   }
 
-  const phoneNumber = args.phoneNumber.trim();
-  if (!phoneNumber) {
-    return { ok: false, response: twilioWebhookForbidden("Missing phone number") };
+  const authToken = attemptedWorkspace
+    ? resolveWorkspaceWebhookAuthToken(twilioData)
+    : env.TWILIO_AUTH_TOKEN();
+
+  if (!authToken) {
+    return twilioWebhookForbiddenHangup();
   }
 
-  const resolved = await resolveTwilioDataForPhoneNumber(
-        phoneNumber,
-    args.logger,
-  );
-  if (!resolved) {
-    return { ok: false, response: twilioWebhookForbidden() };
+  const signature = request.headers.get("x-twilio-signature");
+  if (!validateTwilioWebhookParams(params, signature, canonicalUrl, authToken)) {
+    return twilioWebhookForbiddenHangup();
   }
 
-  const validation = validateWorkspaceTwilioWebhook({
-    request: args.request,
-    params: args.params,
-    twilioData: resolved.twilioData,
-  });
-  if (!validation.ok) {
-    return validation;
-  }
-
-  return {
-    ok: true,
-    params: validation.params,
-    authToken: validation.authToken,
-    workspaceId: resolved.workspaceId,
-    twilioData: resolved.twilioData,
-    numberRow: resolved.numberRow,
-  };
+  return null;
 }
 
 export async function resolveTwilioDataForPhoneNumber(
     phoneNumber: string,
-  logger?: { info: (message: string, ...args: unknown[]) => void },
 ): Promise<{ workspaceId: string; twilioData: unknown; numberRow: TwilioWebhookNumberRow } | null> {
   const numberRow = await findWorkspaceNumberByPhoneNumber(phoneNumber);
   if (!numberRow) {
@@ -343,13 +207,7 @@ export async function resolveTwilioDataForPhoneNumber(
 
   const workspaceId = numberRow.workspaceId;
   const workspace = await getWorkspaceById(workspaceId);
-  const joinedTwilioData = workspace?.twilio_data ?? null;
-
-  const twilioData = await resolveWorkspaceTwilioData(
-        workspaceId,
-    joinedTwilioData,
-    logger,
-  );
+  const twilioData = workspace?.twilio_data ?? null;
 
   return {
     workspaceId,

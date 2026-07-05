@@ -7,9 +7,9 @@ import { call as callTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import {
-  rpcAutoDialQueue,
   rpcCreateOutreachAttempt,
 } from "@/lib/db-rpc.server";
+import { claimNextQueueContact } from "@/lib/campaign-queue-db.server";
 import { db } from "@/server/db";
 
 type TwilioClient = TwilioSDK.Twilio;
@@ -19,8 +19,9 @@ export const normalizePhoneNumber = sharedNormalizePhoneNumber;
 export async function getNextAutoDialQueueContact(
   campaign_id: number,
   user_id: string,
+  tdb: TenantDb = createTenantDb("service"),
 ) {
-  return rpcAutoDialQueue(db, { campaignId: campaign_id, userId: user_id });
+  return claimNextQueueContact(tdb, campaign_id, user_id);
 }
 
 export async function createOutreachAttempt(
@@ -42,13 +43,13 @@ export async function createTwilioCall(
   client: TwilioClient,
   toNumber: string,
   fromNumber: string,
-  user_id: string,
+  conference_id: string,
   selected_device: string,
 ) {
   return await client.calls.create({
     to: toNumber,
     from: fromNumber,
-    url: `${env.BASE_URL()}/api/auto-dial/${user_id}`,
+    url: `${env.BASE_URL()}/api/auto-dial/${conference_id}`,
     machineDetection: "Enable",
     statusCallbackEvent: ["answered", "completed", "ringing"],
     statusCallback: `${env.BASE_URL()}/api/auto-dial/status`,
@@ -73,6 +74,7 @@ function buildCallRow(callData: Partial<Call>) {
     group_sid: callData.group_sid || null,
     caller_name: callData.caller_name || null,
     uri: callData.uri || null,
+    user_id: callData.user_id || null,
     campaign_id: callData.campaign_id || null,
     contact_id: callData.contact_id || null,
     outreach_attempt_id: callData.outreach_attempt_id || null,
@@ -119,9 +121,19 @@ export async function saveCallToDatabase(
   }
 }
 
-export async function completeAllConferences(client: TwilioClient, user_id: string) {
+export async function completeAllConferences(client: TwilioClient, conferenceId: string) {
+  const isSid = conferenceId.startsWith("CF");
+  if (isSid) {
+    try {
+      await client.conferences(conferenceId).update({ status: "completed" as const });
+    } catch (error) {
+      logger.error(`Error completing conference ${conferenceId}:`, error);
+    }
+    return;
+  }
+
   const conferences = await client.conferences.list({
-    friendlyName: user_id,
+    friendlyName: conferenceId,
     status: "in-progress" as const,
   });
   await Promise.all(

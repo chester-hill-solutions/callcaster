@@ -57,11 +57,7 @@ vi.mock("@/lib/twilio-workspace-credentials", () => ({
     credentialsMocks.readTwilioWorkspaceCredentials(...args),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: vi.fn(async () => ({
-    ok: true,
-    params: {},
-    authToken: "tok",
-  })),
+  requireTwilioSignature: vi.fn(async () => (null)),
 }));
 
 vi.mock("resend", () => {
@@ -142,13 +138,10 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
-    vi.mocked(validateTwilioWebhookForCallSid).mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    const { requireTwilioSignature } = await import("@/lib/twilio-webhook.server");
+    vi.mocked(requireTwilioSignature).mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(
       await mod.action({

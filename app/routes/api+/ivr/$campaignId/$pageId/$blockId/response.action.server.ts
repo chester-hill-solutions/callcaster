@@ -6,8 +6,8 @@ import {
 } from "@/lib/telephony-db.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 const getOutreach = async (workspaceId: string, outreachId: number) => {
@@ -133,14 +133,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return new Response("Missing CallSid parameter", { status: 400 });
   }
 
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    callSid,
-    params: formParams,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { callSid });
+  if (forbidden) return forbidden;
 
   try {
     const [call, campaignData] = await Promise.all([
@@ -149,7 +143,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     ]);
 
     if (!call?.workspace) {
-      throw new Error("Call not found");
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+    if (call.campaign_id !== Number(campaignId)) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
     }
 
     const stepsValue = ivrScriptStepsFromCampaign(campaignData);
@@ -161,7 +162,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (!script || !script.blocks || !script.pages) {
       throw new Error("Invalid script structure");
     }
-    const currentBlock = script.blocks[blockId];
+    const currentPage = script.pages[pageId];
+    const currentBlock = currentPage?.blocks.includes(blockId)
+      ? script.blocks[blockId]
+      : undefined;
     if (!currentBlock) {
       throw new Error(`Block ${blockId} not found`);
     }

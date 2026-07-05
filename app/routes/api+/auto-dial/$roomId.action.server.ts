@@ -13,12 +13,20 @@ import {
   findCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import Twilio from "twilio";
 
 const getAdmin = () => null /* removed service client */;
+
+function resolveUserIdFromConferenceName(conferenceName: string): string {
+    // Conference names are generated as `${userId}~${uuid}`. The user id is a UUID,
+    // so we split on the non-hex separator to recover the original user id.
+    const sep = conferenceName.indexOf('~');
+    if (sep === -1) return conferenceName;
+    return conferenceName.slice(0, sep);
+}
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
   const row = await findCallBySid(callSid);
@@ -89,11 +97,11 @@ const updateOutreachAttempt = async (
   return [result];
 };
 
-const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string) => {
+const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string, userId: string) => {
     await fetch(`${env.BASE_URL()}/api/auto-dial/dialer`, {
         method: 'POST',
         headers: { "Content-Type": 'application/json' },
-        body: JSON.stringify({ user_id: conferenceId, campaign_id: campaignId, workspace_id: workspaceId })
+        body: JSON.stringify({ user_id: userId, campaign_id: campaignId, workspace_id: workspaceId, conference_id: conferenceId })
     });
 };
 
@@ -127,9 +135,10 @@ const handleMachineAnswer = async (
       dbCall.campaign_id ?? null,
     );
 
-    const conferences = await twilio.conferences.list({ friendlyName: firstOutreachStatus.user_id?.toString() ?? '', status: 'in-progress' });
+    const conferenceName = dbCall.conference_id?.toString() ?? '';
+    const conferences = await twilio.conferences.list({ friendlyName: conferenceName, status: 'in-progress' });
     if (conferences.length) {
-        await triggerAutoDialer(firstOutreachStatus.user_id?.toString() ?? '', firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
+        await triggerAutoDialer(conferenceName, firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', firstOutreachStatus.user_id?.toString() ?? '');
     }
 
     await call.update({ twiml: pausePlayTwiml(signedUrl, 5) });
@@ -139,8 +148,9 @@ const handleMachineAnswer = async (
     });
 };
 
-const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceName: string, called: string) => {
+const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: string) => {
     const twiml = new Twilio.twiml.VoiceResponse();
+    const conferenceName = dbCall.conference_id?.toString() ?? '';
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
         await updateOutreachAttempt(
@@ -153,6 +163,7 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceN
     const dial = twiml.dial();
     dial.conference({
         beep: 'onExit',
+        endConferenceOnExit: true,
     }, `${conferenceName}`);
 
     return new Response(twiml.toString(), {
@@ -161,10 +172,12 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceN
 };
 
 const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
-    return await addToConference(dbCall.conference_id?.toString() ?? '', dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
+    const conferenceId = dbCall.conference_id?.toString() ?? '';
+    const userId = resolveUserIdFromConferenceName(conferenceId);
+    return await addToConference(conferenceId, dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', userId);
 };
 
-async function addToConference(conferenceId: string, campaignId: string, workspaceId: string) {
+async function addToConference(conferenceId: string, campaignId: string, workspaceId: string, userId: string) {
     const twiml = new Twilio.twiml.VoiceResponse();
     const dial = twiml.dial();
     dial.conference({
@@ -173,14 +186,15 @@ async function addToConference(conferenceId: string, campaignId: string, workspa
         statusCallbackEvent: ['join', 'leave', 'modify'],
         endConferenceOnExit: false,
     }, conferenceId);
-    await triggerAutoDialer(conferenceId, campaignId, workspaceId);
+    await triggerAutoDialer(conferenceId, campaignId, workspaceId, userId);
     return new Response(twiml.toString(), {
         headers: { 'Content-Type': 'text/xml' }
     });
 }
 
 const checkUserDevices = async (contactId: string, conferenceName: string, called: string, callerId: string) => {
-    const verifiedNumbers = await getUserVerifiedAudioNumbers(conferenceName);
+    const userId = resolveUserIdFromConferenceName(conferenceName);
+    const verifiedNumbers = await getUserVerifiedAudioNumbers(userId);
     if (!verifiedNumbers?.length) return false;
     if (called.includes('client')) return true;
     if (called === callerId) return true;
@@ -190,7 +204,7 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
 
 export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
     const conferenceName = params.roomId;
-    const formData = await request.formData();
+    const formData = await request.clone().formData();
     const parsedBody = Object.fromEntries(formData) as Record<string, string>;
     const callSid = formData.get('CallSid') as string;
     const answeredBy = formData.get('AnsweredBy') as string;
@@ -198,19 +212,10 @@ export const action = async ({ request, params }: { request: Request, params: { 
     const called = (formData.get('Called') ?? "").toString();
 
     let response: Response;
-    
+
     try {
-        const validation = await validateTwilioWebhookForCallSid({
-            request,
-            callSid,
-            params: parsedBody,
-        });
-        if (!validation.ok) {
-            return new Response(hangupTwiml(), {
-                status: 403,
-                headers: { 'Content-Type': 'text/xml' }
-            });
-        }
+        const forbidden = await requireTwilioSignature(request, { callSid });
+        if (forbidden) return forbidden;
         const dbCall = await fetchCallData(callSid);
         const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
 
@@ -240,7 +245,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
                 }
             } else {
                 //This is a human answer
-                response = await handleHumanAnswer(dbCall, conferenceName, called);
+                response = await handleHumanAnswer(dbCall, called);
             }
         }
     } catch (error) {

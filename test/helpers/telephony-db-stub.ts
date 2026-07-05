@@ -10,17 +10,19 @@ export type TelephonyStubConfig = {
     outreach_attempt_id?: number | null;
     contact_id?: number | null;
   }>;
+  campaignType?: string | null;
   outreachDisposition?: string;
   outreachFetchError?: Error | null;
   outreachUpdateError?: Error | null;
   outreachUpdateThrows?: unknown;
+  activeConferenceIds?: string[];
 };
 
 const defaultCallRow = {
   sid: "CA1",
   workspace: "w1",
   outreach_attempt_id: 10,
-  conference_id: "conf1",
+  conference_id: "u1~00000000-0000-0000-0000-000000000000",
   contact_id: 1,
   campaign_id: 1,
 };
@@ -38,10 +40,13 @@ function readConfig(): TelephonyStubConfig {
 export const telephonyDbMocks = {
   findCallBySid: vi.fn(),
   findCallsByConferenceId: vi.fn(),
+  findActiveConferenceIdsForUser: vi.fn(),
   updateCallBySid: vi.fn(),
   findOutreachAttemptById: vi.fn(),
   updateOutreachAttemptForWorkspace: vi.fn(),
   insertCallForWorkspace: vi.fn(),
+  findCampaignTypeByCampaignId: vi.fn(),
+  upsertCallBySid: vi.fn(),
 };
 
 function applyTelephonyMockImplementations() {
@@ -55,6 +60,11 @@ function applyTelephonyMockImplementations() {
   telephonyDbMocks.findCallsByConferenceId.mockImplementation(async () => {
     const cfg = readConfig();
     return cfg.callsByConference ?? [];
+  });
+
+  telephonyDbMocks.findActiveConferenceIdsForUser.mockImplementation(async () => {
+    const cfg = readConfig();
+    return cfg.activeConferenceIds ?? ["u1~00000000-0000-0000-0000-000000000000"];
   });
 
   telephonyDbMocks.updateCallBySid.mockImplementation(
@@ -108,6 +118,25 @@ function applyTelephonyMockImplementations() {
   telephonyDbMocks.insertCallForWorkspace.mockImplementation(async () => ({
     ...defaultCallRow,
   }));
+
+  telephonyDbMocks.findCampaignTypeByCampaignId.mockImplementation(async () => {
+    const cfg = readConfig();
+    return cfg.campaignType ?? null;
+  });
+
+  telephonyDbMocks.upsertCallBySid.mockImplementation(async (values: any) => {
+    const cfg = readConfig();
+    if (cfg.callRow === null) return null;
+    const existing = await telephonyDbMocks.findCallBySid(values.sid);
+    if (existing?.workspace) {
+      return await telephonyDbMocks.updateCallBySid(
+        existing.workspace,
+        values.sid,
+        values,
+      );
+    }
+    return { ...defaultCallRow, ...(cfg.callRow ?? {}), ...values };
+  });
 }
 
 applyTelephonyMockImplementations();

@@ -1,6 +1,8 @@
 import { data as routeData } from "react-router";
-import { submitSurveyResponse } from "@/lib/survey-db.server";
-import { requireDualAuth } from "@/lib/api-auth.server";
+import { submitSurveyResponse, getSurveyWorkspaceByPublicId } from "@/lib/survey-db.server";
+import { requireDualAuth, getDualAuthUser } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
+import { AppError } from "@/lib/errors.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -17,8 +19,7 @@ type SubmittedSurveyResponse = {
   answers?: SubmittedSurveyAnswer[];
 };
 
-async function handleSubmitResponse(request: Request) {
-  const formData = await request.formData();
+async function handleSubmitResponse(formData: FormData) {
   const responseDataRaw = formData.get("responseData") as string | null;
   if (!responseDataRaw) {
     return routeData({ error: "Response data is required" }, { status: 400 });
@@ -33,6 +34,11 @@ async function handleSubmitResponse(request: Request) {
 
   if (!surveyId) {
     return routeData({ error: "Survey ID and response data are required" }, { status: 400 });
+  }
+
+  const workspaceId = await getSurveyWorkspaceByPublicId(surveyId);
+  if (!workspaceId) {
+    return routeData({ error: "Survey not found" }, { status: 404 });
   }
 
   const result = await submitSurveyResponse({
@@ -55,8 +61,34 @@ export async function action({ request }: ActionFunctionArgs) {
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
 
+  const formData = await request.formData();
+  const surveyId = formData.get("surveyId") as string;
+  const workspaceId = surveyId ? await getSurveyWorkspaceByPublicId(surveyId) : null;
+
+  if (auth.authType === "api_key") {
+    if (!workspaceId || workspaceId !== auth.workspaceId) {
+      return routeData({ error: "Unauthorized" }, { status: 403 });
+    }
+  } else {
+    const user = getDualAuthUser(auth);
+    if (!user) {
+      return routeData({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!workspaceId) {
+      return routeData({ error: "Survey not found" }, { status: 404 });
+    }
+    try {
+      await requireWorkspaceAccess({ user, workspaceId });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return routeData({ error: error.message }, { status: error.statusCode });
+      }
+      throw error;
+    }
+  }
+
   if (request.method === "POST") {
-    return handleSubmitResponse(request);
+    return handleSubmitResponse(formData);
   }
 
   return routeData({ error: "Method not allowed" }, { status: 405 });

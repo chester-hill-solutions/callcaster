@@ -6,6 +6,7 @@ import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database, Tables } from "@/lib/db-types";
 import {
+  findActiveConferenceIdsForUser,
   findCallsByConferenceId,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
@@ -51,16 +52,25 @@ export const action = async ({
   };
 
   try {
-    const conferences = await twilio.conferences.list({
-      friendlyName: user.id,
-      status: "in-progress" as const,
-    });
+    const conferenceIds = await findActiveConferenceIdsForUser(workspace_id, user.id);
     await Promise.all(
-      conferences.map(async (conf) => {
+      conferenceIds.map(async (conferenceId) => {
         try {
-          await twilio.conferences(conf.sid).update({ status: "completed" });
+          if (conferenceId.startsWith("CF")) {
+            await twilio.conferences(conferenceId).update({ status: "completed" });
+          } else {
+            const conferences = await twilio.conferences.list({
+              friendlyName: conferenceId,
+              status: "in-progress" as const,
+            });
+            await Promise.all(
+              conferences.map(({ sid }) =>
+                twilio.conferences(sid).update({ status: "completed" }),
+              ),
+            );
+          }
 
-          const calls = await findCallsByConferenceId(workspace_id, conf.sid);
+          const calls = await findCallsByConferenceId(workspace_id, conferenceId);
           logger.debug("Conference calls data:", calls);
           if (!calls.length) return;
           await Promise.all(
@@ -80,7 +90,7 @@ export const action = async ({
             }),
           );
         } catch (confError) {
-          d.logger.error(`Error updating conference ${conf.sid}:`, confError);
+          d.logger.error(`Error updating conference ${conferenceId}:`, confError);
         }
       }),
     );

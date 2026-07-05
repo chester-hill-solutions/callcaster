@@ -11,13 +11,13 @@ const mocks = vi.hoisted(() => {
     sendWebhookNotification: vi.fn(),
     isPhoneNumber: vi.fn(),
     isEmail: vi.fn(),
+    requireTwilioSignature: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
     findWorkspaceNumberByPhoneNumber: vi.fn(),
     upsertInboundCallRecord: vi.fn(),
     findInboundIvrScriptSteps: vi.fn(),
     getWorkspaceWebhookRow: vi.fn(),
     findActiveHandsetSessionClientIdentity: vi.fn(),
-    resolveWorkspaceTwilioData: vi.fn(),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
       BETTER_AUTH_SERVICE_KEY: () => "svc",
@@ -40,6 +40,7 @@ vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
 }));
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: mocks.validateTwilioWebhookParams,
+  shouldValidateTwilioWebhooks: () => true,
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -74,7 +75,7 @@ vi.mock("@/lib/twilio-webhook.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/twilio-webhook.server")>();
   return {
     ...actual,
-    resolveWorkspaceTwilioData: (...a: unknown[]) => mocks.resolveWorkspaceTwilioData(...a),
+    requireTwilioSignature: (...a: unknown[]) => mocks.requireTwilioSignature(...a),
   };
 });
 
@@ -102,6 +103,9 @@ vi.mock("twilio", () => {
     }
     record(_opts: any) {
       this.parts.push("record");
+    }
+    hangup() {
+      this.parts.push("hangup");
     }
     toString() {
       return `<Response>${this.parts.join("|")}</Response>`;
@@ -189,21 +193,18 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.sendWebhookNotification.mockReset();
     mocks.isPhoneNumber.mockReset();
     mocks.isEmail.mockReset();
+    mocks.requireTwilioSignature.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.findWorkspaceNumberByPhoneNumber.mockReset();
     mocks.upsertInboundCallRecord.mockReset();
     mocks.findInboundIvrScriptSteps.mockReset();
     mocks.getWorkspaceWebhookRow.mockReset();
     mocks.findActiveHandsetSessionClientIdentity.mockReset();
-    mocks.resolveWorkspaceTwilioData.mockReset();
+    mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
     mocks.upsertInboundCallRecord.mockResolvedValue(defaultCallRow());
     mocks.findInboundIvrScriptSteps.mockResolvedValue(null);
     mocks.findActiveHandsetSessionClientIdentity.mockResolvedValue(null);
-    mocks.resolveWorkspaceTwilioData.mockImplementation(
-      async (_postgres, _workspaceId, twilioData) =>
-        twilioData ?? { account_sid: "ac", auth_token: "at" },
-    );
     mocks.logger.error.mockReset();
     mocks.logger.warn.mockReset();
     vi.mocked(resolveInboundVoicemailAudio).mockReset();
@@ -239,7 +240,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }));
     mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(
       toInboundNumber({
         inbound_action: null,
@@ -404,10 +405,6 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         workspace: { id: "" },
       }),
     );
-    mocks.resolveWorkspaceTwilioData.mockResolvedValueOnce({
-      account_sid: "ac",
-      auth_token: "at",
-    });
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
     mocks.createClient.mockReturnValueOnce(makeDbClient());
     const response = await asRouteResponse(await mod.action({

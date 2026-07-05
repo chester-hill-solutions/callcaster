@@ -71,8 +71,12 @@ export function buildCampaignQueueSearchWhere(
   campaignId: number,
   filters: QueueSearchFilters,
   query = "",
+  workspaceId?: string,
 ): SQL {
   const conditions: SQL[] = [eq(campaignQueueTable.campaign_id, campaignId)];
+  if (workspaceId) {
+    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
+  }
 
   const nameTerm = escapeIlikeTerm(filters.name || query);
   if (nameTerm) {
@@ -205,7 +209,11 @@ export function buildCampaignQueueSearchWhere(
 }
 
 /** Rows with a non-empty contact phone (matches legacy `contact!inner` queue counts). */
-export function buildDialableCampaignQueueWhere(campaignId: number, extra?: SQL): SQL {
+export function buildDialableCampaignQueueWhere(
+  campaignId: number,
+  extra?: SQL,
+  workspaceId?: string,
+): SQL {
   const dialableContact = exists(
     db
       .select({ one: sql`1` })
@@ -219,11 +227,15 @@ export function buildDialableCampaignQueueWhere(campaignId: number, extra?: SQL)
       ),
   );
 
-  return and(
-    eq(campaignQueueTable.campaign_id, campaignId),
-    dialableContact,
-    extra,
-  )!;
+  const conditions: SQL[] = [eq(campaignQueueTable.campaign_id, campaignId), dialableContact];
+  if (workspaceId) {
+    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
+  }
+  if (extra) {
+    conditions.push(extra);
+  }
+
+  return and(...conditions)!;
 }
 
 export function buildCompletedCampaignQueueWhere(campaignId: number): SQL {

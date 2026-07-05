@@ -4,7 +4,7 @@ import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
-  validateTwilioWebhookForCallSid: vi.fn(),
+  requireTwilioSignature: vi.fn(),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   env: {
     BETTER_AUTH_URL: () => "https://sb.example",
@@ -16,8 +16,8 @@ vi.mock("@client/client-js", () => ({
   createClient: (...args: unknown[]) => mocks.createClient(...args),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
-    mocks.validateTwilioWebhookForCallSid(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -26,12 +26,8 @@ describe("app/routes/api+/recording", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValue({
-      ok: true,
-      params: { CallSid: "CA1", RecordingUrl: "https://rec" },
-      authToken: "tok",
-    });
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockResolvedValue(null);
   });
 
   test("returns 400 when CallSid missing", async () => {
@@ -48,12 +44,9 @@ describe("app/routes/api+/recording", () => {
 
   test("returns 403 when validation fails", async () => {
     mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/recording");
     const fd = new FormData();
     fd.set("CallSid", "CA1");

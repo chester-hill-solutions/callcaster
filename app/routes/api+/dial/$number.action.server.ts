@@ -1,12 +1,17 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
 
+    const formData = await request.clone().formData();
+    const callSid = String(formData.get("CallSid") ?? "");
+    const forbidden = await requireTwilioSignature(request, callSid ? { callSid } : {});
+    if (forbidden) return forbidden;
+
     const twiml = new Twilio.twiml.VoiceResponse();
-    const formData = await request.formData();
     const number = params.number;
     try {
         const dial = twiml.dial({
@@ -18,7 +23,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         dial.number({
             machineDetection: 'Enable',
             amdStatusCallback: `${env.BASE_URL()}/api/dial/status`,
-            statusCallback: '/api/call-status/',
+            statusCallback: `${env.BASE_URL()}/api/call-status/`,
             statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
         }, number!);
     } catch (e) {

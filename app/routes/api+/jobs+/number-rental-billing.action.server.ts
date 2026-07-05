@@ -5,16 +5,13 @@ import type { ActionFunctionArgs } from "react-router";
 
 /**
  * HTTP endpoint for the number-rental-billing daily sweep.
- * Called by pg_cron via `net.http_post` (no Authorization header).
+ * Called by pg_cron via `net.http_post` (with x-cron-secret header).
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-  // Basic cron secret validation if configured
-  const cronSecret = process.env.NUMBER_RENTAL_CRON_SECRET;
-  if (cronSecret) {
-    const headerSecret = request.headers.get("x-cron-secret");
-    if (headerSecret !== cronSecret) {
-      return routeData({ error: "Unauthorized" }, { status: 401 });
-    }
+  const cronSecret = process.env.CRON_SECRET;
+  const headerSecret = request.headers.get("x-cron-secret");
+  if (!cronSecret || headerSecret !== cronSecret) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({} as Record<string, unknown>));

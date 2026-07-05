@@ -4,14 +4,17 @@ import { getWorkspaceUsers } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import { logger } from "@/lib/logger.server";
+import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
+import {
+  removeWorkspaceMember,
+  updateWorkspaceMemberRole,
+} from "@/lib/platform-members.server";
 import {
   deleteWorkspaceById,
   findUserIdByUsername,
   findWorkspaceInviteForUser,
   removeWorkspaceInviteForUser,
-  removeWorkspaceMember,
   transferWorkspaceOwnership,
-  updateWorkspaceMemberRole,
   upsertWorkspaceWebhookRow,
 } from "@/lib/workspace-members-db.server";
 
@@ -73,16 +76,24 @@ export async function handleUpdateUser(
   formData: FormData,
   workspaceId: string,
   headers: Headers,
+  actorUserId: string,
 ) {
   const userId = formData.get("user_id") as string;
   const updatedWorkspaceRole = formData.get("updated_workspace_role") as string;
   try {
-    const updatedUser = await updateWorkspaceMemberRole({
+    const result = await updateWorkspaceMemberRole(
+      actorUserId,
       workspaceId,
       userId,
-      role: updatedWorkspaceRole as "owner" | "member" | "caller" | "admin",
-    });
-    return routeData({ data: updatedUser, error: null }, { headers });
+      updatedWorkspaceRole as "owner" | "member" | "caller" | "admin",
+    );
+    if (!result.ok) {
+      return routeData(
+        { data: null, error: result.error },
+        { headers, status: result.status ?? 400 },
+      );
+    }
+    return routeData({ data: result.member, error: null }, { headers });
   } catch (error) {
     return routeData(
       {
@@ -98,12 +109,19 @@ export async function handleDeleteUser(
   formData: FormData,
   workspaceId: string,
   headers: Headers,
+  actorUserId: string,
 ) {
   const userId = formData.get("user_id") as string;
   try {
-    const deletedUser = await removeWorkspaceMember({ workspaceId, userId });
+    const result = await removeWorkspaceMember(actorUserId, workspaceId, userId);
+    if (!result.ok) {
+      return routeData(
+        { data: null, error: result.error },
+        { headers, status: result.status ?? 400 },
+      );
+    }
     return routeData(
-      { data: deletedUser, error: deletedUser ? null : "User not found" },
+      { data: result.member, error: result.member ? null : "User not found" },
       { headers },
     );
   } catch (error) {
@@ -121,14 +139,25 @@ export async function handleDeleteSelf(
   formData: FormData,
   workspaceId: string,
   headers: Headers,
+  actorUserId: string,
 ) {
   const userId = formData.get("user_id") as string;
   if (userId == null) {
     return routeData({ error: `User ${userId} not found` }, { headers });
   }
 
+  if (userId !== actorUserId) {
+    return routeData(
+      { error: "You don't have permission to delete this user" },
+      { headers, status: 403 },
+    );
+  }
+
   try {
-    await removeWorkspaceMember({ workspaceId, userId });
+    const result = await removeWorkspaceMember(actorUserId, workspaceId, userId);
+    if (!result.ok) {
+      throw new Error(result.error ?? "Delete failed");
+    }
     return redirect("/workspaces", { headers });
   } catch (errorDeletingSelf) {
     logger.error("Error deleting current user from workspace", errorDeletingSelf);
@@ -143,8 +172,8 @@ export async function handleTransferWorkspace(
   formData: FormData,
   workspaceId: string,
   headers: Headers,
+  currentOwnerUserId: string,
 ) {
-  const currentOwnerUserId = formData.get("workspace_owner_id") as string;
   const newOwnerUserId = formData.get("user_id") as string;
   try {
     const { previousOwner } = await transferWorkspaceOwnership({
@@ -216,6 +245,7 @@ export async function handleUpdateWebhook(
   });
 
   try {
+    await assertSafeOutboundUrl(destinationUrl);
     const webhook = await upsertWorkspaceWebhookRow({
       workspaceId,
       userId,
@@ -263,6 +293,8 @@ export async function testWebhook(
         ...headersObject,
       },
       body: JSON.stringify(parsedTestData),
+      redirect: "error",
+      signal: AbortSignal.timeout(10000),
     });
 
     let data;

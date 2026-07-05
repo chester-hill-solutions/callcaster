@@ -1,33 +1,40 @@
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
 import { auth } from "@/server/auth-instance";
 import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request }: ActionFunctionArgs) {
-
-  const { headers } = await verifyAuth(request);
-
   const formData = await request.formData();
-  const newPasswordRaw = formData.get("password") as string;
-  const confirmNewPasswordRaw = formData.get("confirmPassword") as string;
+  const passwordRaw = formData.get("password");
+  const confirmPasswordRaw =
+    formData.get("confirm_password") ?? formData.get("confirmPassword");
 
-  const newPassword = newPasswordRaw.trim();
-  const confirmNewPassword = confirmNewPasswordRaw.trim();
+  if (typeof passwordRaw !== "string" || typeof confirmPasswordRaw !== "string") {
+    return routeData({
+      success: null,
+      error: { message: "Invalid form submission" },
+    });
+  }
 
-  if (newPassword !== confirmNewPassword) {
+  const password = passwordRaw.trim();
+  const confirmPassword = confirmPasswordRaw.trim();
+
+  if (password !== confirmPassword) {
     return routeData({
       success: null,
       error: { message: "Passwords do not match" },
     });
   }
 
+  const token = new URL(request.url).searchParams.get("token") ?? "";
+
   try {
-    const result = await (auth.api as any).updateUser({
-      body: { password: newPassword },
+    await auth.api.resetPassword({
+      body: { newPassword: password, token },
       headers: request.headers,
     });
-    return routeData({ success: result, error: null }, { headers });
-  } catch (error: any) {
-    return routeData({ success: null, error: { message: error?.message || "Update failed" } }, { headers });
+  } catch {
+    // Always return a generic success message regardless of token validity.
   }
+
+  return routeData({ success: true, error: null });
 }

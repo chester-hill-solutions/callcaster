@@ -5,12 +5,16 @@ const mocks = vi.hoisted(() => ({
   shouldValidateTwilioWebhooks: vi.fn(() => true),
   logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
   env: {
-    TWILIO_AUTH_TOKEN: () => "main-dev-token",
+    BASE_URL: () => "http://localhost:3000",
+    TWILIO_AUTH_TOKEN: () => "main-account-token",
   },
   findCallBySid: vi.fn(),
+  findMessageBySid: vi.fn(),
   findWorkspaceNumberByPhoneNumber: vi.fn(),
   getWorkspaceById: vi.fn(),
   loadWorkspaceTwilioData: vi.fn(),
+  readTwilioWorkspaceCredentials: vi.fn(),
+  resolveTwilioWebhookAuthToken: vi.fn(),
 }));
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -23,6 +27,9 @@ vi.mock("@/twilio.server", () => ({
 vi.mock("@/lib/telephony-db.server", () => ({
   findCallBySid: (...args: unknown[]) => mocks.findCallBySid(...args),
 }));
+vi.mock("@/lib/message-db.server", () => ({
+  findMessageBySid: (...args: unknown[]) => mocks.findMessageBySid(...args),
+}));
 vi.mock("@/lib/inbound-call-db.server", () => ({
   findWorkspaceNumberByPhoneNumber: (...args: unknown[]) =>
     mocks.findWorkspaceNumberByPhoneNumber(...args),
@@ -31,17 +38,24 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
   getWorkspaceById: (...args: unknown[]) => mocks.getWorkspaceById(...args),
 }));
 vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
-  loadWorkspaceTwilioData: (...args: unknown[]) => mocks.loadWorkspaceTwilioData(...args),
+  loadWorkspaceTwilioData: (...args: unknown[]) =>
+    mocks.loadWorkspaceTwilioData(...args),
+}));
+vi.mock("@/lib/twilio-workspace-credentials", () => ({
+  readTwilioWorkspaceCredentials: (...args: unknown[]) =>
+    mocks.readTwilioWorkspaceCredentials(...args),
+  resolveTwilioWebhookAuthToken: (...args: unknown[]) =>
+    mocks.resolveTwilioWebhookAuthToken(...args),
 }));
 
 import {
-  resolveWorkspaceTwilioData,
+  resolveCanonicalTwilioWebhookUrl,
+  requireTwilioSignature,
   twilioWebhookForbidden,
-  validateTwilioWebhookForCallSid,
-  validateTwilioWebhookForPhoneNumber,
+  twilioWebhookForbiddenHangup,
 } from "@/lib/twilio-webhook.server";
 
-function makeRequest(url = "http://localhost/api/test", headers?: Record<string, string>) {
+function makeRequest(url = "http://localhost:3000/api/test", headers?: Record<string, string>) {
   const fd = new FormData();
   fd.set("CallSid", "CA1");
   return new Request(url, {
@@ -56,13 +70,15 @@ describe("twilio-webhook.server", () => {
     vi.resetModules();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    mocks.shouldValidateTwilioWebhooks.mockReset();
     mocks.shouldValidateTwilioWebhooks.mockReturnValue(true);
-    mocks.logger.info.mockReset();
     mocks.findCallBySid.mockReset();
+    mocks.findMessageBySid.mockReset();
     mocks.findWorkspaceNumberByPhoneNumber.mockReset();
     mocks.getWorkspaceById.mockReset();
     mocks.loadWorkspaceTwilioData.mockReset();
-    vi.stubEnv("NODE_ENV", "development");
+    mocks.readTwilioWorkspaceCredentials.mockReset();
+    mocks.resolveTwilioWebhookAuthToken.mockReset();
   });
 
   test("twilioWebhookForbidden returns 403 JSON response", async () => {
@@ -71,93 +87,120 @@ describe("twilio-webhook.server", () => {
     await expect(res.json()).resolves.toEqual({ error: "Nope" });
   });
 
-  test("resolveWorkspaceTwilioData fetches workspace twilio_data when join lacks token", async () => {
-    mocks.getWorkspaceById.mockResolvedValueOnce({
-      twilio_data: { sid: "AC1", authToken: "fetched-token" },
-    });
+  test("twilioWebhookForbiddenHangup returns 403 TwiML", () => {
+    const res = twilioWebhookForbiddenHangup();
+    expect(res.status).toBe(403);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+  });
 
-    const result = await resolveWorkspaceTwilioData(
-      "w1",
-      { sid: "AC1" },
-      mocks.logger,
-    );
+  test("resolveCanonicalTwilioWebhookUrl uses BASE_URL and pathname", () => {
+    const req = makeRequest("http://wrong-host/api/test?x=1");
+    expect(resolveCanonicalTwilioWebhookUrl(req)).toBe("http://localhost:3000/api/test");
+  });
 
-    expect(result).toEqual({ sid: "AC1", authToken: "fetched-token" });
-    expect(mocks.logger.info).toHaveBeenCalledWith(
-      "Fetched workspace twilio_data (join did not include it)",
-      { workspaceId: "w1" },
+  test("returns null when webhook validation is disabled", async () => {
+    mocks.shouldValidateTwilioWebhooks.mockReturnValue(false);
+    const result = await requireTwilioSignature(makeRequest());
+    expect(result).toBeNull();
+  });
+
+  test("returns hangup TwiML when signature header is missing", async () => {
+    const req = makeRequest(undefined, { "x-twilio-signature": "" });
+    const result = await requireTwilioSignature(req);
+    expect(result?.status).toBe(403);
+    expect(result?.headers.get("Content-Type")).toBe("text/xml");
+  });
+
+  test("returns hangup TwiML when signature validation fails", async () => {
+    mocks.validateTwilioWebhookParams.mockReturnValue(false);
+    const result = await requireTwilioSignature(makeRequest(), { callSid: "CA1" });
+    expect(result?.status).toBe(403);
+    expect(result?.headers.get("Content-Type")).toBe("text/xml");
+  });
+
+  test("validates with main account token when no workspace option is given", async () => {
+    mocks.resolveTwilioWebhookAuthToken.mockReturnValue("main-account-token");
+    const result = await requireTwilioSignature(makeRequest());
+    expect(result).toBeNull();
+    expect(mocks.validateTwilioWebhookParams).toHaveBeenCalledWith(
+      expect.any(Object),
+      "sig",
+      "http://localhost:3000/api/test",
+      "main-account-token",
     );
   });
 
-  test("validateTwilioWebhookForPhoneNumber rejects empty phone", async () => {
-    const result = await validateTwilioWebhookForPhoneNumber({
-      request: makeRequest(),
-      phoneNumber: "   ",
-      params: { Called: "   " },
-    });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.response.status).toBe(403);
-      await expect(result.response.json()).resolves.toEqual({
-        error: "Missing phone number",
-      });
-    }
+  test("validates with workspace token when workspaceId is provided", async () => {
+    mocks.loadWorkspaceTwilioData.mockResolvedValueOnce({ workspace: "w1", twilio_data: { authToken: "ws-token" } });
+    mocks.readTwilioWorkspaceCredentials.mockReturnValueOnce({ authToken: "ws-token" });
+    mocks.resolveTwilioWebhookAuthToken.mockReturnValueOnce("ws-token");
+    const result = await requireTwilioSignature(makeRequest(), { workspaceId: "w1" });
+    expect(result).toBeNull();
+    expect(mocks.loadWorkspaceTwilioData).toHaveBeenCalledWith("w1");
+    expect(mocks.validateTwilioWebhookParams).toHaveBeenCalledWith(
+      expect.any(Object),
+      "sig",
+      "http://localhost:3000/api/test",
+      "ws-token",
+    );
   });
 
-  test("validateTwilioWebhookForCallSid uses dev auth token when call row missing", async () => {
+  test("validates with workspace token when callSid is provided", async () => {
+    mocks.findCallBySid.mockResolvedValueOnce({ workspace: "w1" });
+    mocks.loadWorkspaceTwilioData.mockResolvedValueOnce({ workspace: "w1", twilio_data: { authToken: "ws-token" } });
+    mocks.readTwilioWorkspaceCredentials.mockReturnValueOnce({ authToken: "ws-token" });
+    mocks.resolveTwilioWebhookAuthToken.mockReturnValueOnce("ws-token");
+    const result = await requireTwilioSignature(makeRequest(), { callSid: "CA1" });
+    expect(result).toBeNull();
+    expect(mocks.findCallBySid).toHaveBeenCalledWith("CA1");
+    expect(mocks.loadWorkspaceTwilioData).toHaveBeenCalledWith("w1");
+  });
+
+  test("returns hangup TwiML when callSid workspace cannot be resolved", async () => {
     mocks.findCallBySid.mockResolvedValueOnce(null);
-    mocks.validateTwilioWebhookParams.mockImplementation(
-      (_params, _sig, _url, token: string) => token === "main-dev-token",
+    const result = await requireTwilioSignature(makeRequest(), { callSid: "CA_UNKNOWN" });
+    expect(result?.status).toBe(403);
+  });
+
+  test("validates with workspace token when messageSid is provided", async () => {
+    mocks.findMessageBySid.mockResolvedValueOnce({ workspace: "w1" });
+    mocks.loadWorkspaceTwilioData.mockResolvedValueOnce({ workspace: "w1", twilio_data: { authToken: "ws-token" } });
+    mocks.readTwilioWorkspaceCredentials.mockReturnValueOnce({ authToken: "ws-token" });
+    mocks.resolveTwilioWebhookAuthToken.mockReturnValueOnce("ws-token");
+    const result = await requireTwilioSignature(makeRequest(), { messageSid: "SM1" });
+    expect(result).toBeNull();
+    expect(mocks.findMessageBySid).toHaveBeenCalledWith("SM1");
+    expect(mocks.loadWorkspaceTwilioData).toHaveBeenCalledWith("w1");
+  });
+
+  test("returns hangup TwiML when messageSid workspace cannot be resolved", async () => {
+    mocks.findMessageBySid.mockResolvedValueOnce(null);
+    const result = await requireTwilioSignature(makeRequest(), { messageSid: "SM_UNKNOWN" });
+    expect(result?.status).toBe(403);
+  });
+
+  test("validates with workspace token when phoneNumber is provided", async () => {
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce({ workspace: "w1" });
+    mocks.getWorkspaceById.mockResolvedValueOnce({ twilio_data: { authToken: "ws-token" } });
+    mocks.readTwilioWorkspaceCredentials.mockReturnValueOnce({ authToken: "ws-token" });
+    mocks.resolveTwilioWebhookAuthToken.mockReturnValueOnce("ws-token");
+    const result = await requireTwilioSignature(makeRequest("http://localhost:3000/api/inbound-handset"), { phoneNumber: "+15551234567" });
+    expect(result).toBeNull();
+    expect(mocks.findWorkspaceNumberByPhoneNumber).toHaveBeenCalledWith("+15551234567");
+    expect(mocks.validateTwilioWebhookParams).toHaveBeenCalledWith(
+      expect.any(Object),
+      "sig",
+      "http://localhost:3000/api/inbound-handset",
+      "ws-token",
     );
-
-    const result = await validateTwilioWebhookForCallSid({
-      request: makeRequest(),
-      callSid: "CA_UNKNOWN",
-      params: { CallSid: "CA_UNKNOWN" },
-    });
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.authToken).toBe("main-dev-token");
-    }
   });
 
-  test("validateTwilioWebhookForCallSid rejects unknown call in production", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    mocks.findCallBySid.mockResolvedValueOnce(null);
-
-    const result = await validateTwilioWebhookForCallSid({
-      request: makeRequest(),
-      callSid: "CA_UNKNOWN",
-      params: { CallSid: "CA_UNKNOWN" },
-    });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.response.status).toBe(403);
-    }
-  });
-
-  test("validateTwilioWebhookForPhoneNumber returns numberRow with handset_enabled", async () => {
-    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce({
-      workspaceId: "w1",
-      handset_enabled: true,
-    });
-    mocks.getWorkspaceById.mockResolvedValueOnce({
-      twilio_data: { sid: "AC1", authToken: "tok" },
-    });
-
-    const result = await validateTwilioWebhookForPhoneNumber({
-      request: makeRequest("http://localhost/api/inbound-handset"),
-      phoneNumber: "+15551234567",
-      params: { Called: "+15551234567" },
-    });
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.numberRow).toEqual({ workspace: "w1", handset_enabled: true });
-      expect(result.workspaceId).toBe("w1");
-    }
+  test("returns hangup TwiML when workspace credentials are missing", async () => {
+    mocks.loadWorkspaceTwilioData.mockResolvedValueOnce({ workspace: "w1", twilio_data: {} });
+    mocks.readTwilioWorkspaceCredentials.mockReturnValueOnce({ authToken: null });
+    mocks.resolveTwilioWebhookAuthToken.mockReturnValueOnce(null);
+    const result = await requireTwilioSignature(makeRequest(), { workspaceId: "w1" });
+    expect(result?.status).toBe(403);
+    expect(result?.headers.get("Content-Type")).toBe("text/xml");
   });
 });

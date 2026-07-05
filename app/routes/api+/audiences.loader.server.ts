@@ -8,6 +8,7 @@ import {
 } from "@/lib/database/contact-audience.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
+import { AppError } from "@/lib/errors.server";
 
 interface AuthSessionResponse {
     headers: Headers;
@@ -71,7 +72,8 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
     const sortDirection = sortDirectionRaw === "desc" ? "desc" : "asc";
     const q = (url.searchParams.get("q") || "").trim();
 
-    if (returnType === 'csv') {
+    try {
+      if (returnType === 'csv') {
         if (!audienceId) {
           return routeData({ error: "Missing audienceId" }, { status: 400, headers });
         }
@@ -118,21 +120,42 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
           csv: csvString,
           headers: Object.fromEntries(headers.entries()),
         });
-    }
-    // Handle regular JSON response
-    let parsedAudienceId: number | undefined;
-    if (audienceId) {
+      }
+      // Handle regular JSON response
+      let parsedAudienceId: number | undefined;
+      if (audienceId) {
         const id = parseInt(audienceId, 10);
         if (!isNaN(id)) {
-            parsedAudienceId = id;
+          parsedAudienceId = id;
         }
-    }
+      }
 
-    try {
+      const workspaceId = url.searchParams.get("workspaceId");
+      let resolvedWorkspaceId: string | null = null;
+      if (parsedAudienceId != null) {
+        resolvedWorkspaceId = await findAudienceWorkspaceById(parsedAudienceId);
+        if (!resolvedWorkspaceId) {
+          return routeData({ error: "Audience not found" }, { status: 404, headers });
+        }
+      } else if (workspaceId) {
+        resolvedWorkspaceId = workspaceId;
+      }
+
+      if (!resolvedWorkspaceId) {
+        return routeData({ error: "Workspace ID or audienceId is required" }, { status: 400, headers });
+      }
+
+      if (user) {
+        await d.requireWorkspaceAccess({ user, workspaceId: resolvedWorkspaceId });
+      }
+
       const data = await listAudienceContactsJson(parsedAudienceId);
       return routeData({ data }, { headers });
     } catch (error) {
       logger.error("Error fetching contact audience data:", error);
+      if (error instanceof AppError) {
+        return routeData({ error: error.message }, { status: error.statusCode, headers });
+      }
       throw error;
     }
-}
+  }

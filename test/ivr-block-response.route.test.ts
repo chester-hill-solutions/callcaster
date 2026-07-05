@@ -6,7 +6,7 @@ import { configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
-    validateTwilioWebhookForCallSid: vi.fn(),
+    requireTwilioSignature: vi.fn(),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
       BETTER_AUTH_SERVICE_KEY: () => "svc",
@@ -19,8 +19,8 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@client/client-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...a: unknown[]) =>
-    mocks.validateTwilioWebhookForCallSid(...a),
+  requireTwilioSignature: (...a: unknown[]) =>
+    mocks.requireTwilioSignature(...a),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -152,12 +152,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     ivrTestState.outreachError = null;
     configureTelephonyStub();
     mocks.createClient.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValue({
-      ok: true,
-      params: { CallSid: "CA1" },
-      authToken: "tok",
-    });
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.logger.error.mockReset();
   });
 
@@ -176,12 +172,9 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
   });
 
   test("returns 403 on invalid Twilio signature", async () => {
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const script = { pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1", options: [] } } };
     const campaignData = { script: { steps: script } };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData, workspaceTwilioData: { authToken: "t" } }));
@@ -369,6 +362,30 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
     expect(await res.text()).toContain("An error occurred. Please try again later.");
+  });
+
+  test("returns hangup when campaign_id mismatches URL or call is missing", async () => {
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+
+    // campaign_id mismatch
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1, campaign_id: 2 }, campaignData: { script: { steps: { pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1" } } } } } }),
+    );
+    let res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+    expect(await res.text()).toContain("hangup");
+
+    // call not found
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({ call: null, campaignData: { script: { steps: { pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1" } } } } } }),
+    );
+    res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+    expect(await res.text()).toContain("hangup");
   });
 });
 

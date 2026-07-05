@@ -29,16 +29,28 @@ export const action = async ({ request }: { request: Request }) => {
     campaign_id: number;
     workspace_id: string;
     selected_device: string;
+    conference_id?: string;
   }>(request);
-  const { user_id, campaign_id, workspace_id, selected_device } = body;
+  const {
+    user_id,
+    campaign_id,
+    workspace_id,
+    selected_device,
+    conference_id: conferenceIdFromBody,
+  } = body;
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id,
   });
   const tdb = createTenantDb(workspace_id);
+  const conferenceId =
+    typeof conferenceIdFromBody === "string" && conferenceIdFromBody
+      ? conferenceIdFromBody
+      : user_id;
 
   try {
     const contactRecord = await getNextAutoDialQueueContact(
       campaign_id,
       user_id,
+      tdb,
     );
     if (contactRecord) {
       logger.debug("Contact record:", contactRecord);
@@ -55,7 +67,7 @@ export const action = async ({ request }: { request: Request }) => {
         twilioClient,
         toNumber,
         contactRecord.caller_id,
-        user_id,
+        conferenceId,
         selected_device,
       );
 
@@ -89,7 +101,7 @@ export const action = async ({ request }: { request: Request }) => {
         contact_id: contactRecord.contact_id,
         workspace: workspace_id,
         outreach_attempt_id,
-        conference_id: user_id,
+        conference_id: conferenceId,
       };
 
       await saveCallToDatabase(workspace_id, callData as unknown as Partial<Call>);
@@ -98,7 +110,7 @@ export const action = async ({ request }: { request: Request }) => {
       });
     }
 
-    await completeAllConferences(twilioClient, user_id);
+    await completeAllConferences(twilioClient, conferenceId);
 
     return new Response(
       JSON.stringify({ success: true, message: "No queued contacts" }),

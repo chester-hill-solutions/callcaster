@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
 
@@ -9,7 +13,7 @@ const roomCallRow = vi.hoisted(() => ({
     outreach_attempt_id: 1,
     contact_id: 1,
     workspace: "w1",
-    conference_id: "u1",
+    conference_id: "u1~00000000-0000-0000-0000-000000000000",
   } as Record<string, unknown>,
 }));
 
@@ -86,13 +90,9 @@ vi.mock("@/lib/object-storage.server", () => ({
 }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: vi.fn(async (args: {
+  requireTwilioSignature: vi.fn(async (args: {
     params?: Record<string, string>;
-  }) => ({
-    ok: true,
-    params: args.params ?? {},
-    authToken: "tok",
-  })),
+  }) => (null)),
 }));
 
 vi.mock("@/twilio.server", () => ({
@@ -125,6 +125,7 @@ vi.mock("@/lib/telephony-db.server", async () => {
   return {
     findCallBySid: stub.telephonyDbMocks.findCallBySid,
     findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    findActiveConferenceIdsForUser: stub.telephonyDbMocks.findActiveConferenceIdsForUser,
     updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
     findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
     updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
@@ -188,7 +189,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       outreach_attempt_id: 1,
       contact_id: 1,
       workspace: "w1",
-      conference_id: "u1",
+      conference_id: "u1~00000000-0000-0000-0000-000000000000",
     });
     roomStorageState.error = null;
     vi.stubGlobal("fetch", mocks.fetch);
@@ -209,7 +210,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
                   outreach_attempt_id: 1,
                   contact_id: 1,
                   workspace: "w1",
-                  conference_id: "u1",
+                  conference_id: "u1~00000000-0000-0000-0000-000000000000",
                 },
                 error: null,
               }),
@@ -265,8 +266,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "client:u1");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
@@ -300,7 +301,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
                   outreach_attempt_id: 1,
                   contact_id: 2,
                   workspace: "w1",
-                  conference_id: "u1",
+                  conference_id: "u1~00000000-0000-0000-0000-000000000000",
                 },
                 error: null,
               }),
@@ -370,8 +371,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
@@ -400,7 +401,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" },
+                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" },
                 error: null,
               }),
             }),
@@ -454,8 +455,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
 
     expect(await res.text()).toContain("<Hangup/>");
@@ -490,7 +491,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
                   outreach_attempt_id: 1,
                   contact_id: 2,
                   workspace: "w1",
-                  conference_id: "u1",
+                  conference_id: "u1~00000000-0000-0000-0000-000000000000",
                 },
                 error: null,
               }),
@@ -560,8 +561,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
@@ -578,7 +579,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
@@ -604,8 +605,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -621,7 +622,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
@@ -646,8 +647,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -658,7 +659,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 1, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 1, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
@@ -674,8 +675,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -690,7 +691,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: false, caller_id: "+1555" }, error: null }) }) }) };
@@ -715,8 +716,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     // intentionally omit Called
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
@@ -736,7 +737,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
@@ -774,8 +775,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(mocks.fetch).toHaveBeenCalledWith(
@@ -799,7 +800,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" },
+                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" },
                 error: null,
               }),
             }),
@@ -847,8 +848,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
@@ -873,8 +874,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(mocks.logger.error).toHaveBeenCalled();
     expect(await res.text()).toContain("<Hangup/>");
@@ -889,7 +890,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 1, workspace: "w1", conference_id: "u1" },
+                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 1, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" },
                 error: null,
               }),
             }),
@@ -922,8 +923,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
@@ -961,8 +962,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1777");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
@@ -978,7 +979,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: new Error("camp") }) }) }) };
@@ -997,8 +998,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -1014,7 +1015,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
@@ -1039,8 +1040,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -1061,7 +1062,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: false, caller_id: "+1555" }, error: null }) }) }) };
@@ -1083,8 +1084,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -1100,7 +1101,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     roomRpcState.client = client;
     client.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: false, caller_id: "+1555" }, error: null }) }) }) };
@@ -1125,8 +1126,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "client:u1");
     const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
-      params: { roomId: "u1" },
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     // Only called from machine paths / answered-at branch; should not be invoked here.

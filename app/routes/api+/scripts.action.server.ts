@@ -1,11 +1,12 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import {
   insertScriptForWorkspace,
   updateScriptForWorkspace,
 } from "@/lib/script-api-db.server";
+import { AppError } from "@/lib/errors.server";
 
 export const action = async ({ request }: { request: Request }) => {
 
@@ -32,6 +33,8 @@ export const action = async ({ request }: { request: Request }) => {
     ) {
       return routeData({ error: "Invalid script payload" }, { status: 400 });
     }
+
+    await requireWorkspaceAccess({ user, workspaceId: workspace });
 
     let updatedScript;
     if (saveAsCopy || !id) {
@@ -60,6 +63,9 @@ export const action = async ({ request }: { request: Request }) => {
 
   } catch (error) {
     logger.error("Error updating/creating script:", error);
+    if (error instanceof AppError) {
+      return routeData({ error: error.message }, { status: error.statusCode });
+    }
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("duplicate key") || message.includes("23505")) {
       return routeData(

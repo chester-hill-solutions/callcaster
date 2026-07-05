@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 
 const twilioMocks = vi.hoisted(() => {
@@ -18,10 +22,18 @@ const handsetState = vi.hoisted(() => ({
   handsetNumber: null as string | null,
 }));
 
+const telephonyDbMocks = vi.hoisted(() => ({
+  insertCallForWorkspace: vi.fn(async () => ({})),
+}));
+
 vi.mock("@/lib/handset/handset-session.server", () => ({
   findActiveHandsetSession: vi.fn(async () =>
-    handsetState.activeSession ? { workspace_id: "w1" } : null,
+    handsetState.activeSession ? { workspace_id: "w1", user_id: "u1" } : null,
   ),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  insertCallForWorkspace: (...args: any[]) => telephonyDbMocks.insertCallForWorkspace(...args),
 }));
 
 vi.mock("@/lib/database.server", async () => {
@@ -77,6 +89,10 @@ vi.mock("@/lib/env.server", () => {
 
 vi.mock("@/lib/logger.server", () => ({ logger: loggerMocks }));
 
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  requireTwilioSignature: vi.fn(async () => null),
+}));
+
 describe("app/routes/api+/call/route.tsx", () => {
   beforeEach(() => {
     twilioMocks.dialNumber.mockReset();
@@ -86,6 +102,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     loggerMocks.warn.mockReset();
     handsetState.activeSession = true;
     handsetState.handsetNumber = null;
+    telephonyDbMocks.insertCallForWorkspace.mockReset();
     vi.resetModules();
   });
 
@@ -116,6 +133,7 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("action says invalid when To contains invalid chars", async () => {
+    twilioMocks.dial.mockClear();
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "not-a-phone");
@@ -156,13 +174,14 @@ describe("app/routes/api+/call/route.tsx", () => {
     expect(loggerMocks.warn).toHaveBeenCalled();
   });
 
-  test("handset flow dials with workspace caller id and normalized destination", async () => {
+  test("handset flow persists call row and dials with workspace caller id", async () => {
     handsetState.handsetNumber = "+15559876543";
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
+    fd.set("CallSid", "CA_HANDSET");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
@@ -172,6 +191,17 @@ describe("app/routes/api+/call/route.tsx", () => {
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     await res.text();
+    expect(telephonyDbMocks.insertCallForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      expect.objectContaining({
+        sid: "CA_HANDSET",
+        workspace: "w1",
+        user_id: "u1",
+        to: "+15555550100",
+        from: "+15559876543",
+        status: "initiated",
+      }),
+    );
     expect(twilioMocks.dial).toHaveBeenCalledWith(
       expect.objectContaining({
         callerId: "+15559876543",

@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
   return {
     createWorkspaceTwilioInstance: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
-    validateTwilioWebhookForCallSid: vi.fn(),
+    requireTwilioSignature: vi.fn(),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
       BETTER_AUTH_SERVICE_KEY: () => "svc",
@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
 
 const telephonyDbMocks = vi.hoisted(() => ({
   findCallBySid: vi.fn(),
+  upsertCallBySid: vi.fn(),
   updateOutreachAttemptForWorkspace: vi.fn(),
 }));
 
@@ -41,14 +42,15 @@ vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
-    mocks.validateTwilioWebhookForCallSid(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
 }));
 vi.mock("@/twilio.server", () => ({ validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a) }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/telephony-db.server", () => ({
   findCallBySid: (...args: any[]) => telephonyDbMocks.findCallBySid(...args),
+  upsertCallBySid: (...args: any[]) => telephonyDbMocks.upsertCallBySid(...args),
   updateOutreachAttemptForWorkspace: (...args: any[]) =>
     telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
 }));
@@ -111,36 +113,31 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
-    mocks.validateTwilioWebhookForCallSid.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockImplementation(async (args: {
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockImplementation(async (args: {
       params?: Record<string, string>;
-    }) => ({
-      ok: true,
-      params: args.params ?? { CallSid: "CA1" },
-      authToken: "tok",
-    }));
+    }) => (null));
     mocks.logger.error.mockReset();
     telephonyDbMocks.findCallBySid.mockReset();
+    telephonyDbMocks.upsertCallBySid.mockReset();
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
     campaignIvrMocks.fetchCampaignWithScript.mockReset();
     callStatusMocks.persistCallStatusFromParams.mockReset();
     objectStorageMocks.createSignedObjectUrl.mockReset();
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
     telephonyDbMocks.findCallBySid.mockResolvedValue(makeCallRow());
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValue(makeCampaign());
+    telephonyDbMocks.upsertCallBySid.mockResolvedValue(makeCallRow());
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValue(makeCampaign({ type: "robocall" }));
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValue({});
     callStatusMocks.persistCallStatusFromParams.mockResolvedValue(undefined);
     objectStorageMocks.createSignedObjectUrl.mockResolvedValue("https://signed");
-    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue({ inserted: true, existingId: 1 });
   });
 
   test("returns 403 on invalid signature", async () => {
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     const mod = await import("../app/routes/api+/ivr/status.route");
     const res = await asRouteResponse(
@@ -306,7 +303,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
-  test("covers completed branch and updateCallStatus error branch", async () => {
+  test("covers completed branch and upsertCallBySid error branch", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
 
@@ -317,24 +314,24 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
-    // updateCallStatus error => catch
+    // upsertCallBySid error => catch
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    callStatusMocks.persistCallStatusFromParams.mockRejectedValueOnce(new Error("call-update"));
+    telephonyDbMocks.upsertCallBySid.mockRejectedValueOnce(new Error("call-update"));
     res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    // ensure completed branch executes by forcing updateCallStatus error on completed
+    // ensure completed branch catches upsertCallBySid errors too
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    callStatusMocks.persistCallStatusFromParams.mockRejectedValueOnce(new Error("completed-update"));
+    telephonyDbMocks.upsertCallBySid.mockRejectedValueOnce(new Error("completed-update"));
     res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
-  test("explicitly hits completed branch and debits credits", async () => {
+  test("explicitly hits completed branch and debits credits once", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
 
     const res = await asRouteResponse(await mod.action({
@@ -347,10 +344,31 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callStatusMocks.persistCallStatusFromParams).toHaveBeenCalledWith(
-      expect.objectContaining({ disposition: "completed" }),
+    expect(telephonyDbMocks.upsertCallBySid).toHaveBeenCalled();
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "call:CA1:ivr",
+        type: "DEBIT",
+      }),
     );
-    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalled();
+  });
+
+  test("does not bill failed or no-answer IVR callbacks", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: async () => ({}) }) });
+
+    let res = await asRouteResponse(await mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+
+    res = await asRouteResponse(await mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "no-answer", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
   test("covers switch default (non-terminal callStatus, non-machine)", async () => {

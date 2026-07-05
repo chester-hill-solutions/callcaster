@@ -3,12 +3,8 @@ import {
   parseTrimmedString,
   resolveInboundWorkspaceContext,
 } from "@/lib/inbound-sms-context.server";
-import {
-  rejectMissingTwilioSignatureHeader,
-  validateWorkspaceTwilioWebhook,
-} from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
@@ -19,11 +15,6 @@ import { uploadObject } from "@/lib/object-storage.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const missingHeader = rejectMissingTwilioSignatureHeader(request);
-  if (missingHeader) {
-    return missingHeader;
-  }
-
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
   const toNumber = parseTrimmedString(params.To);
@@ -48,21 +39,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const inboundTwilioCreds = readTwilioWorkspaceCredentials(
     workspaceNumber.twilio_data,
   );
-  const validation = validateWorkspaceTwilioWebhook({
-    request,
-    params,
-    twilioData: workspaceNumber.twilio_data,
+
+  const forbidden = await requireTwilioSignature(request, {
+    workspaceId: workspaceNumber.workspace,
   });
-  if (!validation.ok) {
-    if (validation.response.status === 500) {
+  if (forbidden) {
+    if (forbidden.status === 500) {
       logger.error("Workspace missing Twilio credentials for inbound SMS", {
         workspace: workspaceNumber.workspace,
         attributionPath: resolved.attributionPath,
       });
     }
-    return validation.response;
+    return forbidden;
   }
-  const authToken = validation.authToken;
 
   const data = params as Record<string, unknown>;
   const fromNumber = parseTrimmedString(data.From);
@@ -74,11 +63,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const numSegments =
     Number.parseInt(typeof data.NumSegments === "string" ? data.NumSegments : "0", 10) || 0;
 
-  const credsForRest =
-    inboundTwilioCreds ??
-    (authToken && process.env.NODE_ENV !== "production"
-      ? { sid: env.TWILIO_SID(), authToken }
-      : null);
+  const credsForRest = inboundTwilioCreds;
 
   const media: string[] = [];
   const now = new Date();

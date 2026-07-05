@@ -1,22 +1,16 @@
 import {
-  billingUnitsFromCallDurationSeconds,
   buildCallUpsertFromTwilioParams,
+  processCallStatusWebhook,
   resolveCallOutreachContext,
-  TERMINAL_CALL_STATUSES,
   twilioParamsToUnderCase,
-  voiceBillingKindFromCampaignType,
 } from "@/lib/twilio-call-status.server";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { data as routeData } from "react-router";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
-import { callKey } from "@/lib/billing-keys";
-import { debitAmountFromCredits } from "@/lib/pricing";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import {
   findOutreachAttemptWithCampaignType,
   updateOutreachAttemptForWorkspace,
-  upsertCallBySid,
 } from "@/lib/telephony-db.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 import type { ActionFunctionArgs } from "react-router";
@@ -29,23 +23,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return routeData({ error: "Missing CallSid" }, { status: 400 });
   }
 
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    callSid: callSidRaw,
-    params,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { callSid: callSidRaw });
+  if (forbidden) return forbidden;
 
   const underCaseData = twilioParamsToUnderCase(params);
   const updateData = buildCallUpsertFromTwilioParams(params);
 
-  const callRow = await upsertCallBySid(updateData);
-  if (!callRow) {
-    logger.error("Error updating call:", { sid: updateData.sid });
-    return routeData({ success: false, error: "Failed to update call" }, { status: 500 });
-  }
+  // Persist the call and run billing first. The upserted call row is the
+  // source of truth for workspace/outreach context (it may have inherited a
+  // parent call leg or been created by a dial endpoint).
+  const { call: callRow } = await processCallStatusWebhook(updateData, {});
 
   const { outreachAttemptId, workspaceId } = await resolveCallOutreachContext(callRow);
 
@@ -55,8 +42,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       : null;
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
-  if (currentAttempt && workspaceId) {
-    await emitPredictiveBroadcast(workspaceId, {
+  if (currentAttempt && billingWorkspace) {
+    await emitPredictiveBroadcast(billingWorkspace, {
       contact_id: currentAttempt.contact_id,
       status: String(underCaseData.call_status ?? ""),
     });
@@ -80,35 +67,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       logger.debug("Skipping outreach disposition transition", {
         currentDisposition,
         nextDisposition,
-      });
-    }
-  }
-
-  const statusStr = String(underCaseData.call_status ?? "");
-  if (
-    TERMINAL_CALL_STATUSES.includes(
-      statusStr as (typeof TERMINAL_CALL_STATUSES)[number],
-    )
-  ) {
-    if (billingWorkspace) {
-      const duration = Math.max(
-        Number(underCaseData.duration) || 0,
-        Number(underCaseData.call_duration) || 0,
-      );
-      const campaignType = currentAttempt?.campaign?.type ?? null;
-      const billingKind = voiceBillingKindFromCampaignType(campaignType);
-      const billingUnits = billingUnitsFromCallDurationSeconds(duration, billingKind);
-      const note = currentAttempt
-        ? `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${outreachAttemptId}`
-        : `Call ${updateData.sid} (API/staffed dial)`;
-      await insertTransactionHistoryIdempotent({
-        workspaceId: billingWorkspace,
-        type: "DEBIT",
-        amount: debitAmountFromCredits(billingUnits),
-        note,
-        idempotencyKey: callKey(updateData.sid, billingKind),
-        callSid: updateData.sid,
-        campaignId: callRow.campaign_id ?? null,
       });
     }
   }

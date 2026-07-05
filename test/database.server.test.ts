@@ -6,6 +6,7 @@ vi.hoisted(() => {
 });
 
 import { asRouteResponse, normalizeRouteResult } from "./helpers/route-result";
+import { findActiveConferenceIdsForUser, findCallsByConferenceId } from "@/lib/telephony-db.server";
 
 const loggerMocks = vi.hoisted(() => {
   return { error: vi.fn() };
@@ -112,6 +113,11 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcCancelMessages: vi.fn(async () => ({})),
 }));
 
+vi.mock("@/lib/telephony-db.server", () => ({
+  findActiveConferenceIdsForUser: vi.fn(async () => ["u1~00000000-0000-0000-0000-000000000000"]),
+  findCallsByConferenceId: vi.fn(async () => []),
+}));
+
 vi.mock("twilio", () => {
   class TwilioClientMock {
     constructor() {
@@ -142,6 +148,8 @@ describe("database.server helpers", () => {
     adminDbMocks.messageQueryError = null;
     adminDbMocks.messageSelectCalls = 0;
     adminDbMocks.nextQueryKind = "message";
+    vi.mocked(findActiveConferenceIdsForUser).mockReset();
+    vi.mocked(findCallsByConferenceId).mockReset();
     vi.resetModules();
   });
 
@@ -319,8 +327,16 @@ describe("database.server helpers", () => {
   test("endConferenceByUser completes conferences and attempts to hang up calls, logging per-call/per-conf failures", async () => {
     const mod = await import("../app/lib/database.server");
 
-    adminDbMocks.nextQueryKind = "call";
-    adminDbMocks.callRows = [{ sid: "CA1" }, { sid: "CA2" }];
+    vi.mocked(findActiveConferenceIdsForUser).mockResolvedValueOnce([
+      "CONF_BAD",
+      "CONF_OK",
+    ]);
+    vi.mocked(findCallsByConferenceId)
+      .mockResolvedValueOnce([
+        { sid: "CA1", outreach_attempt_id: 1, contact_id: 1 },
+        { sid: "CA2", outreach_attempt_id: 2, contact_id: 2 },
+      ])
+      .mockResolvedValueOnce([]);
 
     const callsUpdate = vi
       .fn()
@@ -329,7 +345,7 @@ describe("database.server helpers", () => {
 
     const conferencesUpdate = vi
       .fn()
-      .mockRejectedValueOnce(new Error("conf-update-failed")); // first conf fails -> logged
+      .mockRejectedValueOnce(new Error("conf-update-failed")); // CONF_BAD fails -> logged
 
     twilioMocks.instance = {
       conferences: Object.assign(
@@ -338,7 +354,9 @@ describe("database.server helpers", () => {
             sid === "CONF_BAD" ? conferencesUpdate : vi.fn(async () => ({})),
         }),
         {
-          list: vi.fn(async () => [{ sid: "CONF_BAD" }, { sid: "CONF_OK" }]),
+          list: vi.fn(async ({ friendlyName }: { friendlyName: string }) => [
+            { sid: friendlyName },
+          ]),
         },
       ),
       calls: (sid: string) => ({
@@ -360,8 +378,8 @@ describe("database.server helpers", () => {
   test("endConferenceByUser logs when call lookup errors for a conference", async () => {
     const mod = await import("../app/lib/database.server");
 
-    adminDbMocks.nextQueryKind = "call";
-    adminDbMocks.callLookupError = new Error("call-select-failed");
+    vi.mocked(findActiveConferenceIdsForUser).mockResolvedValueOnce(["CONF_X"]);
+    vi.mocked(findCallsByConferenceId).mockRejectedValueOnce(new Error("call-select-failed"));
 
     twilioMocks.instance = {
       conferences: Object.assign(

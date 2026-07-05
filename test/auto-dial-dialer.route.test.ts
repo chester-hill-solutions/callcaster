@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
@@ -26,6 +30,7 @@ vi.mock("@/server/tenant-db", () => ({
       insert: (...args: unknown[]) => mocks.callInsert(...args),
       update: (...args: unknown[]) => mocks.callUpdate(...args),
     },
+    execute: vi.fn(async () => []),
   })),
 }));
 
@@ -43,13 +48,13 @@ vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 
 const testState = vi.hoisted(() => ({ client: null as any }));
 
+const claimNextQueueContactMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
+}));
+
 vi.mock("@/lib/db-rpc.server", () => ({
-  rpcAutoDialQueue: async (_db: any) => {
-    const client = testState.client;
-    const result = await client.rpc("auto_dial_queue");
-    if (result?.error) throw result.error;
-    return result?.data?.[0] ?? null;
-  },
   rpcCreateOutreachAttempt: async (_db: any) => {
     const client = testState.client;
     const result = await client.rpc("create_outreach_attempt");
@@ -88,6 +93,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     mocks.callFindFirst.mockResolvedValue(null);
     mocks.callInsert.mockResolvedValue([]);
     mocks.callUpdate.mockResolvedValue([]);
+    claimNextQueueContactMock.mockReset();
     vi.resetModules();
   });
 
@@ -95,20 +101,14 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     const client = makeDbClient();
     testState.client = client;
 
+    claimNextQueueContactMock.mockResolvedValueOnce({
+      queue_id: 1,
+      contact_id: 2,
+      contact_phone: "(555) 555-0100",
+      caller_id: "+15551234567",
+    });
+
     client.rpc.mockImplementation(async (fn: string) => {
-      if (fn === "auto_dial_queue") {
-        return {
-          data: [
-            {
-              queue_id: 1,
-              contact_id: 2,
-              contact_phone: "(555) 555-0100",
-              caller_id: "+15551234567",
-            },
-          ],
-          error: null,
-        };
-      }
       if (fn === "create_outreach_attempt") return { data: 99, error: null };
       if (fn === "dequeue_contact") return { data: {}, error: null };
       throw new Error(`unexpected rpc ${fn}`);
@@ -124,6 +124,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       campaign_id: 1,
       workspace_id: "w1",
       selected_device: "computer",
+      conference_id: "conf-session",
     });
 
     const twilioCallsCreate = vi.fn(async () => ({
@@ -144,20 +145,25 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
     expect(res.status).toEqual(expect.any(Number));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(twilioCallsCreate).toHaveBeenCalled();
+    expect(twilioCallsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://base.example/api/auto-dial/conf-session",
+      }),
+    );
     expect(mocks.callInsert).toHaveBeenCalled();
+    expect(claimNextQueueContactMock).toHaveBeenCalledWith(expect.anything(), 1, "u1");
   });
 
   test("saves call: logs and continues when sid is missing", async () => {
     const client = makeDbClient();
     testState.client = client;
+    claimNextQueueContactMock.mockResolvedValueOnce({
+      queue_id: 1,
+      contact_id: 2,
+      contact_phone: "5555550100",
+      caller_id: "+1555",
+    });
     client.rpc.mockImplementation(async (fn: string) => {
-      if (fn === "auto_dial_queue") {
-        return {
-          data: [{ queue_id: 1, contact_id: 2, contact_phone: "5555550100", caller_id: "+1555" }],
-          error: null,
-        };
-      }
       if (fn === "create_outreach_attempt") return { data: 1, error: null };
       if (fn === "dequeue_contact") return { data: {}, error: null };
       throw new Error(`unexpected rpc ${fn}`);
@@ -186,13 +192,14 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   test("no queued contacts: completes conferences and returns message", async () => {
     const client = makeDbClient();
     testState.client = client;
-    client.rpc.mockResolvedValueOnce({ data: [], error: null }); // auto_dial_queue
+    claimNextQueueContactMock.mockResolvedValueOnce(null);
     mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
       campaign_id: 1,
       workspace_id: "w1",
       selected_device: "computer",
+      conference_id: "conf-session",
     });
 
     const confUpdate = vi.fn(async () => ({}));
@@ -206,17 +213,21 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     const mod = await import("../app/routes/api+/auto-dial/dialer.route");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true, message: "No queued contacts" });
-    expect(confUpdate).toHaveBeenCalled();
+    expect(confUpdate).toHaveBeenCalledTimes(2);
+    expect(mocks.createWorkspaceTwilioInstance.mock.calls[0][0]).toEqual({ workspace_id: "w1" });
   });
 
   test("returns 500-style JSON response when dequeue_contact rpc errors", async () => {
     const client = makeDbClient();
     testState.client = client;
 
+    claimNextQueueContactMock.mockResolvedValueOnce({
+      queue_id: 1,
+      contact_id: 2,
+      contact_phone: "5555550100",
+      caller_id: "+1555",
+    });
     client.rpc.mockImplementation(async (fn: string) => {
-      if (fn === "auto_dial_queue") {
-        return { data: [{ queue_id: 1, contact_id: 2, contact_phone: "5555550100", caller_id: "+1555" }], error: null };
-      }
       if (fn === "create_outreach_attempt") return { data: 1, error: null };
       if (fn === "dequeue_contact") return { data: null, error: new Error("dq") };
       throw new Error(`unexpected rpc ${fn}`);
@@ -246,7 +257,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   test("error formatting: non-Error thrown becomes Unknown error", async () => {
     const client = makeDbClient();
     testState.client = client;
-    client.rpc.mockRejectedValueOnce("nope");
+    claimNextQueueContactMock.mockRejectedValueOnce("nope");
     mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
       user_id: "u1",
@@ -264,9 +275,11 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   test("normalizePhoneNumber throws invalid length (covered by catch)", async () => {
     const client = makeDbClient();
     testState.client = client;
-    client.rpc.mockResolvedValueOnce({
-      data: [{ queue_id: 1, contact_id: 2, contact_phone: "+123", caller_id: "+1555" }],
-      error: null,
+    claimNextQueueContactMock.mockResolvedValueOnce({
+      queue_id: 1,
+      contact_id: 2,
+      contact_phone: "+123",
+      caller_id: "+1555",
     });
     mocks.createClient.mockReturnValueOnce(client);
     mocks.safeParseJson.mockResolvedValueOnce({
@@ -282,19 +295,14 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid phone number length" });
   });
 
-  test("helper exports cover remaining branches (normalization, rpc throws, and call persistence shaping)", async () => {
+  test("helper exports cover remaining branches (normalization, claim throws, and call persistence shaping)", async () => {
     const helpers = await import("../app/routes/api+/auto-dial/dialer.action.server");
 
     // normalizePhoneNumber: + in middle triggers plus removal and minLength else-path
     expect(helpers.normalizePhoneNumber("1+5555550100")).toBe("+15555550100");
 
-    // getNextContact: throws when rpc returns error
-    testState.client = {
-      rpc: vi.fn(async (fn: string) => {
-        if (fn === "auto_dial_queue") return { data: [], error: new Error("q") };
-        return { data: null, error: null };
-      }),
-    };
+    // getNextContact: throws when claim returns error
+    claimNextQueueContactMock.mockRejectedValueOnce(new Error("q"));
     await expect(helpers.getNextContact(1, "u1")).rejects.toThrow("q");
 
     // createOutreachAttempt: throws when rpc returns error
@@ -346,6 +354,67 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
       "Error saving the call to the database:",
       expect.any(Error),
     );
+  });
+
+  test("concurrency: only one of two simultaneous requests dials a contact", async () => {
+    const client = makeDbClient();
+    testState.client = client;
+
+    let claimCount = 0;
+    claimNextQueueContactMock.mockImplementation(async () => {
+      claimCount += 1;
+      // Only the first concurrent claim succeeds.
+      if (claimCount === 1) {
+        return {
+          queue_id: 1,
+          contact_id: 2,
+          contact_phone: "+15555550100",
+          caller_id: "+15551234567",
+        };
+      }
+      return null;
+    });
+
+    client.rpc.mockImplementation(async (fn: string) => {
+      if (fn === "create_outreach_attempt") return { data: 1, error: null };
+      if (fn === "dequeue_contact") return { data: {}, error: null };
+      throw new Error(`unexpected rpc ${fn}`);
+    });
+    mocks.createClient.mockReturnValue(client);
+
+    const twilioCallsCreate = vi.fn(async () => ({
+      sid: "CA1",
+      from: "+15551234567",
+      status: "queued",
+      dateUpdated: new Date(0),
+    }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+      calls: { create: twilioCallsCreate },
+      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
+    });
+
+    mocks.safeParseJson.mockResolvedValue({
+      user_id: "u1",
+      campaign_id: 1,
+      workspace_id: "w1",
+      selected_device: "computer",
+      conference_id: "conf-session",
+    });
+
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
+    const [res1, res2] = await Promise.all([
+      asRouteResponse(await mod.action({
+        request: new Request("http://localhost/api/auto-dial/dialer", { method: "POST" }),
+      } as any)),
+      asRouteResponse(await mod.action({
+        request: new Request("http://localhost/api/auto-dial/dialer", { method: "POST" }),
+      } as any)),
+    ]);
+
+    await expect(res1.json()).resolves.toEqual({ success: true });
+    await expect(res2.json()).resolves.toEqual({ success: true, message: "No queued contacts" });
+    expect(twilioCallsCreate).toHaveBeenCalledTimes(1);
+    expect(claimNextQueueContactMock).toHaveBeenCalledTimes(2);
   });
 });
 

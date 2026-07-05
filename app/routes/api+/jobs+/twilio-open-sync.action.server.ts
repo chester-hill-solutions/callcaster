@@ -5,9 +5,15 @@ import type { ActionFunctionArgs } from "react-router";
 
 /**
  * HTTP endpoint for the twilio-open-sync periodic sweep.
- * Called by pg_cron via `net.http_post` (with Authorization: Bearer header).
+ * Called by pg_cron via `net.http_post` (with x-cron-secret header).
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const cronSecret = process.env.CRON_SECRET;
+  const headerSecret = request.headers.get("x-cron-secret");
+  if (!cronSecret || headerSecret !== cronSecret) {
+    return routeData({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
   const callLimit = typeof body.callLimit === "number" ? body.callLimit : 50;

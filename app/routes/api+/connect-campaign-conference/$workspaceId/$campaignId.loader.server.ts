@@ -1,6 +1,6 @@
 import {
   twilioWebhookForbidden,
-  validateTwilioWebhookForWorkspace,
+  requireTwilioSignature,
 } from "@/lib/twilio-webhook.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import type { LoaderFunctionArgs } from "react-router";
@@ -13,13 +13,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return twilioWebhookForbidden("Missing workspace or campaign");
   }
 
-  const validation = await validateTwilioWebhookForWorkspace({
-    request,
-    workspaceId,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { workspaceId });
+  if (forbidden) return forbidden;
 
   const campaign = await findCampaignInWorkspace(workspaceId, Number(campaignId));
 

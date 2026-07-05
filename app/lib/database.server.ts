@@ -177,6 +177,10 @@ import { call as callTable, message as messageTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
 import {
+  findActiveConferenceIdsForUser,
+  findCallsByConferenceId,
+} from "@/lib/telephony-db.server";
+import {
   rpcCancelMessages,
   rpcCancelOutreachAttemptsByCallIds,
 } from "@/lib/db-rpc.server";
@@ -194,29 +198,30 @@ export async function endConferenceByUser({
   if (!user_id) {
     throw new Error("User ID is required");
   }
-  const conferences = await twilio.conferences.list({
-    friendlyName: user_id,
-    status: "in-progress",
-  });
+
+  const conferenceIds = await findActiveConferenceIdsForUser(workspace_id, user_id);
 
   await Promise.all(
-    conferences.map(async (conf) => {
+    conferenceIds.map(async (conferenceId) => {
       try {
-        await twilio.conferences(conf.sid).update({ status: "completed" });
+        if (conferenceId.startsWith("CF")) {
+          await twilio.conferences(conferenceId).update({ status: "completed" });
+        } else {
+          const conferences = await twilio.conferences.list({
+            friendlyName: conferenceId,
+            status: "in-progress",
+          });
+          await Promise.all(
+            conferences.map(({ sid }) =>
+              twilio.conferences(sid).update({ status: "completed" }),
+            ),
+          );
+        }
 
-        const { data, error } = await adminDb
-          .select({ sid: callTable.sid })
-          .from(callTable)
-          .where(eq(callTable.conference_id, conf.sid))
-          .then((rows) => ({ data: rows, error: null as null }))
-          .catch((lookupError) => ({
-            data: null as null,
-            error: lookupError as Error,
-          }));
-        if (error) throw error;
+        const calls = await findCallsByConferenceId(workspace_id, conferenceId);
 
         await Promise.all(
-          data.map(async (call) => {
+          calls.map(async (call) => {
             try {
               await twilio
                 .calls(call.sid)
@@ -227,7 +232,7 @@ export async function endConferenceByUser({
           }),
         );
       } catch (confError) {
-        logger.error(`Error updating conference ${conf.sid}:`, confError);
+        logger.error(`Error updating conference ${conferenceId}:`, confError);
       }
     }),
   );

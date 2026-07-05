@@ -24,6 +24,10 @@ export type VoiceBillingKind = "ivr" | "staffed";
 /**
  * Terminal call statuses that trigger a per-minute debit.
  * Canonical set — reconciliation must use the same set as the debit gate.
+ *
+ * The actual debit gate also requires a non-zero duration so that
+ * failed/busy/no-answer calls (which never connect and therefore have no
+ * billable duration) are not charged for staffed or IVR calls.
  */
 export const TERMINAL_BILLABLE_CALL_STATUSES = [
   "completed",

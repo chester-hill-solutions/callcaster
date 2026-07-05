@@ -1,8 +1,10 @@
 import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -124,23 +126,32 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
     return new Response("Missing CallSid parameter", { status: 400 });
   }
 
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    callSid,
-    params: formParams,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { callSid });
+  if (forbidden) return forbidden;
 
   try {
+    const call = await findCallBySid(callSid);
+    if (!call?.workspace) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+    if (call.campaign_id !== Number(campaignId)) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
     const campaignData = await fetchCampaignWithScript(campaignId);
     const script = ivrScriptStepsFromCampaign(campaignData) as Script;
     if (!script || !script.blocks || !script.pages) {
       throw new Error("Invalid script structure");
     }
     const workspace = campaignData.workspace as string;
-    const currentBlock = script.blocks[blockId];
+    const currentPage = script.pages[pageId];
+    const currentBlock = currentPage?.blocks.includes(blockId)
+      ? script.blocks[blockId]
+      : undefined;
 
     if (currentBlock) {
       await handleBlock(

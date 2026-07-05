@@ -551,21 +551,41 @@ export async function getUserRole({
   }
 }
 
+const WORKSPACE_ROLE_RANK: Record<string, number> = {
+  owner: 4,
+  admin: 3,
+  member: 2,
+  caller: 1,
+};
+
+function hasMinRole(
+  role: string | undefined,
+  minRole: string | undefined,
+): boolean {
+  if (!minRole) return true;
+  if (!role) return false;
+  return (WORKSPACE_ROLE_RANK[role] ?? 0) >= (WORKSPACE_ROLE_RANK[minRole] ?? 0);
+}
+
 /**
  * Verify that the user is a member of the workspace. Non-members get a uniform
  * 404 (not 403) so a caller cannot infer whether a workspace id exists
  * (ADR-0004). Use as defense-in-depth when workspace_id comes from a request
  * body. Use `requireWorkspaceLoaderContext` / `withWorkspaceApi*` for
  * role-gated access.
+ *
+ * Pass `{ minRole: "admin" }` to require the user be an owner or admin.
  */
 export async function requireWorkspaceAccess({
   user,
   workspaceId,
   tdb,
+  minRole,
 }: {
   user: { id: string };
   workspaceId: string;
   tdb?: TenantDb;
+  minRole?: "owner" | "admin" | "member" | "caller" | string;
   null?: never;
 }): Promise<void> {
   const role = await getUserRole({
@@ -577,6 +597,9 @@ export async function requireWorkspaceAccess({
     throw new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND);
   }
   if (!["owner", "admin", "member", "caller"].includes(role.role)) {
+    throw new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN);
+  }
+  if (!hasMinRole(role.role, minRole)) {
     throw new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN);
   }
 }

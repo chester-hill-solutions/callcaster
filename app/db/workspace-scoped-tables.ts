@@ -6,6 +6,7 @@ import {
   audience_upload,
   call,
   campaign,
+  campaign_queue,
   contact,
   handset_session,
   households,
@@ -30,10 +31,11 @@ import {
  *
  * `createTenantDb(workspaceId)` auto-scopes each of these tables on every
  * read/update/delete and auto-injects the tenancy column on every insert (ADR-0004).
- * Count: 22 tables after Phase 1 schema transform (vestigial/subtype tables removed).
+ * Count: 23 tables after Phase 1 schema transform (vestigial/subtype tables removed).
  */
 export const WORKSPACE_SCOPED_TABLES = {
   campaign: { table: campaign, workspaceColumn: campaign.workspace },
+  campaign_queue: { table: campaign_queue, workspaceColumn: campaign_queue.workspace },
   contact: { table: contact, workspaceColumn: contact.workspace },
   audience: { table: audience, workspaceColumn: audience.workspace },
   audience_upload: { table: audience_upload, workspaceColumn: audience_upload.workspace },

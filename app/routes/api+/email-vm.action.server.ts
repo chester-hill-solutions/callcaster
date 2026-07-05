@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { Resend } from "resend";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { findWorkspaceNumberVoicemailContextByPhone } from "@/lib/inbound-call-db.server";
 import {
   findCallBySid,
@@ -17,7 +17,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const resend = new Resend(env.RESEND_API_KEY());
 
   try {
-    const formData = await request.formData();
+    const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const recordingUrl = params.RecordingUrl;
     const callSid = params.CallSid;
@@ -32,14 +32,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Missing or invalid CallSid");
     }
 
-    const validation = await validateTwilioWebhookForCallSid({
-      request,
-      callSid,
-      params,
-    });
-    if (!validation.ok) {
-      return validation.response;
-    }
+    const forbidden = await requireTwilioSignature(request, { callSid });
+    if (forbidden) return forbidden;
 
     const callRow = await findCallBySid(callSid);
 

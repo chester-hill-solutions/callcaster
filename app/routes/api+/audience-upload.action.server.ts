@@ -13,6 +13,8 @@ import {
   findAudienceInWorkspace,
   markAudienceUpdating,
 } from "@/lib/audience-upload-db.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
+import { AppError } from "@/lib/errors.server";
 import type { Database } from "@/lib/db-types";
 
 interface StorageBucket {
@@ -48,6 +50,10 @@ type AudienceUploadDeps = Partial<{
     user: { id: string } | null;
   }>;
   processAudienceUpload: typeof processAudienceUpload;
+  requireWorkspaceAccess: (args: {
+    user: { id: string };
+    workspaceId: string;
+  }) => Promise<void>;
 }>;
 
 export const action = async ({
@@ -61,6 +67,7 @@ export const action = async ({
   const d = {
     verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
     processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
+    requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
   };
   const { headers, user } = await d.verifyAuth(request);
   
@@ -98,6 +105,10 @@ export const action = async ({
   }
 
   try {
+    if (user) {
+      await d.requireWorkspaceAccess({ user, workspaceId });
+    }
+
     // If audienceId is provided, use it; otherwise create a new audience
     let finalAudienceId: number;
     
@@ -178,6 +189,9 @@ export const action = async ({
 
   } catch (error) {
     logger.error("Upload request error:", error);
+    if (error instanceof AppError) {
+      return routeData({ error: error.message }, { status: error.statusCode, headers });
+    }
     return routeData({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500, headers });

@@ -1,14 +1,13 @@
 FROM oven/bun:1.2-bookworm-slim
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN bun install --frozen-lockfile || bun install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
 
-COPY . .
+COPY app ./app
+COPY shared ./shared
+COPY worker ./worker
 
-ENV WORKER_MODE=server
-ENV WORKER_PORT=3100
-
-EXPOSE 3100
+ENV NODE_ENV=production
 
 CMD ["bun", "worker/index.ts"]

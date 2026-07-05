@@ -1,7 +1,8 @@
 // Hand-maintained Drizzle schema — update when client/migrations/*.sql changes
 
 import {
-  pgTable, text, integer, boolean, timestamp, jsonb, uuid, serial, smallint, pgEnum,
+  pgTable, text, integer, bigint, boolean, timestamp, jsonb, uuid, serial, smallint, pgEnum,
+  uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -46,16 +47,20 @@ export const workspace_users = pgTable("workspace_users", {
   workspace_id: uuid().notNull(),
 });
 
-export const workspace_api_key = pgTable("workspace_api_key", {
-  id: text().notNull().primaryKey(),
-  workspace_id: uuid().notNull(),
-  name: text().notNull(),
-  key_prefix: text().notNull(),
-  key_hash: text().notNull(),
-  created_by: uuid(),
-  created_at: text().notNull(),
-  last_used_at: text(),
-});
+export const workspace_api_key = pgTable(
+  "workspace_api_key",
+  {
+    id: text().notNull().primaryKey(),
+    workspace_id: uuid().notNull(),
+    name: text().notNull(),
+    key_prefix: text().notNull(),
+    key_hash: text().notNull(),
+    created_by: uuid(),
+    created_at: text().notNull(),
+    last_used_at: text(),
+  },
+  (table) => [uniqueIndex("workspace_api_key_key_prefix_unique").on(table.key_prefix)],
+);
 
 export const workspace_invite = pgTable("workspace_invite", {
   created_at: text().notNull(),
@@ -117,25 +122,30 @@ export const campaign_audience = pgTable("campaign_audience", {
   created_at: text().notNull(),
 });
 
-export const campaign_queue = pgTable("campaign_queue", {
-  assigned_to_user_id: uuid(),
-  attempt_count: integer().notNull(),
-  attempts: integer().notNull(),
-  campaign_id: serial().notNull(),
-  claimed_at: text(),
-  contact_id: serial().notNull(),
-  created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
-  last_attempt_at: text(),
-  last_attempt_error: text(),
-  provider_status: text(),
-  queue_order: integer(),
-  queue_state: text(),
-  status: text(),
-  dequeued_by: uuid(),
-  dequeued_at: text(),
-  dequeued_reason: text(),
-});
+export const campaign_queue = pgTable(
+  "campaign_queue",
+  {
+    assigned_to_user_id: uuid(),
+    attempt_count: integer().notNull(),
+    attempts: integer().notNull(),
+    campaign_id: serial().notNull(),
+    claimed_at: text(),
+    contact_id: serial().notNull(),
+    created_at: text().notNull(),
+    id: serial().notNull().primaryKey(),
+    last_attempt_at: text(),
+    last_attempt_error: text(),
+    provider_status: text(),
+    queue_order: integer(),
+    queue_state: text(),
+    status: text(),
+    dequeued_by: uuid(),
+    dequeued_at: text(),
+    dequeued_reason: text(),
+    workspace: uuid().notNull(),
+  },
+  (table) => [unique("campaign_queue_campaign_contact_unique").on(table.campaign_id, table.contact_id)],
+);
 
 export const script = pgTable("script", {
   created_at: text().notNull(),
@@ -270,6 +280,7 @@ export const call = pgTable("call", {
   to_formatted: text(),
   trunk_sid: text(),
   uri: text(),
+  user_id: uuid(),
   workspace: uuid(),
 });
 
@@ -409,6 +420,9 @@ export const transaction_history = pgTable("transaction_history", {
   note: text(),
   type: text().notNull(),
   workspace: uuid().notNull(),
+  campaign_id: bigint({ mode: "number" }),
+  call_sid: text(),
+  message_sid: text(),
 });
 
 // ─── Survey ──────────────────────────────────────
@@ -454,17 +468,21 @@ export const question_option = pgTable("question_option", {
   created_at: text().notNull(),
 });
 
-export const survey_response = pgTable("survey_response", {
-  id: serial().notNull().primaryKey(),
-  survey_id: serial().notNull(),
-  result_id: text().notNull(),
-  contact_id: serial(),
-  started_at: text().notNull(),
-  completed_at: text(),
-  last_page_completed: text(),
-  created_at: text().notNull(),
-  updated_at: text().notNull(),
-});
+export const survey_response = pgTable(
+  "survey_response",
+  {
+    id: serial().notNull().primaryKey(),
+    survey_id: serial().notNull(),
+    result_id: text().notNull(),
+    contact_id: serial(),
+    started_at: text().notNull(),
+    completed_at: text(),
+    last_page_completed: text(),
+    created_at: text().notNull(),
+    updated_at: text().notNull(),
+  },
+  (table) => [uniqueIndex("survey_response_survey_result_unique").on(table.survey_id, table.result_id)],
+);
 
 export const response_answer = pgTable("response_answer", {
   id: serial().notNull().primaryKey(),
@@ -521,8 +539,18 @@ export const job = pgTable("job", {
   user_id: uuid(),
   idempotency_key: text(),
   error: text(),
+  error_message: text(),
   result: jsonb(),
+  claimed_by: text(),
   claimed_until: timestamp({ withTimezone: true, mode: "string" }),
+  attempt_count: integer().default(0),
+  max_attempts: integer().default(3),
+  retry_at: timestamp({ withTimezone: true, mode: "string" }),
+  progress: integer(),
+  started_at: timestamp({ withTimezone: true, mode: "string" }),
+  completed_at: timestamp({ withTimezone: true, mode: "string" }),
+  failed_at: timestamp({ withTimezone: true, mode: "string" }),
+  dead_letter_reason: text(),
   created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
   updated_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
 });
@@ -563,6 +591,7 @@ export const householdsRelations = relations(households, ({ one }) => ({
 
 export const campaign_queueRelations = relations(campaign_queue, ({ one }) => ({
   campaign: one(campaign, { fields: [campaign_queue.campaign_id], references: [campaign.id] }),
+  workspace: one(workspace, { fields: [campaign_queue.workspace], references: [workspace.id] }),
 }));
 
 export const campaign_audienceRelations = relations(campaign_audience, ({ one }) => ({

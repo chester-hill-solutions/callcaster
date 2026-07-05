@@ -3,16 +3,12 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const twilioWebhookMocks = vi.hoisted(() => ({
-  validateTwilioWebhookForCallSid: vi.fn(async () => ({
-    ok: true as const,
-    params: {},
-    authToken: "tok",
-  })),
+  requireTwilioSignature: vi.fn(async () => (null)),
 }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...args: any[]) =>
-    twilioWebhookMocks.validateTwilioWebhookForCallSid(...args),
+  requireTwilioSignature: (...args: any[]) =>
+    twilioWebhookMocks.requireTwilioSignature(...args),
 }));
 
 const telephonyDbMocks = vi.hoisted(() => ({
@@ -83,12 +79,8 @@ function setCurrentAttempt(attempt: Record<string, unknown> | null) {
 describe("app/routes/api+/call/route-status.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockReset();
-    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValue({
-      ok: true,
-      params: {},
-      authToken: "tok",
-    });
+    twilioWebhookMocks.requireTwilioSignature.mockReset();
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValue(null);
     telephonyDbMocks.findCallBySid.mockReset();
     telephonyDbMocks.findCallBySid.mockResolvedValue(null);
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
@@ -101,12 +93,9 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   });
 
   test("rejects invalid Twilio signature", async () => {
-    twilioWebhookMocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
@@ -114,18 +103,14 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     expect(res.status).toBe(403);
   });
 
-  test("returns 500 when call upsert fails", async () => {
+  test("throws when call upsert fails", async () => {
     setUpsertRow(null);
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
-    } as any));
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ success: false });
-    expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error updating call:",
-      expect.any(Object),
-    );
+    await expect(
+      mod.action({
+        request: makeReq({ CallSid: "CA1", CallStatus: "completed", Workspace: "w1", OutreachAttemptId: "10" }),
+      } as any),
+    ).rejects.toThrow("Failed to upsert call CA1");
   });
 
   test("uses workspace authToken when present", async () => {
@@ -143,14 +128,13 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       workspace: "w1",
       parent_call_sid: "CA_PARENT",
     });
-    telephonyDbMocks.findCallBySid.mockResolvedValueOnce({ workspace: "w_parent", outreach_attempt_id: 77 });
-    setCurrentAttempt(null);
-    telephonyDbMocks.findOutreachAttemptWithCampaignType.mockRejectedValueOnce(new Error("Failed to fetch current attempt"));
+    telephonyDbMocks.findCallBySid.mockResolvedValue({ workspace: "w_parent", outreach_attempt_id: 77 });
+    telephonyDbMocks.findOutreachAttemptWithCampaignType.mockRejectedValue(new Error("Failed to fetch current attempt"));
 
     const mod = await import("../app/routes/api+/call-status");
     await expect(
       mod.action({
-        request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed" }),
+        request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed", ParentCallSid: "CA_PARENT", Workspace: "w1" }),
       } as any),
     ).rejects.toThrow("Failed to fetch current attempt");
   });
@@ -183,7 +167,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     );
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
+      request: makeReq({ CallSid: "CA1", CallStatus: "busy", Workspace: "w1", OutreachAttemptId: "10" }),
     } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "Failed to update attempt" });
@@ -257,7 +241,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
 
     const mod = await import("../app/routes/api+/call-status");
     const res = await asRouteResponse(await mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u3" }),
+      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u3", Workspace: "w1", OutreachAttemptId: "10" }),
     } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.debug).toHaveBeenCalledWith(

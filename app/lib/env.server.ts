@@ -31,6 +31,10 @@ type EnvConfig = {
   OPENAI_API_KEY?: string;
   VERIFICATION_PHONE_NUMBER?: string;
   TWILIO_VALIDATE_WEBHOOKS?: string;
+  /** Secret used to sign media-stream WebSocket tokens. */
+  MEDIA_STREAM_SECRET?: string;
+  /** Public host of the media-stream Bun service (e.g. media-stream-production.up.railway.app). */
+  MEDIA_STREAM_HOST?: string;
 };
 
 import { REQUIRED_ENV_KEYS, validateRequiredEnv } from "./required-env-keys";
@@ -46,6 +50,8 @@ const optionalEnvVars: (keyof EnvConfig)[] = [
   'S3_BUCKET_AUDIO',
   'S3_BUCKET_MEDIA',
   'S3_BUCKET_EXPORTS',
+  'MEDIA_STREAM_SECRET',
+  'MEDIA_STREAM_HOST',
 ];
 
 /**
@@ -124,6 +130,10 @@ export const env = {
   VERIFICATION_PHONE_NUMBER: () => getEnv('VERIFICATION_PHONE_NUMBER'),
   /** When `false` or `0`, Remix Twilio webhooks skip signature checks (local dev only). */
   TWILIO_VALIDATE_WEBHOOKS: () => getEnv('TWILIO_VALIDATE_WEBHOOKS'),
+  /** Secret used to sign media-stream WebSocket tokens. Defaults to a dev-only value. */
+  MEDIA_STREAM_SECRET: () => getEnv('MEDIA_STREAM_SECRET') ?? 'dev-media-stream-secret-change-me',
+  /** Public host of the media-stream Bun service. Defaults to localhost:3001 for dev. */
+  MEDIA_STREAM_HOST: () => getEnv('MEDIA_STREAM_HOST') ?? 'localhost:3001',
 } as const;
 
 /**

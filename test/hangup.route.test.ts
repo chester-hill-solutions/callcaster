@@ -1,21 +1,21 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
+import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
   return {
-    verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
 
-vi.mock("@/lib/auth.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
-}));
 vi.mock("../app/lib/database.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
@@ -23,12 +23,8 @@ vi.mock("../app/lib/database.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-vi.mock("@/lib/campaign-queue-db.server", () => ({
-  findActiveAssignedQueueForUser: vi.fn(),
-}));
-
 vi.mock("@/lib/telephony-db.server", () => ({
-  findCallConferenceIdForWorkspace: vi.fn(),
+  findCallBySid: vi.fn(),
   updateOutreachDispositionByContactId: vi.fn(),
 }));
 
@@ -36,80 +32,16 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcDequeueContact: vi.fn(),
 }));
 
-import { findActiveAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
-import { findCallConferenceIdForWorkspace, updateOutreachDispositionByContactId } from "@/lib/telephony-db.server";
+import { findCallBySid, updateOutreachDispositionByContactId } from "@/lib/telephony-db.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 
-function makeDbClient(options?: {
-  queueError?: any;
-  rpcError?: any;
-  outreachError?: any;
-  queueRows?: any[];
-  callRecord?: { conference_id: string | null } | null;
-}) {
-  const realtimeSend = vi.fn();
-  const removeChannel = vi.fn();
-  const channelObj = { send: realtimeSend };
-
-  const client: any = {
-    realtime: { channel: (_id: string) => channelObj },
-    removeChannel,
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: options?.callRecord ?? null,
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "campaign_queue") {
-        return {
-          select: () => ({
-            is: async () => ({
-              data:
-                options?.queueRows ??
-                [
-                  {
-                    contact_id: 2,
-                    status: "u1",
-                    assigned_to_user_id: "u1",
-                    dequeued_at: null,
-                    campaign: { group_household_queue: true },
-                  },
-                ],
-              error: options?.queueError ?? null,
-            }),
-          }),
-        };
-      }
-      if (table === "outreach_attempt") {
-        return {
-          update: () => ({
-            eq: () => ({
-              eq: async () => ({
-                data: [],
-                error: options?.outreachError ?? null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error("unexpected table");
-    },
-    rpc: async (_name: string, _args: any) => ({
-      data: {},
-      error: options?.rpcError ?? null,
-    }),
-  };
-
-  return { client, realtimeSend, removeChannel };
+function mockCall(overrides?: Partial<{ workspace: string; contact_id: number | null; conference_id: string | null }>) {
+  vi.mocked(findCallBySid).mockResolvedValueOnce({
+    workspace: "w1",
+    contact_id: 2,
+    conference_id: "u1~00000000-0000-0000-0000-000000000000",
+    ...overrides,
+  } as any);
 }
 
 describe("app/routes/api+/hangup/route.tsx", () => {
@@ -119,8 +51,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.logger.error.mockReset();
-    vi.mocked(findActiveAssignedQueueForUser).mockReset();
-    vi.mocked(findCallConferenceIdForWorkspace).mockReset();
+    vi.mocked(findCallBySid).mockReset();
     vi.mocked(updateOutreachDispositionByContactId).mockReset();
     vi.mocked(rpcDequeueContact).mockReset();
   });
@@ -128,16 +59,12 @@ describe("app/routes/api+/hangup/route.tsx", () => {
   test("hangs up, dequeues, and updates outreach", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({
-      conference_id: "conf",
       workspaceId: "w1",
       callSid: "CA1",
     });
     const callUpdate = vi.fn(async () => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
-    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce({
-      contact_id: 2,
-      group_household_queue: true,
-    });
+    mockCall();
 
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
@@ -148,7 +75,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
 
   test("returns 200 when Twilio returns 21220 (call already ended)", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
+    mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
     const err21220 = new Error("Call is not in-progress. Cannot redirect.") as Error & { code: number };
     err21220.code = 21220;
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
@@ -158,10 +85,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
         },
       }),
     });
-    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce({
-      contact_id: 2,
-      group_household_queue: false,
-    });
+    mockCall();
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
@@ -171,7 +95,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
 
   test("returns 500 when Twilio throws non-21220", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
+    mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({
         update: async () => {
@@ -179,36 +103,50 @@ describe("app/routes/api+/hangup/route.tsx", () => {
         },
       }),
     });
+    mockCall();
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
-  test("returns 200 when no queue entry (handset mode)", async () => {
+  test("returns 404 when call not found in workspace", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "conf", workspaceId: "w1", callSid: "CA1" });
-    const callUpdate = vi.fn(async () => ({}));
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
-    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce(null);
+    mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
+    vi.mocked(findCallBySid).mockResolvedValueOnce({
+      workspace: "w2",
+      contact_id: 2,
+      conference_id: "u1~00000000-0000-0000-0000-000000000000",
+    } as any);
+    const mod = await import("../app/routes/api+/hangup");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ success: false, message: "Call not found" });
+  });
+
+  test("returns 200 when call has no contact_id", async () => {
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      calls: () => ({ update: async () => ({}) }),
+    });
+    mockCall({ contact_id: null });
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
+    expect(rpcDequeueContact).not.toHaveBeenCalled();
+    expect(updateOutreachDispositionByContactId).not.toHaveBeenCalled();
   });
 
   test("outreach update error is thrown and returns 500", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
+    mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    vi.mocked(findActiveAssignedQueueForUser).mockResolvedValueOnce({
-      contact_id: 2,
-      group_household_queue: false,
-    });
+    mockCall();
     vi.mocked(updateOutreachDispositionByContactId).mockRejectedValueOnce(new Error("outreach"));
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 });
-

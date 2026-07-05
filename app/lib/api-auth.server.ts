@@ -7,7 +7,7 @@ import {
   touchWorkspaceApiKeyLastUsed,
 } from "@/lib/workspace-members-db.server";
 
-const KEY_PREFIX_LENGTH = 10;
+const KEY_PREFIX_LENGTH = 24;
 
 function hashApiKey(key: string): string {
   return createHash("sha256").update(key, "utf8").digest("hex");

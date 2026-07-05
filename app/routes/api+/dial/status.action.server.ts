@@ -1,7 +1,7 @@
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import {
@@ -26,16 +26,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
   const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
 
-  try {
-    const validation = await validateTwilioWebhookForCallSid({
-      request,
-      callSid,
-      params,
-    });
-    if (!validation.ok) {
-      return validation.response;
-    }
+  const forbidden = await requireTwilioSignature(request, { callSid });
+  if (forbidden) return forbidden;
 
+  try {
     const dbCall = await findCallBySid(callSid);
     if (!dbCall?.workspace) {
       return routeData({ success: false, error: "Call not found" });

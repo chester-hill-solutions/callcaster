@@ -7,6 +7,6 @@ export async function action({ request }: ActionFunctionArgs) {
     return jsonError("Method not allowed", 405);
   }
 
-  await signOutUser(request);
-  return jsonResponse({ success: true }, 200);
+  const headers = await signOutUser(request);
+  return jsonResponse({ success: true }, 200, headers);
 }

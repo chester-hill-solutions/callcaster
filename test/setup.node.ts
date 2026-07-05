@@ -21,6 +21,8 @@ beforeEach(() => {
   process.env.S3_ACCESS_KEY_ID ??= "test-access-key";
   process.env.S3_SECRET_ACCESS_KEY ??= "test-secret-key";
   process.env.S3_BUCKET ??= "callcaster-test";
+  process.env.MEDIA_STREAM_SECRET ??= "test-media-stream-secret";
+  process.env.MEDIA_STREAM_HOST ??= "localhost:3001";
 });
 
 vi.stubGlobal(

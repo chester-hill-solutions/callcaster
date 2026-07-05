@@ -11,15 +11,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
 
   const newWorkspaceName = formData.get("newWorkspaceName") as string;
-  const userId = formData.get("userId") as string;
 
-  if (!newWorkspaceName || !userId) {
-    return { error: "Workspace name or User Id missing!" };
+  if (!newWorkspaceName) {
+    return { error: "Workspace name missing!" };
   }
 
   const { data: newWorkspaceId, error, provisioningWarning } = await createNewWorkspace({
     workspaceName: newWorkspaceName,
-    user_id: userId,
+    user_id: user.id,
   });
   if (error) {
     logger.error("Error creating workspace:", error);

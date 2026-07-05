@@ -1,3 +1,6 @@
+import { resolve } from "node:dns/promises";
+import { isIP } from "node:net";
+
 /**
  * SSRF guard for server-side outbound fetches to user-supplied URLs (e.g. webhook tests).
  */
@@ -34,7 +37,14 @@ function isPrivateIpv6(host: string): boolean {
   );
 }
 
-export function assertSafeOutboundUrl(rawUrl: string): URL {
+function isPrivateOrMetadataIp(ip: string): boolean {
+  if (ip === "169.254.169.254") return true;
+  if (isIP(ip) === 4) return isPrivateIpv4(ip);
+  if (isIP(ip) === 6) return isPrivateIpv6(ip);
+  return false;
+}
+
+export async function assertSafeOutboundUrl(rawUrl: string): Promise<URL> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -53,8 +63,34 @@ export function assertSafeOutboundUrl(rawUrl: string): URL {
   if (hostname.endsWith(".local") || hostname.endsWith(".internal")) {
     throw new Error("Destination URL host is not allowed");
   }
-  if (isPrivateIpv4(hostname) || isPrivateIpv6(hostname)) {
+
+  if (isIP(hostname)) {
+    if (isPrivateOrMetadataIp(hostname)) {
+      throw new Error("Destination URL host is not allowed");
+    }
+    return parsed;
+  }
+
+  const records: string[] = [];
+  try {
+    records.push(...(await resolve(hostname, "A")));
+  } catch {
+    // host may only have AAAA records
+  }
+  try {
+    records.push(...(await resolve(hostname, "AAAA")));
+  } catch {
+    // host may only have A records
+  }
+
+  if (records.length === 0) {
     throw new Error("Destination URL host is not allowed");
+  }
+
+  for (const ip of records) {
+    if (isPrivateOrMetadataIp(ip)) {
+      throw new Error("Destination URL host is not allowed");
+    }
   }
 
   return parsed;

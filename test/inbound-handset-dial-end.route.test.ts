@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  validateTwilioWebhookForPhoneNumber: vi.fn(),
+  requireTwilioSignature: vi.fn(),
   env: {
     BETTER_AUTH_URL: () => "https://sb.example",
     BETTER_AUTH_SERVICE_KEY: () => "svc",
@@ -20,8 +20,8 @@ const inboundDbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForPhoneNumber: (...args: unknown[]) =>
-    mocks.validateTwilioWebhookForPhoneNumber(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/inbound-call-db.server", () => ({
@@ -71,20 +71,14 @@ function makeRequest(opts?: { called?: string; dialCallStatus?: string }) {
 describe("app/routes/api+/inbound-handset-dial-end", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.validateTwilioWebhookForPhoneNumber.mockReset();
+    mocks.requireTwilioSignature.mockReset();
     inboundDbMocks.findWorkspaceNumberInboundFallbackByPhone.mockReset();
     inboundDbMocks.findWorkspaceNumberInboundFallbackByPhone.mockResolvedValue({
       inbound_action: null,
       inbound_audio: null,
       workspaceId: "w1",
     });
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValue({
-      ok: true,
-      params: { Called: "+15551234567", DialCallStatus: "no-answer" },
-      authToken: "tok",
-      workspaceId: "w1",
-      twilioData: { sid: "AC1", authToken: "tok" },
-    });
+    mocks.requireTwilioSignature.mockResolvedValue(null);
   });
 
   test("returns 405 for non-POST", async () => {
@@ -98,12 +92,9 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
     const res = await asRouteResponse(
       await mod.action({
@@ -114,12 +105,9 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
   });
 
   test("returns 403 when Called is empty", async () => {
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Missing phone number" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Missing phone number" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
     const res = await asRouteResponse(
       await mod.action({ request: makeRequest({ called: "" }) } as never),
@@ -128,12 +116,9 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
   });
 
   test("returns 403 when phone number is not found", async () => {
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
     const res = await asRouteResponse(
       await mod.action({
@@ -170,13 +155,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
   });
 
   test("returns TwiML hangup only when dial completed", async () => {
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValueOnce({
-      ok: true,
-      params: { Called: "+15551234567", DialCallStatus: "completed" },
-      authToken: "tok",
-      workspaceId: "w1",
-      twilioData: { sid: "AC1", authToken: "tok" },
-    });
+    mocks.requireTwilioSignature.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
     const res = await asRouteResponse(await mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "completed" }),

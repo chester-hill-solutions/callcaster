@@ -49,7 +49,7 @@ export default function App() {
     success: string | null;
     error: string | null;
   }> => {
-    const response = await fetch("/api/auth/sign-out", {
+    const response = await fetch("/api/auth/signout", {
       method: "POST",
       credentials: "include",
     });

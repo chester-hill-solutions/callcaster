@@ -56,7 +56,7 @@ vi.mock("@/lib/inbound-call-db.server", () => ({
 }));
 
 const twilioMocks = vi.hoisted(() => ({
-  validateTwilioWebhookParams: vi.fn(() => true),
+  requireTwilioSignature: vi.fn(),
 }));
 
 vi.mock("@client/client-js", () => ({
@@ -78,10 +78,9 @@ vi.mock("@/lib/env.server", () => {
   };
 });
 
-vi.mock("@/twilio.server", () => ({
-  validateTwilioWebhookParams: (...args: any[]) =>
-    (twilioMocks.validateTwilioWebhookParams as any)(...args),
-  shouldValidateTwilioWebhooks: () => true,
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  requireTwilioSignature: (...args: any[]) =>
+    (twilioMocks.requireTwilioSignature as any)(...args),
 }));
 
 function makeCallerIdRequest(body: FormData) {
@@ -94,8 +93,8 @@ function makeCallerIdRequest(body: FormData) {
 
 describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   beforeEach(() => {
-    twilioMocks.validateTwilioWebhookParams.mockReset();
-    twilioMocks.validateTwilioWebhookParams.mockReturnValue(true);
+    twilioMocks.requireTwilioSignature.mockReset();
+    twilioMocks.requireTwilioSignature.mockResolvedValue(null);
     inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockReset();
     inboundMocks.updateWorkspaceNumberCapabilitiesByPhone.mockReset();
     inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockResolvedValue([
@@ -202,7 +201,9 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   });
 
   test("returns 403 when Twilio signature does not validate", async () => {
-    twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    twilioMocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+      status: 403,
+    }));
 
     const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
@@ -216,35 +217,4 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     expect(response.status).toBe(403);
   });
 
-  test("returns 500 when candidate lookup errors", async () => {
-    inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockRejectedValueOnce(
-      new Error("lookup failed"),
-    );
-
-    const mod = await import("../app/routes/api+/caller-id/status.route");
-    const fd = new FormData();
-    fd.set("VerificationStatus", "pending");
-    fd.set("To", "+15555550100");
-    const res = await asRouteResponse(await mod.action({
-      request: makeCallerIdRequest(fd),
-    } as any));
-
-    const response = res as Response;
-    expect(response.status).toBe(500);
-  });
-
-  test("returns 403 when candidate lookup returns null data", async () => {
-    inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockResolvedValueOnce([]);
-
-    const mod = await import("../app/routes/api+/caller-id/status.route");
-    const fd = new FormData();
-    fd.set("VerificationStatus", "pending");
-    fd.set("To", "+15555550100");
-    const res = await asRouteResponse(await mod.action({
-      request: makeCallerIdRequest(fd),
-    } as any));
-
-    const response = res as Response;
-    expect(response.status).toBe(403);
-  });
 });

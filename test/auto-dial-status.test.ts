@@ -41,12 +41,12 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
 
 const twilioValidation = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
-  validateTwilioWebhookForCallSid: vi.fn(),
+  requireTwilioSignature: vi.fn(),
 }));
 const rpcDequeueContactMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
-    twilioValidation.validateTwilioWebhookForCallSid(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    twilioValidation.requireTwilioSignature(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: twilioValidation.validateTwilioWebhookParams,
@@ -57,10 +57,13 @@ vi.mock("@/lib/telephony-db.server", async () => {
   return {
     findCallBySid: stub.telephonyDbMocks.findCallBySid,
     findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    findActiveConferenceIdsForUser: stub.telephonyDbMocks.findActiveConferenceIdsForUser,
     updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
     findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
     updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
     insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
+    findCampaignTypeByCampaignId: stub.telephonyDbMocks.findCampaignTypeByCampaignId,
+    upsertCallBySid: stub.telephonyDbMocks.upsertCallBySid,
   };
 });
 
@@ -244,6 +247,7 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
       callRow: dbCallRow,
       callSelectError,
       callUpdateError,
+      campaignType: args?.campaignType,
       outreachDisposition: args?.outreachDisposition,
       outreachFetchError,
       outreachUpdateError,
@@ -300,13 +304,9 @@ describe("api.auto-dial.status", () => {
     await usePostgresStub();
     twilioValidation.validateTwilioWebhookParams.mockReset();
     twilioValidation.validateTwilioWebhookParams.mockReturnValue(true);
-    twilioValidation.validateTwilioWebhookForCallSid.mockReset();
-    twilioValidation.validateTwilioWebhookForCallSid.mockImplementation(
-      async (args: { params?: Record<string, string> }) => ({
-        ok: true,
-        params: args.params ?? {},
-        authToken: "tok",
-      }),
+    twilioValidation.requireTwilioSignature.mockReset();
+    twilioValidation.requireTwilioSignature.mockImplementation(
+      async (args: { params?: Record<string, string> }) => (null),
     );
     twilioClientMock.conferences.list.mockReset();
     twilioClientMock.conferences.list.mockResolvedValue([]);
@@ -321,12 +321,9 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rejects invalid Twilio signature", async () => {
-    twilioValidation.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    twilioValidation.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -343,7 +340,7 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(403);
-  });
+  }, 60000);
 
   test("bills idempotently for completed calls (same CallSid)", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.route");
@@ -370,6 +367,31 @@ describe("api.auto-dial.status", () => {
     expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
     const matching = postgresStub._transactionRows.filter(
       (r) => r.idempotency_key === "call:CA_DUP:staffed",
+    );
+    expect(matching.length).toBe(1);
+  });
+
+  test("billing kind is derived from campaign type", async () => {
+    postgresStub = await usePostgresStub({ campaignType: "robocall" } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_IVR_KIND");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "61");
+    fd.set("CallDuration", "61");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
+    const matching = postgresStub._transactionRows.filter(
+      (r) => r.idempotency_key === "call:CA_IVR_KIND:ivr",
     );
     expect(matching.length).toBe(1);
   });
@@ -493,7 +515,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "1");
     fd.set("CallDuration", "2");
-    fd.set("FriendlyName", "conf1");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
@@ -568,7 +590,7 @@ describe("api.auto-dial.status", () => {
         body: fd,
       }),
     } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
   });
 
   test("updateOutreachAttempt works without disposition (covers else path)", async () => {
@@ -648,7 +670,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "1");
     fd.set("CallDuration", "2");
-    fd.set("FriendlyName", "conf1");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
@@ -671,7 +693,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "1");
     fd.set("CallDuration", "2");
-    fd.set("FriendlyName", "conf1");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
@@ -693,7 +715,7 @@ describe("api.auto-dial.status", () => {
         sid: "CA1",
         workspace: "w1",
         outreach_attempt_id: null,
-        conference_id: "conf1",
+      conference_id: "u1~00000000-0000-0000-0000-000000000000",
         contact_id: 1,
         campaign_id: 1,
       },

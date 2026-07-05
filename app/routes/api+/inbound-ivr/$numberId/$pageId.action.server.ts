@@ -1,7 +1,9 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrPageContext } from "@/lib/inbound-ivr-db.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -21,19 +23,20 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
     return new Response("Missing required parameters", { status: 400 });
   }
 
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    callSid,
-    params: paramsObj,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const forbidden = await requireTwilioSignature(request, { callSid });
+  if (forbidden) return forbidden;
 
   try {
+    const call = await findCallBySid(callSid);
+    if (!call?.to) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
     const context = await loadInboundIvrPageContext(Number(numberId));
 
-    if (!context) {
+    if (!context || call.to !== context.phoneNumber) {
       twiml.say("There was an error in the IVR flow. Goodbye.");
       twiml.hangup();
       return new Response(twiml.toString(), {

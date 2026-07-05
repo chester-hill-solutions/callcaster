@@ -1,7 +1,8 @@
 import { getSession } from "@/lib/auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
-import { parseActionRequest, removeContactFromAudience } from "@/lib/database.server";
+import { parseActionRequest, removeContactFromAudience, requireWorkspaceAccess } from "@/lib/database.server";
+import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 
 
@@ -10,6 +11,10 @@ export const action = async ({ request }: { request: Request }) => {
     const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
   const { headers } = await getSession(request);
+    const user = getDualAuthUser(auth);
+    if (!user) {
+      return routeData({ error: "Unauthorized" }, { status: 401, headers });
+    }
     const method = request.method;
 
     let response;
@@ -23,6 +28,11 @@ export const action = async ({ request }: { request: Request }) => {
         }
 
         try {
+            const workspaceId = await findAudienceWorkspaceById(audienceId);
+            if (!workspaceId) {
+              return routeData({ error: "Audience not found" }, { status: 404, headers });
+            }
+            await requireWorkspaceAccess({ user, workspaceId });
             response = await removeContactFromAudience(contactId, audienceId);
         } catch (updateError) {
             return createErrorResponse(updateError, "Failed to remove contact from audience", 500);
