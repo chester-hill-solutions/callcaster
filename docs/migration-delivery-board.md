@@ -130,8 +130,8 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3B.1 | `workspace_events` + activity log schema | **Done** | WS-C |
 | 3B.2 | SSE route + pg-realtime package | **Done** | WS-C |
 | 3B.3 | Replace Realtime hooks | **Done** | WS-C |
-| 3C.1 | `job` table schema | Todo | WS-C |
-| 3C.2 | Bun worker service | Todo | WS-C |
+| 3C.1 | `job` table schema | **Done** | `client/migrations/20260704000001_create_job_table.sql` |
+| 3C.2 | Bun worker service | **Done** | `scripts/worker.ts` with claim/process/complete loop |
 | 3C.3 | Port twilio_open_sync handler | **Done** | Remix route `/api/jobs/twilio-open-sync` |
 | 3C.4 | Port number_rental_billing handler | **Done** | Remix route `/api/jobs/number-rental-billing` |
 | 3C.5 | Port billing_reconcile handler | **Done** | Remix route `/api/jobs/billing-reconcile` |

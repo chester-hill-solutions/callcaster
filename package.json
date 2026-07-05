@@ -35,6 +35,7 @@
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "node ./server/index.js",
     "start:bun": "bun run ./server/bun.ts",
+    "worker": "bun run ./scripts/worker.ts",
     "typecheck": "react-router typegen && tsc",
     "typecheck:deno": "node scripts/check-deno-functions.mjs",
     "test": "npm run test:node && npm run test:ui",
