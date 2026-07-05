@@ -157,7 +157,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 4.2 | `npm run test:e2e` 77/77 on review URL | Todo |
 | 4.3 | Scriptkit call + survey paths | **Done** | Survey routes pass 40/40 tests; Scriptkit components typecheck clean |
 | 4.4 | Manual Twilio smoke checklist (plan) | **Done** | `docs/manual-test-plan-zero-supabase.md` exists with 150+ test steps across 14 categories |
-| 4.5 | `tools:api:surface:check` green | Todo |
+| 4.5 | `tools:api:surface:check` green | **Done** |
 
 ---
 

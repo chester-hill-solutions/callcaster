@@ -15,7 +15,7 @@ Interactive specs:
 | `/api/audience-upload` | POST | User API | sessionOnly | yes | `routes/api+/audience-upload.tsx` | `docs/api-data-management.md` | Upload audience CSV with column mapping. |
 | `/api/audiences` | GET, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/audiences.tsx` | `docs/api-data-management.md` |  |
 | `/api/audiodrop` | POST | User API | sessionOnly | yes | `routes/api+/audiodrop.tsx` | `docs/api-telephony-control.md` | Voicemail drop during live call. |
-| `/api/auth/callback` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/callback.route.tsx` | `docs/api-auth-matrix.md` | Supabase auth callback; sets session cookies and redirects. |
+| `/api/auth/callback` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/callback.route.tsx` | `docs/api-auth-matrix.md` | Postgres auth callback; sets session cookies and redirects. |
 | `/api/auto-dial` | POST | User API | sessionOnly | yes | `routes/api+/auto-dial.tsx` | `docs/api-telephony-control.md` | Start auto-dial session for workspace. |
 | `/api/auto-dial/:roomId` | POST | Provider Webhook | providerOnly | no | `routes/api+/auto-dial/$roomId.route.tsx` | `docs/api-webhooks.md` | Twilio conference/AMD TwiML callback. |
 | `/api/auto-dial/dialer` | POST | Internal Trusted | internalOnly | no | `routes/api+/auto-dial/dialer.route.tsx` | `docs/api-internal-unsupported.md` | No user/API-key auth; trusts workspace_id/user_id in JSON body via service role. |
@@ -141,6 +141,13 @@ Interactive specs:
 | `/api/admin/users/:userId` | GET, PATCH | Internal Trusted | internalOnly | yes | `routes/api+/admin+/users+/$userId.route.tsx` | `docs/api-admin.md` |  |
 | `/api/admin/users/:userId/workspaces` | GET, POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/users+/$userId/workspaces.route.tsx` | `docs/api-admin.md` |  |
 | `/api/admin/workspaces/:workspaceId/twilio` | POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/workspaces+/$workspaceId/twilio.route.tsx` | `docs/api-admin.md` |  |
+| `/api/auth/...all` | GET, POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/[...all].route.tsx` | `docs/api-auth-matrix.md` | Better Auth catch-all handler for OAuth callbacks and other auth flows. |
+| `/api/acd-router` | POST | Provider Webhook | internalOnly | yes | `routes/api+/acd-router.route.tsx` | `docs/api-live-operations.md` | Twilio ACD wait URL. |
+| `/api/acd-router/agent-bridge` | POST | Provider Webhook | internalOnly | yes | `routes/api+/acd-router/agent-bridge.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/acd-router/agent-status` | POST | Provider Webhook | internalOnly | yes | `routes/api+/acd-router/agent-status.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/acd-router/complete` | POST | Provider Webhook | internalOnly | yes | `routes/api+/acd-router/complete.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/workspaces/:workspaceId/audiences/:audienceId/uploads` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.route.tsx` | `docs/api-data-plane.md` |  |
+| `/api/workspaces/:workspaceId/events` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/events.route.tsx` | `docs/api-live-operations.md` | SSE stream for workspace events (activity log). |
 
-Total entries: **131**
+Total entries: **138**
 
