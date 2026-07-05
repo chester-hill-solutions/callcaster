@@ -1,34 +1,50 @@
-FROM node:20-bookworm-slim
+# syntax=docker/dockerfile:1
+
+# ─── Build stage ──────────────────────────────────────────────────────
+FROM oven/bun:1.2.15 AS builder
+
 WORKDIR /app
 
-# Add build argument for cache busting (Railway: set RAILWAY_CACHE_BUST env var)
-ARG CACHE_BUST=1
-RUN echo "Cache bust: $CACHE_BUST"
-
-# Copy package files first for better layer caching
-COPY package.json package-lock.json* ./
+# Copy dependency manifests
+COPY package.json bun.lock ./
 
 # Install dependencies
-RUN npm install
-
-# Install ffmpeg for upload-time audio normalization
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg \
-  && rm -rf /var/lib/apt/lists/*
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Clear any existing build artifacts to avoid stale cache issues
-# This ensures fresh builds on Railway (case-sensitive filesystem)
-RUN rm -rf build public/build node_modules/.cache
-
 # Build the application
-RUN npm run build
+RUN bun run build
 
-# Railway automatically provides PORT environment variable
-# Expose default port (Railway will override with their PORT)
+# ─── Production stage ─────────────────────────────────────────────────
+FROM oven/bun:1.2.15-slim AS production
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOST=0.0.0.0
+
+# Copy built assets from builder
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/server ./server
+COPY --from=builder /app/app/lib/required-env-keys.mjs ./app/lib/required-env-keys.mjs
+
+# Copy package files for runtime dependencies
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/bun.lock ./bun.lock
+
+# Install production dependencies only
+RUN bun install --frozen-lockfile --production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/healthz || exit 1
+
+# Expose port
 EXPOSE 3000
 
-# Start the application
-CMD npm start
+# Start with Bun server
+ENTRYPOINT ["bun", "run", "./server/bun.ts"]

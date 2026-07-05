@@ -144,7 +144,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3E.1 | S3/storage adapter | **Done** | S3 adapter (`object-storage.server.ts`) already implemented and used for audio/media/exports |
 | 3E.2 | Bulk Supabase → Railway Buckets copy | **Done** | App code no longer references Supabase Storage; zero `@supabase` imports in app/ |
 | 3E.3 | Wire MinIO local dev | **Done** | `docker-compose.dev.yml` includes MinIO; S3-compatible adapter works with any S3 endpoint |
-| 3F.1 | Bun start script + Dockerfile | Todo | WS-C |
+| 3F.1 | Bun start script + Dockerfile | **Done** | `server/bun.ts` + `Dockerfile` created; `start:bun` script added |
 | 3F.2 | Remove Express + buffer-polyfill | Todo | WS-C |
 
 ---
