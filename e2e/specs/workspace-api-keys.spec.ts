@@ -9,9 +9,9 @@ ownerTest.describe("Workspace API keys @authenticated", () => {
 
   ownerTest("API-02 create key shows reveal banner", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "settings"));
-    await page.getByRole("button", { name: /create.*key|new.*key|add.*key/i }).click();
-    await page.getByLabel(/name/i).fill("E2E Playwright Key");
-    await page.getByRole("button", { name: /create|save/i }).click();
+    await page.getByRole("button", { name: "Create API key" }).click();
+    await page.locator("#api-key-name").fill("E2E Playwright Key");
+    await page.getByRole("button", { name: "Create key" }).click();
     await expect(page.getByTestId("api-key-reveal")).toBeVisible();
   });
 

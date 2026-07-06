@@ -16,6 +16,7 @@ const databaseUrl =
   "postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster";
 
 const steps = [
+  "scripts/e2e/bootstrap-compose-reset.sql",
   "drizzle/0000_baseline.sql",
   "drizzle/0001_auth_uid_shim.sql",
   "drizzle/0002_workspace_events.sql",

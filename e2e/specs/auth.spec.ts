@@ -36,7 +36,7 @@ test.describe("Auth @smoke", () => {
     await signIn.goto();
     await signIn.login(E2E_USERS.authflow.email);
     await page.getByTestId("navbar-user-menu").click();
-    await page.locator("#logoutButton").click();
+    await page.getByText("Log Out").click();
     await expect(page).toHaveURL(/\/\/127\.0\.0\.1:3100\/?$/);
   });
 

@@ -23,6 +23,14 @@ const databaseUrl =
   process.env.DATABASE_URL ??
   "postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster";
 
+const e2eS3Env = {
+  S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000",
+  S3_REGION: process.env.S3_REGION ?? "us-east-1",
+  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ?? "callcaster",
+  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "callcaster-dev-secret",
+  S3_BUCKET: process.env.S3_BUCKET ?? "callcaster",
+};
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: rootDir,
@@ -60,6 +68,10 @@ await (async function waitForPostgres() {
 })();
 console.log("[e2e-compose] Postgres ready");
 
+run("node", ["scripts/e2e/ensure-minio-bucket.mjs"], {
+  env: { ...process.env, ...e2eS3Env },
+});
+
 if (process.env.E2E_SKIP_BOOTSTRAP !== "1") {
   console.log("[e2e-compose] bootstrapping schema…");
   run("node", ["scripts/e2e/bootstrap-compose-db.mjs"], {
@@ -71,14 +83,6 @@ console.log("[e2e-compose] seeding E2E data…");
 run("npm", ["run", "test:e2e:seed"], {
   env: { ...process.env, DATABASE_URL: databaseUrl },
 });
-
-const e2eS3Env = {
-  S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000",
-  S3_REGION: process.env.S3_REGION ?? "us-east-1",
-  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ?? "callcaster",
-  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "callcaster-dev-secret",
-  S3_BUCKET: process.env.S3_BUCKET ?? "callcaster",
-};
 
 if (process.env.E2E_SKIP_BUILD !== "1") {
   console.log("[e2e-compose] building app…");

@@ -269,3 +269,44 @@ ALTER TABLE public.outreach_attempt
 CREATE INDEX IF NOT EXISTS outreach_attempt_issue_tags_idx
   ON public.outreach_attempt USING gin (issue_tags)
   WHERE issue_tags IS NOT NULL;
+
+-- Agent presence (RLS omitted — ADR-0004 app-layer tenancy)
+DO $$ BEGIN
+  CREATE TYPE public.agent_state AS ENUM (
+    'offline', 'available', 'busy', 'wrap_up', 'away'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.agent_status (
+  workspace_id uuid NOT NULL REFERENCES public.workspace(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public."user"(id) ON DELETE CASCADE,
+  status public.agent_state NOT NULL DEFAULT 'offline',
+  status_reason text,
+  status_started_at timestamptz NOT NULL DEFAULT now(),
+  current_queue_entry_id bigint,
+  last_heartbeat_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (workspace_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS agent_status_workspace_status_idx
+  ON public.agent_status(workspace_id, status)
+  WHERE status = 'available';
+
+CREATE TABLE IF NOT EXISTS public.agent_status_event (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  workspace_id uuid NOT NULL REFERENCES public.workspace(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public."user"(id) ON DELETE CASCADE,
+  from_status public.agent_state NOT NULL,
+  to_status public.agent_state NOT NULL,
+  reason text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS agent_status_event_workspace_timing_idx
+  ON public.agent_status_event(workspace_id, created_at DESC);
+
+ALTER TABLE public.call
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES public."user"(id) ON DELETE SET NULL;

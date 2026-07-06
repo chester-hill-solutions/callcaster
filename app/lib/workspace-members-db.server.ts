@@ -200,7 +200,7 @@ export async function upsertWorkspaceWebhookRow(args: {
     updated_at: now,
     updated_by: args.userId,
     custom_headers: args.customHeaders,
-    event: args.events,
+    events: args.events,
   };
 
   if (args.webhookId != null) {

@@ -30,7 +30,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     attempts,
   } = await getCallScreenData(id, workspaceId, user.id);
   if (!workspaceData || !campaign) throw redirect("/signin");
-  const twilioData = JSON.parse(workspaceData.twilio_data) as { sid: string };
+  const rawTwilioData = workspaceData.twilio_data;
+  const twilioData = (
+    typeof rawTwilioData === "string"
+      ? JSON.parse(rawTwilioData)
+      : rawTwilioData
+  ) as { sid: string };
   const queue = await getQueueByDialType(id, campaign.dial_type ?? "", user.id);
   const token = await generateToken({
     twilioAccountSid: twilioData.sid,

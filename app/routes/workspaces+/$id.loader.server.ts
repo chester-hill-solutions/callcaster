@@ -35,6 +35,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       workspaceId: workspaceId as string,
     })
   )?.role;
+
+  if (!userRole) {
+    throw redirect("/workspaces", { headers });
+  }
+
   try {
     const pathname = new URL(request.url).pathname;
     const [onboarding, phoneNumbersResult] = await Promise.all([

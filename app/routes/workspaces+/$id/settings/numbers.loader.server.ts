@@ -50,7 +50,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     workspaceId,
   });
   const hasAccess = userRole?.role !== MemberRole.Caller;
-  if (!hasAccess) return redirect("..");
+  if (!hasAccess) {
+    return redirect(`/workspaces/${workspaceId}/settings`, { headers });
+  }
 
   return routeData(
     {

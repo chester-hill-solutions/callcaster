@@ -185,6 +185,28 @@ async function seed() {
 
   for (const [key, scriptId] of Object.entries(SCRIPT_IDS)) {
     const isLive = key === "live";
+    const liveSteps = {
+      pages: {
+        page1: { id: "page1", title: "Page 1", blocks: ["intro"] },
+      },
+      blocks: {
+        intro: { id: "intro", type: "textarea", title: "Intro", content: "Hello" },
+      },
+    };
+    const ivrSteps = {
+      pages: {
+        page1: { id: "page1", title: "Welcome", blocks: ["welcome"] },
+      },
+      blocks: {
+        welcome: {
+          id: "welcome",
+          type: "synthetic",
+          title: "Welcome",
+          content: "Press 1 for yes",
+          options: [{ digit: "1", next: "page2" }],
+        },
+      },
+    };
     await sql`
       INSERT INTO script (id, workspace, name, type, created_by, steps)
       VALUES (
@@ -193,10 +215,7 @@ async function seed() {
         ${isLive ? "E2E Live Script" : "E2E IVR Script"},
         ${isLive ? "script" : "ivr"},
         ${USERS.owner.id},
-        ${isLive
-          ? [{ type: "textarea", title: "Intro", content: "Hello" }]
-          : [{ type: "synthetic", title: "Welcome", content: "Press 1 for yes", options: [{ digit: "1", next: "page2" }] }]
-        }
+        ${sql.json(isLive ? liveSteps : ivrSteps)}
       )
       ON CONFLICT (id) DO UPDATE SET
         workspace = EXCLUDED.workspace,
