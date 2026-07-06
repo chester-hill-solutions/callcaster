@@ -513,7 +513,7 @@ export const webhook = pgTable("webhook", {
   created_at: text().notNull(),
   custom_headers: jsonb().notNull(),
   destination_url: text().notNull(),
-  event: text().array().notNull(),
+  events: jsonb(),
   id: serial().notNull().primaryKey(),
   type: text(),
   updated_at: text(),

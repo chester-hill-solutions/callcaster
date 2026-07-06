@@ -95,6 +95,7 @@ DO $$ BEGIN
     UNIQUE (campaign_id, contact_id);
 EXCEPTION
   WHEN duplicate_object THEN NULL;
+  WHEN duplicate_table THEN NULL;
 END $$;
 
 CREATE OR REPLACE FUNCTION public.set_campaign_queue_workspace()
@@ -245,3 +246,26 @@ $$;
 CREATE UNIQUE INDEX IF NOT EXISTS campaign_queue_unique_assigned_contact
   ON public.campaign_queue (campaign_id, contact_id)
   WHERE queue_state = 'assigned';
+
+-- ADR-0022: typed voter contact results on outreach_attempt
+ALTER TABLE public.outreach_attempt
+  ADD COLUMN IF NOT EXISTS volunteer_interest text;
+
+ALTER TABLE public.outreach_attempt
+  ADD COLUMN IF NOT EXISTS lawn_sign boolean;
+
+ALTER TABLE public.outreach_attempt
+  ADD COLUMN IF NOT EXISTS vote_by_mail boolean;
+
+ALTER TABLE public.outreach_attempt
+  ADD COLUMN IF NOT EXISTS issue_tags text[];
+
+ALTER TABLE public.outreach_attempt
+  ADD COLUMN IF NOT EXISTS membership_sold boolean;
+
+ALTER TABLE public.outreach_attempt
+  ADD COLUMN IF NOT EXISTS callback_audit boolean;
+
+CREATE INDEX IF NOT EXISTS outreach_attempt_issue_tags_idx
+  ON public.outreach_attempt USING gin (issue_tags)
+  WHERE issue_tags IS NOT NULL;

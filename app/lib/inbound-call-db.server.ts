@@ -106,12 +106,13 @@ export async function findInboundIvrScriptSteps(args: {
 }
 
 export function workspaceWebhookHasInboundCallInsert(
-  webhook: { event: string[] | null | undefined } | null | undefined,
+  webhook: { events: unknown } | null | undefined,
 ): boolean {
-  if (!webhook?.event?.length) {
+  const events = webhook?.events;
+  if (!Array.isArray(events) || events.length === 0) {
     return false;
   }
-  return webhook.event.includes("INSERT");
+  return events.includes("INSERT");
 }
 
 export async function listWorkspaceNumberTwilioCandidatesByPhone(

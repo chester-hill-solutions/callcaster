@@ -356,8 +356,8 @@ export default function WorkspaceSettings() {
                       ? {
                           id: String(webhook.id || ""),
                           destination_url: webhook.destination_url || "",
-                          events: Array.isArray(webhook.event)
-                            ? webhook.event.map((e: string) => ({
+                          events: Array.isArray(webhook.events)
+                            ? (webhook.events as string[]).map((e: string) => ({
                                 category: "inbound_call" as const,
                                 type: e as "INSERT" | "UPDATE",
                               }))

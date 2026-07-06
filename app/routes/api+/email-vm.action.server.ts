@@ -140,7 +140,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     const voicemailWebhook = number.workspace.webhook.filter((webhook) =>
-      webhook.event?.includes("voicemail"),
+      Array.isArray(webhook.events) && (webhook.events as string[]).includes("voicemail"),
     );
     if (voicemailWebhook.length > 0) {
       await sendWebhookNotification({

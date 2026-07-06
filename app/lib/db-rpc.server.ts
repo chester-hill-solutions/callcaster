@@ -229,7 +229,7 @@ export async function rpcFindContactsByPhones(
   if (phoneNumbers.length === 0) return [];
   return queryRows(
     db,
-    sql`select * from find_contacts_by_phones(${phoneNumbers}, ${workspaceId}::uuid)`,
+    sql`select * from find_contacts_by_phones(${workspaceId}::uuid, ${phoneNumbers})`,
   );
 }
 

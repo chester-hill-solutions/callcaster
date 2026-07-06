@@ -121,8 +121,26 @@ const serverEnv = {
   ...e2eS3Env,
 };
 
+function freePort(port) {
+  const result = spawnSync("lsof", ["-ti", `:${port}`], { encoding: "utf8" });
+  const pids = (result.stdout ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const pid of pids) {
+    console.log(`[e2e-compose] freeing port ${port}: killing pid ${pid}`);
+    spawnSync("kill", ["-9", pid], { stdio: "ignore" });
+  }
+}
+
 console.log(`[e2e-compose] starting server on ${baseURL}…`);
+freePort(e2ePort);
 const server = runAsync("node", ["./server/index.js"], serverEnv);
+server.on("exit", (code, signal) => {
+  if (code != null && code !== 0) {
+    console.error(`[e2e-compose] server exited early code=${code} signal=${signal ?? ""}`);
+  }
+});
 
 async function waitForReady(url, attempts = 120) {
   for (let i = 0; i < attempts; i += 1) {
