@@ -1,5 +1,9 @@
 import type { Database } from "@/lib/db-types";
 import {
+  isRcsOnboardingEnabled,
+  RCS_ONBOARDING_ENABLED,
+} from "@/lib/rcs-onboarding-flags";
+import {
   buildOnboardingStepsForState,
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
@@ -17,11 +21,7 @@ import type {
 
 import { isObject } from "@/lib/type-safety-utils";
 
-export const RCS_ONBOARDING_ENABLED = false;
-
-export function isRcsOnboardingEnabled(): boolean {
-  return RCS_ONBOARDING_ENABLED;
-}
+export { RCS_ONBOARDING_ENABLED, isRcsOnboardingEnabled } from "@/lib/rcs-onboarding-flags";
 
 export function stripDisabledRcsChannel(
   channels: WorkspaceOnboardingChannel[],

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Tables } from "@/lib/db-types";
+import type { Tables } from "@/lib/db-types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
 import { Contact, QueueItem, User } from "@/lib/types";
 import { logger } from "@/lib/logger.client";

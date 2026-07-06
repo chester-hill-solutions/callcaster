@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { Database } from "@/lib/db-types";
+import type { Database } from "@/lib/db-types";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
 

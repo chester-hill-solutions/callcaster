@@ -14,7 +14,7 @@ import {
   callPanelHeaderSecondaryClass,
   callPanelShellClass,
 } from "@/components/call/call-panel-classes";
-import { Tables } from "@/lib/db-types";
+import type { Tables } from "@/lib/db-types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

@@ -1,5 +1,5 @@
 import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
-import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
+import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding-flags";
 import type { WorkspaceOnboardingChannel } from "@/lib/types";
 
 export const WIZARD_STEP_META: Array<{

@@ -1,3 +1,7 @@
+import {
+  repointAllWorkspaceTwilioWebhooks,
+  repointWorkspaceTwilioWebhooks,
+} from "@/lib/twilio-webhook-audit.server";
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
 import type { Database } from "@/lib/db-types";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database.server";
@@ -27,6 +31,31 @@ import {
 } from "@/lib/workspace-members-db.server";
 
 type UserRow = Database["public"]["Tables"]["user"]["Row"];
+
+export async function repointAllWorkspacesTwilioWebhooks(): Promise<
+  | { ok: true; results: import("@/lib/twilio-webhook-audit.server").TwilioWebhookRepointResult[] }
+  | { ok: false; error: string }
+> {
+  const result = await repointAllWorkspaceTwilioWebhooks();
+  if (!result.ok) {
+    return result;
+  }
+  return { ok: true, results: result.results };
+}
+
+export async function repointWorkspaceTwilioWebhooksForAdmin(
+  workspaceId: string,
+): Promise<{ ok: true; result: Awaited<ReturnType<typeof repointWorkspaceTwilioWebhooks>> } | { ok: false; error: string }> {
+  try {
+    const result = await repointWorkspaceTwilioWebhooks({ workspaceId });
+    return { ok: true, result };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Failed to repoint webhooks",
+    };
+  }
+}
 
 export async function getAdminDashboard() {
   const [workspaces, users, workspaceUsers, workspaceNumbers, allCampaigns] =

@@ -4,6 +4,7 @@ import {
   boolean,
   timestamp,
   index,
+  integer,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -13,6 +14,7 @@ export const authUser = pgTable("auth_user", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
   image: text("image"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -66,6 +68,27 @@ export const authAccount = pgTable(
   (table) => [index("auth_account_user_id_idx").on(table.userId)],
 );
 
+export const authTwoFactor = pgTable(
+  "auth_two_factor",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "cascade" }),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    verified: boolean("verified").default(false).notNull(),
+    failedVerificationCount: integer("failed_verification_count").default(0).notNull(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("auth_two_factor_user_id_idx").on(table.userId)],
+);
+
 export const authVerification = pgTable("auth_verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
@@ -81,6 +104,14 @@ export const authVerification = pgTable("auth_verification", {
 export const authUserRelations = relations(authUser, ({ many }) => ({
   sessions: many(authSession),
   accounts: many(authAccount),
+  twoFactors: many(authTwoFactor),
+}));
+
+export const authTwoFactorRelations = relations(authTwoFactor, ({ one }) => ({
+  user: one(authUser, {
+    fields: [authTwoFactor.userId],
+    references: [authUser.id],
+  }),
 }));
 
 export const authSessionRelations = relations(authSession, ({ one }) => ({

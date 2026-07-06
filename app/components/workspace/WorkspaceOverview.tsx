@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tables } from "@/lib/db-types";
+import type { Tables } from "@/lib/db-types";
 
 type WorkspaceRecord = (Tables<"workspace"> & { campaign?: unknown[] }) | null;
 type WorkspaceUserRecord = (Tables<"workspace_users"> & { user?: Tables<"user"> | null })[] | null | undefined;

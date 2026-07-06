@@ -3,7 +3,6 @@
 
 import "dotenv/config";
 
-import { execSync } from "node:child_process";
 import { createRequestHandler } from "@react-router/express";
 import { createServer as createViteServer } from "vite";
 import { createApp, createHttpServer, validateEnvironment } from "../../server/index.js";
@@ -16,8 +15,6 @@ let isShuttingDown = false;
 let shutdownPromise = null;
 
 validateEnvironment(process.env);
-
-execSync("npm run build:buffer-polyfill", { stdio: "inherit" });
 
 const vite = await createViteServer({
   appType: "custom",

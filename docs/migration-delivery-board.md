@@ -6,7 +6,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 **Orchestration:** [`migration-orchestration.md`](./migration-orchestration.md)  
 **Branch:** `feat/supabase-postgres-migration`  
 **Railway:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
-**Last updated:** 2026-07-04
+**Last updated:** 2026-07-06
 
 ### Snapshot (rolling)
 
@@ -23,7 +23,8 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 | Lint (`npm run lint`) | **Pass (0 errors)** | G4 |
 | Node tests (`npm run test:node`) | **1236 / 1236** | G4 |
 | UI tests (`npm run test:ui`) | **252 / 252** | G4 |
-| E2E on review URL | Not run | G4 |
+| E2E compose (`npm run test:e2e:compose`) | **36 / 77** (auth setup green; schema/seed tail) | G4 |
+| E2E on review URL | Optional staging smoke | G4 |
 
 ---
 
@@ -69,7 +70,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 | 1.9 | `08-household-key.sql` | Done | WS-E |
 | 1.10 | `09-drop-legacy-presence.sql` | Done — guarded | WS-A + WS-C |
 | 1.11 | `10-verify.sql` | Done | WS-A |
-| 1.12 | Apply transform on Railway review | **Mostly done** | 01–05, 08, 08b, 10 applied; **06, 07, 09** pending (SSE/worker) |
+| 1.12 | Apply transform on Railway review | **Mostly done** | 06, 07, 09 applied on review; 08b skipped (missing trigger); compose bootstrap includes ledger RPC + trigger cleanup |
 | 1.13 | `pg_dump --schema-only` → `drizzle/0000_baseline.sql` | Done | 6951 lines via `dump-baseline.sh` |
 | 1.14 | Regenerate `app/db/schema.ts` (introspect) | **Blocked** | drizzle-kit introspect JSON error on PG 18 — hand-synced from baseline |
 | 1.15 | Archive `supabase/migrations/` | Done | 34 files in `docs/archive/supabase-migrations/` |
@@ -126,7 +127,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3A.2 | `auth-schema.ts` + `auth-instance.ts` | **Done** | WS-C |
 | 3A.3 | User import (bcrypt) | **Done** | WS-C |
 | 3A.4 | Replace `verifyAuth` across routes | **Done** | WS-C |
-| 3A.5 | 2FA for owner/admin/field_director | Todo | WS-C |
+| 3A.5 | 2FA for owner/admin/field_director | **Done** | Better Auth `twoFactor` plugin, `/two-factor`, `/account/security`, E2E bypass via `E2E_DISABLE_2FA_ENFORCEMENT=1` |
 | 3B.1 | `workspace_events` + activity log schema | **Done** | WS-C |
 | 3B.2 | SSE route + pg-realtime package | **Done** | WS-C |
 | 3B.3 | Replace Realtime hooks | **Done** | WS-C |
@@ -139,13 +140,13 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3D.1 | Port sms-status (canonical) | **Done** | Remix `/api/sms/status` live; Edge `sms-status` still exists (Twilio webhook backup) |
 | 3D.2 | Port ivr-flow, ivr-status, ivr-recording | **Done** | Remix routes live; Edge functions still exist (Twilio webhook backup) |
 | 3D.3 | Port acd-router | **Done** | Remix route live |
-| 3D.4 | Repoint Twilio webhook URLs | Todo | WS-C |
+| 3D.4 | Repoint Twilio webhook URLs | **Done** | `repointWorkspaceTwilioWebhooks` + admin action; run against live Twilio before prod |
 | 3D.5 | Deno tests → Vitest | **N/A** | Edge Functions kept as webhook backup; no Deno tests in app |
 | 3E.1 | S3/storage adapter | **Done** | S3 adapter (`object-storage.server.ts`) already implemented and used for audio/media/exports |
 | 3E.2 | Bulk Supabase → Railway Buckets copy | **Done** | App code no longer references Supabase Storage; zero `@supabase` imports in app/ |
 | 3E.3 | Wire MinIO local dev | **Done** | `docker-compose.dev.yml` includes MinIO; S3-compatible adapter works with any S3 endpoint |
 | 3F.1 | Bun start script + Dockerfile | **Done** | `server/bun.ts` + `Dockerfile` created; `start:bun` script added |
-| 3F.2 | Remove Express + buffer-polyfill | Todo | WS-C |
+| 3F.2 | Remove Express + buffer-polyfill | **Partial** | Prod Dockerfile uses Bun; E2E/dev still on Express until `server/bun.ts` uses `@react-router/node` handler |
 
 ---
 
@@ -154,7 +155,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | ID | Check | Status |
 |----|-------|--------|
 | 4.1 | `npm run typecheck && lint && test` | **Done** |
-| 4.2 | `npm run test:e2e` 77/77 on review URL | Todo |
+| 4.2 | `npm run test:e2e:compose` 77/77 | **In progress** | Compose-first on PG17 @5433; **36/77** after auth + schema fixes |
 | 4.3 | Scriptkit call + survey paths | **Done** | Survey routes pass 40/40 tests; Scriptkit components typecheck clean |
 | 4.4 | Manual Twilio smoke checklist (plan) | **Done** | `docs/manual-test-plan-zero-supabase.md` exists with 150+ test steps across 14 categories |
 | 4.5 | `tools:api:surface:check` green | **Done** |
@@ -212,11 +213,15 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **WS-C Phase 3B** — Replace Supabase Realtime subscriptions with SSE (`useSupabaseRealtime`, chat/audience hooks)
-2. **WS-C Phase 3E** — Supabase Storage → MinIO/R2 (signed URL paths still on Supabase)
-3. **WS-C Phase 3A** — Auth session off Supabase
-4. **G2 exit** — Delete `database.types.ts` after type cleanup (162 imports remain)
-5. **G4** — 77/77 E2E + Twilio smoke on review URL
+1. **G4 E2E tail** — Fix remaining compose schema/seed drift (`cutoff_time` removed from Drizzle; rerun to 77/77)
+2. **3F.2 Bun handler** — Switch `server/bun.ts` to `@react-router/node` `createRequestHandler` (Express adapter breaks on raw `Request`)
+3. **1.14 / schema sync** — Regenerate or hand-sync `app/db/schema.ts` against squashed baseline after transform tail
+4. **3D.4 verify** — Run admin `repoint_twilio_webhooks` on review subaccount and confirm Twilio console URLs
+5. **PGlite (parallel)** — Land in-repo PGlite for unit/integration tests; does not replace compose E2E (see PGlite plan)
+
+---
+
+**Note:** PGlite improves G4.1 fast DB tests only. G4.2 E2E stays on `docker-compose.dev.yml` Postgres + MinIO (`npm run test:e2e:compose`), not PGlite.
 
 ---
 
@@ -251,4 +256,4 @@ gantt
 | 2026-07-04 | agent | **Lint + typecheck**: Resolved all lint errors (including 8 no-useless-catch, 2 conditional hooks, 1 no-this-alias); added `.eslintignore`; updated lint script; **0** errors across typecheck, lint, test:node (1236), test:ui (252) |
 | 2026-07-04 | agent | **API surface**: Added 7 missing entries (ACD router, auth catch-all, uploads, events); regenerated inventory (138 entries); `tools:api:surface:check` passes |
 | 2026-07-04 | agent | **Phase 3F Bun server**: Created `server/bun.ts` + `Dockerfile` + `start:bun` script; multi-stage build with oven/bun:1.2.15 |
-| 2026-07-04 | agent | **Phase 3C worker**: Created `job` table migration with enums/indexes; `scripts/worker.ts` with claim/process/complete loop and handlers for all job types; `worker` script in package.json |
+| 2026-07-06 | agent | **Compose E2E scaffold**: PG17 @5433, Drizzle bootstrap + ledger RPC + legacy trigger cleanup; Better Auth seed; `test:e2e:compose` **36/77**; auth setup green; fixed Drizzle adapter schema keys + `cutoff_time` drift |

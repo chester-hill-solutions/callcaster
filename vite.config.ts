@@ -30,8 +30,23 @@ function resolveAppModuleSuffix(suffix: ".server" | ".client"): Plugin {
   };
 }
 
+function clientExcludePostgres(): Plugin {
+  return {
+    name: "client-exclude-postgres",
+    enforce: "pre",
+    resolveId(source, _importer, options) {
+      if (options?.ssr) return null;
+      if (source === "postgres" || source.startsWith("postgres/")) {
+        return path.resolve(appDir, "scripts/stubs/postgres-client-stub.mjs");
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    clientExcludePostgres(),
     resolveAppModuleSuffix(".server"),
     resolveAppModuleSuffix(".client"),
     reactRouter(),

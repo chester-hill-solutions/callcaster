@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger.server";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
+import { isTwoFactorRedirectResponse } from "@/lib/two-factor.server";
 import {
   acceptWorkspaceInvitations,
   createNewWorkspace,
@@ -44,6 +45,7 @@ export type AuthTokensResponse = {
 
 export type PasswordLoginResult =
   | { ok: true; token: string; user: AuthTokensResponse["user"]; headers: Headers }
+  | { ok: true; twoFactorRedirect: true; twoFactorMethods?: string[]; headers: Headers }
   | { ok: false; error: string };
 
 function splitName(name: string | null | undefined): {
@@ -102,6 +104,15 @@ export async function loginWithPassword(
     });
 
     const body = result?.response ?? result;
+    if (isTwoFactorRedirectResponse(body)) {
+      return {
+        ok: true,
+        twoFactorRedirect: true,
+        twoFactorMethods: body.twoFactorMethods,
+        headers: mergeBetterAuthSetCookieHeaders(result?.headers),
+      };
+    }
+
     if (!body?.token || !body?.user) {
       return { ok: false, error: "Invalid credentials" };
     }
@@ -188,6 +199,10 @@ export async function tokenLogin(
 
   if (!login.ok) {
     return { ok: false, error: login.error, status: 401 };
+  }
+
+  if ("twoFactorRedirect" in login) {
+    return { ok: false, error: "Two-factor verification required", status: 401 };
   }
 
   return {
@@ -377,7 +392,7 @@ export async function updateMeProfile(
       return { ok: false, error: "Update failed", status: 400 };
     }
 
-    if (body.password) {
+    if (body.password && body.current_password) {
       await auth.api.changePassword({
         body: {
           newPassword: body.password,

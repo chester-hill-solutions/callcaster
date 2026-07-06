@@ -1,6 +1,6 @@
 import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Tables } from "@/lib/db-types";
+import type { Tables } from "@/lib/db-types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

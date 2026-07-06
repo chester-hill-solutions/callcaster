@@ -1,6 +1,8 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
+  buildAssignedQueueUpdate,
   buildDequeuedQueueUpdate,
+  buildProviderStatusQueueUpdate,
   buildQueuedQueueUpdate,
   isAssignedToUser,
   QUEUE_STATUS_DEQUEUED,
@@ -45,12 +47,15 @@ export async function claimNextQueueContact(
 
 export function buildQueueStatusUpdatePayload(status: string) {
   if (status === QUEUE_STATUS_QUEUED) {
-    return buildQueuedQueueUpdate({ includeNormalizedFields: true });
+    return buildQueuedQueueUpdate();
   }
   if (status === QUEUE_STATUS_DEQUEUED) {
-    return buildDequeuedQueueUpdate(null, "api", { includeNormalizedFields: true });
+    return buildDequeuedQueueUpdate(null, "api");
   }
-  return { status };
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(status)) {
+    return buildAssignedQueueUpdate(status);
+  }
+  return buildProviderStatusQueueUpdate(status);
 }
 
 export async function updateCampaignQueueStatusByIds(
@@ -122,7 +127,7 @@ export async function deleteQueuedUnattemptedCampaignQueueByCampaignAndContactId
   const conditions = [
     eq(campaignQueueTable.campaign_id, args.campaignId),
     inArray(campaignQueueTable.contact_id, args.contactIds),
-    eq(campaignQueueTable.status, QUEUE_STATUS_QUEUED),
+    eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
     eq(campaignQueueTable.attempts, 0),
   ];
   if (args.workspaceId) {
@@ -178,9 +183,7 @@ export async function dequeueCampaignQueueById(args: {
   reason: string;
   workspaceId?: string;
 }) {
-  const update = buildDequeuedQueueUpdate(args.userId, args.reason, {
-    includeNormalizedFields: true,
-  });
+  const update = buildDequeuedQueueUpdate(args.userId, args.reason);
   const conditions = [eq(campaignQueueTable.id, args.queueId)];
   if (args.workspaceId) {
     conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
@@ -207,7 +210,7 @@ export async function updateCampaignQueueByContactAndCampaign(args: {
 }
 
 export async function requeueAllCampaignQueueForCampaign(campaignId: number, workspaceId?: string) {
-  const update = buildQueuedQueueUpdate({ includeNormalizedFields: true });
+  const update = buildQueuedQueueUpdate();
   const conditions = [eq(campaignQueueTable.campaign_id, campaignId)];
   if (workspaceId) {
     conditions.push(eq(campaignQueueTable.workspace, workspaceId));
@@ -262,7 +265,6 @@ export async function findActiveAssignedQueueForUser(userId: string, workspaceId
       assigned_to_user_id: campaignQueueTable.assigned_to_user_id,
       queue_state: campaignQueueTable.queue_state,
       dequeued_at: campaignQueueTable.dequeued_at,
-      status: campaignQueueTable.status,
       provider_status: campaignQueueTable.provider_status,
       group_household_queue: campaignTable.group_household_queue,
     })
@@ -299,9 +301,7 @@ export async function dequeueCampaignQueueByContact(args: {
   reason: string;
   workspaceId?: string;
 }) {
-  const update = buildDequeuedQueueUpdate(args.userId, args.reason, {
-    includeNormalizedFields: true,
-  });
+  const update = buildDequeuedQueueUpdate(args.userId, args.reason);
   const conditions = [eq(campaignQueueTable.contact_id, args.contactId)];
   if (args.campaignId != null) {
     conditions.push(eq(campaignQueueTable.campaign_id, args.campaignId));
@@ -337,7 +337,6 @@ export async function releaseAssignedQueueForUser(
         dequeued_at: campaignQueueTable.dequeued_at,
         assigned_to_user_id: campaignQueueTable.assigned_to_user_id,
         queue_state: campaignQueueTable.queue_state,
-        status: campaignQueueTable.status,
         provider_status: campaignQueueTable.provider_status,
       })
       .from(campaignQueueTable)
@@ -351,7 +350,7 @@ export async function releaseAssignedQueueForUser(
       return { ok: true, released: 0 };
     }
 
-    const update = buildQueuedQueueUpdate({ includeNormalizedFields: true });
+    const update = buildQueuedQueueUpdate();
     const released = await db
       .update(campaignQueueTable)
       .set(update)

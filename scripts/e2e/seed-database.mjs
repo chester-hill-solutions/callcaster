@@ -17,13 +17,14 @@ import {
   USERS,
   WORKSPACE_NUMBER_ID,
   WORKSPACES,
-  WORKSPACE_PERMISSIONS,
-  CALLER_PERMISSIONS,
-  MEMBER_PERMISSIONS,
 } from "./seed-data.mjs";
+import { seedAuthUser } from "./seed-auth-users.mjs";
 
 function requireEnv(name, fallbackName) {
-  const value = process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined);
+  const value =
+    process.env[name] ??
+    (fallbackName ? process.env[fallbackName] : undefined) ??
+    (name === "DATABASE_URL" ? process.env.DATABASE_PUBLIC_URL : undefined);
   if (!value) {
     throw new Error(`Missing ${name}${fallbackName ? ` or ${fallbackName}` : ""} for E2E seed`);
   }
@@ -50,30 +51,12 @@ function campaignBase(id, workspaceId, title, type, extra = {}) {
     group_household_queue: false,
     next_queue_order: 1,
     sms_send_mode: extra.sms_send_mode ?? null,
+    script_id: extra.script_id,
+    disposition_options: extra.disposition_options,
+    live_questions: extra.live_questions,
+    body_text: extra.body_text,
+    message_media: extra.message_media,
   };
-}
-
-async function seedWorkspacePermissions(sql) {
-  const rows = [];
-  for (const permission of WORKSPACE_PERMISSIONS) {
-    rows.push({ role: "owner", permission });
-    rows.push({ role: "admin", permission });
-  }
-  for (const permission of MEMBER_PERMISSIONS) {
-    rows.push({ role: "member", permission });
-  }
-  for (const permission of CALLER_PERMISSIONS) {
-    rows.push({ role: "caller", permission });
-  }
-  for (const row of rows) {
-    await sql`
-      INSERT INTO workspace_permissions (role, permission)
-      VALUES (${row.role}, ${row.permission})
-      ON CONFLICT (role, permission) DO UPDATE SET
-        role = EXCLUDED.role,
-        permission = EXCLUDED.permission
-    `;
-  }
 }
 
 async function upsertUserProfile(sql, user, accessLevel = null) {
@@ -104,9 +87,8 @@ async function seed() {
 
   console.log(`[e2e-seed] version=${SEED_VERSION}`);
 
-  await seedWorkspacePermissions(sql);
-
   for (const user of Object.values(USERS)) {
+    await seedAuthUser(sql, user, E2E_PASSWORD);
     const accessLevel = user.id === USERS.sudo.id ? "sudo" : null;
     await upsertUserProfile(sql, user, accessLevel);
   }
@@ -226,22 +208,40 @@ async function seed() {
   }
 
   const campaigns = [
-    campaignBase(CAMPAIGNS.liveCall, readyId, "E2E Live Call", "live_call"),
+    campaignBase(CAMPAIGNS.liveCall, readyId, "E2E Live Call", "live_call", {
+      script_id: SCRIPT_IDS.live,
+      disposition_options: ["answered", "no_answer", "busy"],
+      live_questions: {},
+    }),
     campaignBase(CAMPAIGNS.livePredictive, readyId, "E2E Predictive Live", "live_call", {
       dial_type: "predictive",
+      script_id: SCRIPT_IDS.live,
+      disposition_options: ["answered", "no_answer", "busy"],
+      live_questions: {},
     }),
     campaignBase(CAMPAIGNS.message, readyId, "E2E Message Campaign", "message", {
       sms_send_mode: "from_number",
+      body_text: "Hello from E2E message campaign",
+      message_media: [],
     }),
-    campaignBase(CAMPAIGNS.robocall, readyId, "E2E Robocall", "robocall"),
+    campaignBase(CAMPAIGNS.robocall, readyId, "E2E Robocall", "robocall", {
+      script_id: SCRIPT_IDS.ivr,
+    }),
     campaignBase(CAMPAIGNS.archived, readyId, "E2E Archived Campaign", "live_call", {
       status: "archived",
+      script_id: SCRIPT_IDS.live,
+      disposition_options: ["answered"],
+      live_questions: {},
     }),
   ];
 
   for (const row of campaigns) {
     await sql`
-      INSERT INTO campaign (id, title, type, workspace, status, is_active, caller_id, start_date, end_date, schedule, dial_type, dial_ratio, group_household_queue, next_queue_order, sms_send_mode)
+      INSERT INTO campaign (
+        id, title, type, workspace, status, is_active, caller_id, start_date, end_date,
+        schedule, dial_type, dial_ratio, group_household_queue, next_queue_order,
+        sms_send_mode, script_id, disposition_options, live_questions, body_text, message_media
+      )
       VALUES (
         ${row.id},
         ${row.title},
@@ -257,7 +257,12 @@ async function seed() {
         ${row.dial_ratio},
         ${row.group_household_queue},
         ${row.next_queue_order},
-        ${row.sms_send_mode}
+        ${row.sms_send_mode},
+        ${row.script_id ?? null},
+        ${row.disposition_options ?? null},
+        ${row.live_questions ?? null},
+        ${row.body_text ?? null},
+        ${row.message_media ?? null}
       )
       ON CONFLICT (id) DO UPDATE SET
         title = EXCLUDED.title,
@@ -273,85 +278,14 @@ async function seed() {
         dial_ratio = EXCLUDED.dial_ratio,
         group_household_queue = EXCLUDED.group_household_queue,
         next_queue_order = EXCLUDED.next_queue_order,
-        sms_send_mode = EXCLUDED.sms_send_mode
-    `;
-  }
-
-  const liveCampaigns = [
-    {
-      id: 970001,
-      campaign_id: CAMPAIGNS.liveCall,
-      workspace: readyId,
-      script_id: SCRIPT_IDS.live,
-      disposition_options: ["answered", "no_answer", "busy"],
-      questions: {},
-    },
-    {
-      id: 970002,
-      campaign_id: CAMPAIGNS.livePredictive,
-      workspace: readyId,
-      script_id: SCRIPT_IDS.live,
-      disposition_options: ["answered", "no_answer", "busy"],
-      questions: {},
-    },
-    {
-      id: 970003,
-      campaign_id: CAMPAIGNS.archived,
-      workspace: readyId,
-      script_id: SCRIPT_IDS.live,
-      disposition_options: ["answered"],
-      questions: {},
-    },
-  ];
-  for (const row of liveCampaigns) {
-    await sql`
-      INSERT INTO live_campaign (id, campaign_id, workspace, script_id, disposition_options, questions)
-      VALUES (
-        ${row.id},
-        ${row.campaign_id},
-        ${row.workspace},
-        ${row.script_id},
-        ${row.disposition_options},
-        ${row.questions}
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        campaign_id = EXCLUDED.campaign_id,
-        workspace = EXCLUDED.workspace,
+        sms_send_mode = EXCLUDED.sms_send_mode,
         script_id = EXCLUDED.script_id,
         disposition_options = EXCLUDED.disposition_options,
-        questions = EXCLUDED.questions
+        live_questions = EXCLUDED.live_questions,
+        body_text = EXCLUDED.body_text,
+        message_media = EXCLUDED.message_media
     `;
   }
-
-  await sql`
-    INSERT INTO message_campaign (id, campaign_id, workspace, body_text, message_media)
-    VALUES (
-      970010,
-      ${CAMPAIGNS.message},
-      ${readyId},
-      'Hello from E2E message campaign',
-      ${[]}
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      campaign_id = EXCLUDED.campaign_id,
-      workspace = EXCLUDED.workspace,
-      body_text = EXCLUDED.body_text,
-      message_media = EXCLUDED.message_media
-  `;
-
-  await sql`
-    INSERT INTO ivr_campaign (id, campaign_id, workspace, script_id)
-    VALUES (
-      970020,
-      ${CAMPAIGNS.robocall},
-      ${readyId},
-      ${SCRIPT_IDS.ivr}
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      campaign_id = EXCLUDED.campaign_id,
-      workspace = EXCLUDED.workspace,
-      script_id = EXCLUDED.script_id
-  `;
 
   const contacts = CONTACT_IDS.map((id, index) => ({
     id,
@@ -427,22 +361,24 @@ async function seed() {
 
   for (let i = 0; i < contacts.length; i += 1) {
     await sql`
-      INSERT INTO campaign_queue (id, campaign_id, contact_id, status, queue_order, queue_state, attempts, attempt_count, assigned_to_user_id)
+      INSERT INTO campaign_queue (
+        id, campaign_id, contact_id, queue_order, queue_state,
+        attempts, attempt_count, assigned_to_user_id, created_at
+      )
       VALUES (
         ${980001 + i},
         ${CAMPAIGNS.liveCall},
         ${contacts[i].id},
-        ${USERS.owner.id},
         ${i + 1},
         'assigned',
         0,
         0,
-        ${USERS.owner.id}
+        ${USERS.owner.id},
+        ${new Date().toISOString()}
       )
       ON CONFLICT (id) DO UPDATE SET
         campaign_id = EXCLUDED.campaign_id,
         contact_id = EXCLUDED.contact_id,
-        status = EXCLUDED.status,
         queue_order = EXCLUDED.queue_order,
         queue_state = EXCLUDED.queue_state,
         attempts = EXCLUDED.attempts,
@@ -453,21 +389,23 @@ async function seed() {
 
   for (let i = 0; i < contacts.length; i += 1) {
     await sql`
-      INSERT INTO campaign_queue (id, campaign_id, contact_id, status, queue_order, queue_state, attempts, attempt_count)
+      INSERT INTO campaign_queue (
+        id, campaign_id, contact_id, queue_order, queue_state,
+        attempts, attempt_count, created_at
+      )
       VALUES (
         ${980010 + i},
         ${CAMPAIGNS.livePredictive},
         ${contacts[i].id},
-        'queued',
         ${i + 1},
         'queued',
         0,
-        0
+        0,
+        ${new Date().toISOString()}
       )
       ON CONFLICT (id) DO UPDATE SET
         campaign_id = EXCLUDED.campaign_id,
         contact_id = EXCLUDED.contact_id,
-        status = EXCLUDED.status,
         queue_order = EXCLUDED.queue_order,
         queue_state = EXCLUDED.queue_state,
         attempts = EXCLUDED.attempts,
@@ -582,7 +520,7 @@ async function seed() {
       workspace: readyId,
       contact_id: contacts[0].id,
       body: "Reply from agent",
-      direction: "outbound",
+      direction: "outbound-api",
       from: "+15555501001",
       to: contacts[0].phone,
       status: "delivered",
@@ -608,28 +546,35 @@ async function seed() {
         contact_id = EXCLUDED.contact_id,
         body = EXCLUDED.body,
         direction = EXCLUDED.direction,
-        from = EXCLUDED.from,
-        to = EXCLUDED.to,
+        "from" = EXCLUDED."from",
+        "to" = EXCLUDED."to",
         status = EXCLUDED.status,
         date_created = EXCLUDED.date_created
     `;
   }
 
-  await sql`
-    INSERT INTO workspace_invite (id, workspace, user_id, role, isNew)
-    VALUES (
-      'd1000000-0000-4000-8000-000000000001',
-      ${readyId},
-      ${USERS.invitee.id},
-      'member',
-      ${true}
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      workspace = EXCLUDED.workspace,
-      user_id = EXCLUDED.user_id,
-      role = EXCLUDED.role,
-      isNew = EXCLUDED.isNew
-  `;
+  try {
+    await sql`
+      INSERT INTO workspace_invite (id, workspace, user_id, role, "isNew")
+      VALUES (
+        'd1000000-0000-4000-8000-000000000001',
+        ${readyId},
+        ${USERS.invitee.id},
+        'member',
+        ${true}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        workspace = EXCLUDED.workspace,
+        user_id = EXCLUDED.user_id,
+        role = EXCLUDED.role,
+        "isNew" = EXCLUDED."isNew"
+    `;
+  } catch (error) {
+    console.warn(
+      "[e2e-seed] workspace_invite skipped:",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 
   await sql`
     INSERT INTO workspace_api_key (id, workspace_id, name, key_prefix, key_hash, created_by)

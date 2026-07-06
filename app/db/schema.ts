@@ -25,7 +25,6 @@ export const workspace_role = pgEnum("workspace_role", ["owner","member","caller
 export const workspace = pgTable("workspace", {
   created_at: text().notNull(),
   credits: integer().notNull(),
-  cutoff_time: text().notNull(),
   disabled: boolean().notNull(),
   feature_flags: jsonb().notNull(),
   id: text().notNull().primaryKey(),
@@ -138,7 +137,6 @@ export const campaign_queue = pgTable(
     provider_status: text(),
     queue_order: integer(),
     queue_state: text(),
-    status: text(),
     dequeued_by: uuid(),
     dequeued_at: text(),
     dequeued_reason: text(),
@@ -163,8 +161,6 @@ export const script = pgTable("script", {
 
 export const contact = pgTable("contact", {
   address: text(),
-  address_id: text(),
-  carrier: text(),
   city: text(),
   country: text(),
   created_at: text().notNull(),
@@ -187,7 +183,6 @@ export const contact = pgTable("contact", {
   voter_list_imported_at: text(),
   voter_list_source: text(),
   workspace: uuid(),
-  fullname: text(),
 });
 
 export const contact_audience = pgTable("contact_audience", {
@@ -506,12 +501,10 @@ export const verification_session = pgTable("verification_session", {
 
 export const user = pgTable("user", {
   access_level: text(),
-  activity: jsonb().notNull(),
   created_at: text().notNull(),
   first_name: text(),
   id: text().notNull().primaryKey(),
   last_name: text(),
-  organization: integer(),
   username: text().notNull(),
   verified_audio_numbers: text().array(),
 });

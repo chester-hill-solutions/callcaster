@@ -1,6 +1,7 @@
 import { listUserWorkspaces } from "@/lib/platform-workspace.server";
 import { redirect } from "react-router";
 import { verifyAuth } from "@/lib/auth.server";
+import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 interface Workspace {
@@ -23,6 +24,10 @@ interface LoaderData {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { headers, user } = await verifyAuth(request);
+  await requireTwoFactorEnrollmentForPrivilegedUser({
+    userId: user.id,
+    request,
+  });
 
   const userId = user.id;
   if (!userId) {

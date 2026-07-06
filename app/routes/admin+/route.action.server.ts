@@ -1,6 +1,8 @@
 import { data as routeData } from "react-router";
 import {
   disableUser,
+  repointAllWorkspacesTwilioWebhooks,
+  repointWorkspaceTwilioWebhooksForAdmin,
   syncAllWorkspacesTwilio,
   syncWorkspaceTwilio,
   toggleWorkspaceStatus,
@@ -46,6 +48,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     return routeData({ success: "Workspace Twilio sync started for all workspaces" });
+  }
+
+  if (actionType === "repoint_twilio_webhooks") {
+    const workspaceId = formData.get("workspaceId") as string | null;
+    const result = workspaceId
+      ? await repointWorkspaceTwilioWebhooksForAdmin(workspaceId)
+      : await repointAllWorkspacesTwilioWebhooks();
+
+    if (!result.ok) {
+      return routeData({ error: result.error });
+    }
+
+    if ("result" in result) {
+      return routeData({
+        success: `Repointed ${result.result.updated} Twilio resources (${result.result.skipped} unchanged)`,
+      });
+    }
+
+    const totalUpdated = result.results.reduce(
+      (sum: number, row: { updated: number }) => sum + row.updated,
+      0,
+    );
+    return routeData({
+      success: `Repointed ${totalUpdated} Twilio resources across ${result.results.length} workspaces`,
+    });
   }
 
   if (actionType === "toggle_user_status") {

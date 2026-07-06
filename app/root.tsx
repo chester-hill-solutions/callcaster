@@ -25,7 +25,6 @@ export type { RootLoaderData } from "./root.loader.server";
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
   { rel: "icon", href: "/favicon.ico" },
-  { rel: "modulepreload", href: "/buffer-polyfill.mjs" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -68,7 +67,6 @@ export default function App() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
-        <script type="module" src="/buffer-polyfill.mjs" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){var t=localStorage.getItem("callcaster-theme");if(t==="dark")document.documentElement.classList.add("dark");else if(t==="light")document.documentElement.classList.remove("dark");else if(window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,

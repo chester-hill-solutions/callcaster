@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Tables } from "@/lib/db-types";
+import type { Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 type Call = Tables<"call">

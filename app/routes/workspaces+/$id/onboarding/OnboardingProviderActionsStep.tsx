@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
+import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding-flags";
 import { TWILIO_RCS_DOCS_URL, TWILIO_RCS_PROVIDER, TWILIO_RCS_SENDERS_URL } from "./constants";
 import type { OnboardingProviderActionsProps } from "./types";
 

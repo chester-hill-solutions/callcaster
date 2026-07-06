@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import { fetchAudienceUploads } from "@/lib/chats/messaging-client";
 import { Loader2 } from "lucide-react";
-import { Database } from "@/lib/db-types";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 interface AudienceUploadHistoryProps {

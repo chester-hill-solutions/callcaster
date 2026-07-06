@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Database } from "@/lib/db-types";
+import type { Database } from "@/lib/db-types";
 import { Contact } from "@/lib/types";
 import {
   Select,

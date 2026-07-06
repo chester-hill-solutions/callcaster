@@ -24,13 +24,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const login = await loginWithPassword(request, email, password);
 
-  if (login.ok) {
+  if (login.ok && "twoFactorRedirect" in login && login.twoFactorRedirect) {
+    const headers = login.headers;
+    const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
+    return redirect(`/two-factor?methods=${encodeURIComponent((login.twoFactorMethods ?? ["totp"]).join(","))}${nextParam}`, {
+      headers,
+    });
+  }
+
+  if (login.ok && "token" in login) {
     const headers = mergeBetterAuthSetCookieHeaders(login.headers);
     if (next && next.startsWith("/") && !next.startsWith("/signin")) {
       return redirect(next, { headers });
     }
     return redirect("/workspaces", { headers });
   }
-  logger.error("Sign-in error", login.error);
-  return routeData({ error: login.error });
+  logger.error("Sign-in error", !login.ok ? login.error : "Two-factor required");
+  return routeData({ error: !login.ok ? login.error : "Two-factor verification required" });
 };

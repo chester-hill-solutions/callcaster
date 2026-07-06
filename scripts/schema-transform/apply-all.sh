@@ -26,8 +26,11 @@ STEPS=(
   03b-drop-queue-status.sql
   04-contact-prune.sql
   05-drop-rcs-onboarding.sql
+  06-adr-0015-call-message.sql
+  07-split-workspace-twilio-data.sql
   08-household-key.sql
   08b-household-backfill.sql
+  09-drop-legacy-presence.sql
   10-verify.sql
 )
 
@@ -40,5 +43,5 @@ for step in "${STEPS[@]}"; do
 done
 
 echo ""
-echo "Optional sketches (not in default apply): 06, 07, 09"
+echo "Applied steps 00–10 including optional sketches 06, 07, 09 (guarded/idempotent portions)."
 echo "Baseline: bash scripts/schema-transform/dump-baseline.sh"

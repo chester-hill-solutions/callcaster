@@ -14,7 +14,7 @@ const baseURL =
 
 const env = {
   ...process.env,
-  NODE_ENV: process.env.NODE_ENV ?? "development",
+  NODE_ENV: process.env.NODE_ENV ?? "production",
   HOST: process.env.HOST ?? "0.0.0.0",
   PORT: port,
   BASE_URL: baseURL,
@@ -26,6 +26,14 @@ const env = {
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ?? "e2e_twilio_auth_token",
   TWILIO_APP_SID: process.env.TWILIO_APP_SID ?? "AP_e2e_test_app_sid",
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER ?? "+15555501001",
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "e2e-better-auth-secret-min-32-chars!!",
+  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? baseURL,
+  E2E_DISABLE_2FA_ENFORCEMENT: process.env.E2E_DISABLE_2FA_ENFORCEMENT ?? "1",
+  S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000",
+  S3_REGION: process.env.S3_REGION ?? "us-east-1",
+  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ?? "callcaster",
+  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "callcaster-dev-secret",
+  S3_BUCKET: process.env.S3_BUCKET ?? "callcaster",
 };
 
 async function waitForReady(readyUrl, attempts = 90) {

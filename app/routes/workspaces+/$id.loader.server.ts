@@ -7,6 +7,7 @@ import { data as routeData, redirect } from "react-router";
 import { deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { getUserRole, getWorkspaceInfoWithDetails, getWorkspacePhoneNumbers } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/auth.server";
+import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 import type { User } from "@/lib/types";
@@ -20,6 +21,10 @@ type LoaderData = {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { headers, user } = await verifyAuth(request);
+  await requireTwoFactorEnrollmentForPrivilegedUser({
+    userId: user.id,
+    request,
+  });
   const workspaceId = params.id;
   if (!workspaceId) {
     throw new Error("No workspace found");

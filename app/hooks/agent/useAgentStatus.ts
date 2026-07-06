@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Database, Tables } from "@/lib/db-types";
+import type { Database, Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 type AgentState = Database["public"]["Enums"]["agent_state"];

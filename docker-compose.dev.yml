@@ -3,16 +3,16 @@
 #
 # Usage:
 #   docker compose -f docker-compose.dev.yml up -d
-#   export DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5432/callcaster
+#   export DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster
 #   # After squashed baseline lands:
 #   # drizzle-kit push   # or migrate against drizzle/
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: callcaster-postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: callcaster
       POSTGRES_PASSWORD: callcaster

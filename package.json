@@ -55,7 +55,9 @@
     "test:e2e:debug": "playwright test -c e2e/playwright.config.ts --headed --debug",
     "test:e2e:rbac": "playwright test -c e2e/playwright.config.ts e2e/specs/rbac.spec.ts",
     "test:e2e:seed": "node scripts/e2e/seed-database.mjs",
-    "test:e2e:server": "node scripts/e2e/start-e2e-server.mjs"
+    "test:e2e:server": "node scripts/e2e/start-e2e-server.mjs",
+    "test:e2e:compose": "node scripts/e2e/run-compose-e2e.mjs",
+    "test:e2e:review": "node scripts/e2e/run-review-e2e.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1077.0",

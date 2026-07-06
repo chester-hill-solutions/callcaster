@@ -257,20 +257,12 @@ export function applyQueueStatusFilter(
 export function buildQueuedQueueUpdate(options?: {
   includeNormalizedFields?: boolean;
 }): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: QUEUE_STATUS_QUEUED,
+  void options;
+  return {
+    assigned_to_user_id: null,
     dequeued_at: null,
     dequeued_by: null,
     dequeued_reason: null,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
-  return {
-    ...baseUpdate,
-    assigned_to_user_id: null,
     provider_status: null,
     queue_state: QUEUE_STATUS_QUEUED,
   };
@@ -280,20 +272,12 @@ export function buildAssignedQueueUpdate(
   assignedToUserId: string,
   options?: { includeNormalizedFields?: boolean },
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: assignedToUserId,
+  void options;
+  return {
+    assigned_to_user_id: assignedToUserId,
     dequeued_at: null,
     dequeued_by: null,
     dequeued_reason: null,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
-  return {
-    ...baseUpdate,
-    assigned_to_user_id: assignedToUserId,
     provider_status: null,
     queue_state: QUEUE_LIFECYCLE_ASSIGNED,
   };
@@ -303,16 +287,8 @@ export function buildProviderStatusQueueUpdate(
   providerStatus: string,
   options?: { includeNormalizedFields?: boolean },
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: providerStatus,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
+  void options;
   return {
-    ...baseUpdate,
     provider_status: providerStatus,
     queue_state: QUEUE_LIFECYCLE_ASSIGNED,
   };
@@ -323,20 +299,12 @@ export function buildDequeuedQueueUpdate(
   dequeuedReason: string,
   options?: { includeNormalizedFields?: boolean },
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: QUEUE_STATUS_DEQUEUED,
+  void options;
+  return {
+    assigned_to_user_id: null,
     dequeued_at: new Date().toISOString(),
     dequeued_by: dequeuedBy,
     dequeued_reason: dequeuedReason,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
-  return {
-    ...baseUpdate,
-    assigned_to_user_id: null,
     provider_status: null,
     queue_state: QUEUE_STATUS_DEQUEUED,
   };

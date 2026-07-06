@@ -5,7 +5,6 @@ import { adminDb } from "@/server/admin-db";
 import {
   campaign as campaignTable,
   campaign_queue as campaignQueueTable,
-  live_campaign as liveCampaignTable,
   message as messageTable,
   workspace as workspaceTable,
   workspace_invite as workspaceInviteTable,
@@ -85,9 +84,9 @@ export async function setCampaignReadinessGap(
       return;
     case "script_required":
       await adminDb
-        .update(liveCampaignTable)
+        .update(campaignTable)
         .set({ script_id: null })
-        .where(eq(liveCampaignTable.campaign_id, campaignId));
+        .where(eq(campaignTable.id, campaignId));
       return;
     default: {
       const _exhaustive: never = gap;

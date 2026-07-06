@@ -672,9 +672,7 @@ export interface BaseUser {
   username: string;
   first_name: string | null;
   last_name: string | null;
-  organization: number | null;
   access_level: string | null;
-  activity: Json;
   created_at: string;
   verified_audio_numbers: string[] | null;
 }

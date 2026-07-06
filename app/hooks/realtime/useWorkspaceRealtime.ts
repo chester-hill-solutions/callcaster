@@ -5,7 +5,7 @@ import { useCalls } from "@/hooks/queue/useCalls";
 import { usePhoneNumbers } from "@/hooks/phone/usePhoneNumbers";
 import { fetchCampaignQueueItemWithContact } from "@/lib/chats/messaging-client";
 import { QueueItem, User as AppUser, OutreachAttempt, Call, Contact } from "@/lib/types";
-import { Tables } from "@/lib/db-types";
+import type { Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 import {
   parseWorkspaceEventData,
