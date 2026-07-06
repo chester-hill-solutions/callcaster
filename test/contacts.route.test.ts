@@ -13,11 +13,15 @@ const mocks = vi.hoisted(() => ({
   bulkCreateContacts: vi.fn(),
   createContact: vi.fn(),
   handleError: vi.fn((_e: any, msg?: string) => new Response(msg ?? "err", { status: 500 })),
+  requireWorkspaceAccess: vi.fn(),
 }));
 
-vi.mock("../app/lib/adminDb.server", () => ({
-  getSession: () => ({ headers: new Headers(),
-  }),
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceWorkspaceById: vi.fn(async () => "w1"),
+}));
+
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers() }),
 }));
 vi.mock("../app/lib/database.server", () => ({
   parseRequestData: (...args: any[]) => mocks.parseRequestData(...args),
@@ -25,6 +29,7 @@ vi.mock("../app/lib/database.server", () => ({
   bulkCreateContacts: (...args: any[]) => mocks.bulkCreateContacts(...args),
   createContact: (...args: any[]) => mocks.createContact(...args),
   handleError: (...args: any[]) => mocks.handleError(...args),
+  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 
 const contactSearchMocks = vi.hoisted(() => ({
@@ -74,7 +79,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     queueDualAuthSession({ headers: new Headers(),
       user: { id: "u1" },
     });
-    mocks.parseRequestData.mockResolvedValueOnce({ id: 1 });
+    mocks.parseRequestData.mockResolvedValueOnce({ id: 1, workspace_id: "w1" });
     mocks.updateContact.mockResolvedValueOnce({ id: 1, ok: true });
 
     const mod = await import("../app/routes/api+/contacts");
@@ -102,7 +107,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     } as any));
     await expect(res.json()).resolves.toEqual({ created: 1 });
 
-    mocks.parseRequestData.mockResolvedValueOnce({ firstname: "a", audience_id: 2 });
+    mocks.parseRequestData.mockResolvedValueOnce({ firstname: "a", workspace_id: "w1", audience_id: 2 });
     mocks.createContact.mockResolvedValueOnce({ id: 9 });
     queueDualAuthSession({ headers: new Headers(),
       user: { id: "u1" },

@@ -141,10 +141,15 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
   test("uses and returns respondent token when provided", async () => {
     const mod = await import("../app/routes/api+/survey-answer");
     const { token } = await createRespondentToken(1, "ws-1");
+    const fd = new FormData();
+    fd.set("surveyId", "1");
+    fd.set("questionId", "Q1");
+    fd.set("pageId", "p1");
+    fd.set("answerValue", "yes");
     const res = await asRouteResponse(await mod.action({
       request: new Request(`http://x?respondent_token=${encodeURIComponent(token)}`, {
         method: "POST",
-        body: new FormData(),
+        body: fd,
       }),
     } as any));
     expect(res.status).toBe(200);
@@ -154,18 +159,21 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
 
   test("rate limits by IP", async () => {
     const mod = await import("../app/routes/api+/survey-answer");
-    const body = new FormData();
-    body.set("surveyId", "1");
-    body.set("questionId", "Q1");
-    body.set("pageId", "p1");
-    const base = new Request("http://x", { method: "POST", body });
+
+    function makeBody() {
+      const fd = new FormData();
+      fd.set("surveyId", "1");
+      fd.set("questionId", "Q1");
+      fd.set("pageId", "p1");
+      return fd;
+    }
 
     for (let i = 0; i < 10; i++) {
-      const r = await asRouteResponse(await mod.action({ request: new Request(base, { method: "POST", body }) } as any));
+      const r = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
       expect(r.status).toBe(200);
     }
 
-    const limited = await asRouteResponse(await mod.action({ request: new Request(base, { method: "POST", body }) } as any));
+    const limited = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
     expect(limited.status).toBe(429);
   });
 

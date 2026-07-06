@@ -74,7 +74,6 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
   test("validates required fields", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
     const fd = new FormData();
-    fd.set("surveyId", "S1");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(400);
   });
@@ -125,10 +124,13 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
   test("uses provided respondent token and marks response complete", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
     const { token } = await createRespondentToken(1, "ws-1");
+    const fd = new FormData();
+    fd.set("surveyId", "S1");
+    fd.set("completed", "false");
     const res = await asRouteResponse(await mod.action({
       request: new Request(`http://x?respondent_token=${encodeURIComponent(token)}`, {
         method: "POST",
-        body: new FormData(),
+        body: fd,
       }),
     } as any));
     expect(res.status).toBe(200);
@@ -143,17 +145,20 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
 
   test("rate limits by IP", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
-    const body = new FormData();
-    body.set("surveyId", "S1");
-    body.set("completed", "true");
-    const base = new Request("http://x", { method: "POST", body });
+
+    function makeBody() {
+      const fd = new FormData();
+      fd.set("surveyId", "S1");
+      fd.set("completed", "true");
+      return fd;
+    }
 
     for (let i = 0; i < 10; i++) {
-      const r = await asRouteResponse(await mod.action({ request: new Request(base, { method: "POST", body }) } as any));
+      const r = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
       expect(r.status).toBe(200);
     }
 
-    const limited = await asRouteResponse(await mod.action({ request: new Request(base, { method: "POST", body }) } as any));
+    const limited = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
     expect(limited.status).toBe(429);
   });
 

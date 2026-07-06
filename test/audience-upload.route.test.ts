@@ -34,6 +34,9 @@ const processTdbMocks = vi.hoisted(() => ({
     update: vi.fn(async () => []),
   },
 }));
+const requireWorkspaceAccessMock = vi.hoisted(() => ({
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
 
 const processDbMocks = vi.hoisted(() => ({
   insertValues: vi.fn(async () => undefined),
@@ -50,6 +53,9 @@ const objectStorageMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/object-storage.server", () => ({
   uploadObject: (...args: unknown[]) => objectStorageMocks.uploadObject(...args),
+}));
+vi.mock("@/lib/database.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) => requireWorkspaceAccessMock.requireWorkspaceAccess(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger }));

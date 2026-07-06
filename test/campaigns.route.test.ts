@@ -10,13 +10,14 @@ const mocks = vi.hoisted(() => {
     deleteCampaign: vi.fn(),
     createCampaign: vi.fn(),
     createErrorResponse: vi.fn((_e: any) => new Response("err", { status: 400 })),
+    requireWorkspaceAccess: vi.fn(),
   };
 });
 
-vi.mock("@/lib/api-auth.server", () => ({
-  getDualAuthUser: (auth: any) => auth,
-  requireDualAuth: vi.fn(async () => ({ user: { id: "u1" } })),
+vi.mock("@/lib/platform-telephony.server", () => ({
+  resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
 }));
+
 vi.mock("@/lib/auth.server", () => ({
   getSession: vi.fn(async (request: Request) => ({ user: { id: "u1" }, headers: new Headers(request.headers) })),
 }));
@@ -25,6 +26,7 @@ vi.mock("@/lib/database.server", () => ({
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
   deleteCampaign: (...args: any[]) => mocks.deleteCampaign(...args),
   createCampaign: (...args: any[]) => mocks.createCampaign(...args),
+  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
@@ -50,7 +52,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
   test("PATCH parses JSON fields and returns updated campaign", async () => {
     authSession({ sb: 1 }, new Headers({ "X": "1" }));
     mocks.parseActionRequest.mockResolvedValueOnce({
-      campaignData: JSON.stringify({ title: "t" }),
+      campaignData: JSON.stringify({ id: 1, title: "t" }),
       campaignDetails: { x: 1 },
     });
     mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1 }, campaignDetails: { campaign_id: 1 } });
@@ -75,17 +77,17 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
 
   test("DELETE campaignId fallback covers ?? '' branch", async () => {
     authSession({ sb: 1 });
-    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: null });
+    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: null, workspaceId: "w1" });
     const mod = await import("../app/routes/api+/campaigns");
     await mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "DELETE" }),
     } as any);
-    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ workspaceId: "", campaignId: "" });
+    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ workspaceId: "w1", campaignId: "" });
   });
 
   test("POST calls createCampaign", async () => {
     authSession({ sb: 1 });
-    mocks.parseActionRequest.mockResolvedValueOnce({ campaignData: { title: "x" } });
+    mocks.parseActionRequest.mockResolvedValueOnce({ campaignData: { title: "x", workspace: "w1" } });
     mocks.createCampaign.mockResolvedValueOnce({ campaign: { id: 2 }, campaignDetails: { campaign_id: 2 } });
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(await mod.action({

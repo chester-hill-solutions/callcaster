@@ -20,10 +20,12 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
       fn.mockReset();
     }
     tdbMocks.workspace_number.findMany.mockReset();
-
     vi.doMock("@/lib/workspace-members-db.server", () => workspaceDbMocks);
     vi.doMock("@/server/tenant-db", () => ({
       createTenantDb: vi.fn(() => tdbMocks),
+    }));
+    vi.doMock("@/lib/database.server", () => ({
+      requireWorkspaceAccess: vi.fn(async () => undefined),
     }));
   });
 

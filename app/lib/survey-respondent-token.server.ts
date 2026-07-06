@@ -51,7 +51,7 @@ export async function createRespondentToken(
   const header = { alg: "HS256", typ: "JWT" };
   const encoded = `${base64urlEncode(JSON.stringify(header))}.${base64urlEncode(JSON.stringify(payload))}`;
   const signature = await sign(encoded);
-  const token = `${encoded}.${base64urlEncode(Buffer.from(new Uint8Array(signature)).toString("base64url"))}`;
+  const token = `${encoded}.${Buffer.from(new Uint8Array(signature)).toString("base64url")}`;
   return { token, resultId };
 }
 

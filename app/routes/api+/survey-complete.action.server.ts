@@ -67,6 +67,9 @@ async function handleCompleteSurvey(request: Request) {
   if (!survey) {
     return routeData({ error: "Survey not found" }, { status: 404 });
   }
+  if (!survey.is_active) {
+    return routeData({ error: "Survey is not active" }, { status: 400 });
+  }
 
   const tokenResult = await resolveRespondentToken(request, formData, survey);
   if (!tokenResult.ok) {

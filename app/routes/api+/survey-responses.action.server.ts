@@ -58,12 +58,19 @@ async function handleSubmitResponse(formData: FormData) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  if (request.method !== "POST") {
+    return routeData({ error: "Method not allowed" }, { status: 405 });
+  }
+
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
 
   const formData = await request.formData();
   const surveyId = formData.get("surveyId") as string;
-  const workspaceId = surveyId ? await getSurveyWorkspaceByPublicId(surveyId) : null;
+  if (!surveyId) {
+    return routeData({ error: "Survey ID is required" }, { status: 400 });
+  }
+  const workspaceId = await getSurveyWorkspaceByPublicId(surveyId);
 
   if (auth.authType === "api_key") {
     if (!workspaceId || workspaceId !== auth.workspaceId) {
@@ -87,9 +94,5 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  if (request.method === "POST") {
-    return handleSubmitResponse(formData);
-  }
-
-  return routeData({ error: "Method not allowed" }, { status: 405 });
+  return handleSubmitResponse(formData);
 }

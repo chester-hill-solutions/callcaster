@@ -20,6 +20,9 @@ vi.mock("@/server/tenant-db", () => ({
     execute: vi.fn(async () => []),
   }),
 }));
+vi.mock("@/lib/database.server", () => ({
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
 
 describe("app/routes/api+/reset_campaign/route.tsx", () => {
   beforeEach(() => {

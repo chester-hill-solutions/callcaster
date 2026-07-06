@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     parseActionRequest: vi.fn(),
     removeContactsFromAudience: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    requireWorkspaceAccess: vi.fn(),
   };
 });
 
@@ -19,6 +20,10 @@ vi.mock("@/lib/auth.server", () => ({
 vi.mock("@/lib/database.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
   removeContactsFromAudience: (...args: any[]) => mocks.removeContactsFromAudience(...args),
+  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceWorkspaceById: vi.fn(async () => "w1"),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 

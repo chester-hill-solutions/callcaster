@@ -70,6 +70,7 @@ function mockQueueLookup() {
               workspace_id: "w1",
               name: "Inbound Queue",
               hold_audio: null,
+              twilio_data: { sid: "ACxxx", authToken: "token" },
             },
           ]),
       }),
@@ -94,21 +95,18 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
 
   test("does not create a new offer when an active entry already exists for the call", async () => {
     mockQueueLookup();
+    mocks.adminDb.execute.mockResolvedValueOnce([
+      {
+        id: 42,
+        queue_id: 1,
+        workspace_id: "w1",
+        call_sid: "CA1",
+        caller_number: "+15551234567",
+        status: "offered",
+        offered_to_user_id: "agent-1",
+      },
+    ]);
     const mod = await import("@/lib/acd/acd-router.server");
-    vi.spyOn(mod, "loadWorkspaceTwilioCredentialsForAcd").mockResolvedValue({
-      accountSid: "ACxxx",
-      authToken: "token",
-    });
-    vi.spyOn(mod, "findExistingInboundQueueEntry").mockResolvedValue({
-      id: 42,
-      queue_id: 1,
-      workspace_id: "w1",
-      call_sid: "CA1",
-      caller_number: "+15551234567",
-      status: "offered",
-      offered_to_user_id: "agent-1",
-    });
-    vi.spyOn(mod, "countInboundQueueOfferAttempts").mockResolvedValue(1);
 
     const request = makeAcdRequest(
       { queue_id: "1" },
@@ -124,12 +122,6 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
   test("returns hangup when maximum queue time is exceeded", async () => {
     mockQueueLookup();
     const mod = await import("@/lib/acd/acd-router.server");
-    vi.spyOn(mod, "loadWorkspaceTwilioCredentialsForAcd").mockResolvedValue({
-      accountSid: "ACxxx",
-      authToken: "token",
-    });
-    vi.spyOn(mod, "findExistingInboundQueueEntry").mockResolvedValue(null);
-    vi.spyOn(mod, "countInboundQueueOfferAttempts").mockResolvedValue(0);
 
     const request = makeAcdRequest(
       { queue_id: "1" },
@@ -145,14 +137,9 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
   test("returns hangup when maximum offer attempts are reached", async () => {
     mockQueueLookup();
     const mod = await import("@/lib/acd/acd-router.server");
-    vi.spyOn(mod, "loadWorkspaceTwilioCredentialsForAcd").mockResolvedValue({
-      accountSid: "ACxxx",
-      authToken: "token",
-    });
-    vi.spyOn(mod, "findExistingInboundQueueEntry").mockResolvedValue(null);
-    vi.spyOn(mod, "countInboundQueueOfferAttempts").mockResolvedValue(
-      mod.MAX_OFFER_ATTEMPTS,
-    );
+    mocks.adminDb.execute
+      .mockResolvedValueOnce([]) // findExistingInboundQueueEntry: no existing entry
+      .mockResolvedValueOnce([{ count: mod.MAX_OFFER_ATTEMPTS }]); // countInboundQueueOfferAttempts
 
     const request = makeAcdRequest(
       { queue_id: "1" },
@@ -168,12 +155,9 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
   test("claims a new agent when no active entry exists and limits are not exceeded", async () => {
     mockQueueLookup();
     const mod = await import("@/lib/acd/acd-router.server");
-    vi.spyOn(mod, "loadWorkspaceTwilioCredentialsForAcd").mockResolvedValue({
-      accountSid: "ACxxx",
-      authToken: "token",
-    });
-    vi.spyOn(mod, "findExistingInboundQueueEntry").mockResolvedValue(null);
-    vi.spyOn(mod, "countInboundQueueOfferAttempts").mockResolvedValue(0);
+    mocks.adminDb.execute
+      .mockResolvedValueOnce([]) // findExistingInboundQueueEntry: no existing entry
+      .mockResolvedValueOnce([{ count: 0 }]); // countInboundQueueOfferAttempts: 0
     mocks.rpcClaimInboundQueueEntry.mockResolvedValue({
       agent_user_id: "agent-1",
       entry_id: 123,

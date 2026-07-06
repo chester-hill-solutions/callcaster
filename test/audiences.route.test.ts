@@ -272,7 +272,7 @@ describe("api.audiences route", () => {
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
     const res = await asRouteResponse(await mod.loader({
-      request: new Request("http://localhost/api/audiences"),
+      request: new Request("http://localhost/api/audiences?workspaceId=w1"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
     expect(await res.json()).toEqual({ data: [{ id: 1 }] });
@@ -292,7 +292,7 @@ describe("api.audiences route", () => {
     contactAudienceMocks.listAudienceContactsJson.mockRejectedValueOnce(new Error("q"));
     await expect(
       mod.loader({
-        request: new Request("http://localhost/api/audiences"),
+        request: new Request("http://localhost/api/audiences?workspaceId=w1"),
         deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
       } as any),
     ).rejects.toBeTruthy();

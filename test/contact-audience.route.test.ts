@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { queueDualAuthSession } from "./helpers/route-auth-mock";
 
 vi.hoisted(() => {
   process.env.DATABASE_URL =
@@ -10,29 +11,30 @@ vi.hoisted(() => {
 const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
   return {
-    requireDualAuth: vi.fn(),
-    getDualAuthPostgres: vi.fn(() => ({})),
     parseActionRequest: vi.fn(),
     removeContactFromAudience: vi.fn(),
+    findAudienceWorkspaceById: vi.fn(),
+    requireWorkspaceAccess: vi.fn(),
     createErrorResponse: vi.fn((e: unknown) =>
       new Response(String(e instanceof Error ? e.message : e), { status: 500 }),
     ),
   };
 });
 
-vi.mock("@/lib/api-auth.server", () => ({
-  requireDualAuth: (...args: unknown[]) => mocks.requireDualAuth(...args),
-  getDualAuthPostgres: (...args: unknown[]) => mocks.null /* removed */ (...args),
-  getDualAuthUser: vi.fn(),
-}));
-
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: postgresServerMocks.headers }),
 }));
+
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceWorkspaceById: (...args: unknown[]) => mocks.findAudienceWorkspaceById(...args),
+}));
+
 vi.mock("../app/lib/database.server", () => ({
   parseActionRequest: (...args: unknown[]) => mocks.parseActionRequest(...args),
   removeContactFromAudience: (...args: unknown[]) => mocks.removeContactFromAudience(...args),
+  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
 }));
+
 vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: unknown[]) => mocks.createErrorResponse(...args),
 }));
@@ -40,15 +42,16 @@ vi.mock("@/lib/errors.server", () => ({
 describe("app/routes/api+/contact-audience/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.requireDualAuth.mockReset();
     mocks.parseActionRequest.mockReset();
     mocks.removeContactFromAudience.mockReset();
+    mocks.findAudienceWorkspaceById.mockReset();
+    mocks.requireWorkspaceAccess.mockReset();
     mocks.createErrorResponse.mockClear();
   });
 
   test("DELETE returns 400 when ids missing", async () => {
+    queueDualAuthSession({ user: { id: "test-user" } });
     postgresServerMocks.headers = new Headers({ "X-Test": "1" });
-    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "", audience_id: "" });
     const mod = await import("../app/routes/api+/contact-audience");
     const res = await asRouteResponse(await mod.action({
@@ -61,8 +64,9 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
   test("DELETE removes contact from audience", async () => {
     const headers = new Headers({ "Set-Cookie": "a=1" });
     postgresServerMocks.headers = headers;
-    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
+    queueDualAuthSession({ user: { id: "test-user" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
+    mocks.findAudienceWorkspaceById.mockResolvedValueOnce("test-workspace-id");
     mocks.removeContactFromAudience.mockResolvedValueOnce({ ok: true });
 
     const mod = await import("../app/routes/api+/contact-audience");
@@ -77,8 +81,9 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
 
   test("DELETE error uses createErrorResponse", async () => {
     postgresServerMocks.headers = new Headers();
-    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
+    queueDualAuthSession({ user: { id: "test-user" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
+    mocks.findAudienceWorkspaceById.mockResolvedValueOnce("test-workspace-id");
     mocks.removeContactFromAudience.mockRejectedValueOnce(new Error("nope"));
 
     const mod = await import("../app/routes/api+/contact-audience");
@@ -91,7 +96,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
 
   test("non-DELETE returns json(undefined) with headers", async () => {
     postgresServerMocks.headers = new Headers({ "X": "1" });
-    mocks.requireDualAuth.mockResolvedValueOnce({ authType: "session" });
+    queueDualAuthSession({ user: { id: "test-user" } });
     const mod = await import("../app/routes/api+/contact-audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "POST" }),

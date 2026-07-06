@@ -13,7 +13,7 @@ import { WORKSPACE_SCOPED_TABLES, type WorkspaceScopedTableName } from "@/db/wor
 // vi.hoisted (which cannot import other modules). A test below cross-checks
 // this list against the real registry.
 const SCOPED_TABLE_NAMES = [
-  "campaign", "contact", "audience", "audience_upload", "call", "message",
+  "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
   "outreach_attempt", "script", "survey", "webhook", "workspace_number",
   "workspace_invite", "transaction_history",
   "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
@@ -44,7 +44,7 @@ const hoisted = vi.hoisted(() => {
     txExecute: [],
   };
   const TABLES = [
-    "campaign", "contact", "audience", "audience_upload", "call", "message",
+    "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
     "outreach_attempt", "script", "survey", "webhook", "workspace_number",
     "workspace_invite", "transaction_history",
     "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
@@ -189,8 +189,8 @@ describe("createTenantDb — registry completeness", () => {
     }
   });
 
-  test("registry covers exactly the 23 workspace-scoped tables", () => {
-    expect(Object.keys(WORKSPACE_SCOPED_TABLES)).toHaveLength(23);
+  test("registry covers exactly the 24 workspace-scoped tables", () => {
+    expect(Object.keys(WORKSPACE_SCOPED_TABLES)).toHaveLength(24);
     const registryNames = Object.keys(WORKSPACE_SCOPED_TABLES).sort();
     const inlineNames = [...SCOPED_TABLE_NAMES].sort();
     expect(registryNames).toEqual(inlineNames);

@@ -5,7 +5,11 @@ import { logger } from "@/lib/logger.server";
 const getWorkspaceUsers = vi.fn(async () => ({ data: [] as Array<{ username: string }> }));
 vi.mock("@/lib/database.server", async () => {
   const actual = await vi.importActual<typeof import("@/lib/database.server")>("@/lib/database.server");
-  return { ...actual, getWorkspaceUsers };
+  return {
+    ...actual,
+    getWorkspaceUsers,
+    requireWorkspaceAccess: vi.fn(async () => undefined),
+  };
 });
 
 vi.mock("@/lib/env.server", () => ({
@@ -17,16 +21,30 @@ vi.mock("@/lib/env.server", () => ({
 const membersDbMocks = vi.hoisted(() => ({
   findUserIdByUsername: vi.fn(async () => null as string | null),
   findWorkspaceInviteForUser: vi.fn(async () => null as unknown),
-  updateWorkspaceMemberRole: vi.fn(async () => ({ id: "u1" } as any)),
-  removeWorkspaceMember: vi.fn(async () => ({ id: "u1" } as any)),
+  updateWorkspaceMemberRole: vi.fn(async () => ({ ok: true, member: { id: "u1" } } as any)),
+  removeWorkspaceMember: vi.fn(async () => ({ ok: true, member: { id: "u1" } } as any)),
   transferWorkspaceOwnership: vi.fn(async () => ({ previousOwner: { id: "owner" } } as any)),
   deleteWorkspaceById: vi.fn(async () => ({ id: "w1" } as any)),
   removeWorkspaceInviteForUser: vi.fn(async () => [{ ok: 1 }] as any),
   upsertWorkspaceWebhookRow: vi.fn(async () => ({ id: 1 }) as any),
   getWorkspaceWebhookRow: vi.fn(async () => null as any),
+  requireMemberManager: vi.fn(async () => ({ role: "owner" })),
 }));
 
-vi.mock("@/lib/workspace-members-db.server", () => ({ ...membersDbMocks }));
+vi.mock("@/lib/platform-members.server", () => ({
+  updateWorkspaceMemberRole: (...args: unknown[]) => membersDbMocks.updateWorkspaceMemberRole(...args),
+  removeWorkspaceMember: (...args: unknown[]) => membersDbMocks.removeWorkspaceMember(...args),
+}));
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  findUserIdByUsername: (...args: unknown[]) => membersDbMocks.findUserIdByUsername(...args),
+  findWorkspaceInviteForUser: (...args: unknown[]) => membersDbMocks.findWorkspaceInviteForUser(...args),
+  transferWorkspaceOwnership: (...args: unknown[]) => membersDbMocks.transferWorkspaceOwnership(...args),
+  deleteWorkspaceById: (...args: unknown[]) => membersDbMocks.deleteWorkspaceById(...args),
+  removeWorkspaceInviteForUser: (...args: unknown[]) => membersDbMocks.removeWorkspaceInviteForUser(...args),
+  upsertWorkspaceWebhookRow: (...args: unknown[]) => membersDbMocks.upsertWorkspaceWebhookRow(...args),
+  getWorkspaceWebhookRow: (...args: unknown[]) => membersDbMocks.getWorkspaceWebhookRow(...args),
+  requireMemberManager: (...args: unknown[]) => membersDbMocks.requireMemberManager(...args),
+}));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => ({
     execute: vi.fn(async () => []),
@@ -49,8 +67,8 @@ function resetMembersDbMocks() {
 
   membersDbMocks.findUserIdByUsername.mockResolvedValue(null);
   membersDbMocks.findWorkspaceInviteForUser.mockResolvedValue(null);
-  membersDbMocks.updateWorkspaceMemberRole.mockResolvedValue({ id: "u1" });
-  membersDbMocks.removeWorkspaceMember.mockResolvedValue({ id: "u1" });
+  membersDbMocks.updateWorkspaceMemberRole.mockResolvedValue({ ok: true, member: { id: "u1" } });
+  membersDbMocks.removeWorkspaceMember.mockResolvedValue({ ok: true, member: { id: "u1" } });
   membersDbMocks.transferWorkspaceOwnership.mockResolvedValue({ previousOwner: { id: "owner" } });
   membersDbMocks.deleteWorkspaceById.mockResolvedValue({ id: "w1" });
   membersDbMocks.removeWorkspaceInviteForUser.mockResolvedValue([{ ok: 1 }]);
@@ -116,14 +134,14 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "u1");
     fd.set("updated_workspace_role", "admin");
 
-    const resUpdateOk = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", headers));
+    const resUpdateOk = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", headers, "u1"));
     expect(await resUpdateOk.json()).toEqual({ data: { id: "u1" }, error: null });
 
     membersDbMocks.updateWorkspaceMemberRole.mockRejectedValueOnce(new Error("nope"));
-    const resUpdateErr = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", headers));
+    const resUpdateErr = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", headers, "u1"));
     expect(await resUpdateErr.json()).toEqual({ data: null, error: "nope" });
 
-    const resDeleteOk = await asRouteResponse(await mod.handleDeleteUser(fd, "w1", headers));
+    const resDeleteOk = await asRouteResponse(await mod.handleDeleteUser(fd, "w1", headers, "u1"));
     expect(await resDeleteOk.json()).toEqual({ data: { id: "u1" }, error: null });
   });
 
@@ -132,19 +150,19 @@ describe("WorkspaceSettingUtils", () => {
     const headers = new Headers();
 
     const fdMissing = new FormData();
-    const resMissing = await asRouteResponse(await mod.handleDeleteSelf(fdMissing, "w1", headers));
+    const resMissing = await asRouteResponse(await mod.handleDeleteSelf(fdMissing, "w1", headers, "u1"));
     expect(resMissing.status).toBe(200);
 
     const fd = new FormData();
     fd.set("user_id", "u1");
 
     membersDbMocks.removeWorkspaceMember.mockRejectedValueOnce(new Error("del"));
-    const errObj = await mod.handleDeleteSelf(fd, "w1", headers);
+    const errObj = await mod.handleDeleteSelf(fd, "w1", headers, "u1");
     expect(errObj).toEqual({ data: null, error: "del" });
     expect(logger.error).toHaveBeenCalled();
 
     membersDbMocks.removeWorkspaceMember.mockResolvedValueOnce({ ok: 1 });
-    const res = await asRouteResponse(await mod.handleDeleteSelf(fd, "w1", headers));
+    const res = await asRouteResponse(await mod.handleDeleteSelf(fd, "w1", headers, "u1"));
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/workspaces");
   });
@@ -158,15 +176,15 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "new");
 
     membersDbMocks.transferWorkspaceOwnership.mockRejectedValueOnce(new Error("new owner failed"));
-    const res1 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers));
+    const res1 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
     expect(await res1.json()).toEqual({ error: "new owner failed" });
 
     membersDbMocks.transferWorkspaceOwnership.mockRejectedValueOnce(new Error("current failed"));
-    const res2 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers));
+    const res2 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
     expect(await res2.json()).toEqual({ error: "current failed" });
 
     membersDbMocks.transferWorkspaceOwnership.mockResolvedValueOnce({ previousOwner: { id: "owner" } });
-    const res3 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers));
+    const res3 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
     expect(await res3.json()).toEqual({ data: { id: "owner" }, error: null });
   });
 

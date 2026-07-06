@@ -251,7 +251,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("say:Call not found");
+    expect(await res.text()).toContain("hangup");
 
     // missing stepsValue => say error message
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData: { script: { steps: null } } }));

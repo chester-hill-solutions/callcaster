@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => {
     searchCampaignQueueIds: vi.fn(),
     deleteCampaignQueueByIds: vi.fn(),
     dbDeleteReturning: vi.fn(),
+    dbSelectWhere: vi.fn(),
+    requireWorkspaceAccess: vi.fn(),
   };
 });
 
@@ -17,8 +19,12 @@ vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: postgresServerMocks.headers,
   }),
 }));
+vi.mock("@/lib/platform-telephony.server", () => ({
+  resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
+}));
 vi.mock("@/lib/database.server", () => ({
   parseRequestData: (...args: any[]) => mocks.parseRequestData(...args),
+  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: any[]) => mocks.enqueueContactsForCampaign(...args),
@@ -31,6 +37,11 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
 }));
 vi.mock("@/server/db", () => ({
   db: {
+    select: () => ({
+      from: () => ({
+        where: (...args: any[]) => mocks.dbSelectWhere(...args),
+      }),
+    }),
     delete: () => ({
       where: () => ({
         returning: (...args: any[]) => mocks.dbDeleteReturning(...args),
@@ -46,6 +57,8 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.searchCampaignQueueIds.mockReset();
     mocks.deleteCampaignQueueByIds.mockReset();
     mocks.dbDeleteReturning.mockReset();
+    mocks.dbSelectWhere.mockReset();
+    mocks.dbSelectWhere.mockResolvedValue([]);
   });
 
   test("redirects to /signin when user missing", async () => {
@@ -61,6 +74,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     const dbClient = {};
     queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: ["1", 2], campaign_id: "10" });
+    mocks.dbSelectWhere.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));

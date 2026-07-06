@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     insertScriptForWorkspace: vi.fn(),
     updateScriptForWorkspace: vi.fn(),
+    requireWorkspaceAccess: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
@@ -25,6 +26,7 @@ vi.mock("@/lib/api-auth.server", () => ({
 
 vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
+  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
 }));
 
 vi.mock("@/lib/script-api-db.server", () => ({

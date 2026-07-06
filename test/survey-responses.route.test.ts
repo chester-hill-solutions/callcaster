@@ -13,10 +13,18 @@ const surveyDbMocks = vi.hoisted(() => ({
     response_id: 10,
     result_id: "R1",
   })),
+  getSurveyWorkspaceByPublicId: vi.fn(async () => "w1"),
 }));
+
+const wsAccessMock = vi.hoisted(() => ({ requireWorkspaceAccess: vi.fn() }));
 
 vi.mock("@/lib/survey-db.server", () => ({
   submitSurveyResponse: (...args: unknown[]) => surveyDbMocks.submitSurveyResponse(...args),
+  getSurveyWorkspaceByPublicId: (...args: unknown[]) => surveyDbMocks.getSurveyWorkspaceByPublicId(...args),
+}));
+
+vi.mock("@/lib/database.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) => wsAccessMock.requireWorkspaceAccess(...args),
 }));
 
 function makeReq(form: Record<string, string>) {
@@ -34,17 +42,18 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
       response_id: 10,
       result_id: "R1",
     });
+    surveyDbMocks.getSurveyWorkspaceByPublicId.mockReset().mockResolvedValue("w1");
+    wsAccessMock.requireWorkspaceAccess.mockReset().mockResolvedValue(undefined);
   });
 
   test("returns 405 for non-POST", async () => {
-    queueDualAuthSession({ null: {} });
     const mod = await import("../app/routes/api+/survey-responses");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields and bad JSON", async () => {
-    setDualAuthSession({ null: {} });
+    setDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/survey-responses");
 
     const r0 = await asRouteResponse(await mod.action({ request: makeReq({ surveyId: "S1" }) } as any));
@@ -64,18 +73,14 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   test("returns 404 when survey missing and 400 when inactive", async () => {
     const mod = await import("../app/routes/api+/survey-responses");
 
-    queueDualAuthSession({ null: {} });
-    surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
-      ok: false,
-      error: "Survey not found",
-      status: 404,
-    });
+    queueDualAuthSession({ user: { id: "u1" } });
+    surveyDbMocks.getSurveyWorkspaceByPublicId.mockResolvedValueOnce(null);
     const r1 = await asRouteResponse(await mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
     } as any));
     expect(r1.status).toBe(404);
 
-    queueDualAuthSession({ null: {} });
+    queueDualAuthSession({ user: { id: "u1" } });
     surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
       ok: false,
       error: "Survey is not active",
@@ -88,7 +93,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("returns 500 when submit fails", async () => {
-    queueDualAuthSession({ null: {} });
+    queueDualAuthSession({ user: { id: "u1" } });
     surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
       ok: false,
       error: "Failed to submit response",
@@ -102,7 +107,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
   });
 
   test("returns success payload from submitSurveyResponse", async () => {
-    queueDualAuthSession({ null: {} });
+    queueDualAuthSession({ user: { id: "u1" } });
     surveyDbMocks.submitSurveyResponse.mockResolvedValueOnce({
       ok: true,
       response_id: 11,
