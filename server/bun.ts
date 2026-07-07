@@ -3,7 +3,7 @@
 /// <reference types="bun" />
 
 import "dotenv/config";
-import { createRequestHandler } from "@react-router/express";
+import { createRequestHandler } from "react-router";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -135,10 +135,7 @@ async function createServer() {
     process.exit(1);
   }
 
-  const requestHandler = createRequestHandler({
-    build,
-    mode: "production",
-  });
+  const requestHandler = createRequestHandler(build, "production");
 
   return Bun.serve({
     hostname: HOST,

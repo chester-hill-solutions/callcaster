@@ -146,7 +146,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3E.2 | Bulk Supabase → Railway Buckets copy | **Done** | App code no longer references Supabase Storage; zero `@supabase` imports in app/ |
 | 3E.3 | Wire MinIO local dev | **Done** | `docker-compose.dev.yml` includes MinIO; S3-compatible adapter works with any S3 endpoint |
 | 3F.1 | Bun start script + Dockerfile | **Done** | `server/bun.ts` + `Dockerfile` created; `start:bun` script added |
-| 3F.2 | Remove Express + buffer-polyfill | **Partial** | Prod Dockerfile uses Bun; E2E/dev still on Express until `server/bun.ts` uses `@react-router/node` handler |
+| 3F.2 | Remove Express + buffer-polyfill | **Partial** | Bun server uses `createRequestHandler` from `react-router` (Web Fetch API); E2E/dev still on Express; drop `buffer-polyfill` build step once verified |
 
 ---
 
