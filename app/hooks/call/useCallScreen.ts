@@ -29,7 +29,7 @@ import {
 } from "@/hooks/call/useCampaignDialActions";
 import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
 import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
-import { getCallSid } from "@/lib/twilio/twilio-call-adapter.client";
+import { getCallSid } from "@/lib/twilio/twilio-call-params";
 import { KEYPAD_KEYS } from "@/lib/dtmf";
 import type {
   AppUser,
@@ -183,7 +183,10 @@ export function useCallScreen() {
 
   const fetcher = useFetcher<{ creditsError?: boolean }>();
   const submit = fetcher.submit;
-  const creditsError = fetcher.data?.creditsError || conferenceCreditsError;
+  const creditsError =
+    fetcher.data?.creditsError ||
+    conferenceCreditsError ||
+    (credits ?? 0) <= 0;
 
   const { startCall } = handleCall({ submit });
   const { handleConferenceEnd } = handleConference({

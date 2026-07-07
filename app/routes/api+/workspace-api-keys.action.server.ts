@@ -5,8 +5,7 @@ import {
   createApiKeyBodySchema,
   deleteApiKeyBodySchema,
 } from "@/lib/schemas/api/platform-workspace-admin";
-import {
-  createWorkspaceApiKey,
+import { createWorkspaceApiKey,
   deleteWorkspaceApiKey,
   listWorkspaceApiKeys,
 } from "@/lib/platform-members.server";

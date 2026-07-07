@@ -228,11 +228,13 @@ async function seed() {
 
   const campaigns = [
     campaignBase(CAMPAIGNS.liveCall, readyId, "E2E Live Call", "live_call", {
+      is_active: true,
       script_id: SCRIPT_IDS.live,
       disposition_options: ["answered", "no_answer", "busy"],
       live_questions: {},
     }),
     campaignBase(CAMPAIGNS.livePredictive, readyId, "E2E Predictive Live", "live_call", {
+      is_active: true,
       dial_type: "predictive",
       script_id: SCRIPT_IDS.live,
       disposition_options: ["answered", "no_answer", "busy"],
@@ -382,7 +384,7 @@ async function seed() {
     await sql`
       INSERT INTO campaign_queue (
         id, campaign_id, contact_id, queue_order, queue_state,
-        attempts, attempt_count, assigned_to_user_id, created_at
+        attempts, attempt_count, assigned_to_user_id, created_at, workspace
       )
       VALUES (
         ${980001 + i},
@@ -393,7 +395,8 @@ async function seed() {
         0,
         0,
         ${USERS.owner.id},
-        ${new Date().toISOString()}
+        ${new Date().toISOString()},
+        ${readyId}
       )
       ON CONFLICT (id) DO UPDATE SET
         campaign_id = EXCLUDED.campaign_id,
@@ -410,7 +413,7 @@ async function seed() {
     await sql`
       INSERT INTO campaign_queue (
         id, campaign_id, contact_id, queue_order, queue_state,
-        attempts, attempt_count, created_at
+        attempts, attempt_count, created_at, workspace
       )
       VALUES (
         ${980010 + i},
@@ -420,7 +423,8 @@ async function seed() {
         'queued',
         0,
         0,
-        ${new Date().toISOString()}
+        ${new Date().toISOString()},
+        ${readyId}
       )
       ON CONFLICT (id) DO UPDATE SET
         campaign_id = EXCLUDED.campaign_id,

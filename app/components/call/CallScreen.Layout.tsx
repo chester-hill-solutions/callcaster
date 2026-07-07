@@ -116,6 +116,22 @@ export function CallScreenLayout({
 
   return (
     <div className="w-full space-y-6">
+      {Number(credits) <= 0 ? (
+        <div
+          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center"
+          data-testid="credits-error-banner"
+          role="alert"
+        >
+          <p className="font-Zilla-Slab text-xl font-semibold">
+            {hasAccess ? "No Credits Remaining" : "Campaign Disabled"}
+          </p>
+          <p className="mt-2 text-sm">
+            {hasAccess
+              ? "Purchase more credits to continue this campaign."
+              : "Please contact your administrator to enable the campaign."}
+          </p>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4 rounded-2xl border-2 border-brand-secondary/40 p-4 sm:p-6 lg:flex-row lg:items-start">
         <CampaignHeader
           className="min-w-0 flex-1"
@@ -257,7 +273,8 @@ export function CallScreenLayout({
         householdMap={householdMap}
         currentState={currentState}
         isActive={isActive}
-        creditsError={credits === 0 || creditsError}
+        credits={credits}
+        creditsError={Number(credits) <= 0 || creditsError}
         hasAccess={hasAccess}
       />
     </div>

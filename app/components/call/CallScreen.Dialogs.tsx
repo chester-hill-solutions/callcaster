@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Form, NavLink, useFetcher, useNavigate, useNavigation } from "react-router";
+import { Form, NavLink, useFetcher, useNavigate } from "react-router";
 import { QueueItem } from "@/lib/types";
 
 interface CampaignDialogsProps {
@@ -26,6 +26,7 @@ interface CampaignDialogsProps {
   fetchMore: (params: Record<string, unknown>) => void;
   householdMap: Record<string, QueueItem[]>;
   isActive: boolean;
+  credits?: number;
   creditsError?: boolean;
   hasAccess: boolean;
 }
@@ -42,12 +43,14 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   householdMap,
   currentState,
   isActive,
+  credits,
   creditsError,
   hasAccess
 }) => {
   const [errorDescription, setErrorDescription] = useState<string>('');
-  const [isCreditsDialogOpen, setCreditsDialogOpen] = useState(!!creditsError);
-  const { state } = useNavigation();
+  const noCredits = Number(credits ?? 0) <= 0;
+  const shouldBlockForCredits = noCredits || Boolean(creditsError);
+  const [isCreditsDialogOpen, setCreditsDialogOpen] = useState(shouldBlockForCredits);
   const fetcher = useFetcher();
   const navigate = useNavigate();
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
@@ -66,10 +69,10 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   };
 
   useEffect(() => {
-    if (state === 'idle') {
-      setCreditsDialogOpen(!!creditsError)
-    }
-  }, [creditsError, state])
+    setCreditsDialogOpen(shouldBlockForCredits);
+  }, [shouldBlockForCredits]);
+
+  const showCreditsDialog = shouldBlockForCredits || isCreditsDialogOpen;
 
   return (
     <>
@@ -193,8 +196,14 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog onOpenChange={setCreditsDialogOpen} open={isCreditsDialogOpen}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+      <Dialog
+        onOpenChange={setCreditsDialogOpen}
+        open={showCreditsDialog}
+      >
+        <DialogContent
+          className="flex w-[450px] flex-col items-center bg-card"
+          data-testid="credits-error-dialog"
+        >
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               {hasAccess ? 'No Credits Remaining' : 'Campaign Disabled'}

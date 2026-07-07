@@ -19,9 +19,14 @@ export async function setWorkspaceCredits(workspaceId: string, credits: number):
     .update(workspaceTable)
     .set({ credits })
     .where(eq(workspaceTable.id, workspaceId))
-    .returning();
+    .returning({ credits: workspaceTable.credits });
   if (result.length === 0) {
     throw new Error(`Workspace ${workspaceId} not found`);
+  }
+  if (result[0]?.credits !== credits) {
+    throw new Error(
+      `Workspace ${workspaceId} credits expected ${credits}, got ${result[0]?.credits}`,
+    );
   }
 }
 

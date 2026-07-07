@@ -13,6 +13,7 @@ import {
   handleUpdateWebhook,
   removeInvite,
 } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { createWorkspaceApiKey } from "@/lib/platform-members.server";
 import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/auth.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
@@ -44,6 +45,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     case "deleteUser":
     case "cancelInvite":
     case "updateWebhook": {
+      if (!hasMinRole(role, MemberRole.Member)) {
+        return routeData(
+          { error: "You don't have permission to perform this action" },
+          { headers, status: 403 },
+        );
+      }
+      break;
+    }
+    case "createApiKey": {
       if (!hasMinRole(role, MemberRole.Member)) {
         return routeData(
           { error: "You don't have permission to perform this action" },
@@ -101,6 +111,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
     case "updateWebhook": {
       return handleUpdateWebhook(formData, workspaceId, headers);
+    }
+    case "createApiKey": {
+      const name = String(formData.get("name") ?? "").trim();
+      if (!name) {
+        return routeData({ error: "API key name is required" }, { headers, status: 400 });
+      }
+
+      const result = await createWorkspaceApiKey(user.id, workspaceId, name);
+      if (!result.ok) {
+        return routeData({ error: result.error }, { headers, status: result.status });
+      }
+
+      return routeData({ key: result.key }, { headers });
     }
     default: {
       break;

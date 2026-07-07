@@ -1,6 +1,6 @@
 export { action } from "./new.action.server";
 
-import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
+import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation, useSearchParams } from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
 import {
@@ -14,7 +14,7 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/typography";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
 import type { Database } from "@/lib/db-types";
 
@@ -26,9 +26,13 @@ export default function AudiencesNew() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   
+  const [searchParams] = useSearchParams();
+  const initialStep = searchParams.get("step") === "upload" ? 2 : 1;
+  const initialName = searchParams.get("name") ?? "";
+
   // Multi-step form state
-  const [currentStep, setCurrentStep] = useState(1);
-  const [audienceName, setAudienceName] = useState("");
+  const [currentStep, setCurrentStep] = useState(initialStep);
+  const [audienceName, setAudienceName] = useState(initialName);
   
   useOutletContext<{ }>();
 
@@ -92,49 +96,61 @@ export default function AudiencesNew() {
                 Process
               </TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="step-1" className="space-y-4">
+
+            {currentStep === 1 ? (
+              <div className="space-y-4">
               <form onSubmit={handleCreateAudience} className="space-y-6">
                 <FormField htmlFor="audience-name" label="Audience Name">
                   <Input
                     type="text"
                     name="audience-name"
                     id="audience-name"
-                    value={audienceName}
+                    aria-label="Audience Name"
+                    defaultValue=""
                     onChange={(e) => setAudienceName(e.target.value)}
                     required
                   />
                 </FormField>
-                
-                <BrandedCardActions>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => window.history.back()}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={!audienceName || isSubmitting}
-                    className="bg-brand-primary text-white hover:bg-brand-secondary"
-                  >
-                    Create Empty Audience
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={goToNextStep}
-                    disabled={!audienceName}
-                    className="bg-brand-primary text-white hover:bg-brand-secondary"
-                  >
-                    Next: Upload Contacts <MdArrowForward className="ml-2" />
-                  </Button>
-                </BrandedCardActions>
+
+                <Button
+                  type="submit"
+                  disabled={!audienceName || isSubmitting}
+                  className="bg-brand-primary text-white hover:bg-brand-secondary"
+                >
+                  Create Empty Audience
+                </Button>
               </form>
-            </TabsContent>
-            
-            <TabsContent value="step-2" className="space-y-4">
-              <div className="text-center mb-4">
+
+              <BrandedCardActions>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => window.history.back()}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  data-testid="audience-next-upload"
+                  onClick={() => {
+                    const input = document.getElementById(
+                      "audience-name",
+                    ) as HTMLInputElement | null;
+                    const trimmed = input?.value.trim();
+                    if (trimmed) setAudienceName(trimmed);
+                    goToNextStep();
+                  }}
+                  className="bg-brand-primary text-white hover:bg-brand-secondary"
+                >
+                  Next: Upload Contacts <MdArrowForward className="ml-2" />
+                </Button>
+              </BrandedCardActions>
+              </div>
+            ) : null}
+
+            {currentStep === 2 ? (
+              <div className="space-y-4">
+              <div className="text-center mb-4" data-testid="audience-upload-step">
                 <h3 className="text-lg font-medium">Upload Contacts</h3>
                 <Text variant="muted" className="text-center">
                   Upload a CSV file with your contacts. You'll be able to map the columns in the next step.
@@ -156,16 +172,19 @@ export default function AudiencesNew() {
                   </Button>
                 </div>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="step-3" className="space-y-4">
+              </div>
+            ) : null}
+
+            {currentStep === 3 ? (
+              <div className="space-y-4">
               <div className="text-center">
                 <h3 className="text-lg font-medium mb-2">Upload Complete</h3>
                 <Text variant="muted">
                   Your audience has been created and contacts are being processed.
                 </Text>
               </div>
-            </TabsContent>
+              </div>
+            ) : null}
           </Tabs>
         </BrandedCardContent>
       </BrandedCard>

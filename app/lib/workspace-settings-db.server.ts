@@ -4,6 +4,7 @@ import { requireWorkspaceAccess } from "@/lib/database.server";
 import {
   getWorkspaceById,
   getWorkspaceWebhookRow,
+  listWorkspaceApiKeyRows,
   listWorkspaceInvitesEnriched,
   listWorkspaceMembersEnriched,
 } from "@/lib/workspace-members-db.server";
@@ -21,6 +22,7 @@ export type WorkspaceSettingsPageData = {
   pendingInvites: (WorkspaceInvite & { user: Partial<User> | null })[];
   webhook: WorkspaceWebhook | null;
   hasAccess: boolean;
+  apiKeys: Awaited<ReturnType<typeof listWorkspaceApiKeyRows>>;
 };
 
 export async function getWorkspaceSettingsPageData(
@@ -49,6 +51,10 @@ export async function getWorkspaceSettingsPageData(
     id: member.user_id,
     username: member.username,
   }));
+  const hasAccess = userRole !== MemberRole.Caller;
+  const apiKeys = hasAccess
+    ? await listWorkspaceApiKeyRows(workspaceId, tdb)
+    : [];
 
   return {
     workspace: { id: workspace.id, name: workspace.name },
@@ -60,6 +66,7 @@ export async function getWorkspaceSettingsPageData(
       user: invite.user ?? {},
     })),
     webhook: (webhookRow as WorkspaceWebhook | null) ?? null,
-    hasAccess: userRole !== MemberRole.Caller,
+    hasAccess,
+    apiKeys,
   };
 }

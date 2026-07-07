@@ -22,6 +22,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       pendingInvites: settings.pendingInvites,
       webhook: settings.webhook,
       hasAccess: settings.hasAccess,
+      apiKeys: settings.apiKeys,
     },
     { headers },
   );

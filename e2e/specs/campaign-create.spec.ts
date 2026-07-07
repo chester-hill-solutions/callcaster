@@ -1,6 +1,6 @@
 import { ownerTest, expect } from "../fixtures/test-base";
 import { E2E_WORKSPACES, workspacePath } from "../fixtures/seed";
-import { selectRadixOption } from "../fixtures/ui-helpers";
+import { selectCampaignType } from "../fixtures/ui-helpers";
 
 ownerTest.describe("Campaign create @authenticated", () => {
   for (const [type, label] of [
@@ -13,7 +13,7 @@ ownerTest.describe("Campaign create @authenticated", () => {
       await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "campaigns/new"));
       await page.locator("#campaign-name").fill(uniqueName);
       if (type !== "live_call") {
-        await selectRadixOption(page, "#campaign-type", label);
+        await selectCampaignType(page, type);
       }
       await page.getByRole("button", { name: "Add Campaign" }).click();
       await expect(page).toHaveURL(/\/campaigns\/\d+\/settings/);

@@ -4,16 +4,7 @@ export { action } from "./settings.action.server";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import {
-  Form,
-  Link,
-  NavLink,
-  Outlet,
-  useActionData,
-  useLoaderData,
-  useOutlet,
-  useOutletContext,
-} from "react-router";
+import { Form, Link, NavLink, Outlet, useSearchParams, useActionData, useLoaderData, useOutlet, useOutletContext } from "react-router";
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
@@ -48,7 +39,14 @@ type LoaderData = {
   pendingInvites: (WorkspaceInvite & {user: Partial<User>})[];
   webhook: WorkspaceWebhook;
   hasAccess: boolean;
-}   
+  apiKeys: {
+    id: string;
+    name: string;
+    key_prefix: string;
+    created_at: string;
+    last_used_at: string | null;
+  }[];
+}
 
 type WorkspaceNumbers = {
   id: string;
@@ -69,7 +67,10 @@ export default function WorkspaceSettings() {
     pendingInvites,
     webhook,
     workspace,
+    apiKeys,
   } = useLoaderData<LoaderData>();
+  const [searchParams] = useSearchParams();
+  const showApiKeyCreateForm = searchParams.get("create") === "1";
   const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
   const outletContext = useOutletContext<{
     workspace: WorkspaceData;
@@ -335,6 +336,8 @@ export default function WorkspaceSettings() {
         <ApiKeysSection
           workspaceId={workspaceRecord?.id ?? ""}
           hasAccess={hasAccess}
+          initialKeys={apiKeys}
+          defaultShowCreateForm={showApiKeyCreateForm}
           variant="flat"
         />
       ) : null}

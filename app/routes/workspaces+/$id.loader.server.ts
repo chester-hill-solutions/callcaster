@@ -14,7 +14,7 @@ import type { User } from "@/lib/types";
 
 type LoaderData = {
   userRole: string | null | undefined;
-  workspaceData: Promise<WorkspaceInfoWithDetails>;
+  workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
 };
 
@@ -67,14 +67,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
     }
 
-    const workspacePromise = getWorkspaceInfoWithDetails({
+    const workspaceData = await getWorkspaceInfoWithDetails({
       workspaceId,
       userId: user.id,
     });
 
     return routeData({
       userRole: userRole,
-      workspaceData: workspacePromise,
+      workspaceData,
       onboardingReadiness: readiness,
       headers,
     });

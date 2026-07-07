@@ -142,9 +142,16 @@ export async function handleNewCampaign({formData,
   workspaceId,
   headers,
 }: NewCampaignParams) {
-  const newCampaignName = formData.get("campaign-name") as string;
+  const newCampaignName = (formData.get("campaign-name") as string | null)?.trim() ?? "";
   const newCampaignType = formData.get("campaign-type") as CampaignType;
   logger.debug("Campaign Type: ", newCampaignType);
+
+  if (!newCampaignName) {
+    return routeData(
+      { campaignData: null, error: { message: "Campaign name is required" } },
+      { headers },
+    );
+  }
 
   const { start_date, end_date } = getDefaultCampaignDates();
   const phoneNumbersResult = await getWorkspacePhoneNumbers({

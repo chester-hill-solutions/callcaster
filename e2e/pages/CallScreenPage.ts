@@ -15,6 +15,16 @@ export class CallScreenPage {
   }
 
   async dismissBlockingDialogs(): Promise<void> {
+    const creditsDialog = this.page.getByRole("dialog").filter({
+      hasText: /No Credits Remaining|Campaign Disabled/i,
+    });
+    if (await creditsDialog.isVisible().catch(() => false)) {
+      return;
+    }
+    const inactiveDialog = this.page.getByText("This campaign is currently inactive.");
+    if (await inactiveDialog.isVisible().catch(() => false)) {
+      await this.page.keyboard.press("Escape");
+    }
     const getStarted = this.page.getByRole("button", { name: "Get started" });
     if (await getStarted.isVisible().catch(() => false)) {
       await getStarted.click();

@@ -1,4 +1,4 @@
-import { useFetcher } from "react-router";
+import { Form, useActionData, useFetcher } from "react-router";
 import { useEffect, useState } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
@@ -19,32 +19,56 @@ type ApiKeyRecord = {
 type ApiKeysSectionProps = {
   workspaceId: string;
   hasAccess: boolean;
+  initialKeys?: ApiKeyRecord[];
+  defaultShowCreateForm?: boolean;
   variant?: "elevated" | "flat";
 };
 
 export default function ApiKeysSection({
   workspaceId,
   hasAccess,
+  initialKeys = [],
+  defaultShowCreateForm = false,
   variant = "elevated",
 }: ApiKeysSectionProps) {
   const listFetcher = useFetcher<{ keys?: ApiKeyRecord[]; error?: string }>({
     key: "api-keys-list",
   });
   const mutateFetcher = useFetcher<
-    | { key?: string; id?: string; name?: string; key_prefix?: string; created_at?: string }
     | { success?: boolean }
     | { error?: string }
   >({ key: "api-keys-mutate" });
+  const actionData = useActionData<{ key?: string; error?: string }>();
 
-  const [createName, setCreateName] = useState("");
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newKeyReveal, setNewKeyReveal] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(
+    defaultShowCreateForm && !actionData?.key,
+  );
+  const [newKeyReveal, setNewKeyReveal] = useState<string | null>(actionData?.key ?? null);
+  const revealedKey = newKeyReveal ?? actionData?.key ?? null;
 
   useEffect(() => {
-    if (workspaceId && hasAccess) {
+    if (workspaceId && hasAccess && initialKeys.length === 0) {
       listFetcher.load(`/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`);
     }
-  }, [workspaceId, hasAccess]);
+  }, [workspaceId, hasAccess, initialKeys.length]);
+
+  useEffect(() => {
+    if (actionData?.key) {
+      setNewKeyReveal(actionData.key);
+      setShowCreateForm(false);
+      listFetcher.load(
+        `/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`,
+      );
+    }
+  }, [actionData, workspaceId]);
+
+  useActionFeedback(actionData, {
+    getError: (data) =>
+      data && typeof data === "object" && "error" in data
+        ? String((data as { error?: string }).error ?? "")
+        : undefined,
+    getSuccess: () => false,
+  });
 
   useActionFeedback(mutateFetcher.data, {
     getError: (data) =>
@@ -52,15 +76,6 @@ export default function ApiKeysSection({
         ? String((data as { error?: string }).error ?? "")
         : undefined,
     onSuccess: (data) => {
-      if (data && "key" in data && data.key) {
-        setNewKeyReveal(data.key);
-        setShowCreateForm(false);
-        setCreateName("");
-        listFetcher.load(
-          `/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`,
-        );
-        return;
-      }
       if (data && "success" in data) {
         listFetcher.load(
           `/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`,
@@ -68,33 +83,20 @@ export default function ApiKeysSection({
       }
     },
     getSuccess: (data) =>
-      Boolean(
-        data &&
-          (("key" in data && Boolean(data.key)) ||
-            ("success" in data && data.success)),
-      ),
+      Boolean(data && "success" in data && data.success),
   });
 
-  const keys: ApiKeyRecord[] = listFetcher.data?.keys ?? [];
-  const isLoading = listFetcher.state === "loading" || listFetcher.state === "idle";
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createName.trim()) return;
-    mutateFetcher.submit(
-      { workspace_id: workspaceId, name: createName.trim() },
-      {
-        method: "POST",
-        action: "/api/workspace-api-keys",
-        encType: "application/json",
-      }
-    );
-  };
+  const keys: ApiKeyRecord[] = listFetcher.data?.keys ?? initialKeys;
+  const isLoading =
+    listFetcher.state === "loading" ||
+    (listFetcher.state === "idle" &&
+      listFetcher.data === undefined &&
+      initialKeys.length === 0);
 
   const handleRevoke = (id: string) => {
     if (!confirm("Revoke this API key? It will stop working immediately.")) return;
     mutateFetcher.submit(
-      { id, workspace_id: workspaceId },
+      JSON.stringify({ id, workspace_id: workspaceId }),
       {
         method: "DELETE",
         action: "/api/workspace-api-keys",
@@ -156,7 +158,7 @@ export default function ApiKeysSection({
                     variant="destructive"
                     size="sm"
                     onClick={() => handleRevoke(key.id)}
-                    disabled={mutateFetcher.state !== "idle"}
+                    disabled={mutateFetcher.state === "submitting"}
                   >
                     Revoke
                   </Button>
@@ -165,7 +167,7 @@ export default function ApiKeysSection({
             </ul>
           )}
 
-        {newKeyReveal ? (
+        {revealedKey ? (
           <div
             className="rounded-md border border-warning/50 bg-warning/10 p-3"
             data-testid="api-key-reveal"
@@ -175,7 +177,7 @@ export default function ApiKeysSection({
               </p>
             <div className="flex flex-wrap gap-2">
               <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-sm">
-                  {newKeyReveal}
+                  {revealedKey}
                 </code>
                 <Button type="button" size="sm" onClick={copyKey}>
                   Copy
@@ -192,39 +194,40 @@ export default function ApiKeysSection({
           </div>
         ) : null}
 
-        {showCreateForm ? (
-          <form onSubmit={handleCreate} className="flex flex-col gap-2">
+        {showCreateForm && !revealedKey ? (
+          <Form method="post" className="flex flex-col gap-2" data-testid="api-key-create-form">
+              <input type="hidden" name="formName" value="createApiKey" />
               <FormField htmlFor="api-key-name" label="Key name">
                 <Input
                   aria-label="Key name"
                   id="api-key-name"
+                  name="name"
                   type="text"
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
+                  required
+                  defaultValue=""
                   placeholder="e.g. Production, Zapier"
               />
               </FormField>
               <div className="flex gap-2">
-                <Button
-                  type="submit"
-                  disabled={!createName.trim() || mutateFetcher.state !== "idle"}
-                >
+                <Button type="submit" data-testid="api-key-submit">
                   Create key
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setCreateName("");
-                  }}
+                  onClick={() => setShowCreateForm(false)}
                 >
                   Cancel
                 </Button>
               </div>
-          </form>
+          </Form>
         ) : (
-          <Button type="button" variant="outline" onClick={() => setShowCreateForm(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="api-key-create-button"
+            onClick={() => setShowCreateForm(true)}
+          >
             Create API key
           </Button>
         )}

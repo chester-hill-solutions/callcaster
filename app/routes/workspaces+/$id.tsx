@@ -1,16 +1,6 @@
 export { loader } from "./$id.loader.server";
 
-import { Suspense } from "react";
-import {
-  Await,
-  useLoaderData,
-  Outlet,
-  useOutlet,
-  useOutletContext,
-  data as routeData,
-  redirect,
-  type LoaderFunctionArgs,
-} from "react-router";
+import { useLoaderData, Outlet, useOutlet, useOutletContext } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -26,7 +16,7 @@ import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 
 type LoaderData = {
   userRole: string | null | undefined;
-  workspaceData: Promise<WorkspaceInfoWithDetails>;
+  workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
 };
 
@@ -158,26 +148,13 @@ export default function Workspace() {
 
   return (
     <main className="mx-auto flex min-h-[80vh] w-full flex-col px-4 py-6 sm:px-6">
-      <Suspense fallback={<div>Loading workspace...</div>}>
-        <Await
-          resolve={workspaceData}
-          errorElement={<div>Error loading workspace</div>}
-        >
-          {(resolvedData) => {
-            return (
-              <WorkspaceResolvedView
-                resolvedData={
-                  resolvedData as unknown as WorkspaceInfoWithDetails
-                }
-                userRole={userRole}
-                outlet={outlet}
-                context={context}
-                onboardingReadiness={onboardingReadiness}
-              />
-            );
-          }}
-        </Await>
-      </Suspense>
+      <WorkspaceResolvedView
+        resolvedData={workspaceData}
+        userRole={userRole}
+        outlet={outlet}
+        context={context}
+        onboardingReadiness={onboardingReadiness}
+      />
     </main>
   );
 }

@@ -57,12 +57,12 @@ export default function CampaignsNew() {
           <BrandedCardContent>
             <input type="hidden" name="formAction" value="newCampaign" />
             <FormField htmlFor="campaign-name" label="Campaign Name">
-              <Input type="text" name="campaign-name" id="campaign-name" />
+              <Input type="text" name="campaign-name" id="campaign-name" required />
             </FormField>
-            <FormField htmlFor="campaign-type" label="Campaign Type">
+            <FormField htmlFor="campaign-type-trigger" label="Campaign Type">
               <input type="hidden" name="campaign-type" value={campaignType} />
               <Select value={campaignType} onValueChange={setCampaignType}>
-                <SelectTrigger id="campaign-type">
+                <SelectTrigger id="campaign-type-trigger" data-testid="campaign-type">
                   <SelectValue placeholder="Select campaign type" />
                 </SelectTrigger>
                 <SelectContent>

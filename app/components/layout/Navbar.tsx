@@ -99,16 +99,15 @@ const UserDropdownMenu = ({
           </NavLink>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Button
-            id="logoutButton"
-            variant="ghost"
-            className="w-full justify-start font-Zilla-Slab"
-            onClick={handleSignOut}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Log Out</span>
-          </Button>
+        <DropdownMenuItem
+          id="logoutButton"
+          data-testid="logout-button"
+          onSelect={() => {
+            void handleSignOut();
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Log Out</span>
         </DropdownMenuItem>
         {workspaceId && (
           <>

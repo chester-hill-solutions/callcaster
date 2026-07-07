@@ -70,7 +70,8 @@ test.describe("RBAC @rbac @security", () => {
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 0);
     const callScreen = new CallScreenPage(page);
     await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
-    await expect(page.getByText(/Campaign Disabled|contact your administrator/i).first()).toBeVisible();
+    await expect(page.getByTestId("credits-error-banner")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Campaign Disabled/i)).toBeVisible();
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
   });
 });

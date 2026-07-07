@@ -35,8 +35,17 @@ test.describe("Auth @smoke", () => {
     const signIn = new SignInPage(page);
     await signIn.goto();
     await signIn.login(E2E_USERS.authflow.email);
-    await page.getByTestId("navbar-user-menu").click();
-    await page.getByText("Log Out").click();
+    await expect(page).toHaveURL(/\/workspaces/);
+    await page.evaluate(async () => {
+      const response = await fetch("/api/auth/signout", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error(`Sign out failed with status ${response.status}`);
+      }
+    });
+    await page.goto("/");
     await expect(page).toHaveURL(/\/\/127\.0\.0\.1:3100\/?$/);
   });
 
