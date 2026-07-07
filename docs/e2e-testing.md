@@ -6,7 +6,7 @@ Browser E2E tests use [Playwright](https://playwright.dev/) against a production
 
 - Docker (for compose Postgres + MinIO + Inbucket)
 - Node 20+
-- Bun (optional; E2E server uses Express via `server/index.js` until Bun handler is fixed)
+- Bun 1.2+ (production server and E2E use `server/bun.ts`)
 
 ## Quick start (compose-first — recommended)
 
@@ -14,7 +14,7 @@ Browser E2E tests use [Playwright](https://playwright.dev/) against a production
 npm run test:e2e:compose
 ```
 
-This runs: `docker compose -f docker-compose.dev.yml up` (Postgres on **127.0.0.1:5433**, MinIO, Inbucket) → Drizzle bootstrap (`drizzle/0000`–`0005` + ledger RPC + legacy trigger cleanup) → Better Auth seed → `npm run build` → Express server on port **3100** → Playwright.
+This runs: `docker compose -f docker-compose.dev.yml up` (Postgres on **127.0.0.1:5433**, MinIO, Inbucket) → Drizzle bootstrap (`drizzle/0000`–`0005` + ledger RPC + legacy trigger cleanup) → Better Auth seed → `npm run build` → Bun server on port **3100** → Playwright.
 
 **G4 gate:** **77/77** specs pass on this stack (2026-07-07). Railway review smoke is optional staging only.
 

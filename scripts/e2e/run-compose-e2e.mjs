@@ -139,7 +139,7 @@ function freePort(port) {
 
 console.log(`[e2e-compose] starting server on ${baseURL}…`);
 freePort(e2ePort);
-const server = runAsync("node", ["./server/index.js"], serverEnv);
+const server = runAsync("bun", ["run", "./server/bun.ts"], serverEnv);
 server.on("exit", (code, signal) => {
   if (code != null && code !== 0) {
     console.error(`[e2e-compose] server exited early code=${code} signal=${signal ?? ""}`);

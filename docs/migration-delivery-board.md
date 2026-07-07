@@ -146,7 +146,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3E.2 | Bulk Supabase → Railway Buckets copy | **Done** | App code no longer references Supabase Storage; zero `@supabase` imports in app/ |
 | 3E.3 | Wire MinIO local dev | **Done** | `docker-compose.dev.yml` includes MinIO; S3-compatible adapter works with any S3 endpoint |
 | 3F.1 | Bun start script + Dockerfile | **Done** | `server/bun.ts` + `Dockerfile` created; `start:bun` script added |
-| 3F.2 | Remove Express + buffer-polyfill | **Partial** | Bun server uses `createRequestHandler` from `react-router` (Web Fetch API); E2E/dev still on Express; drop `buffer-polyfill` build step once verified |
+| 3F.2 | Remove Express + buffer-polyfill | **Done** | `server/bun.ts` is the sole production/E2E server (Twilio raw-body middleware, static, probes); Express `server/index.js` deleted; `build:buffer-polyfill` removed; `npm run dev` → `react-router dev` |
 
 ---
 
@@ -215,9 +215,9 @@ gantt
 
 1. **G4 review smoke** — Manual Twilio checklist on Railway review URL (`docs/manual-test-plan-zero-supabase.md`)
 2. **3D.4 verify** — Run admin `repoint_twilio_webhooks` on review subaccount and confirm Twilio console URLs
-3. **3F.2 Bun handler** — Switch `server/bun.ts` to `@react-router/node` `createRequestHandler` (Express adapter breaks on raw `Request`)
-4. **1.14 / schema sync** — Regenerate or hand-sync `app/db/schema.ts` against squashed baseline after transform tail
-5. **Phase 5 prep** — Maintenance window, final delta dump, env flip checklist
+3. **1.14 / schema sync** — Regenerate or hand-sync `app/db/schema.ts` against squashed baseline after transform tail
+4. **Phase 5 prep** — Maintenance window, final delta dump, env flip checklist
+5. **Compose E2E on Bun** — Re-run `npm run test:e2e:compose` after 3F.2 cutover (77/77 gate)
 
 ---
 

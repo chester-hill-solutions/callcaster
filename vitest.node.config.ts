@@ -9,7 +9,7 @@ export default mergeConfig(
       environment: "node",
       testTimeout: 60000,
       include: ["test/**/*.test.ts"],
-      exclude: ["test/ui/**"],
+      exclude: ["test/ui/**", "test/server-runtime.test.ts"],
       setupFiles: ["test/setup.node.ts"],
       coverage: {
         provider: "istanbul",

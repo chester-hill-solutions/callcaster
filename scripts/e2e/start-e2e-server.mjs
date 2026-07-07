@@ -51,7 +51,7 @@ async function waitForReady(readyUrl, attempts = 90) {
   throw new Error(`Server not ready at ${readyUrl}/readyz`);
 }
 
-const child = spawn("node", ["./server/index.js"], {
+const child = spawn("bun", ["run", "./server/bun.ts"], {
   cwd: rootDir,
   env,
   stdio: "inherit",

@@ -3,7 +3,7 @@ import {
   validateRequiredEnv as validateRequiredEnvImpl,
 } from "./required-env-keys.mjs";
 
-/** Required process.env keys for server boot (shared with server/index.js). */
+/** Required process.env keys for server boot (shared with server/bun.ts). */
 export const REQUIRED_ENV_KEYS = REQUIRED_ENV_KEYS_LIST as readonly string[];
 
 export type RequiredEnvKey = (typeof REQUIRED_ENV_KEYS)[number];

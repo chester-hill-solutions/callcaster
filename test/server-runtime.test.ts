@@ -1,105 +1,63 @@
-import { once } from "node:events";
-import { request as httpRequest } from "node:http";
-import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, test } from "vitest";
-import { createApp, createHttpServer, validateEnvironment } from "../server/index.js";
+import { afterEach, describe, expect, test } from "bun:test";
+import { createServer, validateEnvironment } from "../server/bun.ts";
 
-type TestServer = ReturnType<typeof createHttpServer>;
-
-const servers = new Set<TestServer>();
+const servers = new Set<ReturnType<typeof Bun.serve>>();
 
 afterEach(async () => {
-  await Promise.all(
-    [...servers].map(
-      (server) =>
-        new Promise<void>((resolve, reject) => {
-          server.close((error) => {
-            servers.delete(server);
-
-            if (error) {
-              reject(error);
-              return;
-            }
-
-            resolve();
-          });
-        }),
-    ),
-  );
+  for (const server of servers) {
+    server.stop(true);
+    servers.delete(server);
+  }
 });
 
 async function startTestServer(acceptingTraffic = true) {
   const readyState = { acceptingTraffic, buildReady: true };
-  const app = createApp({
+  const server = await createServer({
     build: {},
     readyState,
-    remixHandler: (_request, response) => {
-      response.status(204).end();
-    },
+    skipDbHealthCheck: true,
+    port: 0,
+    requestHandler: async () => new Response(null, { status: 204 }),
   });
-  const server = createHttpServer(app);
 
   servers.add(server);
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
 
-  return { server, readyState };
+  return { server, readyState, port: server.port! };
 }
 
-async function requestServer(server: TestServer, pathname: string) {
-  const address = server.address() as AddressInfo;
+async function requestServer(port: number, pathname: string) {
+  const response = await fetch(`http://127.0.0.1:${port}${pathname}`, {
+    method: "GET",
+  });
+  const body = await response.text();
 
-  return new Promise<{ statusCode: number; headers: Record<string, string | string[] | undefined>; body: string }>(
-    (resolve, reject) => {
-      const request = httpRequest(
-        {
-          host: "127.0.0.1",
-          port: address.port,
-          path: pathname,
-          method: "GET",
-        },
-        (response) => {
-          const chunks: Buffer[] = [];
-
-          response.on("data", (chunk) => {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          });
-          response.on("end", () => {
-            resolve({
-              statusCode: response.statusCode ?? 0,
-              headers: response.headers,
-              body: Buffer.concat(chunks).toString("utf8"),
-            });
-          });
-        },
-      );
-
-      request.on("error", reject);
-      request.end();
-    },
-  );
+  return {
+    statusCode: response.status,
+    headers: Object.fromEntries(response.headers.entries()),
+    body,
+  };
 }
 
 describe("server runtime", () => {
   test("serves health and readiness probes with request ids", async () => {
-    const { server } = await startTestServer(true);
+    const { port } = await startTestServer(true);
 
-    const health = await requestServer(server, "/healthz");
-    const ready = await requestServer(server, "/readyz");
+    const health = await requestServer(port, "/healthz");
+    const ready = await requestServer(port, "/readyz");
 
     expect(health.statusCode).toBe(200);
     expect(health.body).toBe(JSON.stringify({ ok: true }));
-    expect(health.headers["x-request-id"]).toBeTypeOf("string");
+    expect(typeof health.headers["x-request-id"]).toBe("string");
 
     expect(ready.statusCode).toBe(200);
     expect(ready.body).toBe(JSON.stringify({ ok: true }));
   });
 
   test("returns 503 for readiness during drain", async () => {
-    const { server, readyState } = await startTestServer(true);
+    const { port, readyState } = await startTestServer(true);
     readyState.acceptingTraffic = false;
 
-    const ready = await requestServer(server, "/readyz");
+    const ready = await requestServer(port, "/readyz");
 
     expect(ready.statusCode).toBe(503);
     expect(ready.body).toBe(

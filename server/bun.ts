@@ -8,16 +8,34 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
+import { isTwilioWebhookPath } from "./twilio-webhook-paths.ts";
+type TwilioWebhookModule = typeof import("./twilio-webhook.ts");
+let twilioWebhookModule: TwilioWebhookModule | null = null;
+
+async function getTwilioWebhookModule() {
+  twilioWebhookModule ??= await import("./twilio-webhook.ts");
+  return twilioWebhookModule;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const BUILD_PATH = path.resolve(ROOT_DIR, "build/server/index.js");
+const PUBLIC_DIR = path.resolve(ROOT_DIR, "public");
 const CLIENT_BUILD_DIR = path.resolve(ROOT_DIR, "build/client");
+const CLIENT_ASSETS_DIR = path.resolve(CLIENT_BUILD_DIR, "assets");
 const HOST = process.env.HOST ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const SHUTDOWN_GRACE_PERIOD_MS = 10_000;
 const PROBE_PATHS = new Set(["/healthz", "/readyz"]);
+const FATAL_ON_REJECTION =
+  process.env.PROCESS_FATAL_ON_REJECTION === "1" ||
+  process.env.PROCESS_FATAL_ON_REJECTION === "true";
+
+export type ReadyState = {
+  acceptingTraffic: boolean;
+  buildReady: boolean;
+};
 
 export function validateEnvironment(env = process.env) {
   validateRequiredEnv(env);
@@ -27,13 +45,19 @@ export async function loadBuild(buildPath = BUILD_PATH) {
   return import(pathToFileURL(buildPath).href);
 }
 
-function log(level, message, details) {
+function log(
+  level: "info" | "warn" | "error",
+  message: string,
+  details?: unknown,
+) {
   const timestamp = new Date().toISOString();
   const entry = {
     timestamp,
     level,
     message,
-    ...(details && typeof details === "object" ? details : { detail: details }),
+    ...(details && typeof details === "object"
+      ? details
+      : { detail: details }),
   };
   const line = JSON.stringify(entry);
 
@@ -50,57 +74,62 @@ function log(level, message, details) {
   console.log(line);
 }
 
-function requestLogger(request) {
+function requestLogger(request: Request) {
   const startedAt = process.hrtime.bigint();
   const requestId = request.headers.get("x-request-id") || randomUUID();
 
   return {
     requestId,
     startedAt,
-    finish: (response) => {
+    finish: (response: Response) => {
       const url = new URL(request.url);
       const pathname = url.pathname;
       if (PROBE_PATHS.has(pathname)) {
         return;
       }
 
-      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      const durationMs =
+        Number(process.hrtime.bigint() - startedAt) / 1_000_000;
       const status = response.status;
 
-      log("info", "request", {
+      log("info", "request completed", {
         requestId,
         method: request.method,
         path: pathname,
-        status,
-        durationMs: Math.round(durationMs * 100) / 100,
+        statusCode: status,
+        durationMs: Math.round(durationMs * 10) / 10,
       });
     },
   };
 }
 
-function securityHeaders(response) {
+function applySecurityHeaders(response: Response) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
 }
 
-function serveFile(filePath, mimeType) {
-  const file = Bun.file(filePath);
-  if (!file.exists) {
-    return new Response("Not Found", { status: 404 });
-  }
-
-  return new Response(file, {
-    headers: {
-      "Content-Type": mimeType,
-      "Cache-Control": "public, max-age=31536000, immutable",
-    },
-  });
+function finalizeResponse(response: Response, requestId: string) {
+  applySecurityHeaders(response);
+  response.headers.set("x-request-id", requestId);
+  return response;
 }
 
-function getMimeType(filePath) {
+function resolveSafeFile(rootDir: string, urlPath: string): string | null {
+  const relativePath = urlPath.replace(/^\/+/, "");
+  const filePath = path.normalize(path.join(rootDir, relativePath));
+  const rootWithSep = `${rootDir}${path.sep}`;
+
+  if (filePath !== rootDir && !filePath.startsWith(rootWithSep)) {
+    return null;
+  }
+
+  return filePath;
+}
+
+function getMimeType(filePath: string) {
   const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes = {
+  const mimeTypes: Record<string, string> = {
     ".js": "application/javascript",
     ".mjs": "application/javascript",
     ".css": "text/css",
@@ -121,69 +150,193 @@ function getMimeType(filePath) {
   return mimeTypes[ext] || "application/octet-stream";
 }
 
-async function createServer() {
-  const build = await loadBuild();
-
-  // DB schema health check: fail loudly if required RPC/triggers are missing/wrong.
-  try {
-    const { assertRequiredDbFunctions } = await import("../app/server/db-health.server.ts");
-    await assertRequiredDbFunctions();
-  } catch (error) {
-    log("error", "database schema health check failed", {
-      message: error instanceof Error ? error.message : String(error),
-    });
-    process.exit(1);
+async function serveStaticFile(
+  rootDir: string,
+  urlPath: string,
+  cacheControl: string,
+): Promise<Response | null> {
+  const filePath = resolveSafeFile(rootDir, urlPath);
+  if (!filePath) {
+    return null;
   }
 
-  const requestHandler = createRequestHandler(build, "production");
+  const file = Bun.file(filePath);
+  if (!(await file.exists())) {
+    return null;
+  }
+
+  return new Response(file, {
+    headers: {
+      "Content-Type": getMimeType(filePath),
+      "Cache-Control": cacheControl,
+    },
+  });
+}
+
+function probeResponse(pathname: string, readyState: ReadyState): Response {
+  if (pathname === "/healthz") {
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!readyState.buildReady || !readyState.acceptingTraffic) {
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        buildReady: Boolean(readyState.buildReady),
+        acceptingTraffic: Boolean(readyState.acceptingTraffic),
+      }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export type CreateServerOptions = {
+  build?: Awaited<ReturnType<typeof loadBuild>>;
+  buildPath?: string;
+  host?: string;
+  port?: number;
+  readyState?: ReadyState;
+  requestHandler?: (request: Request) => Promise<Response>;
+  serveBuildAssets?: boolean;
+  skipDbHealthCheck?: boolean;
+};
+
+export async function createServer(options: CreateServerOptions = {}) {
+  const readyState = options.readyState ?? {
+    acceptingTraffic: true,
+    buildReady: true,
+  };
+  const build =
+    options.build ??
+    (await (async () => {
+      readyState.buildReady = false;
+      const loaded = await loadBuild(options.buildPath);
+      readyState.buildReady = true;
+      return loaded;
+    })());
+
+  if (!options.skipDbHealthCheck) {
+    try {
+      const { assertRequiredDbFunctions } = await import(
+        "../app/server/db-health.server.ts"
+      );
+      await assertRequiredDbFunctions();
+    } catch (error) {
+      log("error", "database schema health check failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      process.exit(1);
+    }
+  }
+
+  const requestHandler =
+    options.requestHandler ?? createRequestHandler(build, "production");
+  const serveBuildAssets = options.serveBuildAssets ?? true;
 
   return Bun.serve({
-    hostname: HOST,
-    port: PORT,
+    hostname: options.host ?? HOST,
+    port: options.port ?? PORT,
     fetch: async (request) => {
       const logger = requestLogger(request);
       const url = new URL(request.url);
       const pathname = url.pathname;
 
-      // Static files
-      if (pathname.startsWith("/assets/")) {
-        const filePath = path.join(CLIENT_BUILD_DIR, pathname);
-        const response = serveFile(filePath, getMimeType(pathname));
-        securityHeaders(response);
-        logger.finish(response);
-        return response;
-      }
-
-      if (pathname === "/healthz" || pathname === "/readyz") {
-        const response = new Response(JSON.stringify({ status: "ok" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-        securityHeaders(response);
-        logger.finish(response);
-        return response;
-      }
-
-      // React Router request handler
       try {
+        if (pathname === "/healthz" || pathname === "/readyz") {
+          const response = finalizeResponse(
+            probeResponse(pathname, readyState),
+            logger.requestId,
+          );
+          logger.finish(response);
+          return response;
+        }
+
+        if (serveBuildAssets && pathname.startsWith("/assets/")) {
+          const assetResponse = await serveStaticFile(
+            CLIENT_ASSETS_DIR,
+            pathname.slice("/assets/".length),
+            "public, max-age=31536000, immutable",
+          );
+          if (assetResponse) {
+            const response = finalizeResponse(assetResponse, logger.requestId);
+            logger.finish(response);
+            return response;
+          }
+        }
+
+        if (serveBuildAssets) {
+          const clientResponse = await serveStaticFile(
+            CLIENT_BUILD_DIR,
+            pathname,
+            "public, max-age=3600",
+          );
+          if (clientResponse) {
+            const response = finalizeResponse(clientResponse, logger.requestId);
+            logger.finish(response);
+            return response;
+          }
+        }
+
+        const publicResponse = await serveStaticFile(
+          PUBLIC_DIR,
+          pathname,
+          "public, max-age=3600",
+        );
+        if (publicResponse) {
+          const response = finalizeResponse(publicResponse, logger.requestId);
+          logger.finish(response);
+          return response;
+        }
+
+        if (isTwilioWebhookPath(pathname)) {
+          const { handleTwilioWebhookRequest } = await getTwilioWebhookModule();
+          const twilioResult = await handleTwilioWebhookRequest(request);
+          if (twilioResult.kind === "response") {
+            const response = finalizeResponse(
+              twilioResult.response,
+              logger.requestId,
+            );
+            logger.finish(response);
+            return response;
+          }
+
+          const rrRequest =
+            twilioResult.kind === "validated" ? twilioResult.request : request;
+          const rrResponse = await requestHandler(rrRequest);
+          const response = finalizeResponse(rrResponse, logger.requestId);
+          logger.finish(response);
+          return response;
+        }
+
         const rrResponse = await requestHandler(request);
-        securityHeaders(rrResponse);
-        logger.finish(rrResponse);
-        return rrResponse;
+        const response = finalizeResponse(rrResponse, logger.requestId);
+        logger.finish(response);
+        return response;
       } catch (error) {
         log("error", "Unhandled request error", {
           error: error instanceof Error ? error.message : String(error),
           path: pathname,
         });
 
-        const response = new Response(
-          JSON.stringify({ error: "Internal Server Error" }),
-          {
+        const response = finalizeResponse(
+          new Response(JSON.stringify({ error: "Internal Server Error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
-          }
+          }),
+          logger.requestId,
         );
-        securityHeaders(response);
+        logger.finish(response);
         return response;
       }
     },
@@ -196,14 +349,15 @@ async function createServer() {
   });
 }
 
-function gracefulShutdown(server) {
+function gracefulShutdown(server: ReturnType<typeof Bun.serve>, readyState: ReadyState) {
   let shuttingDown = false;
 
-  const shutdown = async (signal) => {
+  const shutdown = async (signal: string, exitCode = 0) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    readyState.acceptingTraffic = false;
 
-    log("info", `${signal} received. Starting graceful shutdown...`);
+    log("warn", "shutdown started", { signal });
 
     const timer = setTimeout(() => {
       log("warn", "Graceful shutdown timeout exceeded. Force exiting.");
@@ -212,9 +366,9 @@ function gracefulShutdown(server) {
 
     try {
       server.stop(true);
-      log("info", "Server stopped gracefully.");
       clearTimeout(timer);
-      process.exit(0);
+      log("info", "shutdown finished", { signal });
+      process.exit(exitCode);
     } catch (error) {
       log("error", "Error during shutdown", {
         error: error instanceof Error ? error.message : String(error),
@@ -224,27 +378,72 @@ function gracefulShutdown(server) {
     }
   };
 
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => {
+    void shutdown("SIGTERM", 0);
+  });
+  process.on("SIGINT", () => {
+    void shutdown("SIGINT", 0);
+  });
+  process.on("uncaughtException", (error) => {
+    log("error", "uncaught exception", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    void shutdown("uncaughtException", 1);
+  });
+  process.on("unhandledRejection", (reason) => {
+    log("error", "unhandled rejection", {
+      message: reason instanceof Error ? reason.message : String(reason),
+    });
+    if (FATAL_ON_REJECTION) {
+      void shutdown("unhandledRejection", 1);
+    }
+  });
+}
+
+export async function startServer({
+  host = HOST,
+  port = PORT,
+  env = process.env,
+  buildPath = BUILD_PATH,
+}: {
+  host?: string;
+  port?: number;
+  env?: NodeJS.ProcessEnv;
+  buildPath?: string;
+} = {}) {
+  validateEnvironment(env);
+
+  const readyState: ReadyState = {
+    acceptingTraffic: false,
+    buildReady: false,
+  };
+
+  const server = await createServer({
+    buildPath,
+    host,
+    port,
+    readyState,
+  });
+
+  readyState.acceptingTraffic = true;
+  gracefulShutdown(server, readyState);
+
+  log("info", "server listening", { host, port });
+
+  return { server, readyState, shutdown: () => server.stop(true) };
 }
 
 async function main() {
   try {
-    validateEnvironment();
-    const server = await createServer();
-    gracefulShutdown(server);
-
-    log("info", "Bun server listening", {
-      host: HOST,
-      port: PORT,
-      url: `http://${HOST}:${PORT}`,
-    });
+    await startServer();
   } catch (error) {
-    log("error", "Failed to start server", {
-      error: error instanceof Error ? error.message : String(error),
+    log("error", "server boot failed", {
+      message: error instanceof Error ? error.message : String(error),
     });
     process.exit(1);
   }
 }
 
-main();
+if (import.meta.main) {
+  void main();
+}
