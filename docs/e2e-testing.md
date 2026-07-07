@@ -16,6 +16,8 @@ npm run test:e2e:compose
 
 This runs: `docker compose -f docker-compose.dev.yml up` (Postgres on **127.0.0.1:5433**, MinIO, Inbucket) → Drizzle bootstrap (`drizzle/0000`–`0005` + ledger RPC + legacy trigger cleanup) → Better Auth seed → `npm run build` → Express server on port **3100** → Playwright.
 
+**G4 gate:** **77/77** specs pass on this stack (2026-07-07). Railway review smoke is optional staging only.
+
 Optional env:
 
 - `E2E_SKIP_BOOTSTRAP=1` — DB already migrated

@@ -6,7 +6,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 **Orchestration:** [`migration-orchestration.md`](./migration-orchestration.md)  
 **Branch:** `feat/supabase-postgres-migration`  
 **Railway:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
-**Last updated:** 2026-07-06
+**Last updated:** 2026-07-07
 
 ### Snapshot (rolling)
 
@@ -23,7 +23,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 | Lint (`npm run lint`) | **Pass (0 errors)** | G4 |
 | Node tests (`npm run test:node`) | **1236 / 1236** | G4 |
 | UI tests (`npm run test:ui`) | **252 / 252** | G4 |
-| E2E compose (`npm run test:e2e:compose`) | **36 / 77** (auth setup green; schema/seed tail) | G4 |
+| E2E compose (`npm run test:e2e:compose`) | **77 / 77** | G4 ✓ (compose) |
 | E2E on review URL | Optional staging smoke | G4 |
 
 ---
@@ -155,7 +155,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | ID | Check | Status |
 |----|-------|--------|
 | 4.1 | `npm run typecheck && lint && test` | **Done** |
-| 4.2 | `npm run test:e2e:compose` 77/77 | **In progress** | Compose-first on PG17 @5433; **36/77** after auth + schema fixes |
+| 4.2 | `npm run test:e2e:compose` 77/77 | **Done** | Compose-first on PG17 @5433; **77/77** (2026-07-07) |
 | 4.3 | Scriptkit call + survey paths | **Done** | Survey routes pass 40/40 tests; Scriptkit components typecheck clean |
 | 4.4 | Manual Twilio smoke checklist (plan) | **Done** | `docs/manual-test-plan-zero-supabase.md` exists with 150+ test steps across 14 categories |
 | 4.5 | `tools:api:surface:check` green | **Done** |
@@ -213,11 +213,11 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **G4 E2E tail** — Fix remaining compose schema/seed drift (`cutoff_time` removed from Drizzle; rerun to 77/77)
-2. **3F.2 Bun handler** — Switch `server/bun.ts` to `@react-router/node` `createRequestHandler` (Express adapter breaks on raw `Request`)
-3. **1.14 / schema sync** — Regenerate or hand-sync `app/db/schema.ts` against squashed baseline after transform tail
-4. **3D.4 verify** — Run admin `repoint_twilio_webhooks` on review subaccount and confirm Twilio console URLs
-5. **PGlite (parallel)** — Land in-repo PGlite for unit/integration tests; does not replace compose E2E (see PGlite plan)
+1. **G4 review smoke** — Manual Twilio checklist on Railway review URL (`docs/manual-test-plan-zero-supabase.md`)
+2. **3D.4 verify** — Run admin `repoint_twilio_webhooks` on review subaccount and confirm Twilio console URLs
+3. **3F.2 Bun handler** — Switch `server/bun.ts` to `@react-router/node` `createRequestHandler` (Express adapter breaks on raw `Request`)
+4. **1.14 / schema sync** — Regenerate or hand-sync `app/db/schema.ts` against squashed baseline after transform tail
+5. **Phase 5 prep** — Maintenance window, final delta dump, env flip checklist
 
 ---
 
@@ -257,3 +257,4 @@ gantt
 | 2026-07-04 | agent | **API surface**: Added 7 missing entries (ACD router, auth catch-all, uploads, events); regenerated inventory (138 entries); `tools:api:surface:check` passes |
 | 2026-07-04 | agent | **Phase 3F Bun server**: Created `server/bun.ts` + `Dockerfile` + `start:bun` script; multi-stage build with oven/bun:1.2.15 |
 | 2026-07-06 | agent | **Compose E2E scaffold**: PG17 @5433, Drizzle bootstrap + ledger RPC + legacy trigger cleanup; Better Auth seed; `test:e2e:compose` **36/77**; auth setup green; fixed Drizzle adapter schema keys + `cutoff_time` drift |
+| 2026-07-07 | agent | **Compose E2E gate (G4)**: **77/77** on `npm run test:e2e:compose`; fixes for credits banner, API key create (settings action + Buffer polyfill), auth sign-out, audience upload, campaign create, webhook dedupe, RBAC redirects, schema tail + seed/bootstrap |
