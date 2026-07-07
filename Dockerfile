@@ -5,8 +5,9 @@ FROM oven/bun:1.2.15 AS builder
 
 WORKDIR /app
 
-# Copy dependency manifests
+# Copy dependency manifests and vendored packages (file: deps in package.json)
 COPY package.json bun.lock ./
+COPY vendor ./vendor
 
 # Install dependencies
 RUN bun install --frozen-lockfile
@@ -26,18 +27,14 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-# Copy built assets from builder
+# Copy built assets and runtime source from builder
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/server ./server
-COPY --from=builder /app/app/lib/required-env-keys.mjs ./app/lib/required-env-keys.mjs
-
-# Copy package files for runtime dependencies
+COPY --from=builder /app/app ./app
+COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/bun.lock ./bun.lock
-
-# Install production dependencies only
-RUN bun install --frozen-lockfile --production
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
