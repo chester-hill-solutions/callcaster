@@ -83,6 +83,39 @@ function withRouteUrl<T extends RouteHandlerArgs>(
   return { ...args, url: new URL("http://localhost") };
 }
 
+export function mockDataPlaneContext(
+  overrides: Partial<DataPlaneAuthContextValue> = {},
+): DataPlaneAuthContextValue {
+  return {
+    userId: "user-1",
+    workspaceId: "ws-1",
+    ...overrides,
+  };
+}
+
+/** Merge data-plane middleware context into loader/action test args. */
+export async function withDataPlaneRouteArgs<T extends RouteHandlerArgs>(
+  args: T,
+  dataPlaneOverrides: Partial<DataPlaneAuthContextValue> = {},
+): Promise<T & { context: RouterContextProvider; url: URL }> {
+  const withUrl = withRouteUrl(args);
+  const workspaceId =
+    dataPlaneOverrides.workspaceId ??
+    withUrl.params?.workspaceId ??
+    "ws-1";
+  return {
+    ...withUrl,
+    context:
+      withUrl.context ??
+      (await createRouteContextProvider({
+        dataPlane: mockDataPlaneContext({
+          workspaceId,
+          ...dataPlaneOverrides,
+        }),
+      })),
+  };
+}
+
 export function mockAdminContext(
   overrides: Partial<AdminContextValue> = {},
 ): AdminContextValue {

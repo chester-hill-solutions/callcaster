@@ -14,12 +14,11 @@
 ## Routes (React Router 8)
 
 - Route discovery: [app/routes.ts](app/routes.ts) uses `remix-flat-routes` hybrid folders (`workspaces+/`, `api+/`, …). Each route is a **single module** (`folder/route.tsx`); React Router splits `loader` / `action` / UI automatically — no manual `route.server.tsx`.
-- **Auth middleware:** `workspaces+/$id` uses [`app/lib/workspace-middleware.server.ts`](app/lib/workspace-middleware.server.ts) → `workspaceContext`; nested `api+/workspaces+/$workspaceId/*` uses [`app/lib/data-plane-middleware.server.ts`](app/lib/data-plane-middleware.server.ts) → `dataPlaneAuthContext`; `admin+/` uses [`app/lib/admin-middleware.server.ts`](app/lib/admin-middleware.server.ts) → `adminContext`. Child loaders read context via `getWorkspaceRouteContext` / `getDataPlaneRouteContext` / `getAdminRouteContext`. Twilio webhooks, `/api/jobs/*`, SSE, stripe, and auth catch-all stay outside product middleware.
+- **Auth middleware:** `workspaces+/$id` uses [`app/lib/workspace-middleware.server.ts`](app/lib/workspace-middleware.server.ts) → `workspaceContext`; nested `api+/workspaces+/$workspaceId/*` uses [`app/lib/data-plane-middleware.server.ts`](app/lib/data-plane-middleware.server.ts) → `dataPlaneAuthContext`; `admin+/` uses [`app/lib/admin-middleware.server.ts`](app/lib/admin-middleware.server.ts) → `adminContext`. Child loaders read context via `getWorkspaceRouteContext` / `getDataPlaneRouteContext` / `getAdminRouteContext`. Twilio webhooks, `/api/jobs/*`, stripe, and auth catch-all stay outside product middleware. SSE at [`events.loader.server.ts`](app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts) lives under data-plane middleware for auth context but returns a streaming Response directly (see ADR-0005, ADR-0031).
 - **Inline auth (not middleware):** These routes intentionally keep inline `verifyAuth` / dual-auth — do not migrate to layout middleware:
 
 | Route module | Reason |
 |---|---|
-| [`api+/workspaces+/$workspaceId/events.loader.server.ts`](app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts) | SSE streaming (ADR-0005) |
 | [`account.security.loader.server.ts`](app/routes/account.security.loader.server.ts) | User-scoped, not workspace |
 | [`accept-invite.action.server.ts`](app/routes/accept-invite.action.server.ts) | Public + auth hybrid |
 | [`confirm-payment.loader.server.ts`](app/routes/confirm-payment.loader.server.ts) | Stripe return URL |
@@ -29,7 +28,6 @@
 | [`api+/audiodrop.action.server.ts`](app/routes/api+/audiodrop.action.server.ts) | Flat dual-auth |
 | [`api+/auto-dial/end.action.server.ts`](app/routes/api+/auto-dial/end.action.server.ts) | JSON auth inject |
 | [`api+/audiodrop.tsx`](app/routes/api+/audiodrop.tsx) | Route module ref |
-| [`admin+/requireSudoOrWorkspaceAdmin.server.ts`](app/routes/admin+/requireSudoOrWorkspaceAdmin.server.ts) | Invite routes: sudo **or** workspace admin |
 - **Auth layout adapter:** Until `@chester-hill-solutions/auth-react-router` is installable, use [`app/lib/auth-layout.server.ts`](app/lib/auth-layout.server.ts) (`createAuthLayoutLoader`, `createRequireSessionUserId`).
 - **`@react-router/fs-routes`:** Deferred — `remix-flat-routes` + route tooling baselines remain; evaluate fs-routes only after RR8 is stable in production.
 - Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).

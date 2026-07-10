@@ -21,6 +21,17 @@ _Avoid_: List (except "voter list"), contact group
 **Contact**: A person with phone, email, address. Belongs to a workspace. Has `opt_out` flag (honors STOP/START SMS keywords). In v2, tracks voter list source and lifecycle.
 _Avoid_: Voter (use "voter" only when referring specifically to a registered elector on a voter list)
 
+### Platform access
+
+**Product Middleware**: Route-tree authentication that runs before child page or API handlers and injects session or workspace context without writing a response body.
+_Avoid_: Layout middleware, route guard (implementation terms)
+
+**Data Plane**: The workspace-scoped JSON API surface under `/api/workspaces/:id/*` used by the web app and external integrators.
+_Avoid_: API layer, backend (too generic)
+
+**Sudo Admin Portal**: The cross-workspace operator interface at `/admin/*`, restricted to users with sudo access level.
+_Avoid_: Admin panel, back office (informal)
+
 ### Calling domain
 
 **Voter**: A contact who is a registered elector. Has a support level (1-5), turnout propensity, and belongs to a household. Comes from a voter list (Liberalist, VAN, Elections Canada).

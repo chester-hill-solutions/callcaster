@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { requireWorkspaceAccess } from "@/lib/database.server";
-import { AppError } from "@/lib/errors.server";
-import { verifyAuth } from "@/lib/auth.server";
+import { getSession } from "@/lib/auth.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import {
   WORKSPACE_EVENTS_NOTIFY_CHANNEL,
   fetchWorkspaceEventsAfter,
@@ -37,22 +36,14 @@ function formatSseEvent(event: {
   return `id: ${event.id}\nevent: workspace_event\ndata: ${data}\n\n`;
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return new Response("workspaceId is required", { status: 400 });
   }
 
-  const { headers, user } = await verifyAuth(request);
-
-  try {
-    await requireWorkspaceAccess({ user, workspaceId });
-  } catch (error) {
-    if (error instanceof AppError) {
-      return new Response(error.message, { status: error.statusCode });
-    }
-    throw error;
-  }
+  getDataPlaneRouteContext(context, workspaceId);
+  const { headers } = await getSession(request);
 
   const initialCursor = parseCursor(request);
 

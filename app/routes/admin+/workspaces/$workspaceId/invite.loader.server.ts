@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { loadAdminWorkspaceInvitePage } from "@/lib/platform-admin.server";
+import { getAdminRouteContext } from "@/lib/admin-route.server";
 import { MemberRole } from "@/lib/member-role";
-import { requireSudoOrWorkspaceAdmin } from "../../requireSudoOrWorkspaceAdmin.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Tables } from "@/lib/db-types";
 
@@ -24,18 +24,13 @@ const memberRoles = new Set(Object.values(MemberRole));
 const isMemberRole = (role: string | null | undefined): role is MemberRole =>
   !!role && memberRoles.has(role as MemberRole);
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     throw new Error("No workspace id found!");
   }
 
-  const access = await requireSudoOrWorkspaceAdmin(request, workspaceId);
-  if (!("user" in access)) {
-    return access;
-  }
-
-  const { headers, user } = access;
+  const { headers, user } = getAdminRouteContext(context);
   const page = await loadAdminWorkspaceInvitePage(workspaceId, user.id);
   if (!page.ok) {
     throw new Error(page.error);

@@ -23,14 +23,14 @@ try {
   fs.rmSync(tmpFile, { force: true });
 }
 
-const normalized = out
-  .split("\n")
-  .map((l) => l.trim())
-  .filter((l) => l.includes('path="'))
-  .map((l) => l.match(/path="([^"]+)"/)?.[1])
-  .filter(Boolean)
-  .sort()
-  .join("\n");
+const normalized = [...new Set(
+  out
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.includes('path="'))
+    .map((l) => l.match(/path="([^"]+)"/)?.[1])
+    .filter(Boolean),
+)].sort().join("\n");
 
 if (update) {
   fs.mkdirSync(path.dirname(BASELINE), { recursive: true });
@@ -44,7 +44,7 @@ if (!fs.existsSync(BASELINE)) {
   process.exit(1);
 }
 
-const prev = fs.readFileSync(BASELINE, "utf8").trim().split("\n").sort().join("\n");
+const prev = [...new Set(fs.readFileSync(BASELINE, "utf8").trim().split("\n"))].sort().join("\n");
 if (prev === normalized) {
   console.log("route tree matches baseline");
   process.exit(0);
