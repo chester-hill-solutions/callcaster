@@ -1,20 +1,19 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import {
   findCampaignMessageMedia,
   updateCampaignMessageMedia,
 } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const campaignIdRaw = formData.get("campaignId");
   const mediaName = formData.get("fileName") as string;
   const encodedMediaName = encodeURI(mediaName);
 
-  const workspaceId = params.id;
-  const { headers } = await verifyAuth(request);
+  const { headers, user, workspaceId } = getWorkspaceRouteContext(context);
 
   if (!workspaceId) {
     return routeData({ success: false, error: "Missing workspace" }, { headers });

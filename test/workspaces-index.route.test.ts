@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth.server", () => ({
+  getSession: mocks.verifyAuth,
   verifyAuth: mocks.verifyAuth,
 }));
 

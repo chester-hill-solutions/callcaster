@@ -4,8 +4,8 @@ import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const access = await requireWorkspaceLoaderContext(request, params.id);
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
+  const access = await requireWorkspaceLoaderContext(request, params.id, { context });
   if (!access.ok) {
     return access.response;
   }

@@ -1,5 +1,5 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
 import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
 import {
   addInboundQueueMember,
@@ -12,17 +12,14 @@ import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { headers, user } = await verifyAuth(request);
-  const workspaceId = params.id;
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   if (!user || !workspaceId) {
     return routeData({ error: "Unauthorized" }, { status: 401, headers });
   }
 
   await requireWorkspaceAccess({ user: { id: user.id }, workspaceId });
-
-  const userRole = await getUserRole({ user, workspaceId });
-  if (!userRole || userRole.role === MemberRole.Caller) {
+  if (!userRole || userRole === MemberRole.Caller) {
     return routeData({ error: "Not authorized" }, { status: 403, headers });
   }
 

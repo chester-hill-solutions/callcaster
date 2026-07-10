@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { eq } from "drizzle-orm";
 import { data as routeData, redirect } from "react-router";
 import { campaign as campaignTable, workspace as workspaceTable } from "@/db/schema";
@@ -7,7 +8,6 @@ import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
 import { loadActiveSurveysForWorkspace } from "@/lib/survey-db.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { Campaign, FileObject, IVRCampaign, LiveCampaign, MessageCampaign, QueueItem, TwilioAccountData } from "@/lib/types";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
@@ -17,9 +17,9 @@ import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-  const { user } = await verifyAuth(request);
+  const { user } = getWorkspaceRouteContext(context)
 
   if (!selected_id || !workspace_id) return redirect("/");
 

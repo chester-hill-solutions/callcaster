@@ -1,24 +1,18 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { csvResponse } from "@/lib/csv";
 import { getUserRole } from "@/lib/database.server";
 import { buildSurveyResponsesCsv } from "@/lib/platform-analytics.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { user } = await verifyAuth(request);
-  const { id: workspaceId, surveyId } = params;
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
+  const { surveyId } = params;
+  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context);
 
   if (!workspaceId || !surveyId) {
     throw new Response("Workspace ID and Survey ID are required", {
       status: 400,
     });
   }
-
-  const userRole = await getUserRole({
-    user,
-    workspaceId,
-  });
-
   if (!userRole) {
     throw new Response("Unauthorized", { status: 403 });
   }

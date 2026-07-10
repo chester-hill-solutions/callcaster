@@ -1,9 +1,9 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   getUserRole,
   requireWorkspaceAccess,
 } from "@/lib/database.server";
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 import {
   isOnboardingActionName,
@@ -66,8 +66,8 @@ async function runUiOnboardingAction(
   });
 }
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { user, headers } = await verifyAuth(request);
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   const wsId = params.id;
   if (!wsId) {
     return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });

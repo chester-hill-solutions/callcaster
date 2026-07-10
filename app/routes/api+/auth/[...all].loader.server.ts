@@ -3,22 +3,21 @@ import { isSignupOpen } from "@/lib/env.server";
 import { jsonError } from "@/lib/platform-api.server";
 import { auth } from "@/server/auth-instance";
 
-function isBetterAuthSignUpPath(request: Request): boolean {
-  const { pathname } = new URL(request.url);
-  return pathname.includes("/sign-up");
+function isBetterAuthSignUpPath(url: URL): boolean {
+  return url.pathname.includes("/sign-up");
 }
 
-async function handleAuthRequest(request: Request) {
-  if (!isSignupOpen() && isBetterAuthSignUpPath(request)) {
+async function handleAuthRequest(request: Request, url: URL) {
+  if (!isSignupOpen() && isBetterAuthSignUpPath(url)) {
     return jsonError("Registration is closed.", 403);
   }
   return auth.handler(request);
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  return handleAuthRequest(request);
+export async function loader({ request, url }: LoaderFunctionArgs) {
+  return handleAuthRequest(request, url);
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  return handleAuthRequest(request);
+export async function action({ request, url }: ActionFunctionArgs) {
+  return handleAuthRequest(request, url);
 }

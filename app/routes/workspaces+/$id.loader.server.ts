@@ -1,17 +1,17 @@
-import {
-  Campaign,
-  ContextType,
-  type WorkspaceMessagingReadiness,
-} from "@/lib/types";
+import { type WorkspaceMessagingReadiness } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import { deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { getUserRole, getWorkspaceInfoWithDetails, getWorkspacePhoneNumbers } from "@/lib/database.server";
+import {
+  deriveWorkspaceMessagingReadiness,
+  getWorkspaceMessagingOnboardingState,
+} from "@/lib/messaging-onboarding.server";
+import {
+  getWorkspaceInfoWithDetails,
+  getWorkspacePhoneNumbers,
+} from "@/lib/database.server";
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
-import { verifyAuth } from "@/lib/auth.server";
-import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
+import { workspaceContext } from "@/lib/route-context.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
-import type { User } from "@/lib/types";
 
 type LoaderData = {
   userRole: string | null | undefined;
@@ -19,40 +19,20 @@ type LoaderData = {
   onboardingReadiness: WorkspaceMessagingReadiness;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
-  const { headers, user } = await verifyAuth(request);
-  await requireTwoFactorEnrollmentForPrivilegedUser({
-    userId: user.id,
-    request,
-  });
-  const workspaceId = params.id;
-  if (!workspaceId) {
-    throw new Error("No workspace found");
+export const loader = async ({ request, params, context, url }: LoaderFunctionArgs) => {
+  const ws = context.get(workspaceContext);
+  if (!ws) {
+    throw new Error("Workspace context missing");
   }
 
-  const userRole = (
-    await getUserRole({user: user,
-      workspaceId: workspaceId as string,
-    })
-  )?.role;
-
-  if (!userRole) {
-    throw redirect("/workspaces", { headers });
-  }
+  const { headers, userId, userRole, workspaceId } = ws;
 
   try {
-    const pathname = new URL(request.url).pathname;
+    const pathname = url.pathname;
     const [onboarding, phoneNumbersResult, recentOutboundCount] = await Promise.all([
-      getWorkspaceMessagingOnboardingState({
-        workspaceId: workspaceId as string,
-      }),
-      getWorkspacePhoneNumbers({
-        workspaceId: workspaceId as string,
-      }),
-      getWorkspaceRecentOutboundMessageCount({
-        workspaceId: workspaceId as string,
-      }),
+      getWorkspaceMessagingOnboardingState({ workspaceId }),
+      getWorkspacePhoneNumbers({ workspaceId }),
+      getWorkspaceRecentOutboundMessageCount({ workspaceId }),
     ]);
     const readiness = deriveWorkspaceMessagingReadiness({
       onboarding,
@@ -73,15 +53,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     const workspaceData = await getWorkspaceInfoWithDetails({
       workspaceId,
-      userId: user.id,
+      userId,
     });
 
     return routeData({
-      userRole: userRole,
+      userRole,
       workspaceData,
       onboardingReadiness: readiness,
-      headers,
-    });
+    } satisfies LoaderData, { headers });
   } catch (error) {
     if (
       error &&
@@ -93,4 +72,4 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
     throw error;
   }
-}
+};

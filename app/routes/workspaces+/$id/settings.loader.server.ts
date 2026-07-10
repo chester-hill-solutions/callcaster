@@ -3,8 +3,8 @@ import { getWorkspaceSettingsPageData } from "@/lib/workspace-settings-db.server
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const access = await requireWorkspaceLoaderContext(request, params.id);
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+  const access = await requireWorkspaceLoaderContext(request, params.id, { context });
   if (!access.ok) {
     return access.response;
   }

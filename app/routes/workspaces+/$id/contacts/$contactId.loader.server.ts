@@ -1,8 +1,8 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import {
   campaign as campaignTable,
@@ -27,7 +27,7 @@ export type ContactIdLoaderData = {
   audiences: Audience[];
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id) {
@@ -39,14 +39,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   try {
-    const { user } = await verifyAuth(request);
-
-    const userRole = await getUserRole({
-      user,
-      workspaceId: workspace_id,
-    });
-
-    if (!userRole?.role) {
+    const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context)
+    if (!userRole) {
       return redirect(`/workspaces/${workspace_id}`);
     }
 
@@ -108,7 +102,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       workspace_id,
       selected_id,
       contact,
-      userRole: userRole.role as MemberRole,
+      userRole: userRole as MemberRole,
       audiences: audiences || [],
     } satisfies ContactIdLoaderData);
   } catch (error) {

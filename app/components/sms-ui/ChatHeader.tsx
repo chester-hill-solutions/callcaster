@@ -143,7 +143,7 @@ export default function ChatHeader({
   // the workspace's numbers (see $contact_number.loader.server.ts).
   const multipleNumbersUsed = useMemo(() => {
     for (let i = matches.length - 1; i >= 0; i -= 1) {
-      const matchData = matches[i]?.data;
+      const matchData = matches[i]?.loaderData;
       if (
         matchData &&
         typeof matchData === "object" &&

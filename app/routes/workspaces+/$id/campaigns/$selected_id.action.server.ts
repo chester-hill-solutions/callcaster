@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   IVRCampaign,
   LiveCampaign,
@@ -12,7 +13,6 @@ import { fetchBasicResults, fetchCampaignDetails, fetchQueueCounts, getUserRole,
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { logger as loggerServer } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -24,13 +24,13 @@ const VALID_CAMPAIGN_TYPES = new Set([
   "complex_ivr",
 ]);
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
 
   const { id: workspace_id, selected_id } = params;
   if (!workspace_id || !selected_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
-  const { user } = await verifyAuth(request);
+  const { user } = getWorkspaceRouteContext(context)
 
   const [campaignRow, queueCounts, userRole] = await Promise.all([
     findCampaignInWorkspace(workspace_id, selected_id),
@@ -71,7 +71,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
 
-  await verifyAuth(request);
+  
   const { id: workspace_id, selected_id: campaign_id } = params;
   if (!workspace_id || !campaign_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);

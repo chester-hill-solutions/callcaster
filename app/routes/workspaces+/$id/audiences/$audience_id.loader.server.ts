@@ -4,8 +4,8 @@ import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const result = await requireWorkspaceLoaderContext(request, params.id);
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
+  const result = await requireWorkspaceLoaderContext(request, params.id, { context });
   if (!result.ok) return result.response;
   const { headers, workspaceId: workspace_id } = result.ctx;
 

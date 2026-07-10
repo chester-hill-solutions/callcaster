@@ -1,19 +1,17 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import {
   getAudienceDetailApi,
-  resolveDataPlaneAuth,
 } from "@/lib/platform-data.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   const audienceId = params.audienceId;
   if (!workspaceId || !audienceId) {
     return jsonError("workspaceId and audienceId are required", 400);
   }
-
-  const auth = await resolveDataPlaneAuth(request, workspaceId);
-  if (auth instanceof Response) return auth;
+  getDataPlaneRouteContext(context, workspaceId);
 
   const url = new URL(request.url);
   const result = await getAudienceDetailApi(

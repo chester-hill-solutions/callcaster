@@ -1,7 +1,7 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { requireWorkspaceAccess, updateContact } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -21,8 +21,7 @@ export type ContactFormData = {
 };
 
 export const action = async ({
-  request,
-  params,
+  request, params, context,
 }: ActionFunctionArgs) => {
   const { id: workspace_id, contactId: selected_id } = params;
 
@@ -31,7 +30,7 @@ export const action = async ({
   }
 
   try {
-    const { user } = await verifyAuth(request);
+    const { user } = getWorkspaceRouteContext(context)
 
     await requireWorkspaceAccess({
       user: { id: user.id },

@@ -1,12 +1,14 @@
 import { createNewWorkspace } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
+import { getSession } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-  const { headers, user } = await verifyAuth(request);
+  const { headers, user } = await getSession(request);
+  if (!user) {
+    throw redirect("/signin");
+  }
 
   const formData = await request.formData();
 
@@ -33,4 +35,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   return { ok: true, error: null };
-}
+};

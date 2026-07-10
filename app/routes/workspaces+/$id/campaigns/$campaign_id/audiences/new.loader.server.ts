@@ -1,14 +1,11 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
 
-  const { headers } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  const campaignId = params.campaign_id;
+  const { headers, user, workspaceId } = getWorkspaceRouteContext(context);  const campaignId = params.campaign_id;
 
   if (workspaceId == null || campaignId == null) {
     return routeData(

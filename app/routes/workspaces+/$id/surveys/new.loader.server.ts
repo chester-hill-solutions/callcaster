@@ -1,24 +1,16 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
-import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
-import { verifyAuth } from "@/lib/auth.server";
+import { User } from "@/lib/types";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-
-  const { user } = await verifyAuth(request);
-  const workspaceId = params.id;
+export async function loader({ params, context }: LoaderFunctionArgs) {
+  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context);
 
   if (!workspaceId) {
     throw new Response("Workspace ID is required", { status: 400 });
   }
 
-  // Get user role for this workspace
-  const userRole = await getUserRole({ user: user, 
-    workspaceId 
-  });
-
-  if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
+  if (!userRole || !["owner", "admin", "member"].includes(userRole)) {
     throw new Response("Unauthorized", { status: 403 });
   }
 
@@ -26,5 +18,5 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     workspaceId,
     user,
     userRole,
-  });
+  }, { headers });
 }

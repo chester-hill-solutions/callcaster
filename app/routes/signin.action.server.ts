@@ -14,9 +14,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return routeData({ user: null }, { headers });
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const requestUrl = new URL(request.url);
-  const next = requestUrl.searchParams.get("next");
+export const action = async ({ request, url }: ActionFunctionArgs) => {
+  const next = url.searchParams.get("next");
 
   const formData = await request.formData();
   const email = formData.get("email") as string;

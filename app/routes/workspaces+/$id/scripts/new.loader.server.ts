@@ -1,16 +1,15 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
 
-  const { headers } = await verifyAuth(request);
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   const url = new URL(request.url);
   const search = new URLSearchParams(url.search);
   const ref = search.get("ref") || null;
-  const workspaceId = params.id;
   if (workspaceId == null) {
     return routeData(
       { workspace: null, error: "Workspace does not exist" },

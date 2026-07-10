@@ -142,7 +142,7 @@ const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
 
 interface ContactFormProps {
   isBusy: boolean;
-  formRef: React.RefObject<HTMLFormElement>;
+  formRef: React.RefObject<HTMLFormElement | null>;
   fetcher: ReturnType<typeof useFetcher<FetcherData>>;
 }
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
+import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
 
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
@@ -44,13 +45,13 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     formData.set("contact_id", "42");
 
     const res = await asRouteResponse(
-      await action({
+      await action(await withWorkspaceRouteArgs({
         request: new Request("http://x/workspaces/w1/chats/+15555550100", {
           method: "POST",
           body: formData,
         }),
         params: { id: "w1", contact_number: "+15555550100" },
-      } as any),
+      })),
     );
 
     expect(res.status).toBe(200);
@@ -72,13 +73,13 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     formData.set("intent", "link_contact");
 
     const res = await asRouteResponse(
-      await action({
+      await action(await withWorkspaceRouteArgs({
         request: new Request("http://x/workspaces/w1/chats/+15555550100", {
           method: "POST",
           body: formData,
         }),
         params: { id: "w1", contact_number: "+15555550100" },
-      } as any),
+      })),
     );
 
     expect(res.status).toBe(400);
@@ -97,13 +98,13 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     formData.set("from", "+15550000000");
 
     const res = await asRouteResponse(
-      await action({
+      await action(await withWorkspaceRouteArgs({
         request: new Request("http://x/workspaces/w1/chats/+15555550100", {
           method: "POST",
           body: formData,
         }),
         params: { id: "w1", contact_number: "+15555550100" },
-      } as any),
+      })),
     );
 
     expect(res.status).toBe(200);

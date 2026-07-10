@@ -1,13 +1,11 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { updateCampaignScriptId } from "@/lib/campaign-ivr.server";
 import { createWorkspaceScript } from "@/lib/script-api-db.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const { headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
+export async function action({ request, params, context }: ActionFunctionArgs) {
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   if (workspaceId == null) {
     return routeData(
       { success: false, error: "Workspace does not exist" },

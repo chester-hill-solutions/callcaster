@@ -6,7 +6,7 @@ import {
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
   const { id: workspaceId, surveyId } = params;
 
   const access = await requireWorkspaceLoaderContext(request, workspaceId);

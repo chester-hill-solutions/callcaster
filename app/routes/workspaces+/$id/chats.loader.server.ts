@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { getChatSortOption } from "@/lib/chat-conversation-sort";
 import { data as routeData, redirect } from "react-router";
 import {
@@ -8,15 +9,14 @@ import {
 } from "@/lib/database.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { verifyAuth } from "@/lib/auth.server";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { headers, user } = await verifyAuth(request);
-  const { id: workspaceId } = params;
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
+  const { headers, user, workspaceId, userRole } =
+    getWorkspaceRouteContext(context);
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
@@ -41,11 +41,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const tdb = createTenantDb(workspaceId);
-  const userRole = await getUserRole({
-    user,
-    workspaceId,
-    tdb,
-  });
 
   let optOutKeywords = parseOptOutKeywords(null);
   try {

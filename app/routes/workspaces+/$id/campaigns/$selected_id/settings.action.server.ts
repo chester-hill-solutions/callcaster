@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   Audience,
   Campaign,
@@ -28,7 +29,6 @@ import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -89,10 +89,10 @@ async function handleCampaignDuplicate(
   return { success: true };
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, context }: ActionFunctionArgs) {
 
   const { id: workspace_id, selected_id } = params;
-  const { user } = await verifyAuth(request);
+  const { user } = getWorkspaceRouteContext(context)
 
   if (!selected_id || !workspace_id) return redirect("/");
 

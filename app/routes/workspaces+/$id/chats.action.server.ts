@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   getConversationParticipantPhones,
   getChatSortOption,
@@ -10,7 +11,6 @@ import { data as routeData, redirect } from "react-router";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { cancelScheduledMessage, sendMessage } from "@/lib/chat-sms.server";
 import { linkContactToConversation } from "@/lib/database/chat-contact-link.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { eq } from "drizzle-orm";
 import { contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
@@ -26,11 +26,9 @@ import type {
 import type { ActionFunctionArgs } from "react-router";
 import type { Database, Tables } from "@/lib/db-types";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, context }: ActionFunctionArgs) {
 
-  const { headers, user } = await verifyAuth(request);
-
-  const workspaceId = params["id"];
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
 

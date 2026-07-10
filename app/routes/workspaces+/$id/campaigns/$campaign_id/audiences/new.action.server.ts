@@ -1,13 +1,11 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { handleNewAudience } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, context }: ActionFunctionArgs) {
 
-  const { headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   const campaignId = params.campaign_id;
 
   if (!(workspaceId && campaignId)) {

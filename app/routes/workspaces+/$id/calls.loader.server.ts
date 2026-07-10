@@ -1,8 +1,8 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { loadCallLogPage } from "@/lib/call-log.server";
-import { getHandsetNumberForWorkspace, getUserRole } from "@/lib/database.server";
+import { getHandsetNumberForWorkspace } from "@/lib/database.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import type { User } from "@/lib/types";
@@ -70,9 +70,9 @@ export type CallLogLoaderData = Awaited<ReturnType<typeof loadCallLogPage>> & {
   };
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { headers, user } = await verifyAuth(request);
-  const workspaceId = params.id;
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+  const { headers, user, workspaceId, userRole } =
+    getWorkspaceRouteContext(context);
 
   if (!workspaceId) {
     return routeData(
@@ -100,40 +100,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         listening: { ...EMPTY_LISTENING },
       } satisfies CallLogLoaderData,
       { headers, status: 400 },
-    );
-  }
-
-  const userRole = await getUserRole({
-    user: user,
-    workspaceId,
-  });
-
-  if (!userRole?.role) {
-    return routeData(
-      {
-        rows: [],
-        filters: {
-          callcasterNumber: "",
-          otherNumber: "",
-          direction: "all",
-          disposition: "",
-          agentUserId: "",
-          sortKey: "date_created",
-          sortDirection: "desc",
-          page: 1,
-          pageSize: 25,
-        },
-        workspaceNumbers: [],
-        agents: [],
-        pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
-        workspace: null,
-        userRole: null,
-        campaigns: [],
-        error: "You don't have access to this workspace",
-        handsetNumber: null,
-        listening: { ...EMPTY_LISTENING },
-      } satisfies CallLogLoaderData,
-      { headers, status: 403 },
     );
   }
 
@@ -176,7 +142,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         agents: [],
         pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
         workspace: null,
-        userRole: userRole.role,
+        userRole,
         campaigns: campaigns ?? [],
         error: "Workspace not found",
         handsetNumber: null,
@@ -207,7 +173,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       {
         ...callLog,
         workspace,
-        userRole: userRole.role,
+        userRole,
         campaigns: campaigns ?? [],
         error: null,
         handsetNumber: incomingState.handsetNumber,
@@ -235,7 +201,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         agents: [],
         pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
         workspace,
-        userRole: userRole.role,
+        userRole,
         campaigns: campaigns ?? [],
         error: "Failed to load call log. Please try again.",
         handsetNumber: null,

@@ -27,7 +27,7 @@ interface QueueResponse {
   filters: QueueSearchFilters;
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
   const { selected_id, id: workspaceId } = params;
   const url = new URL(request.url);
   const searchParams = url.searchParams;

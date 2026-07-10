@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
 
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
@@ -87,12 +88,12 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=jo")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=jo`,
       ),
       params: { id: workspaceId },
-    } as any));
+    })));
 
     expect(res.status).toBe(200);
     const [, searchParams] = mocks.listWorkspaceContactsApi.mock.calls[0];
@@ -109,12 +110,12 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=example.com")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=example.com`,
       ),
       params: { id: workspaceId },
-    } as any));
+    })));
 
     expect(res.status).toBe(200);
     const [, searchParams] = mocks.listWorkspaceContactsApi.mock.calls[0];
@@ -131,12 +132,12 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=1234")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=1234`,
       ),
       params: { id: workspaceId },
-    } as any));
+    })));
 
     expect(res.status).toBe(200);
     const [, searchParams] = mocks.listWorkspaceContactsApi.mock.calls[0];

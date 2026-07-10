@@ -1,16 +1,15 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import {
   findCampaignMessageMedia,
   updateCampaignMessageMedia,
 } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
   const campaignId = params.selected_id;
-  const workspaceId = params.id;
+  const { headers, workspaceId } = getWorkspaceRouteContext(context);
   if (!campaignId || !workspaceId) {
     throw new Response("Campaign ID is required", { status: 400 });
   }
@@ -22,8 +21,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!encodedMediaName) {
     return routeData({ success: false, error: "File name is required" });
   }
-
-  const { headers } = await verifyAuth(request);
 
   const campaign = await findCampaignMessageMedia(workspaceId, parseInt(campaignId, 10));
 
@@ -42,4 +39,4 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return routeData({ success: false, error: "Campaign update failed" }, { headers });
   }
   return routeData({ success: true, data: [campaignUpdate] }, { headers });
-}
+};

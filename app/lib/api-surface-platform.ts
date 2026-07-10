@@ -16,6 +16,7 @@ type PlatformSeed = {
   operations: Op[];
   notes?: string;
   workspaceScoped?: boolean;
+  duplicate?: boolean;
 };
 
 function platformSeed(input: PlatformSeed): ApiSurfaceEntry {
@@ -31,6 +32,7 @@ function platformSeed(input: PlatformSeed): ApiSurfaceEntry {
     operations: input.operations,
     notes: input.notes,
     workspaceScoped: input.workspaceScoped,
+    duplicate: input.duplicate,
   };
 }
 
@@ -159,6 +161,18 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+  }),
+  platformSeed({
+    path: "/api/workspaces/:workspaceId",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId.tsx",
+    authClass: "session",
+    ownerArea: "workspace",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.platform,
+    workspaceScoped: true,
+    duplicate: true,
+    notes: "Middleware layout for nested workspace API routes; no direct handler.",
+    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/transfer-ownership",

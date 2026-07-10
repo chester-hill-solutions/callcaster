@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -75,7 +76,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -83,7 +84,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
           from: "+15550000000",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({
@@ -100,7 +101,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -108,7 +109,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
           from: "+15550000000",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(mocks.sendMessage).toHaveBeenCalledWith(
@@ -122,14 +123,14 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
           from: "+15550000000",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(tenantDbMocks.contact.findFirst).not.toHaveBeenCalled();
@@ -143,7 +144,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -151,7 +152,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
           from: "+15550000000",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -168,7 +169,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -176,7 +177,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
           from: "+15550000000",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -203,7 +204,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
         "../app/routes/workspaces+/$id/chats.action.server"
       );
       const res = await asRouteResponse(
-        await mod.action({
+        await mod.action(await withWorkspaceRouteArgs({
           request: makeFormRequest({
             body: "hi",
             contact_number: "+15551234567",
@@ -211,7 +212,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
             from: "+15550000000",
           }),
           params: { id: "w1", contact_number: "+15551234567" },
-        } as any),
+        })),
       );
       expect(res.status).toBe(200);
       expect(mocks.sendMessage).toHaveBeenCalled();
@@ -224,14 +225,14 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
           from: "+15550000000",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(mocks.getOrLookupLineType).not.toHaveBeenCalled();
@@ -246,7 +247,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -254,7 +255,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
           from: "+15550000000",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(mocks.sendMessage).toHaveBeenCalled();
@@ -267,7 +268,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     );
     const sendAt = "2026-08-01T12:00:00.000Z";
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -275,7 +276,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
           send_at: sendAt,
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(mocks.sendMessage).toHaveBeenCalledWith(
@@ -291,7 +292,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -299,7 +300,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
           send_at: "2026-08-01T12:00:00.000Z",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -315,13 +316,13 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           intent: "cancel_scheduled_message",
           sid: "SM1",
         }),
         params: { id: "w1" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(mocks.cancelScheduledMessage).toHaveBeenCalledWith({
@@ -336,10 +337,10 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({ intent: "cancel_scheduled_message" }),
         params: { id: "w1" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(400);
     expect(mocks.cancelScheduledMessage).not.toHaveBeenCalled();
@@ -353,13 +354,13 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           intent: "cancel_scheduled_message",
           sid: "SM1",
         }),
         params: { id: "w1" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -373,14 +374,14 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const res = await asRouteResponse(
-      await mod.action({
+      await mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           intent: "link_contact",
           contact_id: "9",
           contact_number: "+15551234567",
         }),
         params: { id: "w1" },
-      } as any),
+      })),
     );
     expect(res.status).toBe(200);
     expect(mocks.linkContactToConversation).toHaveBeenCalled();

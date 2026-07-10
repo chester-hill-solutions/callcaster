@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { releaseAssignedQueueForUser } from "@/lib/queue-status";
 import {
   handleCall,
@@ -14,7 +15,6 @@ import { generateToken } from "@/lib/twilio-token.server";
 import { playTone } from "@/lib/utils";
 import { redirect } from "react-router";
 import { Tables } from "@/lib/db-types";
-import { verifyAuth } from "@/lib/auth.server";
 import type {
   LoaderData,
   QueueItem,
@@ -28,11 +28,11 @@ import type {
 import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
 
   const { campaign_id } = params;
 
-  const { headers, user } = await verifyAuth(request);
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   if (!user || !campaign_id) {
     throw redirect("/signin");
   }

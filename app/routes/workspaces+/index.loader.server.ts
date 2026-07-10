@@ -1,6 +1,6 @@
 import { listUserWorkspaces } from "@/lib/platform-workspace.server";
-import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
+import { data as routeData, redirect } from "react-router";
+import { getSession } from "@/lib/auth.server";
 import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -22,26 +22,38 @@ interface LoaderData {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { user, headers } = await getSession(request);
+  if (!user) {
+    const url = new URL(request.url);
+    throw redirect(
+      `/signin?next=${encodeURIComponent(`${url.pathname}${url.search}`)}`,
+    );
+  }
 
-  const { headers, user } = await verifyAuth(request);
   await requireTwoFactorEnrollmentForPrivilegedUser({
     userId: user.id,
     request,
   });
 
-  const userId = user.id;
-  if (!userId) {
-    return redirect("/signin", { headers });
-  }
-
-  const result = await listUserWorkspaces(userId);
+  const result = await listUserWorkspaces(user.id);
 
   if (!result.ok) {
-    return { workspaces: null, userId: userId, error: result.error } satisfies LoaderData;
+    return routeData(
+      {
+        workspaces: null,
+        userId: user.id,
+        error: result.error,
+      } satisfies LoaderData,
+      { headers },
+    );
   }
-  return {
-    workspaces: result.workspaces as WorkspaceUser[],
-    userId: userId,
-    error: null,
-  } satisfies LoaderData;
-}
+
+  return routeData(
+    {
+      workspaces: result.workspaces as WorkspaceUser[],
+      userId: user.id,
+      error: null,
+    } satisfies LoaderData,
+    { headers },
+  );
+};

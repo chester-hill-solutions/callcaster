@@ -1,8 +1,8 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { getUserRole, listMedia } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { getScriptDetailApi } from "@/lib/platform-data.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
@@ -16,24 +16,19 @@ export type ScriptIdLoaderData = {
   userRole: MemberRole;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
   const { id: workspace_id, scriptId: selected_id } = params;
   if (!workspace_id || !selected_id) {
     throw redirect("/workspaces");
   }
 
-  const { user } = await verifyAuth(request);
+  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context)
 
   const workspaceData = await getWorkspaceById(workspace_id);
   if (!workspaceData) {
     throw redirect("/workspaces");
   }
-
-  const userRole = await getUserRole({
-    user,
-    workspaceId: workspace_id,
-  });
-  if (!userRole?.role) {
+  if (!userRole) {
     throw redirect(`/workspaces/${workspace_id}`);
   }
 
@@ -50,6 +45,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     selected_id,
     script,
     mediaNames,
-    userRole: userRole.role as MemberRole,
+    userRole: userRole as MemberRole,
   } satisfies ScriptIdLoaderData);
 };

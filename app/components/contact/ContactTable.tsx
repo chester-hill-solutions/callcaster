@@ -115,7 +115,7 @@ const ContactTable: React.FC<ContactTableProps> = ({
     }
   };
 
-  const renderBulkActionBar = (): JSX.Element | null => {
+  const renderBulkActionBar = (): React.ReactElement | null => {
     if (selectedContacts.length === 0) return null;
 
     return (

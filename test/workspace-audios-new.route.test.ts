@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
 import { uploadObject } from "@/lib/object-storage.server";
 
 const mocks = vi.hoisted(() => {
@@ -75,13 +76,13 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       new File(["source-audio"], "greeting.m4a", { type: "audio/mp4" }),
     );
 
-    const response = await asRouteResponse(await mod.action({
+    const response = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any));
+    })));
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("../audios?uploaded=1");
@@ -104,13 +105,13 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     const formData = new FormData();
     formData.set("media-name", "Greeting");
 
-    const response = await asRouteResponse(await mod.action({
+    const response = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any));
+    })));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
@@ -137,13 +138,13 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       new File(["bogus"], "bad.ogg", { type: "audio/ogg" }),
     );
 
-    const response = await asRouteResponse(await mod.action({
+    const response = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any));
+    })));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({

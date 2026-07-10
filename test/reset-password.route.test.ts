@@ -2,6 +2,10 @@ import { describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 
+function routeArgs(request: Request, params: Record<string, string> = {}) {
+  return { request, params, url: new URL(request.url) };
+}
+
 const mocks = vi.hoisted(() => ({
   resetPassword: vi.fn(),
 }));
@@ -18,9 +22,7 @@ describe("app/routes/reset-password", () => {
   test("loader returns token from query string", async () => {
     const mod = await import("../app/routes/reset-password");
     const response = await asRouteResponse(
-      await mod.loader({
-        request: new Request("http://localhost/reset-password?token=abc123"),
-      } as any),
+      await mod.loader(routeArgs(new Request("http://localhost/reset-password?token=abc123"))),
     );
 
     expect(response.status).toBe(200);
@@ -30,9 +32,7 @@ describe("app/routes/reset-password", () => {
   test("loader returns null token when missing", async () => {
     const mod = await import("../app/routes/reset-password");
     const response = await asRouteResponse(
-      await mod.loader({
-        request: new Request("http://localhost/reset-password"),
-      } as any),
+      await mod.loader(routeArgs(new Request("http://localhost/reset-password"))),
     );
 
     expect(response.status).toBe(200);
@@ -48,12 +48,14 @@ describe("app/routes/reset-password", () => {
 
     const mod = await import("../app/routes/reset-password");
     const response = await asRouteResponse(
-      await mod.action({
-        request: new Request("http://localhost/reset-password?token=abc123", {
-          method: "POST",
-          body: form,
-        }),
-      } as any),
+      await mod.action(
+        routeArgs(
+          new Request("http://localhost/reset-password?token=abc123", {
+            method: "POST",
+            body: form,
+          }),
+        ),
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -71,12 +73,14 @@ describe("app/routes/reset-password", () => {
 
     const mod = await import("../app/routes/reset-password");
     const response = await asRouteResponse(
-      await mod.action({
-        request: new Request("http://localhost/reset-password?token=abc123", {
-          method: "POST",
-          body: form,
-        }),
-      } as any),
+      await mod.action(
+        routeArgs(
+          new Request("http://localhost/reset-password?token=abc123", {
+            method: "POST",
+            body: form,
+          }),
+        ),
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -96,12 +100,14 @@ describe("app/routes/reset-password", () => {
 
     const mod = await import("../app/routes/reset-password");
     const response = await asRouteResponse(
-      await mod.action({
-        request: new Request("http://localhost/reset-password?token=abc123", {
-          method: "POST",
-          body: form,
-        }),
-      } as any),
+      await mod.action(
+        routeArgs(
+          new Request("http://localhost/reset-password?token=abc123", {
+            method: "POST",
+            body: form,
+          }),
+        ),
+      ),
     );
 
     expect(response.status).toBe(200);

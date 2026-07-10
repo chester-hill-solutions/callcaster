@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   deleteWorkspaceNumber,
   patchWorkspaceNumber,
@@ -6,11 +7,10 @@ import {
 import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { normalizeInboundRingCount } from "../../../../../shared/inbound-rings";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { user } = await verifyAuth(request);
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
+  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context)
 
   const data = Object.fromEntries(await request.formData()) as Record<
     string,
@@ -24,12 +24,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     user: { id: user.id },
     workspaceId: workspace_id,
   });
-
-  const userRole = await getUserRole({
-    user: { id: user.id },
-    workspaceId: workspace_id,
-  });
-  if (userRole?.role === MemberRole.Caller) {
+  if (userRole === MemberRole.Caller) {
     return { error: "You do not have permission to update phone numbers" };
   }
 

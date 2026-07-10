@@ -15,14 +15,12 @@ import {
 } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { createWorkspaceApiKey } from "@/lib/platform-members.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/auth.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const workspaceId = params.id;
-  const { headers, user } = await verifyAuth(request);
-
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   if (!user) {
     return redirect("/signin");
   }
@@ -32,9 +30,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   await requireWorkspaceAccess({ user, workspaceId });
-
-  const userRole = await getUserRole({ user, workspaceId });
-  const role = userRole?.role;
+  const role = userRole;
 
   const formData = await request.formData();
   const formName = formData.get("formName");

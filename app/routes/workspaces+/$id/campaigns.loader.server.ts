@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   Audience,
   WorkspaceData,
@@ -5,11 +6,9 @@ import {
   Campaign,
 } from "@/lib/types";
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-  const { headers, user } = await verifyAuth(request);
+export const loader = async ({ context }: LoaderFunctionArgs) => {
+  getWorkspaceRouteContext(context);
   return null;
-}
+};

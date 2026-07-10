@@ -1,7 +1,7 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { listWorkspaceScriptsApi } from "@/lib/platform-data.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { Json , Database } from "@/lib/db-types";
 import type { LoaderFunctionArgs } from "react-router";
@@ -38,11 +38,9 @@ type LoaderData =
       userRole: Database["public"]["Enums"]["workspace_role"];
     };
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
 
-  const { headers, user } = await verifyAuth(request);
-
-  const workspaceId = params["id"];
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   if (workspaceId == null) {
     return routeData<LoaderData>(
       {

@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -7,15 +8,14 @@ import {
 } from "@/lib/message-db.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { verifyAuth } from "@/lib/auth.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Message } from "@/lib/types";
 import { fetchMessagePage } from "./$contact_number.messages.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
   const { id, contact_number } = params;
-  const { headers } = await verifyAuth(request);
+  const { headers, user, workspaceId } = getWorkspaceRouteContext(context);
   const url = new URL(request.url);
   const before = url.searchParams.get("before");
   let messages: Message[] = [];

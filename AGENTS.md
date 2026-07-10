@@ -1,5 +1,7 @@
 ## Learned User Preferences
 
+> **Platform context:** Read [docs/AGENT-PLATFORM-GUIDE.md](docs/AGENT-PLATFORM-GUIDE.md) for CHS portfolio role, shared `@chester-hill-solutions/*` packages, and migration-branch boundaries before cross-cutting work.
+
 - When the user says `do the needful`, continue with the most obvious next implementation, cleanup, or verification steps without waiting for repeated confirmation unless blocked.
 - For broad bug, typecheck, test, or coverage sweeps, keep iterating until the issue list is exhausted or a real blocker is reached.
 - When implementing from an attached plan whose todos already exist, update the existing todos instead of recreating them and work through the full list before stopping.
@@ -9,9 +11,12 @@
 
 - Prefer [app/components/ui/](app/components/ui/) primitives; use `FormField` for form layout, `Section`/`AuthCard` for page structure, `DataTable`/`TablePagination` for tables, and `toast()` from sonner (single root Toaster). See [docs/design-system.md](docs/design-system.md).
 
-## Routes (React Router 7)
+## Routes (React Router 8)
 
-- Route discovery: [app/routes.ts](app/routes.ts) uses `remix-flat-routes` hybrid folders (`workspaces+/`, `api+/`, …). Each route is a **single module** (`folder/route.tsx`); React Router 7 splits `loader` / `action` / UI automatically — no manual `route.server.tsx`.
+- Route discovery: [app/routes.ts](app/routes.ts) uses `remix-flat-routes` hybrid folders (`workspaces+/`, `api+/`, …). Each route is a **single module** (`folder/route.tsx`); React Router splits `loader` / `action` / UI automatically — no manual `route.server.tsx`.
+- **Auth middleware:** `workspaces+/$id` uses [`app/lib/workspace-middleware.server.ts`](app/lib/workspace-middleware.server.ts) → `workspaceContext`; nested `api+/workspaces+/$workspaceId/*` uses [`app/lib/data-plane-middleware.server.ts`](app/lib/data-plane-middleware.server.ts) → `dataPlaneAuthContext`. Child loaders read context via `getWorkspaceRouteContext` / `getDataPlaneRouteContext`. Twilio webhooks, `/api/jobs/*`, SSE, stripe, and auth catch-all stay outside middleware.
+- **Auth layout adapter:** Until `@chester-hill-solutions/auth-react-router` is installable, use [`app/lib/auth-layout.server.ts`](app/lib/auth-layout.server.ts) (`createAuthLayoutLoader`, `createRequireSessionUserId`).
+- **`@react-router/fs-routes`:** Deferred — `remix-flat-routes` + route tooling baselines remain; evaluate fs-routes only after RR8 is stable in production.
 - Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).
 
 ## Public APIs (doc-first / Hey API)

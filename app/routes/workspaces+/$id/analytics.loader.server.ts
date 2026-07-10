@@ -1,8 +1,7 @@
-import { getUserRole } from "@/lib/database.server";
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { MemberRole } from "@/lib/member-role";
 import { loadWorkspaceAnalytics } from "@/lib/workspace-analytics.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import {
   getWorkspaceById,
   listWorkspaceMembersEnriched,
@@ -44,9 +43,8 @@ function emptyAnalytics(): WorkspaceAnalyticsResult {
   };
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { headers, user } = await verifyAuth(request);
-  const workspaceId = params.id;
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
 
   if (!workspaceId || !user) {
     return routeData(
@@ -62,27 +60,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       { headers, status: 400 },
     );
   }
-
-  const userRole = await getUserRole({
-    user,
-    workspaceId,
-  });
-
-  if (!userRole?.role) {
-    return routeData(
-      {
-        workspace: null,
-        userRole: null,
-        campaigns: [],
-        analytics: emptyAnalytics(),
-        workspaceUsers: [],
-        currentUserId: user.id,
-        error: "You don't have access to this workspace",
-      } satisfies WorkspaceAnalyticsLoaderData,
-      { headers, status: 403 },
-    );
-  }
-
   const workspace = await getWorkspaceById(workspaceId);
   const tdb = createTenantDb(workspaceId);
   const campaigns = await tdb.campaign.findMany({
@@ -94,7 +71,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return routeData(
       {
         workspace: null,
-        userRole: userRole.role,
+        userRole,
         campaigns,
         analytics: emptyAnalytics(),
         workspaceUsers: [],
@@ -106,9 +83,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const canViewAllUsers =
-    userRole.role === MemberRole.Admin ||
-    userRole.role === MemberRole.Owner ||
-    userRole.role === MemberRole.Member;
+    userRole === MemberRole.Admin ||
+    userRole === MemberRole.Owner ||
+    userRole === MemberRole.Member;
 
   try {
     const [memberRows, analytics] = await Promise.all([
@@ -137,7 +114,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           name: workspace.name,
           credits: workspace.credits,
         },
-        userRole: userRole.role,
+        userRole,
         campaigns,
         analytics,
         workspaceUsers,
@@ -155,7 +132,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           name: workspace.name,
           credits: workspace.credits,
         },
-        userRole: userRole.role,
+        userRole,
         campaigns,
         analytics: emptyAnalytics(),
         workspaceUsers: [],

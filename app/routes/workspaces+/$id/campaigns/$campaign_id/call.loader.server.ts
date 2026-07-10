@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { checkSchedule, getUserRole } from "@/lib/database.server";
 import { generateToken } from "@/lib/twilio-token.server";
 import {
@@ -10,13 +11,12 @@ import {
   getVerifiedNumbers,
 } from "@/lib/call-screen.server";
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 import { MemberRole } from "@/lib/member-role";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { campaign_id: id, id: workspaceId } = params;
-  const {user } = await verifyAuth(request);
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+  const { campaign_id: id } = params;
+  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context);
   if (!user || !workspaceId || !id) throw redirect("/signin");
 
   const verifiedNumbers = await getVerifiedNumbers(user.id);
@@ -47,9 +47,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const initalCallsList = getInitialCallsList(attempts || []);
   const initialRecentCall = getInitialRecentCall(attempts || []);
   const initialRecentAttempt = getInitialRecentAttempt(attempts || []);
-
-  const userRole = await getUserRole({ user, workspaceId: workspaceId! });
-  const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole);
+  const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole as MemberRole);
   const isActive = campaign ? checkSchedule(campaign) : false;
 
   return {

@@ -1,9 +1,8 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -37,13 +36,12 @@ function errorPayload(
   };
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
   try {
-    const { headers, user } = await verifyAuth(request);
+    const { headers, user, workspaceId, userRole: roleStr } = getWorkspaceRouteContext(context);
     const url = new URL(request.url);
     const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
 
-    const workspaceId = params.id;
     if (!workspaceId) {
       return routeData(
         errorPayload(
@@ -88,12 +86,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const tdb = createTenantDb(workspaceId);
 
     const [
-      userRoleResult,
       workspace,
       campaigns,
       contactsResult,
     ] = await Promise.all([
-      getUserRole({ user, workspaceId }),
       getWorkspaceById(workspaceId),
       tdb.campaign.findMany({
         columns: { id: true, title: true, status: true },
@@ -102,7 +98,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       listWorkspaceContactsApi(workspaceId, url.searchParams),
     ]);
 
-    const userRole = (userRoleResult?.role || null) as MemberRole | null;
+    const userRole = roleStr as MemberRole;
     const flags = workspace ? { feature_flags: workspace.feature_flags } : null;
 
     if (!userRole) {

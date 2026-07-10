@@ -1,6 +1,31 @@
 import { data as routeData } from "react-router";
+import type { RouterContextProvider } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/auth.server";
+import { workspaceContext } from "@/lib/route-context.server";
+
+export type WorkspaceRouteContext = {
+  headers: Headers;
+  user: { id: string };
+  workspaceId: string;
+  userRole: string;
+};
+
+/** Read workspace context set by layout middleware (required on `workspaces+/$id` children). */
+export function getWorkspaceRouteContext(
+  context: Readonly<RouterContextProvider>,
+): WorkspaceRouteContext {
+  const ws = context.get(workspaceContext);
+  if (!ws) {
+    throw new Error("Workspace context missing");
+  }
+  return {
+    headers: ws.headers,
+    user: { id: ws.userId },
+    workspaceId: ws.workspaceId,
+    userRole: ws.userRole,
+  };
+}
 
 export type WorkspaceLoaderContext = {
   headers: Headers;
@@ -30,10 +55,43 @@ export function hasMinRole(
 }
 
 /**
- * Session auth + workspace membership for workspace UI loaders.
- * Pass `{ minRole }` to enforce a minimum role (owner/admin/member/caller).
+ * Read workspace context set by layout middleware, or fall back to full auth check.
  */
 export async function requireWorkspaceLoaderContext(
+  request: Request,
+  workspaceId: string | undefined,
+  options?: { minRole?: string; context?: Readonly<RouterContextProvider> },
+): Promise<WorkspaceLoaderResult> {
+  const fromMiddleware = options?.context?.get(workspaceContext);
+  if (fromMiddleware) {
+    if (options?.minRole && !hasMinRole(fromMiddleware.userRole, options.minRole)) {
+      return {
+        ok: false,
+        response: routeData(
+          { error: "You don't have permission to perform this action" },
+          { headers: fromMiddleware.headers, status: 403 },
+        ),
+      };
+    }
+    return {
+      ok: true,
+      ctx: {
+        headers: fromMiddleware.headers,
+        user: { id: fromMiddleware.userId },
+        workspaceId: fromMiddleware.workspaceId,
+        userRole: { role: fromMiddleware.userRole },
+      },
+    };
+  }
+
+  return requireWorkspaceLoaderContextFromRequest(
+    request,
+    workspaceId,
+    options,
+  );
+}
+
+async function requireWorkspaceLoaderContextFromRequest(
   request: Request,
   workspaceId: string | undefined,
   options?: { minRole?: string },

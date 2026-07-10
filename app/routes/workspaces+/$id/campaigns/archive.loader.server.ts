@@ -4,9 +4,9 @@ import { logger } from "@/lib/logger.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
 
-  const result = await requireWorkspaceLoaderContext(request, params.id);
+  const result = await requireWorkspaceLoaderContext(request, params.id, { context });
   if (!result.ok) return result.response;
   const { headers, workspaceId } = result.ctx;
 

@@ -1,4 +1,5 @@
 export { loader } from "./$id.loader.server";
+export { middleware } from "./$id.middleware.server";
 
 import { useLoaderData, Outlet, useOutlet, useOutletContext } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";

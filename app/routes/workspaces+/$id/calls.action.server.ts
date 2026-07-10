@@ -1,14 +1,13 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   endHandsetSession,
   getHandsetLoaderData,
 } from "@/lib/handset/handset-session.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { headers, user } = await verifyAuth(request);
-  const workspaceId = params.id;
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
 
   if (!workspaceId || !user) {
     return routeData({ error: "Unauthorized" }, { headers, status: 401 });

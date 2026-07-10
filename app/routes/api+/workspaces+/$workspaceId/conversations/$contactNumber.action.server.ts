@@ -4,9 +4,10 @@ import {
   markReceivedMessagesAsDeliveredForPhone,
 } from "@/lib/message-db.server";
 import { resolveDataPlaneAuth } from "@/lib/platform-data.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   const contactNumber = params.contactNumber;
   if (!workspaceId || !contactNumber) {
@@ -16,9 +17,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (request.method !== "POST") {
     return jsonError("Method not allowed", 405);
   }
-
-  const auth = await resolveDataPlaneAuth(request, workspaceId);
-  if (auth instanceof Response) return auth;
+  getDataPlaneRouteContext(context, workspaceId);
 
   const decodedContactNumber = decodeURIComponent(contactNumber);
   let messageSid: string | undefined;

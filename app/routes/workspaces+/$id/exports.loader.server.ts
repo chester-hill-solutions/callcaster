@@ -38,7 +38,7 @@ interface LoaderData {
   exports: SerializedExportItem[];
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
 
   const result = await requireWorkspaceLoaderContext(request, params["id"]);
   if (!result.ok) return result.response;

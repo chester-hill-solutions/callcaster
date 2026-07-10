@@ -1,13 +1,10 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { createEmptyAudience } from "@/lib/audience-upload-db.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const { headers } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-
+export async function action({ request, params, context }: ActionFunctionArgs) {
+  const { headers, user, workspaceId } = getWorkspaceRouteContext(context);
   if (workspaceId == null) {
     return routeData(
       {

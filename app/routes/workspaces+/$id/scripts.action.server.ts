@@ -4,8 +4,8 @@ import { getScriptExportFields } from "@/lib/script-api-db.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const access = await requireWorkspaceLoaderContext(request, params.id);
+export async function action({ request, params, context }: ActionFunctionArgs) {
+  const access = await requireWorkspaceLoaderContext(request, params.id, { context });
   if (!access.ok) {
     return access.response;
   }

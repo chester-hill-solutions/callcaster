@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   applyWorkspaceOnboardingChannelPolicy,
@@ -6,7 +7,6 @@ import {
   isWizardOnboardingStepId,
 } from "@/lib/messaging-onboarding.server";
 import {
-  getUserRole,
   getWorkspaceInfo,
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
@@ -18,7 +18,6 @@ import {
   isRcsOnboardingEnabled,
 } from "@/lib/rcs-onboarding.server";
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { listObjects } from "@/lib/object-storage.server";
@@ -49,9 +48,8 @@ export type OnboardingLoaderData = {
   scripts: { id: number; name: string }[];
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { user, headers } = await verifyAuth(request);
-  const workspaceId = params.id;
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   if (!workspaceId) {
     throw redirect("/workspaces", { headers });
   }
@@ -61,12 +59,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     workspaceId,
   });
 
-  const userRole = (
-    await getUserRole({
-      user,
-      workspaceId,
-    })
-  )?.role;
   const tdb = createTenantDb(workspaceId);
   const [
     { data: workspaceInfo },

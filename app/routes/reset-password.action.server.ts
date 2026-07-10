@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { auth } from "@/server/auth-instance";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, url }: ActionFunctionArgs) {
   const formData = await request.formData();
   const passwordRaw = formData.get("password");
   const confirmPasswordRaw =
@@ -25,7 +25,7 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
-  const token = new URL(request.url).searchParams.get("token") ?? "";
+  const token = url.searchParams.get("token") ?? "";
 
   try {
     await auth.api.resetPassword({

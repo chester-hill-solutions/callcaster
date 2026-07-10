@@ -1,8 +1,8 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
 import { fetchCampaignForScriptEdit } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
 import {
@@ -14,7 +14,7 @@ import {
 
 type LoaderData = ScriptEditLoaderData;
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
 
   const { id: workspace_id, selected_id } = params;
   
@@ -22,8 +22,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Response("Missing required parameters", { status: 400 });
   }
 
-  const { user } = await verifyAuth(request);
-  const userRole = await getUserRole({ user, workspaceId: workspace_id });
+  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context)
   const scripts = await getWorkspaceScripts({
     workspace: workspace_id,
   }) || [];
@@ -121,7 +120,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       campaignDetails,
     },
     mediaNames,
-    userRole: userRole?.role ?? "",
+    userRole: userRole ?? "",
     scripts,
   } satisfies LoaderData);
 }

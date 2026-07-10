@@ -1,17 +1,14 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { AudioUploadError, getSafeMediaBaseName, normalizeUploadedAudio } from "@/lib/audio.server";
 import { data as routeData, redirect } from "react-router";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { uploadObject } from "@/lib/object-storage.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, context }: ActionFunctionArgs) {
 
-  const { headers } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (workspaceId == null) {
+  const { headers, user, workspaceId } = getWorkspaceRouteContext(context);  if (workspaceId == null) {
     return routeData(
       { success: false, error: "Workspace does not exist" },
       { headers },

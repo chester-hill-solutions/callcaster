@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { eq } from "drizzle-orm";
@@ -10,7 +11,6 @@ import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { parseActionRequest } from "@/lib/database.server";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
-import { verifyAuth } from "@/lib/auth.server";
 import { contact_audience as contactAudienceTable } from "@/db/schema";
 // contact_audience is a join table without a workspace column; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
@@ -27,9 +27,9 @@ const EMPTY_FILTERS: QueueSearchFilters = {
   queueStatus: "",
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params, context }: ActionFunctionArgs) => {
   const { selected_id } = params;
-  await verifyAuth(request);
+  
 
   if (!selected_id) throw redirect("../../");
 

@@ -1,3 +1,4 @@
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { getSurveyDetailApi } from "@/lib/platform-data.server";
@@ -8,19 +9,15 @@ import {
   SurveyQuestion,
   SurveyQuestionType,
 } from "@/lib/types";
-import { verifyAuth } from "@/lib/auth.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { user } = await verifyAuth(request);
-  const { id: workspaceId, surveyId } = params;
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
+  const { surveyId } = params;
+  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context);
 
   if (!workspaceId || !surveyId) {
     throw new Response("Missing required parameters", { status: 400 });
   }
-
-  const userRole = await getUserRole({ user, workspaceId });
-
   const result = await getSurveyDetailApi(surveyId, workspaceId);
   if (!result.ok) {
     throw new Response(result.error, { status: result.status });
