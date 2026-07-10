@@ -1,6 +1,13 @@
-> **Historical only** — notes may not match the current codebase.
+> ⛔ **DO NOT FOLLOW THESE INSTRUCTIONS — they will silently corrupt credit balances.**
+> The `transaction_history_update_credits` trigger this procedure relies on was **dropped**
+> (`client/migrations/20260704000005_drop_legacy_triggers.sql`, ADR-0006). A raw insert into
+> `transaction_history` no longer updates `workspace.credits`, creating undetected
+> ledger/balance drift. To adjust credits manually, use the
+> `apply_ledger_entry_and_sync_credits` RPC (via `insertTransactionHistoryIdempotent` in
+> `app/lib/transaction-history.server.ts`), which writes the ledger row and syncs the balance
+> atomically.
 
-# Manual Credit Loading Instructions
+# Manual Credit Loading Instructions (OBSOLETE)
 
 ## Overview
 

@@ -19,6 +19,10 @@ export default function WorkspaceMessagingOnboardingRoute() {
     phoneNumbers,
     creditsBalance,
     rcsBlockingIssues,
+    workspaceUsers,
+    mediaNames,
+    inboundQueues,
+    scripts,
   } = useLoaderData<OnboardingLoaderData>();
   const actionData = useActionData<OnboardingActionData>();
   const navigation = useNavigation();
@@ -65,9 +69,9 @@ export default function WorkspaceMessagingOnboardingRoute() {
   const pending = {
     isSavingBusinessProfile: pendingAction === "save_business_profile",
     isSavingChannels: pendingAction === "save_channels",
-    isBootstrappingMessagingService: pendingAction === "bootstrap_messaging_service",
     isProvisioningA2P: pendingAction === "provision_a2p",
     isSavingRcs: pendingAction === "save_rcs",
+    isAttachingRcsSender: pendingAction === "attach_rcs_sender",
     isReviewingEmergencyVoice: pendingAction === "review_emergency_voice",
     isVerifyingCallerId: pendingAction === "verify_caller_id",
   };
@@ -90,6 +94,12 @@ export default function WorkspaceMessagingOnboardingRoute() {
       pending={pending}
       a2pBlockingIssues={a2pBlockingIssues}
       a2pErrors={a2pErrors}
+      workspaceUsers={workspaceUsers}
+      mediaNames={mediaNames}
+      inboundQueues={inboundQueues}
+      scripts={scripts}
     />
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

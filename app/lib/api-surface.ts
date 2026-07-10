@@ -626,6 +626,50 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     notes: "Returns TwiML.",
   }),
   seed({
+    path: "/api/jobs/low-credit-notify",
+    routeModule: "app/routes/api+/jobs+/low-credit-notify.tsx",
+    authClass: "internalTrusted",
+    ownerArea: "billing",
+    exposure: "internalOnly",
+    docsGuide: GUIDE.internal,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    notes:
+      "Cron-triggered low-credit email sweep; authenticated via x-cron-secret header (process.env.CRON_SECRET).",
+  }),
+  seed({
+    path: "/api/jobs/number-rental-billing",
+    routeModule: "app/routes/api+/jobs+/number-rental-billing.tsx",
+    authClass: "internalTrusted",
+    ownerArea: "billing",
+    exposure: "internalOnly",
+    docsGuide: GUIDE.internal,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    notes:
+      "Cron-triggered monthly number-rental billing; authenticated via x-cron-secret header (process.env.CRON_SECRET).",
+  }),
+  seed({
+    path: "/api/jobs/billing-reconcile",
+    routeModule: "app/routes/api+/jobs+/billing-reconcile.tsx",
+    authClass: "internalTrusted",
+    ownerArea: "billing",
+    exposure: "internalOnly",
+    docsGuide: GUIDE.internal,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    notes:
+      "Cron-triggered billing reconciliation snapshot; authenticated via x-cron-secret header (process.env.CRON_SECRET).",
+  }),
+  seed({
+    path: "/api/jobs/twilio-open-sync",
+    routeModule: "app/routes/api+/jobs+/twilio-open-sync.tsx",
+    authClass: "internalTrusted",
+    ownerArea: "telephony",
+    exposure: "internalOnly",
+    docsGuide: GUIDE.internal,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    notes:
+      "Cron-triggered sync of open Twilio calls/messages; authenticated via x-cron-secret header (process.env.CRON_SECRET).",
+  }),
+  seed({
     path: "/api/initiate-ivr",
     routeModule: "app/routes/api+/initiate-ivr.tsx",
     authClass: "session",
@@ -947,6 +991,30 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     docsGuide: GUIDE.workspace,
     workspaceScoped: true,
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+  }),
+  seed({
+    path: "/api/twilio/trusthub/status",
+    routeModule: "app/routes/api+/twilio/trusthub/status.route.tsx",
+    authClass: "twilioSignature",
+    ownerArea: "messaging",
+    exposure: "providerOnly",
+    docsGuide: GUIDE.webhooks,
+    operations: [{ method: "POST", handler: "action", bodyType: "form" }],
+    notes:
+      "Trust Hub status_callback receiver; resolves workspace by customer-profile bundle SID and reconciles compliance status.",
+  }),
+  seed({
+    path: "/api/twilio/a2p/events",
+    routeModule: "app/routes/api+/twilio/a2p/events.route.tsx",
+    authClass: "internalTrusted",
+    ownerArea: "messaging",
+    exposure: "internalOnly",
+    docsGuide: GUIDE.internal,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    securityWarning:
+      "A2P Event Streams sink receiver (JSON body); sink-secret validation lands in Phase D.",
+    notes:
+      "Parses A2P brand/campaign lifecycle events and reconciles workspace onboarding status.",
   }),
   ...PLATFORM_API_SURFACE,
 ];

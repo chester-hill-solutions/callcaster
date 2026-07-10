@@ -7,7 +7,7 @@ import { Contact } from "../types";
 import { logger } from "../logger.server";
 import { rpcFindContactByPhone } from "@/lib/db-rpc.server";
 import { buildContactSearchWhere } from "@/lib/contacts/search.server";
-import { contact as contactTable, contact_audience } from "@/db/schema";
+import { audience as audienceTable, contact as contactTable, contact_audience } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
@@ -21,7 +21,7 @@ function dedupeContactsById(contacts: Contact[]): Contact[] {
   );
 }
 
-function buildExactPhoneCandidates(fullNumber: string): string[] {
+export function buildExactPhoneCandidates(fullNumber: string): string[] {
   const candidates = new Set<string>();
 
   if (!fullNumber) {
@@ -259,12 +259,46 @@ export const updateContact = async (
   return updated;
 };
 
+/**
+ * Fallback audience name used to keep chat-created contacts visible to
+ * audience-scoped campaign features when the caller didn't pick one.
+ */
+export const DEFAULT_CHAT_AUDIENCE_NAME = "SMS Contacts";
+
+async function findOrCreateDefaultChatAudience(
+  tenantDb: TenantDb,
+  workspaceId: string,
+): Promise<number | null> {
+  const existing = (await tenantDb.audience.findFirst({
+    where: eq(audienceTable.name, DEFAULT_CHAT_AUDIENCE_NAME),
+  })) as { id: number } | undefined;
+
+  if (existing?.id) {
+    return existing.id;
+  }
+
+  const [created] = await tenantDb.audience.insert({
+    name: DEFAULT_CHAT_AUDIENCE_NAME,
+    is_conditional: false,
+    created_at: new Date().toISOString(),
+  });
+
+  return created?.id ?? null;
+}
+
 export const createContact = async (
   contactData: Partial<Contact>,
   audience_id: string,
   user_id: string,
   opts?: {
     tdb?: TenantDb;
+    /**
+     * When true and no `audience_id` was supplied, auto-create-or-reuse the
+     * workspace's default "SMS Contacts" audience and link the new contact
+     * to it. Opt-in only (chat contact-creation flow) so every other
+     * `createContact` caller keeps its existing no-audience behavior.
+     */
+    assignDefaultAudienceIfMissing?: boolean;
     /** @deprecated ignored */
     null?: never;
   },
@@ -285,10 +319,20 @@ export const createContact = async (
     created_by: user_id,
   });
 
-  if (audience_id && inserted) {
+  // Preserve existing behavior exactly when a caller supplies an
+  // audience_id: parse it and attempt the link regardless of whether it
+  // happens to be numeric (unchanged from prior callers' expectations).
+  // Only treat a *missing* audience_id as eligible for the opt-in default.
+  let resolvedAudienceId: number | null = audience_id ? Number(audience_id) : null;
+
+  if (!audience_id && opts?.assignDefaultAudienceIfMissing && inserted && workspace) {
+    resolvedAudienceId = await findOrCreateDefaultChatAudience(tenantDb, workspace);
+  }
+
+  if (resolvedAudienceId != null && inserted) {
     await db.insert(contact_audience).values({
       contact_id: inserted.id,
-      audience_id: Number(audience_id),
+      audience_id: resolvedAudienceId,
       created_at: new Date().toISOString(),
     });
   }

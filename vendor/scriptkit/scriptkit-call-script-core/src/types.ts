@@ -17,7 +17,25 @@ const baseBlockFields = {
   prompt: z.string().optional(),
   required: z.boolean().optional(),
   routingRules: z.array(routingRuleSchema).optional(),
+  /** Recorded-audio reference carried through from/to the Callcaster wire format. */
+  audioFile: z.string().optional(),
 };
+
+/**
+ * Option shape shared by choice/select/radio/checkbox blocks. `value`/`label`
+ * are the canonical internal representation; `next` and `content` are
+ * carried through losslessly from the Callcaster wire format (which keys
+ * options by `{ content, next }` rather than `{ value, label }`) so a
+ * migrate -> serialize round-trip doesn't drop routing or original text.
+ */
+const scriptOptionSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  next: z.string().optional(),
+  content: z.string().optional(),
+});
+
+export type ScriptOption = z.infer<typeof scriptOptionSchema>;
 
 export const instructionBlockSchema = z.object({
   ...baseBlockFields,
@@ -35,7 +53,7 @@ export const choiceBlockSchema = z.object({
   ...baseBlockFields,
   type: z.literal("choice"),
   prompt: z.string().default(""),
-  options: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+  options: z.array(scriptOptionSchema).default([]),
 });
 
 export const textBlockSchema = z.object({
@@ -61,21 +79,21 @@ export const selectBlockSchema = z.object({
   ...baseBlockFields,
   type: z.literal("select"),
   prompt: z.string().default(""),
-  options: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+  options: z.array(scriptOptionSchema).default([]),
 });
 
 export const radioBlockSchema = z.object({
   ...baseBlockFields,
   type: z.literal("radio"),
   prompt: z.string().default(""),
-  options: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+  options: z.array(scriptOptionSchema).default([]),
 });
 
 export const checkboxBlockSchema = z.object({
   ...baseBlockFields,
   type: z.literal("checkbox"),
   prompt: z.string().default(""),
-  options: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+  options: z.array(scriptOptionSchema).default([]),
 });
 
 export const scriptBlockSchema = z.discriminatedUnion("type", [

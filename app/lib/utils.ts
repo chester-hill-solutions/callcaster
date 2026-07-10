@@ -45,6 +45,49 @@ export function formatMessageTimestamp(dateInput: string | Date): string {
   });
 }
 
+/** Day-divider label for grouping chat messages: "Today", "Yesterday", or a short date. */
+export function formatMessageDateDivider(dateInput: string | Date): string {
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (dateOnly.getTime() === today.getTime()) {
+    return "Today";
+  }
+  if (dateOnly.getTime() === yesterday.getTime()) {
+    return "Yesterday";
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString([], {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** True when two dates fall on the same calendar day (local time). */
+export function isSameCalendarDay(
+  a: string | Date,
+  b: string | Date,
+): boolean {
+  const dateA = typeof a === "string" ? new Date(a) : a;
+  const dateB = typeof b === "string" ? new Date(b) : b;
+  return (
+    dateA.getFullYear() === dateB.getFullYear() &&
+    dateA.getMonth() === dateB.getMonth() &&
+    dateA.getDate() === dateB.getDate()
+  );
+}
+
 export function capitalize(text: string): string {
   return text?.charAt(0).toUpperCase() + text?.slice(1);
 }

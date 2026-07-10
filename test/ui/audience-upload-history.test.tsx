@@ -142,7 +142,9 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
 
     expect(screen.getByText("Unknown file")).toBeInTheDocument();
     expect(screen.getByText("1.0 KB")).toBeInTheDocument();
-    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    // "Unknown" now appears twice: the null file_size cell (id=2) and the
+    // "unknown" status badge (id=5), since StatusBadge capitalizes labels.
+    expect(screen.getAllByText("Unknown")).toHaveLength(2);
     expect(screen.getByText("1.0 MB")).toBeInTheDocument();
     expect(screen.getByText("1.0 GB")).toBeInTheDocument();
 
@@ -154,18 +156,21 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
     const zeroProgress = zeroRow.querySelector("div[style]") as HTMLElement;
     expect(zeroProgress.getAttribute("style")).toContain("0%");
 
-    const completedRow = screen.getByText("completed").closest("tr") as HTMLElement;
+    const completedRow = screen.getByText("ok.csv").closest("tr") as HTMLElement;
     expect(within(completedRow).getByText("5")).toBeInTheDocument();
 
-    const errorRow = screen.getByText("error").closest("tr") as HTMLElement;
+    const errorRow = screen.getByText("bad.csv").closest("tr") as HTMLElement;
     const warn = within(errorRow).getByTitle("boom");
     expect(warn).toBeInTheDocument();
 
-    expect(screen.getByText("pending").className).toContain("bg-yellow-100");
-    expect(screen.getAllByText("processing")[0]!.className).toContain("bg-blue-100");
-    expect(screen.getByText("completed").className).toContain("bg-green-100");
-    expect(screen.getByText("error").className).toContain("bg-red-100");
-    expect(screen.getByText("unknown").className).toContain("bg-gray-100");
+    const unknownRow = screen.getByText("u.csv").closest("tr") as HTMLElement;
+    const pendingRow = screen.getByText("p.csv").closest("tr") as HTMLElement;
+
+    expect(within(pendingRow).getByText("Pending").className).toContain("bg-warning");
+    expect(within(processingRow).getByText("Processing").className).toContain("bg-secondary");
+    expect(within(completedRow).getByText("Completed").className).toContain("bg-success");
+    expect(within(errorRow).getByText("Error").className).toContain("bg-destructive");
+    expect(within(unknownRow).getByText("Unknown").className).toContain("text-foreground");
   });
 
   test("renders empty state when no uploads", async () => {
@@ -264,7 +269,7 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
         new: { id: 2, status: "error", error_message: "e" },
       });
     });
-    await waitFor(() => expect(screen.getByText("error")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Error")).toBeInTheDocument());
     expect(screen.getByTitle("e")).toBeInTheDocument();
 
     await act(async () => {

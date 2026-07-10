@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const ROUTE_OPEN =
   /<Route(?:\s+index)?(?:\s+path="([^"]*)")?\s+file="([^"]+)"/;
@@ -12,15 +15,19 @@ const ROUTE_CLOSE = /<\/Route>/;
  */
 export function parseApiRoutesFromReactRouter(opts = {}) {
   const cwd = opts.cwd ?? process.cwd();
-  let out;
+  // Redirect to a file instead of capturing the pipe: the react-router CLI can
+  // exit before its stdout pipe flushes, silently truncating output at 8KB.
+  const tmpFile = path.join(os.tmpdir(), `api-routes-${process.pid}.txt`);
+  let out = "";
   try {
-    out = execSync("npx react-router routes 2>/dev/null", {
+    execSync(`npx react-router routes > ${JSON.stringify(tmpFile)} 2>/dev/null`, {
       cwd,
-      encoding: "utf8",
-      maxBuffer: 10 * 1024 * 1024,
     });
-  } catch (e) {
-    out = (e.stdout ?? "") + (e.stderr ?? "");
+    out = fs.readFileSync(tmpFile, "utf8");
+  } catch {
+    out = fs.existsSync(tmpFile) ? fs.readFileSync(tmpFile, "utf8") : "";
+  } finally {
+    fs.rmSync(tmpFile, { force: true });
   }
 
   /** @type {string[]} */

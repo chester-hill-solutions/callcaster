@@ -24,6 +24,11 @@ import {
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { mergeWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import {
+  classifyPhoneNumberSenderType,
+  inferSmsSenderClassFromSenderTypes,
+} from "@/lib/twilio-sender-class.server";
 
 export const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   trafficClass: "unknown",
@@ -354,4 +359,92 @@ export async function updateWorkspaceTwilioPortalConfig({
   }));
 
   return nextConfig;
+}
+
+/**
+ * Sentinel `actorUsername` written to the portal-config audit trail whenever
+ * {@link deriveAndPersistWorkspaceThroughput} applies an update. Used to tell
+ * an auto-derived value apart from an explicit admin edit, since
+ * `WorkspaceTwilioOpsConfig` itself (app/lib/types.ts) has no dedicated
+ * "auto-derived" flag we're allowed to add.
+ */
+export const THROUGHPUT_AUTO_DERIVE_ACTOR_USERNAME = "system:auto-derived-throughput";
+
+export type DeriveWorkspaceThroughputResult = {
+  applied: boolean;
+  smsSenderClass: TwilioSmsSenderClass;
+  smsTargetMps: number;
+  reason: "seeded_unknown" | "reapplied_auto" | "unchanged" | "admin_override";
+};
+
+/**
+ * Derives `smsSenderClass`/`smsTargetMps` from the workspace's current number
+ * inventory (reusing the same sender-type classification used at Twilio sync
+ * time) and persists them via `updateWorkspaceTwilioPortalConfig`.
+ *
+ * Safe to call after every number purchase / path-selection event: it only
+ * overwrites the config when the current `smsSenderClass` is `"unknown"`
+ * (never configured) or when the most recent audit entry shows the last write
+ * was itself an auto-derive (i.e. no admin has overridden it since). An
+ * explicit admin edit — anything that leaves a different actor in the top
+ * audit slot — is never clobbered.
+ */
+export async function deriveAndPersistWorkspaceThroughput({
+  workspaceId,
+}: {
+  workspaceId: string;
+}): Promise<DeriveWorkspaceThroughputResult> {
+  const currentConfig = await getWorkspaceTwilioPortalConfig({ workspaceId });
+
+  const lastAuditEntry = currentConfig.auditTrail[0];
+  const currentIsAutoOrUnset =
+    currentConfig.smsSenderClass === "unknown" ||
+    lastAuditEntry?.actorUsername === THROUGHPUT_AUTO_DERIVE_ACTOR_USERNAME;
+
+  const { data: phoneNumbers } = await getWorkspacePhoneNumbers({ workspaceId });
+  const senderTypes = (phoneNumbers ?? [])
+    .map((number) => number?.phone_number)
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .map(classifyPhoneNumberSenderType);
+
+  const derivedSenderClass = inferSmsSenderClassFromSenderTypes(senderTypes);
+  const derivedTargetMps = defaultSmsTargetMps(derivedSenderClass);
+
+  if (!currentIsAutoOrUnset) {
+    return {
+      applied: false,
+      smsSenderClass: currentConfig.smsSenderClass,
+      smsTargetMps: currentConfig.smsTargetMps,
+      reason: "admin_override",
+    };
+  }
+
+  if (
+    currentConfig.smsSenderClass === derivedSenderClass &&
+    currentConfig.smsTargetMps === derivedTargetMps
+  ) {
+    return {
+      applied: false,
+      smsSenderClass: derivedSenderClass,
+      smsTargetMps: derivedTargetMps,
+      reason: "unchanged",
+    };
+  }
+
+  const nextConfig = await updateWorkspaceTwilioPortalConfig({
+    workspaceId,
+    updates: {
+      smsSenderClass: derivedSenderClass,
+      smsTargetMps: derivedTargetMps,
+    },
+    actorUserId: null,
+    actorUsername: THROUGHPUT_AUTO_DERIVE_ACTOR_USERNAME,
+  });
+
+  return {
+    applied: true,
+    smsSenderClass: nextConfig.smsSenderClass,
+    smsTargetMps: nextConfig.smsTargetMps,
+    reason: currentConfig.smsSenderClass === "unknown" ? "seeded_unknown" : "reapplied_auto",
+  };
 }

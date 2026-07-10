@@ -5,6 +5,7 @@ const workspaceDbMocks = vi.hoisted(() => ({
   listWorkspaceMembersEnriched: vi.fn(),
   listWorkspaceInvitesEnriched: vi.fn(),
   getWorkspaceWebhookRow: vi.fn(),
+  listWorkspaceApiKeyRows: vi.fn(),
 }));
 
 const tdbMocks = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
       fn.mockReset();
     }
     tdbMocks.workspace_number.findMany.mockReset();
+    workspaceDbMocks.listWorkspaceApiKeyRows.mockResolvedValue([]);
     vi.doMock("@/lib/workspace-members-db.server", () => workspaceDbMocks);
     vi.doMock("@/server/tenant-db", () => ({
       createTenantDb: vi.fn(() => tdbMocks),

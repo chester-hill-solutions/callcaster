@@ -96,11 +96,16 @@ export const BUSINESS_PROFILE_REQUIRED_FIELDS: Record<
     "supportEmail",
     "optInWorkflow",
   ],
+  // "sms" is the readiness channel for the toll-free bulk SMS (TFV) path.
+  // Its business-profile requirements only block when `toll_free_bulk_sms` is
+  // selected (see the tollFreeApplies gate in buildBusinessProfileFieldPredicates).
   sms: [
     "legalBusinessName",
     "websiteUrl",
     "useCaseSummary",
     "sampleMessages",
+    "doingBusinessAs",
+    "businessRegistrationNumber",
   ],
 };
 
@@ -158,6 +163,19 @@ const BUSINESS_PROFILE_FIELD_MESSAGES: Record<
   optInKeywords: {},
   optOutKeywords: {},
   helpKeywords: {},
+  doingBusinessAs: {
+    sms: "Add the doing-business-as (DBA) name for toll-free verification.",
+  },
+  businessRegistrationNumber: {
+    sms: "Add the business registration number (BN) for toll-free verification.",
+  },
+  ageGatedContent: {},
+  ein: {},
+  industry: {},
+  authorizedRepName: {},
+  authorizedRepEmail: {},
+  authorizedRepPhone: {},
+  authorizedRepTitle: {},
 };
 
 function buildBusinessProfileFieldPredicates(): WorkspaceReadinessPredicate[] {
@@ -171,7 +189,13 @@ function buildBusinessProfileFieldPredicates(): WorkspaceReadinessPredicate[] {
       }
       predicates.push({
         id: `business_profile.${field}.${channel}`,
+        // A2P business-profile fields only apply when the A2P path is active
+        // (a2p10dlc selected AND operating in the US). The "sms" channel is the
+        // toll-free bulk SMS (TFV) path — its fields only apply when
+        // `toll_free_bulk_sms` is selected.
         test: (ctx) =>
+          (channel === "a2p10dlc" && !a2pApplies(ctx)) ||
+          (channel === "sms" && !tollFreeApplies(ctx)) ||
           isBusinessProfileFieldComplete(ctx.onboarding.businessProfile, field),
         blockingFor: [channel],
         code: `business_profile_${field}_required`,
@@ -183,11 +207,41 @@ function buildBusinessProfileFieldPredicates(): WorkspaceReadinessPredicate[] {
   return predicates;
 }
 
-function isCanadianBusiness(ctx: WorkspaceReadinessContext): boolean {
-  const code = ctx.onboarding.emergencyVoice.address.countryCode
-    .trim()
-    .toUpperCase();
-  return code === "CA" || code === "CANADA";
+/**
+ * A2P 10DLC gates only apply when the workspace has selected the a2p10dlc channel
+ * AND operates in the US ("US" or "BOTH"). Canadian-only orgs skip A2P entirely.
+ */
+function a2pApplies(ctx: WorkspaceReadinessContext): boolean {
+  if (!ctx.onboarding.selectedChannels.includes("a2p10dlc")) return false;
+  const country = ctx.onboarding.operatingCountry;
+  return country === "US" || country === "BOTH";
+}
+
+/**
+ * The toll-free bulk SMS (TFV) path — represented by the "sms" readiness channel
+ * — only applies when the workspace has opted into the `toll_free_bulk_sms`
+ * channel. This scopes the toll-free business-profile requirements to that
+ * selection without introducing a parallel readiness channel.
+ *
+ * NOTE: the send-gate predicate `toll_free_verified` is intentionally NOT gated
+ * on this — it must fail closed for any workspace whose toll-free number has
+ * blocked Twilio verification, regardless of onboarding channel selection.
+ */
+function tollFreeApplies(ctx: WorkspaceReadinessContext): boolean {
+  return ctx.onboarding.selectedChannels.includes("toll_free_bulk_sms");
+}
+
+const EMERGENCY_ADDRESS_FIELDS: Array<
+  keyof WorkspaceMessagingOnboardingState["emergencyVoice"]["address"]
+> = ["street", "city", "region", "postalCode", "countryCode"];
+
+/** True when the emergency-voice service address has all required fields filled in. */
+function emergencyAddressComplete(ctx: WorkspaceReadinessContext): boolean {
+  const address = ctx.onboarding.emergencyVoice.address;
+  return EMERGENCY_ADDRESS_FIELDS.every((field) => {
+    const value = address[field];
+    return typeof value === "string" && value.trim().length > 0;
+  });
 }
 
 function sendViaMessagingService(ctx: WorkspaceReadinessContext): boolean {
@@ -243,8 +297,7 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
   {
     id: "a2p_approved",
     test: (ctx) =>
-      !ctx.onboarding.selectedChannels.includes("a2p10dlc") ||
-      isCanadianBusiness(ctx) ||
+      !a2pApplies(ctx) ||
       ctx.onboarding.a2p10dlc.status === "approved" ||
       ctx.onboarding.a2p10dlc.status === "live",
     blockingFor: ["a2p10dlc"] as const,
@@ -253,12 +306,22 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
     severity: "error" as const,
   },
   {
+    id: "emergency_address_present",
+    // Voice is always-on: the emergency service address is required in Business
+    // basics before a first number can be rented (regardless of selectedChannels).
+    test: (ctx) => emergencyAddressComplete(ctx),
+    blockingFor: ["all"] as const,
+    code: "emergency_address_required",
+    message: "Add the emergency service address in Business basics.",
+    severity: "error" as const,
+  },
+  {
     id: "voice_ready",
+    // Voice compliance is always evaluated regardless of selectedChannels.
     test: (ctx) =>
-      !ctx.onboarding.selectedChannels.includes("voice_compliance") ||
-      (ctx.onboarding.emergencyVoice.enabled &&
-        ctx.onboarding.emergencyVoice.address.status === "validated" &&
-        ctx.onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length > 0),
+      ctx.onboarding.emergencyVoice.enabled &&
+      ctx.onboarding.emergencyVoice.address.status === "validated" &&
+      ctx.onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length > 0,
     blockingFor: ["voice_compliance"] as const,
     code: "voice_not_ready",
     message: "Emergency voice readiness is incomplete.",
@@ -345,7 +408,8 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
   },
   {
     id: "a2p_customer_profile_bundle",
-    test: (ctx) => Boolean(ctx.onboarding.a2p10dlc.customerProfileBundleSid),
+    test: (ctx) =>
+      !a2pApplies(ctx) || Boolean(ctx.onboarding.a2p10dlc.customerProfileBundleSid),
     blockingFor: ["a2p10dlc"] as const,
     code: "a2p_customer_profile_bundle_required",
     message:
@@ -354,7 +418,7 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
   },
   {
     id: "a2p_trust_product",
-    test: (ctx) => Boolean(ctx.onboarding.a2p10dlc.trustProductSid),
+    test: (ctx) => !a2pApplies(ctx) || Boolean(ctx.onboarding.a2p10dlc.trustProductSid),
     blockingFor: ["a2p10dlc"] as const,
     code: "a2p_trust_product_required",
     message:

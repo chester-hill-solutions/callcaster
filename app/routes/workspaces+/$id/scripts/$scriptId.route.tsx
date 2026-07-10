@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLoaderData } from "react-router";
+import { toast } from "sonner";
 import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { useHasChanges } from "@/hooks/utils/useHasChanges";
+import { useUnsavedChangesGuard } from "@/hooks/utils/useUnsavedChangesGuard";
 import {
   normalizeScriptForComparison,
 } from "@/lib/script-change";
@@ -17,11 +19,15 @@ export { action } from "./$scriptId.action.server";
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 export default function ScriptEditor() {
-  const { script: initScript, mediaNames } = useLoaderData<ScriptIdLoaderData>();
-  const [script, setScript] = useState(initScript);
+  const { script: loaderScript, mediaNames } = useLoaderData<ScriptIdLoaderData>();
+  const [initScript, setInitScript] = useState(loaderScript);
+  const [script, setScript] = useState(loaderScript);
+  const [isSaving, setIsSaving] = useState(false);
   const isChanged = useHasChanges(script, initScript, normalizeScriptForComparison);
+  useUnsavedChangesGuard(isChanged);
 
   const handleSaveUpdate = async () => {
+    setIsSaving(true);
     try {
       const response = await fetch("/api/scripts", {
         method: "PATCH",
@@ -30,14 +36,23 @@ export default function ScriptEditor() {
         }),
         headers: { "Content-Type": "application/json" },
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
 
-      if (result.error) {
-        throw new Error(result.error);
+      if (!response.ok || result?.error) {
+        throw new Error(result?.error ?? "Failed to save script");
       }
-      setScript(script);
-    } catch (error) {
-      console.error("Error saving update:", error);
+
+      // Reflect the persisted row (which may have a new id/name if this was
+      // a "save as copy") so the unsaved-changes bar clears correctly and
+      // future saves target the row that actually exists on the server.
+      const savedScript: Script | null = result?.script ?? script;
+      setScript(savedScript);
+      setInitScript(savedScript);
+      toast.success("Script saved");
+    } catch {
+      toast.error("Couldn't save the script. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -66,6 +81,7 @@ export default function ScriptEditor() {
       />
       <SaveBar
         isChanged={isChanged}
+        isSaving={isSaving}
         onSave={handleSaveUpdate}
         onReset={handleReset}
       />

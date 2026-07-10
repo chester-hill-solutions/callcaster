@@ -54,6 +54,19 @@ describe("startConferenceAndDial", () => {
     });
   });
 
+  test("returns creditsError payload without throwing when the route responds 402", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      new Response(JSON.stringify({ creditsError: true }), { status: 402 }),
+    );
+
+    const mod = await import("../app/lib/services/hooks-api");
+    await expect(mod.startConferenceAndDial(params)).resolves.toMatchObject({
+      success: false,
+      creditsError: true,
+      error: "Insufficient credits to start conference",
+    });
+  });
+
   test("throws when required params are missing", async () => {
     const mod = await import("../app/lib/services/hooks-api");
     await expect(

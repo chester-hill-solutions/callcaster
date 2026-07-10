@@ -79,7 +79,33 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     } as any);
     const mod = await import("../app/routes/api+/initiate-ivr");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
     expect(res).toMatchObject({ creditsError: true });
+  });
+
+  test("halts the queue loop after the first creditsError response", async () => {
+    const queue = [
+      { id: "q1", contact_id: "c1", caller_id: "+1", phone: "555" },
+      { id: "q2", contact_id: "c2", caller_id: "+1", phone: "556" },
+      { id: "q3", contact_id: "c3", caller_id: "+1", phone: "557" },
+    ];
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: 1,
+      user_id: { id: "u1" },
+      workspace_id: WORKSPACE_ID,
+    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+    vi.mocked(rpcGetCampaignQueue).mockResolvedValueOnce(queue);
+    mocks.fetch.mockResolvedValueOnce({
+      status: 402,
+      json: async () => ({ creditsError: true }),
+    } as any);
+
+    const mod = await import("../app/routes/api+/initiate-ivr");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    expect(res).toMatchObject({ creditsError: true });
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 
   test("logs fetch error and continues (res null), returning queue data", async () => {

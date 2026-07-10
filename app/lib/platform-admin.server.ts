@@ -17,6 +17,7 @@ import {
   listAllWorkspaceNumbers,
   listAllWorkspacesOrdered,
   listAllWorkspaceUsers,
+  listRecentDeadLetteredJobs,
   listPendingInvitesForUsername,
   listUserWorkspaceMembershipsWithWorkspace,
   listWorkspaceInvitesEnriched,
@@ -58,14 +59,21 @@ export async function repointWorkspaceTwilioWebhooksForAdmin(
 }
 
 export async function getAdminDashboard() {
-  const [workspaces, users, workspaceUsers, workspaceNumbers, allCampaigns] =
-    await Promise.all([
-      listAllWorkspacesOrdered(),
-      listAllUsersOrdered(),
-      listAllWorkspaceUsers(),
-      listAllWorkspaceNumbers(),
-      listAllCampaignsOrdered(),
-    ]);
+  const [
+    workspaces,
+    users,
+    workspaceUsers,
+    workspaceNumbers,
+    allCampaigns,
+    deadLetteredJobs,
+  ] = await Promise.all([
+    listAllWorkspacesOrdered(),
+    listAllUsersOrdered(),
+    listAllWorkspaceUsers(),
+    listAllWorkspaceNumbers(),
+    listAllCampaignsOrdered(),
+    listRecentDeadLetteredJobs(),
+  ]);
 
   const campaignsByWorkspace = new Map<string, typeof allCampaigns>();
   for (const campaign of allCampaigns) {
@@ -94,6 +102,7 @@ export async function getAdminDashboard() {
     workspaceNumbers,
     workspaceRows,
     campaigns: allCampaigns,
+    deadLetteredJobs,
     stats: {
       totalWorkspaces: workspaces.length,
       totalUsers: users.length,

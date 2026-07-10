@@ -3,6 +3,7 @@ import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/cal
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
+import { runAutoDialerTurn } from "@/lib/auto-dial.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
@@ -98,10 +99,15 @@ const updateOutreachAttempt = async (
 };
 
 const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string, userId: string) => {
-    await fetch(`${env.BASE_URL()}/api/auto-dial/dialer`, {
-        method: 'POST',
-        headers: { "Content-Type": 'application/json' },
-        body: JSON.stringify({ user_id: userId, campaign_id: campaignId, workspace_id: workspaceId, conference_id: conferenceId })
+    // Call the dialer turn in-process rather than self-fetching
+    // `/api/auto-dial/dialer`: that path is matched by the Twilio webhook
+    // prefix `/api/auto-dial`, so an unsigned self-fetch would be rejected
+    // with 403 by requireTwilioSignature (always enforced in production).
+    await runAutoDialerTurn({
+        user_id: userId,
+        campaign_id: campaignId,
+        workspace_id: workspaceId,
+        conference_id: conferenceId,
     });
 };
 

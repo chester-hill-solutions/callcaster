@@ -464,4 +464,30 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       expect.objectContaining({ workspaceId: "w1", callSid: "CA1" }),
     );
   });
+
+  test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
+    mocks.findWorkspaceNumberByPhoneNumber.mockRejectedValueOnce(
+      new Error("db unavailable"),
+    );
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
+
+    const mod = await import("../app/routes/api+/inbound");
+    const fd = new FormData();
+    fd.set("Called", "+1");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as any),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    const xml = await res.text();
+    expect(xml).toContain("say:");
+    expect(xml).toContain("hangup");
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Unhandled error in api.inbound",
+      expect.objectContaining({ error: "db unavailable" }),
+    );
+  });
 });

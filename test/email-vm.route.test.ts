@@ -165,8 +165,8 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         name: "W",
         twilio_data: { sid: "tsid", authToken: "ttok" },
         webhook: [
-          { event: ["voicemail"] },
-          { event: ["other"] },
+          { events: ["voicemail"] },
+          { events: ["other"] },
         ],
       },
     });
@@ -240,8 +240,8 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         name: "W",
         twilio_data: { sid: "tsid", authToken: "ttok" },
         webhook: [
-          { event: undefined }, // event?.filter || []
-          { event: ["voicemail"] },
+          { events: undefined }, // non-array events is skipped by the filter
+          { events: ["voicemail"] },
         ],
       },
       numberRow: { inbound_action: null },
@@ -317,6 +317,66 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
+  });
+
+  test("webhook retry: does not resend email when the call's recording URL already matches", async () => {
+    setupEmailVmMocks({
+      callRow: {
+        sid: "CA1",
+        from: "+15550001111",
+        to: "+15550002222",
+        recording_url: "https://tw/rec",
+      },
+    });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(await mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/rec",
+        CallSid: "CA1",
+        AccountSid: "AC1",
+        RecordingSid: "RE1",
+      }),
+      params: {},
+    } as any));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ success: true });
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(objectStorageMocks.uploadObject).not.toHaveBeenCalled();
+    expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
+  });
+
+  test("does not skip processing when the recording URL differs from what's stored (new voicemail on same call)", async () => {
+    setupEmailVmMocks({
+      callRow: {
+        sid: "CA1",
+        from: "+15550001111",
+        to: "+15550002222",
+        recording_url: "https://tw/old-rec",
+      },
+    });
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(await mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/new-rec",
+        CallSid: "CA1",
+        AccountSid: "AC1",
+        RecordingSid: "RE2",
+      }),
+      params: {},
+    } as any));
+
+    expect(res.status).toBe(200);
+    expect(mocks.sendEmail).toHaveBeenCalled();
   });
 
   test("covers helper error branches (call not found, number not found, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {

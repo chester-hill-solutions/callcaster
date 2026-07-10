@@ -1,6 +1,10 @@
 import { parseCSV } from "@/lib/csv";
 import { logger } from "@/lib/logger.server";
 import { uploadObject } from "@/lib/object-storage.server";
+import {
+  isProcessingStale,
+  PROCESSING_INTERRUPTED_MESSAGE,
+} from "@/lib/processing-watchdog.server";
 import { eq } from "drizzle-orm";
 import {
   audience as audienceTable,
@@ -80,15 +84,81 @@ async function writeAudienceUploadStatus(
   uploadId: number,
   status: Record<string, unknown>,
 ): Promise<void> {
+  // Stamp updated_at on every write (called once per processed chunk) so the
+  // staleness watchdog in the status loader can tell a live upload from one
+  // abandoned by a mid-run restart. See app/lib/processing-watchdog.server.ts.
   await uploadObject(
     "audience-uploads",
     `${workspaceId}/${uploadId}.json`,
-    JSON.stringify(status),
+    JSON.stringify({ ...status, updated_at: new Date().toISOString() }),
     {
       contentType: "application/json",
       upsert: true,
     },
   );
+}
+
+/**
+ * Staleness watchdog for the polling status loader: `processAudienceUpload`
+ * runs as a fire-and-forget promise inside a request process (see
+ * app/routes/api+/audience-upload.action.server.ts). If that process
+ * restarts mid-run, the `audience_upload` row is stranded at
+ * status: "processing" forever and the client polls indefinitely.
+ *
+ * Call this from the status loader (write-through on read): if the DB row
+ * is "processing" and the object-storage status blob hasn't been updated
+ * in PROCESSING_STALE_MS, mark both the DB row and the status blob failed.
+ */
+export async function markAudienceUploadInterruptedIfStale(args: {
+  workspaceId: string;
+  uploadId: number;
+  dbStatus: string;
+  statusFileData: Record<string, unknown>;
+  now?: Date;
+}): Promise<{ interrupted: boolean; statusFileData: Record<string, unknown> }> {
+  const { workspaceId, uploadId, dbStatus, statusFileData, now } = args;
+
+  if (dbStatus !== "processing") {
+    return { interrupted: false, statusFileData };
+  }
+
+  const updatedAt =
+    typeof statusFileData.updated_at === "string"
+      ? statusFileData.updated_at
+      : typeof statusFileData.created_at === "string"
+        ? statusFileData.created_at
+        : undefined;
+
+  if (!isProcessingStale(updatedAt, now)) {
+    return { interrupted: false, statusFileData };
+  }
+
+  const tdb = createTenantDb(workspaceId);
+  await tdb.audience_upload.update({
+    set: {
+      status: "error",
+      error_message: PROCESSING_INTERRUPTED_MESSAGE,
+    },
+    where: eq(audienceUploadTable.id, uploadId),
+  });
+
+  const nextStatusFileData = {
+    ...statusFileData,
+    status: "error",
+    error: PROCESSING_INTERRUPTED_MESSAGE,
+    stage: "Upload failed",
+  };
+  await writeAudienceUploadStatus(workspaceId, uploadId, nextStatusFileData);
+
+  logger.error("audience_upload.watchdog.interrupted", {
+    workspaceId,
+    uploadId,
+  });
+
+  return {
+    interrupted: true,
+    statusFileData: { ...nextStatusFileData, updated_at: (now ?? new Date()).toISOString() },
+  };
 }
 
 // Process audience upload in background

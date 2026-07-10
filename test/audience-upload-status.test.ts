@@ -67,9 +67,21 @@ function buildMockDb() {
 }
 
 const downloadObjectMock = vi.hoisted(() => vi.fn());
+const uploadObjectMock = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("@/lib/object-storage.server", () => ({
   downloadObject: downloadObjectMock,
+  uploadObject: uploadObjectMock,
+}));
+
+const tenantAudienceUploadUpdateMock = vi.hoisted(() =>
+  vi.fn(async () => [{}]),
+);
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    audience_upload: { update: tenantAudienceUploadUpdateMock },
+  }),
 }));
 
 vi.mock("@/lib/auth.server", () => ({
@@ -104,6 +116,8 @@ describe("api.audience-upload-status loader", () => {
       },
     };
     downloadObjectMock.mockReset();
+    uploadObjectMock.mockClear();
+    tenantAudienceUploadUpdateMock.mockClear();
     downloadObjectMock.mockImplementation(async () => {
       if (downloadMode.kind === "throw") throw downloadMode.value;
       if (downloadMode.kind === "error")
@@ -263,6 +277,117 @@ describe("api.audience-upload-status loader", () => {
       uploadId: 1,
       file_name: "f.csv",
       processed_contacts: 1,
+    });
+  });
+
+  describe("staleness watchdog", () => {
+    test("marks a processing upload failed when its status blob is stale (>10min)", async () => {
+      const staleUpdatedAt = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+      downloadMode = {
+        kind: "ok",
+        statusJson: { status: "processing", progress: 40, updated_at: staleUpdatedAt },
+      };
+      uploadMode = {
+        kind: "ok",
+        row: {
+          id: 1,
+          audience_id: 2,
+          status: "processing",
+          file_name: "f.csv",
+          file_size: 1,
+          total_contacts: 10,
+          processed_contacts: 4,
+          error_message: null,
+        },
+      };
+      setDualAuthSession({
+        headers: new Headers({ "set-cookie": "x=y" }),
+        user: { id: "u1" },
+      });
+      const mod = await import("../app/routes/api+/audience-upload-status");
+      const res = await asRouteResponse(await mod.loader({
+        request: new Request(
+          "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
+        ),
+      } as any));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("error");
+      expect(body.error_message).toBe("Processing interrupted — please retry");
+      expect(tenantAudienceUploadUpdateMock).toHaveBeenCalledTimes(1);
+      expect(uploadObjectMock).toHaveBeenCalledTimes(1);
+    });
+
+    test("leaves a processing upload alone when its status blob was updated recently", async () => {
+      const freshUpdatedAt = new Date(Date.now() - 60 * 1000).toISOString();
+      downloadMode = {
+        kind: "ok",
+        statusJson: { status: "processing", progress: 40, updated_at: freshUpdatedAt },
+      };
+      uploadMode = {
+        kind: "ok",
+        row: {
+          id: 1,
+          audience_id: 2,
+          status: "processing",
+          file_name: "f.csv",
+          file_size: 1,
+          total_contacts: 10,
+          processed_contacts: 4,
+          error_message: null,
+        },
+      };
+      setDualAuthSession({
+        headers: new Headers({ "set-cookie": "x=y" }),
+        user: { id: "u1" },
+      });
+      const mod = await import("../app/routes/api+/audience-upload-status");
+      const res = await asRouteResponse(await mod.loader({
+        request: new Request(
+          "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
+        ),
+      } as any));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("processing");
+      expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+      expect(uploadObjectMock).not.toHaveBeenCalled();
+    });
+
+    test("does not touch a non-processing upload even if its status blob is old", async () => {
+      const staleUpdatedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      downloadMode = {
+        kind: "ok",
+        statusJson: { status: "completed", progress: 100, updated_at: staleUpdatedAt },
+      };
+      uploadMode = {
+        kind: "ok",
+        row: {
+          id: 1,
+          audience_id: 2,
+          status: "completed",
+          file_name: "f.csv",
+          file_size: 1,
+          total_contacts: 10,
+          processed_contacts: 10,
+          error_message: null,
+        },
+      };
+      setDualAuthSession({
+        headers: new Headers({ "set-cookie": "x=y" }),
+        user: { id: "u1" },
+      });
+      const mod = await import("../app/routes/api+/audience-upload-status");
+      const res = await asRouteResponse(await mod.loader({
+        request: new Request(
+          "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
+        ),
+      } as any));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("completed");
+      expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+      expect(uploadObjectMock).not.toHaveBeenCalled();
     });
   });
 });

@@ -15,6 +15,7 @@ import SelectVoicemail from "./CampaignDetailed.Voicemail";
 import SelectScript from "./CampaignDetailed.SelectScript";
 import ActivateButtons from "./CampaignDetailed.ActivateButtons";
 import SelectVoiceDrop from "./live/CampaignDetailed.Live.SelectVoiceDrop";
+import { SplitCampaignPrompt } from "./CampaignDetailed.SplitCampaign";
 import {
   DialTypeSwitch,
   HouseholdSwitch,
@@ -300,7 +301,7 @@ export const CampaignTypeSpecificSettings = ({
                   ...(campaignData.voicemail_file && { voicemail_file: campaignData.voicemail_file }),
                 }}
               />
-              <Button variant="outline" asChild size="icon" disabled={isBusy}>
+              <Button variant="outline" asChild size="icon" disabled={isBusy} aria-label="Add new audio file">
                 <NavLink to="../../../audios/new">
                   <MdAdd />
                 </NavLink>
@@ -313,7 +314,7 @@ export const CampaignTypeSpecificSettings = ({
                 scripts={scripts}
                 invalid={isScriptMissing}
               />
-              <Button variant="outline" asChild size="icon" disabled={isBusy}>
+              <Button variant="outline" asChild size="icon" disabled={isBusy} aria-label="Create new script">
                 <NavLink
                   to={`../../../scripts/new?ref=${campaignData.id}`}
                 >
@@ -427,6 +428,11 @@ export const CampaignTypeSpecificSettings = ({
           <OutboundEstimateAlert
             title="Outbound SMS pacing estimate"
             lines={messageTooltipLines}
+          />
+          <SplitCampaignPrompt
+            queueCount={queueCount}
+            senderClass={outboundEstimateInputs.portalConfig.smsSenderClass}
+            disabled={isBusy}
           />
           <div className="flex gap-2 justify-end items-center">
             <Button

@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import { fetchAudienceUploads } from "@/lib/chats/messaging-client";
 import { Loader2 } from "lucide-react";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
@@ -84,12 +85,12 @@ export default function AudienceUploadHistory({
 
   if (error) {
     return (
-      <div className="p-4 border border-red-300 rounded-md bg-red-50 text-red-700">
+      <div className="p-4 border border-destructive/30 rounded-md bg-destructive/10 text-destructive">
         <p className="font-semibold">Error loading upload history</p>
         <p className="text-sm">{error}</p>
         <button
           onClick={() => fetchUploads()}
-          className="mt-2 text-sm underline hover:text-red-900"
+          className="mt-2 text-sm underline hover:text-destructive/80"
         >
           Try again
         </button>
@@ -99,8 +100,8 @@ export default function AudienceUploadHistory({
 
   if (uploads.length === 0) {
     return (
-      <div className="p-6 text-center border border-gray-200 rounded-md bg-gray-50">
-        <p className="text-gray-500">No upload history found for this audience</p>
+      <div className="p-6 text-center border border-border rounded-md bg-muted">
+        <p className="text-muted-foreground">No upload history found for this audience</p>
       </div>
     );
   }
@@ -120,83 +121,68 @@ export default function AudienceUploadHistory({
     return `${size.toFixed(1)} ${units[unitIndex]}`;
   }
 
-  function getStatusBadgeClass(status: string): string {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "processing":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "completed":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "error":
-        return "bg-red-100 text-red-800 border-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  }
-
   function getProgressPercentage(upload: AudienceUpload): number {
     if (upload.total_contacts === 0) return 0;
     return Math.round((upload.processed_contacts / upload.total_contacts) * 100);
   }
 
   return (
-    <div className="mt-4 bg-white rounded-md border border-gray-200 overflow-hidden">
+    <div className="mt-4 bg-card rounded-md border border-border overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Date
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 File
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Status
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Contacts
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Size
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-card divide-y divide-border">
             {uploads.map((upload) => (
-              <tr key={upload.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <tr key={upload.id} className="hover:bg-muted/50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {formatDistanceToNow(new Date(upload.created_at), { addSuffix: true })}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {upload.file_name || "Unknown file"}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusBadgeClass(upload.status)}`}>
-                      {upload.status}
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={upload.status} className="w-fit" />
                       {upload.status === "error" && upload.error_message && (
-                        <span className="ml-2 text-red-500" title={upload.error_message}>⚠️</span>
+                        <span title={upload.error_message}>⚠️</span>
                       )}
-                    </span>
+                    </div>
 
                     {upload.status === "processing" && (
-                      <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                      <div className="mt-1 h-1.5 w-full bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-blue-500 rounded-full"
+                          className="h-full bg-primary rounded-full"
                           style={{ width: `${getProgressPercentage(upload)}%` }}
                         ></div>
                       </div>
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {upload.status === "completed"
                     ? upload.total_contacts
                     : `${upload.processed_contacts} / ${upload.total_contacts}`}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {formatFileSize(upload.file_size)}
                 </td>
               </tr>

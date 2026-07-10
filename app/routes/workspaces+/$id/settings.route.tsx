@@ -4,7 +4,10 @@ export { action } from "./settings.action.server";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { MetaFunction } from "react-router";
 import { Form, Link, NavLink, Outlet, useSearchParams, useActionData, useLoaderData, useOutlet, useOutletContext } from "react-router";
+
+export const meta: MetaFunction = () => [{ title: "Settings — CallCaster" }];
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
@@ -388,3 +391,5 @@ export default function WorkspaceSettings() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

@@ -102,3 +102,5 @@ export default function AcceptInvite() {
     </main>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

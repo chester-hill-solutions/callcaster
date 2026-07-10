@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Tables } from "@/lib/db-types";
+import { OPERATING_COUNTRY_OPTIONS } from "./constants";
 import type { OnboardingPendingActions, OnboardingStepProps } from "./types";
 
 type OnboardingBusinessBasicsStepProps = Pick<
@@ -75,6 +76,26 @@ export function OnboardingBusinessBasicsStep({
                   defaultValue={onboarding.businessProfile.businessType}
                   disabled={isReadOnly}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="operatingCountry">Operating country</Label>
+                <p className="text-xs text-muted-foreground">
+                  Where does this workspace send messages and calls? Canada-only
+                  programs skip US A2P 10DLC registration.
+                </p>
+                <select
+                  id="operatingCountry"
+                  name="operatingCountry"
+                  defaultValue={onboarding.operatingCountry}
+                  disabled={isReadOnly}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {OPERATING_COUNTRY_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="websiteUrl">Website URL</Label>
@@ -260,17 +281,17 @@ export function OnboardingBusinessBasicsStep({
                 <Input
                   id="addressCity"
                   name="addressCity"
-                  placeholder="San Francisco"
+                  placeholder="Toronto"
                   defaultValue={onboarding.emergencyVoice.address.city}
                   disabled={isReadOnly}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="addressRegion">State or region</Label>
+                <Label htmlFor="addressRegion">Province or region</Label>
                 <Input
                   id="addressRegion"
                   name="addressRegion"
-                  placeholder="CA"
+                  placeholder="ON"
                   defaultValue={onboarding.emergencyVoice.address.region}
                   disabled={isReadOnly}
                 />
@@ -280,7 +301,7 @@ export function OnboardingBusinessBasicsStep({
                 <Input
                   id="addressPostalCode"
                   name="addressPostalCode"
-                  placeholder="94105"
+                  placeholder="M5V 2T6"
                   defaultValue={onboarding.emergencyVoice.address.postalCode}
                   disabled={isReadOnly}
                 />
@@ -290,7 +311,7 @@ export function OnboardingBusinessBasicsStep({
                 <Input
                   id="addressCountryCode"
                   name="addressCountryCode"
-                  placeholder="US"
+                  placeholder="CA"
                   defaultValue={onboarding.emergencyVoice.address.countryCode}
                   disabled={isReadOnly}
                 />

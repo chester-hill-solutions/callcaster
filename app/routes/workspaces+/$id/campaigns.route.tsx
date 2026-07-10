@@ -45,3 +45,5 @@ export default function WorkspaceCampaignsPage() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

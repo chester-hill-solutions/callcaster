@@ -1,12 +1,56 @@
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TabsContent } from "@/components/ui/tabs";
+import type { DeadLetteredJobRow } from "../admin.types";
 
-export function AdminSystemSettingsPanel() {
+export function AdminSystemSettingsPanel({
+    deadLetteredJobs = [],
+}: {
+    deadLetteredJobs?: DeadLetteredJobRow[];
+}) {
     return (
         <TabsContent value="settings">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="md:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Dead-Lettered Jobs</CardTitle>
+                        <CardDescription>
+                            Background jobs that exhausted their retries (status = &quot;failed&quot;). Read-only — most recent {deadLetteredJobs.length} shown.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {deadLetteredJobs.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No dead-lettered jobs.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {deadLetteredJobs.map((job) => (
+                                    <div
+                                        key={job.id}
+                                        className="flex flex-col gap-1 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="destructive">{job.type}</Badge>
+                                                <span className="text-xs text-muted-foreground">
+                                                    job #{job.id}
+                                                    {job.workspace_id ? ` · workspace ${job.workspace_id}` : ""}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                {job.failed_at ? new Date(job.failed_at).toLocaleString() : "unknown time"}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            attempts {job.attempt_count ?? "?"}/{job.max_attempts ?? "?"} — {job.dead_letter_reason ?? job.error_message ?? "no reason recorded"}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>System Settings</CardTitle>

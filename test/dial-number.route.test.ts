@@ -25,6 +25,8 @@ vi.mock("twilio", () => {
     constructor(..._args: any[]) {}
   }
   class VoiceResponse {
+    private said = false;
+    private hungUp = false;
     dial(_opts: any) {
       return {
         number: (opts2: any, _num: string) => {
@@ -33,7 +35,16 @@ vi.mock("twilio", () => {
         },
       };
     }
+    say(_text: string) {
+      this.said = true;
+    }
+    hangup() {
+      this.hungUp = true;
+    }
     toString() {
+      if (this.said || this.hungUp) {
+        return `<Response>${this.said ? "<Say/>" : ""}${this.hungUp ? "<Hangup/>" : ""}</Response>`;
+      }
       return "<Response/>";
     }
   }
@@ -62,17 +73,22 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
     });
   }, 30000);
 
-  test("logs and rethrows when twiml building throws", async () => {
+  test("logs and returns fallback TwiML (not an HTML error page) when twiml building throws", async () => {
     mocks.dialNumberThrows = true;
     const mod = await import("../app/routes/api+/dial/$number.route");
     const fd = new FormData();
     fd.set("From", "+1555");
-    await expect(
-      mod.action({
+    const res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://localhost/api/dial/+1555", { method: "POST", body: fd }),
         params: { number: "+15550001111" },
       } as any),
-    ).rejects.toThrow("dial");
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    const body = await res.text();
+    expect(body).toContain("<Say");
+    expect(body).toContain("<Hangup");
     expect(mocks.logger.error).toHaveBeenCalledWith("Error in dial route:", expect.any(Error));
   }, 30000);
 });

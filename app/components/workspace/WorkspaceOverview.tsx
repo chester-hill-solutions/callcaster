@@ -46,23 +46,23 @@ export default function WorkspaceOverview({
                 <CardContent>
                     <dl className="space-y-4">
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">ID</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">ID</dt>
                             <dd className="mt-1 text-sm font-mono">{workspace?.id}</dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Name</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Name</dt>
                             <dd className="mt-1 text-sm">{workspace?.name}</dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Credits</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Credits</dt>
                             <dd className="mt-1 text-sm">{workspace?.credits}</dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Created</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Created</dt>
                             <dd className="mt-1 text-sm">{workspace?.created_at ? new Date(workspace.created_at).toLocaleString() : ''}</dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Status</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Status</dt>
                             <dd className="mt-1 text-sm">
                                 <Badge variant={workspace?.disabled ? "destructive" : "secondary"}>
                                     {workspace?.disabled ? "Disabled" : "Active"}
@@ -81,15 +81,15 @@ export default function WorkspaceOverview({
                 <CardContent>
                     <dl className="space-y-4">
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Total Campaigns</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Total Campaigns</dt>
                             <dd className="mt-1 text-sm">{campaigns.length}</dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Total Users</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Total Users</dt>
                             <dd className="mt-1 text-sm">{users.length}</dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Phone Numbers</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Phone Numbers</dt>
                             <dd className="mt-1 text-sm">{numbers.length}</dd>
                         </div>
                     </dl>
@@ -104,7 +104,7 @@ export default function WorkspaceOverview({
                 <CardContent>
                     <dl className="space-y-4">
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Sync Status</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Sync Status</dt>
                             <dd className="mt-1 text-sm">
                                 <Badge
                                     variant={
@@ -120,25 +120,25 @@ export default function WorkspaceOverview({
                             </dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Account Status</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Account Status</dt>
                             <dd className="mt-1 text-sm">{syncSnapshot?.accountStatus || "Unknown"}</dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Last Synced</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Last Synced</dt>
                             <dd className="mt-1 text-sm">
                                 {syncSnapshot?.lastSyncedAt ? new Date(syncSnapshot.lastSyncedAt).toLocaleString() : "Never"}
                             </dd>
                         </div>
                         <div className="flex flex-col">
-                            <dt className="text-sm font-medium text-gray-500">Number Types</dt>
+                            <dt className="text-sm font-medium text-muted-foreground">Number Types</dt>
                             <dd className="mt-1 text-sm">
                                 {syncSnapshot?.numberTypes?.length ? syncSnapshot.numberTypes.join(", ") : "None detected"}
                             </dd>
                         </div>
                         {syncSnapshot?.lastSyncError && (
                             <div className="flex flex-col">
-                                <dt className="text-sm font-medium text-gray-500">Last Error</dt>
-                                <dd className="mt-1 text-sm text-red-600">{syncSnapshot.lastSyncError}</dd>
+                                <dt className="text-sm font-medium text-muted-foreground">Last Error</dt>
+                                <dd className="mt-1 text-sm text-destructive">{syncSnapshot.lastSyncError}</dd>
                             </div>
                         )}
                     </dl>

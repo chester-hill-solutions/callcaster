@@ -68,11 +68,15 @@ function buildReadinessContext(
 function isBusinessBasicsComplete(ctx: WorkspaceReadinessContext): boolean {
   for (const field of BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc) {
     const value = ctx.onboarding.businessProfile[field];
-    if (Array.isArray(value) ? value.length === 0 : !value || !value.trim()) {
+    if (Array.isArray(value)) {
+      if (value.length === 0) return false;
+    } else if (typeof value === "string" ? !value.trim() : !value) {
       return false;
     }
   }
-  return true;
+  // Emergency service address is required in Business basics before a first
+  // number can be rented (voice is always-on).
+  return predicatePassed("emergency_address_present", ctx);
 }
 
 function isEmergencyReady(onboarding: WorkspaceMessagingOnboardingState): boolean {
@@ -94,7 +98,6 @@ export function buildOnboardingStepsForState(
   const businessProfileStep = stepById.business_profile!;
   const useCaseStep = stepById.use_case!;
   const pathSelectionStep = stepById.path_selection!;
-  const messagingServiceStep = stepById.messaging_service!;
   const firstNumberStep = stepById.first_number!;
   const providerProvisioningStep = stepById.provider_provisioning!;
   const launchChecksStep = stepById.launch_checks!;
@@ -118,10 +121,6 @@ export function buildOnboardingStepsForState(
     {
       ...pathSelectionStep,
       status: pathSelected ? "complete" : "in_progress",
-    },
-    {
-      ...messagingServiceStep,
-      status: messagingProvisioned ? "complete" : "in_progress",
     },
     {
       ...firstNumberStep,
@@ -167,6 +166,7 @@ export function deriveWorkspaceMessagingReadiness({
   const results = evaluateWorkspaceReadinessByIds(ctx, [
     "messaging_service_provisioned",
     "a2p_approved",
+    "emergency_address_present",
     "voice_ready",
     "caller_ids_only",
     "first_number_present",

@@ -44,7 +44,7 @@ const AudienceForm = ({
           }}
           className="text-muted-foreground"
         />
-        <Button type="submit" disabled={name.length === 0}>SAVE</Button>
+        <Button type="submit" disabled={name.length === 0}>Save</Button>
       </div>
     </Form>
   )

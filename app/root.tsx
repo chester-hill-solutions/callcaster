@@ -7,9 +7,10 @@ import {
   isRouteErrorResponse,
   useLoaderData,
   useNavigate,
+  useNavigation,
   useRouteError,
 } from "react-router";
-import type { LinksFunction } from "react-router";
+import type { LinksFunction, MetaFunction } from "react-router";
 import { useCallback } from "react";
 import { Toaster } from "sonner";
 
@@ -21,6 +22,14 @@ import type { RootLoaderData } from "./root.loader.server";
 
 export { loader } from "./root.loader.server";
 export type { RootLoaderData } from "./root.loader.server";
+
+export const meta: MetaFunction = () => [
+  { title: "CallCaster" },
+  {
+    name: "description",
+    content: "Outbound calling and SMS campaigns for teams.",
+  },
+];
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
@@ -36,6 +45,21 @@ export const links: LinksFunction = () => [
     href: "https://fonts.googleapis.com/css2?family=Zilla+Slab:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap",
   },
 ];
+
+function GlobalNavigationIndicator() {
+  const navigation = useNavigation();
+  if (navigation.state === "idle") {
+    return null;
+  }
+  return (
+    <div
+      aria-hidden
+      className="fixed left-0 top-0 z-[100] h-0.5 w-full overflow-hidden bg-brand-primary/20"
+    >
+      <div className="h-full w-full animate-pulse bg-brand-primary" />
+    </div>
+  );
+}
 
 export default function App() {
   const { env, session, workspaces, user, params } =
@@ -80,6 +104,7 @@ export default function App() {
           storageKey="callcaster-theme"
           attribute="class"
         >
+          <GlobalNavigationIndicator />
           <Navbar
             className="bg-brand-secondary"
             handleSignOut={signOut}
@@ -98,38 +123,98 @@ export default function App() {
   );
 }
 
+const SUPPORT_EMAIL = "info@callcaster.ca";
+
+function ErrorShell({
+  title,
+  heading,
+  body,
+}: {
+  title: string;
+  heading: string;
+  body: string;
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{title}</title>
+        <Meta />
+        <Links />
+      </head>
+      <body className="min-h-screen bg-background">
+        <main className="flex min-h-screen items-center justify-center p-6">
+          <div className="w-full max-w-md text-center">
+            <p className="font-Tabac-Slab text-2xl font-black text-brand-primary">
+              CallCaster
+            </p>
+            <h1 className="mt-6 text-3xl font-semibold text-foreground">
+              {heading}
+            </h1>
+            <p className="mt-3 text-base text-muted-foreground">
+              {body}
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a
+                href="/"
+                className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+              >
+                Go home
+              </a>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                Try again
+              </button>
+            </div>
+            <p className="mt-6 text-sm text-muted-foreground">
+              Still stuck?{" "}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="text-brand-primary underline"
+              >
+                Contact support
+              </a>
+            </p>
+          </div>
+        </main>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
 export function ErrorBoundary() {
   const error = useRouteError();
 
   if (isRouteErrorResponse(error)) {
+    const isNotFound = error.status === 404;
     return (
-      <html lang="en">
-        <head>
-          <title>{error.status}</title>
-          <Meta />
-          <Links />
-        </head>
-        <body>
-          <h1>
-            {error.status} {error.statusText}
-          </h1>
-          <p>{error.data}</p>
-        </body>
-      </html>
+      <ErrorShell
+        title={`${error.status} — CallCaster`}
+        heading={isNotFound ? "Page not found" : `${error.status} ${error.statusText}`}
+        body={
+          isNotFound
+            ? "The page you're looking for doesn't exist or may have moved."
+            : typeof error.data === "string" && error.data
+              ? error.data
+              : "Something went wrong handling your request."
+        }
+      />
     );
   }
 
+  // Log the real error for operators; never surface internals to the user.
+  console.error("Root ErrorBoundary caught:", error);
+
   return (
-    <html lang="en">
-      <head>
-        <title>Unexpected Error</title>
-        <Meta />
-        <Links />
-      </head>
-      <body>
-        <h1>Unexpected Error</h1>
-        <p>{error instanceof Error ? error.message : "Unknown error"}</p>
-      </body>
-    </html>
+    <ErrorShell
+      title="Unexpected error — CallCaster"
+      heading="Something went wrong"
+      body="An unexpected error occurred on our end. Your data is safe — please try again, and reach out if the problem continues."
+    />
   );
 }

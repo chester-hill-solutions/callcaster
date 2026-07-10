@@ -331,6 +331,7 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.getByText("1 / 160 units used")).toBeInTheDocument();
     expect(screen.getByText("1 segment (GSM-7)")).toBeInTheDocument();
     expect(screen.getByText("1 visible character")).toBeInTheDocument();
+    expect(screen.getByText("≈ 1 credit per recipient")).toBeInTheDocument();
 
     unmount();
     const props2 = baseProps({
@@ -345,11 +346,12 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.getByText("9 / 153 units used")).toBeInTheDocument();
     expect(screen.getByText("2 segments (GSM-7)")).toBeInTheDocument();
     expect(screen.getByText("81 visible characters")).toBeInTheDocument();
+    expect(screen.getByText("≈ 2 credits per recipient")).toBeInTheDocument();
 
     r2.unmount();
   });
 
-  test("switches to unicode segment limits when the message contains emoji", async () => {
+  test("switches to unicode segment limits when the message contains emoji, counting each emoji as 2 UTF-16 units", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
 
     const props3 = baseProps({
@@ -361,8 +363,25 @@ describe("app/components/MessageSettings.tsx", () => {
       },
     });
     render(<MessageSettings {...props3} />);
-    expect(screen.getByText("4 / 67 characters used")).toBeInTheDocument();
-    expect(screen.getByText("2 segments (UCS-2)")).toBeInTheDocument();
+    // 71 emoji = 142 UTF-16 units -> 3 segments (67-per, after the 70 single-
+    // segment threshold is exceeded), not 2: each 🔥 is a surrogate pair.
+    expect(screen.getByText("8 / 67 characters used")).toBeInTheDocument();
+    expect(screen.getByText("3 segments (UCS-2)")).toBeInTheDocument();
     expect(screen.getByText("71 visible characters")).toBeInTheDocument();
+    expect(screen.getByText("≈ 3 credits per recipient")).toBeInTheDocument();
+  });
+
+  test("credit estimate flips to the flat MMS rate the instant media is attached, regardless of segment count", async () => {
+    const { MessageSettings } = await import("@/components/MessageSettings");
+
+    const props = baseProps({
+      details: { ...baseProps().details, body_text: "a".repeat(400) },
+    });
+    render(<MessageSettings {...props} />);
+    // baseProps() ships 2 mediaLinks, so this is an MMS. The body is 3
+    // segments' worth of text, but MMS bills a flat MMS_CREDITS (2), not
+    // per segment — the credit line must show 2, not 3.
+    expect(screen.getByText("3 segments (GSM-7)")).toBeInTheDocument();
+    expect(screen.getByText("≈ 2 credits per recipient (MMS)")).toBeInTheDocument();
   });
 });

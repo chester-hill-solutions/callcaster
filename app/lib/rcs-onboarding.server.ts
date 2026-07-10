@@ -253,7 +253,7 @@ export async function updateWorkspaceRcsOnboarding({
 
   let nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
     selectedChannels,
-    currentStep: onboarding.messagingService.serviceSid ? "provider_provisioning" : "messaging_service",
+    currentStep: onboarding.messagingService.serviceSid ? "provider_provisioning" : "first_number",
     status,
     rcs: {
       ...onboarding.rcs,

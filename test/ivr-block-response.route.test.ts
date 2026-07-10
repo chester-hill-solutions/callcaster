@@ -231,6 +231,32 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_2/b2/");
   });
 
+  test("timeout/null input does not spuriously match vx-any and falls through to linear next", async () => {
+    // vx-any has a distinct target from the linear fallthrough so we can
+    // tell which branch actually fired.
+    const script = {
+      pages: { page_1: { blocks: ["b1", "bX"] } },
+      blocks: {
+        b1: { id: "b1", options: [{ value: "vx-any", next: "page_9:bZ" }] },
+        bX: { id: "bX" },
+      },
+    };
+    const campaignData = { script: { steps: script } };
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 }, campaignData, outreachResult: {} }),
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+
+    // No Digits/SpeechResult => userInput is null (timeout). Must NOT match vx-any.
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    const text = await res.text();
+    expect(text).not.toContain("page_9/bZ");
+    expect(text).toContain("redirect:https://base.example/api/ivr/1/page_1/bX/");
+  });
+
   test("covers page_ redirect branch and error handling branches", async () => {
     const script = {
       pages: { page_1: { blocks: ["b1"] } },

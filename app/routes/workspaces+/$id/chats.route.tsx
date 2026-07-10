@@ -2,7 +2,9 @@ export { loader } from "./chats.loader.server";
 export { action } from "./chats.action.server";
 
 import { Outlet, useRouteError } from "react-router";
+import type { MetaFunction } from "react-router";
 import { Card } from "@/components/ui/card";
+import { workspacePanelHeightClass } from "@/components/workspace/workspace-panel-classes";
 import {
   Sheet,
   SheetContent,
@@ -16,6 +18,8 @@ import { ConversationSidebar } from "./chats/ConversationSidebar";
 import { useChatsPage } from "@/hooks/chats/useChatsPage";
 import { logger } from "@/lib/logger.client";
 import type { Workspace } from "@/lib/types";
+
+export const meta: MetaFunction = () => [{ title: "Chats — CallCaster" }];
 
 export default function ChatsList() {
   const {
@@ -44,6 +48,8 @@ export default function ChatsList() {
     setIsMobileConversationListOpen,
     sidebarProps,
     chatInputWorkspaceNumbers,
+    initialFrom,
+    establishedFromNumber,
     handleSubmit,
     handleImageSelect,
     handleImageRemove,
@@ -54,7 +60,9 @@ export default function ChatsList() {
 
   return (
     <main className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row">
-      <Card className="flex h-[68vh] max-h-[68vh] hidden flex-col overflow-hidden border-border/80 bg-card/80 md:flex md:max-w-[40%] md:basis-2/5">
+      <Card
+        className={`hidden ${workspacePanelHeightClass} flex-col overflow-hidden border-border/80 bg-card/80 md:flex md:max-w-[40%] md:basis-2/5`}
+      >
         <ConversationSidebar {...sidebarProps} />
       </Card>
 
@@ -90,11 +98,13 @@ export default function ChatsList() {
           />
         </div>
         <ChatInput
+          key={contact_number || "new"}
           isValid={isValid}
           phoneNumber={phoneNumber}
           workspace={workspace as NonNullable<Workspace>}
           workspaceNumbers={chatInputWorkspaceNumbers}
-          initialFrom={chatInputWorkspaceNumbers[0]?.phone_number || ""}
+          initialFrom={initialFrom}
+          establishedFromNumber={establishedFromNumber}
           handleSubmit={handleSubmit}
           handleImageSelect={handleImageSelect}
           handleImageRemove={handleImageRemove}

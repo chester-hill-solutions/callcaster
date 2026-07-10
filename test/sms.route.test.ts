@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
     countCampaignMessagesToPhone: vi.fn(),
     updateOutreachAttemptForWorkspace: vi.fn(),
     rpcCreateOutreachAttempt: vi.fn(),
+    getWorkspaceCreditsBalance: vi.fn(async () => 100),
     env: {
       BETTER_AUTH_URL: vi.fn(() => "http://client"),
       BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service-key"),
@@ -135,7 +136,7 @@ vi.mock("@/lib/telephony-db.server", async (importOriginal) => {
 });
 
 vi.mock("@/lib/workspace-credits.server", () => ({
-  getWorkspaceCreditsBalance: vi.fn(async () => 100),
+  getWorkspaceCreditsBalance: (...args: any[]) => mocks.getWorkspaceCreditsBalance(...args),
 }));
 vi.mock("@/lib/twilio-readiness.server", () => ({
   assertWorkspaceCanSendSms: vi.fn(async () => undefined),
@@ -249,6 +250,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.countCampaignMessagesToPhone.mockReset();
     mocks.updateOutreachAttemptForWorkspace.mockReset();
     mocks.rpcCreateOutreachAttempt.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     mocks.logger.error.mockReset();
     mocks.createClient.mockClear();
     mocks.verifyApiKeyOrSession.mockResolvedValue({
@@ -283,6 +286,42 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id does not match API key" });
+  });
+
+  test("returns 402 with creditsError when workspace balance is depleted, gated once before loading audience", async () => {
+    currentClient = makeDbClient({});
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(0);
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: "c-credits",
+      workspace_id: TEST_WORKSPACE_ID,
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    const mod = await import("../app/routes/api+/sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({
+      creditsError: true,
+      error: "Insufficient credits",
+    });
+    // Gated once at entry: never reached campaign/audience loading or dispatch.
+    expect(mocks.loadCampaignSmsDispatchData).not.toHaveBeenCalled();
+    expect(mocks.getCampaignQueueById).not.toHaveBeenCalled();
+  });
+
+  test("returns 402 with creditsError when workspace balance is unknown (fail closed)", async () => {
+    currentClient = makeDbClient({});
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(null);
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: "c-credits-null",
+      workspace_id: TEST_WORKSPACE_ID,
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    const mod = await import("../app/routes/api+/sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toMatchObject({ creditsError: true });
   });
 
   test("happy path shortens URLs, signs media, templates body, and sends with mediaUrl", async () => {

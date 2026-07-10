@@ -1,5 +1,6 @@
 import { Form, Link, useNavigate, useNavigation, useSearchParams } from "react-router";
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   isWizardOnboardingStepId,
@@ -13,7 +14,6 @@ import { OnboardingChannelsStep } from "./OnboardingChannelsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
 import { OnboardingLaunchStep } from "./OnboardingLaunchStep";
-import { OnboardingMessagingServiceStep } from "./OnboardingMessagingServiceStep";
 import { OnboardingOverviewCard } from "./OnboardingOverviewCard";
 import { OnboardingProviderActionsStep } from "./OnboardingProviderActionsStep";
 import { WIZARD_STEP_META } from "./constants";
@@ -58,6 +58,10 @@ export function OnboardingWizard({
   pending,
   a2pBlockingIssues,
   a2pErrors,
+  workspaceUsers,
+  mediaNames,
+  inboundQueues,
+  scripts,
 }: OnboardingWizardProps) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -77,14 +81,15 @@ export function OnboardingWizard({
 
   const hasFirstNumber = workspaceHasFirstNumber(phoneNumbers ?? []);
   const isFormSubmitting = navigation.state !== "idle";
-  const messagingProvisioned = Boolean(onboarding.messagingService.serviceSid);
+
+  // The first-number step only lets you advance past it once a number exists
+  // (see the `first_number` case in `footerContinue` below), so reaching a
+  // later step without a number means it was explicitly skipped.
+  const firstNumberStepIndex = WIZARD_ONBOARDING_STEP_IDS.indexOf("first_number");
+  const showSkippedFirstNumberNotice = !hasFirstNumber && stepIndex > firstNumberStepIndex;
 
   const previousStep =
     activeStep && stepIndex > 0 ? WIZARD_ONBOARDING_STEP_IDS[stepIndex - 1]! : null;
-  const nextStep =
-    activeStep && stepIndex >= 0 && stepIndex < WIZARD_ONBOARDING_STEP_IDS.length - 1
-      ? WIZARD_ONBOARDING_STEP_IDS[stepIndex + 1]!
-      : null;
 
   const emergencyEligibleNumbers = new Set(onboarding.emergencyVoice.emergencyEligiblePhoneNumbers);
   const voiceCapableWorkspaceNumbers = (phoneNumbers ?? []).filter(
@@ -121,30 +126,6 @@ export function OnboardingWizard({
             aria-busy={pending.isSavingChannels}
           >
             {pending.isSavingChannels ? "Saving…" : "Save & continue"}
-          </Button>
-        );
-      case "messaging_service":
-        if (messagingProvisioned && nextStep) {
-          return (
-            <Form method="post">
-              <input type="hidden" name="_action" value="advance_step" />
-              <input type="hidden" name="targetStep" value={nextStep} />
-              <Button type="submit" disabled={isFormSubmitting}>
-                Next
-              </Button>
-            </Form>
-          );
-        }
-        return (
-          <Button
-            type="submit"
-            form="onboarding-messaging-form"
-            disabled={pending.isBootstrappingMessagingService}
-            aria-busy={pending.isBootstrappingMessagingService}
-          >
-            {pending.isBootstrappingMessagingService
-              ? "Provisioning…"
-              : "Provision & continue"}
           </Button>
         );
       case "first_number":
@@ -196,6 +177,16 @@ export function OnboardingWizard({
         />
       ) : null}
 
+      {showSkippedFirstNumberNotice ? (
+        <Alert variant="warning" data-testid="skipped-first-number-notice">
+          <AlertDescription>
+            You skipped renting a number — you&apos;ll need one before launching
+            campaigns. You can rent or verify one from workspace Settings at any
+            time.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {showIntro ? (
         <OnboardingIntroStep
           workspaceName={workspaceName}
@@ -228,17 +219,6 @@ export function OnboardingWizard({
         />
       ) : null}
 
-      {!showIntro && activeStep === "messaging_service" ? (
-        <OnboardingMessagingServiceStep
-          formId="onboarding-messaging-form"
-          onboarding={onboarding}
-          isReadOnly={isReadOnly}
-          pending={pending}
-          workspaceId={workspaceId}
-          creditsBalance={creditsBalance}
-        />
-      ) : null}
-
       {!showIntro && activeStep === "first_number" ? (
         <OnboardingFirstNumberStep
           onboarding={onboarding}
@@ -246,6 +226,10 @@ export function OnboardingWizard({
           phoneNumbers={phoneNumbers}
           creditsBalance={creditsBalance}
           isReadOnly={isReadOnly}
+          workspaceUsers={workspaceUsers}
+          mediaNames={mediaNames}
+          inboundQueues={inboundQueues}
+          scripts={scripts}
         />
       ) : null}
 

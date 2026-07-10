@@ -2,7 +2,10 @@ export { loader } from "./index.loader.server";
 export { action } from "./index.action.server";
 
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, Form, Link, NavLink, useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
+import type { MetaFunction } from "react-router";
 import React, { useMemo } from "react";
+
+export const meta: MetaFunction = () => [{ title: "Workspaces — CallCaster" }];
 import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
@@ -23,7 +26,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Heading } from "@/components/ui/typography";
+import { Card, CardContent } from "@/components/ui/card";
+import { Heading, Text } from "@/components/ui/typography";
 
 interface Workspace {
   id: string;
@@ -65,20 +69,24 @@ WorkspaceCard.displayName = "WorkspaceCard";
 const NewWorkspaceDialog = ({
   userId,
   isBusy,
+  trigger,
 }: {
   userId: string;
   isBusy: boolean;
+  trigger?: React.ReactNode;
 }) => (
   <Dialog>
     <DialogTrigger asChild>
-      <Button
-        variant="outline"
-        className="h-full w-full border-2 border-black px-4 py-8 dark:border-white"
-        aria-label="Add new workspace"
-        disabled={isBusy}
-      >
-        <FaPlus size="72px" className="text-black dark:text-white" />
-      </Button>
+      {trigger ?? (
+        <Button
+          variant="outline"
+          className="h-full w-full border-2 border-black px-4 py-8 dark:border-white"
+          aria-label="Add new workspace"
+          disabled={isBusy}
+        >
+          <FaPlus size="72px" className="text-black dark:text-white" />
+        </Button>
+      )}
     </DialogTrigger>
     <DialogContent className="bg-brand-secondary dark:bg-inherit">
       <DialogHeader>
@@ -128,6 +136,40 @@ const NewWorkspaceDialog = ({
   </Dialog>
 );
 
+const ZeroWorkspaceIntro = ({
+  userId,
+  isBusy,
+}: {
+  userId: string;
+  isBusy: boolean;
+}) => (
+  <Card className="w-full max-w-3xl border-2 border-brand-primary/40 dark:border-white/40">
+    <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+      <Heading level={3} branded>
+        Create your first workspace
+      </Heading>
+      <Text variant="muted" className="max-w-xl">
+        A workspace is your team&apos;s hub — it holds your contacts, campaigns,
+        phone numbers, and billing. Create one to start calling and texting.
+      </Text>
+      <NewWorkspaceDialog
+        userId={userId}
+        isBusy={isBusy}
+        trigger={
+          <Button
+            variant="default"
+            className="px-8 py-6 text-xl"
+            disabled={isBusy}
+          >
+            <FaPlus className="mr-2" />
+            Create your first workspace
+          </Button>
+        }
+      />
+    </CardContent>
+  </Card>
+);
+
 export default function Workspaces() {
   const { workspaces, userId, error } = useLoaderData<LoaderData>();
   const actionData = useActionData();
@@ -168,6 +210,8 @@ export default function Workspaces() {
     [workspaces],
   );
 
+  const hasWorkspaces = Boolean(workspaces && workspaces.length > 0);
+
   return (
     <main className="mx-auto flex h-full w-full max-w-7xl flex-col items-center gap-8 px-4 py-8">
       <div className="w-full max-w-3xl">
@@ -184,19 +228,25 @@ export default function Workspaces() {
       <Heading className="text-center" branded>
         Your Workspaces
       </Heading>
-      <Section className="w-full">
-        <SectionHeader
-          branded
-          title="Workspace Directory"
-          description="Choose an existing workspace or create a new one."
-        />
-        <div className="flex flex-wrap justify-center gap-4 sm:justify-start">
-          <div className="w-full sm:w-48">
-            <NewWorkspaceDialog userId={userId} isBusy={isBusy} />
+      {hasWorkspaces ? (
+        <Section className="w-full">
+          <SectionHeader
+            branded
+            title="Workspace Directory"
+            description="Choose an existing workspace or create a new one."
+          />
+          <div className="flex flex-wrap justify-center gap-4 sm:justify-start">
+            <div className="w-full sm:w-48">
+              <NewWorkspaceDialog userId={userId} isBusy={isBusy} />
+            </div>
+            {workspaceCards}
           </div>
-          {workspaceCards}
-        </div>
-      </Section>
+        </Section>
+      ) : (
+        <ZeroWorkspaceIntro userId={userId} isBusy={isBusy} />
+      )}
     </main>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

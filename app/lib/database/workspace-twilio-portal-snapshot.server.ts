@@ -43,6 +43,26 @@ import {
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 
+/**
+ * Cheap count of a workspace's recent outbound-api messages, using the same
+ * `direction = "outbound-api"` filter as {@link getWorkspaceTwilioPortalSnapshot}'s
+ * `metrics.recentOutboundCount`, but via a single `COUNT(*)` query instead of
+ * fetching (and paying transfer cost for) up to 200 message rows. Callers that
+ * only need to know "does this workspace have outbound messaging history"
+ * (e.g. `hasLegacyTraffic` in `deriveWorkspaceMessagingReadiness`) should use
+ * this instead of pulling the full portal snapshot.
+ */
+export async function getWorkspaceRecentOutboundMessageCount({
+  workspaceId,
+}: {
+  workspaceId: string;
+}): Promise<number> {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.message.count({
+    where: eq(messageTable.direction, "outbound-api"),
+  });
+}
+
 export function buildDefaultWorkspaceTwilioPortalSnapshot(): WorkspaceTwilioPortalSnapshot {
   const onboarding = {
     ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,

@@ -16,6 +16,7 @@ import {
   asWorkspaceOnboardingStatus,
   buildBusinessProfile,
   isOnboardingActionName,
+  readChannelInlineBusinessFields,
   readSelectedChannels,
   type OnboardingActionData,
   type OnboardingActionName,
@@ -33,10 +34,20 @@ import {
 } from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { buildA2pBlockingIssues, provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
+
+// Compliance channels that trigger the Twilio compliance provisioning job.
+// `toll_free_bulk_sms` is a Phase C channel referenced by string literal (it is
+// not yet in the WorkspaceOnboardingChannel union), so channels are compared as
+// plain strings here.
+const COMPLIANCE_CHANNELS = ["toll_free_bulk_sms", "a2p10dlc"] as const;
+import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
 import type {
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
+  WorkspaceOperatingCountry,
 } from "@/lib/types";
+import { WORKSPACE_OPERATING_COUNTRY_VALUES } from "@/lib/types";
 import type { Tables } from "@/lib/db-types";
 
 export type OnboardingHandlerResult =
@@ -210,7 +221,9 @@ export async function patchWorkspaceOnboarding(
   workspaceId: string,
   updates: {
     current_step?: string;
-    selected_channels?: Array<"a2p10dlc" | "rcs" | "voice_compliance">;
+    selected_channels?: Array<
+      "a2p10dlc" | "rcs" | "voice_compliance" | "toll_free_bulk_sms"
+    >;
     status?: ReturnType<typeof asWorkspaceOnboardingStatus>;
   },
 ): Promise<
@@ -315,83 +328,66 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
   });
   const selectedChannels = stripDisabledRcsChannel(readSelectedChannels(formData));
 
+  // The Channels step reveals channel-scoped inline inputs (toll-free
+  // verification fields, US A2P Trust Hub fields). Overlay any posted values onto
+  // the current business profile without wiping fields collected on other steps.
+  const businessProfile = readChannelInlineBusinessFields(
+    formData,
+    current.businessProfile,
+  );
+
+  // The Messaging Service is auto-provisioned at workspace create via
+  // ensureWorkspaceTwilioBootstrap; there is no dedicated wizard step for it.
+  // Ensure it exists (idempotent) so the first-number step can attach senders.
+  if (!current.messagingService.serviceSid) {
+    await ensureWorkspaceTwilioBootstrap({
+      workspaceId: ctx.workspaceId,
+      actorUserId: ctx.user.id,
+    });
+  }
+
   await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: {
       selectedChannels,
+      businessProfile,
       status: "collecting_business",
-      currentStep: "messaging_service",
-      emergencyVoice: selectedChannels.includes("voice_compliance")
-        ? current.emergencyVoice
-        : {
-            ...current.emergencyVoice,
-            enabled: false,
-          },
+      currentStep: "first_number",
     },
   });
-  return { kind: "redirect", step: "messaging_service" };
+
+  // Kick off Twilio compliance provisioning when a compliance path is newly
+  // selected. Idempotent enqueue — repeated saves do not stack duplicate jobs.
+  const previousChannels = new Set(current.selectedChannels as string[]);
+  const nextChannels = selectedChannels as string[];
+  const newlySelectedCompliance = COMPLIANCE_CHANNELS.some(
+    (channel) => nextChannels.includes(channel) && !previousChannels.has(channel),
+  );
+  if (newlySelectedCompliance) {
+    await enqueueWorkspaceComplianceJob(ctx.workspaceId, "channels_selected");
+  }
+
+  return { kind: "redirect", step: "first_number" };
 }
 
+/**
+ * Legacy action retained for API backward-compatibility. The Messaging Service
+ * is now auto-provisioned at workspace create, so this just ensures it exists
+ * (idempotent) and routes to the first-number step.
+ */
 async function handleBootstrapMessagingService(
   ctx: OnboardingActionContext,
 ): Promise<OnboardingHandlerResult> {
-  const bootstrap = await ensureWorkspaceTwilioBootstrap({workspaceId: ctx.workspaceId,
+  await ensureWorkspaceTwilioBootstrap({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.user.id,
   });
-
-  if (bootstrap.serviceSid) {
-    await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
-      actorUserId: ctx.actorUserId,
-      updates: { currentStep: "first_number" },
-    });
-    if (bootstrap.outcome === "success") {
-      return {
-        kind: "redirect",
-        step: "first_number",
-        searchParams: { provisioned: "messaging_service" },
-      };
-    }
-    if (bootstrap.outcome === "partial") {
-      return {
-        kind: "redirect",
-        step: "first_number",
-        searchParams: {
-          provisioned: "messaging_service",
-          warning:
-            bootstrap.lastError ??
-            "Messaging Service was created but some configuration is still incomplete.",
-        },
-      };
-    }
-  }
-
-  if (bootstrap.outcome === "success") {
-    return {
-      kind: "payload",
-      data: { success: "Messaging Service is ready." },
-    };
-  }
-
-  if (bootstrap.outcome === "partial") {
-    return {
-      kind: "payload",
-      data: {
-        warning:
-          bootstrap.lastError ??
-          "Messaging Service was created but some configuration is still incomplete. Review details below and retry.",
-      },
-    };
-  }
-
-  return {
-    kind: "payload",
-    data: {
-      error:
-        bootstrap.lastError ??
-        "Messaging Service could not be provisioned. Try again or contact support.",
-    },
-    status: 500,
-  };
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
+    actorUserId: ctx.actorUserId,
+    updates: { currentStep: "first_number" },
+  });
+  return { kind: "redirect", step: "first_number" };
 }
 
 async function handleSaveBusinessProfile(
@@ -400,7 +396,7 @@ async function handleSaveBusinessProfile(
   const formData = resolveOnboardingInput(ctx.input);
   const current = await getWorkspaceMessagingOnboardingState({workspaceId: ctx.workspaceId,
   });
-  const businessProfile = buildBusinessProfile(formData);
+  const businessProfile = buildBusinessProfile(formData, current.businessProfile);
   const addressStreet = String(formData.get("addressStreet") ?? formData.get("address_street") ?? "");
   const addressCity = String(formData.get("addressCity") ?? formData.get("address_city") ?? "");
   const addressRegion = String(formData.get("addressRegion") ?? formData.get("address_region") ?? "");
@@ -408,8 +404,17 @@ async function handleSaveBusinessProfile(
     formData.get("addressPostalCode") ?? formData.get("address_postal_code") ?? "",
   );
   const addressCountryCode = String(
-    formData.get("addressCountryCode") ?? formData.get("address_country_code") ?? "US",
+    formData.get("addressCountryCode") ?? formData.get("address_country_code") ?? "CA",
   );
+  const operatingCountryRaw = String(
+    formData.get("operatingCountry") ?? formData.get("operating_country") ?? "",
+  );
+  const operatingCountry: WorkspaceOperatingCountry =
+    WORKSPACE_OPERATING_COUNTRY_VALUES.includes(
+      operatingCountryRaw as WorkspaceOperatingCountry,
+    )
+      ? (operatingCountryRaw as WorkspaceOperatingCountry)
+      : current.operatingCountry;
   const hasEmergencyAddress = Boolean(
     addressStreet.trim() &&
       addressCity.trim() &&
@@ -421,6 +426,7 @@ async function handleSaveBusinessProfile(
     actorUserId: ctx.actorUserId,
     updates: {
       businessProfile,
+      operatingCountry,
       status: "collecting_business",
       currentStep: "path_selection",
       emergencyVoice: {
@@ -446,6 +452,20 @@ async function handleSaveBusinessProfile(
       },
     },
   });
+
+  // If a compliance path is already selected and the business profile now has a
+  // usable service address, (re)enqueue compliance provisioning so Trust Hub can
+  // consume the updated profile. Idempotent enqueue.
+  const compliancePathSelected = COMPLIANCE_CHANNELS.some((channel) =>
+    (current.selectedChannels as string[]).includes(channel),
+  );
+  if (compliancePathSelected && hasEmergencyAddress) {
+    await enqueueWorkspaceComplianceJob(
+      ctx.workspaceId,
+      "business_profile_saved",
+    );
+  }
+
   return { kind: "redirect", step: "path_selection" };
 }
 
@@ -556,6 +576,47 @@ async function handleSaveRcs(ctx: OnboardingActionContext): Promise<OnboardingHa
   };
 }
 
+async function handleAttachRcsSender(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
+  if (!isRcsOnboardingEnabled()) {
+    return {
+      kind: "payload",
+      data: { error: "RCS onboarding is not available." },
+      status: 400,
+    };
+  }
+
+  const result = await attachWorkspaceRcsSenderToPool({ workspaceId: ctx.workspaceId });
+
+  if (!result.serviceSid) {
+    return {
+      kind: "payload",
+      data: { error: "Provision a Messaging Service before attaching the RCS sender." },
+      status: 400,
+    };
+  }
+  if (!result.rcsSenderId) {
+    return {
+      kind: "payload",
+      data: {
+        error:
+          "Save the Twilio Sender SID from Console (once your RCS sender is approved) before attaching it to the pool.",
+      },
+      status: 400,
+    };
+  }
+
+  return {
+    kind: "payload",
+    data: {
+      success: result.alreadyInPool
+        ? `RCS sender ${result.rcsSenderId} is already attached to the sender pool.`
+        : `RCS sender ${result.rcsSenderId} attached to the sender pool.`,
+    },
+  };
+}
+
 const ONBOARDING_ACTION_HANDLERS = {
   advance_step: handleAdvanceStep,
   skip_first_number: handleSkipFirstNumber,
@@ -566,6 +627,7 @@ const ONBOARDING_ACTION_HANDLERS = {
   review_emergency_voice: handleReviewEmergencyVoice,
   provision_a2p: handleProvisionA2p,
   save_rcs: handleSaveRcs,
+  attach_rcs_sender: handleAttachRcsSender,
 } satisfies Record<OnboardingActionName, (ctx: OnboardingActionContext) => Promise<OnboardingHandlerResult>>;
 
 export async function runOnboardingAction(

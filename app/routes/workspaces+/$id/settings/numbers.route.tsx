@@ -6,9 +6,19 @@ import type { NumbersSearchFetcherData } from "@/components/phone-numbers/Number
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 
 import { useWorkspaceRealtime } from "@/hooks/realtime/useWorkspaceRealtime";
@@ -86,6 +96,32 @@ const WorkspaceSettings = () => {
   );
   const fetcher = useFetcher<NumbersSearchFetcherData>();
   const updateFetcher = useFetcher();
+  const [numberPendingRemoval, setNumberPendingRemoval] = useState<
+    number | null
+  >(null);
+
+  // Toast the outcome of inline row edits (and removals), which otherwise
+  // save silently through updateFetcher.
+  const pendingFormNameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (updateFetcher.state === "submitting") {
+      pendingFormNameRef.current = String(
+        updateFetcher.formData?.get("formName") ?? "",
+      );
+      return;
+    }
+    if (updateFetcher.state !== "idle" || !pendingFormNameRef.current) return;
+    const formName = pendingFormNameRef.current;
+    pendingFormNameRef.current = null;
+    const error = (updateFetcher.data as { error?: string } | null)?.error;
+    if (error) {
+      toast.error(error);
+    } else if (formName === "remove-number") {
+      toast.success("Number released");
+    } else {
+      toast.success("Number settings saved");
+    }
+  }, [updateFetcher.state, updateFetcher.formData, updateFetcher.data]);
 
   const { phoneNumbers, setPhoneNumbers } = useWorkspaceRealtime({
     user,
@@ -199,10 +235,16 @@ const WorkspaceSettings = () => {
   };
 
   const handleNumberRemoval = (numberId: number) => {
+    setNumberPendingRemoval(numberId);
+  };
+
+  const confirmNumberRemoval = () => {
+    if (numberPendingRemoval == null) return;
     updateFetcher.submit(
-      { formName: "remove-number", numberId: String(numberId) },
+      { formName: "remove-number", numberId: String(numberPendingRemoval) },
       { method: "POST" },
     );
+    setNumberPendingRemoval(null);
   };
 
   return (
@@ -212,7 +254,39 @@ const WorkspaceSettings = () => {
         onOpenChange={setDialog}
         validationRequest={actionData?.validationRequest}
       />
-      <div className="flex min-h-screen flex-col">
+      <Dialog
+        open={numberPendingRemoval != null}
+        onOpenChange={(open) => {
+          if (!open) setNumberPendingRemoval(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Release this phone number?</DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            Releasing this number removes it from your workspace. Inbound calls
+            and texts to it will stop, and you may not be able to get the same
+            number back.
+          </DialogDescription>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setNumberPendingRemoval(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmNumberRemoval}
+              disabled={updateFetcher.state !== "idle"}
+            >
+              Release number
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="flex flex-col">
         <BackButton disabled={updateFetcher.state !== "idle"} />
         <div className="flex flex-wrap gap-4 p-4">
           <Panel className="flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
@@ -253,13 +327,9 @@ const WorkspaceSettings = () => {
 
 const BackButton = ({ disabled }: { disabled: boolean }) => (
   <div className="flex justify-end pr-4 pt-4">
-    <Button
-      asChild
-      disabled={disabled}
-      variant="outline"
-      className="h-full w-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
-    >
+    <Button asChild disabled={disabled} variant="outline" size="sm">
       <Link to=".." relative="path">
+        <ArrowLeft className="mr-1 h-4 w-4" />
         Back
       </Link>
     </Button>

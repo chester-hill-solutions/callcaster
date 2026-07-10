@@ -25,14 +25,11 @@
     --brand-secondary: 198 100% 87%;
     --brand-tertiary: 354 83% 88%;
 
-    --brand-bronze: 30 61% 48%;
-    --brand-silver: 30 2% 62%;
-    --brand-gold: 45 100% 48%;
-
     --background: 0 0% 100%;
 
     --foreground: 240 10% 3.9%;
-    --card: 220 5% 90%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
     --primary: var(--brand-primary);
@@ -51,7 +48,7 @@
     --warning-foreground: 0 0% 10%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 346.8 77.2% 49.8%;
+    --ring: var(--brand-primary);
     --radius: 0.5rem;
     --contrast-text: #333;
   }
@@ -60,17 +57,18 @@
   :root[class~="dark"] {
     --background: 220 5% 12%;
     --foreground: 0 0% 95%;
-    --card: 44 1% 41%;
-    /* --card-foreground: 0 0% 95%; */
+    --card: 220 5% 16%;
+    --card-foreground: 0 0% 95%;
     --popover: 0 0% 9%;
     --popover-foreground: 0 0% 95%;
     --primary: var(--brand-primary);
     --primary-foreground: 355.7 100% 97.3%;
     --secondary: var(--brand-secondary);
-    --secondary-foreground: 0 0% 98%;
+    /* --secondary stays pale blue in dark mode, so its foreground must stay dark. */
+    --secondary-foreground: 240 5.9% 10%;
     --muted: 0 0% 15%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 12 6.5% 15.1%;
+    --accent: 240 4% 18%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 85.7% 97.3%;
@@ -80,24 +78,21 @@
     --warning-foreground: 0 0% 10%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 346.8 77.2% 49.8%;
+    --ring: var(--brand-primary);
     --contrast-text: #f1f1f1;
-
-    --brand-bronze: 30 61% 48% 50%;
-    --brand-silver: 30 2% 62% 50%;
-    --brand-gold: 45 100% 48% 50%;
   }
 }
 
-input:not([type="hidden"]),
-select,
-textarea {
-  border: 2px solid hsl(var(--border));
+/* Baseline for raw form controls that don't use the ui/ primitives.
+   :where() keeps specificity at zero so Tailwind utilities always win. */
+:where(input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="file"]), select, textarea) {
+  border: 1px solid hsl(var(--input));
+  border-radius: calc(var(--radius) - 2px);
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   padding: 4px 8px;
 }
 
-textarea::placeholder {
+:where(textarea)::placeholder {
   color: hsl(var(--muted-foreground));
 }

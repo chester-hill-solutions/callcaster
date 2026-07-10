@@ -1,6 +1,7 @@
 export { action } from "./new.action.server";
 
 import { Form, Link, useActionData } from "react-router";
+import type { MetaFunction } from "react-router";
 import { useState } from "react";
 import {
   BrandedCard,
@@ -20,6 +21,8 @@ import {
 } from "@/components/ui/select";
 import { Text } from "@/components/ui/typography";
 
+export const meta: MetaFunction = () => [{ title: "New Campaign — CallCaster" }];
+
 const CREATION_SECTION_CLASS =
   "mx-auto w-full max-w-2xl px-2 py-6 sm:px-4";
 
@@ -38,6 +41,7 @@ export default function CampaignsNew() {
   const [campaignPhase, setCampaignPhase] = useState<
     "identification" | "persuasion" | "gotv"
   >("identification");
+  const [nameMissing, setNameMissing] = useState(false);
 
   return (
     <section id="form" className={CREATION_SECTION_CLASS}>
@@ -56,8 +60,25 @@ export default function CampaignsNew() {
         <Form method="POST" className="space-y-6">
           <BrandedCardContent>
             <input type="hidden" name="formAction" value="newCampaign" />
-            <FormField htmlFor="campaign-name" label="Campaign Name">
-              <Input type="text" name="campaign-name" id="campaign-name" required />
+            <FormField
+              htmlFor="campaign-name"
+              label="Campaign Name"
+              error={nameMissing ? "Campaign name is required." : undefined}
+            >
+              <Input
+                type="text"
+                name="campaign-name"
+                id="campaign-name"
+                required
+                aria-invalid={nameMissing || undefined}
+                onInvalid={(e) => {
+                  e.preventDefault();
+                  setNameMissing(true);
+                }}
+                onChange={(e) => {
+                  if (e.target.value.trim()) setNameMissing(false);
+                }}
+              />
             </FormField>
             <FormField htmlFor="campaign-type-trigger" label="Campaign Type">
               <input type="hidden" name="campaign-type" value={campaignType} />
@@ -80,7 +101,11 @@ export default function CampaignsNew() {
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField htmlFor="campaign-phase" label="Campaign Phase">
+            <FormField
+              htmlFor="campaign-phase"
+              label="Campaign Phase"
+              description="Where this campaign fits in your outreach: identifying supporters, persuading undecideds, or getting out the vote."
+            >
               <input type="hidden" name="campaign-phase" value={campaignPhase} />
               <Select
                 value={campaignPhase}

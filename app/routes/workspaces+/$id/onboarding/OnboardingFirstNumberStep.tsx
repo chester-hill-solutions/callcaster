@@ -2,6 +2,7 @@ import { Link, useFetcher, useRevalidator } from "react-router";
 import { useCallback, useEffect, useState } from "react";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
+import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
 import { CallerIdVerificationDialog } from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { CallerIdVerificationForm } from "@/components/phone-numbers/CallerIdVerificationForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -17,10 +18,24 @@ import type { OnboardingStepProps } from "./types";
 
 type OnboardingFirstNumberStepProps = Pick<
   OnboardingStepProps,
-  "onboarding" | "workspaceId" | "phoneNumbers" | "isReadOnly"
+  | "onboarding"
+  | "workspaceId"
+  | "phoneNumbers"
+  | "isReadOnly"
+  | "workspaceUsers"
+  | "mediaNames"
+  | "inboundQueues"
+  | "scripts"
 > & {
   creditsBalance: number;
 };
+
+// Reuse the same patch-number action handlers the numbers settings page uses
+// (app/routes/workspaces+/$id/settings/numbers.action.server.ts) instead of
+// building a second inbound-routing/handset write path (Phase G, Q44-46/59).
+function numbersSettingsActionPath(workspaceId: string): string {
+  return `/workspaces/${workspaceId}/settings/numbers`;
+}
 
 export function OnboardingFirstNumberStep({
   onboarding,
@@ -28,14 +43,20 @@ export function OnboardingFirstNumberStep({
   phoneNumbers,
   creditsBalance,
   isReadOnly,
+  workspaceUsers,
+  mediaNames,
+  inboundQueues,
+  scripts,
 }: OnboardingFirstNumberStepProps) {
   const purchaseFetcher = useFetcher<NumbersSearchFetcherData>();
   const verifyFetcher = useFetcher<OnboardingActionData>();
+  const routingFetcher = useFetcher();
   const revalidator = useRevalidator();
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
 
   const numbers = phoneNumbers ?? [];
   const rentedCount = countRentedWorkspaceNumbers(numbers);
+  const rentedNumbers = numbers.filter((number) => number?.type === "rented");
   const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
   const hasFirstNumber = workspaceHasFirstNumber(numbers);
   const pendingCallerIds = numbers.filter(
@@ -48,10 +69,92 @@ export function OnboardingFirstNumberStep({
       (number.capabilities as Record<string, unknown>).verification_status === "pending",
   );
   const messagingReady = Boolean(onboarding.messagingService.serviceSid);
+  const isRoutingBusy = routingFetcher.state !== "idle";
+  const actionPath = numbersSettingsActionPath(workspaceId);
 
   const handlePurchaseComplete = useCallback(() => {
     revalidator.revalidate();
   }, [revalidator]);
+
+  const handleIncomingActivityChange = useCallback(
+    (numberId: number, value: string) => {
+      routingFetcher.submit(
+        { formName: "update-incoming-activity", numberId: String(numberId), incomingActivity: value },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
+
+  const handleIncomingVoiceMessageChange = useCallback(
+    (numberId: number, value: string) => {
+      routingFetcher.submit(
+        { formName: "update-incoming-voice-message", numberId: String(numberId), incomingVoiceMessage: value },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
+
+  const handleHandsetChange = useCallback(
+    (numberId: number, enabled: boolean) => {
+      routingFetcher.submit(
+        { formName: "update-handset", numberId: String(numberId), handsetEnabled: String(enabled) },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
+
+  const handleInboundRingCountChange = useCallback(
+    (numberId: number, value: string) => {
+      routingFetcher.submit(
+        { formName: "update-inbound-ring-count", numberId: String(numberId), inboundRingCount: value },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
+
+  const handleInboundQueueChange = useCallback(
+    (numberId: number, queueId: string) => {
+      routingFetcher.submit(
+        { formName: "update-inbound-queue", numberId: String(numberId), inboundQueueId: queueId },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
+
+  const handleInboundScriptChange = useCallback(
+    (numberId: number, scriptId: string) => {
+      routingFetcher.submit(
+        { formName: "update-inbound-script", numberId: String(numberId), inboundScriptId: scriptId },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
+
+  const handleCallerIdChange = useCallback(
+    (numberId: number, value: string) => {
+      routingFetcher.submit(
+        { formName: "update-caller-id", numberId: String(numberId), friendly_name: value },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
+
+  const handleNumberRemoval = useCallback(
+    (numberId: number) => {
+      routingFetcher.submit(
+        { formName: "remove-number", numberId: String(numberId) },
+        { method: "POST", action: actionPath },
+      );
+    },
+    [routingFetcher, actionPath],
+  );
 
   useEffect(() => {
     if (verifyFetcher.data?.validationRequest) {
@@ -175,6 +278,38 @@ export function OnboardingFirstNumberStep({
               )}
             </div>
           </div>
+
+          {rentedNumbers.length > 0 && !isReadOnly ? (
+            <div className="space-y-2 rounded-lg border p-4">
+              <div>
+                <h3 className="font-medium">Inbound routing &amp; handset</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose who handles incoming calls (agent, queue, or IVR script), whether to ring
+                  your handset, how many rings before falling back, and the voicemail greeting for
+                  each rented number. Unless you change it here, incoming calls route to the
+                  workspace owner.
+                </p>
+              </div>
+              <NumbersTable
+                title="Your rented numbers"
+                phoneNumbers={rentedNumbers}
+                users={workspaceUsers}
+                mediaNames={mediaNames}
+                queues={inboundQueues}
+                scripts={scripts}
+                onIncomingActivityChange={handleIncomingActivityChange}
+                onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
+                onCallerIdChange={handleCallerIdChange}
+                onHandsetChange={handleHandsetChange}
+                onInboundRingCountChange={handleInboundRingCountChange}
+                onInboundQueueChange={handleInboundQueueChange}
+                onInboundScriptChange={handleInboundScriptChange}
+                onNumberRemoval={handleNumberRemoval}
+                isBusy={isRoutingBusy}
+                hideEmptyState
+              />
+            </div>
+          ) : null}
 
           <p className="text-sm text-muted-foreground">
             Manage numbers later in{" "}

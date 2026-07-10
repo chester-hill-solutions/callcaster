@@ -32,7 +32,12 @@ type ResolvedLocation = {
 
 let s3Client: S3Client | undefined;
 
-function getS3Client(): S3Client {
+/**
+ * Shared S3 client. Exported so boot-time smoke checks (see
+ * app/server/boot-checks.server.ts) can reuse the same client/credentials
+ * instead of constructing a duplicate one.
+ */
+export function getS3Client(): S3Client {
   if (!s3Client) {
     s3Client = new S3Client({
       endpoint: env.S3_ENDPOINT(),
@@ -45,6 +50,42 @@ function getS3Client(): S3Client {
     });
   }
   return s3Client;
+}
+
+/** Underlying S3 bucket env vars, keyed by the name used in error messages. */
+const BUCKET_ENV_VARS = [
+  "S3_BUCKET",
+  "S3_BUCKET_AUDIO",
+  "S3_BUCKET_MEDIA",
+  "S3_BUCKET_EXPORTS",
+] as const;
+
+export type ConfiguredBucket = {
+  envVar: (typeof BUCKET_ENV_VARS)[number];
+  bucketName: string;
+};
+
+/**
+ * Every underlying S3 bucket name that is actually configured (fallback
+ * S3_BUCKET plus any dedicated buckets). Used by boot-time smoke checks to
+ * verify each configured bucket is reachable.
+ */
+export function listConfiguredBuckets(): ConfiguredBucket[] {
+  const resolvers: Record<(typeof BUCKET_ENV_VARS)[number], () => string | undefined> = {
+    S3_BUCKET: () => env.S3_BUCKET(),
+    S3_BUCKET_AUDIO: () => env.S3_BUCKET_AUDIO(),
+    S3_BUCKET_MEDIA: () => env.S3_BUCKET_MEDIA(),
+    S3_BUCKET_EXPORTS: () => env.S3_BUCKET_EXPORTS(),
+  };
+
+  const buckets: ConfiguredBucket[] = [];
+  for (const envVar of BUCKET_ENV_VARS) {
+    const bucketName = resolvers[envVar]();
+    if (bucketName) {
+      buckets.push({ envVar, bucketName });
+    }
+  }
+  return buckets;
 }
 
 function dedicatedBucketFor(logicalBucket: ObjectStorageBucket): string | undefined {

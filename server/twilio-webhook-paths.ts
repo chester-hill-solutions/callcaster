@@ -13,6 +13,8 @@ export const TWILIO_WEBHOOK_PATH_PREFIXES = [
   "/api/caller-id/status",
   "/api/email-vm",
   "/api/connect-campaign-conference",
+  "/api/twilio/trusthub/status",
+  "/api/twilio/a2p/events",
 ] as const;
 
 export function isTwilioWebhookPath(pathname: string): boolean {

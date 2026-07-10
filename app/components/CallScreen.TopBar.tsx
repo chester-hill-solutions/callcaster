@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+
 interface TopBarProps {
   handleQueueButton: () => void;
   state: string;
@@ -7,25 +9,25 @@ interface TopBarProps {
 }
 
 const TopBar = ({ handleQueueButton, state, handleNextNumber, handleDialNext, handlePowerDial }: TopBarProps) => (
-    <div className="flex p-4 gap-2" style={{ border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem" }}>
-        <button onClick={handleQueueButton} style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white' }}>
+    <div className="mb-8 flex gap-2 rounded-full border-[3px] border-brand-secondary p-4">
+        <Button onClick={handleQueueButton}>
             {state === 'idle' ? 'Load' : 'Loading'}
-        </button>
-        <div className="flex row gap2" style={{ display: 'flex', gap: "8px" }}>
-            <button onClick={handlePowerDial} style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white', opacity: ".5" }}>
+        </Button>
+        <div className="flex gap-2">
+            <Button onClick={handlePowerDial} className="opacity-50">
                 Predictive Dial
-            </button>
-            <button onClick={handleDialNext} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>
+            </Button>
+            <Button variant="outline" onClick={handleDialNext} className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
                 Dial Next
-            </button>
+            </Button>
         </div>
-        <div className="flex row gap2" style={{ display: 'flex', gap: "8px" }}>
-            <button onClick={() => handleNextNumber(true)} style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white' }}>
+        <div className="flex gap-2">
+            <Button onClick={() => handleNextNumber(true)}>
                 Skip Household
-            </button>
-            <button onClick={() => handleNextNumber(false)} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>
+            </Button>
+            <Button variant="outline" onClick={() => handleNextNumber(false)} className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
                 Skip Person
-            </button>
+            </Button>
         </div>
     </div>
 )

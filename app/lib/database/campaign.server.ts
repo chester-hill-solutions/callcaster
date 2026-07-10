@@ -13,6 +13,8 @@ import { logger } from "../logger.server";
 import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
 import { campaign as campaignTable, script as scriptTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 
 export type CampaignType =
   | "live_call"
@@ -293,6 +295,120 @@ type ScriptUpdateProps = {
   /** @deprecated ignored */
   client?: never;
 };
+
+export type SplitMessageCampaignResult = {
+  segments: Array<{
+    campaignId: number;
+    title: string;
+    contactCount: number;
+  }>;
+  movedContactCount: number;
+};
+
+/**
+ * Phase F — parallel-campaign split.
+ *
+ * Clones a bulk message campaign into `segmentCount` sibling campaigns and
+ * partitions the source's queued contacts across them (round-robin, so segment
+ * sizes stay balanced). Each segment inherits the source's content, sender
+ * config, schedule, and send window, and is created as a `draft` so an operator
+ * can vary copy per segment before launching. The redistributed rows are then
+ * dequeued off the source (reason "Moved to parallel split segment") so the
+ * same contact is never sent twice.
+ *
+ * Intended to be driven by the `bulk_sender_misaligned` split wizard when a
+ * `ca_local` queue is large enough that a single sender would throttle badly.
+ */
+export async function splitMessageCampaign({
+  workspaceId,
+  sourceCampaignId,
+  segmentCount,
+  userId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  sourceCampaignId: string | number;
+  segmentCount: number;
+  userId: string;
+  tdb?: TenantDb;
+}): Promise<SplitMessageCampaignResult> {
+  const normalizedSegments = Math.floor(Number(segmentCount));
+  if (!Number.isFinite(normalizedSegments) || normalizedSegments < 2) {
+    throw new Error("A campaign split needs at least 2 segments");
+  }
+  if (normalizedSegments > 20) {
+    throw new Error("A campaign split supports at most 20 segments");
+  }
+
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const source = await tdb.campaign.findFirst({
+    where: eq(campaignTable.id, Number(sourceCampaignId)),
+  });
+  if (!source) {
+    throw new Error("Source campaign not found");
+  }
+  if (source.type !== "message") {
+    throw new Error("Only message campaigns can be split");
+  }
+
+  const members = await getCampaignQueueById({
+    campaign_id: String(sourceCampaignId),
+    onlyQueued: true,
+  });
+
+  const buckets: number[][] = Array.from(
+    { length: normalizedSegments },
+    () => [],
+  );
+  members.forEach((member, index) => {
+    buckets[index % normalizedSegments]!.push(Number(member.contact_id));
+  });
+
+  const {
+    id: _sourceId,
+    created_at: _sourceCreatedAt,
+    ...clonableFields
+  } = source;
+
+  const segments: SplitMessageCampaignResult["segments"] = [];
+  for (let index = 0; index < normalizedSegments; index++) {
+    const title = `${source.title} — Segment ${index + 1} of ${normalizedSegments}`;
+    const { campaign: created } = await createCampaign({
+      campaignData: {
+        ...(clonableFields as unknown as Record<string, unknown>),
+        workspace: workspaceId,
+        title,
+        status: "draft",
+        is_active: false,
+      } as unknown as CampaignData,
+      tdb,
+    });
+
+    const contactIds = buckets[index] ?? [];
+    if (contactIds.length > 0) {
+      await enqueueContactsForCampaign(Number(created.id), contactIds);
+    }
+
+    segments.push({
+      campaignId: Number(created.id),
+      title,
+      contactCount: contactIds.length,
+    });
+  }
+
+  // Remove the redistributed rows from the source so volume isn't double-sent.
+  let movedContactCount = 0;
+  for (const member of members) {
+    await dequeueCampaignQueueById({
+      queueId: Number(member.id),
+      userId,
+      reason: "Moved to parallel split segment",
+    });
+    movedContactCount++;
+  }
+
+  return { segments, movedContactCount };
+}
 
 export async function updateOrCopyScript({
   workspaceId,

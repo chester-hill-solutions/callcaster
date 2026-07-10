@@ -28,9 +28,14 @@ type EnvConfig = {
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET?: string;
   RESEND_API_KEY: string;
-  OPENAI_API_KEY?: string;
+  /** Ops-alert recipient for Twilio compliance jobs needing docs / failing terminally. Optional — alerts are skipped when unset. */
+  TWILIO_COMPLIANCE_NOTIFY_EMAIL?: string;
+  /** Trust Hub secondary customer-profile policy SID (override; optional). */
+  TWILIO_TRUSTHUB_SECONDARY_POLICY_SID?: string;
   VERIFICATION_PHONE_NUMBER?: string;
   TWILIO_VALIDATE_WEBHOOKS?: string;
+  /** Enables Twilio Lookup v2 line-type checks before first SMS to a contact. Off by default; costs $0.008/lookup. */
+  TWILIO_LOOKUP_ENABLED?: string;
   /** Secret used to sign media-stream WebSocket tokens. */
   MEDIA_STREAM_SECRET?: string;
   /** Public host of the media-stream Bun service (e.g. media-stream-production.up.railway.app). */
@@ -42,9 +47,11 @@ import { REQUIRED_ENV_KEYS, validateRequiredEnv } from "./required-env-keys";
 const requiredEnvVars = [...REQUIRED_ENV_KEYS] as (keyof EnvConfig)[];
 
 const optionalEnvVars: (keyof EnvConfig)[] = [
-  'OPENAI_API_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'TWILIO_VALIDATE_WEBHOOKS',
+  'TWILIO_COMPLIANCE_NOTIFY_EMAIL',
+  'TWILIO_TRUSTHUB_SECONDARY_POLICY_SID',
+  'TWILIO_LOOKUP_ENABLED',
   'DATABASE_DIRECT_URL',
   'BETTER_AUTH_URL',
   'S3_BUCKET_AUDIO',
@@ -122,16 +129,35 @@ export const env = {
   TWILIO_AUTH_TOKEN: () => getEnv('TWILIO_AUTH_TOKEN'),
   TWILIO_APP_SID: () => getEnv('TWILIO_APP_SID'),
   TWILIO_PHONE_NUMBER: () => getEnv('TWILIO_PHONE_NUMBER'),
-  BASE_URL: () => getEnv('BASE_URL'),
+  // Trailing slash stripped centrally: 23 of 29 call sites string-template
+  // Twilio callback URLs from this value, and `https://host//api/...` 404s.
+  BASE_URL: () => getEnv('BASE_URL').replace(/\/+$/, ''),
   STRIPE_SECRET_KEY: () => getEnv('STRIPE_SECRET_KEY'),
   STRIPE_WEBHOOK_SECRET: () => getEnv('STRIPE_WEBHOOK_SECRET'),
   RESEND_API_KEY: () => getEnv('RESEND_API_KEY'),
-  OPENAI_API_KEY: () => getEnv('OPENAI_API_KEY'),
+  /** Ops-alert recipient for Twilio compliance jobs needing docs / failing terminally. */
+  TWILIO_COMPLIANCE_NOTIFY_EMAIL: () => getEnv('TWILIO_COMPLIANCE_NOTIFY_EMAIL'),
+  /** Trust Hub secondary customer-profile policy SID override (optional). */
+  TWILIO_TRUSTHUB_SECONDARY_POLICY_SID: () =>
+    getEnv('TWILIO_TRUSTHUB_SECONDARY_POLICY_SID'),
   VERIFICATION_PHONE_NUMBER: () => getEnv('VERIFICATION_PHONE_NUMBER'),
   /** When `false` or `0`, Remix Twilio webhooks skip signature checks (local dev only). */
   TWILIO_VALIDATE_WEBHOOKS: () => getEnv('TWILIO_VALIDATE_WEBHOOKS'),
-  /** Secret used to sign media-stream WebSocket tokens. Defaults to a dev-only value. */
-  MEDIA_STREAM_SECRET: () => getEnv('MEDIA_STREAM_SECRET') ?? 'dev-media-stream-secret-change-me',
+  /** When "true" or "1", enables Twilio Lookup v2 line-type checks (see twilio-lookup.server.ts). Off by default. */
+  TWILIO_LOOKUP_ENABLED: () => getEnv('TWILIO_LOOKUP_ENABLED'),
+  /** Secret used to sign media-stream WebSocket tokens. Dev-only fallback; must be set in production. */
+  MEDIA_STREAM_SECRET: () => {
+    const value = getEnv('MEDIA_STREAM_SECRET');
+    if (value) {
+      return value;
+    }
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'MEDIA_STREAM_SECRET must be set in production — refusing to sign media-stream tokens with the dev fallback secret.',
+      );
+    }
+    return 'dev-media-stream-secret-change-me';
+  },
   /** Public host of the media-stream Bun service. Defaults to localhost:3001 for dev. */
   MEDIA_STREAM_HOST: () => getEnv('MEDIA_STREAM_HOST') ?? 'localhost:3001',
 } as const;

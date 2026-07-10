@@ -1,10 +1,14 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 const twilioDataMocks = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
   loadError: null as Error | null,
   persistError: null as Error | null,
   persistCalls: [] as unknown[],
+}));
+
+const rcsFlagMock = vi.hoisted(() => ({
+  enabled: true,
 }));
 
 vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
@@ -20,6 +24,15 @@ vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
     }
     twilioDataMocks.persistCalls.push(data);
   }),
+}));
+
+// The real flag defaults to enabled now that RCS onboarding has shipped. Individual
+// tests can flip `rcsFlagMock.enabled` to exercise the disabled (kill-switch) path.
+vi.mock("@/lib/rcs-onboarding-flags", () => ({
+  get RCS_ONBOARDING_ENABLED() {
+    return rcsFlagMock.enabled;
+  },
+  isRcsOnboardingEnabled: () => rcsFlagMock.enabled,
 }));
 
 import {
@@ -46,7 +59,20 @@ function configureTwilioData(
 }
 
 describe("RCS onboarding helpers", () => {
+  afterEach(() => {
+    rcsFlagMock.enabled = true;
+  });
+
+  test("stripDisabledRcsChannel keeps rcs while workspace onboarding is enabled", () => {
+    expect(stripDisabledRcsChannel(["a2p10dlc", "rcs", "voice_compliance"])).toEqual([
+      "a2p10dlc",
+      "rcs",
+      "voice_compliance",
+    ]);
+  });
+
   test("stripDisabledRcsChannel removes rcs while workspace onboarding is disabled", () => {
+    rcsFlagMock.enabled = false;
     expect(stripDisabledRcsChannel(["a2p10dlc", "rcs", "voice_compliance"])).toEqual([
       "a2p10dlc",
       "voice_compliance",
@@ -54,6 +80,7 @@ describe("RCS onboarding helpers", () => {
   });
 
   test("hydrateWorkspaceRcsOnboardingState is a no-op when RCS onboarding is disabled", () => {
+    rcsFlagMock.enabled = false;
     const input = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       {
@@ -72,6 +99,24 @@ describe("RCS onboarding helpers", () => {
     expect(hydrated.messagingService.supportedChannels).toEqual(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService.supportedChannels,
     );
+  });
+
+  test("hydrateWorkspaceRcsOnboardingState hydrates when RCS onboarding is enabled", () => {
+    const input = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        selectedChannels: ["rcs"],
+        businessProfile: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.businessProfile,
+          legalBusinessName: "Acme Health",
+        },
+      },
+    );
+
+    const hydrated = hydrateWorkspaceRcsOnboardingState(input);
+
+    expect(hydrated).not.toBe(input);
+    expect(hydrated.rcs.displayName).toBe("Acme Health");
   });
 
   test("hydrates the RCS draft from saved business details", () => {

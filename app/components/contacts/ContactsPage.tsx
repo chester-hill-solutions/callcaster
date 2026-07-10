@@ -4,9 +4,11 @@ import { Search, X } from "lucide-react";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Heading } from "@/components/ui/typography";
+import { Heading, Text } from "@/components/ui/typography";
 import type { ContactsLoaderData } from "@/lib/contacts-loader.types";
 import { formatDateToLocale } from "@/lib/utils";
 
@@ -147,19 +149,47 @@ export default function ContactsPage() {
           )}
 
           {error && !isWorkspaceEmpty && (
-            <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
-              {error}
-            </h4>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
           {isWorkspaceEmpty && (
-            <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-foreground">
-              Add Your Own Contacts to this Workspace!
-            </h4>
+            <div className="flex items-center justify-center py-16">
+              <Card className="w-full max-w-md">
+                <CardHeader className="items-center gap-2 text-center">
+                  <Heading as="h2" level={3} branded={false}>
+                    Add Your Own Contacts to this Workspace!
+                  </Heading>
+                  <Text variant="muted" className="max-w-sm">
+                    Contacts are the people you call and text. Add one
+                    manually or import an audience CSV.
+                  </Text>
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      asChild
+                      className="font-Zilla-Slab text-base font-semibold"
+                    >
+                      <Link to={`./new`}>Add Contact</Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+              </Card>
+            </div>
           )}
       {isSearchEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-foreground">
-          No contacts found matching "{searchTerm}"
-        </h4>
+        <div className="flex items-center justify-center py-16">
+          <Card className="w-full max-w-md">
+            <CardHeader className="items-center gap-2 text-center">
+              <Heading as="h2" level={3} branded={false}>
+                No contacts found
+              </Heading>
+              <Text variant="muted" className="max-w-sm">
+                No contacts match &quot;{searchTerm}&quot;. Try a different
+                search term.
+              </Text>
+            </CardHeader>
+          </Card>
+        </div>
       )}
 
       {(contacts?.length ?? 0) > 0 && (

@@ -26,13 +26,13 @@ describe("app/components/audience/AudienceForm.tsx", () => {
 
     const nameInput = screen.getByPlaceholderText("Audience Name") as HTMLInputElement;
     expect(nameInput.value).toBe("");
-    expect(screen.getByRole("button", { name: "SAVE" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
     fireEvent.change(nameInput, { target: { value: "My Audience" } });
-    expect(screen.getByRole("button", { name: "SAVE" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
     // cover value.length === 0 branch (does not clear error)
     fireEvent.change(nameInput, { target: { value: "" } });
-    expect(screen.getByRole("button", { name: "SAVE" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     fireEvent.change(nameInput, { target: { value: "My Audience" } });
 
     fireEvent.submit(nameInput.closest("form") as HTMLFormElement);

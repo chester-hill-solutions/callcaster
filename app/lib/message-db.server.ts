@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, lt, ne, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, lt, or } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -19,7 +19,6 @@ export async function fetchMessagePageForContact(
   const rows = (await tdb.message.findMany({
     where: and(
       isNotNull(messageTable.date_created),
-      ne(messageTable.status, "failed"),
       or(eq(messageTable.from, contactFilter), eq(messageTable.to, contactFilter)),
       ...(before ? [lt(messageTable.date_created, before)] : []),
     ),
@@ -61,6 +60,38 @@ export async function markMessageAsDeliveredBySid(
   });
 }
 
+/**
+ * Count distinct "other side" phone numbers seen across a conversation's
+ * messages (i.e. how many different workspace numbers have texted this
+ * contact). Used to show a "used multiple of your numbers" banner. Reuses
+ * the same from/to exact-match filter as fetchMessagePageForContact so it
+ * only counts messages actually shown in the thread.
+ */
+export async function countDistinctNumbersForConversation(
+  workspaceId: string,
+  contactFilter: string,
+  options?: { tdb?: TenantDb },
+): Promise<number> {
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  const rows = (await tdb.message.findMany({
+    where: and(
+      isNotNull(messageTable.date_created),
+      or(eq(messageTable.from, contactFilter), eq(messageTable.to, contactFilter)),
+    ),
+    columns: { from: true, to: true },
+  })) as Array<{ from: string | null; to: string | null }>;
+
+  const otherNumbers = new Set<string>();
+  for (const row of rows) {
+    const other = row.from === contactFilter ? row.to : row.from;
+    if (other) {
+      otherNumbers.add(other);
+    }
+  }
+
+  return otherNumbers.size;
+}
+
 export async function fetchLatestMessageForPhone(
   workspaceId: string,
   phone: string,
@@ -70,7 +101,6 @@ export async function fetchLatestMessageForPhone(
   const rows = (await tdb.message.findMany({
     where: and(
       isNotNull(messageTable.date_created),
-      ne(messageTable.status, "failed"),
       or(eq(messageTable.from, phone), eq(messageTable.to, phone)),
     ),
     orderBy: [desc(messageTable.date_created)],

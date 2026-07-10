@@ -24,9 +24,9 @@ type OutletContext = {
 };
 
 const STATUS_OPTIONS: { value: AgentState; label: string; color: string }[] = [
-  { value: "available", label: "Available", color: "bg-green-500" },
-  { value: "away", label: "Away", color: "bg-amber-500" },
-  { value: "offline", label: "Offline", color: "bg-gray-400" },
+  { value: "available", label: "Available", color: "bg-success" },
+  { value: "away", label: "Away", color: "bg-warning" },
+  { value: "offline", label: "Offline", color: "bg-muted-foreground" },
 ];
 
 const STATUS_REASONS: Record<string, string[]> = {
@@ -304,10 +304,10 @@ function StatusBar({
           <div
             className={`h-3 w-3 rounded-full ${
               currentState === "available"
-                ? "bg-green-500"
+                ? "bg-success"
                 : currentState === "away"
-                  ? "bg-amber-500"
-                  : "bg-gray-400"
+                  ? "bg-warning"
+                  : "bg-muted-foreground"
             }`}
           />
           <span className="text-sm font-medium capitalize">

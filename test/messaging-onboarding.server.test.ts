@@ -12,6 +12,14 @@ vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
   persistWorkspaceTwilioData: (...args: unknown[]) => twilioDataMocks.persist(...args),
 }));
 
+// These cases document the pre-RCS (flag-off) behavior; the flag-on paths are
+// covered by test/rcs-onboarding.server.test.ts. Pin the flag so flipping the
+// production default doesn't rewrite this suite's meaning.
+vi.mock("@/lib/rcs-onboarding-flags", () => ({
+  RCS_ONBOARDING_ENABLED: false,
+  isRcsOnboardingEnabled: () => false,
+}));
+
 import {
   applyWorkspaceOnboardingChannelPolicy,
   buildOnboardingStepsForState,
@@ -30,10 +38,10 @@ describe("messaging onboarding helpers", () => {
   test("normalizes a complete default onboarding state", () => {
     const state = normalizeWorkspaceMessagingOnboardingState(null);
 
-    expect(state.selectedChannels).toEqual(["a2p10dlc", "voice_compliance"]);
+    expect(state.selectedChannels).toEqual([]);
     expect(state.messagingService.desiredSendMode).toBe("messaging_service");
     expect(state.emergencyVoice.address.status).toBe("not_started");
-    expect(state.steps).toHaveLength(7);
+    expect(state.steps).toHaveLength(6);
     expect(state.steps.some((step) => step.id === "first_number")).toBe(true);
   });
 
@@ -62,6 +70,24 @@ describe("messaging onboarding helpers", () => {
     expect(legacyWorkspaceReadiness.warnings).toContain(
       "Only verified caller IDs are present. Outbound is supported, but inbound SMS and calls require a rented number.",
     );
+  });
+
+  test("does not redirect a workspace with real message history but zero current numbers", () => {
+    // Regression test: a workspace that has released/lost its numbers but has
+    // genuine outbound message history should still be classified as legacy
+    // (and therefore not force-redirected into onboarding), matching the
+    // "real message history but zero current numbers" bug this guards
+    // against.
+    const state = normalizeWorkspaceMessagingOnboardingState(null);
+
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding: state,
+      workspaceNumbers: [],
+      recentOutboundCount: 12,
+    });
+
+    expect(readiness.legacyMode).toBe(true);
+    expect(readiness.shouldRedirectToOnboarding).toBe(false);
   });
 
   test("counts verified caller IDs as first-number readiness", () => {
@@ -172,12 +198,12 @@ describe("messaging onboarding helpers", () => {
 
     expect(malformed.status).toBe("not_started");
     expect(malformed.selectedChannels).toEqual(["rcs"]);
-    expect(malformed.steps).toHaveLength(7);
+    expect(malformed.steps).toHaveLength(6);
     expect(malformed.messagingService.desiredSendMode).toBe("from_number");
     expect(malformed.messagingService.stickySenderEnabled).toBe(true);
     expect(malformed.subaccountBootstrap.authMode).toBe("mixed");
     expect(malformed.emergencyVoice.enabled).toBe(false);
-    expect(malformed.emergencyVoice.address.countryCode).toBe("US");
+    expect(malformed.emergencyVoice.address.countryCode).toBe("CA");
     expect(malformed.a2p10dlc.status).toBe("not_started");
     expect(malformed.rcs.status).toBe("not_started");
     expect(malformed.reviewState.blockingIssues).toEqual(["ok"]);
@@ -191,10 +217,7 @@ describe("messaging onboarding helpers", () => {
     );
 
     expect(fromNull.currentStep).toBe("business_profile");
-    expect(fromPrimitive.selectedChannels).toEqual([
-      "a2p10dlc",
-      "voice_compliance",
-    ]);
+    expect(fromPrimitive.selectedChannels).toEqual([]);
   });
 
   test("mergeWorkspaceMessagingOnboardingState preserves nested arrays unless overridden", () => {
@@ -357,7 +380,7 @@ describe("messaging onboarding helpers", () => {
       steps: legacySteps,
     });
 
-    expect(normalized.steps).toHaveLength(7);
+    expect(normalized.steps).toHaveLength(6);
     expect(normalized.steps.find((step) => step.id === "first_number")?.label).toBe(
       "Your first number",
     );
@@ -419,6 +442,8 @@ describe("messaging onboarding helpers", () => {
     const state = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       {
+        operatingCountry: "US",
+        selectedChannels: ["a2p10dlc"],
         messagingService: {
           ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
           serviceSid: "MG123",

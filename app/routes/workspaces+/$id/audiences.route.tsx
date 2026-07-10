@@ -1,12 +1,15 @@
 export { loader } from "./audiences.loader.server";
 
 import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import type { MetaFunction } from "react-router";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { audienceColumns } from "@/components/workspace/tables/columns";
 import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
 
 import type { ContextType } from "@/lib/types";
+
+export const meta: MetaFunction = () => [{ title: "Audiences — CallCaster" }];
 
 export default function WorkspaceAudiencesPage() {
   const outlet = useOutlet();
@@ -30,6 +33,7 @@ export default function WorkspaceAudiencesPage() {
       error={error}
       isEmpty={isWorkspaceAudienceEmpty}
       emptyMessage="Add An Audience To This Workspace"
+      emptyDescription="Audiences are the contact lists your campaigns dial and message. Upload a CSV or build one from your contacts."
       addAction={
         <Button asChild className="font-Zilla-Slab text-lg font-semibold">
           <Link to="./new">Add Audience</Link>
@@ -46,3 +50,5 @@ export default function WorkspaceAudiencesPage() {
     </WorkspaceResourceListShell>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

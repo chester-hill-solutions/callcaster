@@ -2,6 +2,8 @@ import React from "react";
 import { NavLink, useLocation } from "react-router";
 import {
   BarChart3,
+  BookUser,
+  ClipboardList,
   CreditCard,
   FileText,
   Headset,
@@ -12,6 +14,7 @@ import {
   Upload,
   Users,
   AudioLines,
+  Voicemail,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,8 +26,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useUnreadConversationsCount } from "@/hooks/chats/useUnreadConversationsCount";
 import { MemberRole } from "./TeamMember";
 import { workspacePanelHeightClass } from "./workspace-panel-classes";
+
+function formatUnreadBadgeCount(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
 
 interface NavItem {
   name: string;
@@ -57,11 +65,14 @@ const NAV_ITEMS: NavItem[] = [
   },
   { name: "Chats", path: "chats", icon: MessageSquare },
   { name: "Calls", path: "calls", icon: Phone },
+  { name: "Voicemails", path: "voicemails", icon: Voicemail },
   { name: "Analytics", path: "analytics", icon: BarChart3 },
   { name: "Handset", path: "handset", icon: Headset },
   { name: "Scripts", path: "scripts", callerHidden: true, icon: FileText },
+  { name: "Surveys", path: "surveys", callerHidden: true, icon: ClipboardList },
   { name: "Audio", path: "audios", callerHidden: true, icon: AudioLines },
   { name: "Audiences", path: "audiences", callerHidden: true, icon: Users },
+  { name: "Contacts", path: "contacts", callerHidden: true, icon: BookUser },
   { name: "Exports", path: "exports", callerHidden: true, icon: Upload },
 ];
 
@@ -87,6 +98,7 @@ const WorkspaceNav = ({
   className = "",
 }: WorkspaceNavProps) => {
   const location = useLocation();
+  const unreadChatsCount = useUnreadConversationsCount(workspace.id);
   const userIsCaller = userRole === MemberRole.Caller;
   const isAdmin =
     userRole === MemberRole.Admin || userRole === MemberRole.Owner;
@@ -198,6 +210,14 @@ const WorkspaceNav = ({
                 >
                   <Icon className="h-5 w-5" />
                   <span>{item.name}</span>
+                  {item.name === "Chats" && unreadChatsCount > 0 ? (
+                    <span
+                      data-testid="chats-unread-badge"
+                      className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                    >
+                      {formatUnreadBadgeCount(unreadChatsCount)}
+                    </span>
+                  ) : null}
                 </NavLink>
                 {campaignSubItems.length > 0 && showCampaignSubNav ? (
                   <div className="ml-4 space-y-1 border-l border-border/70 pl-3">

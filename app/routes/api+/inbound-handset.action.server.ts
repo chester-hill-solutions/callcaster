@@ -5,48 +5,67 @@ import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+/** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
+ * hears a graceful message instead of an HTML error page. */
+function handsetUnavailableTwiml(): Response {
   const twiml = new Twilio.twiml.VoiceResponse();
-  const formData = await request.clone().formData();
-  const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const called = params.Called?.trim() ?? "";
-
-  const forbidden = await requireTwilioSignature(request, { phoneNumber: called });
-  if (forbidden) return forbidden;
-
-  if (!called) {
-    logger.debug("Inbound handset: missing called number", { called });
-    twiml.say("This number is not configured for handset.");
-    twiml.hangup();
-    return new Response(twiml.toString(), {
-      headers: { "Content-Type": "text/xml" },
-    });
-  }
-
-  const numberRow = await findWorkspaceNumberByPhoneNumber(called);
-  if (!numberRow?.handset_enabled) {
-    logger.debug("Inbound handset: number not handset-enabled", { called });
-    twiml.say("This number is not configured for handset.");
-    twiml.hangup();
-    return new Response(twiml.toString(), {
-      headers: { "Content-Type": "text/xml" },
-    });
-  }
-
-  const workspaceId = numberRow.workspaceId;
-  const clientIdentity = await findActiveHandsetSessionClientIdentity(workspaceId);
-
-  if (!clientIdentity) {
-    twiml.say("No one is available to take your call. Please try again later.");
-    twiml.hangup();
-    return new Response(twiml.toString(), {
-      headers: { "Content-Type": "text/xml" },
-    });
-  }
-
-  twiml.dial().client(clientIdentity);
-
+  twiml.say("We're unable to take your call right now. Please try again later.");
+  twiml.hangup();
   return new Response(twiml.toString(), {
+    status: 200,
     headers: { "Content-Type": "text/xml" },
   });
+}
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+  try {
+    const twiml = new Twilio.twiml.VoiceResponse();
+    const formData = await request.clone().formData();
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const called = params.Called?.trim() ?? "";
+
+    const forbidden = await requireTwilioSignature(request, { phoneNumber: called });
+    if (forbidden) return forbidden;
+
+    if (!called) {
+      logger.debug("Inbound handset: missing called number", { called });
+      twiml.say("This number is not configured for handset.");
+      twiml.hangup();
+      return new Response(twiml.toString(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    const numberRow = await findWorkspaceNumberByPhoneNumber(called);
+    if (!numberRow?.handset_enabled) {
+      logger.debug("Inbound handset: number not handset-enabled", { called });
+      twiml.say("This number is not configured for handset.");
+      twiml.hangup();
+      return new Response(twiml.toString(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    const workspaceId = numberRow.workspaceId;
+    const clientIdentity = await findActiveHandsetSessionClientIdentity(workspaceId);
+
+    if (!clientIdentity) {
+      twiml.say("No one is available to take your call. Please try again later.");
+      twiml.hangup();
+      return new Response(twiml.toString(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    twiml.dial().client(clientIdentity);
+
+    return new Response(twiml.toString(), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  } catch (error) {
+    logger.error("Unhandled error in api.inbound-handset", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return handsetUnavailableTwiml();
+  }
 };

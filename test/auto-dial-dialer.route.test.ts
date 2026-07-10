@@ -49,9 +49,11 @@ vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 const testState = vi.hoisted(() => ({ client: null as any }));
 
 const claimNextQueueContactMock = vi.hoisted(() => vi.fn());
+const requeueCampaignQueueByIdMock = vi.hoisted(() => vi.fn(async () => []));
 
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
+  requeueCampaignQueueById: (...args: unknown[]) => requeueCampaignQueueByIdMock(...args),
 }));
 
 vi.mock("@/lib/db-rpc.server", () => ({
@@ -94,6 +96,8 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     mocks.callInsert.mockResolvedValue([]);
     mocks.callUpdate.mockResolvedValue([]);
     claimNextQueueContactMock.mockReset();
+    requeueCampaignQueueByIdMock.mockReset();
+    requeueCampaignQueueByIdMock.mockResolvedValue([]);
     vi.resetModules();
   });
 
@@ -415,6 +419,55 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
     await expect(res2.json()).resolves.toEqual({ success: true, message: "No queued contacts" });
     expect(twilioCallsCreate).toHaveBeenCalledTimes(1);
     expect(claimNextQueueContactMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("queue wedge fix: releases the claimed contact back to queued when the Twilio call fails", async () => {
+    const client = makeDbClient();
+    testState.client = client;
+
+    claimNextQueueContactMock.mockResolvedValueOnce({
+      queue_id: 7,
+      contact_id: 2,
+      contact_phone: "+15555550100",
+      caller_id: "+15551234567",
+    });
+
+    client.rpc.mockImplementation(async (fn: string) => {
+      if (fn === "create_outreach_attempt") return { data: 99, error: null };
+      throw new Error(`unexpected rpc ${fn}`);
+    });
+
+    mocks.createClient.mockReturnValueOnce(client);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      user_id: "u1",
+      campaign_id: 1,
+      workspace_id: "w1",
+      selected_device: "computer",
+      conference_id: "conf-session",
+    });
+
+    const twilioCallsCreate = vi.fn(async () => {
+      throw new Error("Twilio API unavailable");
+    });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      calls: { create: twilioCallsCreate },
+      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
+    });
+
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://localhost/api/auto-dial/dialer", { method: "POST" }),
+    } as any));
+
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "Twilio API unavailable",
+    });
+    // Regression guard: the claimed campaign_queue row must be released back
+    // to `queued` when the Twilio call never gets placed — otherwise the
+    // contact is stuck "assigned" forever and the predictive dialer's queue
+    // wedges. See app/lib/campaign-queue-db.server.ts:requeueCampaignQueueById.
+    expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(7, "w1");
   });
 });
 

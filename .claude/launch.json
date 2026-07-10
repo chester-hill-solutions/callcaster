@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "callcaster-e2e-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/e2e/start-e2e-server.mjs"],
+      "port": 3100,
+      "env": {
+        "DATABASE_URL": "postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster"
+      }
+    }
+  ]
+}

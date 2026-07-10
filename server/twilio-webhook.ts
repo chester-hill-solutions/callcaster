@@ -48,7 +48,7 @@ async function readRawBody(request: Request): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   let size = 0;
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     if (!value) continue;

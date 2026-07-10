@@ -136,6 +136,7 @@ export const CampaignBasicInfo = ({
               type="button"
               variant={state === "Active" ? "default" : "outline"}
               size="icon"
+              aria-label={tooltip}
               onClick={(e) => {
                 e.preventDefault();
                 if (type === "duplicate") {

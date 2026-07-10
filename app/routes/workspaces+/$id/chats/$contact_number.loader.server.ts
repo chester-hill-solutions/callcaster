@@ -1,7 +1,10 @@
 import { data as routeData } from "react-router";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { markReceivedMessagesAsDeliveredForPhone } from "@/lib/message-db.server";
+import {
+  countDistinctNumbersForConversation,
+  markReceivedMessagesAsDeliveredForPhone,
+} from "@/lib/message-db.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { verifyAuth } from "@/lib/auth.server";
@@ -19,6 +22,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   let hasMore = false;
   let normalizedNumber: string | null = null;
   let optOutKeywords = parseOptOutKeywords(null);
+  let multipleNumbersUsed = false;
 
   if (id) {
     try {
@@ -64,6 +68,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         logger.error("Error marking messages as read:", error);
       }
     }
+
+    // Only computed on the initial page load (not on "load older" pagination
+    // fetches) to keep this cheap.
+    if (contactFilter && id && !before) {
+      try {
+        const distinctNumbers = await countDistinctNumbersForConversation(
+          id,
+          contactFilter,
+          { tdb: tdb ?? undefined },
+        );
+        multipleNumbersUsed = distinctNumbers > 1;
+      } catch (error) {
+        logger.error("Error counting distinct numbers for conversation:", error);
+      }
+    }
   }
 
   return routeData(
@@ -72,6 +91,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       hasMore,
       contact_number: normalizedNumber || contact_number,
       optOutKeywords,
+      multipleNumbersUsed,
     },
     { headers },
   );

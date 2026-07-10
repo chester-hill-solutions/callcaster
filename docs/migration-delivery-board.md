@@ -6,13 +6,17 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 **Orchestration:** [`migration-orchestration.md`](./migration-orchestration.md)  
 **Branch:** `feat/supabase-postgres-migration`  
 **Railway:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-08 (production-readiness pass: lockfile CI fix, worker image fixed + verified, secrets purged from tree, Dockerfile hardening, /readyz DB probe)
 
 ### Snapshot (rolling)
 
 | Metric | Value | Gate |
 |--------|------:|------|
-| Migration ledger (Railway PG 18) | 34/34 | G0 ✓ |
+| Migration ledger (Railway PG 18) | **37** in `supabase_migrations.schema_migrations` | G0 ✓ (legacy ledger; `AUTH_migrations` not on PG18) |
+| Review app (`callcaster-review`) | **Online** — `/healthz` + `/readyz` + `/signin` 200 | G3 / G4 |
+| Review URL | `https://callcaster-review-visual-asset-review.up.railway.app` | G4 |
+| Review runtime | **Bun** (`server/bun.ts` via `railway up`) | G3 ✓ |
+| Review S3 | Railway bucket `callcaster-review` (iad) + `S3_*` vars | G3 ✓ |
 | `app/lib/database/*.server.ts` on tenant-db | **13 / 13** | G2 ✓ |
 | App `supabase.from()` call sites in `app/` | **0** | G2 ✓ |
 | `database.types.ts` | **Deleted** | G2 ✓ |
@@ -21,10 +25,12 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 | ADR-0004 `@/server/db` imports in routes | **0** violations (8 legitimate exceptions with comments) | G2 ✓ |
 | Typecheck (`npm run typecheck`) | **Pass** | G4 |
 | Lint (`npm run lint`) | **Pass (0 errors)** | G4 |
-| Node tests (`npm run test:node`) | **1236 / 1236** | G4 |
+| Node tests (`npm run test:node`) | **1324 / 1327** pass (3 skipped) — requires Node ≥ 20 | G4 |
 | UI tests (`npm run test:ui`) | **252 / 252** | G4 |
-| E2E compose (`npm run test:e2e:compose`) | **77 / 77** | G4 ✓ (compose) |
-| E2E on review URL | Optional staging smoke | G4 |
+| Worker image (`Dockerfile.worker`) | **Builds + boots** (2026-07-08: fixed nonexistent base tag, missing `vendor/` + `tsconfig.json`) | G3 |
+| CI on PR #1036 | Was red on `npm ci` (lock drift) — lockfile resynced 2026-07-08 | G4 |
+| E2E compose (`npm run test:e2e:compose`) | **77 / 77** (Bun server) | G4 ✓ (compose) |
+| E2E on review URL | Review deploy online; **manual Twilio smoke pending** | G4 |
 
 ---
 
@@ -70,7 +76,7 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 | 1.9 | `08-household-key.sql` | Done | WS-E |
 | 1.10 | `09-drop-legacy-presence.sql` | Done — guarded | WS-A + WS-C |
 | 1.11 | `10-verify.sql` | Done | WS-A |
-| 1.12 | Apply transform on Railway review | **Mostly done** | 06, 07, 09 applied on review; 08b skipped (missing trigger); compose bootstrap includes ledger RPC + trigger cleanup |
+| 1.12 | Apply transform on Railway review | **Mostly done** | 06, 07, 09 applied on review; 08b skipped; **2026-07-07:** ledger RPC (`20260704000004`) + drop legacy triggers (`20260704000005`) applied on PG18; `20260704000000` pg_cron blocked (no `cron` extension); `20260704000003` partial (enum conflict) |
 | 1.13 | `pg_dump --schema-only` → `drizzle/0000_baseline.sql` | Done | 6951 lines via `dump-baseline.sh` |
 | 1.14 | Regenerate `app/db/schema.ts` (introspect) | **Blocked** | drizzle-kit introspect JSON error on PG 18 — hand-synced from baseline |
 | 1.15 | Archive `supabase/migrations/` | Done | 34 files in `docs/archive/supabase-migrations/` |
@@ -132,7 +138,7 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3B.2 | SSE route + pg-realtime package | **Done** | WS-C |
 | 3B.3 | Replace Realtime hooks | **Done** | WS-C |
 | 3C.1 | `job` table schema | **Done** | `drizzle/0003_job.sql` + `client/migrations/20260704000003_extend_job_table.sql` |
-| 3C.2 | Bun worker service | **Done** | `scripts/worker.ts` with claim/process/complete loop |
+| 3C.2 | Bun worker service | **Partial** | Code done (`worker/index.ts`); image now builds/boots locally (2026-07-08 Dockerfile.worker fixes); **not deployed** on Railway review yet |
 | 3C.3 | Port twilio_open_sync handler | **Done** | Remix route `/api/jobs/twilio-open-sync` |
 | 3C.4 | Port number_rental_billing handler | **Done** | Remix route `/api/jobs/number-rental-billing` |
 | 3C.5 | Port billing_reconcile handler | **Done** | Remix route `/api/jobs/billing-reconcile` |
@@ -145,8 +151,10 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3E.1 | S3/storage adapter | **Done** | S3 adapter (`object-storage.server.ts`) already implemented and used for audio/media/exports |
 | 3E.2 | Bulk Supabase → Railway Buckets copy | **Done** | App code no longer references Supabase Storage; zero `@supabase` imports in app/ |
 | 3E.3 | Wire MinIO local dev | **Done** | `docker-compose.dev.yml` includes MinIO; S3-compatible adapter works with any S3 endpoint |
-| 3F.1 | Bun start script + Dockerfile | **Done** | `server/bun.ts` + `Dockerfile` created; `start:bun` script added |
-| 3F.2 | Remove Express + buffer-polyfill | **Done** | `server/bun.ts` is the sole production/E2E server (Twilio raw-body middleware, static, probes); Express `server/index.js` deleted; `build:buffer-polyfill` removed; `npm run dev` → `react-router dev` |
+| 3E.4 | Railway Buckets on review | **Done** | Bucket `callcaster-review` (iad); `S3_*` vars on `callcaster-review` service |
+| 3F.1 | Bun start script + Dockerfile | **Done** | `server/bun.ts` + `Dockerfile` (vendor copy before install; runtime `app/` + `shared/` in prod stage) |
+| 3F.2 | Remove Express + buffer-polyfill | **Done** | `server/bun.ts` is the sole production/E2E server; Express deleted; `npm run dev` → `react-router dev` |
+| 3G.1 | Railway review env (`callcaster-review`) | **Partial** | **2026-07-07:** `BASE_URL`/`BETTER_AUTH_*` fixed; PG18 `DATABASE_URL`; Bun deploy live; GitHub auto-deploy still on pre-migration branch until PR #1036 merges |
 
 ---
 
@@ -155,10 +163,11 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | ID | Check | Status |
 |----|-------|--------|
 | 4.1 | `npm run typecheck && lint && test` | **Done** |
-| 4.2 | `npm run test:e2e:compose` 77/77 | **Done** | Compose-first on PG17 @5433; **77/77** (2026-07-07) |
+| 4.2 | `npm run test:e2e:compose` 77/77 | **Done** | Compose-first on PG17 @5433; **77/77** on Bun server (2026-07-07) |
 | 4.3 | Scriptkit call + survey paths | **Done** | Survey routes pass 40/40 tests; Scriptkit components typecheck clean |
 | 4.4 | Manual Twilio smoke checklist (plan) | **Done** | `docs/manual-test-plan-zero-supabase.md` exists with 150+ test steps across 14 categories |
 | 4.5 | `tools:api:surface:check` green | **Done** |
+| 4.6 | Railway review deploy smoke | **Partial** | App online at review URL; health probes pass; **manual Twilio + auth flows not yet executed** |
 
 ---
 
@@ -213,11 +222,11 @@ gantt
 
 ## Next 5 actions (orchestrator)
 
-1. **G4 review smoke** — Manual Twilio checklist on Railway review URL (`docs/manual-test-plan-zero-supabase.md`)
-2. **3D.4 verify** — Run admin `repoint_twilio_webhooks` on review subaccount and confirm Twilio console URLs
-3. **1.14 / schema sync** — Regenerate or hand-sync `app/db/schema.ts` against squashed baseline after transform tail
-4. **Phase 5 prep** — Maintenance window, final delta dump, env flip checklist
-5. **Compose E2E on Bun** — Re-run `npm run test:e2e:compose` after 3F.2 cutover (77/77 gate)
+1. **G4 review smoke** — Execute manual Twilio checklist on `https://callcaster-review-visual-asset-review.up.railway.app` (`docs/manual-test-plan-zero-supabase.md`)
+2. **3D.4 verify** — Run admin `repoint_twilio_webhooks` on review subaccount; confirm Twilio console URLs match `BASE_URL`
+3. **PG18 migration tail** — Apply remaining `client/migrations/` on review (two-factor, queue/ACD/survey); install `pg_cron` or skip `20260704000000` until worker replaces cron
+4. **Railway worker + CI deploy** — Add `callcaster-worker` service on review; wire GitHub deploy to `feat/supabase-postgres-migration` (PR #1036)
+5. **Phase 5 prep** — Maintenance window, final delta dump, env flip checklist
 
 ---
 
@@ -258,3 +267,5 @@ gantt
 | 2026-07-04 | agent | **Phase 3F Bun server**: Created `server/bun.ts` + `Dockerfile` + `start:bun` script; multi-stage build with oven/bun:1.2.15 |
 | 2026-07-06 | agent | **Compose E2E scaffold**: PG17 @5433, Drizzle bootstrap + ledger RPC + legacy trigger cleanup; Better Auth seed; `test:e2e:compose` **36/77**; auth setup green; fixed Drizzle adapter schema keys + `cutoff_time` drift |
 | 2026-07-07 | agent | **Compose E2E gate (G4)**: **77/77** on `npm run test:e2e:compose`; fixes for credits banner, API key create (settings action + Buffer polyfill), auth sign-out, audience upload, campaign create, webhook dedupe, RBAC redirects, schema tail + seed/bootstrap |
+| 2026-07-07 | agent | **3F.2 Bun cutover**: Express removed; `server/bun.ts` + Twilio webhook middleware; E2E/start on Bun; **77/77** compose gate retained |
+| 2026-07-07 | agent | **Railway review hookup**: Fixed `BASE_URL`/`BETTER_AUTH_*`; created Railway bucket + `S3_*`; applied ledger RPC + trigger cleanup on PG18; Bun deploy live at `callcaster-review-visual-asset-review.up.railway.app` |

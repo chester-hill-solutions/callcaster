@@ -54,6 +54,7 @@ const ALLOWED_EXTENSIONS = new Set([
 function sanitizeFilename(filename: string) {
   const decoded = decodeURIComponent(filename);
   const sanitized = decoded
+    // eslint-disable-next-line no-control-regex -- strip control chars from user-supplied filenames
     .replace(/[\x00-\x1f\x7f]/g, "")
     .replace(/[\\/]/g, "_")
     .replace(/\.\./g, "_")

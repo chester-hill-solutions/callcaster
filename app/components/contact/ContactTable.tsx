@@ -119,10 +119,10 @@ const ContactTable: React.FC<ContactTableProps> = ({
     if (selectedContacts.length === 0) return null;
 
     return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+      <div className="bg-secondary border border-border rounded-lg p-4 mb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-blue-900">
+            <span className="text-sm font-medium text-secondary-foreground">
               {selectedContacts.length} contact{selectedContacts.length !== 1 ? 's' : ''} selected
             </span>
           </div>
@@ -130,10 +130,10 @@ const ContactTable: React.FC<ContactTableProps> = ({
             <Button
               onClick={handleBulkDelete}
               disabled={fetcher.state !== 'idle'}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              variant="destructive"
             >
               <Trash className="w-4 h-4 mr-2" />
-              Delete Selected
+              Delete selected
             </Button>
           </div>
         </div>
@@ -142,7 +142,7 @@ const ContactTable: React.FC<ContactTableProps> = ({
   };
 
   const TableHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+    <div className="bg-muted px-4 py-2 border-b border-border">
       {children}
     </div>
   );
@@ -151,20 +151,20 @@ const ContactTable: React.FC<ContactTableProps> = ({
     <div className="space-y-4">
       {renderBulkActionBar()}
       
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-card rounded-lg shadow">
         <TableHeader>
           <div className="flex items-center space-x-4">
             <input
               type="checkbox"
               checked={selectedContacts.length === contacts.length && contacts.length > 0}
               onChange={handleSelectAll}
-              className="rounded border-gray-300"
+              className="rounded border-input"
             />
             <span className="font-medium">Contacts ({contacts.length})</span>
           </div>
         </TableHeader>
 
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-border">
           {contacts.map((contact) => (
             <AudienceContactRow
               key={contact.id}
@@ -179,7 +179,7 @@ const ContactTable: React.FC<ContactTableProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-card rounded-lg shadow p-4">
         <h3 className="text-lg font-medium mb-4">Add New Contact</h3>
         <ContactForm
           isNew={true}

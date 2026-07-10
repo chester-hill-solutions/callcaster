@@ -8,6 +8,7 @@ import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { buildNumberPurchaseColumns } from "./NumberPurchase.columns";
 import { NumberPurchaseConfirmDialog } from "./NumberPurchase.ConfirmDialog";
+import { NumberPurchaseSuccessDialog } from "./NumberPurchase.SuccessDialog";
 import { NumberRentalCreditsAlert } from "./NumberRentalCreditsAlert";
 import {
   emptyMessageForMode,
@@ -39,6 +40,7 @@ export const NumberPurchase = ({
   const [filterSms, setFilterSms] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(null);
   const [lastQuery, setLastQuery] = useState("");
+  const [purchasedNumber, setPurchasedNumber] = useState<string | null>(null);
 
   const canAfford = hasCreditsForNumberRental(creditsBalance);
   const isSearching = fetcher.state !== "idle";
@@ -66,8 +68,12 @@ export const NumberPurchase = ({
         return `Number purchased: ${purchased?.friendly_name ?? purchased?.phone_number ?? "New number"}`;
       },
       getError: (data) => data?.error,
-      onSuccess: () => {
+      onSuccess: (data) => {
         setSelectedNumber(null);
+        const newPhoneNumber = data?.newNumber?.phone_number;
+        if (newPhoneNumber) {
+          setPurchasedNumber(newPhoneNumber);
+        }
         onPurchaseComplete?.();
       },
     },
@@ -136,6 +142,12 @@ export const NumberPurchase = ({
         canAfford={canAfford}
         billingLink={billingLink}
         purchaseFetcher={purchaseFetcher}
+      />
+
+      <NumberPurchaseSuccessDialog
+        phoneNumber={purchasedNumber}
+        onClose={() => setPurchasedNumber(null)}
+        workspaceId={workspaceId}
       />
     </div>
   );

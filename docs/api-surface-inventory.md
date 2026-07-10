@@ -58,6 +58,10 @@ Interactive specs:
 | `/api/inbound-sms` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound-sms.tsx` | `docs/api-webhooks.md` |  |
 | `/api/inbound-verification` | POST | Internal Trusted | internalOnly | no | `routes/api+/inbound-verification.tsx` | `docs/api-internal-unsupported.md` | Call-in verification TwiML; service role, no Twilio signature. |
 | `/api/inbound` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound.tsx` | `docs/api-webhooks.md` | Returns TwiML. |
+| `/api/jobs/low-credit-notify` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/low-credit-notify.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered low-credit email sweep; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
+| `/api/jobs/number-rental-billing` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/number-rental-billing.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered monthly number-rental billing; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
+| `/api/jobs/billing-reconcile` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/billing-reconcile.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered billing reconciliation snapshot; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
+| `/api/jobs/twilio-open-sync` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/twilio-open-sync.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered sync of open Twilio calls/messages; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
 | `/api/initiate-ivr` | POST | User API | sessionOnly | yes | `routes/api+/initiate-ivr.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/ivr` | POST | User API | sessionOnly | yes | `routes/api+/ivr.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/ivr/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/ivr/status.route.tsx` | `docs/api-webhooks.md` |  |
@@ -89,6 +93,8 @@ Interactive specs:
 | `/api/verify-pin-input` | POST | Internal Trusted | internalOnly | no | `routes/api+/verify-pin-input.tsx` | `docs/api-internal-unsupported.md` | Twilio gather callback; service role, no Twilio signature. |
 | `/api/workspace-api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspace-api-keys.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspace` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspace.tsx` | `docs/api-workspace-admin.md` |  |
+| `/api/twilio/trusthub/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/twilio/trusthub/status.route.tsx` | `docs/api-webhooks.md` | Trust Hub status_callback receiver; resolves workspace by customer-profile bundle SID and reconciles compliance status. |
+| `/api/twilio/a2p/events` | POST | Internal Trusted | internalOnly | no | `routes/api+/twilio/a2p/events.route.tsx` | `docs/api-internal-unsupported.md` | A2P Event Streams sink receiver (JSON body); sink-secret validation lands in Phase D. |
 | `/api/auth/register` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/register.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/token` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/token.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/refresh` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/refresh.route.tsx` | `docs/api-agent-quickstart.md` |  |
@@ -149,5 +155,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/audiences/:audienceId/uploads` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/workspaces/:workspaceId/events` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/events.route.tsx` | `docs/api-live-operations.md` | SSE stream for workspace events (activity log). |
 
-Total entries: **138**
+Total entries: **144**
 

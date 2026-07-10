@@ -231,29 +231,6 @@ export function matchesQueueStatusFilter(
   return getQueueDisplayState(value) === queueStatus;
 }
 
-export function applyQueueStatusFilter(
-  query: any,
-  queueStatus: QueueStatusFilter,
-): any {
-  if (queueStatus === "queued") {
-    return query.eq("queue_state", QUEUE_STATUS_QUEUED).is("dequeued_at", null);
-  }
-
-  if (queueStatus === "completed") {
-    return query.or(
-      `queue_state.eq.${QUEUE_STATUS_DEQUEUED},dequeued_at.not.is.null`,
-    );
-  }
-
-  if (queueStatus === "assigned") {
-    return query
-      .eq("queue_state", QUEUE_LIFECYCLE_ASSIGNED)
-      .is("dequeued_at", null);
-  }
-
-  return query.not("provider_status", "is", null).is("dequeued_at", null);
-}
-
 export function buildQueuedQueueUpdate(options?: {
   includeNormalizedFields?: boolean;
 }): Database["public"]["Tables"]["campaign_queue"]["Update"] {

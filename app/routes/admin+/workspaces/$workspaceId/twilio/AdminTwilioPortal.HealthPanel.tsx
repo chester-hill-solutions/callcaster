@@ -47,6 +47,13 @@ export function HealthPanel({ onboarding, syncSnapshot }: HealthPanelProps) {
               </Button>
             </Form>
             <Form method="post">
+              <input type="hidden" name="_action" value="attach_rcs_sender_pool" />
+              <Button variant="outline" type="submit" size="sm">
+                <Activity className="mr-2 h-4 w-4" />
+                Attach RCS sender to pool
+              </Button>
+            </Form>
+            <Form method="post">
               <input type="hidden" name="_action" value="sync_a2p_status" />
               <Button variant="outline" type="submit" size="sm">
                 Sync A2P status

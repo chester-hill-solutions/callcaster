@@ -9,6 +9,7 @@ import {
   getUserRole,
   getWorkspaceInfo,
   getWorkspacePhoneNumbers,
+  getWorkspaceUsers,
   requireWorkspaceAccess,
 } from "@/lib/database.server";
 import {
@@ -19,7 +20,11 @@ import {
 import { data as routeData, redirect } from "react-router";
 import { verifyAuth } from "@/lib/auth.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
+import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
+import { listObjects } from "@/lib/object-storage.server";
+import { createTenantDb } from "@/server/tenant-db";
 import type {
+  User,
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
@@ -35,6 +40,13 @@ export type OnboardingLoaderData = {
   phoneNumbers: Tables<"workspace_number">[] | null;
   creditsBalance: number;
   rcsBlockingIssues: string[];
+  // Phase G: lets OnboardingFirstNumberStep reuse NumbersTable's inbound
+  // routing/handset widgets for a just-rented number without leaving
+  // onboarding. Mirrors the data settings/numbers.loader.server.ts loads.
+  workspaceUsers: { id: string; username: string }[];
+  mediaNames: { id: number | string; name: string }[];
+  inboundQueues: { id: number; name: string }[];
+  scripts: { id: number; name: string }[];
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -55,13 +67,34 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       workspaceId,
     })
   )?.role;
-  const [{ data: workspaceInfo }, { data: phoneNumbers }, onboarding, creditsBalance] =
-    await Promise.all([
-      getWorkspaceInfo({ workspaceId }),
-      getWorkspacePhoneNumbers({ workspaceId }),
-      getWorkspaceMessagingOnboardingState({ workspaceId }),
-      getWorkspaceCredits(workspaceId),
-    ]);
+  const tdb = createTenantDb(workspaceId);
+  const [
+    { data: workspaceInfo },
+    { data: phoneNumbers },
+    onboarding,
+    creditsBalance,
+    recentOutboundCount,
+    { data: workspaceUsersData },
+    mediaNames,
+    inboundQueues,
+    scripts,
+  ] = await Promise.all([
+    getWorkspaceInfo({ workspaceId }),
+    getWorkspacePhoneNumbers({ workspaceId }),
+    getWorkspaceMessagingOnboardingState({ workspaceId }),
+    getWorkspaceCredits(workspaceId),
+    getWorkspaceRecentOutboundMessageCount({ workspaceId }),
+    getWorkspaceUsers({ workspaceId }),
+    listObjects("workspaceAudio", workspaceId),
+    tdb.inbound_queue.findMany({
+      columns: { id: true, name: true },
+      orderBy: (queue, { asc: ascFn }) => [ascFn(queue.name)],
+    }),
+    tdb.script.findMany({
+      columns: { id: true, name: true },
+      orderBy: (script, { asc: ascFn }) => [ascFn(script.name)],
+    }),
+  ]);
   const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
     hydrateWorkspaceRcsOnboardingState(applyWorkspaceOnboardingChannelPolicy(onboarding)),
     phoneNumbers ?? [],
@@ -78,7 +111,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       phone_number: number?.phone_number ?? null,
       capabilities: number?.capabilities ?? null,
     })),
-    recentOutboundCount: 0,
+    recentOutboundCount,
   });
 
   const requestUrl = new URL(request.url);
@@ -110,6 +143,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       phoneNumbers,
       creditsBalance: creditsBalance ?? 0,
       rcsBlockingIssues,
+      workspaceUsers: workspaceUsersData ?? [],
+      mediaNames,
+      inboundQueues,
+      scripts,
     },
     { headers },
   );

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     parseJsonBodyOrResponse: vi.fn(),
     processTemplateTags: vi.fn((body: string) => body),
+    getWorkspaceCreditsBalance: vi.fn(async () => 100),
     env: { BETTER_AUTH_URL: vi.fn(() => "http://client"), BASE_URL: vi.fn(() => "https://app.example") },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
@@ -65,6 +66,9 @@ vi.mock("@/lib/twilio-readiness.server", () => ({
 }));
 vi.mock("@/lib/twilio-client.server", () => ({
   withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+}));
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: (...args: any[]) => mocks.getWorkspaceCreditsBalance(...args),
 }));
 
 vi.mock("@/server/tenant-db", () => ({
@@ -137,6 +141,8 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockReset();
     mocks.parseJsonBodyOrResponse.mockReset();
     mocks.processTemplateTags.mockClear();
+    mocks.getWorkspaceCreditsBalance.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     mocks.env.BETTER_AUTH_URL.mockClear();
     mocks.logger.error.mockReset();
     tenantDbMocks.message.insert.mockReset();
@@ -383,7 +389,9 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         contact_id: "",
         user: null,
       }),
-    ).rejects.toThrow("Failed to send message");
+    ).rejects.toThrow(
+      "Something went wrong with the phone provider. If this continues, contact support.",
+    );
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
@@ -517,6 +525,43 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     expect(res.status).toBe(403);
   });
 
+  test("action returns 402 with creditsError when workspace balance is depleted", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(0);
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} });
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      to_number: "+15551234567",
+      workspace_id: TEST_WORKSPACE_ID,
+      contact_id: "",
+      caller_id: "+1555",
+      body: "hi",
+      media: "[]",
+    });
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({
+      creditsError: true,
+      error: "Insufficient credits",
+    });
+  });
+
+  test("action returns 402 with creditsError when workspace balance is unknown (fail closed)", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(null);
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} });
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      to_number: "+15551234567",
+      workspace_id: TEST_WORKSPACE_ID,
+      contact_id: "",
+      caller_id: "+1555",
+      body: "hi",
+      media: "[]",
+    });
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toMatchObject({ creditsError: true });
+  });
+
   test("action api_key success path uses authResult.client and user null; covers '+' not at start normalization", async () => {
     const client = makeDbClientStub({ webhookRows: [] });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client });
@@ -587,7 +632,9 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       contactRow: { firstname: "A" },
       webhookRows: [],
     });
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ firstname: "A" });
+    // Not mockResolvedValueOnce: the opt-out gate does its own contact lookup
+    // before the template-tag branch fetches the contact again.
+    tenantDbMocks.contact.findFirst.mockResolvedValue({ firstname: "A", opt_out: false });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+1 (555) 123-4567",

@@ -18,6 +18,9 @@ COPY . .
 # Build the application
 RUN bun run build
 
+# Prune devDependencies so the production stage ships runtime deps only
+RUN rm -rf node_modules && bun install --frozen-lockfile --production
+
 # ─── Production stage ─────────────────────────────────────────────────
 FROM oven/bun:1.2.15-slim AS production
 
@@ -28,17 +31,21 @@ ENV PORT=3000
 ENV HOST=0.0.0.0
 
 # Copy built assets and runtime source from builder
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/app ./app
-COPY --from=builder /app/shared ./shared
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+COPY --from=builder --chown=bun:bun /app/build ./build
+COPY --from=builder --chown=bun:bun /app/public ./public
+COPY --from=builder --chown=bun:bun /app/server ./server
+COPY --from=builder --chown=bun:bun /app/app ./app
+COPY --from=builder --chown=bun:bun /app/shared ./shared
+COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=builder --chown=bun:bun /app/package.json ./package.json
+# Bun resolves the "@/*" import alias from tsconfig paths at runtime
+COPY --from=builder --chown=bun:bun /app/tsconfig.json ./tsconfig.json
 
-# Health check
+USER bun
+
+# Health check (bun fetch — curl is not available in the slim image)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3000/healthz || exit 1
+  CMD bun -e "fetch(\`http://localhost:\${process.env.PORT || 3000}/healthz\`).then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 # Expose port
 EXPOSE 3000

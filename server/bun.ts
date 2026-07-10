@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
 import { isTwilioWebhookPath } from "./twilio-webhook-paths.ts";
+import { runBootSmokeChecks } from "../app/server/boot-checks.server.ts";
 type TwilioWebhookModule = typeof import("./twilio-webhook.ts");
 let twilioWebhookModule: TwilioWebhookModule | null = null;
 
@@ -39,6 +40,34 @@ export type ReadyState = {
 
 export function validateEnvironment(env = process.env) {
   validateRequiredEnv(env);
+
+  // BASE_URL drives every Twilio callback URL — a malformed or localhost value
+  // boots cleanly but silently breaks all inbound webhooks in production.
+  const baseUrl = env.BASE_URL ?? "";
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error(`BASE_URL is not a valid URL: "${baseUrl}"`);
+  }
+  if (env.NODE_ENV === "production" && env.E2E_TEST !== "1") {
+    const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
+    if (localHosts.has(parsed.hostname)) {
+      throw new Error(
+        `BASE_URL points at ${parsed.hostname} in production — Twilio cannot reach it. Set it to the public HTTPS URL.`,
+      );
+    }
+    if (parsed.protocol !== "https:") {
+      throw new Error(
+        `BASE_URL must be https:// in production (got ${parsed.protocol}//) — Twilio webhook signatures are computed over the exact URL.`,
+      );
+    }
+    if (!env.STRIPE_WEBHOOK_SECRET) {
+      // Not fatal (review envs run without Stripe), but this is the config gap
+      // where customers get charged and never receive credits.
+      log("error", "STRIPE_WEBHOOK_SECRET is not set in production — Stripe checkout webhooks will 503 and paid credits will NOT be granted");
+    }
+  }
 }
 
 export async function loadBuild(buildPath = BUILD_PATH) {
@@ -116,7 +145,17 @@ function finalizeResponse(response: Response, requestId: string) {
 }
 
 function resolveSafeFile(rootDir: string, urlPath: string): string | null {
-  const relativePath = urlPath.replace(/^\/+/, "");
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    return null;
+  }
+  if (decodedPath.includes("\0")) {
+    return null;
+  }
+
+  const relativePath = decodedPath.replace(/^\/+/, "");
   const filePath = path.normalize(path.join(rootDir, relativePath));
   const rootWithSep = `${rootDir}${path.sep}`;
 
@@ -173,7 +212,44 @@ async function serveStaticFile(
   });
 }
 
-function probeResponse(pathname: string, readyState: ReadyState): Response {
+const DB_PING_CACHE_MS = 10_000;
+
+type DbReadinessChecker = () => Promise<boolean>;
+
+function createDbReadinessChecker(): DbReadinessChecker {
+  let cache: { at: number; ok: boolean } | null = null;
+  let inflight: Promise<boolean> | null = null;
+
+  return () => {
+    if (cache && Date.now() - cache.at < DB_PING_CACHE_MS) {
+      return Promise.resolve(cache.ok);
+    }
+
+    inflight ??= (async () => {
+      try {
+        const { pingDatabase } = await import(
+          "../app/server/db-health.server.ts"
+        );
+        const ok = await pingDatabase();
+        cache = { at: Date.now(), ok };
+        return ok;
+      } catch {
+        cache = { at: Date.now(), ok: false };
+        return false;
+      } finally {
+        inflight = null;
+      }
+    })();
+
+    return inflight;
+  };
+}
+
+async function probeResponse(
+  pathname: string,
+  readyState: ReadyState,
+  checkDb: DbReadinessChecker | null,
+): Promise<Response> {
   if (pathname === "/healthz") {
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -181,12 +257,15 @@ function probeResponse(pathname: string, readyState: ReadyState): Response {
     });
   }
 
-  if (!readyState.buildReady || !readyState.acceptingTraffic) {
+  const dbReady = checkDb ? await checkDb() : true;
+
+  if (!readyState.buildReady || !readyState.acceptingTraffic || !dbReady) {
     return new Response(
       JSON.stringify({
         ok: false,
         buildReady: Boolean(readyState.buildReady),
         acceptingTraffic: Boolean(readyState.acceptingTraffic),
+        databaseReady: dbReady,
       }),
       {
         status: 503,
@@ -243,6 +322,9 @@ export async function createServer(options: CreateServerOptions = {}) {
   const requestHandler =
     options.requestHandler ?? createRequestHandler(build, "production");
   const serveBuildAssets = options.serveBuildAssets ?? true;
+  const dbReadinessChecker = options.skipDbHealthCheck
+    ? null
+    : createDbReadinessChecker();
 
   return Bun.serve({
     hostname: options.host ?? HOST,
@@ -255,7 +337,7 @@ export async function createServer(options: CreateServerOptions = {}) {
       try {
         if (pathname === "/healthz" || pathname === "/readyz") {
           const response = finalizeResponse(
-            probeResponse(pathname, readyState),
+            await probeResponse(pathname, readyState, dbReadinessChecker),
             logger.requestId,
           );
           logger.finish(response);
@@ -429,6 +511,13 @@ export async function startServer({
   gracefulShutdown(server, readyState);
 
   log("info", "server listening", { host, port });
+
+  // Fire-and-forget: never delays or blocks readiness, and never throws.
+  void runBootSmokeChecks(env).catch((error) => {
+    log("error", "boot smoke checks failed unexpectedly", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   return { server, readyState, shutdown: () => server.stop(true) };
 }

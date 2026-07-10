@@ -1,10 +1,11 @@
 import { getSession } from "@/lib/auth.server";
-import { createCampaign, deleteCampaign, parseActionRequest, requireWorkspaceAccess, updateCampaign } from "@/lib/database.server";
+import { createCampaign, deleteCampaign, parseActionRequest, requireWorkspaceAccess, updateCampaign, updateOrCopyScript } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
 import { parseJsonField } from "@/lib/parse-utils.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";
+import type { Campaign, Script } from "@/lib/types";
 
 
 export const action = async ({ request }: { request: Request }) => {
@@ -31,9 +32,43 @@ export const action = async ({ request }: { request: Request }) => {
         return routeData({ error: "Campaign not found" }, { status: 404, headers });
       }
       await requireWorkspaceAccess({ user, workspaceId });
+
+      const rawScriptData = data.scriptData;
+      const scriptData =
+        typeof rawScriptData === "string" &&
+        rawScriptData.trim() !== "" &&
+        rawScriptData !== "undefined"
+          ? parseJsonField<Script | null>(rawScriptData)
+          : null;
+      const saveScriptAsCopy = data.saveScriptAsCopy === "true" || data.saveScriptAsCopy === true;
+
+      let scriptId: number | undefined;
+      let savedScript: Awaited<ReturnType<typeof updateOrCopyScript>> | undefined;
+      if (scriptData && typeof scriptData === "object") {
+        try {
+          savedScript = await updateOrCopyScript({
+            workspaceId,
+            scriptData,
+            saveAsCopy: saveScriptAsCopy,
+            campaignData: campaignData as unknown as Campaign,
+            created_by: user.id,
+            created_at: new Date().toISOString(),
+          });
+        } catch (scriptError) {
+          return createErrorResponse(scriptError, "Failed to save script", 400, { headers });
+        }
+        scriptId = savedScript?.id;
+        if (scriptId) {
+          campaignData.script_id = scriptId;
+        }
+      }
+
       const { campaign, campaignDetails: updatedCampaignDetails } =
         await updateCampaign({ campaignData, campaignDetails });
-      return routeData({ campaign, campaignDetails: updatedCampaignDetails }, { headers });
+      return routeData(
+        { campaign, campaignDetails: updatedCampaignDetails, scriptId, script: savedScript },
+        { headers },
+      );
     }
 
     if (request.method === "DELETE") {

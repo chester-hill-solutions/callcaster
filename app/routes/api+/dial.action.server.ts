@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 import { createOutreachAttempt } from "@/lib/auto-dial.server";
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { saveCallToDatabase } from "@/lib/auto-dial.server";
@@ -59,9 +60,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         throw new Response("Workspace not found", { status: 404 });
     }
     if (credits <= 0) {
-        return {
-            creditsError: true,
-        }
+        return routeData({ creditsError: true }, { status: 402 });
     }
     const tdb = createTenantDb(workspace_id);
     const [callerIdRecord, onboarding] = await Promise.all([

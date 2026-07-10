@@ -1,22 +1,27 @@
 # Number Rental Billing
 
-This document describes how monthly billing works for rented phone numbers (`workspace_number.type = "rented"`), including reminder emails, grace period behavior, and automatic release.
+This document describes how monthly billing works for rented phone numbers (`workspace_number.type = "rented"`), including the monthly renewal charge and reminder emails. Grace-period auto-release is **not implemented** — see [Grace period and release](#grace-period-and-release).
 
 ## Scope
 
 - Initial purchase charge when a number is rented.
 - Monthly renewal charge (`100` credits/month at Option B / $2.00 CAD).
 - Renewal reminder emails (`25`, `15`, `3` days before due date).
-- Overdue final notice and auto-release (`30` days after due date if still unpaid).
+- **Not yet implemented:** overdue final notice and auto-release. See
+  [Grace period and release](#grace-period-and-release) below — unpaid
+  renewals currently require manual release.
 
 ## Key implementation files
 
-- Billing worker: `supabase/functions/number-rental-billing/index.ts`
-- Billing date/window helpers: `supabase/functions/_shared/number-rental-billing.ts`
-- Purchase-time debit path: `app/routes/api.numbers.tsx`
-- Node test updates (purchase path): `test/numbers.route.test.ts`
-- Deno tests (date/window logic): `supabase/functions/__tests__/number_rental_billing_test.ts`
-- Cron registration migration: `supabase/migrations/202604140001_number_rental_billing_cron.sql`
+The billing sweep runs as a React Router server route (the original Supabase
+edge function has been retired as part of the Postgres/Drizzle migration):
+
+- Billing sweep logic: `app/lib/number-rental-billing.server.ts`
+- HTTP job route (called by pg_cron via `x-cron-secret`): `app/routes/api+/jobs+/number-rental-billing.action.server.ts`
+- Purchase-time debit path: `app/routes/api+/numbers.action.server.ts`
+- Node tests (purchase path): `test/numbers.route.test.ts`
+- Node tests (sweep logic, reminders, result shape): `test/number-rental-billing.server.test.ts`
+- Cron job target update (edge function -> React Router route): `client/migrations/20260704000000_update_pg_cron_to_remix_routes.sql`
 
 ## Billing rules
 
@@ -38,68 +43,75 @@ This prevents duplicate initial charges during retries.
 
 ## Daily renewal worker flow
 
-The `number-rental-billing` edge function performs a daily sweep:
+`runNumberRentalBilling` (`app/lib/number-rental-billing.server.ts`), invoked
+via the `number-rental-billing` job route, performs a daily sweep per
+workspace:
 
 1. Load all rented numbers.
 2. Skip numbers created before `2026-04-01`.
 3. Resolve current month due date from anchor (`created_at`).
 4. If today is due date:
    - If workspace has enough credits, insert monthly debit idempotently.
-   - If not enough credits, leave unpaid for grace handling.
-5. Evaluate reminder windows for current/previous cycle and send notices once.
-6. On `+30` days after due date for an unpaid cycle:
-   - send final notice,
-   - release Twilio number,
-   - delete `workspace_number` row.
+   - If not enough credits, leave unpaid for grace handling (see
+     [Grace period and release](#grace-period-and-release) — there is no
+     automatic follow-up on an unpaid cycle yet).
+5. Otherwise, if today falls in a reminder window (`-25`, `-15`, `-3` days
+   before due date), send a reminder email.
+6. Return sweep counters, including `remindersFailed` (emails that could not
+   be sent, e.g. no owner/admin recipients or a Resend error) and
+   `autoReleaseImplemented: false`.
 
 ## Reminder emails
 
-Emails are sent via Resend to workspace users with role `owner` or `admin`:
+Reminder emails are sent via Resend (`sendNumberRentalReminderEmail` in
+`app/lib/number-rental-billing.server.ts`, following the same inline-Resend
+pattern as `app/lib/low-credit-notify.server.ts`) to workspace owners/admins
+(`listWorkspaceOwnerAdminEmails`):
 
 - `-25 days`
 - `-15 days`
 - `-3 days`
-- `+30 days` (final notice before/at release)
 
-Email dedupe is tracked in number capabilities:
+A send only counts toward `remindersSent` if the email actually went out;
+failures (Resend errors, or no owner/admin recipients found) are counted in
+`remindersFailed` instead and logged, and do not throw — the sweep continues
+to the next number.
 
-- `workspace_number.capabilities.rental_billing.notifications`
-- key format: `<cycleKey>:<windowKey>` (for example `2026-04:pre15`)
+There is currently no dedupe marker (no per-cycle "already sent" flag stored
+on the number). A reminder window is only hit once per cycle under the
+assumption the sweep runs once per day; running the sweep more than once on
+the same day for the same workspace can re-send a reminder.
 
 ## Grace period and release
 
-- Grace period is `30` days from due date for unpaid renewals.
-- On day `+30`, if cycle is still unpaid:
-  - Twilio incoming number is removed from the workspace subaccount.
-  - `workspace_number` record is deleted.
-
-Manual removal before day `+30` is naturally treated as a no-op by future runs because the row no longer exists.
+**Not implemented.** There is no automatic release of numbers with an unpaid
+renewal cycle — `runNumberRentalBilling` always returns `released: 0` and
+`autoReleaseImplemented: false`. An unpaid renewal is left as-is by the
+sweep; someone must release the number manually (remove the Twilio incoming
+number from the workspace subaccount and delete the `workspace_number` row)
+until auto-release is built.
 
 ## Scheduler
 
-Migration `202604140001_number_rental_billing_cron.sql` registers a daily cron job:
-
-- job name: `number_rental_billing_daily`
-- schedule: `15 3 * * *` (UTC)
-
-It uses `public.create_cron_job(...)` with `net.http_post(...)` to call the edge function URL.
-
-The migration expects one of these DB settings to be present:
-
-- `app.settings.edge_functions_base_url`, or
-- `app.settings.supabase_functions_url`
-
-If neither setting is present, migration exits with a notice and does not create the job.
+A daily `pg_cron` job (`number_rental_billing_daily`, originally registered by
+the now-archived `docs/archive/supabase-migrations/202604140001_number_rental_billing_cron.sql`)
+calls the billing sweep once a day (`15 3 * * *` UTC). It was repointed from
+the retired Supabase edge function to the React Router job route by
+`client/migrations/20260704000000_update_pg_cron_to_remix_routes.sql`, which
+calls `<base_url>/api/jobs/number-rental-billing` with an `x-cron-secret`
+header matching the `CRON_SECRET` env var.
 
 ## Verification and tests
 
-- Node route tests:
+- Node route tests (purchase path):
   - `npm run test:node -- test/numbers.route.test.ts`
-- Deno function tests:
-  - `npx deno test --allow-env --allow-read --allow-net supabase/functions/__tests__/number_rental_billing_test.ts supabase/functions/__tests__/import_all_test.ts`
+- Node tests (sweep logic — charge/reminder/result-shape behavior):
+  - `npm run test:node -- test/number-rental-billing.server.test.ts`
 
-Date logic tests cover:
+Sweep logic tests cover:
 
 - 31st day fallback behavior,
 - leap/non-leap February handling,
-- notification windows (`-25/-15/-3/+30`).
+- reminder windows (`-25/-15/-3` days) sending emails and incrementing `remindersSent`,
+- failed sends incrementing `remindersFailed` instead of `remindersSent`,
+- the honest result shape (`released: 0`, `autoReleaseImplemented: false`).

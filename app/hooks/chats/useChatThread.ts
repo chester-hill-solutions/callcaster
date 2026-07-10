@@ -24,7 +24,9 @@ type ChatThreadOutletContext = {
         from: string;
         to: string;
         media?: string;
+        sid?: string;
       }) => void;
+      markOptimisticMessageFailed?: (sid: string) => void;
     } | null,
   ) => void;
   contactOptOut?: boolean;
@@ -60,11 +62,12 @@ export function useChatThread({
 
   const olderFetcher = useFetcher<ChatThreadLoaderData>();
 
-  const { messages, setMessages, addOptimisticMessage } = useChatRealTime({
-        initial: initialMessages,
-    workspace: workspace.id,
-    contact_number,
-  });
+  const { messages, setMessages, addOptimisticMessage, markOptimisticMessageFailed } =
+    useChatRealTime({
+      initial: initialMessages,
+      workspace: workspace.id,
+      contact_number,
+    });
 
   useEffect(() => {
     setHasMoreOlder(initialHasMore);
@@ -136,9 +139,9 @@ export function useChatThread({
   }, [messages.length]);
 
   useEffect(() => {
-    registerChatActions?.({ addOptimisticMessage });
+    registerChatActions?.({ addOptimisticMessage, markOptimisticMessageFailed });
     return () => registerChatActions?.(null);
-  }, [addOptimisticMessage, registerChatActions]);
+  }, [addOptimisticMessage, markOptimisticMessageFailed, registerChatActions]);
 
   useEffect(() => {
     if (!contact_number || hasMarkedAsReadRef.current) return;

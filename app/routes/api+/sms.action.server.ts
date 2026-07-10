@@ -26,11 +26,16 @@ import {
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
 import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isWithinSendWindow, parseSendWindow } from "@/lib/campaign-send-window";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
+const OPTED_OUT_SMS_DEQUEUED_REASON = "Contact opted out";
+const LANDLINE_SMS_DEQUEUED_REASON = "Landline — cannot receive SMS";
 
 interface SendMessageParams {
   body: string;
@@ -248,7 +253,21 @@ export const action = async ({ request }: { request: Request }) => {
         workspaceId: workspace_id,
       });
     }
-    
+
+    // Fail-closed credit gate: check once at entry for the whole batch
+    // rather than per contact, so a mid-campaign depletion doesn't burn
+    // through the audience one Twilio failure at a time.
+    const creditsBalance = await getWorkspaceCreditsBalance(workspace_id);
+    if (creditsBalance === null || creditsBalance <= 0) {
+      return new Response(
+        JSON.stringify({ creditsError: true, error: "Insufficient credits" }),
+        {
+          status: 402,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const [campaign, audience, portalConfig] = await Promise.all([
       loadCampaignSmsDispatchData(workspace_id, campaign_id),
       getCampaignQueueById({campaign_id,
@@ -271,7 +290,27 @@ export const action = async ({ request }: { request: Request }) => {
       );
     }
 
-    const media = campaign.message_media?.length 
+    // Campaign send-window / CASL quiet-hours gate. This is the authoritative
+    // Send-Now SMS path and is campaign-only — 1:1 chat sends use a different
+    // route (chat_sms) and are never gated here. When the current tick falls
+    // outside the campaign's send window we DEFER the whole batch: nothing is
+    // dispatched and nothing is dequeued, so contacts remain queued for a
+    // later in-window tick. A `null` window is unrestricted.
+    if (!isWithinSendWindow(parseSendWindow(campaign.campaign?.sms_send_window ?? null))) {
+      return new Response(
+        JSON.stringify({
+          deferred: true,
+          reason: "Outside campaign send window",
+          responses: [],
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      );
+    }
+
+    const media = campaign.message_media?.length
       ? await Promise.all(
           campaign.message_media.map(mediaItem =>
             createSignedObjectUrl("messageMedia", `${workspace_id}/${mediaItem}`, 3600)
@@ -299,6 +338,45 @@ export const action = async ({ request }: { request: Request }) => {
       const batchResults = await Promise.all(
         batch.map(async member => {
           const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
+
+          if (member.contact?.opt_out) {
+            await dequeueCampaignQueueById({
+              queueId: member.id,
+              userId: effectiveUserId as string,
+              reason: OPTED_OUT_SMS_DEQUEUED_REASON,
+            });
+            return {
+              [member.contact_id]: {
+                success: true,
+                skipped: true,
+                reason: OPTED_OUT_SMS_DEQUEUED_REASON,
+              },
+            };
+          }
+
+          const lineType = member.contact
+            ? await getOrLookupLineType({
+                workspaceId: workspace_id,
+                contactId: member.contact_id,
+                phone: normalizedPhone,
+              })
+            : null;
+
+          if (isSmsIncapableLineType(lineType)) {
+            await dequeueCampaignQueueById({
+              queueId: member.id,
+              userId: effectiveUserId as string,
+              reason: LANDLINE_SMS_DEQUEUED_REASON,
+            });
+            return {
+              [member.contact_id]: {
+                success: true,
+                skipped: true,
+                reason: LANDLINE_SMS_DEQUEUED_REASON,
+              },
+            };
+          }
+
           const duplicateExists = await hasDuplicateCampaignSms({
             workspaceId: workspace_id,
             campaignId: campaign_id,

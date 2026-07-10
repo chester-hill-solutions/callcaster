@@ -11,8 +11,18 @@
  *   bun run ./worker/index.ts drain
  *   bun run ./worker/index.ts --mode=drain
  */
-import { runWorkerPollLoop, claimNextJob, completeJob, failJob } from "../app/lib/worker/poll-jobs.server.ts";
+import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
+import { runWorkerPollLoop, resetStaleClaims, claimNextJob, completeJob, failJob } from "../app/lib/worker/poll-jobs.server.ts";
 import { jobHandlers } from "../app/lib/worker/handlers.server.ts";
+
+try {
+  validateRequiredEnv(process.env);
+} catch (error) {
+  console.error("worker.boot_failed", {
+    error: error instanceof Error ? error.message : String(error),
+  });
+  process.exit(1);
+}
 
 function parseMode(argv: string[]): "long-running" | "drain" {
   for (const arg of argv) {
@@ -38,6 +48,10 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 if (mode === "drain") {
+  // Recover any claims stranded by a prior crash/redeploy before attempting
+  // to claim a job, matching the long-running poll loop's per-iteration reset.
+  await resetStaleClaims();
+
   const job = await claimNextJob(workerId);
   if (!job) {
     console.info("worker.drain", { message: "idle" });
@@ -51,7 +65,7 @@ if (mode === "drain") {
       jobId: job.id,
       error: `No handler registered for job type: ${job.type}`,
     });
-    await failJob(job.id, job.attempt_count, job.max_attempts, `No handler registered for job type: ${job.type}`);
+    await failJob(job.id, job.attempt_count, job.max_attempts, `No handler registered for job type: ${job.type}`, job.type);
     process.exit(1);
   }
 
@@ -63,7 +77,7 @@ if (mode === "drain") {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("worker.drain", { jobId: job.id, error: message });
-    await failJob(job.id, job.attempt_count, job.max_attempts, message);
+    await failJob(job.id, job.attempt_count, job.max_attempts, message, job.type);
     process.exit(1);
   }
 }

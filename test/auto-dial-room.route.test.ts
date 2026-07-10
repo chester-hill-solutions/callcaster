@@ -71,6 +71,11 @@ vi.mock("../app/lib/env.server", () => ({
 
 vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 
+const runAutoDialerTurnMock = vi.hoisted(() => vi.fn(async () => ({ success: true })));
+vi.mock("@/lib/auto-dial.server", () => ({
+  runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
+}));
+
 const roomRpcState = vi.hoisted(() => ({ client: null as any }));
 const roomStorageState = vi.hoisted(() => ({ error: null as Error | null }));
 
@@ -193,6 +198,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     roomStorageState.error = null;
     vi.stubGlobal("fetch", mocks.fetch);
+    runAutoDialerTurnMock.mockClear();
+    runAutoDialerTurnMock.mockResolvedValue({ success: true });
   });
 
   test("device-check path: verified device joins conference and triggers dialer", async () => {
@@ -271,9 +278,21 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(mocks.fetch).toHaveBeenCalledWith(
+    // Regression guard: the dialer turn must be invoked in-process, not via
+    // a self-fetch to /api/auto-dial/dialer (that path is matched by the
+    // Twilio webhook prefix and an unsigned self-fetch would 403 in
+    // production). See app/lib/auto-dial.server.ts:runAutoDialerTurn.
+    expect(mocks.fetch).not.toHaveBeenCalledWith(
       "https://base.example/api/auto-dial/dialer",
-      expect.objectContaining({ method: "POST" }),
+      expect.anything(),
+    );
+    expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "u1",
+        campaign_id: "1",
+        workspace_id: "w1",
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+      }),
     );
   });
 
@@ -379,7 +398,19 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(updateCallTwiml).toHaveBeenCalledWith(
       expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
     );
-    expect(mocks.fetch).toHaveBeenCalled();
+    // Regression guard: dialer turn is invoked in-process, not via self-fetch.
+    expect(mocks.fetch).not.toHaveBeenCalledWith(
+      "https://base.example/api/auto-dial/dialer",
+      expect.anything(),
+    );
+    expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "u1",
+        campaign_id: "1",
+        workspace_id: "w1",
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+      }),
+    );
   });
 
   test("machine answer with no voicemail signedUrl returns Hangup response", async () => {
@@ -723,6 +754,11 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   });
 
   test("covers triggerAutoDialer fallbacks when outreachStatus/user/workspace are missing", async () => {
+    // Simulate a sparse outreach row (no user/campaign) to exercise the
+    // '' fallbacks in the dialer-turn arguments.
+    configureTelephonyStub({
+      outreachRowOverrides: { user_id: undefined, campaign_id: undefined },
+    });
     const updateCallTwiml = vi.fn(async () => ({}));
     const twilio = {
       calls: (_sid: string) => ({ update: updateCallTwiml }),
@@ -779,9 +815,18 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(mocks.fetch).toHaveBeenCalledWith(
+    // Regression guard: dialer turn is invoked in-process, not via self-fetch.
+    expect(mocks.fetch).not.toHaveBeenCalledWith(
       "https://base.example/api/auto-dial/dialer",
-      expect.objectContaining({ method: "POST" }),
+      expect.anything(),
+    );
+    expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "",
+        campaign_id: "",
+        workspace_id: "w1",
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+      }),
     );
   });
 

@@ -15,7 +15,7 @@ import { AdminUsersPanel } from "./panels/AdminUsersPanel";
 import { AdminWorkspacesPanel } from "./panels/AdminWorkspacesPanel";
 
 export default function Admin() {
-    const { user, workspaces, users, workspaceUsers, workspaceRows, campaigns, stats } =
+    const { user, workspaces, users, workspaceUsers, workspaceRows, campaigns, deadLetteredJobs, stats } =
         useLoaderData<AdminLoaderData>();
     const [searchParams, setSearchParams] = useSearchParams();
     const actionData = useActionData<AdminActionData>();
@@ -105,7 +105,7 @@ export default function Admin() {
                 <AdminWorkspacesPanel workspaceRows={workspaceRows} />
                 <AdminUsersPanel users={users} workspaceUsers={workspaceUsers} workspaces={workspaces} />
                 <AdminCampaignsPanel campaigns={campaigns} workspaces={workspaces} />
-                <AdminSystemSettingsPanel />
+                <AdminSystemSettingsPanel deadLetteredJobs={deadLetteredJobs} />
             </Tabs>
 
             <Outlet />

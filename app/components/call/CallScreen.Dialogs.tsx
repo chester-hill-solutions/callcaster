@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Form, NavLink, useFetcher, useNavigate } from "react-router";
 import { QueueItem } from "@/lib/types";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 interface CampaignDialogsProps {
   isDialogOpen: boolean;
@@ -51,7 +52,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   const noCredits = Number(credits ?? 0) <= 0;
   const shouldBlockForCredits = noCredits || Boolean(creditsError);
   const [isCreditsDialogOpen, setCreditsDialogOpen] = useState(shouldBlockForCredits);
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
   const navigate = useNavigate();
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -67,6 +68,14 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       },
     );
   };
+
+  useActionFeedback(fetcher.data, {
+    successMessage: "Report sent",
+    onSuccess: () => {
+      setReportDialog(false);
+      setErrorDescription("");
+    },
+  });
 
   useEffect(() => {
     setCreditsDialogOpen(shouldBlockForCredits);
@@ -188,7 +197,9 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Submit Report</Button>
+                  <Button type="submit" disabled={fetcher.state !== "idle"}>
+                    {fetcher.state !== "idle" ? "Sending..." : "Submit Report"}
+                  </Button>
                 </div>
               </Form>
             </div>

@@ -289,12 +289,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     });
   });
 
-  test("action returns 400 creditsError when credits too low", async () => {
+  test("action returns 402 creditsError when credits too low", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "Insufficient credits for number rental",
-      status: 400,
+      status: 402,
       creditsError: true,
     });
 
@@ -309,7 +309,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       }),
     } as any));
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(402);
     await expect(res.json()).resolves.toEqual({ creditsError: true });
   });
 

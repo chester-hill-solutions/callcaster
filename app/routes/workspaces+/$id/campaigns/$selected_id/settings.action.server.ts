@@ -23,6 +23,7 @@ import {
   updateCampaignStatusInWorkspace,
 } from "@/lib/campaign-ivr.server";
 import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
+import { splitMessageCampaign } from "@/lib/database/campaign.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
@@ -227,6 +228,44 @@ export async function action({ request, params }: ActionFunctionArgs) {
             success: false,
             error: error instanceof Error ? error.message : "Campaign could not be duplicated",
             actionType: "duplicate" as const,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    case "split": {
+      try {
+        const segmentCount = Number(data.segmentCount ?? 0);
+        if (!Number.isFinite(segmentCount) || segmentCount < 2) {
+          return routeData(
+            {
+              success: false,
+              error: "Choose at least 2 segments to split into",
+              actionType: "split" as const,
+            },
+            { status: 400 },
+          );
+        }
+        const result = await splitMessageCampaign({
+          workspaceId: workspace_id,
+          sourceCampaignId: selected_id,
+          segmentCount,
+          userId: user.id,
+        });
+        return routeData({
+          success: true,
+          actionType: "split" as const,
+          segments: result.segments,
+          movedContactCount: result.movedContactCount,
+        });
+      } catch (error) {
+        logger.error("Error splitting campaign", error);
+        return routeData(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : "Campaign could not be split",
+            actionType: "split" as const,
           },
           { status: 400 },
         );

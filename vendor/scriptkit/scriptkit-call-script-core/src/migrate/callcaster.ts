@@ -29,6 +29,8 @@ export const callcasterWireBlockSchema = z
     required: z.boolean().optional(),
     options: z.array(z.unknown()).optional(),
     routingRules: z.array(z.unknown()).optional(),
+    /** Recorded-audio reference. Must survive a migrate -> serialize round-trip. */
+    audioFile: z.string().optional(),
   })
   .passthrough();
 
@@ -47,8 +49,23 @@ function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): Scr
           return { value: opt, label: opt };
         }
         const record = opt as Record<string, unknown>;
-        const value = String(record.value ?? record.id ?? record.label ?? "");
-        return { value, label: String(record.label ?? value) };
+        // The Callcaster wire format keys options by { content, next } rather
+        // than { value, label } (see docs/script-json-format.md). Derive
+        // value/label sensibly from whatever is present, and carry `next`
+        // and `content` through verbatim so nothing is lost on round-trip.
+        const value = String(
+          record.value ?? record.id ?? record.content ?? record.label ?? "",
+        );
+        const label = String(record.label ?? record.content ?? value);
+        const next = typeof record.next === "string" ? record.next : undefined;
+        const content =
+          typeof record.content === "string" ? record.content : undefined;
+        return {
+          value,
+          label,
+          ...(next !== undefined ? { next } : {}),
+          ...(content !== undefined ? { content } : {}),
+        };
       })
     : [];
 
@@ -57,6 +74,7 @@ function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): Scr
     label: typeof parsed.label === "string" ? parsed.label : undefined,
     prompt,
     required: Boolean(parsed.required),
+    audioFile: typeof parsed.audioFile === "string" ? parsed.audioFile : undefined,
     routingRules: Array.isArray(parsed.routingRules)
       ? parsed.routingRules.map((rule) => {
           const r = rule as Record<string, unknown>;
@@ -134,6 +152,7 @@ export function serializeToCallcasterFlow(doc: ScriptDocument): CallcasterFlow {
       label: block.label,
       required: block.required,
       routingRules: block.routingRules,
+      audioFile: block.audioFile,
     };
 
     if (block.type === "instruction") {
@@ -141,7 +160,15 @@ export function serializeToCallcasterFlow(doc: ScriptDocument): CallcasterFlow {
     }
 
     if ("options" in block && block.options) {
-      wire.options = block.options;
+      // Emit both the internal { value, label } shape and the Callcaster
+      // wire's { content, next } shape so a migrate -> serialize round-trip
+      // doesn't drop routing (`next`) or the original option text.
+      wire.options = block.options.map((option) => ({
+        value: option.value,
+        label: option.label,
+        content: option.content ?? option.label ?? option.value,
+        next: option.next,
+      }));
     }
 
     blocks[block.id] = wire;

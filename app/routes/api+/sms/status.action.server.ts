@@ -9,6 +9,7 @@ import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
 import { logger } from "@/lib/logger.server";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { markContactLineType } from "@/lib/twilio-lookup.server";
 import {
   isTerminalSmsStatus,
   normalizeSmsStatus,
@@ -16,7 +17,7 @@ import {
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
-import { SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
+import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
 import { campaign as campaignTable } from "@/db/schema";
@@ -86,14 +87,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ? payload.AccountSid.trim()
         : null;
 
+    const errorCode =
+      typeof payload.ErrorCode === "string" && payload.ErrorCode.trim()
+        ? Number.parseInt(payload.ErrorCode, 10)
+        : null;
+
     const messageData = await updateMessageBySid(preUpdateMessage.workspace, sid, {
       status: messageStatus,
       ...(accountSidFromWebhook ? { account_sid: accountSidFromWebhook } : {}),
+      ...(errorCode != null && Number.isFinite(errorCode) ? { error_code: errorCode } : {}),
     });
 
     if (!messageData) {
       logger.error("Error updating message for sid", { sid });
       return routeData({ error: "Failed to update message" }, { status: 500 });
+    }
+
+    // Free line-type signal: Twilio error 30006 = "Landline or unreachable
+    // carrier". Stamping it means this contact is never texted again (the
+    // send gates skip landlines) even when the paid Lookup flag is off.
+    if (errorCode === 30006 && messageData.contact_id) {
+      await markContactLineType({
+        workspaceId: messageData.workspace,
+        contactId: messageData.contact_id,
+        lineType: "landline",
+      });
     }
 
     // Debit billing for SMS (campaign, API/chat, or any outbound) when terminal status
@@ -103,11 +121,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           1,
           Number.parseInt(String(messageData.num_segments ?? "1"), 10) || 1,
         );
+        const numMedia = Number.parseInt(String(messageData.num_media ?? "0"), 10) || 0;
+        const isMms = numMedia > 0;
+        // MMS is billed flat per message at MMS_CREDITS (see public-pricing.ts);
+        // SMS is billed per segment at SMS_SEGMENT_CREDITS.
+        const amount = isMms ? MMS_CREDITS : SMS_SEGMENT_CREDITS * numSegments;
+        const note = isMms
+          ? `MMS ${sid} ${messageStatus}`
+          : `SMS ${sid} ${messageStatus} (${numSegments} segment${numSegments === 1 ? "" : "s"})`;
         await insertTransactionHistoryIdempotent({
           workspaceId: messageData.workspace,
           type: "DEBIT",
-          amount: debitAmountFromCredits(SMS_SEGMENT_CREDITS * numSegments),
-          note: `SMS ${sid} ${messageStatus} (${numSegments} segment${numSegments === 1 ? "" : "s"})`,
+          amount: debitAmountFromCredits(amount),
+          note,
           idempotencyKey: smsKey(sid),
           messageSid: sid,
         });

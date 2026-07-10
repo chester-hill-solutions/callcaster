@@ -21,6 +21,7 @@ export default function WorkspaceVoicemailsPage() {
       error={error}
       isEmpty={isWorkspaceAudioEmpty}
       emptyMessage="Add a voicemail greeting to this workspace."
+      emptyDescription="Add a voicemail greeting so callers hear your message when you can't pick up."
     >
       {voicemails != null && !isWorkspaceAudioEmpty ? (
         <DataTable
@@ -32,3 +33,5 @@ export default function WorkspaceVoicemailsPage() {
     </WorkspaceResourceListShell>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

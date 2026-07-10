@@ -101,6 +101,17 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
       }),
     });
 
+    if (response.status === 402) {
+      // Insufficient credits — the route returns this as a graceful JSON
+      // body, not a hard failure, so read it before the !response.ok gate
+      // below would otherwise turn it into a thrown error.
+      return {
+        success: false,
+        creditsError: true,
+        error: 'Insufficient credits to start conference',
+      };
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);

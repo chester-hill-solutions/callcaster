@@ -2,6 +2,9 @@
 import { BsChatLeftText } from "react-icons/bs";
 import { FaPhoneVolume, FaMicrophone } from "react-icons/fa6";
 import type { ReactNode } from "react";
+import type { MetaFunction } from "react-router";
+
+export const meta: MetaFunction = () => [{ title: "Pricing — CallCaster" }];
 
 export async function loader() {
   return {};
@@ -29,11 +32,11 @@ interface PricingRowProps {
 }
 
 const PricingRow = ({ icon, service, type, rates }: PricingRowProps) => (
-  <div className="mb-8 overflow-hidden rounded-xl bg-[#bae6fd] last:mb-0">
-    <div className="flex items-center gap-3 border-b border-white/20 bg-[#bae6fd]/80 p-6">
-      <span className="text-[#dc2626]">{icon}</span>
+  <div className="mb-8 overflow-hidden rounded-xl bg-brand-secondary last:mb-0">
+    <div className="flex items-center gap-3 border-b border-white/20 bg-brand-secondary/80 p-6">
+      <span className="text-brand-primary">{icon}</span>
       <div>
-        <h3 className="font-Zilla-Slab text-2xl font-bold uppercase text-[#dc2626]">
+        <h3 className="font-Zilla-Slab text-2xl font-bold uppercase text-brand-primary">
           {service}
         </h3>
         <p className="font-Zilla-Slab text-lg text-gray-700">{type}</p>
@@ -47,7 +50,7 @@ const PricingRow = ({ icon, service, type, rates }: PricingRowProps) => (
               <span className="font-Zilla-Slab text-lg font-semibold text-gray-900">
                 {rate.name}
               </span>
-              <span className="font-Zilla-Slab text-xl font-bold text-[#dc2626]">
+              <span className="font-Zilla-Slab text-xl font-bold text-brand-primary">
                 {rate.price}
               </span>
             </div>
@@ -139,12 +142,12 @@ export default function Pricing() {
       </div>
 
       <div className="mt-12 text-center">
-        <div className="inline-block rounded-full border-2 border-[#bae6fd] bg-white px-8 py-4">
+        <div className="inline-block rounded-full border-2 border-brand-secondary bg-white px-8 py-4">
           <p className="font-Zilla-Slab text-xl">
             For More Information Contact{" "}
             <a
               href="mailto:info@callcaster.ca"
-              className="font-bold text-[#dc2626] hover:underline"
+              className="font-bold text-brand-primary hover:underline"
             >
               info@callcaster.ca
             </a>
@@ -154,3 +157,5 @@ export default function Pricing() {
     </main>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

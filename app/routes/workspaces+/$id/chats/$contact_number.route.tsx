@@ -21,12 +21,13 @@ type ChatThreadOutletContext = {
 };
 
 export default function ChatScreen() {
-  const { workspace, registerChatActions, contactOptOut } =
+  const { workspace, workspaceNumbers, registerChatActions, contactOptOut } =
     useOutletContext<ChatThreadOutletContext>();
 
   return (
     <ChatThreadView
       workspace={workspace}
+      workspaceNumbers={workspaceNumbers}
       registerChatActions={registerChatActions}
       contactOptOut={contactOptOut}
     />

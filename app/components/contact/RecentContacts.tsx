@@ -39,7 +39,8 @@ const ResultItem: React.FC<ResultItemProps> = ({ label, value }) => {
   const formatValue = (val: unknown): string => {
     try {
       if (val == null) return 'N/A';
-      if (isObject(val) || isArray(val)) return JSON.stringify(val);
+      if (isArray(val)) return val.map((item) => safeString(item)).join(', ');
+      if (isObject(val)) return Object.values(val).map((item) => safeString(item)).join(', ');
       return safeString(val);
     } catch (error) {
       logger.error('Error formatting value:', error);
@@ -58,9 +59,9 @@ const ResultItem: React.FC<ResultItemProps> = ({ label, value }) => {
   };
 
   return (
-    <li className="text-sm text-gray-600 dark:text-gray-400">
+    <li className="text-sm text-muted-foreground">
       <span className="font-medium">{formatLabel(label)}:</span>{" "}
-      <span className="text-gray-800 dark:text-gray-200">{formatValue(value)}</span>
+      <span className="text-foreground">{formatValue(value)}</span>
     </li>
   );
 };
@@ -123,10 +124,10 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
   }, [attempt.result]);
 
   return (
-    <Card className="mb-4 overflow-hidden bg-white shadow-md transition-shadow duration-300 hover:shadow-lg dark:bg-gray-800">
+    <Card className="mb-4 overflow-hidden bg-card shadow-md transition-shadow duration-300 hover:shadow-lg">
       <CardContent className="p-4">
         <button
-          className="w-full text-left focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md"
+          className="w-full text-left focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
           onClick={toggleOpen}
           aria-expanded={isOpen}
           aria-controls={`content-${index}`}
@@ -134,13 +135,13 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <b>{getCampaignTitle()} -</b>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <p className="text-sm font-medium text-muted-foreground">
                 {formatDateString(attempt.created_at)}
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <Clipboard className="h-5 w-5 text-green-500" />
-              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 capitalize">
+              <Clipboard className="h-5 w-5 text-success" />
+              <p className="text-sm font-semibold text-foreground capitalize">
                 {getDisposition()}
               </p>
               <ChevronDown
@@ -161,14 +162,14 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
           }}
         >
           {getResultData().length > 0 && (
-            <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
-              <p className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">
+            <div className="mt-3 border-t border-border pt-3">
+              <p className="mb-2 text-sm font-semibold text-foreground capitalize">
                 {getCampaignType()}
               </p>
               <ul className="space-y-2">
                 {getResultData().map(({ key, value }) => (
                   <li key={key}>
-                    <p className="mb-1 text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
+                    <p className="mb-1 text-sm font-medium capitalize text-foreground">
                       {key.replace(/_/g, ' ')}:
                     </p>
                     <ul className="ml-6 space-y-1">
@@ -236,7 +237,7 @@ export const RecentContacts: React.FC<RecentContactsProps> = ({ contact }) => {
     return (
       <div className="mt-6">
         <h3 className="mb-4 text-xl font-semibold">Recent Activity</h3>
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-muted-foreground">
           <p>No recent activity found for this contact.</p>
         </div>
       </div>

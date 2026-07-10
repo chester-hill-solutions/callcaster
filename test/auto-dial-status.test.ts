@@ -71,6 +71,11 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcDequeueContact: rpcDequeueContactMock,
 }));
 
+const runAutoDialerTurnMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/auto-dial.server", () => ({
+  runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
+}));
+
 const twilioClientMock = {
   conferences: Object.assign(
     (sid: string) => ({
@@ -317,7 +322,8 @@ describe("api.auto-dial.status", () => {
     loggerMocks.info.mockReset();
     rpcDequeueContactMock.mockReset();
     rpcDequeueContactMock.mockImplementation(async () => {});
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
+    runAutoDialerTurnMock.mockReset();
+    runAutoDialerTurnMock.mockResolvedValue({ success: true });
   });
 
   test("rejects invalid Twilio signature", async () => {
@@ -527,9 +533,8 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
-  test("call status busy triggers dialer when conferences exist and status not completed", async () => {
+  test("call status busy triggers dialer in-process (no HTTP self-fetch) when conferences exist and status not completed", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 200 })));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA_BUSY");
@@ -546,11 +551,18 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
+    // Regression guard: the dialer turn must be invoked in-process, not via a
+    // self-fetch to /api/auto-dial/dialer (that path is matched by the
+    // Twilio webhook prefix and an unsigned self-fetch would 403 in
+    // production). See app/lib/auto-dial.server.ts:runAutoDialerTurn.
+    expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
+      expect.objectContaining({ campaign_id: 1, workspace_id: "w1" }),
+    );
   });
 
-  test("triggerAutoDialer error bubbles to 500 when fetch not ok", async () => {
+  test("triggerAutoDialer error bubbles to 500 when the in-process dialer turn fails", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad", { status: 500 })));
+    runAutoDialerTurnMock.mockResolvedValueOnce({ success: false, error: "no queue" });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA_BUSY");

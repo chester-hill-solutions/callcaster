@@ -114,6 +114,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       },
     } as any));
 
+    expect(res.status).toBe(402);
     expect(res).toMatchObject({ creditsError: true });
   });
 

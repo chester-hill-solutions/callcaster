@@ -10,6 +10,7 @@ function seedRequiredEnv() {
   process.env.TWILIO_PHONE_NUMBER = "+15555550100";
   process.env.STRIPE_SECRET_KEY = "sk";
   process.env.RESEND_API_KEY = "re";
+  process.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL = "compliance@callcaster.ca";
 }
 
 describe("env.server", () => {
@@ -34,11 +35,9 @@ describe("env.server", () => {
 
   test("optional env getter returns undefined when missing", async () => {
     vi.resetModules();
-    delete process.env.OPENAI_API_KEY;
     seedRequiredEnv();
 
     const mod = await import("../app/lib/env.server");
-    expect(mod.env.OPENAI_API_KEY()).toBeUndefined();
     expect(mod.env.STRIPE_WEBHOOK_SECRET()).toBeUndefined();
   });
 
@@ -74,7 +73,6 @@ describe("env.server", () => {
   test("all getters return values when present and revalidateEnv passes", async () => {
     vi.resetModules();
     seedRequiredEnv();
-    process.env.OPENAI_API_KEY = "oa";
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_1";
     process.env.VERIFICATION_PHONE_NUMBER = "+15551234567";
 
@@ -87,7 +85,6 @@ describe("env.server", () => {
     expect(mod.env.TWILIO_PHONE_NUMBER()).toBe("+15555550100");
     expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk");
     expect(mod.env.RESEND_API_KEY()).toBe("re");
-    expect(mod.env.OPENAI_API_KEY()).toBe("oa");
     expect(mod.env.STRIPE_WEBHOOK_SECRET()).toBe("whsec_1");
     expect(mod.env.VERIFICATION_PHONE_NUMBER()).toBe("+15551234567");
 

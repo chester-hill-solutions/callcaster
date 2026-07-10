@@ -121,7 +121,7 @@ export default function NewScript() {
                       className="hidden"
                       onChange={handleFileChange}
                     />
-                    <Button asChild variant="outline" size="icon">
+                    <Button asChild variant="outline" size="icon" aria-label="Choose a JSON file to upload">
                       <label htmlFor="steps" className="cursor-pointer">
                         <MdAdd />
                       </label>
@@ -135,6 +135,7 @@ export default function NewScript() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label="Remove selected file"
                       onClick={handleRemoveFile}
                     >
                       <MdClose />

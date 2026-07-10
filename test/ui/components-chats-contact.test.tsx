@@ -53,6 +53,73 @@ describe("app/components/chats/ChatOptOutBanner.tsx", () => {
   });
 });
 
+describe("app/components/sms-ui/ChatMessages.tsx", () => {
+  test("renders a distinct failed/undelivered state with error_message", async () => {
+    const ChatMessages = (await import("@/components/sms-ui/ChatMessages"))
+      .default;
+    render(
+      <ChatMessages
+        messages={[
+          {
+            sid: "SM-failed",
+            status: "failed",
+            direction: "outbound",
+            body: "hello",
+            date_created: new Date().toISOString(),
+            error_message: "Landline or unreachable carrier",
+          },
+          {
+            sid: "SM-ok",
+            status: "delivered",
+            direction: "outbound",
+            body: "world",
+            date_created: new Date().toISOString(),
+          },
+        ]}
+        messagesEndRef={createRef()}
+      />,
+    );
+
+    expect(screen.getByText("Not delivered")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Landline or unreachable carrier/),
+    ).toBeInTheDocument();
+    const failedBubble = screen
+      .getByText("hello")
+      .closest("div[data-message-status]")
+      ?.querySelector("div");
+    expect(failedBubble?.className).toContain("border-destructive");
+
+    const okItem = screen.getByText("world").closest("[data-message-status]");
+    expect(okItem).toHaveAttribute("data-message-status", "delivered");
+    expect(screen.queryByText(/Landline/)).not.toBeNull();
+  });
+
+  test("keeps data-message-status intact for both failed and normal messages", async () => {
+    const ChatMessages = (await import("@/components/sms-ui/ChatMessages"))
+      .default;
+    render(
+      <ChatMessages
+        messages={[
+          {
+            sid: "SM-failed-2",
+            status: "failed",
+            direction: "inbound",
+            body: "failed one",
+            date_created: new Date().toISOString(),
+          },
+        ]}
+        messagesEndRef={createRef()}
+      />,
+    );
+    const item = screen
+      .getByText("failed one")
+      .closest("[data-message-status]");
+    expect(item).toHaveAttribute("data-message-status", "failed");
+    expect(item).toHaveAttribute("data-message-id", "SM-failed-2");
+  });
+});
+
 describe("app/components/chats/ChatThreadView.tsx", () => {
   test("renders messages from hook", async () => {
     const { ChatThreadView } = await import("@/components/chats/ChatThreadView");

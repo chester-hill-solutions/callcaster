@@ -5,6 +5,7 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   requireTwilioSignature: vi.fn(),
+  updateCallRecordingUrlBySid: vi.fn(),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   env: {
     BETTER_AUTH_URL: () => "https://sb.example",
@@ -19,6 +20,10 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) =>
     mocks.requireTwilioSignature(...args),
 }));
+vi.mock("@/lib/telephony-db.server", () => ({
+  updateCallRecordingUrlBySid: (...args: unknown[]) =>
+    mocks.updateCallRecordingUrlBySid(...args),
+}));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -28,6 +33,9 @@ describe("app/routes/api+/recording", () => {
     mocks.createClient.mockReset();
     mocks.requireTwilioSignature.mockReset();
     mocks.requireTwilioSignature.mockResolvedValue(null);
+    mocks.updateCallRecordingUrlBySid.mockReset();
+    mocks.updateCallRecordingUrlBySid.mockResolvedValue({ sid: "CA1" });
+    mocks.logger.error.mockReset();
   });
 
   test("returns 400 when CallSid missing", async () => {
@@ -71,5 +79,41 @@ describe("app/routes/api+/recording", () => {
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ CallSid: "CA1" });
+    // Regression guard: the recordingStatusCallback must persist the
+    // recording URL, not just echo the webhook params back. See
+    // app/routes/api+/call.action.server.ts (recordingStatusCallback wiring)
+    // and app/lib/telephony-db.server.ts:updateCallRecordingUrlBySid.
+    expect(mocks.updateCallRecordingUrlBySid).toHaveBeenCalledWith("CA1", "https://rec");
+  });
+
+  test("does not attempt to persist when RecordingUrl is missing", async () => {
+    mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
+    const mod = await import("../app/routes/api+/recording");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.updateCallRecordingUrlBySid).not.toHaveBeenCalled();
+  });
+
+  test("still returns 200 with payload when persistence fails (webhook must not fail loudly)", async () => {
+    mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
+    mocks.updateCallRecordingUrlBySid.mockRejectedValueOnce(new Error("db down"));
+    const mod = await import("../app/routes/api+/recording");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("RecordingUrl", "https://rec");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ CallSid: "CA1" });
+    expect(mocks.logger.error).toHaveBeenCalled();
   });
 });

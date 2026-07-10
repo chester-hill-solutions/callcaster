@@ -40,7 +40,11 @@ vi.mock("@/components/ui/dialog", () => ({
 vi.mock("react-router", () => ({
   Form: ({ children, ...props }: any) => <form {...props}>{children}</form>,
   NavLink: ({ to, children }: any) => <a href={String(to)}>{children}</a>,
-  useFetcher: () => ({ submit: (...args: any[]) => mocks.fetcherSubmit(...args) }),
+  useFetcher: () => ({
+    submit: (...args: any[]) => mocks.fetcherSubmit(...args),
+    state: "idle",
+    data: undefined,
+  }),
   useNavigate: () => mocks.navigate,
   useNavigation: () => ({ state: mocks.navigationState }),
 }));

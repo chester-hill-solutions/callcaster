@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLoaderData, useOutletContext, useSubmit } from "react-router";
+import { toast } from "sonner";
 
 import ContactDetails from "@/components/contact/ContactDetails";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/ui/page-shell";
 import type { Contact } from "@/lib/types";
 
 import type { ContactIdLoaderData } from "./$contactId.loader.server";
@@ -26,8 +28,8 @@ export default function ContactScreen() {
     try {
       setIsSaving(true);
       submit({}, { method: "post" });
-    } catch (error) {
-      console.error("Error saving contact:", error);
+    } catch {
+      toast.error("Couldn't save the contact. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -44,12 +46,11 @@ export default function ContactScreen() {
   }, [contact, setContact]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          {selected_id === "new" ? "New Contact" : "Edit Contact"}
-        </h1>
-        <div className="flex items-center space-x-2">
+    <PageShell
+      title={selected_id === "new" ? "New Contact" : "Edit Contact"}
+      maxWidth="content"
+      actions={
+        <>
           <Button
             onClick={handleReset}
             disabled={!hasChanges}
@@ -57,22 +58,18 @@ export default function ContactScreen() {
           >
             Reset
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!hasChanges || isSaving}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
+          <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
             {isSaving ? "Saving..." : "Save"}
           </Button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       <ContactDetails
         contact={contact ?? undefined}
         audiences={audiences}
         userRole={userRole}
         onChangesChange={setHasChanges}
       />
-    </div>
+    </PageShell>
   );
 }

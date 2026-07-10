@@ -92,11 +92,15 @@ export async function auditWorkspaceTwilioWebhooks({
       live: number.smsUrl ?? null,
       severity: "error",
     });
+    // The number-level statusCallback is the SMS delivery status callback and
+    // is expected on /api/sms/status. Caller-ID *verification* uses a distinct
+    // callback on /api/caller-id/status (expected.callerIdStatus) driven by the
+    // validationRequests flow, not the number's statusCallback field.
     compareField(entries, driftMessages, {
       resourceType: "phone_number",
       resourceSid: number.sid,
       field: "statusCallback",
-      expected: expected.callerIdStatus,
+      expected: expectedSmsStatus,
       live: number.statusCallback ?? null,
       severity: "warning",
     });
@@ -212,11 +216,18 @@ export async function repointWorkspaceTwilioWebhooks({
     if (isLegacyEdgeUrl(number.smsUrl)) {
       updates.smsUrl = expected.inboundSms;
     }
+    // Number-level statusCallback is the SMS delivery status callback: repair
+    // any legacy Edge URL or the stale remix caller-ID value to /api/sms/status.
+    // Caller-ID *verification* (validationRequests) is a separate flow and is
+    // not repointed here.
     const statusNorm = normalizeUrl(number.statusCallback);
-    if (statusNorm?.includes("/functions/v1/sms-status")) {
+    if (
+      statusNorm &&
+      statusNorm !== expected.smsStatus &&
+      (isLegacyEdgeUrl(number.statusCallback) ||
+        statusNorm === expected.callerIdStatus)
+    ) {
       updates.statusCallback = expected.smsStatus;
-    } else if (statusNorm?.includes("/functions/v1/")) {
-      updates.statusCallback = expected.callerIdStatus;
     }
 
     if (Object.keys(updates).length === 0) {

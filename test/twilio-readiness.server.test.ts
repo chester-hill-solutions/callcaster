@@ -15,6 +15,13 @@ vi.mock("@/lib/twilio-sender-pool.server", () => ({
   verifyWorkspaceMessagingSenderPool: vi.fn(),
 }));
 
+// Pin the RCS flag off: this suite documents pre-RCS readiness semantics
+// (flag-on paths are covered by test/rcs-onboarding.server.test.ts).
+vi.mock("@/lib/rcs-onboarding-flags", () => ({
+  RCS_ONBOARDING_ENABLED: false,
+  isRcsOnboardingEnabled: () => false,
+}));
+
 vi.mock("@/lib/database.server", () => ({
   getWorkspaceTwilioPortalConfig: vi.fn(),
   getWorkspaceTwilioSyncSnapshotFromTwilioData: vi.fn(),
@@ -36,7 +43,10 @@ vi.mock("@/server/admin-db", () => ({
   },
 }));
 
-import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import {
+  getWorkspaceMessagingOnboardingState,
+  DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+} from "@/lib/messaging-onboarding.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import {
   getWorkspaceTwilioPortalConfig,
@@ -46,14 +56,20 @@ import {
 describe("twilio-readiness.server", () => {
   test("blocks bulk SMS when toll-free verification is blocked", async () => {
     vi.mocked(getWorkspaceMessagingOnboardingState).mockResolvedValue({
+      ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       status: "live",
+      operatingCountry: "CA",
       selectedChannels: [],
       messagingService: {
+        ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
         serviceSid: "MG123",
         desiredSendMode: "messaging_service",
         advancedOptOutEnabled: false,
       },
-      a2p10dlc: { status: "live" },
+      a2p10dlc: {
+        ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.a2p10dlc,
+        status: "live",
+      },
     } as never);
     vi.mocked(getWorkspaceTwilioPortalConfig).mockResolvedValue(
       makePortalConfig({ sendMode: "messaging_service" }),

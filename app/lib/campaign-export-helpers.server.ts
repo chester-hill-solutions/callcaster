@@ -4,6 +4,10 @@ import {
   createSignedObjectUrl,
   uploadObject,
 } from "@/lib/object-storage.server";
+import {
+  isProcessingStale,
+  PROCESSING_INTERRUPTED_MESSAGE,
+} from "@/lib/processing-watchdog.server";
 import type { ExportScript } from "@/lib/campaign-export-types.server";
 
 export type CampaignExportStatus = {
@@ -15,6 +19,10 @@ export type CampaignExportStatus = {
   stage: string;
   workspaceId: string;
   created_at: string;
+  /** Stamped on every writeExportStatus() call; used by the staleness
+   * watchdog in the status loader to detect a run abandoned by a mid-run
+   * restart. See app/lib/processing-watchdog.server.ts. */
+  updated_at?: string;
   campaignId?: number;
   processed?: number;
   total?: number;
@@ -28,6 +36,7 @@ export function createInitialExportStatus(args: {
   workspaceId: string;
   campaignId: number;
 }): CampaignExportStatus {
+  const now = new Date().toISOString();
   return {
     status: "processing",
     progress: 0,
@@ -36,7 +45,8 @@ export function createInitialExportStatus(args: {
     campaignName: args.campaignName,
     stage: "Starting export",
     workspaceId: args.workspaceId,
-    created_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
   };
 }
 
@@ -46,7 +56,11 @@ export async function writeExportStatus(
   statusData: CampaignExportStatus,
   patch: Partial<CampaignExportStatus>,
 ): Promise<CampaignExportStatus> {
-  const nextStatus = { ...statusData, ...patch };
+  const nextStatus = {
+    ...statusData,
+    ...patch,
+    updated_at: new Date().toISOString(),
+  };
   await uploadObject(
     "campaign-exports",
     `${workspaceId}/${exportId}.json`,
@@ -111,6 +125,46 @@ export async function writeExportErrorStatus(
   } catch (statusError) {
     logger.error("Error writing error status:", statusError);
   }
+}
+
+/**
+ * Staleness watchdog for the polling status loader:
+ * `processMessageCampaignExport`/`processCallCampaignExport` run
+ * fire-and-forget in the request process that started them (see
+ * app/routes/api+/campaign-export.action.server.ts). If that process
+ * restarts mid-run, the status blob is stranded at status: "processing"
+ * forever and the client polls indefinitely.
+ *
+ * Call this from the status loader (write-through on read): if the status
+ * is "processing" and hasn't been updated in PROCESSING_STALE_MS, rewrite
+ * it as a terminal failure.
+ */
+export async function markCampaignExportInterruptedIfStale(
+  workspaceId: string,
+  exportId: string,
+  statusData: CampaignExportStatus,
+  now?: Date,
+): Promise<{ interrupted: boolean; statusData: CampaignExportStatus }> {
+  if (statusData.status !== "processing") {
+    return { interrupted: false, statusData };
+  }
+  const lastUpdated = statusData.updated_at ?? statusData.created_at;
+  if (!isProcessingStale(lastUpdated, now)) {
+    return { interrupted: false, statusData };
+  }
+
+  const nextStatus = await writeExportStatus(workspaceId, exportId, statusData, {
+    status: "error",
+    error: PROCESSING_INTERRUPTED_MESSAGE,
+    stage: "Export failed",
+  });
+
+  logger.error("campaign_export.watchdog.interrupted", {
+    workspaceId,
+    exportId,
+  });
+
+  return { interrupted: true, statusData: nextStatus };
 }
 
 export type ScriptQuestion = {

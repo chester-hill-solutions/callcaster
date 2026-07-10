@@ -110,6 +110,9 @@ const serverEnv = {
   DATABASE_URL: databaseUrl,
   BASE_URL: baseURL,
   E2E_BASE_URL: baseURL,
+  // Marks this as the E2E harness: relaxes prod-only boot guards
+  // (localhost BASE_URL check, 2FA-bypass refusal).
+  E2E_TEST: "1",
   PORT: e2ePort,
   TWILIO_VALIDATE_WEBHOOKS: "false",
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",

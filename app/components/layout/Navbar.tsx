@@ -41,8 +41,10 @@ export const NavButton = ({
     className={({ isActive }) =>
       `rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-bold transition-colors duration-150 ease-in-out ${
         isActive
-          ? "border-brand-primary bg-brand-primary text-white"
-          : "border-transparent bg-background/70 text-brand-primary hover:border-border hover:bg-background"
+          ? "border-brand-primary bg-brand-primary text-primary-foreground"
+          : // The navbar keeps its pale brand-blue in both themes, so the pills
+            // stay light regardless of theme rather than following bg-background.
+            "border-transparent bg-white/70 text-brand-primary hover:border-brand-primary/30 hover:bg-white"
       } ${className}`
     }
   >
@@ -98,6 +100,16 @@ const UserDropdownMenu = ({
             {user.workspace_invite.length !== 1 ? "s" : ""}
           </NavLink>
         </DropdownMenuItem>
+        {workspaceId && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to={`/workspaces/${workspaceId}/settings`}>
+                Workspace settings
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           id="logoutButton"
@@ -109,15 +121,6 @@ const UserDropdownMenu = ({
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log Out</span>
         </DropdownMenuItem>
-        {workspaceId && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Workspace Settings</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link to={`/workspaces/${workspaceId}/settings`}>Users</Link>
-            </DropdownMenuItem>
-          </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -162,9 +165,13 @@ export default function Navbar({
         </Link>
         <div className="hidden items-center space-x-3 sm:flex">
           <NavButton to="/pricing">Pricing</NavButton>
-          {/* <NavButton to="/">Home</NavButton> */}
-          {/*           <NavButton to="/services">Services</NavButton>
-           */}{" "}
+          <NavButton to="/docs">Docs</NavButton>
+          <a
+            href="mailto:info@callcaster.ca"
+            className="rounded-lg border border-transparent bg-white/70 px-3 py-2 font-Zilla-Slab text-base font-bold text-brand-primary transition-colors duration-150 ease-in-out hover:border-brand-primary/30 hover:bg-white"
+          >
+            Support
+          </a>{" "}
           {!isSignedIn && (
             <>
               <NavButton to="/signin">Sign In</NavButton>

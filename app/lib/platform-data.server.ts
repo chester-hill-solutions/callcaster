@@ -1004,6 +1004,7 @@ export async function listWorkspaceConversationsApi(
   searchParams: URLSearchParams,
 ) {
   const campaignId = searchParams.get("campaign_id");
+  const search = searchParams.get("search") ?? undefined;
   const sortBy = getChatSortOption(searchParams.get("sort"));
   const { page, pageSize, offset } = parsePagination(searchParams, {
     defaultPageSize: 20,
@@ -1013,7 +1014,7 @@ export async function listWorkspaceConversationsApi(
   const { chats, chatsError, hasMore } = await fetchConversationSummary(
     workspaceId,
     campaignId,
-    { limit: pageSize, offset, sort: sortBy },
+    { limit: pageSize, offset, sort: sortBy, search },
   );
 
   if (chatsError) {

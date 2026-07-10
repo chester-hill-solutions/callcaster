@@ -6,6 +6,7 @@ import { useState } from "react";
 import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageShell } from "@/components/ui/page-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -214,14 +215,11 @@ export default function NewSurveyPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Create New Survey</h1>
-        <p className="text-muted-foreground">
-          Build a new survey for your workspace
-        </p>
-      </div>
-
+    <PageShell
+      title="Create New Survey"
+      description="Build a new survey for your workspace"
+      maxWidth="narrow"
+    >
       <form onSubmit={handleSubmit}>
         <Card className="mb-6">
           <CardHeader>
@@ -408,6 +406,6 @@ export default function NewSurveyPage() {
           </Button>
         </div>
       </form>
-    </div>
+    </PageShell>
   );
 }

@@ -5,7 +5,7 @@ export {
   type WizardOnboardingStepId,
 } from "@/lib/messaging-onboarding/wizard-steps";
 
-export const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 2;
+export const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 3;
 
 export const DEFAULT_WORKSPACE_ONBOARDING_STEPS: WorkspaceOnboardingStepState[] = [
   {
@@ -25,12 +25,6 @@ export const DEFAULT_WORKSPACE_ONBOARDING_STEPS: WorkspaceOnboardingStepState[] 
     label: "Channel selection",
     status: "pending",
     description: "Choose which messaging and voice tracks this workspace actually needs.",
-  },
-  {
-    id: "messaging_service",
-    label: "Messaging Service",
-    status: "pending",
-    description: "Provision or confirm the shared Messaging Service used for sending.",
   },
   {
     id: "first_number",

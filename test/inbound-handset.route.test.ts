@@ -121,4 +121,19 @@ describe("app/routes/api+/inbound-handset", () => {
     const text = await res.text();
     expect(text).toContain("client:agent-1");
   });
+
+  test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
+    mocks.findWorkspaceNumberByPhoneNumber.mockRejectedValueOnce(new Error("db down"));
+    const mod = await import("../app/routes/api+/inbound-handset");
+    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    const text = await res.text();
+    expect(text).toContain("say:");
+    expect(text).toContain("hangup");
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Unhandled error in api.inbound-handset",
+      expect.objectContaining({ error: "db down" }),
+    );
+  });
 });

@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { initiateIvrBodySchema } from "@/lib/schemas/api/common";
 import { requireJsonAuth } from "@/lib/api-auth.server";
@@ -48,19 +49,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     formData.append("contact_id", String(contact.contact_id));
     formData.append("caller_id", String(contact.caller_id));
     formData.append("to_number", normalizePhoneNumber(contact.phone));
-    const res = await fetch(`${env.BASE_URL()}/api/ivr`, {
+    const response = await fetch(`${env.BASE_URL()}/api/ivr`, {
       body: formData,
       method: "POST",
-    })
-      .then((response) => response.json())
-      .catch((fetchError) => {
-        logger.error("Error initiating IVR call:", fetchError);
+    }).catch((fetchError) => {
+      logger.error("Error initiating IVR call:", fetchError);
+      return null;
+    });
+    if (!response) {
+      continue;
+    }
+    const res = await response
+      .json()
+      .catch((parseError: unknown) => {
+        logger.error("Error parsing IVR response:", parseError);
         return null;
       });
-    if (res?.creditsError) {
-      return {
-        creditsError: true,
-      };
+    if (response.status === 402 || res?.creditsError) {
+      return routeData({ creditsError: true }, { status: 402 });
     }
   }
   return data;

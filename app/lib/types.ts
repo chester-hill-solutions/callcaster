@@ -281,6 +281,13 @@ export const WORKSPACE_ONBOARDING_CHANNEL_VALUES = [
   "a2p10dlc",
   "rcs",
   "voice_compliance",
+  "toll_free_bulk_sms",
+] as const;
+
+export const WORKSPACE_OPERATING_COUNTRY_VALUES = [
+  "CA",
+  "US",
+  "BOTH",
 ] as const;
 
 export const WORKSPACE_ONBOARDING_STATUS_VALUES = [
@@ -316,6 +323,8 @@ export const WORKSPACE_TWILIO_AUTH_MODE_VALUES = [
 
 export type WorkspaceOnboardingChannel =
   (typeof WORKSPACE_ONBOARDING_CHANNEL_VALUES)[number];
+export type WorkspaceOperatingCountry =
+  (typeof WORKSPACE_OPERATING_COUNTRY_VALUES)[number];
 export type WorkspaceOnboardingStatus =
   (typeof WORKSPACE_ONBOARDING_STATUS_VALUES)[number];
 export type WorkspaceOnboardingStepStatus =
@@ -346,6 +355,18 @@ export interface WorkspaceMessagingBusinessProfile {
   optOutKeywords: string;
   helpKeywords: string;
   sampleMessages: string[];
+  // --- Phase C/D additive fields (channel-scoped inline inputs collected on the
+  // Channels step). Toll-free bulk SMS (TFV) verification inputs: ---
+  doingBusinessAs: string;
+  businessRegistrationNumber: string;
+  ageGatedContent: boolean;
+  // --- US A2P 10DLC Trust Hub brand inputs: ---
+  ein: string;
+  industry: string;
+  authorizedRepName: string;
+  authorizedRepEmail: string;
+  authorizedRepPhone: string;
+  authorizedRepTitle: string;
 }
 
 export interface WorkspaceMessagingServiceState {
@@ -445,6 +466,7 @@ export interface WorkspaceMessagingOnboardingState {
   version: number;
   status: WorkspaceOnboardingStatus;
   currentStep: string;
+  operatingCountry: WorkspaceOperatingCountry;
   selectedChannels: WorkspaceOnboardingChannel[];
   steps: WorkspaceOnboardingStepState[];
   businessProfile: WorkspaceMessagingBusinessProfile;

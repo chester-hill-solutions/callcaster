@@ -5,6 +5,10 @@ import type { TwilioPageData } from "../loadTwilioData.server";
 export const TWILIO_RCS_PROVIDER = "Twilio";
 export const TWILIO_RCS_DOCS_URL = "https://www.twilio.com/docs/rcs/onboarding";
 export const TWILIO_RCS_SENDERS_URL = "https://console.twilio.com/us1/develop/rcs/senders";
+// Ops Console entry point for uploading/reviewing Trust Hub Customer Profile
+// and End User documents — the only manual step Twilio doesn't expose via
+// REST API. Used solely as a jump-off link from the admin Compliance panel.
+export const TWILIO_TRUSTHUB_CONSOLE_URL = "https://console.twilio.com/us1/develop/trust-hub/customer-profiles";
 
 export function formatLabel(value: string) {
     return value

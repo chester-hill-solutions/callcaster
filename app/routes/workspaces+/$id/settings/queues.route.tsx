@@ -7,6 +7,7 @@ import { Heading } from "@/components/ui/typography";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 type Queue = {
   id: number;
@@ -42,12 +43,56 @@ type QueueFormData = {
   description: string;
 };
 
+type QueueActionResult = { ok: true } | { error: string };
+
+const getQueueActionError = (data: QueueActionResult | undefined) =>
+  data && "error" in data ? data.error : undefined;
+
+const getQueueActionSuccess = (data: QueueActionResult | undefined) =>
+  Boolean(data && "ok" in data && data.ok);
+
 export default function QueueSettings() {
   const { queues, members, numbers, workspaceId } = useLoaderData<LoaderData>();
   useOutletContext<{ }>();
-  const fetcher = useFetcher();
+  const createFetcher = useFetcher<QueueActionResult>({ key: "queue-create" });
+  const editFetcher = useFetcher<QueueActionResult>({ key: "queue-edit" });
+  const deleteFetcher = useFetcher<QueueActionResult>({ key: "queue-delete" });
+  const addMemberFetcher = useFetcher<QueueActionResult>({ key: "queue-add-member" });
+  const removeMemberFetcher = useFetcher<QueueActionResult>({ key: "queue-remove-member" });
   const [editing, setEditing] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+
+  useActionFeedback(createFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Queue created",
+    onSuccess: () => setShowCreate(false),
+  });
+
+  useActionFeedback(editFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Queue updated",
+    onSuccess: () => setEditing(null),
+  });
+
+  useActionFeedback(deleteFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Queue deleted",
+  });
+
+  useActionFeedback(addMemberFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Agent added to queue",
+  });
+
+  useActionFeedback(removeMemberFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Agent removed from queue",
+  });
 
   const getQueueMembers = (queueId: number) =>
     members.filter((m) => m.queue_id === queueId);
@@ -125,7 +170,7 @@ export default function QueueSettings() {
                 initial={queue}
                 onCancel={() => setEditing(null)}
                 onSubmit={(data) => {
-                  fetcher.submit(
+                  editFetcher.submit(
                     {
                       _action: "update-queue",
                       id: String(queue.id),
@@ -135,7 +180,6 @@ export default function QueueSettings() {
                     },
                     { method: "PUT", encType: "application/json" },
                   );
-                  setEditing(null);
                 }}
               />
             ) : (
@@ -153,9 +197,10 @@ export default function QueueSettings() {
                     <Button
                       variant="destructive"
                       size="sm"
+                      disabled={deleteFetcher.state !== "idle"}
                       onClick={() => {
                         if (confirm("Delete queue?")) {
-                          fetcher.submit(
+                          deleteFetcher.submit(
                             {
                               _action: "delete-queue",
                               id: String(queue.id),
@@ -186,7 +231,7 @@ export default function QueueSettings() {
                 onChange={(e) => {
                   const userId = e.target.value;
                   if (!userId) return;
-                  fetcher.submit(
+                  addMemberFetcher.submit(
                     {
                       _action: "add-member",
                       queue_id: String(queue.id),
@@ -214,7 +259,7 @@ export default function QueueSettings() {
                     <button
                       className="text-destructive hover:underline"
                       onClick={() => {
-                        fetcher.submit(
+                        removeMemberFetcher.submit(
                           {
                             _action: "remove-member",
                             queue_id: String(queue.id),
@@ -259,7 +304,7 @@ export default function QueueSettings() {
           <QueueForm
             onCancel={() => setShowCreate(false)}
             onSubmit={(data) => {
-              fetcher.submit(
+              createFetcher.submit(
                 {
                   _action: "create-queue",
                   name: data.name,
@@ -268,7 +313,6 @@ export default function QueueSettings() {
                 },
                 { method: "POST", encType: "application/json" },
               );
-              setShowCreate(false);
             }}
           />
         )}

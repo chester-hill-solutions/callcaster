@@ -1,14 +1,10 @@
-import { and, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
-import type { Database } from "@/lib/db-types";
+import { inArray, sql, type SQL } from "drizzle-orm";
 import { rpcFindContactsByPhones } from "@/lib/db-rpc.server";
-import { message as messageTable, contact as contactTable } from "@/db/schema";
+import { contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "../logger.server";
 import {
-  getConversationParticipantPhones,
   getConversationPhoneKey,
-  isInboundMessageDirection,
-  sortConversationSummaries,
   type ChatSortOption,
   type ConversationSummary,
 } from "../chat-conversation-sort";
@@ -17,55 +13,35 @@ type FetchConversationSummaryOptions = {
   limit?: number;
   offset?: number;
   sort?: ChatSortOption;
+  /** Free-text filter matched against contact name, phone digits, and the
+   * most recent inbound message body. Empty/whitespace = no filtering. */
+  search?: string;
 };
 
-type ConversationMessageRow = Pick<
-  Database["public"]["Tables"]["message"]["Row"],
-  | "body"
-  | "campaign_id"
-  | "contact_id"
-  | "date_created"
-  | "direction"
-  | "from"
-  | "status"
-  | "to"
->;
+type ContactNameRow = {
+  firstname: string | null;
+  id: number;
+  phone: string | null;
+  surname: string | null;
+};
 
-type ContactNameRow = Pick<
-  Database["public"]["Tables"]["contact"]["Row"],
-  "firstname" | "id" | "phone" | "surname"
->;
-
-type PhoneMatchedContactRow =
-  Database["public"]["Functions"]["find_contact_by_phone"]["Returns"][number];
-
-function compareConversationDates(left: string, right: string): number {
-  return new Date(left).getTime() - new Date(right).getTime();
-}
-
-function contactMatchesConversationPhone(
-  contact: ContactNameRow | undefined,
-  contactPhone: string,
-): contact is ContactNameRow {
-  if (!contact?.phone) {
-    return false;
-  }
-
-  return (
-    getConversationPhoneKey(contact.phone) ===
-    getConversationPhoneKey(contactPhone)
-  );
-}
-
-function conversationNeedsPhoneMatchedContact(
-  conversation: ConversationSummary,
-): boolean {
-  return !conversation.contact_firstname && !conversation.contact_surname;
-}
-
-/** Max messages to fetch when building conversation list; keeps contact/phone lookups bounded. */
-const CONVERSATION_MESSAGE_CAP = 30_000;
-const CONVERSATION_MESSAGE_PAGE_SIZE = 2_000;
+/**
+ * One row per conversation, produced by {@link buildConversationSummaryQuery}.
+ * `conv_key` and `primary_contact_id` are internal — used only to drive the
+ * contact-name enrichment pass below — and never returned to callers.
+ */
+type AggregatedConversationRow = {
+  conv_key: string;
+  contact_phone: string;
+  user_phone: string | null;
+  conversation_start: string;
+  conversation_last_update: string;
+  message_count: number;
+  unread_count: number;
+  has_replied: boolean;
+  last_inbound_body: string | null;
+  primary_contact_id: number | null;
+};
 
 const CONTACT_IDS_BATCH_SIZE = 800;
 const PHONES_BATCH_SIZE = 800;
@@ -78,6 +54,227 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+/** Escapes LIKE/ILIKE metacharacters so free-text search can't be used to
+ * inject wildcard patterns. Postgres' default LIKE escape char is `\`. */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, "\\$&");
+}
+
+function buildWorkspaceKeysArray(workspacePhoneKeys: Set<string>): SQL {
+  const keys = Array.from(workspacePhoneKeys);
+  if (keys.length === 0) {
+    return sql`ARRAY[]::text[]`;
+  }
+  return sql`ARRAY[${sql.join(
+    keys.map((key) => sql`${key}`),
+    sql`, `,
+  )}]::text[]`;
+}
+
+function buildSortPredicate(sort: ChatSortOption): SQL {
+  if (sort === "hasReplied") return sql`has_replied = true`;
+  if (sort === "hasUnreadReply") return sql`unread_count > 0`;
+  return sql`true`;
+}
+
+/**
+ * Matches the same conversations the JS reference implementation used to
+ * search: contact phone digits, most-recent-inbound body text, and the
+ * enriched contact's name (matched the same way the post-aggregation
+ * enrichment pass matches it — by candidate contact id, falling back to a
+ * normalised-phone-key match via the same function backing
+ * idx_contact_workspace_normalised_phone).
+ */
+function buildSearchPredicate(workspaceId: string, search: string | undefined): SQL {
+  const trimmed = (search ?? "").trim();
+  if (!trimmed) return sql`true`;
+
+  const likePattern = `%${escapeLikePattern(trimmed)}%`;
+  const digits = trimmed.replace(/\D/g, "");
+  const phoneCondition =
+    digits.length > 0
+      ? sql`regexp_replace(a.contact_phone, '[^0-9]', '', 'g') LIKE ${`%${digits}%`}`
+      : sql`false`;
+
+  return sql`(
+    ${phoneCondition}
+    OR a.last_inbound_body ILIKE ${likePattern}
+    OR EXISTS (
+      SELECT 1 FROM public.contact c
+      WHERE c.workspace = ${workspaceId}::uuid
+        AND (
+          c.id = a.primary_contact_id
+          OR public.normalise_phone_key(c.phone) = a.conv_key
+        )
+        AND (
+          c.firstname ILIKE ${likePattern}
+          OR c.surname ILIKE ${likePattern}
+          OR (COALESCE(c.firstname, '') || ' ' || COALESCE(c.surname, '')) ILIKE ${likePattern}
+        )
+    )
+  )`;
+}
+
+/**
+ * Builds the conversation-summary aggregation. Conversation identity mirrors
+ * `getConversationParticipantPhones`/`getConversationPhoneKey`
+ * (app/lib/chat-conversation-sort.ts): the "contact" side of a message is
+ * whichever of from/to is NOT a workspace-owned number (falling back to
+ * direction when neither side matches a workspace number), and the grouping
+ * key is that contact phone's digit-normalised key
+ * (`public.normalise_phone_key`, the same function backing
+ * idx_contact_workspace_normalised_phone — verified equivalent to
+ * getConversationPhoneKey).
+ *
+ * Per-conversation scalar fields (contact_phone/user_phone/last_inbound_body)
+ * use `array_agg(... ORDER BY date_created DESC) FILTER (...)` to take the
+ * most-recent non-null value, matching the JS reference's "scan newest-first,
+ * first non-null value wins" behavior.
+ */
+function buildConversationSummaryQuery(params: {
+  workspaceId: string;
+  workspacePhoneKeys: Set<string>;
+  campaignId: number | null;
+  sort: ChatSortOption;
+  search: string | undefined;
+  limit: number;
+  offset: number;
+}): SQL {
+  const { workspaceId, workspacePhoneKeys, campaignId, sort, search, limit, offset } = params;
+
+  const campaignFilter =
+    campaignId !== null ? sql`AND m.campaign_id = ${campaignId}` : sql``;
+  const wsKeys = buildWorkspaceKeysArray(workspacePhoneKeys);
+  const sortPredicate = buildSortPredicate(sort);
+  const searchPredicate = buildSearchPredicate(workspaceId, search);
+
+  return sql`
+    WITH scoped AS (
+      SELECT
+        m.body,
+        m.contact_id::int AS contact_id,
+        m.date_created,
+        m.direction,
+        m.status,
+        m."from" AS msg_from,
+        m."to" AS msg_to,
+        public.normalise_phone_key(m."from") AS from_key,
+        public.normalise_phone_key(m."to") AS to_key,
+        regexp_replace(m."from", '[^0-9]', '', 'g') AS from_digits,
+        regexp_replace(m."to", '[^0-9]', '', 'g') AS to_digits
+      FROM public.message m
+      WHERE m.workspace = ${workspaceId}::uuid
+        AND m.date_created IS NOT NULL
+        AND m.status <> 'failed'
+        ${campaignFilter}
+    ),
+    normed AS (
+      SELECT
+        body, contact_id, date_created, direction, status, from_key, to_key,
+        CASE
+          WHEN msg_from IS NULL OR from_digits = '' THEN NULL
+          WHEN length(from_digits) = 10 THEN '+1' || from_digits
+          WHEN length(from_digits) = 11 AND left(from_digits, 1) = '1' THEN '+' || from_digits
+          WHEN left(msg_from, 1) = '+' THEN msg_from
+          ELSE '+' || from_digits
+        END AS from_norm,
+        CASE
+          WHEN msg_to IS NULL OR to_digits = '' THEN NULL
+          WHEN length(to_digits) = 10 THEN '+1' || to_digits
+          WHEN length(to_digits) = 11 AND left(to_digits, 1) = '1' THEN '+' || to_digits
+          WHEN left(msg_to, 1) = '+' THEN msg_to
+          ELSE '+' || to_digits
+        END AS to_norm
+      FROM scoped
+    ),
+    participants AS (
+      SELECT
+        date_created,
+        direction,
+        status,
+        body,
+        contact_id,
+        CASE
+          WHEN from_key IS NOT NULL AND from_key = ANY(${wsKeys}) THEN to_key
+          WHEN to_key IS NOT NULL AND to_key = ANY(${wsKeys}) THEN from_key
+          WHEN direction = 'inbound' THEN from_key
+          ELSE to_key
+        END AS conv_key,
+        CASE
+          WHEN from_key IS NOT NULL AND from_key = ANY(${wsKeys}) THEN to_norm
+          WHEN to_key IS NOT NULL AND to_key = ANY(${wsKeys}) THEN from_norm
+          WHEN direction = 'inbound' THEN from_norm
+          ELSE to_norm
+        END AS contact_phone,
+        CASE
+          WHEN from_key IS NOT NULL AND from_key = ANY(${wsKeys}) THEN from_norm
+          WHEN to_key IS NOT NULL AND to_key = ANY(${wsKeys}) THEN to_norm
+          WHEN direction = 'inbound' THEN to_norm
+          ELSE from_norm
+        END AS user_phone
+      FROM normed
+    ),
+    agg AS (
+      SELECT
+        conv_key,
+        (array_agg(contact_phone ORDER BY date_created DESC))[1] AS contact_phone,
+        COALESCE(
+          (array_agg(user_phone ORDER BY date_created DESC) FILTER (WHERE user_phone IS NOT NULL))[1],
+          ''
+        ) AS user_phone,
+        MIN(date_created) AS conversation_start,
+        MAX(date_created) AS conversation_last_update,
+        COUNT(*)::int AS message_count,
+        COUNT(*) FILTER (WHERE direction = 'inbound' AND status = 'received')::int AS unread_count,
+        COALESCE(BOOL_OR(direction = 'inbound'), false) AS has_replied,
+        (array_agg(body ORDER BY date_created DESC) FILTER (WHERE direction = 'inbound' AND body IS NOT NULL))[1] AS last_inbound_body,
+        (array_agg(contact_id ORDER BY date_created DESC) FILTER (WHERE contact_id IS NOT NULL))[1] AS primary_contact_id
+      FROM participants
+      WHERE conv_key IS NOT NULL
+      GROUP BY conv_key
+    ),
+    searched AS (
+      SELECT a.*
+      FROM agg a
+      WHERE (${sortPredicate}) AND (${searchPredicate})
+    )
+    SELECT
+      conv_key,
+      contact_phone,
+      user_phone,
+      conversation_start,
+      conversation_last_update,
+      message_count,
+      unread_count,
+      has_replied,
+      last_inbound_body,
+      primary_contact_id
+    FROM searched
+    ORDER BY conversation_last_update DESC, conv_key ASC
+    LIMIT ${limit + 1}
+    OFFSET ${offset}
+  `;
+}
+
+function contactMatchesConversationPhone(
+  contact: ContactNameRow | undefined,
+  contactPhone: string,
+): contact is ContactNameRow {
+  if (!contact?.phone) {
+    return false;
+  }
+
+  return (
+    getConversationPhoneKey(contact.phone) === getConversationPhoneKey(contactPhone)
+  );
+}
+
+function conversationNeedsPhoneMatchedContact(
+  conversation: ConversationSummary,
+): boolean {
+  return !conversation.contact_firstname && !conversation.contact_surname;
+}
+
 export async function fetchConversationSummary(
   workspaceId: string,
   campaign_id?: string | null,
@@ -86,6 +283,7 @@ export async function fetchConversationSummary(
   const limit = Math.max(1, options.limit ?? 20);
   const offset = Math.max(0, options.offset ?? 0);
   const sort = options.sort ?? "recent";
+  const search = options.search;
   const tdb = createTenantDb(workspaceId);
 
   let workspaceNumberRows: Array<{ phone_number: string | null }>;
@@ -107,152 +305,57 @@ export async function fetchConversationSummary(
       .filter((phone): phone is string => Boolean(phone)),
   );
 
-  const conversationMap = new Map<string, ConversationSummary>();
-  const conversationContactIds = new Map<string, number>();
-  const contactIds = new Set<number>();
-
   const numericCampaignId = campaign_id ? Number(campaign_id) : null;
   const shouldFilterByCampaign =
     numericCampaignId !== null && !Number.isNaN(numericCampaignId);
 
-  let scannedMessages = 0;
-  let cursor = 0;
-  let hasMoreRows = true;
+  const query = buildConversationSummaryQuery({
+    workspaceId,
+    workspacePhoneKeys,
+    campaignId: shouldFilterByCampaign ? (numericCampaignId as number) : null,
+    sort,
+    search,
+    limit,
+    offset,
+  });
 
-  while (hasMoreRows && scannedMessages < CONVERSATION_MESSAGE_CAP) {
-    const pageStart = cursor;
-    const pageLimit = Math.min(
-      CONVERSATION_MESSAGE_PAGE_SIZE,
-      CONVERSATION_MESSAGE_CAP - scannedMessages,
-    );
-
-    const messageWhere = [
-      isNotNull(messageTable.date_created),
-      ne(messageTable.status, "failed"),
-      ...(shouldFilterByCampaign
-        ? [eq(messageTable.campaign_id, numericCampaignId as number)]
-        : []),
-    ];
-
-    let pageRows: ConversationMessageRow[];
-    try {
-      pageRows = (await tdb.message.findMany({
-        where: and(...messageWhere),
-        columns: {
-          body: true,
-          campaign_id: true,
-          contact_id: true,
-          date_created: true,
-          direction: true,
-          from: true,
-          status: true,
-          to: true,
-        },
-        orderBy: [desc(messageTable.date_created)],
-        limit: pageLimit,
-        offset: pageStart,
-      })) as ConversationMessageRow[];
-    } catch (messagesError) {
-      return { chats: [], chatsError: messagesError as { message: string }, hasMore: false };
-    }
-
-    if (pageRows.length === 0) {
-      hasMoreRows = false;
-      continue;
-    }
-
-    scannedMessages += pageRows.length;
-    cursor += pageRows.length;
-    hasMoreRows = pageRows.length === pageLimit;
-
-    for (const message of pageRows) {
-      if (typeof message.contact_id === "number") {
-        contactIds.add(message.contact_id);
-      }
-
-      const { contactPhone, userPhone } = getConversationParticipantPhones(
-        message,
-        workspacePhoneKeys,
-      );
-      const conversationKey = getConversationPhoneKey(contactPhone);
-      const timestamp = message.date_created ?? new Date().toISOString();
-
-      if (!contactPhone || !conversationKey) {
-        continue;
-      }
-
-      if (
-        typeof message.contact_id === "number" &&
-        !conversationContactIds.has(conversationKey)
-      ) {
-        // Rows are scanned newest-first, so the first contact_id per conversation
-        // is the strongest candidate and keeps contact lookups bounded.
-        conversationContactIds.set(conversationKey, message.contact_id);
-      }
-
-      const existingConversation = conversationMap.get(conversationKey);
-      const hasReplied = isInboundMessageDirection(message.direction);
-      const unreadIncrement =
-        isInboundMessageDirection(message.direction) && message.status === "received"
-          ? 1
-          : 0;
-
-      if (!existingConversation) {
-        conversationMap.set(conversationKey, {
-          contact_phone: contactPhone,
-          user_phone: userPhone ?? "",
-          conversation_start: timestamp,
-          conversation_last_update: timestamp,
-          message_count: 1,
-          unread_count: unreadIncrement,
-          contact_firstname: null,
-          contact_surname: null,
-          has_replied: hasReplied,
-          last_inbound_body:
-            hasReplied && message.body != null ? message.body : null,
-        });
-        continue;
-      }
-
-      existingConversation.message_count += 1;
-      existingConversation.unread_count += unreadIncrement;
-      existingConversation.has_replied =
-        existingConversation.has_replied === true || hasReplied;
-      if (
-        existingConversation.last_inbound_body == null &&
-        hasReplied &&
-        message.body != null
-      ) {
-        existingConversation.last_inbound_body = message.body;
-      }
-
-      if (
-        compareConversationDates(
-          existingConversation.conversation_start,
-          timestamp,
-        ) > 0
-      ) {
-        existingConversation.conversation_start = timestamp;
-      }
-
-      if (
-        compareConversationDates(
-          existingConversation.conversation_last_update,
-          timestamp,
-        ) < 0
-      ) {
-        existingConversation.conversation_last_update = timestamp;
-      }
-
-      if (!existingConversation.user_phone && userPhone) {
-        existingConversation.user_phone = userPhone;
-      }
-
-      if (!existingConversation.contact_phone && contactPhone) {
-        existingConversation.contact_phone = contactPhone;
-      }
-    }
+  let aggregatedRows: AggregatedConversationRow[];
+  try {
+    aggregatedRows = (await tdb.execute(query)) as AggregatedConversationRow[];
+  } catch (aggregationError) {
+    return {
+      chats: [],
+      chatsError: aggregationError as { message: string },
+      hasMore: false,
+    };
   }
+
+  const hasMore = aggregatedRows.length > limit;
+  const pageRows = hasMore ? aggregatedRows.slice(0, limit) : aggregatedRows;
+
+  const conversationContactIds = new Map<string, number>();
+  const contactIds = new Set<number>();
+
+  const chats: ConversationSummary[] = pageRows.map((row) => {
+    const conversationKey = getConversationPhoneKey(row.contact_phone);
+    if (conversationKey && typeof row.primary_contact_id === "number") {
+      conversationContactIds.set(conversationKey, row.primary_contact_id);
+      contactIds.add(row.primary_contact_id);
+    }
+
+    return {
+      contact_phone: row.contact_phone,
+      user_phone: row.user_phone ?? "",
+      conversation_start: row.conversation_start,
+      conversation_last_update: row.conversation_last_update,
+      message_count: row.message_count,
+      unread_count: row.unread_count,
+      contact_firstname: null,
+      contact_surname: null,
+      has_replied: row.has_replied,
+      last_inbound_body: row.last_inbound_body ?? null,
+    };
+  });
 
   const contactsById = new Map<number, ContactNameRow>();
   if (contactIds.size > 0) {
@@ -281,19 +384,17 @@ export async function fetchConversationSummary(
     }
   }
 
-  for (const [conversationKey, conversation] of conversationMap.entries()) {
-    const candidateContactId = conversationContactIds.get(conversationKey);
+  for (const conversation of chats) {
+    const conversationKey = getConversationPhoneKey(conversation.contact_phone);
+    const candidateContactId = conversationKey
+      ? conversationContactIds.get(conversationKey)
+      : undefined;
     if (typeof candidateContactId !== "number") {
       continue;
     }
 
     const candidateContact = contactsById.get(candidateContactId);
-    if (
-      !contactMatchesConversationPhone(
-        candidateContact,
-        conversation.contact_phone,
-      )
-    ) {
+    if (!contactMatchesConversationPhone(candidateContact, conversation.contact_phone)) {
       continue;
     }
 
@@ -308,17 +409,15 @@ export async function fetchConversationSummary(
 
   const phonesMissingNames = Array.from(
     new Set(
-      Array.from(conversationMap.values())
-        .filter((conversation) =>
-          conversationNeedsPhoneMatchedContact(conversation),
-        )
+      chats
+        .filter((conversation) => conversationNeedsPhoneMatchedContact(conversation))
         .map((conversation) => conversation.contact_phone)
         .filter((phone): phone is string => Boolean(phone)),
     ),
   );
 
   if (phonesMissingNames.length > 0) {
-    const phoneMatchedContacts = new Map<string, PhoneMatchedContactRow>();
+    const phoneMatchedContacts = new Map<string, ContactNameRow>();
     const phoneBatches = chunk(phonesMissingNames, PHONES_BATCH_SIZE);
     const rpcResults = await Promise.all(
       phoneBatches.map((phones) =>
@@ -336,24 +435,21 @@ export async function fetchConversationSummary(
           phoneCount: phonesMissingNames.length,
         });
       } else if (data?.length) {
-        for (const row of data) {
-          const key = getConversationPhoneKey(row.phone as string) ?? (row.phone as string);
-          if (key) phoneMatchedContacts.set(key, row as PhoneMatchedContactRow);
+        for (const row of data as ContactNameRow[]) {
+          const key = getConversationPhoneKey(row.phone) ?? row.phone;
+          if (key) phoneMatchedContacts.set(key, row);
         }
       }
     }
 
-    for (const conversation of conversationMap.values()) {
+    for (const conversation of chats) {
       if (!conversationNeedsPhoneMatchedContact(conversation)) {
         continue;
       }
 
       const lookupKey =
-        getConversationPhoneKey(conversation.contact_phone) ??
-        conversation.contact_phone;
-      const matchedContact = lookupKey
-        ? phoneMatchedContacts.get(lookupKey)
-        : undefined;
+        getConversationPhoneKey(conversation.contact_phone) ?? conversation.contact_phone;
+      const matchedContact = lookupKey ? phoneMatchedContacts.get(lookupKey) : undefined;
       if (!matchedContact) {
         continue;
       }
@@ -363,16 +459,14 @@ export async function fetchConversationSummary(
     }
   }
 
-  const filteredAndSortedChats = sortConversationSummaries(
-    Array.from(conversationMap.values()),
-    sort,
-  );
-  const paginatedChats = filteredAndSortedChats.slice(offset, offset + limit + 1);
-  const hasMore = paginatedChats.length > limit;
-
   return {
-    chats: hasMore ? paginatedChats.slice(0, limit) : paginatedChats,
+    chats,
     chatsError: null,
     hasMore,
   };
 }
+
+// Exposed for the SQL/JS parity fixture test (test/workspace-conversations-sql-parity.test.ts).
+export const __internal = {
+  buildConversationSummaryQuery,
+};

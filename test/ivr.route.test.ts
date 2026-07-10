@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+const creditsState = vi.hoisted(() => ({
+  credits: 10 as number | null,
+}));
+
 vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
   requireWorkspaceAccess: (...a: any[]) => mocks.requireWorkspaceAccess(...a),
@@ -34,6 +38,9 @@ vi.mock("@/lib/telephony-db.server", () => ({
 }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   dequeueCampaignQueueById: (...a: any[]) => mocks.dequeueCampaignQueueById(...a),
+}));
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: vi.fn(async () => creditsState.credits),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -62,6 +69,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     });
     mocks.insertCallForWorkspace.mockResolvedValue({ sid: "CA1" });
     mocks.dequeueCampaignQueueById.mockResolvedValue(undefined);
+    creditsState.credits = 10;
   });
 
   test("throws when required form data missing", async () => {
@@ -71,6 +79,43 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     await expect(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any)).rejects.toThrow(
       "Missing required form data",
     );
+  });
+
+  test("returns 402 creditsError when workspace balance is <= 0", async () => {
+    creditsState.credits = 0;
+    const mod = await import("../app/routes/api+/ivr");
+    const res = await asRouteResponse(await mod.action({
+      request: makeRequest({
+        to_number: "+1555",
+        campaign_id: "1",
+        workspace_id: "w1",
+        contact_id: "2",
+        caller_id: "+1666",
+        queue_id: "3",
+        user_id: "u1",
+      }),
+    } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({ creditsError: true });
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+  });
+
+  test("returns 404 when workspace credits balance is not found", async () => {
+    creditsState.credits = null;
+    const mod = await import("../app/routes/api+/ivr");
+    const res = await asRouteResponse(await mod.action({
+      request: makeRequest({
+        to_number: "+1555",
+        campaign_id: "1",
+        workspace_id: "w1",
+        contact_id: "2",
+        caller_id: "+1666",
+        queue_id: "3",
+        user_id: "u1",
+      }),
+    } as any));
+    expect(res.status).toBe(404);
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
   });
 
   test("success creates outreach, places call, inserts call, dequeues, returns JSON", async () => {

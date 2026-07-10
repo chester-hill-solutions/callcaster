@@ -15,5 +15,7 @@ export {
   debitAmountFromCredits,
   TERMINAL_BILLABLE_CALL_STATUSES,
   TERMINAL_BILLABLE_SMS_STATUSES,
+  estimateMessageCredits,
   type VoiceBillingKind,
+  type MessageCreditEstimate,
 } from "../../shared/pricing";

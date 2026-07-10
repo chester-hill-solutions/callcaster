@@ -27,9 +27,11 @@ let statusJsonText = JSON.stringify({ status: "processing" });
 let downloadThrows: unknown = null;
 
 const downloadObjectMock = vi.hoisted(() => vi.fn());
+const uploadObjectMock = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("@/lib/object-storage.server", () => ({
   downloadObject: downloadObjectMock,
+  uploadObject: uploadObjectMock,
 }));
 
 function applyDualAuth() {
@@ -51,6 +53,7 @@ describe("api.campaign-export-status error handling", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     downloadObjectMock.mockReset();
+    uploadObjectMock.mockClear();
     downloadObjectMock.mockImplementation(async () => {
       if (downloadThrows != null) throw downloadThrows;
       if (downloadBehavior === "not_found") {
@@ -162,5 +165,70 @@ describe("api.campaign-export-status error handling", () => {
     } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
+  });
+
+  describe("staleness watchdog", () => {
+    test("marks a processing export failed when its status blob is stale (>10min)", async () => {
+      const staleUpdatedAt = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+      statusJsonText = JSON.stringify({
+        status: "processing",
+        progress: 42,
+        updated_at: staleUpdatedAt,
+        created_at: staleUpdatedAt,
+      });
+      applyDualAuth();
+      const mod = await import("../app/routes/api+/campaign-export-status");
+      const res = await asRouteResponse(await mod.loader({
+        request: new Request(
+          "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
+        ),
+      } as any));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("error");
+      expect(body.error).toBe("Processing interrupted — please retry");
+      expect(uploadObjectMock).toHaveBeenCalledTimes(1);
+    });
+
+    test("leaves a processing export alone when its status blob was updated recently", async () => {
+      const freshUpdatedAt = new Date(Date.now() - 60 * 1000).toISOString();
+      statusJsonText = JSON.stringify({
+        status: "processing",
+        progress: 42,
+        updated_at: freshUpdatedAt,
+        created_at: freshUpdatedAt,
+      });
+      applyDualAuth();
+      const mod = await import("../app/routes/api+/campaign-export-status");
+      const res = await asRouteResponse(await mod.loader({
+        request: new Request(
+          "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
+        ),
+      } as any));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("processing");
+      expect(uploadObjectMock).not.toHaveBeenCalled();
+    });
+
+    test("does not touch a non-processing export even if old", async () => {
+      const staleUpdatedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      statusJsonText = JSON.stringify({
+        status: "completed",
+        progress: 100,
+        updated_at: staleUpdatedAt,
+      });
+      applyDualAuth();
+      const mod = await import("../app/routes/api+/campaign-export-status");
+      const res = await asRouteResponse(await mod.loader({
+        request: new Request(
+          "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
+        ),
+      } as any));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe("completed");
+      expect(uploadObjectMock).not.toHaveBeenCalled();
+    });
   });
 });

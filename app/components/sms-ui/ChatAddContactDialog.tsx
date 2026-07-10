@@ -70,6 +70,7 @@ const ChatAddContactDialog = ({
           handleSaveContact={handleSaveContact}
           workspace_id={workspace_id}
           audience_id={null}
+          assignToDefaultSmsAudience={!(contact?.id)}
         />
       </DialogContent>
     </Dialog>

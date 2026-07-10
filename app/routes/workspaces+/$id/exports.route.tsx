@@ -198,3 +198,5 @@ export default function WorkspaceExports() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

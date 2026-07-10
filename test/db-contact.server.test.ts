@@ -9,6 +9,10 @@ const tdbMocks = vi.hoisted(() => ({
     update: vi.fn(),
     delete: vi.fn(),
   },
+  audience: {
+    findFirst: vi.fn(),
+    insert: vi.fn(),
+  },
 }));
 
 const dbMocks = vi.hoisted(() => ({
@@ -19,6 +23,9 @@ describe("app/lib/database/contact.server.ts", () => {
   beforeEach(() => {
     vi.resetModules();
     for (const fn of Object.values(tdbMocks.contact)) {
+      fn.mockReset();
+    }
+    for (const fn of Object.values(tdbMocks.audience)) {
       fn.mockReset();
     }
     dbMocks.insert.mockReset();
@@ -171,6 +178,70 @@ describe("app/lib/database/contact.server.ts", () => {
     await expect(
       mod.createContact({ workspace: "w1" } as any, "a1", "u1"),
     ).resolves.toEqual([{ id: 10 }]);
+  });
+
+  test("createContact: assignDefaultAudienceIfMissing is a no-op when audience_id was provided", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    tdbMocks.contact.insert.mockResolvedValueOnce([{ id: 10 }]);
+    dbMocks.insert.mockResolvedValueOnce(undefined);
+    await mod.createContact({ workspace: "w1" } as any, "1", "u1", {
+      assignDefaultAudienceIfMissing: true,
+    });
+
+    expect(tdbMocks.audience.findFirst).not.toHaveBeenCalled();
+    expect(tdbMocks.audience.insert).not.toHaveBeenCalled();
+    expect(dbMocks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ audience_id: 1 }),
+    );
+  });
+
+  test("createContact: assignDefaultAudienceIfMissing reuses an existing SMS Contacts audience", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    tdbMocks.contact.insert.mockResolvedValueOnce([{ id: 10 }]);
+    tdbMocks.audience.findFirst.mockResolvedValueOnce({ id: 7 });
+    dbMocks.insert.mockResolvedValueOnce(undefined);
+
+    await mod.createContact({ workspace: "w1" } as any, "", "u1", {
+      assignDefaultAudienceIfMissing: true,
+    });
+
+    expect(tdbMocks.audience.insert).not.toHaveBeenCalled();
+    expect(dbMocks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ contact_id: 10, audience_id: 7 }),
+    );
+  });
+
+  test("createContact: assignDefaultAudienceIfMissing creates the SMS Contacts audience when missing", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    tdbMocks.contact.insert.mockResolvedValueOnce([{ id: 10 }]);
+    tdbMocks.audience.findFirst.mockResolvedValueOnce(undefined);
+    tdbMocks.audience.insert.mockResolvedValueOnce([{ id: 99 }]);
+    dbMocks.insert.mockResolvedValueOnce(undefined);
+
+    await mod.createContact({ workspace: "w1" } as any, "", "u1", {
+      assignDefaultAudienceIfMissing: true,
+    });
+
+    expect(tdbMocks.audience.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ name: mod.DEFAULT_CHAT_AUDIENCE_NAME }),
+    );
+    expect(dbMocks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ contact_id: 10, audience_id: 99 }),
+    );
+  });
+
+  test("createContact: without assignDefaultAudienceIfMissing, missing audience_id links nothing", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    tdbMocks.contact.insert.mockResolvedValueOnce([{ id: 10 }]);
+
+    await mod.createContact({ workspace: "w1" } as any, "", "u1");
+
+    expect(tdbMocks.audience.findFirst).not.toHaveBeenCalled();
+    expect(dbMocks.insert).not.toHaveBeenCalled();
   });
 
   test("bulkCreateContacts: inserts and links, throwing on either error", async () => {

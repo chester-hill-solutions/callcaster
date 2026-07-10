@@ -6,11 +6,14 @@ const mocks = vi.hoisted(() => ({
   requireTwilioSignature: vi.fn(),
   getAdminDb: vi.fn(),
   findCampaignInWorkspace: vi.fn(),
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("@/lib/env.server", () => ({
   env: { BASE_URL: () => "https://base.example" },
 }));
+
+vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) =>
@@ -46,6 +49,9 @@ vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
         },
       };
     }
+    hangup() {
+      this.parts.push("hangup");
+    }
     toString() {
       return `<Response>${this.parts.join("|")}</Response>`;
     }
@@ -59,6 +65,7 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
     mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.getAdminDb.mockReturnValue({});
     mocks.findCampaignInWorkspace.mockResolvedValue({ id: 1 });
+    mocks.logger.error.mockReset();
   });
 
   test("returns TwiML with campaign conference name when signature validates", async () => {
@@ -99,5 +106,30 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
       } as never),
     );
     expect(res.status).toBe(403);
+  });
+
+  test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
+    mocks.findCampaignInWorkspace.mockRejectedValueOnce(new Error("db down"));
+
+    const mod = await import(
+      "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
+    );
+    const res = await asRouteResponse(
+      await mod.loader({
+        request: new Request(
+          "https://base.example/api/connect-campaign-conference/w1/c1",
+        ),
+        params: { workspaceId: "w1", campaignId: "1" },
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    const body = await res.text();
+    expect(body).toContain("say:");
+    expect(body).toContain("hangup");
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Unhandled error in api.connect-campaign-conference",
+      expect.objectContaining({ error: "db down" }),
+    );
   });
 });

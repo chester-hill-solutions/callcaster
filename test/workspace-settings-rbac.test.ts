@@ -130,7 +130,7 @@ describe("workspace settings RBAC", () => {
   describe("settings action", () => {
     test("rejects caller for addUser, updateUser, deleteUser, cancelInvite, and updateWebhook", async () => {
       dbMocks.getUserRole.mockResolvedValue({ role: "caller" });
-      const mod = await import("../app/routes/workspaces+/\$id/settings.action.server");
+      const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
 
       for (const formName of ["addUser", "updateUser", "deleteUser", "cancelInvite", "updateWebhook"]) {
         const fd = new FormData();
@@ -148,7 +148,7 @@ describe("workspace settings RBAC", () => {
 
     test("rejects non-owner for transferWorkspaceOwnership and deleteWorkspace", async () => {
       dbMocks.getUserRole.mockResolvedValue({ role: "admin" });
-      const mod = await import("../app/routes/workspaces+/\$id/settings.action.server");
+      const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
 
       for (const formName of ["transferWorkspaceOwnership", "deleteWorkspace"]) {
         const fd = new FormData();
@@ -163,7 +163,7 @@ describe("workspace settings RBAC", () => {
 
     test("rejects deleteSelf when form user_id does not match the session user", async () => {
       dbMocks.getUserRole.mockResolvedValue({ role: "member" });
-      const mod = await import("../app/routes/workspaces+/\$id/settings.action.server");
+      const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
 
       const fd = new FormData();
       fd.set("formName", "deleteSelf");
@@ -175,7 +175,7 @@ describe("workspace settings RBAC", () => {
 
     test("uses the session user id for transferWorkspaceOwnership, not the form", async () => {
       dbMocks.getUserRole.mockResolvedValue({ role: "owner" });
-      const mod = await import("../app/routes/workspaces+/\$id/settings.action.server");
+      const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
 
       const fd = new FormData();
       fd.set("formName", "transferWorkspaceOwnership");
@@ -198,7 +198,7 @@ describe("workspace settings RBAC", () => {
         ok: false,
         response: { data: { error: "Workspace not found" }, init: { status: 404 } },
       });
-      const mod = await import("../app/routes/workspaces+/\$id/settings.loader.server");
+      const mod = await import("../app/routes/workspaces+/$id/settings.loader.server");
 
       const res = await asRouteResponse(await mod.loader({ request: new Request("http://localhost"), params: { id: "w1" }, context: {} }));
       expect(res.status).toBe(404);
@@ -209,7 +209,7 @@ describe("workspace settings RBAC", () => {
   describe("settings/numbers loader", () => {
     test("returns 404 for non-members", async () => {
       dbMocks.requireWorkspaceAccess.mockRejectedValue(new Error("Workspace not found"));
-      const mod = await import("../app/routes/workspaces+/\$id/settings/numbers.loader.server");
+      const mod = await import("../app/routes/workspaces+/$id/settings/numbers.loader.server");
 
       const res = await asRouteResponse(await mod.loader({ request: new Request("http://localhost"), params: { id: "w1" }, context: {} }));
       expect(res.status).toBe(404);

@@ -1,6 +1,38 @@
 # CallCaster
 
-Version 1
+CallCaster is a contact-center platform for calling and SMS campaigns: campaign scripts and IVR, live power dialing, surveys, audiences/contacts, billing by credits, and a public integrator API. Built with React Router 7, a Bun production server, Railway Postgres (Drizzle ORM), S3-compatible object storage, Twilio, Stripe, and Resend.
+
+## Quickstart
+
+Prerequisites: **Node >= 20**, **Bun >= 1.2.15**, and Docker.
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start local services (Postgres on :5433, MinIO on :9000, Inbucket mail on :9002)
+docker compose -f docker-compose.dev.yml up -d
+
+# 3. Configure environment
+cp .env.example .env
+# Fill in DATABASE_URL, BETTER_AUTH_SECRET, S3_*, TWILIO_*, BASE_URL,
+# STRIPE_SECRET_KEY, RESEND_API_KEY — placeholders are fine until you
+# exercise the corresponding integration. See docs/local-development.md.
+
+# 4. Run the app (validates env, then starts react-router dev on :3000)
+npm run dev
+```
+
+Verify your setup:
+
+```bash
+npm run typecheck   # react-router typegen + tsc
+npm run lint
+npm test            # vitest node + UI suites, plus bun server-runtime tests
+npm run test:e2e:compose   # full E2E against compose Postgres + MinIO
+```
+
+Production entry points: `npm start` (Bun server, `server/bun.ts`) and `npm run worker` (job worker, `worker/index.ts`); images build from `Dockerfile` and `Dockerfile.worker`.
 
 ## Documentation
 
@@ -16,3 +48,4 @@ Version 1
 - **[Public API test drift](docs/public-api-test-drift.md)** – Tracked gaps and verification commands for the integrator API surface.
 - **Interactive API docs** – Public spec at **[`/docs`](/docs)**; complete classified surface at **[`/docs?spec=complete`](/docs?spec=complete)**. Raw JSON: `/api/docs/openapi`, `/api/docs/openapi/all`.
 - **[Stripe webhook](docs/stripe-webhook.md)** – Configure Stripe to send `checkout.session.completed` to `/api/stripe-webhook`; requires `STRIPE_WEBHOOK_SECRET`.
+- **[Link shortening](docs/link-shortening.md)** – One-time Twilio Console setup that activates the already-shipped `shortenUrls` support (halves segments on link-bearing sends).

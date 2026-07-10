@@ -65,6 +65,7 @@ describe("server runtime", () => {
         ok: false,
         buildReady: true,
         acceptingTraffic: false,
+        databaseReady: true,
       }),
     );
   });
@@ -73,5 +74,23 @@ describe("server runtime", () => {
     expect(() => validateEnvironment({ AUTH_URL: "http://localhost" })).toThrow(
       "Missing required environment variables:",
     );
+  });
+
+  test("serves public files with URL-encoded names", async () => {
+    const { port } = await startTestServer(true);
+
+    const font = await requestServer(port, "/fonts/Tabac%20Slab.otf");
+
+    expect(font.statusCode).toBe(200);
+    expect(font.headers["content-type"]).toBe("font/otf");
+  });
+
+  test("rejects encoded path traversal outside the public dir", async () => {
+    const { port } = await startTestServer(true);
+
+    const escape = await requestServer(port, "/fonts/..%2F..%2Fpackage.json");
+
+    // Must fall through to the app handler (stubbed to 204), never serve the file.
+    expect(escape.statusCode).toBe(204);
   });
 });

@@ -23,7 +23,11 @@ import {
 } from "@/lib/twilio-bootstrap.server";
 import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server";
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
-import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
+import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
+import {
+  attachWorkspaceRcsSenderToPool,
+  verifyWorkspaceMessagingSenderPool,
+} from "@/lib/twilio-sender-pool.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
@@ -201,6 +205,22 @@ export async function dispatchAdminTwilioAction({
         : { ok: false, error: result.error, status: 500 };
     }
 
+    case "retry_compliance_job":
+      try {
+        await enqueueWorkspaceComplianceJob(workspaceId, "admin_retry");
+        return { ok: true, message: "Compliance job re-queued for this workspace" };
+      } catch (error) {
+        logger.error("Error enqueueing workspace compliance retry:", error);
+        return {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to enqueue compliance job",
+          status: 500,
+        };
+      }
+
     case "sync_a2p_status":
       try {
         await syncWorkspaceA2pStatus({
@@ -218,14 +238,48 @@ export async function dispatchAdminTwilioAction({
         const result = await verifyWorkspaceMessagingSenderPool({
           workspaceId,
         });
+        const poolMessage = result.inSync
+          ? "Sender pool matches onboarding state"
+          : `Sender pool drift: missing ${result.missingFromPool.join(", ") || "none"}; extra ${result.extraInPool.join(", ") || "none"}`;
+        const rcsMessage = result.rcsSenderId
+          ? ` RCS sender ${result.rcsSenderId} is ${result.rcsSenderInPool ? "attached to" : "NOT attached to"} the sender pool.`
+          : "";
         return {
           ok: true,
-          message: result.inSync
-            ? "Sender pool matches onboarding state"
-            : `Sender pool drift: missing ${result.missingFromPool.join(", ") || "none"}; extra ${result.extraInPool.join(", ") || "none"}`,
+          message: `${poolMessage}.${rcsMessage}`,
         };
       } catch (error) {
         logger.error("Sender pool verification failed:", error);
+        return { ok: false, error: twilioErrorUserMessage(error), status: 500 };
+      }
+
+    case "attach_rcs_sender_pool":
+      try {
+        const result = await attachWorkspaceRcsSenderToPool({
+          workspaceId,
+        });
+        if (!result.serviceSid) {
+          return {
+            ok: false,
+            error: "Provision a Messaging Service before attaching the RCS sender.",
+            status: 400,
+          };
+        }
+        if (!result.rcsSenderId) {
+          return {
+            ok: false,
+            error: "Save the Twilio RCS sender SID (from Console) before attaching it to the pool.",
+            status: 400,
+          };
+        }
+        return {
+          ok: true,
+          message: result.alreadyInPool
+            ? `RCS sender ${result.rcsSenderId} is already attached to the sender pool.`
+            : `RCS sender ${result.rcsSenderId} attached to the sender pool.`,
+        };
+      } catch (error) {
+        logger.error("RCS sender pool attach failed:", error);
         return { ok: false, error: twilioErrorUserMessage(error), status: 500 };
       }
 

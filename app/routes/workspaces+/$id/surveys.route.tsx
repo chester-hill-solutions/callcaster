@@ -105,3 +105,5 @@ export default function SurveysPage() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

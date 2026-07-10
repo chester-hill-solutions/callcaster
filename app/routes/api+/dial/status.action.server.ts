@@ -2,6 +2,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { markContactLineType } from "@/lib/twilio-lookup.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import {
@@ -33,6 +34,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const dbCall = await findCallBySid(callSid);
     if (!dbCall?.workspace) {
       return routeData({ success: false, error: "Call not found" });
+    }
+
+    // Free line-type signal: AMD identifying a fax machine means this number
+    // can never receive SMS — stamp it so the send gates skip it.
+    if (answeredBy === "fax" && dbCall.contact_id) {
+      await markContactLineType({
+        workspaceId: dbCall.workspace,
+        contactId: dbCall.contact_id,
+        lineType: "fax",
+      });
     }
 
     const twilio = await createWorkspaceTwilioInstance({

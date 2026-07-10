@@ -58,7 +58,8 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
 };
 
 const findNextStep = (currentBlock: { id: string; options?: Array<{ value: string; next?: string }> }, userInput: string | null, script: Script, pageId: string): string => {
-  if (currentBlock.options) {
+  const hasUserInput = userInput != null && String(userInput).trim() !== "";
+  if (currentBlock.options && hasUserInput) {
     const matchedOption = currentBlock.options.find((option) => {
       const optionValue = String(option.value).trim();
       const input = String(userInput).trim();

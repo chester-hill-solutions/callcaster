@@ -37,6 +37,12 @@ export type MessagePersistFields = {
   contact_id?: string | number | null;
   campaign_id?: string | number | null;
   outbound_media?: unknown[];
+  /**
+   * Requested "send later" time (ISO string). Twilio's Message resource does
+   * not echo `sendAt` back on create, so this is stamped by the caller when a
+   * scheduled send was requested.
+   */
+  scheduled_at?: Date | string | null;
 };
 
 /**
@@ -168,6 +174,9 @@ function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
   }
   if (fields.outbound_media && fields.outbound_media.length > 0) {
     row.outbound_media = [...fields.outbound_media] as string[];
+  }
+  if (fields.scheduled_at != null) {
+    row.scheduled_at = toDateIso(fields.scheduled_at);
   }
   return row;
 }

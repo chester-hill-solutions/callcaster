@@ -6,7 +6,6 @@
 export const WIZARD_ONBOARDING_STEP_IDS = [
   "business_profile",
   "path_selection",
-  "messaging_service",
   "first_number",
   "provider_provisioning",
   "launch_checks",

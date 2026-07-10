@@ -1,3 +1,4 @@
+import { Resend } from "resend";
 import { eq, and, gte } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable, workspace as workspaceTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
@@ -6,9 +7,12 @@ import { numberRentalCycleKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { listWorkspaceOwnerAdminEmails } from "@/lib/workspace-members-db.server";
+import { env } from "@/lib/env.server";
 
 const NUMBER_RENTAL_MONTHLY_CREDITS = 100;
 const ROLLOUT_CUTOFF_DATE = "2026-04-01";
+const REMINDER_WINDOWS_DAYS = [25, 15, 3];
 
 function getCycleKey(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -39,9 +43,66 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / msPerDay);
 }
 
+function formatDueDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildReminderEmail(args: {
+  phoneNumberLabel: string;
+  daysUntilDue: number;
+  dueDate: Date;
+  workspaceId: string;
+}) {
+  const billingUrl = `${env.BASE_URL()}/workspaces/${args.workspaceId}/billing`;
+  const dueDateLabel = formatDueDate(args.dueDate);
+  return {
+    subject: `Your CallCaster number rental renews in ${args.daysUntilDue} days`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Your number rental renews soon</h2>
+        <p>The rental for <strong>${args.phoneNumberLabel}</strong> renews in
+        <strong>${args.daysUntilDue} days</strong>, on <strong>${dueDateLabel}</strong>, for
+        ${NUMBER_RENTAL_MONTHLY_CREDITS} credits.</p>
+        <p>Make sure your workspace has enough credits to avoid an unpaid renewal.</p>
+        <p><a href="${billingUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Review billing</a></p>
+      </div>
+    `,
+    text: `
+      Your number rental renews soon
+
+      The rental for ${args.phoneNumberLabel} renews in ${args.daysUntilDue} days, on ${dueDateLabel}, for ${NUMBER_RENTAL_MONTHLY_CREDITS} credits.
+      Make sure your workspace has enough credits to avoid an unpaid renewal.
+
+      Review billing: ${billingUrl}
+    `,
+  };
+}
+
+async function sendNumberRentalReminderEmail(args: {
+  workspaceId: string;
+  recipients: string[];
+  phoneNumberLabel: string;
+  daysUntilDue: number;
+  dueDate: Date;
+}): Promise<void> {
+  const resend = new Resend(env.RESEND_API_KEY());
+  const { subject, html, text } = buildReminderEmail(args);
+  await resend.emails.send({
+    from: "Callcaster <info@callcaster.ca>",
+    to: args.recipients,
+    subject,
+    html,
+    text,
+  });
+}
+
 /**
  * Daily sweep for number rental billing.
  * Called by pg_cron or admin action.
+ *
+ * Note: automatic release of unpaid rented numbers is not implemented yet
+ * (`released` is always `0` and `autoReleaseImplemented` is always `false`).
+ * Numbers with unpaid renewals must currently be released manually.
  */
 export async function runNumberRentalBilling(args: {
   workspaceId?: string;
@@ -52,6 +113,8 @@ export async function runNumberRentalBilling(args: {
   charged: number;
   released: number;
   remindersSent: number;
+  remindersFailed: number;
+  autoReleaseImplemented: false;
 }> {
   const today = args.today ?? new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -78,18 +141,44 @@ export async function runNumberRentalBilling(args: {
   let charged = 0;
   const released = 0;
   let remindersSent = 0;
+  let remindersFailed = 0;
 
   for (const number of numbers) {
     const anchorDate = number.created_at;
     const currentMonthDue = getDueDate(anchorDate, today);
+    const phoneNumberLabel = number.phone_number ?? number.friendly_name ?? String(number.id);
 
     // Check if today is the due date
     if (!isSameDay(today, currentMonthDue)) {
       // Handle reminder windows
       const daysUntilDue = daysBetween(today, currentMonthDue);
-      if ([25, 15, 3].includes(daysUntilDue)) {
-        // TODO: Send reminder email via Resend
-        remindersSent++;
+      if (REMINDER_WINDOWS_DAYS.includes(daysUntilDue)) {
+        try {
+          const recipients = await listWorkspaceOwnerAdminEmails(number.workspace);
+          if (recipients.length === 0) {
+            remindersFailed++;
+            logger.warn("number_rental_billing.reminder_no_recipients", {
+              numberId: number.id,
+              workspaceId: number.workspace,
+            });
+          } else {
+            await sendNumberRentalReminderEmail({
+              workspaceId: number.workspace,
+              recipients,
+              phoneNumberLabel,
+              daysUntilDue,
+              dueDate: currentMonthDue,
+            });
+            remindersSent++;
+          }
+        } catch (error) {
+          remindersFailed++;
+          logger.error("number_rental_billing.reminder_failed", {
+            numberId: number.id,
+            workspaceId: number.workspace,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
       continue;
     }
@@ -103,7 +192,7 @@ export async function runNumberRentalBilling(args: {
         workspaceId: number.workspace,
         type: "DEBIT",
         amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
-        note: `Monthly rental for ${number.phone_number ?? number.friendly_name ?? number.id}`,
+        note: `Monthly rental for ${phoneNumberLabel}`,
         idempotencyKey,
       });
       charged++;
@@ -122,8 +211,9 @@ export async function runNumberRentalBilling(args: {
     const previousCycleKey = getCycleKey(previousMonthDue);
     const previousIdempotencyKey = numberRentalCycleKey(number.id, previousCycleKey);
 
-    // TODO: Check if previous cycle was actually unpaid by querying transaction_history
-    // For now, skip auto-release logic until we have a reliable unpaid check
+    // Auto-release of numbers with an unpaid previous cycle is not
+    // implemented yet — see the `autoReleaseImplemented: false` flag on the
+    // return value. Numbers must be released manually for now.
   }
 
   return {
@@ -132,5 +222,7 @@ export async function runNumberRentalBilling(args: {
     charged,
     released,
     remindersSent,
+    remindersFailed,
+    autoReleaseImplemented: false,
   };
 }

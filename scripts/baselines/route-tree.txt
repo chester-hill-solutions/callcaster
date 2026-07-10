@@ -21,6 +21,7 @@
 :surveyId
 :workspaceId
 accept-invite
+account/security
 actions
 admin
 agent-bridge
@@ -80,6 +81,10 @@ api/inbound-sms
 api/inbound-verification
 api/initiate-ivr
 api/ivr
+api/jobs/billing-reconcile
+api/jobs/low-credit-notify
+api/jobs/number-rental-billing
+api/jobs/twilio-open-sync
 api/me
 api/media
 api/message_media
@@ -99,6 +104,8 @@ api/survey-responses
 api/surveys
 api/test-webhook
 api/token
+api/twilio/a2p/events
+api/twilio/trusthub/status
 api/verify-audio-pin/:pin
 api/verify-audio-session
 api/verify-call-in-session
@@ -130,7 +137,6 @@ contacts
 contacts
 conversations
 create-with-script
-dashboard/:id
 dialer
 docs
 edit
@@ -188,6 +194,7 @@ surveys
 surveys
 transfer-ownership
 twilio
+two-factor
 uploads
 users
 users/:userId/edit

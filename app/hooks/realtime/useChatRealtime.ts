@@ -109,7 +109,6 @@ export const useChatRealTime = ({
     if (!isForContact) return;
 
     if (typedPayload.eventType === "INSERT") {
-      if (newRow.status === "failed") return;
       setMessages((curr) => {
         const newMessage = newRow as Message;
         if (!newMessage?.sid || messageIdsRef.current.has(newMessage.sid)) {
@@ -137,10 +136,16 @@ export const useChatRealTime = ({
   }, [workspace]);
 
   const addOptimisticMessage = useCallback(
-    (params: { body: string; from: string; to: string; media?: string }) => {
+    (params: {
+      body: string;
+      from: string;
+      to: string;
+      media?: string;
+      sid?: string;
+    }) => {
       const mediaArr = params.media ? JSON.parse(params.media || "[]") : [];
       const pending = {
-        sid: `pending-${Date.now()}`,
+        sid: params.sid ?? `pending-${Date.now()}`,
         body: params.body,
         from: params.from,
         to: params.to,
@@ -157,6 +162,13 @@ export const useChatRealTime = ({
     [workspace]
   );
 
+  /** Flip a still-pending optimistic message (by sid) to "failed" so it renders as undelivered. */
+  const markOptimisticMessageFailed = useCallback((sid: string) => {
+    setMessages((curr) =>
+      curr.map((m) => (m?.sid === sid ? ({ ...m, status: "failed" } as Message) : m)),
+    );
+  }, []);
+
   useWorkspaceEventSubscription({
     workspaceId: workspace,
     table: "message",
@@ -164,7 +176,7 @@ export const useChatRealTime = ({
     onChange: handleMessageChange as (p: RealtimeChangePayload<Record<string, unknown>>) => void
   });
 
-  return { messages, setMessages, addOptimisticMessage };
+  return { messages, setMessages, addOptimisticMessage, markOptimisticMessageFailed };
 };
 
 /**

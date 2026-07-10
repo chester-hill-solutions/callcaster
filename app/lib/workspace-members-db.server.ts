@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import {
   campaign as campaignTable,
+  job as jobTable,
   user as userTable,
   webhook as webhookTable,
   workspace as workspaceTable,
@@ -9,6 +10,7 @@ import {
   workspace_number as workspaceNumberTable,
   workspace_users as workspaceUsersTable,
 } from "@/db/schema";
+import { authUser } from "@/db/auth-schema";
 import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
@@ -333,6 +335,26 @@ export async function listAllCampaignsOrdered() {
     .orderBy(desc(campaignTable.created_at));
 }
 
+/** Read-only diagnostics: most-recently dead-lettered background jobs (status='failed'). */
+export async function listRecentDeadLetteredJobs(limit = 25) {
+  return adminDb
+    .select({
+      id: jobTable.id,
+      type: jobTable.type,
+      workspace_id: jobTable.workspace_id,
+      attempt_count: jobTable.attempt_count,
+      max_attempts: jobTable.max_attempts,
+      dead_letter_reason: jobTable.dead_letter_reason,
+      error_message: jobTable.error_message,
+      failed_at: jobTable.failed_at,
+      created_at: jobTable.created_at,
+    })
+    .from(jobTable)
+    .where(eq(jobTable.status, "failed"))
+    .orderBy(desc(jobTable.failed_at))
+    .limit(limit);
+}
+
 export async function updateUserAccessLevel(userId: string, accessLevel: string) {
   const rows = await adminDb
     .update(userTable)
@@ -632,6 +654,43 @@ export async function touchWorkspaceApiKeyLastUsed(keyId: string) {
     .update(workspaceApiKeyTable)
     .set({ last_used_at: new Date().toISOString() })
     .where(eq(workspaceApiKeyTable.id, keyId));
+}
+
+/**
+ * Real email addresses (from the better-auth identity table) for a
+ * workspace's owners and admins. Used for billing/credit notifications.
+ *
+ * `workspace_users.user_id` and `auth_user.id` live in differently-typed
+ * columns (uuid vs text), so this resolves membership first and joins to
+ * `auth_user` by id in a second query rather than a single cross-type SQL
+ * join.
+ */
+export async function listWorkspaceOwnerAdminEmails(
+  workspaceId: string,
+): Promise<string[]> {
+  const members = await adminDb
+    .select({ user_id: workspaceUsersTable.user_id })
+    .from(workspaceUsersTable)
+    .where(
+      and(
+        eq(workspaceUsersTable.workspace_id, workspaceId),
+        inArray(workspaceUsersTable.role, ["owner", "admin"]),
+      ),
+    );
+
+  const userIds = [...new Set(members.map((member) => member.user_id))].filter(
+    Boolean,
+  );
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  const rows = await adminDb
+    .select({ email: authUser.email })
+    .from(authUser)
+    .where(inArray(authUser.id, userIds));
+
+  return [...new Set(rows.map((row) => row.email).filter(Boolean))];
 }
 
 export async function listUserWorkspaceMembershipsForProfile(userId: string) {

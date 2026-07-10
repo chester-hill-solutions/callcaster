@@ -93,7 +93,8 @@ const mockState = vi.hoisted(() => {
         j.status = "queued";
         j.claimed_until = null;
         j.claimed_by = null;
-        j.attempt_count++;
+        // NOTE: no attempt_count bump here — claimNextJob increments on
+        // reclaim, so a crash-recovery cycle costs exactly one attempt.
       });
       return reset;
     }
@@ -303,7 +304,7 @@ describe("worker poll-jobs lifecycle", () => {
     expect(stored?.error_message).toBe("Permanent error");
   });
 
-  test("resets stale claims at startup", async () => {
+  test("resets stale claims without bumping attempt_count", async () => {
     mockState.state.jobs.push(
       createJob({
         id: 42,
@@ -319,6 +320,32 @@ describe("worker poll-jobs lifecycle", () => {
     expect(stored?.status).toBe("queued");
     expect(stored?.claimed_until).toBeNull();
     expect(stored?.claimed_by).toBeNull();
+    // attempt_count is untouched by the reset itself — claimNextJob is what
+    // bumps it when the job is reclaimed.
+    expect(stored?.attempt_count).toBe(1);
+  });
+
+  test("crash-recovery cycle (reset + reclaim) costs exactly one attempt, not two", async () => {
+    mockState.state.jobs.push(
+      createJob({
+        id: 42,
+        status: "running",
+        attempt_count: 1,
+        claimed_until: new Date(mockState.baseTime.getTime() - 1_000).toISOString(),
+      }),
+    );
+
+    // Simulate a crash: the poll loop's stale-claim reset runs, then the
+    // (possibly different) worker reclaims the job.
+    await resetStaleClaims();
+    const reclaimed = await claimNextJob("worker-2");
+
+    expect(reclaimed?.id).toBe(42);
+    // Started this cycle at attempt_count 1; one crash-recovery cycle should
+    // land at 2, not 3 (which would dead-letter after a single real
+    // execution when max_attempts=3).
+    expect(reclaimed?.attempt_count).toBe(2);
+    const stored = mockState.state.jobs.find((j) => j.id === 42);
     expect(stored?.attempt_count).toBe(2);
   });
 
@@ -331,5 +358,41 @@ describe("worker poll-jobs lifecycle", () => {
 
     controller.abort();
     await loopPromise;
+  });
+
+  test("poll loop resets stale claims on every iteration, not just at boot", async () => {
+    const controller = new AbortController();
+    const loopPromise = runWorkerPollLoop(controller.signal, {}, {
+      pollIntervalMs: 5,
+      heartbeatIntervalMs: 60_000,
+    });
+
+    // Let a few iterations run (no jobs queued, so each iteration is a
+    // quick no-op poll + sleep).
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    controller.abort();
+    await loopPromise;
+
+    const resetCalls = (db.execute as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([query]) => {
+        const chunks = (query as any).queryChunks as Array<{
+          constructor: { name: string };
+          value: unknown;
+        }>;
+        const str = chunks
+          .filter((c) => c.constructor.name === "StringChunk")
+          .map((c) => String(c.value))
+          .join("");
+        return (
+          str.includes("UPDATE job") &&
+          str.includes("SET status = 'queued'") &&
+          str.includes("WHERE status = 'running'") &&
+          str.includes("claimed_until < now()")
+        );
+      },
+    );
+
+    // One reset before the loop starts, plus at least one per iteration.
+    expect(resetCalls.length).toBeGreaterThan(1);
   });
 });

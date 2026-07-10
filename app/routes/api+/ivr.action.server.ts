@@ -1,6 +1,8 @@
+import { data as routeData } from "react-router";
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
@@ -34,6 +36,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+
+    const credits = await getWorkspaceCreditsBalance(workspace_id);
+    if (credits === null) {
+      return routeData({ error: "Workspace not found" }, { status: 404 });
+    }
+    if (credits <= 0) {
+      return routeData({ creditsError: true }, { status: 402 });
+    }
+
     const tdb = createTenantDb(workspace_id);
     outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
       contactId: Number(contact_id),

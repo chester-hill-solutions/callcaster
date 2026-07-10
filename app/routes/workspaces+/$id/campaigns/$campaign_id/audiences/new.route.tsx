@@ -67,7 +67,7 @@ export default function NewAudience() {
                       className="hidden"
                       onChange={displayFileToUpload}
                     />
-                    <Button asChild variant="outline" size="icon">
+                    <Button asChild variant="outline" size="icon" aria-label="Choose a CSV file to upload">
                       <label htmlFor="contacts" className="cursor-pointer">
                         <Plus className="h-4 w-4" />
                       </label>
@@ -81,6 +81,7 @@ export default function NewAudience() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label="Remove selected file"
                       onClick={handleRemoveFile}
                     >
                       <X className="h-4 w-4" />

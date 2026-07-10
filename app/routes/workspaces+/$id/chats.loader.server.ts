@@ -20,6 +20,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
+  const search = url.searchParams.get("search") ?? undefined;
   const sortBy = getChatSortOption(url.searchParams.get("sort"));
   const page = Math.max(
     1,
@@ -118,6 +119,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       limit: pageSize,
       offset,
       sort: sortBy,
+      search,
     },
   );
 

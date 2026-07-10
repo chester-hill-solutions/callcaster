@@ -8,7 +8,7 @@ import {
 } from "@/lib/campaign-setup-steps";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { Contact } from "@/lib/types";
-import { Database } from "@/lib/db-types";
+import { Database, Json } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { eq } from "drizzle-orm";
 import {
@@ -16,6 +16,9 @@ import {
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
+import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace-twilio-config.server";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 
 type CampaignType = "live_call" | "message" | "robocall";
 
@@ -138,6 +141,17 @@ export async function handleNewAudience({
   }
 }
 
+function workspaceNumberHasCapability(
+  capabilities: unknown,
+  key: "sms" | "voice",
+): boolean {
+  if (!capabilities || typeof capabilities !== "object" || Array.isArray(capabilities)) {
+    return false;
+  }
+  const value = (capabilities as Record<string, unknown>)[key];
+  return value === true || value === "true";
+}
+
 export async function handleNewCampaign({formData,
   workspaceId,
   headers,
@@ -160,10 +174,60 @@ export async function handleNewCampaign({formData,
   const workspaceNumbers = (phoneNumbersResult.data ?? []).filter(
     (number) => Boolean(number?.phone_number),
   );
-  const caller_id =
-    workspaceNumbers.length === 1
-      ? String(workspaceNumbers[0]?.phone_number)
-      : null;
+
+  // Q58: for voice campaigns (live_call/robocall), default the caller ID to
+  // the first voice-capable rented number rather than requiring exactly one
+  // workspace number to exist.
+  const isVoiceCampaign = newCampaignType === "live_call" || newCampaignType === "robocall";
+  const isMessageCampaign = newCampaignType === "message";
+
+  let caller_id: string | null = null;
+  if (isVoiceCampaign) {
+    const voiceCapableNumber = workspaceNumbers.find((number) =>
+      workspaceNumberHasCapability(number?.capabilities, "voice"),
+    );
+    const fallbackNumber = voiceCapableNumber ?? workspaceNumbers[0];
+    caller_id = fallbackNumber?.phone_number ? String(fallbackNumber.phone_number) : null;
+  } else if (workspaceNumbers.length === 1) {
+    caller_id = String(workspaceNumbers[0]?.phone_number);
+  }
+
+  // Q47: default new message campaigns to messaging-service send mode once
+  // the workspace's Messaging Service actually has senders attached — mirrors
+  // the same readiness check/gating used on the campaign settings page
+  // (settings.loader.server.ts) so we don't set a mode Twilio can't fulfill.
+  // Existing campaigns and non-message campaign types are left untouched
+  // (sms_send_mode stays null / from_number).
+  let smsSendMode: "messaging_service" | undefined;
+  let smsMessagingServiceSid: string | undefined;
+  if (isMessageCampaign) {
+    try {
+      const [portalConfig, onboarding] = await Promise.all([
+        getWorkspaceTwilioPortalConfig({ workspaceId }),
+        getWorkspaceMessagingOnboardingState({ workspaceId }),
+      ]);
+      const messagingServiceSid = portalConfig.messagingServiceSid?.trim() || null;
+      const messagingServiceReady = workspaceMessagingServiceHasAvailableSenders({
+        messagingServiceSid,
+        attachedSenderPhoneNumbers: onboarding.messagingService.attachedSenderPhoneNumbers,
+        workspaceNumbers: workspaceNumbers.map((number) => ({
+          phone_number: number?.phone_number,
+          capabilities: number?.capabilities as Json | null,
+        })),
+      });
+      if (messagingServiceReady && messagingServiceSid) {
+        smsSendMode = "messaging_service";
+        smsMessagingServiceSid = messagingServiceSid;
+      }
+    } catch (readinessError) {
+      // Non-fatal: fall back to leaving sms_send_mode null (from_number
+      // behavior) if we can't determine MS readiness for some reason.
+      logger.error(
+        "Failed to resolve messaging service readiness for new campaign",
+        readinessError,
+      );
+    }
+  }
 
   const tdb = createTenantDb(workspaceId);
   try {
@@ -180,6 +244,10 @@ export async function handleNewCampaign({formData,
       next_queue_order: 0,
       group_household_queue: false,
       is_active: false,
+      ...(smsSendMode ? { sms_send_mode: smsSendMode } : {}),
+      ...(smsMessagingServiceSid
+        ? { sms_messaging_service_sid: smsMessagingServiceSid }
+        : {}),
     });
     const campaignData = rows[0];
     if (!campaignData) {

@@ -15,6 +15,7 @@ import { useContactSearch } from "@/hooks/contact/useContactSearch";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import {
   getConversationParticipantPhones,
+  getConversationPhoneKey,
   getChatSortOption,
   sortConversationSummaries,
 } from "@/lib/chat-conversation-sort";
@@ -56,7 +57,8 @@ export function useChatsPage() {
   const paginationFilterKey = useMemo(() => {
     const campaignFilter = searchParams.get("campaign_id") ?? ALL_CAMPAIGNS_VALUE;
     const sortFilter = getChatSortOption(searchParams.get("sort"));
-    return `${campaignFilter}:${sortFilter}`;
+    const searchFilter = searchParams.get("search") ?? "";
+    return `${campaignFilter}:${sortFilter}:${searchFilter}`;
   }, [searchParams]);
   const paginationFetcher = useFetcher<ChatsLoaderData>({
     key: `chat-pages-${workspace.id}-${paginationFilterKey}`,
@@ -68,8 +70,13 @@ export function useChatsPage() {
       from: string;
       to: string;
       media?: string;
+      sid?: string;
     }) => void;
+    markOptimisticMessageFailed?: (sid: string) => void;
   } | null>(null);
+  const pendingOptimisticMessageRef = useRef<{ sid: string; body: string } | null>(
+    null,
+  );
   const requestedPageRef = useRef(pagination.page);
   const registerChatActions = useCallback(
     (actions: typeof chatActionsRef.current) => {
@@ -99,9 +106,33 @@ export function useChatsPage() {
         .map((workspaceNumber) => ({
           id: String(workspaceNumber.id),
           phone_number: workspaceNumber.phone_number ?? "",
+          friendly_name: workspaceNumber.friendly_name ?? null,
         })),
     [workspaceNumbers],
   );
+  // ConversationSummary.user_phone holds the workspace number that most
+  // recently texted this contact. Resolving it here lets the composer
+  // default to the number the contact already knows, instead of always
+  // defaulting to the workspace's first number.
+  const establishedFromNumber = useMemo(() => {
+    if (!contact_number) return "";
+    const activeConversation = loadedChats.find((chat) =>
+      phoneNumbersMatch(chat.contact_phone, contact_number),
+    );
+    return activeConversation?.user_phone || "";
+  }, [loadedChats, contact_number]);
+
+  const initialFrom = useMemo(() => {
+    if (establishedFromNumber) {
+      const establishedKey = getConversationPhoneKey(establishedFromNumber);
+      const matchedWorkspaceNumber = chatInputWorkspaceNumbers.find(
+        (num) => getConversationPhoneKey(num.phone_number) === establishedKey,
+      );
+      return matchedWorkspaceNumber?.phone_number || establishedFromNumber;
+    }
+    return chatInputWorkspaceNumbers[0]?.phone_number || "";
+  }, [establishedFromNumber, chatInputWorkspaceNumbers]);
+
   const chatsRoutePath = `/workspaces/${workspace.id}/chats`;
   const closeMobileConversationList = useCallback(() => {
     setIsMobileConversationListOpen(false);
@@ -284,11 +315,14 @@ export function useChatsPage() {
         workspaceNumbers?.[0]?.phone_number ||
         "";
       const media = formData.get("media") as string | undefined;
+      const pendingSid = `pending-${Date.now()}`;
+      pendingOptimisticMessageRef.current = { sid: pendingSid, body };
       chatActionsRef.current?.addOptimisticMessage?.({
         body,
         from,
         to: toNumber,
         media,
+        sid: pendingSid,
       });
 
       messageFetcher.submit(formData, { method: "POST" });
@@ -308,6 +342,28 @@ export function useChatsPage() {
       workspaceNumbers,
     ],
   );
+
+  useEffect(() => {
+    if (messageFetcher.state !== "idle") return;
+    const pending = pendingOptimisticMessageRef.current;
+    if (!pending) return;
+
+    const data = messageFetcher.data as { error?: string } | undefined;
+    if (!data || !data.error) {
+      pendingOptimisticMessageRef.current = null;
+      return;
+    }
+
+    chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
+    const bodyField = document.getElementById("body") as
+      | HTMLTextAreaElement
+      | HTMLInputElement
+      | null;
+    if (bodyField && !bodyField.value) {
+      bodyField.value = pending.body;
+    }
+    pendingOptimisticMessageRef.current = null;
+  }, [messageFetcher.state, messageFetcher.data]);
 
   const markConversationReadForContact = useCallback(
     (number: string) => {
@@ -455,6 +511,8 @@ export function useChatsPage() {
     setIsMobileConversationListOpen,
     sidebarProps,
     chatInputWorkspaceNumbers,
+    initialFrom,
+    establishedFromNumber,
     handleSubmit,
     handleImageSelect,
     handleImageRemove,

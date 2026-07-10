@@ -50,6 +50,16 @@ export const MobileMenu = ({
           <NavLink to="/pricing" onClick={onClose} className={navLinkClass}>
             Pricing
           </NavLink>
+          <NavLink to="/docs" onClick={onClose} className={navLinkClass}>
+            Docs
+          </NavLink>
+          <a
+            href="mailto:info@callcaster.ca"
+            onClick={onClose}
+            className={`block ${navLinkClass}`}
+          >
+            Support
+          </a>
           {!isSignedIn && (
             <>
               <NavLink to="/signin" onClick={onClose} className={navLinkClass}>

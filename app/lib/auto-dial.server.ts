@@ -8,9 +8,11 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import {
   rpcCreateOutreachAttempt,
+  rpcDequeueContact,
 } from "@/lib/db-rpc.server";
-import { claimNextQueueContact } from "@/lib/campaign-queue-db.server";
+import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { db } from "@/server/db";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 
 type TwilioClient = TwilioSDK.Twilio;
 
@@ -141,4 +143,130 @@ export async function completeAllConferences(client: TwilioClient, conferenceId:
       client.conferences(sid).update({ status: "completed" as const }),
     ),
   );
+}
+
+export type AutoDialerTurnInput = {
+  user_id: string;
+  campaign_id: number | string;
+  workspace_id: string;
+  selected_device?: string;
+  conference_id?: string | null;
+};
+
+export type AutoDialerTurnResult =
+  | { success: true; message?: string }
+  | { success: false; error: string };
+
+/**
+ * Advances the predictive dialer by one turn: claims the next queued contact
+ * for the campaign and places a call, or completes the conference if the
+ * queue is empty.
+ *
+ * This is the core logic behind the `/api/auto-dial/dialer` route. It is
+ * exported here so callers that need to trigger the next dialer turn can
+ * invoke it in-process rather than issuing an HTTP self-fetch back to
+ * `/api/auto-dial/dialer` — that path matches the Twilio webhook prefix
+ * `/api/auto-dial`, so an unsigned self-fetch is rejected with 403 by
+ * `requireTwilioSignature` whenever signature validation is enabled (always
+ * in production). See app/routes/api+/auto-dial/dialer.action.server.ts and
+ * server/twilio-webhook.ts.
+ */
+export async function runAutoDialerTurn(
+  input: AutoDialerTurnInput,
+): Promise<AutoDialerTurnResult> {
+  const { user_id, workspace_id, selected_device } = input;
+  const campaign_id = Number(input.campaign_id);
+  const conferenceId =
+    typeof input.conference_id === "string" && input.conference_id
+      ? input.conference_id
+      : user_id;
+
+  const twilioClient = await createWorkspaceTwilioInstance({ workspace_id });
+  const tdb = createTenantDb(workspace_id);
+
+  try {
+    const contactRecord = await getNextAutoDialQueueContact(campaign_id, user_id, tdb);
+    if (contactRecord) {
+      logger.debug("Contact record:", contactRecord);
+
+      // Everything up through placing the Twilio call can fail without any
+      // call having actually been placed. If it does, release the claimed
+      // queue row back to `queued` — otherwise `claim_next_queue_contact`
+      // has already marked it assigned and it is stuck forever, wedging the
+      // predictive dialer's queue for that contact.
+      let toNumber: string;
+      let outreach_attempt_id: number;
+      let call: Awaited<ReturnType<typeof createTwilioCall>>;
+      try {
+        toNumber = normalizePhoneNumber(contactRecord.contact_phone);
+        outreach_attempt_id = await createOutreachAttempt(
+          contactRecord,
+          campaign_id,
+          workspace_id,
+          user_id,
+        );
+        call = await createTwilioCall(
+          twilioClient,
+          toNumber,
+          contactRecord.caller_id,
+          conferenceId,
+          selected_device ?? "",
+        );
+      } catch (dialError) {
+        try {
+          await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
+        } catch (revertError) {
+          logger.error(
+            "Failed to release claimed queue contact after auto-dial failure:",
+            revertError,
+          );
+        }
+        throw dialError;
+      }
+
+      await rpcDequeueContact(tdb, {
+        contactId: contactRecord.contact_id,
+        groupOnHousehold: true,
+        dequeuedById: user_id,
+        dequeuedReasonText: "Predictive Dialer called contact",
+      });
+
+      const callData = {
+        sid: call.sid,
+        date_updated: call.dateUpdated,
+        parent_call_sid: call.parentCallSid,
+        account_sid: call.accountSid,
+        to: toNumber,
+        from: call.from,
+        phone_number_sid: call.phoneNumberSid,
+        status: call.status,
+        start_time: call.startTime,
+        end_time: call.endTime,
+        duration: call.duration,
+        price: call.price,
+        direction: call.direction,
+        answered_by: call.answeredBy,
+        api_version: call.apiVersion,
+        forwarded_from: call.forwardedFrom,
+        group_sid: call.groupSid,
+        caller_name: call.callerName,
+        uri: call.uri,
+        campaign_id,
+        contact_id: contactRecord.contact_id,
+        workspace: workspace_id,
+        outreach_attempt_id,
+        conference_id: conferenceId,
+      };
+
+      await saveCallToDatabase(workspace_id, callData as unknown as Partial<Call>);
+      return { success: true };
+    }
+
+    await completeAllConferences(twilioClient, conferenceId);
+    return { success: true, message: "No queued contacts" };
+  } catch (error) {
+    logger.error("Error dialing number:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
 }

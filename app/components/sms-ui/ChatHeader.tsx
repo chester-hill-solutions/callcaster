@@ -1,6 +1,9 @@
-import React, { RefObject, useState } from "react";
+import React, { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MdEdit, MdExpandMore } from "react-icons/md";
+import { toast } from "sonner";
+import { useFetcher, useMatches, useParams, useRevalidator } from "react-router";
 import { Contact } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Menu } from "lucide-react";
 import {
@@ -10,6 +13,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+
+type LinkContactFetcherData = {
+  linkedCount?: number;
+  contactId?: number;
+  error?: string;
+};
+
+type ContactSearchFetcherData = {
+  contacts?: Contact[];
+  error?: string;
+};
 
 const getSortableName = (contact: Contact) => {
   if (contact.firstname && contact.surname) {
@@ -91,13 +105,26 @@ export default function ChatHeader({
   onShowConversationList,
 }: ChatHeaderParams) {
   const [isContactListOpen, setIsContactListOpen] = useState(false);
+  const [isContactSearchOpen, setIsContactSearchOpen] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState("");
+  const [hasSearchedContacts, setHasSearchedContacts] = useState(false);
+  const params = useParams();
+  const workspaceId = params["id"];
+  const matches = useMatches();
+  const linkFetcher = useFetcher<LinkContactFetcherData>();
+  const contactSearchFetcher = useFetcher<ContactSearchFetcherData>();
+  const revalidator = useRevalidator();
+  const lastHandledLinkDataRef = useRef<unknown>(null);
+
   const activeContactLabel = contact
     ? getDisplayName(contact)
     : selectedContact
       ? getDisplayName(selectedContact)
       : contactNumber;
 
-  const allContacts = React.useMemo(() => {
+  const isLandlineContact = (contact ?? selectedContact)?.line_type === "landline";
+
+  const allContacts = useMemo(() => {
     const potenialFiltered =
       potentialContacts?.length > 0 ? [...potentialContacts] : [];
     const combinedContacts = [...contacts, ...potenialFiltered];
@@ -111,38 +138,206 @@ export default function ChatHeader({
     );
   }, [contacts, potentialContacts]);
 
+  // Conversation may span multiple matched routes (parent chats route +
+  // child $contact_number route); walk from the deepest match to find the
+  // one that reports whether this conversation has used more than one of
+  // the workspace's numbers (see $contact_number.loader.server.ts).
+  const multipleNumbersUsed = useMemo(() => {
+    for (let i = matches.length - 1; i >= 0; i -= 1) {
+      const matchData = matches[i]?.data;
+      if (
+        matchData &&
+        typeof matchData === "object" &&
+        "multipleNumbersUsed" in matchData
+      ) {
+        return Boolean(
+          (matchData as { multipleNumbersUsed?: boolean }).multipleNumbersUsed,
+        );
+      }
+    }
+    return false;
+  }, [matches]);
+
+  const isLinking = linkFetcher.state !== "idle";
+
+  const handleLinkContact = useCallback(
+    (contactItem: Contact) => {
+      if (!contactItem?.id || isLinking) return;
+      linkFetcher.submit(
+        { intent: "link_contact", contact_id: String(contactItem.id) },
+        { method: "post" },
+      );
+    },
+    [isLinking, linkFetcher],
+  );
+
+  useEffect(() => {
+    if (linkFetcher.state !== "idle" || !linkFetcher.data) return;
+    if (lastHandledLinkDataRef.current === linkFetcher.data) return;
+    lastHandledLinkDataRef.current = linkFetcher.data;
+
+    if (linkFetcher.data.error) {
+      toast.error(linkFetcher.data.error);
+      return;
+    }
+
+    const linkedCount = linkFetcher.data.linkedCount ?? 0;
+    toast.success(
+      linkedCount > 0
+        ? `Linked — ${linkedCount} earlier message${linkedCount === 1 ? "" : "s"} attached`
+        : "Contact linked to this conversation",
+    );
+    setIsContactListOpen(false);
+    setIsContactSearchOpen(false);
+    setContactSearchQuery("");
+    setHasSearchedContacts(false);
+    revalidator.revalidate();
+  }, [linkFetcher.state, linkFetcher.data, revalidator]);
+
+  const runContactSearch = useCallback(() => {
+    const query = contactSearchQuery.trim();
+    if (!query || !workspaceId) return;
+    setHasSearchedContacts(true);
+    contactSearchFetcher.load(
+      `/api/contacts?q=${encodeURIComponent(query)}&workspace_id=${encodeURIComponent(workspaceId)}`,
+    );
+  }, [contactSearchFetcher, contactSearchQuery, workspaceId]);
+
+  const contactSearchResults = contactSearchFetcher.data?.contacts ?? [];
+
   const actionButton =
-    !!outlet && !contact && allContacts.length > 0 ? (
-      <DropdownMenu
-        open={isContactListOpen}
-        onOpenChange={setIsContactListOpen}
-      >
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="outline" className="gap-2">
-            Edit Contacts
-            <MdExpandMore className="h-5 w-5" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
-          {allContacts.map((contactItem) => (
-            <DropdownMenuItem
-              key={contactItem.id || contactItem.phone}
-              className="flex items-center justify-between gap-3"
-              onSelect={() => setDialog(contactItem)}
+    !!outlet && !contact ? (
+      <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {allContacts.length > 0 && (
+            <DropdownMenu
+              open={isContactListOpen}
+              onOpenChange={setIsContactListOpen}
             >
-              <div className="min-w-0">
-                <p className="truncate font-medium">
-                  {getDisplayName(contactItem)}
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" className="gap-2">
+                  Assign Contact
+                  <MdExpandMore className="h-5 w-5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                {allContacts.map((contactItem) => (
+                  <DropdownMenuItem
+                    key={contactItem.id || contactItem.phone}
+                    className="flex items-center justify-between gap-3"
+                    disabled={isLinking}
+                    onSelect={() => handleLinkContact(contactItem)}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {getDisplayName(contactItem)}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {contactItem.phone}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`Edit ${getDisplayName(contactItem)}`}
+                      className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        setDialog(contactItem);
+                      }}
+                    >
+                      <MdEdit className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsContactSearchOpen((open) => !open)}
+          >
+            Find contact
+          </Button>
+          <Button
+            type="button"
+            onClick={() =>
+              setDialog({
+                phone: contactNumber || "",
+                firstname: "",
+                surname: "",
+              } as Contact)
+            }
+          >
+            {contactNumber ? `Add ${contactNumber}` : "Add Contact"}
+          </Button>
+        </div>
+        {isContactSearchOpen && (
+          <div className="z-10 w-full max-w-xs rounded-md border border-border bg-background p-2 shadow-lg sm:w-72">
+            <div className="flex gap-2">
+              <Input
+                value={contactSearchQuery}
+                onChange={(event) => setContactSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    runContactSearch();
+                  }
+                }}
+                placeholder="Search contacts by name or phone"
+                className="h-8"
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={runContactSearch}
+                disabled={!contactSearchQuery.trim()}
+              >
+                Search
+              </Button>
+            </div>
+            <div className="mt-2 max-h-48 overflow-auto">
+              {contactSearchFetcher.state !== "idle" && (
+                <p className="p-2 text-xs text-muted-foreground">
+                  Searching…
                 </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {contactItem.phone}
-                </p>
-              </div>
-              <MdEdit className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              )}
+              {contactSearchFetcher.state === "idle" &&
+                hasSearchedContacts &&
+                contactSearchResults.length === 0 && (
+                  <p className="p-2 text-xs text-muted-foreground">
+                    No contacts found.
+                  </p>
+                )}
+              {contactSearchResults.map((result) => (
+                <div
+                  key={result.id}
+                  className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-muted"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {getDisplayName(result)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {result.phone}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isLinking}
+                    onClick={() => handleLinkContact(result)}
+                  >
+                    Link
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     ) : (
       <Button
         type="button"
@@ -190,9 +385,23 @@ export default function ChatHeader({
             <h2 className="truncate text-lg font-semibold sm:text-xl">
               Chat {!!outlet && `with ${activeContactLabel}`}
             </h2>
+            {!!outlet && isLandlineContact && (
+              <Badge
+                variant="secondary"
+                className="shrink-0 text-muted-foreground"
+              >
+                Landline
+              </Badge>
+            )}
           </div>
           <div className="shrink-0">{actionButton}</div>
         </div>
+
+        {!!outlet && multipleNumbersUsed && (
+          <p className="text-xs text-muted-foreground">
+            This conversation has used multiple of your numbers.
+          </p>
+        )}
 
         {!outlet && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start">

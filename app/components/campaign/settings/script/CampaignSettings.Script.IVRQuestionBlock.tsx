@@ -104,7 +104,12 @@ const IVRQuestionBlockOption = ({
                 <SelectItem value={"hangup"}>Hang Up</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="icon" onClick={() => onRemove(index)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Remove option"
+              onClick={() => onRemove(index)}
+            >
               <MdRemove size={24} className="text-primary" />
             </Button>
           </div>
@@ -182,13 +187,13 @@ const IVRQuestionBlock = ({
             {localBlock.title || `Block ${localBlock.id}`}
           </CardTitle>
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" onClick={onMoveUp}>
+            <Button variant="ghost" size="icon" aria-label="Move block up" onClick={onMoveUp}>
               <ArrowUp className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onMoveDown}>
+            <Button variant="ghost" size="icon" aria-label="Move block down" onClick={onMoveDown}>
               <ArrowDown className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onRemove}>
+            <Button variant="ghost" size="icon" aria-label="Remove block" onClick={onRemove}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -252,7 +257,7 @@ const IVRQuestionBlock = ({
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="icon" asChild>
+                <Button size="icon" asChild aria-label="Add audio file">
                   <NavLink to={"../../../../audios"} relative="path">
                     <MdAdd size={24} />
                   </NavLink>
@@ -263,7 +268,11 @@ const IVRQuestionBlock = ({
           <div className="pt-4">
             <div className="flex items-center gap-2">
               <h3>Responses</h3>
-              <Button variant={"ghost"} onClick={() => handleAddOption()}>
+              <Button
+                variant={"ghost"}
+                aria-label="Add response option"
+                onClick={() => handleAddOption()}
+              >
                 <MdAddCircleOutline />
               </Button>{" "}
             </div>

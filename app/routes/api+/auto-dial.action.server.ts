@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 import {
   checkSchedule,
   createWorkspaceTwilioInstance,
@@ -122,9 +123,7 @@ export const action = async ({
     throw new Error(`Workspace ${workspace_id} not found`);
   }
   if (credits <= 0) {
-    return {
-      creditsError: true,
-    };
+    return routeData({ creditsError: true }, { status: 402 });
   }
 
   const parsedCampaignId =

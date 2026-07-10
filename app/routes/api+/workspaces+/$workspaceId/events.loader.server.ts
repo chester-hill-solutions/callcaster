@@ -128,7 +128,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
               void flushEvents();
             },
           );
-          listenUnsubscribe = (listenResult as unknown as { unsubscribe: () => Promise<void> }).unsubscribe;
+          // postgres.js returns { state, unlisten } — using the wrong property
+          // here leaks one listener closure per SSE connection for the
+          // lifetime of the process.
+          listenUnsubscribe = (listenResult as unknown as { unlisten: () => Promise<void> }).unlisten;
         } catch {
           // LISTEN unavailable (e.g. pooled connection); polling fallback only.
         }

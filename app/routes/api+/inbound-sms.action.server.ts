@@ -12,6 +12,8 @@ import { inArray } from "drizzle-orm";
 import { contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { uploadObject } from "@/lib/object-storage.server";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -139,7 +141,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     messageError = { message: error instanceof Error ? error.message : String(error) };
   }
 
-  if (body.toLowerCase() === "stop" || body.toLowerCase() === '"stop"') {
+  let optOutKeywords = parseOptOutKeywords(null);
+  try {
+    const onboarding = await getWorkspaceMessagingOnboardingState({
+      workspaceId: workspaceNumber.workspace,
+    });
+    optOutKeywords = parseOptOutKeywords(onboarding.businessProfile.optOutKeywords);
+  } catch (error) {
+    logger.error("Error loading workspace opt-out keywords for inbound SMS:", error);
+  }
+
+  if (isOptOutMessage(body, optOutKeywords)) {
     if (matchingContactIds.length > 0) {
       await tdb.contact.update({
         set: { opt_out: true },
@@ -147,6 +159,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
   } else if (body.toLowerCase() === "start" || body.toLowerCase() === '"start"') {
+    // Onboarding only configures opt-out keywords today (no configurable
+    // opt-in list), so re-subscribe stays hardcoded to Twilio's "START".
     if (matchingContactIds.length > 0) {
       await tdb.contact.update({
         set: { opt_out: false },

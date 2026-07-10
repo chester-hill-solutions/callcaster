@@ -81,7 +81,7 @@ export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAdd
       city: "",
       region: "",
       postalCode: "",
-      countryCode: "US",
+      countryCode: "CA",
       status: "not_started",
       validationError: null,
       lastValidatedAt: null,
@@ -95,7 +95,7 @@ export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAdd
     city: parseString(value.city),
     region: parseString(value.region),
     postalCode: parseString(value.postalCode),
-    countryCode: parseString(value.countryCode) || "US",
+    countryCode: parseString(value.countryCode) || "CA",
     status: pickEnumValue(
       value.status,
       WORKSPACE_EMERGENCY_ADDRESS_STATUS_VALUES,
@@ -142,6 +142,15 @@ export function normalizeBusinessProfile(
     optOutKeywords: parseString(value.optOutKeywords),
     helpKeywords: parseString(value.helpKeywords),
     sampleMessages: parseStringArray(value.sampleMessages),
+    doingBusinessAs: parseString(value.doingBusinessAs),
+    businessRegistrationNumber: parseString(value.businessRegistrationNumber),
+    ageGatedContent: typeof value.ageGatedContent === "boolean" ? value.ageGatedContent : false,
+    ein: parseString(value.ein),
+    industry: parseString(value.industry),
+    authorizedRepName: parseString(value.authorizedRepName),
+    authorizedRepEmail: parseString(value.authorizedRepEmail),
+    authorizedRepPhone: parseString(value.authorizedRepPhone),
+    authorizedRepTitle: parseString(value.authorizedRepTitle),
   };
 }
 
@@ -175,7 +184,7 @@ export function normalizeMessagingServiceSection(
     advancedOptOutEnabled:
       typeof value.advancedOptOutEnabled === "boolean"
         ? value.advancedOptOutEnabled
-        : true,
+        : false,
     lastProvisionedAt: parseOptionalString(value.lastProvisionedAt),
     lastError: parseOptionalString(value.lastError),
   };

@@ -3,7 +3,7 @@ import { NavLink } from "react-router";
 import { FaPlus } from "react-icons/fa";
 import { Card, CardHeader } from "@/components/ui/card";
 import { MemberRole } from "@/components/workspace/TeamMember";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Campaign } from "@/lib/types";
 
 const handleNavlinkStyles = ({
@@ -20,26 +20,6 @@ const handleNavlinkStyles = ({
         ? "border-border bg-muted"
         : "border-transparent bg-background/60 text-foreground/90 hover:border-border hover:bg-muted"
   }`;
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const badgeStyles = {
-    pending: "bg-yellow-200 text-yellow-800",
-    scheduled: "bg-blue-200 text-blue-800",
-    draft: "bg-gray-200 text-gray-800",
-    running: "bg-green-200 text-green-800",
-    active: "bg-green-200 text-green-800",
-    paused: "bg-orange-200 text-orange-800",
-    complete: "bg-teal-100 text-teal-800",
-  };
-
-  return (
-    <Badge
-      className={`text-xxs shrink-0 ${badgeStyles[status as keyof typeof badgeStyles] || ""}`}
-    >
-      {status ? status?.charAt(0)?.toUpperCase() + status?.slice(1) : "ERROR"}
-    </Badge>
-  );
-};
 
 const CampaignsList = ({
   campaigns,
@@ -81,7 +61,7 @@ const CampaignsList = ({
                 <span className="line-clamp-2 leading-tight">
                   {row.title || `Unnamed campaign ${i + 1}`}
                 </span>
-                <StatusBadge status={row.status || ""} />
+                <StatusBadge status={row.status || ""} className="text-xxs" />
               </NavLink>
             )
           );

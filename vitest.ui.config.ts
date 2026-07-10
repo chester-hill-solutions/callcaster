@@ -34,7 +34,9 @@ export default mergeConfig(
           "app/lib/type-utils.ts",
           "app/lib/type-safety-utils.ts",
           "app/routes/**/*.{ts,tsx,js,jsx}",
-          "shared/**",
+          // NOTE: do not add a bare "shared/**" here — istanbul's test-exclude
+          // treats it as "**/shared/**", silently dropping app/components/shared
+          // from coverage. The `include: app/**` already keeps top-level dirs out.
           "twilio-serverless/**",
         ],
       },

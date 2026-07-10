@@ -1,12 +1,15 @@
 export { loader } from "./analytics.loader.server";
 
 import { Link, useLoaderData } from "react-router";
+import type { MetaFunction } from "react-router";
 
 import { WorkspaceAnalyticsPanel } from "@/components/analytics/WorkspaceAnalyticsPanel";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import type { WorkspaceAnalyticsLoaderData } from "./analytics.loader.server";
+
+export const meta: MetaFunction = () => [{ title: "Analytics — CallCaster" }];
 
 export default function WorkspaceAnalyticsPage() {
   const { userRole, analytics, workspaceUsers, currentUserId, error } =
@@ -47,3 +50,5 @@ export default function WorkspaceAnalyticsPage() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

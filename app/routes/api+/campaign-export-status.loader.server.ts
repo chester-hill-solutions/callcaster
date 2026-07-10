@@ -3,6 +3,10 @@ import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { downloadObject } from "@/lib/object-storage.server";
+import {
+  markCampaignExportInterruptedIfStale,
+  type CampaignExportStatus,
+} from "@/lib/campaign-export-helpers.server";
 
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -43,8 +47,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     // Read and parse the status data
-    const status = JSON.parse(statusBuffer.toString());
-    
+    let status = JSON.parse(statusBuffer.toString()) as CampaignExportStatus;
+
+    // Staleness watchdog: write-through on read. If the export was left
+    // "processing" by a process that restarted mid-run, mark it failed
+    // rather than leaving the client to poll forever.
+    try {
+      const watchdogResult = await markCampaignExportInterruptedIfStale(
+        workspaceId,
+        exportId,
+        status,
+      );
+      if (watchdogResult.interrupted) {
+        status = watchdogResult.statusData;
+      }
+    } catch (error) {
+      logger.error("Error running campaign export staleness watchdog:", error);
+    }
+
     return routeData(status);
   } catch (error) {
     logger.error("Status check error:", error);

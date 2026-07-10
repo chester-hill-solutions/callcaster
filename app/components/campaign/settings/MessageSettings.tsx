@@ -2,6 +2,7 @@ import { MdAddAPhoto , MdTag } from "react-icons/md";
 import { useRef, useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
+import { estimateMessageCredits } from "@/lib/pricing";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -57,7 +58,7 @@ type MessageMediaActionData = {
 
 function getErrorMessage(error: MessageMediaActionData["error"]) {
   if (!error) return null;
-  return typeof error === "string" ? error : error.message ?? "Message media could not be updated";
+  return "Message media could not be updated";
 }
 
 export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: MessageSettingsProps) => {
@@ -68,6 +69,8 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mediaFetcher = useFetcher<MessageMediaActionData>();
     const segmentInfo = getSmsSegmentInfo(displayText);
+    const hasMedia = resolvedMediaLinks.length > 0;
+    const creditEstimate = estimateMessageCredits({ body: displayText, hasMedia });
     const FUNCTION_EXAMPLES = [
         {
             label: 'Base64 encode phone and external ID',
@@ -249,7 +252,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                             />
                             {imageId && eraseVisible[imageId] && (
                                 <button
-                                    className="absolute right-2 top-2 rounded-md bg-gray-500 px-2 py-4 text-white opacity-80"
+                                    className="absolute right-2 top-2 rounded-md bg-foreground/70 px-2 py-4 text-background"
                                     onClick={() => removeImage(imageId)}
                                 >
                                     Remove
@@ -276,16 +279,15 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                 </div>
             </div>
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
-            <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
+            <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-secondary/40 p-4 shadow-md">
                 <div className="flex flex-col">
                         {renderMediaContent()}
                         <div>
-                            <div className="text-sm leading-snug text-gray-700">
+                            <div className="text-sm leading-snug text-muted-foreground">
                                 <textarea
                                     ref={textareaRef}
                                     name="body_text"
-                                    className="h-fit w-full cursor-text resize-none rounded-md border-none bg-white pb-2 pl-4 pr-4 pt-2 text-gray-900 outline-none"
-                                    style={{ caretColor: "black" }}
+                                    className="h-fit w-full cursor-text resize-none rounded-md border-none bg-background pb-2 pl-4 pr-4 pt-2 text-foreground caret-foreground outline-none"
                                     rows={5}
                                     value={displayText}
                                     onChange={handleBodyTextChange}
@@ -300,7 +302,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                             </div>
                         )}
                         {mediaFetcher.data?.success && mediaFetcher.state === "idle" && (
-                            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700">
+                            <div className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm text-success">
                                 {mediaFetcher.data.uploadedFileName
                                     ? "Media uploaded."
                                     : mediaFetcher.data.removedFileName
@@ -309,7 +311,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                             </div>
                         )}
                         <div className="flex items-center justify-between">
-                            <div className="text-sm leading-snug text-gray-700">
+                            <div className="text-sm leading-snug text-muted-foreground">
                                 <div>
                                     {segmentInfo.unitsUsedInCurrentSegment} / {segmentInfo.unitsPerSegment}{" "}
                                     {segmentInfo.encoding === "GSM-7" ? "units" : "characters"} used
@@ -322,6 +324,11 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                     {segmentInfo.totalCharacters} visible character
                                     {segmentInfo.totalCharacters !== 1 && 's'}
                                 </div>
+                                <div className="font-medium text-foreground">
+                                    ≈ {creditEstimate.credits} credit
+                                    {creditEstimate.credits !== 1 && 's'} per recipient
+                                    {creditEstimate.isMms ? " (MMS)" : ""}
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 {/* Template Tags Button */}
@@ -329,7 +336,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                     <button
                                         type="button"
                                         onClick={() => setShowTemplateTags(!showTemplateTags)}
-                                        className="text-gray-700 cursor-pointer p-1 rounded hover:bg-gray-200 transition-colors"
+                                        className="text-muted-foreground cursor-pointer p-1 rounded hover:bg-muted transition-colors"
                                         title="Insert template tags"
                                     >
                                         <MdTag size={20} />
@@ -337,11 +344,11 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
 
                                     {/* Template Tags Dropdown */}
                                     {showTemplateTags && (
-                                        <div className="absolute bottom-full right-0 mb-2 w-80 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-96 overflow-y-auto z-50">
-                                            <div className="p-2 border-b border-gray-200">
-                                                <h4 className="text-sm font-semibold text-gray-700">Template Tags</h4>
-                                                <p className="text-xs text-gray-500 mb-1">Click to insert contact field placeholders.</p>
-                                                <p className="text-xs text-blue-700 mb-1">
+                                        <div className="absolute bottom-full right-0 mb-2 w-80 bg-popover border border-border rounded-lg shadow-lg z-10 max-h-96 overflow-y-auto z-50">
+                                            <div className="p-2 border-b border-border">
+                                                <h4 className="text-sm font-semibold text-foreground">Template Tags</h4>
+                                                <p className="text-xs text-muted-foreground mb-1">Click to insert contact field placeholders.</p>
+                                                <p className="text-xs text-muted-foreground mb-1">
                                                     You can combine tags, text, and functions. Try <span className="font-mono">btoa(&#123;&#123;phone&#125;&#125;:&#123;&#123;external_id&#125;&#125;)</span> or <span className="font-mono">survey(&#123;&#123;contact_id&#125;&#125;, "survey-name")</span>!
                                                 </p>
                                             </div>
@@ -351,16 +358,16 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                         key={tag.key}
                                                         type="button"
                                                         onClick={() => insertTemplateTag(tag.key)}
-                                                        className="w-full text-left p-2 hover:bg-gray-100 rounded text-sm transition-colors"
+                                                        className="w-full text-left p-2 hover:bg-muted rounded text-sm transition-colors"
                                                     >
-                                                        <div className="font-mono text-blue-600">{tag.key}</div>
-                                                        <div className="text-gray-700">{tag.label}</div>
-                                                        <div className="text-xs text-gray-500">{tag.description}</div>
+                                                        <div className="font-mono text-primary">{tag.key}</div>
+                                                        <div className="text-foreground">{tag.label}</div>
+                                                        <div className="text-xs text-muted-foreground">{tag.description}</div>
                                                     </button>
                                                 ))}
                                             </div>
-                                            <div className="border-t border-gray-200 mt-2 pt-2 px-2">
-                                                <div className="text-xs font-semibold text-gray-700 mb-1">Function Examples</div>
+                                            <div className="border-t border-border mt-2 pt-2 px-2">
+                                                <div className="text-xs font-semibold text-foreground mb-1">Function Examples</div>
                                                 <div className="flex flex-col gap-1">
                                                     {FUNCTION_EXAMPLES.map((ex) => (
                                                         <button
@@ -373,15 +380,15 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                                     insertFunctionExample(ex.example);
                                                                 }
                                                             }}
-                                                            className="w-full text-left p-2 hover:bg-blue-50 rounded text-xs transition-colors border border-blue-100 mb-1"
+                                                            className="w-full text-left p-2 hover:bg-secondary/40 rounded text-xs transition-colors border border-secondary/60 mb-1"
                                                         >
-                                                            <div className="font-mono text-blue-800">{ex.example}</div>
-                                                            <div className="text-gray-700">{ex.label}</div>
-                                                            <div className="text-gray-500">{ex.description}</div>
+                                                            <div className="font-mono text-primary">{ex.example}</div>
+                                                            <div className="text-foreground">{ex.label}</div>
+                                                            <div className="text-muted-foreground">{ex.description}</div>
                                                         </button>
                                                     ))}
                                                 </div>
-                                                <div className="text-xs text-gray-500 mt-2">
+                                                <div className="text-xs text-muted-foreground mt-2">
                                                     <span className="font-semibold">Tip:</span> You can use <span className="font-mono">btoa(...)</span> to base64-encode any combination of tags and text, or <span className="font-mono">survey(...)</span> to generate personalized survey links.
                                                 </div>
                                             </div>
@@ -390,7 +397,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                 </div>
 
                                 {/* Media Upload Button */}
-                                <label htmlFor="add-image" className="text-gray-700 cursor-pointer">
+                                <label htmlFor="add-image" className="text-muted-foreground cursor-pointer">
                                     <MdAddAPhoto size={24} />
                                 </label>
                                 <input
@@ -461,16 +468,16 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                 }
 
                                 return foundTags.length > 0 ? (
-                                    <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
-                                        <div className="text-xs font-semibold text-blue-800 mb-1">Template Tags Found:</div>
-                                        <div className="text-xs text-blue-700">
+                                    <div className="mt-3 p-2 bg-secondary/30 rounded border border-secondary/60">
+                                        <div className="text-xs font-semibold text-foreground mb-1">Template Tags Found:</div>
+                                        <div className="text-xs text-muted-foreground">
                                             {foundTags.map((tag, index) => (
-                                                <span key={index} className="inline-block mr-2 mb-1 px-2 py-1 bg-blue-100 rounded">
+                                                <span key={index} className="inline-block mr-2 mb-1 px-2 py-1 bg-secondary/60 rounded">
                                                     {tag.key} → {tag.label}
                                                 </span>
                                             ))}
                                         </div>
-                                        <div className="text-xs text-green-700 mt-2">
+                                        <div className="text-xs text-success mt-2">
                                             <span className="font-semibold">💡 Tip:</span> Survey links will be automatically generated when messages are sent!
                                         </div>
                                         {/* Survey Link Preview */}
@@ -478,9 +485,9 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                             const surveyMatches = displayText.match(/survey\([^)]+\)/g);
                                             if (surveyMatches) {
                                                 return (
-                                                    (<div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
-                                                        <div className="text-xs font-semibold text-green-800 mb-1">Survey Links Preview:</div>
-                                                        <div className="text-xs text-green-700 space-y-1">
+                                                    (<div className="mt-3 p-2 bg-success/10 rounded border border-success/30">
+                                                        <div className="text-xs font-semibold text-success mb-1">Survey Links Preview:</div>
+                                                        <div className="text-xs text-success space-y-1">
                                                             {surveyMatches.map((match, index) => {
                                                                 // Extract survey ID from the function
                                                                 const surveyIdMatch = match.match(/survey\([^,]+,\s*"([^"]+)"/);
@@ -489,11 +496,11 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                                 
                                                                 return (
                                                                     <div key={index} className="flex items-center gap-2">
-                                                                        <span className="font-mono text-xs bg-green-100 px-1 rounded">
+                                                                        <span className="font-mono text-xs bg-success/20 px-1 rounded">
                                                                             {match}
                                                                         </span>
                                                                         <span>→</span>
-                                                                        <span className="text-xs text-green-600">
+                                                                        <span className="text-xs text-success">
                                                                             {previewLink}
                                                                         </span>
                                                                     </div>

@@ -5,11 +5,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Heading } from "@/components/ui/typography";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import type {
   WebhookEvent,
   WebhookEventCategory,
   WebhookEventType,
 } from "@/lib/twilio.types";
+
+type TestWebhookResult = {
+  data?: unknown;
+  status?: number;
+  statusText?: string;
+  error?: string | null;
+};
+
+type SaveWebhookResult = {
+  data?: unknown;
+  error?: string | null;
+};
 
 type WebhookEditorProps = {
   initialWebhook?: {
@@ -133,8 +146,34 @@ export default function WebhookEditor({
     Object.entries(initialWebhook?.custom_headers || {}),
   );
   const formRef = useRef<HTMLFormElement | null>(null);
-  const fetcher = useFetcher();
-  const isBusy = fetcher.state !== "idle";
+  const testFetcher = useFetcher<TestWebhookResult>({ key: "webhook-test" });
+  const saveFetcher = useFetcher<SaveWebhookResult>({ key: "webhook-save" });
+  const isBusy = testFetcher.state !== "idle";
+  const isSaving = saveFetcher.state !== "idle";
+
+  useActionFeedback(testFetcher.data, {
+    getError: (data) => data?.error ?? undefined,
+    getWarning: (data) =>
+      data && typeof data.status === "number" && data.status >= 400
+        ? `Destination responded with status ${data.status}`
+        : undefined,
+    getSuccess: (data) =>
+      Boolean(
+        data &&
+          (data.error == null) &&
+          (typeof data.status !== "number" || data.status < 400),
+      ),
+    successMessage: (data) =>
+      typeof data?.status === "number"
+        ? `Test event delivered (status ${data.status})`
+        : "Test event delivered",
+  });
+
+  useActionFeedback(saveFetcher.data, {
+    getError: (data) => data?.error ?? undefined,
+    getSuccess: (data) => Boolean(data && data.error == null),
+    successMessage: "Webhook saved",
+  });
 
   const submitTestEvent = (category: WebhookEventCategory, eventType: WebhookEventType) => {
     if (isBusy || !destinationUrl) return;
@@ -171,7 +210,7 @@ export default function WebhookEditor({
       }
     }
     
-    fetcher.submit(
+    testFetcher.submit(
       {
         event: JSON.stringify(testEvent),
         destination_url: destinationUrl,
@@ -218,8 +257,8 @@ export default function WebhookEditor({
     
     formData.append("events", JSON.stringify(events))
     formData.append("customHeaders", JSON.stringify(customHeaders))
-    
-    fetcher.submit(formData, {
+
+    saveFetcher.submit(formData, {
       method: "post",
     })
   }
@@ -484,9 +523,10 @@ export default function WebhookEditor({
       
       <Button
         type="submit"
+        disabled={isSaving}
         className="font-Zilla-Slab text-xl font-semibold"
       >
-        Update Webhook
+        {isSaving ? "Saving..." : "Update Webhook"}
       </Button>
     </Form>
   );

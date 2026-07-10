@@ -45,7 +45,7 @@ export function ContactSearchDialog({
                             placeholder="Search by name or phone..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)} />
-                        <Button size="icon" onClick={() => handleSearch(searchQuery)}>
+                        <Button size="icon" aria-label="Search contacts" onClick={() => handleSearch(searchQuery)}>
                             <Search className="h-4 w-4" />
                         </Button>
                     </div>

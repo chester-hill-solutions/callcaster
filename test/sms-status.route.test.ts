@@ -60,6 +60,10 @@ vi.mock("@/lib/outreach-disposition", () => ({
     mocks.shouldUpdateOutreachDisposition(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+const markContactLineTypeMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("@/lib/twilio-lookup.server", () => ({
+  markContactLineType: (...args: unknown[]) => markContactLineTypeMock(...args),
+}));
 
 function makeSmsStatusRequest(payload: { SmsSid?: string; SmsStatus?: string }) {
   const formData = new FormData();
@@ -107,6 +111,80 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       } as never),
     );
     expect(res.status).toBe(403);
+  });
+
+  test("stamps contact as landline on Twilio error 30006", async () => {
+    mocks.findMessageBySid.mockResolvedValueOnce({
+      workspace: "w1",
+      direction: "outbound-api",
+      sid: "SM1",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+    mocks.updateMessageBySid.mockResolvedValueOnce({
+      sid: "SM1",
+      workspace: "w1",
+      status: "undelivered",
+      contact_id: 42,
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+    mocks.requireTwilioSignature.mockResolvedValueOnce(null);
+
+    const formData = new FormData();
+    formData.set("SmsSid", "SM1");
+    formData.set("SmsStatus", "undelivered");
+    formData.set("ErrorCode", "30006");
+
+    const mod = await import("../app/routes/api+/sms/status.route");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: formData }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    expect(markContactLineTypeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "w1", contactId: 42, lineType: "landline" }),
+    );
+    // error_code persisted alongside status
+    expect(mocks.updateMessageBySid).toHaveBeenCalledWith(
+      "w1",
+      "SM1",
+      expect.objectContaining({ error_code: 30006 }),
+    );
+  });
+
+  test("does not stamp line type for other error codes", async () => {
+    mocks.findMessageBySid.mockResolvedValueOnce({
+      workspace: "w1",
+      direction: "outbound-api",
+      sid: "SM2",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+    mocks.updateMessageBySid.mockResolvedValueOnce({
+      sid: "SM2",
+      workspace: "w1",
+      status: "failed",
+      contact_id: 42,
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+    mocks.requireTwilioSignature.mockResolvedValueOnce(null);
+
+    const formData = new FormData();
+    formData.set("SmsSid", "SM2");
+    formData.set("SmsStatus", "failed");
+    formData.set("ErrorCode", "30007");
+
+    const mod = await import("../app/routes/api+/sms/status.route");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: formData }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    expect(markContactLineTypeMock).not.toHaveBeenCalled();
   });
 
   test("returns 400 when SmsSid or status missing", async () => {
@@ -161,6 +239,72 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       } as never),
     );
     expect(res.status).toBe(500);
+  });
+
+  test("bills MMS flat at MMS_CREDITS when the message has media", async () => {
+    mocks.findMessageBySid.mockResolvedValueOnce({
+      workspace: "w1",
+      direction: "outbound-api",
+      sid: "SM1",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+    mocks.updateMessageBySid.mockResolvedValueOnce({
+      sid: "SM1",
+      workspace: "w1",
+      status: "delivered",
+      num_media: "1",
+      num_segments: "3",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+
+    const mod = await import("../app/routes/api+/sms/status.route");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "delivered" }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: -2,
+        note: expect.stringContaining("MMS SM1 delivered"),
+      }),
+    );
+  });
+
+  test("bills SMS per-segment at SMS_SEGMENT_CREDITS when the message has no media", async () => {
+    mocks.findMessageBySid.mockResolvedValueOnce({
+      workspace: "w1",
+      direction: "outbound-api",
+      sid: "SM2",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+    mocks.updateMessageBySid.mockResolvedValueOnce({
+      sid: "SM2",
+      workspace: "w1",
+      status: "delivered",
+      num_media: "0",
+      num_segments: "3",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+
+    const mod = await import("../app/routes/api+/sms/status.route");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: makeSmsStatusRequest({ SmsSid: "SM2", SmsStatus: "delivered" }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: -3,
+        note: expect.stringContaining("SMS SM2 delivered (3 segments)"),
+      }),
+    );
   });
 
   test("returns 200 without updating DB when message is inbound", async () => {

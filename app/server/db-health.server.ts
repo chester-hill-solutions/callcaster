@@ -23,6 +23,19 @@ const BANNED_FUNCTIONS = [
 ];
 
 /**
+ * Cheap connectivity probe for readiness checks. Returns false instead of
+ * throwing so callers can report 503 without crashing the probe path.
+ */
+export async function pingDatabase(): Promise<boolean> {
+  try {
+    await db.execute(sql`select 1`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Assert that the database has the required ledger RPC and no legacy triggers
  * or functions containing a hardcoded Supabase JWT.
  *

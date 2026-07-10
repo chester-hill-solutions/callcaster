@@ -59,7 +59,7 @@ The workspace is inferred from the key. If you send `workspace_id` in the body, 
 
 ### API key setup
 
-API keys are created in the workspace **Settings** UI (session required). The admin endpoint `POST /api/workspace-api-keys` is **not** part of the public integrator API.
+API keys are created in the workspace **Settings** UI, or programmatically via `POST /api/workspaces/{workspaceId}/api-keys` (session or Bearer JWT auth — see the [agent quickstart](./api-agent-quickstart.md#api-keys-automation)). The flat admin endpoint `POST /api/workspace-api-keys` backs the Settings UI and is **not** part of the public integrator API.
 
 1. Sign in to CallCaster in a browser.
 2. Open workspace **Settings** and create an API key.

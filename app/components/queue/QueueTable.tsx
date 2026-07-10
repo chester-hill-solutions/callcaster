@@ -40,11 +40,11 @@ const SUPPORT_LEVEL_LABELS: Record<SupportLevel, string> = {
 };
 
 const SUPPORT_LEVEL_BADGE_CLASS: Record<SupportLevel, string> = {
-    1: "bg-emerald-500/20 text-emerald-800 border-emerald-500/40",
-    2: "bg-green-500/10 text-green-800 border-green-500/30",
-    3: "bg-amber-500/20 text-amber-900 border-amber-500/60 ring-2 ring-amber-400/40 font-semibold",
-    4: "bg-orange-500/10 text-orange-800 border-orange-500/30",
-    5: "bg-red-500/20 text-red-800 border-red-500/40",
+    1: "bg-success/20 text-success border-success/40",
+    2: "bg-success/10 text-success border-success/30",
+    3: "bg-warning/20 text-warning border-warning/60 ring-2 ring-warning/40 font-semibold",
+    4: "bg-destructive/10 text-destructive border-destructive/30",
+    5: "bg-destructive/20 text-destructive border-destructive/40",
 };
 
 function getContactSupportLevel(contact: Contact & {
@@ -291,7 +291,7 @@ export function QueueTable({
                             placeholder="Filter names..."
                             value={optimisticInputs.name}
                             onChange={(e) => handleFilterChange('name', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -329,7 +329,7 @@ export function QueueTable({
                             placeholder="Filter phone..."
                             value={optimisticInputs.phone}
                             onChange={(e) => handleFilterChange('phone', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -367,7 +367,7 @@ export function QueueTable({
                             placeholder="Filter email..."
                             value={optimisticInputs.email}
                             onChange={(e) => handleFilterChange('email', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -405,7 +405,7 @@ export function QueueTable({
                             placeholder="Filter address..."
                             defaultValue={defaultFilters.address}
                             onChange={(e) => handleFilterChange('address', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -449,7 +449,7 @@ export function QueueTable({
                                 setOptimisticAudience(newValue);
                                 handleFilterChange('audiences', newValue);
                             }}
-                            className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs"
+                            className="h-6 w-full rounded border border-input bg-muted/50 px-2 text-xs"
                         >
                             <option value="">Select audience...</option>
                             {audiences?.map(audience => (
@@ -505,7 +505,7 @@ export function QueueTable({
                                     handleFilterChange('queueStatus', newValue);
                                 }
                             }}
-                            className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs"
+                            className="h-6 w-full rounded border border-input bg-muted/50 px-2 text-xs"
                         >
                             {selectedRows.length > 0 || isAllFilteredSelected ? (
                                 <>
@@ -554,7 +554,7 @@ export function QueueTable({
                             <span className="font-medium text-xs">Support</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <select name="disposition" value={optimisticDisposition} className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs" onChange={(e) => { const v = e.target.value; setOptimisticDisposition(v); handleFilterChange('disposition', v); }}>
+                            <select name="disposition" value={optimisticDisposition} className="h-6 w-full rounded border border-input bg-muted/50 px-2 text-xs" onChange={(e) => { const v = e.target.value; setOptimisticDisposition(v); handleFilterChange('disposition', v); }}>
                                 <option value="">Select...</option>
                                 {ATTEMPT_OPTIONS.map((attempt) => (
                                     <option key={attempt} value={attempt}>{attempt}</option>
@@ -572,7 +572,7 @@ export function QueueTable({
                 const level = getContactSupportLevel(contact);
                 if (level === null) {
                     return (
-                        <span className="text-center w-full text-[8px] px-2 py-1 rounded-full bg-gray-500/10 text-gray-800 border border-gray-500/20">
+                        <span className="text-center w-full text-[8px] px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border">
                             UNKNOWN
                         </span>
                     );
@@ -668,7 +668,7 @@ export function QueueTable({
                 <div className="relative">
                     <div className="max-h-[800px] overflow-y-auto">
                         <table className="w-full" data-testid="campaign-queue-table">
-                            <thead className="sticky top-0 bg-gray-100 border-b">
+                            <thead className="sticky top-0 bg-muted border-b">
                                 {table.getHeaderGroups().map(headerGroup => (
                                     <tr key={headerGroup.id}>
                                         {headerGroup.headers.map((header, i) => (
@@ -688,7 +688,7 @@ export function QueueTable({
                             </thead>
                             <tbody>
                                 {table.getRowModel().rows.map(row => (
-                                    <tr key={row.id} className="border-b hover:bg-muted/50 text-gray-500">
+                                    <tr key={row.id} className="border-b hover:bg-muted/50 text-muted-foreground">
                                         {row.getVisibleCells().map((cell, i) => (
                                             <td key={`${i}-${cell.id}`} className="p-1 px-2 text-xs">
                                                 {flexRender(
@@ -699,7 +699,7 @@ export function QueueTable({
                                         ))}
                                     </tr>
                                 ))}
-                                <tr className="sticky bottom-0 bg-gray-100">
+                                <tr className="sticky bottom-0 bg-muted">
                                     <td colSpan={columns.length} className="p-2 text-xs">
                                         {isAllFilteredSelected ?
                                             `Selected: ${totalCount} of ${unfilteredCount}` :

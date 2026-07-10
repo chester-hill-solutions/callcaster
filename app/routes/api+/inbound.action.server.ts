@@ -61,7 +61,30 @@ function dispatchInboundCallWebhookNotification(args: {
   });
 }
 
+/** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
+ * hears a graceful message instead of an HTML error page. */
+function inboundUnavailableTwiml(): Response {
+  const twiml = new Twilio.twiml.VoiceResponse();
+  twiml.say("We're unable to take your call right now. Please try again later.");
+  twiml.hangup();
+  return new Response(twiml.toString(), {
+    status: 200,
+    headers: { "Content-Type": "text/xml" },
+  });
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
+  try {
+    return await handleInboundAction(request);
+  } catch (error) {
+    logger.error("Unhandled error in api.inbound", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return inboundUnavailableTwiml();
+  }
+};
+
+async function handleInboundAction(request: ActionFunctionArgs["request"]) {
   const twiml = new Twilio.twiml.VoiceResponse();
   const formData = await request.clone().formData();
   const data = Object.fromEntries(
@@ -267,4 +290,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       "Content-Type": "text/xml",
     },
   });
-};
+}

@@ -6,6 +6,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Heading } from "@/components/ui/typography";
 import { FaEdit, FaSave } from "react-icons/fa";
 import ContactFields from "./ContactDetailsFields";
 import OtherDataFields from "./ContactDetailsOtherFields";
@@ -119,9 +120,9 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
     <Card className="mx-auto w-full max-w-4xl">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Contact Details</h2>
+          <Heading level={3}>Contact Details</Heading>
           {isDirty && (
-            <span className="text-sm text-orange-600 font-medium">
+            <span className="text-sm text-warning font-medium">
               Unsaved changes
             </span>
           )}
@@ -136,7 +137,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
         />
         
         <div className="my-6">
-          <h3 className="mb-4 text-xl font-semibold">Audiences</h3>
+          <Heading level={4} className="mb-4">Audiences</Heading>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {audiences.map((audience) => (
               <div key={audience.id} className="flex items-center space-x-2">
@@ -148,11 +149,11 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
                   id={`audience-${audience.id}`}
                   onChange={handleAudienceChange}
                   disabled={!editMode}
-                  className="rounded border-gray-300"
+                  className="rounded border-input"
                 />
                 <label 
                   htmlFor={`audience-${audience.id}`}
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-foreground"
                 >
                   {getAudienceName(audience)}
                 </label>
@@ -189,16 +190,13 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
         {editMode ? (
           <Button
             onClick={handleSave}
-            className="bg-green-500 text-white hover:bg-green-600"
+            className="bg-success text-success-foreground hover:bg-success/90"
             disabled={!hasChanges}
           >
             <FaSave className="mr-2" /> Save
           </Button>
         ) : (
-          <Button
-            onClick={handleEdit}
-            className="bg-blue-500 text-white hover:bg-blue-600"
-          >
+          <Button onClick={handleEdit}>
             <FaEdit className="mr-2" /> Edit
           </Button>
         )}

@@ -44,6 +44,15 @@ vi.mock("@/lib/object-storage.server", () => ({
   uploadObject: vi.fn(async () => undefined),
 }));
 
+const onboardingMocks = vi.hoisted(() => ({
+  getWorkspaceMessagingOnboardingState: vi.fn(),
+}));
+
+vi.mock("@/lib/messaging-onboarding.server", () => ({
+  getWorkspaceMessagingOnboardingState: (...args: unknown[]) =>
+    onboardingMocks.getWorkspaceMessagingOnboardingState(...args),
+}));
+
 const inboundContextMocks = vi.hoisted(() => ({
   contacts: [] as Array<{ id: number }>,
   contactError: null as Error | null,
@@ -262,6 +271,94 @@ describe("app/routes/api+/inbound-sms", () => {
     mocks.logger.warn.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal("fetch", mocks.fetch);
+    onboardingMocks.getWorkspaceMessagingOnboardingState.mockReset();
+    onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
+      businessProfile: { optOutKeywords: "" },
+    });
+  });
+
+  describe("workspace-configurable opt-out keywords", () => {
+    test("marks contact opted out on a custom configured keyword", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+        businessProfile: { optOutKeywords: "QUIT, LEAVE ME ALONE" },
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(
+        await mod.action({
+          request: makeInboundSmsRequest({ Body: "quit", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
+    });
+
+    test("does not opt out on default STOP keyword when a custom keyword list doesn't include it", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+        businessProfile: { optOutKeywords: "QUIT" },
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(
+        await mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toHaveLength(0);
+    });
+
+    test("falls back to default STOP/UNSUBSCRIBE keywords when onboarding lookup fails", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockRejectedValueOnce(
+        new Error("onboarding unavailable"),
+      );
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(
+        await mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        "Error loading workspace opt-out keywords for inbound SMS:",
+        expect.any(Error),
+      );
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
+    });
+
+    test("START re-subscribes regardless of configured opt-out keywords", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+        businessProfile: { optOutKeywords: "QUIT" },
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(
+        await mod.action({
+          request: makeInboundSmsRequest({ Body: "start", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: false } }),
+      );
+    });
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {

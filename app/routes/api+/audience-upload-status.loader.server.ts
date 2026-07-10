@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
+import { markAudienceUploadInterruptedIfStale } from "@/lib/audience-upload-process.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { AppError } from "@/lib/errors.server";
@@ -38,7 +39,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await requireWorkspaceAccess({ user, workspaceId });
 
-    const uploadData = await findAudienceUploadById(workspaceId, uploadId);
+    let uploadData = await findAudienceUploadById(workspaceId, uploadId);
 
     if (!uploadData) {
       return routeData({ error: "Upload not found" }, { status: 404, headers });
@@ -53,6 +54,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       statusFileData = JSON.parse(statusBuffer.toString()) as Record<string, unknown>;
     } catch (error) {
       // Object may not exist yet; ignore parse/download errors
+    }
+
+    // Staleness watchdog: `processAudienceUpload` runs fire-and-forget in
+    // the request process that created it. If that process restarted
+    // mid-run, the row is stuck at "processing" forever and the client
+    // would poll indefinitely. Write-through on read: if progress hasn't
+    // been updated in 10 minutes, mark the upload failed.
+    try {
+      const watchdogResult = await markAudienceUploadInterruptedIfStale({
+        workspaceId,
+        uploadId,
+        dbStatus: uploadData.status,
+        statusFileData,
+      });
+      if (watchdogResult.interrupted) {
+        statusFileData = watchdogResult.statusFileData;
+        uploadData = {
+          ...uploadData,
+          status: "error",
+          error_message:
+            typeof statusFileData.error === "string"
+              ? statusFileData.error
+              : uploadData.error_message,
+        };
+      }
+    } catch (error) {
+      logger.error("Error running audience upload staleness watchdog:", error);
     }
 
     return routeData({

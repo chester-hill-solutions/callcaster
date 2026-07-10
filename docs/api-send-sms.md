@@ -26,6 +26,8 @@ Send a single SMS to one phone number. Optional `contact_id` enables template ta
 | `media` | string | No | Media URL/path for MMS. |
 | `message_intent` | string | No | Twilio message intent. |
 | `messaging_service_sid` | string | No | Messaging Service SID override. |
+| `send_at` | string | No | "Send later" — ISO date/time, 15 min–35 days from now. Requires a resolved Messaging Service sender (from-number sends cannot be scheduled); returns an error otherwise. |
+| `opt_out` (response) | — | — | Sends to a contact with `opt_out = true` are rejected with `403 { "error": "This contact has opted out of messages.", "optedOut": true }`. |
 
 ### Example (API key)
 

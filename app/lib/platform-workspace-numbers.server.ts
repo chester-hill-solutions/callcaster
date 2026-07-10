@@ -1,6 +1,7 @@
 import {
   createWorkspaceTwilioInstance,
   getUserRole,
+  getWorkspaceInfo,
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
   removeWorkspacePhoneNumber,
@@ -32,10 +33,18 @@ import { debitAmountFromCredits } from "@/lib/pricing";
 import { numberRentalPurchaseKey } from "@/lib/billing-keys";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { deriveAndPersistWorkspaceThroughput } from "@/lib/database/workspace-twilio-config.server";
+import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace-twilio-sync.server";
 import type { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import type { z } from "zod";
 
 type PatchNumberInput = z.infer<typeof patchNumberBodySchema>;
+
+// Default inbound ring count applied to newly rented numbers (Q59). Distinct
+// from `INBOUND_RING_COUNT_DEFAULT` in shared/inbound-rings.ts (which backs
+// `normalizeInboundRingCount`'s fallback for missing/invalid values) — this is
+// the deliberate first-purchase default, not a parsing fallback.
+const FIRST_NUMBER_DEFAULT_RING_COUNT = 3;
 
 async function requireNumbersManager(
   userId: string,
@@ -113,7 +122,7 @@ export async function purchaseWorkspaceNumber(
       return {
         ok: false as const,
         error: "Insufficient credits for number rental",
-        status: 400,
+        status: 402,
         creditsError: true as const,
       };
     }
@@ -123,14 +132,35 @@ export async function purchaseWorkspaceNumber(
       workspaceId,
     });
 
+    const { data: workspaceInfo } = await getWorkspaceInfo({ workspaceId });
+    const workspaceName = workspaceInfo?.name ?? workspaceId;
+
+    // Attach a validated emergency (E911) address SID when we have one so the
+    // number is E911-provisioned at purchase time.
+    const validatedEmergencyAddressSid =
+      onboarding.emergencyVoice.address.status === "validated"
+        ? onboarding.emergencyVoice.address.addressSid ?? undefined
+        : undefined;
+
+    // TODO(Q43): auto-apply `addressRequirements` when the number's regulation
+    // requires a registered address. Deferred: the Twilio SDK's create options
+    // do not expose a clean typed field here, so we set the emergency address
+    // SID only and leave regulatory address-requirement handling to a follow-up.
     const number = await withTwilioRetry(
       () =>
         twilio.incomingPhoneNumbers.create({
           phoneNumber,
-          statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
+          friendlyName: `${workspaceName} / ${phoneNumber}`,
+          // SMS delivery status (caller-ID verification keeps /api/caller-id/status).
+          statusCallback: `${env.BASE_URL()}/api/sms/status`,
           statusCallbackMethod: "POST",
           voiceUrl: `${env.BASE_URL()}/api/inbound`,
+          voiceMethod: "POST",
           smsUrl: `${env.BASE_URL()}/api/inbound-sms`,
+          smsMethod: "POST",
+          ...(validatedEmergencyAddressSid
+            ? { emergencyAddressSid: validatedEmergencyAddressSid }
+            : {}),
         }),
       { workspaceId, operation: "incomingPhoneNumbers.create" },
     );
@@ -161,6 +191,7 @@ export async function purchaseWorkspaceNumber(
     const [newNumber] = await tdb.workspace_number.insert({
       friendly_name: number.friendlyName,
       phone_number: number.phoneNumber,
+      twilio_phone_number_sid: number.sid ?? null,
       capabilities: {
         verification_status:
           number.capabilities.mms &&
@@ -177,8 +208,11 @@ export async function purchaseWorkspaceNumber(
       inbound_action: owner?.username ?? null,
       type: "rented",
       created_at: new Date().toISOString(),
+      // Q45/Q59: handset off, ring count 3 by default for a freshly rented
+      // number; owners can change both from the numbers table or the
+      // first-number onboarding step.
       handset_enabled: false,
-      inbound_ring_count: 0,
+      inbound_ring_count: FIRST_NUMBER_DEFAULT_RING_COUNT,
     });
 
     if (!newNumber) {
@@ -228,6 +262,33 @@ export async function purchaseWorkspaceNumber(
       updates: nextOnboarding,
       actorUserId: owner?.id ?? null,
     });
+
+    // Q39: re-derive smsSenderClass/smsTargetMps from the updated number
+    // inventory now that this purchase changed it. Best-effort — a failure
+    // here shouldn't fail the purchase itself.
+    try {
+      await deriveAndPersistWorkspaceThroughput({ workspaceId });
+    } catch (throughputError) {
+      logger.error(
+        "Failed to auto-derive workspace throughput after number purchase",
+        throughputError,
+      );
+    }
+
+    // Q60: kick off a Twilio portal snapshot sync once this workspace's first
+    // number lands, so the numbers/throughput inventory is fresh without
+    // waiting for the next scheduled/admin-triggered sync. Best-effort.
+    const isFirstWorkspaceNumber = (workspacePhoneNumbers ?? [newNumber]).length <= 1;
+    if (isFirstWorkspaceNumber) {
+      try {
+        await syncWorkspaceTwilioSnapshot({ workspaceId });
+      } catch (syncError) {
+        logger.error(
+          "Failed to sync Twilio portal snapshot after first number purchase",
+          syncError,
+        );
+      }
+    }
 
     await insertTransactionHistoryIdempotent({
       workspaceId,

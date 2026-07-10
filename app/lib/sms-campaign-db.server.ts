@@ -10,6 +10,7 @@ export interface CampaignSmsDispatchData {
     sms_send_mode: string | null;
     sms_messaging_service_sid: string | null;
     caller_id: string | null;
+    sms_send_window: unknown;
   };
 }
 
@@ -28,6 +29,7 @@ export async function loadCampaignSmsDispatchData(
       sms_send_mode: true,
       sms_messaging_service_sid: true,
       caller_id: true,
+      sms_send_window: true,
     },
   });
 
@@ -43,6 +45,7 @@ export async function loadCampaignSmsDispatchData(
       sms_send_mode: row.sms_send_mode,
       sms_messaging_service_sid: row.sms_messaging_service_sid,
       caller_id: row.caller_id,
+      sms_send_window: row.sms_send_window ?? null,
     },
   };
 }

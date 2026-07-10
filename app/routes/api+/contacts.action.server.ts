@@ -53,7 +53,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             );
           return routeData(bulkResult);
         } else {
-          const newContact = await createContact(data, data.audience_id, user.id);
+          const newContact = await createContact(data, data.audience_id, user.id, {
+            assignDefaultAudienceIfMissing: data.assign_default_sms_audience === "true",
+          });
           return routeData(newContact);
         }
       }

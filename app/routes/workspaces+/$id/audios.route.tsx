@@ -57,6 +57,7 @@ export default function WorkspaceAudiosPage() {
         error={error}
         isEmpty={isWorkspaceAudioEmpty}
         emptyMessage="Add Your Own Audio to this Workspace!"
+        emptyDescription="Upload or record audio to use in IVR campaigns and voicemail drops."
         addAction={
           <Button asChild className="font-Zilla-Slab text-lg font-semibold">
             <Link to="./new">Add Audio</Link>
@@ -74,3 +75,5 @@ export default function WorkspaceAudiosPage() {
     </>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

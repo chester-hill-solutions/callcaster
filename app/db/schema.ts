@@ -1,4 +1,18 @@
+// ─────────────────────────────────────────────────────────────────────────
+// DANGER: this file is hand-synced introspection output, not the source of
+// truth for the database schema. It has zero `.references()` declared and
+// there is no drizzle/meta journal checked in, so running
+// `drizzle-kit generate` against this schema (see drizzle.config.ts) can
+// emit DESTRUCTIVE DDL (dropped/recreated constraints, tables, etc.).
+//
+// Do NOT run `drizzle-kit generate` against this file to produce real
+// migrations. New DDL goes in hand-written SQL under
+// client/migrations/*.sql — see docs/migration-delivery-board.md item 1.14
+// (schema.ts is hand-synced from baseline because drizzle-kit introspect
+// currently errors against this Postgres version).
+//
 // Hand-maintained Drizzle schema — update when client/migrations/*.sql changes
+// ─────────────────────────────────────────────────────────────────────────
 
 import {
   pgTable, text, integer, bigint, boolean, timestamp, jsonb, uuid, serial, smallint, pgEnum,
@@ -82,6 +96,7 @@ export const workspace_number = pgTable("workspace_number", {
   inbound_ring_count: integer().notNull(),
   inbound_script_id: serial(),
   phone_number: text(),
+  twilio_phone_number_sid: text(),
   type: text().notNull(),
   workspace: uuid().notNull(),
 });
@@ -106,6 +121,7 @@ export const campaign = pgTable("campaign", {
   script_id: integer(),
   sms_messaging_service_sid: text(),
   sms_send_mode: text(),
+  sms_send_window: jsonb(),
   start_date: text(),
   status: text(),
   title: text().notNull(),
@@ -171,6 +187,10 @@ export const contact = pgTable("contact", {
   firstname: text(),
   household_id: uuid(),
   id: serial().notNull().primaryKey(),
+  // Twilio Lookup v2 line-type cache: null = never looked up. Populated
+  // lazily on a contact's first SMS attempt and treated as permanent once set.
+  line_type: text(),
+  line_type_checked_at: timestamp({ withTimezone: true, mode: "string" }),
   opt_out: boolean(),
   other_data: text().notNull(),
   phone: text(),
@@ -291,6 +311,8 @@ export const message = pgTable("message", {
   num_media: text(),
   num_segments: text(),
   outbound_media: text().array(),
+  /** Requested "send later" time for scheduled sends (Twilio doesn't echo `sendAt` back). */
+  scheduled_at: text(),
   outreach_attempt_id: serial(),
   price: text(),
   price_unit: text(),

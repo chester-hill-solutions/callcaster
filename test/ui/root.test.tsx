@@ -64,6 +64,7 @@ vi.mock("react-router", async () => {
     ScrollRestoration: () => null,
     useLoaderData: () => mocks.loaderData,
     useNavigate: () => mocks.navigate,
+    useNavigation: () => ({ state: "idle" }),
     useRouteError: () => null,
     isRouteErrorResponse: () => false,
   };

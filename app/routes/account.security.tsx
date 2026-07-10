@@ -93,3 +93,5 @@ export default function AccountSecurity() {
     </main>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

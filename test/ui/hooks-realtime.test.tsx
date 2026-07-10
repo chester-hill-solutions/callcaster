@@ -177,6 +177,70 @@ describe("realtime hooks", () => {
     expect(result.current.messages.length).toBeGreaterThan(0);
   });
 
+  test("useChatRealTime keeps failed INSERT events instead of dropping them", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
+
+    const stableInitial: any[] = [];
+    const { result } = renderHook(() =>
+      useChatRealTime({
+        client: {} as any,
+        initial: stableInitial,
+        workspace: "ws",
+      }),
+    );
+
+    act(() => {
+      emitWorkspaceEvent({
+        eventType: "INSERT",
+        table: "message",
+        new: {
+          sid: "SM-failed",
+          body: "oops",
+          from: "+15551111111",
+          to: "+15552222222",
+          workspace: "ws",
+          status: "failed",
+        },
+        old: null,
+      });
+    });
+
+    expect(result.current.messages.some((m) => m.sid === "SM-failed")).toBe(true);
+  });
+
+  test("useChatRealTime markOptimisticMessageFailed flips a pending message to failed", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+
+    const stableInitial: any[] = [];
+    const { result } = renderHook(() =>
+      useChatRealTime({
+        client: {} as any,
+        initial: stableInitial,
+        workspace: "ws",
+      }),
+    );
+
+    act(() => {
+      result.current.addOptimisticMessage({
+        body: "hi",
+        from: "+1",
+        to: "+2",
+        sid: "pending-123",
+      });
+    });
+    expect(
+      result.current.messages.find((m) => m.sid === "pending-123")?.status,
+    ).toBe("sending");
+
+    act(() => {
+      result.current.markOptimisticMessageFailed("pending-123");
+    });
+    expect(
+      result.current.messages.find((m) => m.sid === "pending-123")?.status,
+    ).toBe("failed");
+  });
+
   test("useConversationSummaryRealTime refreshes and updates unread", async () => {
     messagingMocks.fetchConversationSummaries.mockResolvedValue([
       {

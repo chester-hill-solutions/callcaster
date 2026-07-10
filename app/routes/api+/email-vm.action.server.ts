@@ -44,6 +44,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw new Error("Call destination number not found");
     }
 
+    // Idempotency guard: Twilio retries the recordingStatusCallback on
+    // timeout, and the retry carries the exact same RecordingUrl/RecordingSid
+    // as the original. If this call's recording URL was already persisted
+    // (by a prior run of this same handler, below), the voicemail has
+    // already been fetched, stored, and emailed — ack success without
+    // reprocessing so we don't send a duplicate email.
+    if (callRow.recording_url && callRow.recording_url === recordingUrl) {
+      logger.debug("Voicemail webhook retry detected; skipping duplicate processing", {
+        callSid,
+        recordingSid,
+      });
+      return routeData({ success: true, message: "Already processed" });
+    }
+
     const number = await findWorkspaceNumberVoicemailContextByPhone(callRow.to);
 
     if (!number) {

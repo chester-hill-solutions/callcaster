@@ -334,7 +334,7 @@ export default function AudienceUploader({
                 className="hidden"
                 onChange={displayFileToUpload}
               />
-              <Button asChild variant="outline" size="icon">
+              <Button asChild variant="outline" size="icon" aria-label="Choose a CSV file to upload">
                 <label htmlFor="contacts" className="cursor-pointer">
                   <MdAdd />
                 </label>
@@ -348,6 +348,7 @@ export default function AudienceUploader({
                 type="button"
                 variant="ghost"
                 size="icon"
+                aria-label="Remove selected file"
                 onClick={handleRemoveFile}
               >
                 <MdClose />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
+import { toast } from "sonner";
 import { logger } from "@/lib/logger.client";
 import type { ImageFetcherData } from "@/lib/chats/types";
 
@@ -43,7 +44,12 @@ export function useImageHandling(workspaceId: string) {
         const fileInput = document.querySelector<HTMLInputElement>("#image");
         if (fileInput) fileInput.value = "";
       } else if (fetcherData.error) {
+        const reason =
+          typeof fetcherData.error === "string"
+            ? fetcherData.error
+            : "Upload failed. Please try again.";
         logger.error("Image upload error:", fetcherData.error);
+        toast.error(reason);
       }
     }
   }, [imageFetcher]);

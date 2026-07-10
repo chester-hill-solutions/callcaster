@@ -173,3 +173,5 @@ export default function WorkspaceCallLogPage() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

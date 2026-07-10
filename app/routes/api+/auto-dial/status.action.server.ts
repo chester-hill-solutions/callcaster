@@ -7,7 +7,7 @@ import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
+import { runAutoDialerTurn } from "@/lib/auto-dial.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 // adminDb is used for Supabase Realtime channels (not available via tdb).
@@ -103,21 +103,18 @@ function resolveUserIdFromConferenceName(conferenceId: string | null): string {
 const triggerAutoDialer = async (callData: Tables<"call">) => {
   try {
     const userId = resolveUserIdFromConferenceName(callData.conference_id);
-    const response = await fetch(
-      `${env.BASE_URL()}/api/auto-dial/dialer`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          campaign_id: callData.campaign_id,
-          workspace_id: callData.workspace,
-          conference_id: callData.conference_id,
-        }),
-      },
-    );
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Call the dialer turn in-process rather than self-fetching
+    // `/api/auto-dial/dialer`: that path is matched by the Twilio webhook
+    // prefix `/api/auto-dial`, so an unsigned self-fetch would be rejected
+    // with 403 by requireTwilioSignature (always enforced in production).
+    const result = await runAutoDialerTurn({
+      user_id: userId,
+      campaign_id: callData.campaign_id ?? 0,
+      workspace_id: callData.workspace ?? "",
+      conference_id: callData.conference_id,
+    });
+    if (!result.success) {
+      throw new Error(result.error);
     }
   } catch (error) {
     logger.error("Error triggering auto dialer:", error);

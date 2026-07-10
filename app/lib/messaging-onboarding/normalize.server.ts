@@ -2,7 +2,9 @@ import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 import {
   WORKSPACE_ONBOARDING_CHANNEL_VALUES,
   WORKSPACE_ONBOARDING_STATUS_VALUES,
+  WORKSPACE_OPERATING_COUNTRY_VALUES,
 } from "@/lib/types";
+import type { WorkspaceOperatingCountry } from "@/lib/types";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import {
@@ -39,7 +41,8 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
   version: WORKSPACE_MESSAGING_ONBOARDING_VERSION,
   status: "not_started",
   currentStep: "business_profile",
-  selectedChannels: ["a2p10dlc", "voice_compliance"],
+  operatingCountry: "CA",
+  selectedChannels: [],
   steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   businessProfile: {
     legalBusinessName: "",
@@ -55,6 +58,15 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
     optOutKeywords: "",
     helpKeywords: "",
     sampleMessages: [],
+    doingBusinessAs: "",
+    businessRegistrationNumber: "",
+    ageGatedContent: false,
+    ein: "",
+    industry: "",
+    authorizedRepName: "",
+    authorizedRepEmail: "",
+    authorizedRepPhone: "",
+    authorizedRepTitle: "",
   },
   messagingService: {
     desiredSendMode: "messaging_service",
@@ -64,7 +76,7 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
     attachedSenderPhoneNumbers: [],
     supportedChannels: [],
     stickySenderEnabled: true,
-    advancedOptOutEnabled: true,
+    advancedOptOutEnabled: false,
     lastProvisionedAt: null,
     lastError: null,
   },
@@ -135,6 +147,15 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
   lastUpdatedBy: null,
 };
 
+function inferOperatingCountryFromAddress(
+  countryCode: string,
+): WorkspaceOperatingCountry {
+  const code = countryCode.trim().toUpperCase();
+  if (code === "CA" || code === "CANADA") return "CA";
+  if (code === "US" || code === "USA" || code === "UNITED STATES") return "US";
+  return "CA";
+}
+
 export function normalizeWorkspaceMessagingOnboardingState(
   value: unknown,
 ): WorkspaceMessagingOnboardingState {
@@ -203,6 +224,13 @@ export function normalizeWorkspaceMessagingOnboardingState(
       "not_started",
     ),
     currentStep: parseOptionalString(value.currentStep) ?? "business_profile",
+    operatingCountry: pickEnumValue(
+      value.operatingCountry,
+      WORKSPACE_OPERATING_COUNTRY_VALUES,
+      // Grandfather existing persisted states (which predate operatingCountry)
+      // by inferring from the saved emergency-voice address country.
+      inferOperatingCountryFromAddress(emergencyVoice.address.countryCode),
+    ),
     selectedChannels:
       selectedChannels.length > 0
         ? selectedChannels

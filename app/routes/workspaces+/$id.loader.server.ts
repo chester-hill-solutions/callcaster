@@ -6,6 +6,7 @@ import {
 import { data as routeData, redirect } from "react-router";
 import { deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { getUserRole, getWorkspaceInfoWithDetails, getWorkspacePhoneNumbers } from "@/lib/database.server";
+import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { verifyAuth } from "@/lib/auth.server";
 import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import type { LoaderFunctionArgs } from "react-router";
@@ -42,11 +43,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   try {
     const pathname = new URL(request.url).pathname;
-    const [onboarding, phoneNumbersResult] = await Promise.all([
+    const [onboarding, phoneNumbersResult, recentOutboundCount] = await Promise.all([
       getWorkspaceMessagingOnboardingState({
         workspaceId: workspaceId as string,
       }),
       getWorkspacePhoneNumbers({
+        workspaceId: workspaceId as string,
+      }),
+      getWorkspaceRecentOutboundMessageCount({
         workspaceId: workspaceId as string,
       }),
     ]);
@@ -57,7 +61,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         phone_number: number?.phone_number ?? null,
         capabilities: number?.capabilities ?? null,
       })),
-      recentOutboundCount: 0,
+      recentOutboundCount,
     });
     if (
       pathname === `/workspaces/${workspaceId}` &&

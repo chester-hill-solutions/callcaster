@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   countRentedWorkspaceNumbers,
@@ -72,7 +73,6 @@ export function OnboardingLaunchStep({
             .filter((step) =>
               [
                 "business_profile",
-                "messaging_service",
                 "first_number",
                 "provider_provisioning",
                 "launch_checks",
@@ -82,9 +82,7 @@ export function OnboardingLaunchStep({
               <div key={step.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">{step.label}</span>
-                  <Badge variant={step.status === "complete" ? "secondary" : "outline"}>
-                    {step.status}
-                  </Badge>
+                  <StatusBadge status={step.status} />
                 </div>
               </div>
             ))}

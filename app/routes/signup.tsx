@@ -2,7 +2,7 @@ export { loader } from "./signup.loader.server";
 export { action } from "./signup.action.server";
 
 import { data as routeData, Form, redirect, useActionData, useFetcher, useNavigate, useNavigation } from "react-router";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { ReactNode, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -19,6 +19,8 @@ import { Heading } from "@/components/ui/typography";
 
 
 
+
+export const meta: MetaFunction = () => [{ title: "Sign Up — CallCaster" }];
 
 // Removed unused legacy styles
 

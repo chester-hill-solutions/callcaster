@@ -40,3 +40,8 @@ pnpm-debug.log*
 .agents/
 .opencode/
 skills-lock.json
+
+# Secrets — never commit
+app/transcribe.json
+*.serviceaccount.json
+scripts/dev/certs/

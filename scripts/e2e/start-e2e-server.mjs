@@ -15,6 +15,10 @@ const baseURL =
 const env = {
   ...process.env,
   NODE_ENV: process.env.NODE_ENV ?? "production",
+  // Marks this as the E2E harness: relaxes prod-only boot guards
+  // (localhost BASE_URL check, 2FA-bypass refusal) that would otherwise
+  // reject this intentionally local "production" server.
+  E2E_TEST: "1",
   HOST: process.env.HOST ?? "0.0.0.0",
   PORT: port,
   BASE_URL: baseURL,

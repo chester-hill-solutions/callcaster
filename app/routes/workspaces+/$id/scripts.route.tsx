@@ -2,7 +2,10 @@ export { loader } from "./scripts.loader.server";
 export { action } from "./scripts.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import type { MetaFunction } from "react-router";
 import type { ContextType } from "@/lib/types";
+
+export const meta: MetaFunction = () => [{ title: "Scripts — CallCaster" }];
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
@@ -113,6 +116,7 @@ export default function WorkspaceScripts() {
       error={error}
       isEmpty={isWorkspaceAudioEmpty}
       emptyMessage="Add Your Own Scripts to this Workspace!"
+      emptyDescription="Scripts guide your callers through each conversation and power IVR flows."
       addAction={
         <Button asChild className="font-Zilla-Slab text-lg font-semibold">
           <Link to="./new">Add a Script</Link>
@@ -200,3 +204,5 @@ export default function WorkspaceScripts() {
     </WorkspaceResourceListShell>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

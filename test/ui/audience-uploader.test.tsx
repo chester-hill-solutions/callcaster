@@ -192,7 +192,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByText("CSV Header")).toBeInTheDocument();
 
     // remove file clears filename and input value
-    fireEvent.click(screen.getByRole("button", { name: "close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove selected file" }));
     expect(screen.queryByText("contacts.csv")).toBeNull();
     expect(fileInput.value).toBe("");
   });

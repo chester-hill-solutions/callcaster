@@ -1,4 +1,5 @@
 import { Audience, CampaignQueue, Contact, Queue, QueueItem } from "@/lib/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { QueueHeader } from "./QueueHeader";
 import { QueueTable } from "@/components/queue/QueueTable";
 import { useEffect, useState, useRef } from "react";
@@ -84,7 +85,18 @@ export function QueueContent({
         setQueueData(queueValue.queueData ?? []);
     }, [queueValue.queueData]);
 
-    if (queueValue?.queueError) return <div>{queueValue.queueError.message}</div>;
+    if (queueValue?.queueError) {
+        return (
+            <div className="p-2">
+                <Alert variant="destructive">
+                    <AlertTitle>Queue unavailable</AlertTitle>
+                    <AlertDescription>
+                        The call queue failed to load. Refresh the page to try again.
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
+    }
 
     return (
         <div className="p-2">

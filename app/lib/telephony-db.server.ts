@@ -15,6 +15,35 @@ import type { OutreachAttempt } from "@/lib/types";
 type CallRow = typeof callTable.$inferSelect;
 type OutreachRow = typeof outreachAttemptTable.$inferSelect;
 
+/**
+ * Terminal `call.status` values. Once a call reaches one of these, a status
+ * update carrying a non-terminal status (e.g. a late/out-of-order webhook
+ * still reporting `queued`/`ringing`/`in-progress`) must not regress it.
+ */
+export const TERMINAL_CALL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "busy",
+  "no-answer",
+  "canceled",
+]);
+
+/**
+ * True unless applying `next` would regress a terminal call status back to a
+ * non-terminal one. Terminal-to-terminal and any transition away from a
+ * non-terminal (or unknown) current status are always allowed.
+ */
+export function canTransitionCallStatus(
+  current: string | null | undefined,
+  next: string | null | undefined,
+): boolean {
+  if (!next) return true;
+  if (!current) return true;
+  const c = String(current).toLowerCase();
+  const n = String(next).toLowerCase();
+  return !(TERMINAL_CALL_STATUSES.has(c) && !TERMINAL_CALL_STATUSES.has(n));
+}
+
 /** Global lookup by Twilio SID (webhooks do not carry workspace id). */
 export async function findCallBySid(sid: string): Promise<CallRow | null> {
   const rows = await db
@@ -88,8 +117,29 @@ export async function updateCallBySid(
   options?: { tdb?: TenantDb },
 ): Promise<CallRow | null> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  let set: Partial<CallRow> = update;
+
+  if (update.status != null) {
+    const existing = (await tdb.call.findFirst({
+      where: eq(callTable.sid, sid),
+    })) as CallRow | undefined;
+
+    if (existing && !canTransitionCallStatus(existing.status, update.status)) {
+      logger.debug("Skipping call status regression", {
+        sid,
+        current: existing.status,
+        next: update.status,
+      });
+      const { status: _status, ...rest } = update;
+      set = rest;
+      if (Object.keys(set).length === 0) {
+        return existing;
+      }
+    }
+  }
+
   const [row] = await tdb.call.update({
-    set: update,
+    set,
     where: eq(callTable.sid, sid),
   });
   return row ?? null;

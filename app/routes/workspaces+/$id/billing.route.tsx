@@ -8,7 +8,10 @@ import {
   useNavigation,
   useSearchParams,
 } from "react-router";
+import type { MetaFunction } from "react-router";
 import { useState } from "react";
+
+export const meta: MetaFunction = () => [{ title: "Billing — CallCaster" }];
 
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -104,7 +107,10 @@ export default function Credits() {
           <AlertTitle>Payment error</AlertTitle>
           <AlertDescription>
             {paymentMessage ||
-              "We could not confirm this payment. If your card was charged, please contact support."}
+              "We could not confirm this payment. If your card was charged, please contact support."}{" "}
+            <a href="mailto:info@callcaster.ca" className="underline">
+              info@callcaster.ca
+            </a>
           </AlertDescription>
         </Alert>
       ) : null}
@@ -302,3 +308,5 @@ export default function Credits() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

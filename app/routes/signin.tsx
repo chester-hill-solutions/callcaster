@@ -2,7 +2,7 @@ export { loader } from "./signin.loader.server";
 export { action } from "./signin.action.server";
 
 import { data as routeData, redirect, Form, NavLink, useActionData } from "react-router";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { Text } from "@/components/ui/typography";
 
 
 
+
+export const meta: MetaFunction = () => [{ title: "Sign In — CallCaster" }];
 
 export default function SignIn() {
   const actionData = useActionData();
@@ -91,3 +93,5 @@ export default function SignIn() {
     </main>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

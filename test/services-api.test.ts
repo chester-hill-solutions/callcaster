@@ -132,6 +132,28 @@ describe.each(services)("$name service", ({ path }) => {
     });
   });
 
+  test("startConferenceAndDial returns creditsError structure on 402 without reading response.ok", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 402,
+      json: async () => ({ creditsError: true }),
+    });
+    await expect(
+      mod.startConferenceAndDial({
+        user_id: "u",
+        caller_id: "c",
+        workspace_id: "w",
+        campaign_id: "cmp",
+        selected_device: "dev",
+      }),
+    ).resolves.toEqual({
+      success: false,
+      creditsError: true,
+      error: "Insufficient credits to start conference",
+    });
+  });
+
   test("startConferenceAndDial throws when success true but no conferenceName", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValueOnce({

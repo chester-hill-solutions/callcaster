@@ -177,6 +177,23 @@ export async function getQueuedContactIdsForCampaign(args: {
   return rows.map((row) => row.contact_id);
 }
 
+/**
+ * Revert a claimed campaign_queue row back to `queued`. Used to release a
+ * contact claimed by `claim_next_queue_contact` when the subsequent dial
+ * attempt fails before a Twilio call is actually placed (e.g. the Twilio API
+ * call itself throws) — otherwise the contact is stuck "assigned" forever
+ * and the predictive dialer can never retry it.
+ */
+export async function requeueCampaignQueueById(queueId: number, workspaceId?: string) {
+  const update = buildQueuedQueueUpdate();
+  const conditions = [eq(campaignQueueTable.id, queueId)];
+  if (workspaceId) {
+    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
+  }
+
+  return db.update(campaignQueueTable).set(update).where(and(...conditions)).returning();
+}
+
 export async function dequeueCampaignQueueById(args: {
   queueId: number;
   userId: string;

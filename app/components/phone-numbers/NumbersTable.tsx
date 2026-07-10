@@ -1,9 +1,10 @@
 import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
-import { Form } from "react-router";
+import { Form, Link } from "react-router";
 import { useState, useCallback, useEffect } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Heading } from "@/components/ui/typography";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Heading, Text } from "@/components/ui/typography";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -14,6 +15,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { User, WorkspaceNumbers } from "@/lib/types";
+
+/** Minimal member shape this table consumes (User rows or workspace-user rows). */
+type MemberOption = Pick<NonNullable<User>, "id" | "username"> | null;
 import {
   INBOUND_RING_COUNT_OPTIONS,
   normalizeInboundRingCount,
@@ -34,10 +38,12 @@ export const NumbersTable = ({
   onInboundScriptChange,
   onNumberRemoval,
   isBusy,
+  title = "Existing Numbers",
+  hideEmptyState = false,
 }: {
   phoneNumbers: WorkspaceNumbers[];
-  users: User[];
-  mediaNames: { id: number; name: string }[];
+  users: MemberOption[];
+  mediaNames: { id: number | string; name: string }[];
   queues?: { id: number; name: string }[];
   scripts?: { id: number; name: string }[];
   onIncomingActivityChange: (id: number, value: string) => void;
@@ -49,6 +55,10 @@ export const NumbersTable = ({
   onInboundScriptChange?: (numberId: number, scriptId: string) => void;
   onNumberRemoval: (id: number) => void;
   isBusy: boolean;
+  /** Reuse hook for embedding this table outside the numbers settings page (e.g. onboarding). */
+  title?: string;
+  /** Reuse hook: suppress the "No phone numbers yet" empty state when the caller already gates rendering on having numbers. */
+  hideEmptyState?: boolean;
 }) => {
   const [numbers, setNumbers] = useState(phoneNumbers);
 
@@ -134,8 +144,28 @@ export const NumbersTable = ({
   return (
       <>
       <Heading className="text-center" branded>
-      Existing Numbers
+      {title}
     </Heading><div className="flex flex-col py-4">
+        {numbers.length === 0 ? (
+          hideEmptyState ? null :
+          <div className="flex items-center justify-center py-8">
+            <Card className="w-full max-w-md">
+              <CardHeader className="items-center gap-2 text-center">
+                <Heading as="h2" level={3} branded={false}>
+                  No phone numbers yet
+                </Heading>
+                <Text variant="muted" className="max-w-sm">
+                  Rent a number or verify a caller ID to start calling.
+                </Text>
+                <div className="flex justify-center pt-2">
+                  <Button asChild>
+                    <Link to="./purchase">Rent a Number</Link>
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+          </div>
+        ) : (
         <Table>
           <TableHeader>
             <TableRow>
@@ -173,6 +203,7 @@ export const NumbersTable = ({
             ))}
           </TableBody>
         </Table>
+        )}
       </div></>
   );
 };
@@ -195,9 +226,9 @@ const NumberRow = ({
   isBusy,
 }: {
   number: WorkspaceNumbers;
-  members: User[];
+  members: MemberOption[];
   verifiedNumbers: WorkspaceNumbers[];
-  mediaNames: { id: number; name: string }[];
+  mediaNames: { id: number | string; name: string }[];
   queues?: { id: number; name: string }[];
   scripts?: { id: number; name: string }[];
   handleIncomingActivityChange: (id: number, value: string) => void;
@@ -419,7 +450,7 @@ const IncomingActivitySelect = ({
   onChange,
 }: {
   number: WorkspaceNumbers;
-  members: User[];
+  members: MemberOption[];
   verifiedNumbers: WorkspaceNumbers[];
   onChange: (id: number, value: string) => void;
 }) => {
@@ -438,7 +469,7 @@ const IncomingActivitySelect = ({
             <option value="">Select how to handle incoming calls</option>
             <option value="webhook_only">Webhook Only</option>
             {members.map(
-              (member: User) =>
+              (member: MemberOption) =>
                 member && (
                   <option key={member.id} value={member.username}>
                     Email to Workspace Member{" "}
@@ -465,7 +496,7 @@ const IncomingActivitySelect = ({
   );
 };
 
-const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: WorkspaceNumbers, mediaNames: { id: number; name: string; }[], onChange: (id: number, value: string) => void }) => {
+const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: WorkspaceNumbers, mediaNames: { id: number | string; name: string; }[], onChange: (id: number, value: string) => void }) => {
   if (!number) return null;
   return (
     <select
@@ -474,7 +505,7 @@ const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: 
       onChange={(e) => onChange(number?.id, e.target.value)}
     >
       <option value="">Select a voice message</option>
-      {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number, name: string }, index: number) => (
+      {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number | string; name: string }, index: number) => (
         <option key={index} value={mediaName.name}>
           {mediaName.name}
         </option>

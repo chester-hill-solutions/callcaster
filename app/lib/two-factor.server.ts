@@ -39,8 +39,17 @@ export async function requireTwoFactorEnrollmentForPrivilegedUser(args: {
   request: Request;
   nextPath?: string;
 }): Promise<void> {
+  // Test-only escape hatch. Never honored in real production: a leaked env var
+  // must not silently disable a security control (mirrors
+  // TWILIO_VALIDATE_WEBHOOKS). The E2E harness runs with NODE_ENV=production
+  // and sets E2E_TEST=1 explicitly.
   if (process.env.E2E_DISABLE_2FA_ENFORCEMENT === "1") {
-    return;
+    if (process.env.NODE_ENV !== "production" || process.env.E2E_TEST === "1") {
+      return;
+    }
+    console.error(
+      "E2E_DISABLE_2FA_ENFORCEMENT=1 is set in production — ignoring; 2FA enforcement remains active.",
+    );
   }
 
   const pathname = new URL(args.request.url).pathname;

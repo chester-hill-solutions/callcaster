@@ -12,6 +12,14 @@ export interface ContactFormProps {
   handleSaveContact: (event: React.FormEvent<HTMLFormElement>) => void;
   workspace_id: string;
   audience_id: string | null;
+  /**
+   * Opt-in flag for the chat "add contact" flow: when true and no
+   * audience_id is set, the server auto-assigns the contact to the
+   * workspace's default "SMS Contacts" audience so it stays visible to
+   * audience-scoped campaign features. Defaults to false for every other
+   * caller (e.g. the contacts table edit/create flow).
+   */
+  assignToDefaultSmsAudience?: boolean;
 }
 
 export interface ContactFormData {
@@ -32,6 +40,7 @@ const ContactForm: React.FC<ContactFormProps> = ({
   handleSaveContact,
   workspace_id,
   audience_id,
+  assignToDefaultSmsAudience = false,
 }) => (
   <Form
     onSubmit={handleSaveContact}
@@ -97,6 +106,12 @@ const ContactForm: React.FC<ContactFormProps> = ({
     </FormField>
     <input hidden name="workspace" value={workspace_id} readOnly />
     <input hidden name="audience_id" value={audience_id ?? ""} readOnly />
+    <input
+      hidden
+      name="assign_default_sms_audience"
+      value={assignToDefaultSmsAudience ? "true" : ""}
+      readOnly
+    />
     <div className="flex flex-auto justify-end">
       <div>
         <Button type="submit" className="ml-2">

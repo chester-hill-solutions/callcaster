@@ -12,6 +12,7 @@ export interface Campaign {
 export interface RouteWorkspaceNumber {
   id: number;
   phone_number: string | null;
+  friendly_name?: string | null;
 }
 
 export interface Chat {
@@ -61,6 +62,7 @@ export type ChatsWorkspaceContextType = {
 export type ChatInputWorkspaceNumber = {
   id: string;
   phone_number: string;
+  friendly_name: string | null;
 };
 
 export type { WorkspaceNumber };

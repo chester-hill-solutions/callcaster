@@ -15,6 +15,9 @@ export type TelephonyStubConfig = {
   outreachFetchError?: Error | null;
   outreachUpdateError?: Error | null;
   outreachUpdateThrows?: unknown;
+  /** Override fields on the row returned by the outreach update (set a field
+   * to undefined/null to simulate a sparse row for fallback-path tests). */
+  outreachRowOverrides?: Record<string, unknown>;
   activeConferenceIds?: string[];
 };
 
@@ -25,6 +28,17 @@ const defaultCallRow = {
   conference_id: "u1~00000000-0000-0000-0000-000000000000",
   contact_id: 1,
   campaign_id: 1,
+};
+
+// The real updateOutreachAttemptForWorkspace returns the FULL updated row
+// (drizzle `update` returning), not just the patch — callers read user_id and
+// campaign_id off the result (e.g. auto-dial machine-answer → next dial turn).
+const defaultOutreachRow = {
+  id: 10,
+  workspace: "w1",
+  user_id: "u1",
+  campaign_id: 1,
+  contact_id: 1,
 };
 
 export const telephonyStubState = {
@@ -111,7 +125,12 @@ function applyTelephonyMockImplementations() {
         );
       }
       telephonyStubState.outreachUpdateCalls.push(patch);
-      return { ...patch, contact_id: 1 };
+      return {
+        ...defaultOutreachRow,
+        ...patch,
+        contact_id: 1,
+        ...(cfg.outreachRowOverrides ?? {}),
+      };
     },
   );
 

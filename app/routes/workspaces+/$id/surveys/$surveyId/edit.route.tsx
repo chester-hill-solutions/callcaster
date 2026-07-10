@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageShell } from "@/components/ui/page-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -209,22 +210,19 @@ export default function EditSurveyPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Button variant="outline" asChild>
-            <Link to={`/workspaces/${workspaceId}/surveys/${survey.survey_id}`}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Survey
-            </Link>
-          </Button>
-        </div>
-        <h1 className="text-3xl font-bold">Edit Survey</h1>
-        <p className="text-muted-foreground">
-          Update your survey structure and questions
-        </p>
-      </div>
-
+    <PageShell
+      title="Edit Survey"
+      description="Update your survey structure and questions"
+      maxWidth="narrow"
+      actions={
+        <Button variant="outline" asChild>
+          <Link to={`/workspaces/${workspaceId}/surveys/${survey.survey_id}`}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Survey
+          </Link>
+        </Button>
+      }
+    >
       <form onSubmit={handleSubmit}>
         <Card className="mb-6">
           <CardHeader>
@@ -415,6 +413,6 @@ export default function EditSurveyPage() {
           </Button>
         </div>
       </form>
-    </div>
+    </PageShell>
   );
 }

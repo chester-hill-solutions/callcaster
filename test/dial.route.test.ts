@@ -140,6 +140,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
 
     const mod = await import("../app/routes/api+/dial");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
     expect(res).toMatchObject({ creditsError: true });
   });
 

@@ -49,12 +49,14 @@ export function getWorkerId(): string {
 }
 
 export async function resetStaleClaims(): Promise<void> {
+  // Reclaims are re-queued WITHOUT bumping attempt_count here: claimNextJob
+  // increments attempt_count when it re-claims the row, so a crash-recovery
+  // cycle costs exactly one attempt instead of two (reset + reclaim).
   await db.execute(sql`
     UPDATE job
     SET status = 'queued',
         claimed_until = null,
         claimed_by = null,
-        attempt_count = attempt_count + 1,
         updated_at = now()
     WHERE status = 'running'
       AND claimed_until < now()
@@ -113,6 +115,7 @@ export async function failJob(
   attemptCount: number,
   maxAttempts: number,
   error: string,
+  jobType?: string,
 ): Promise<void> {
   if (attemptCount < maxAttempts) {
     await db.execute(sql`
@@ -133,6 +136,15 @@ export async function failJob(
           updated_at = now()
       WHERE id = ${jobId}
     `);
+    // Dead-letter visibility: nothing else surfaces status='failed' rows in
+    // near-real-time, so log at error level for ops alerting/log search.
+    logger.error("worker.job.dead_letter", {
+      jobId,
+      type: jobType ?? "unknown",
+      attemptCount,
+      maxAttempts,
+      reason: error,
+    });
   }
 }
 
@@ -151,6 +163,11 @@ export async function runWorkerPollLoop(
 
   while (!signal.aborted) {
     try {
+      // Cheap (single indexed UPDATE) — run every iteration, not just at
+      // boot, so claims stranded by a mid-poll crash/redeploy are recovered
+      // without waiting for the next process restart.
+      await resetStaleClaims();
+
       const job = await claimNextJob(workerId);
       if (!job) {
         await sleep(pollIntervalMs, signal);
@@ -191,7 +208,7 @@ export async function runWorkerPollLoop(
         const message =
           error instanceof Error ? error.message : String(error);
         logger.error("worker.job.failed", { jobId: job.id, error: message });
-        await failJob(job.id, job.attempt_count, job.max_attempts, message);
+        await failJob(job.id, job.attempt_count, job.max_attempts, message, job.type);
       } finally {
         clearInterval(heartbeat);
       }

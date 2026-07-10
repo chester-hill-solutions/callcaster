@@ -6,6 +6,7 @@ import type { SurveyWithPages, ContextType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageShell } from "@/components/ui/page-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { 
@@ -86,15 +87,12 @@ export default function SurveyDetailPage() {
   const surveyUrl = `${window.location.origin}/survey/${survey.survey_id}`;
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">{survey.title}</h1>
-          <p className="text-muted-foreground">
-            Survey ID: {survey.survey_id}
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <PageShell
+      title={survey.title}
+      description={`Survey ID: ${survey.survey_id}`}
+      maxWidth="content"
+      actions={
+        <>
           <Button variant="outline" asChild>
             <Link to={`/workspaces/${workspaceId}/surveys/${survey.survey_id}/responses`}>
               <Users className="w-4 h-4 mr-2" />
@@ -113,10 +111,10 @@ export default function SurveyDetailPage() {
               View Survey
             </a>
           </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3 mb-6">
+        </>
+      }
+    >
+      <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -253,6 +251,6 @@ export default function SurveyDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

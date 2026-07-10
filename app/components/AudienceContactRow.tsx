@@ -92,55 +92,55 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border-b border-gray-200 hover:bg-gray-50">
+    <div className="flex items-center justify-between p-4 border-b border-border hover:bg-muted/50">
       <div className="flex items-center space-x-4 flex-1">
         <input 
           type="checkbox" 
           checked={isSelected}
           onChange={(e) => onSelect(contact.id, e.target.checked)}
-          className="rounded border-gray-300"
+          className="rounded border-input"
         />
         
         <div className="flex-1 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="text-sm">
-            <span className="font-medium text-gray-500">ID:</span>
+            <span className="font-medium text-muted-foreground">ID:</span>
             <span className="ml-2">{contact.id}</span>
           </div>
           
           <div className="text-sm">
-            <span className="font-medium text-gray-500">External ID:</span>
+            <span className="font-medium text-muted-foreground">External ID:</span>
             <span className="ml-2">{contact.external_id || '-'}</span>
           </div>
           
           <div className="text-sm">
-            <span className="font-medium text-gray-500">Name:</span>
+            <span className="font-medium text-muted-foreground">Name:</span>
             <span className="ml-2">
               {[contact.firstname, contact.surname].filter(Boolean).join(' ') || '-'}
             </span>
           </div>
           
           <div className="text-sm">
-            <span className="font-medium text-gray-500">Phone:</span>
+            <span className="font-medium text-muted-foreground">Phone:</span>
             <span className="ml-2">{contact.phone || '-'}</span>
           </div>
           
           <div className="text-sm">
-            <span className="font-medium text-gray-500">Email:</span>
+            <span className="font-medium text-muted-foreground">Email:</span>
             <span className="ml-2">{contact.email || '-'}</span>
           </div>
           
           <div className="text-sm">
-            <span className="font-medium text-gray-500">Address:</span>
+            <span className="font-medium text-muted-foreground">Address:</span>
             <span className="ml-2">{contact.address || '-'}</span>
           </div>
           
           <div className="text-sm">
-            <span className="font-medium text-gray-500">City:</span>
+            <span className="font-medium text-muted-foreground">City:</span>
             <span className="ml-2">{contact.city || '-'}</span>
           </div>
           
           <div className="text-sm">
-            <span className="font-medium text-gray-500">Created:</span>
+            <span className="font-medium text-muted-foreground">Created:</span>
             <span className="ml-2">
               {contact.created_at ? (
                 <>
@@ -154,7 +154,7 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
           
           {otherDataHeaders.map((header: string) => (
             <div key={header} className="text-sm">
-              <span className="font-medium text-gray-500">{header}:</span>
+              <span className="font-medium text-muted-foreground">{header}:</span>
               <span className="ml-2">{getOtherDataValue(header) || '-'}</span>
             </div>
           ))}
@@ -166,7 +166,7 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
           variant="ghost" 
           size="sm"
           onClick={() => onRemove(contact.id)}
-          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           <MdRemoveCircleOutline className="w-4 h-4" />
         </Button>

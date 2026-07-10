@@ -17,18 +17,74 @@ export function OnboardingProviderActionsStep({
   a2pBlockingIssues,
   a2pErrors,
 }: OnboardingProviderActionsProps) {
-  const { isProvisioningA2P, isSavingRcs } = pending;
+  const { isSavingRcs, isAttachingRcsSender } = pending;
   const showRcsOnboarding = isRcsOnboardingEnabled();
+  const showTollFree = onboarding.selectedChannels.includes("toll_free_bulk_sms");
+  const showA2p = onboarding.selectedChannels.includes("a2p10dlc");
+  const reviewIssues = onboarding.reviewState.blockingIssues;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Provider setup</CardTitle>
         <CardDescription>
-          Submit provider registrations for the channels you selected. Review can take several days.
+          Provider registrations for the compliance paths you selected are submitted automatically. This page shows
+          their live status — review can take several days.
         </CardDescription>
       </CardHeader>
       <CardContent className={showRcsOnboarding ? "grid gap-6 xl:grid-cols-2" : "grid gap-6"}>
+        {!showTollFree && !showA2p && !showRcsOnboarding ? (
+          <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+            No compliance provider paths were selected, so there is nothing to register here. You can enable toll-free
+            bulk SMS or US A2P 10DLC on the Channels step if you need them.
+          </div>
+        ) : null}
+        {showTollFree ? (
+          <div className="space-y-4 rounded-lg border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-medium">Toll-free bulk SMS verification</div>
+              <Badge
+                variant={
+                  onboarding.a2p10dlc.status === "approved" || onboarding.a2p10dlc.status === "live"
+                    ? "secondary"
+                    : "outline"
+                }
+              >
+                {onboarding.a2p10dlc.status.replaceAll("_", " ")}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              High-volume SMS to Canadian mobiles runs over a verified toll-free number. Once you have a toll-free
+              number, we submit the Twilio toll-free verification for you using the details from the Channels step —
+              no manual step required.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border p-4">
+                <div className="text-sm text-muted-foreground">Verification status</div>
+                <div className="mt-1 font-medium capitalize">
+                  {onboarding.a2p10dlc.status.replaceAll("_", " ")}
+                </div>
+              </div>
+              <div className="rounded-lg border p-4">
+                <div className="text-sm text-muted-foreground">Last updated</div>
+                <div className="mt-1 text-sm">
+                  {onboarding.a2p10dlc.lastSyncedAt ?? "Not submitted yet"}
+                </div>
+              </div>
+            </div>
+            {reviewIssues.length > 0 ? (
+              <div className="rounded-lg border p-4 text-sm">
+                <div className="font-medium">Waiting on a few items before verification can complete.</div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {reviewIssues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {showA2p ? (
         <div className="space-y-4 rounded-lg border p-4">
           <div>
             <div className="flex items-center justify-between gap-3">
@@ -49,13 +105,9 @@ export function OnboardingProviderActionsStep({
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
               A2P 10DLC is primarily a US registration path for application-to-person SMS sent over US 10-digit
-              long-code numbers.
+              long-code numbers. Brand and campaign registration are submitted automatically once the required
+              details are in place.
             </p>
-          </div>
-          <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-            Canada-only messaging programs can usually leave this for later. It becomes valuable when you use US
-            numbers, message US recipients, or want better US deliverability, throughput, and carrier trust before
-            expanding there.
           </div>
           {a2pBlockingIssues.length > 0 ? (
             <div className="rounded-lg border p-4 text-sm">
@@ -93,22 +145,19 @@ export function OnboardingProviderActionsStep({
               <div className="mt-1 font-mono text-sm">{onboarding.a2p10dlc.campaignSid ?? "Not created"}</div>
             </div>
           </div>
-          {!isReadOnly ? (
-            <Form method="post">
-              <input type="hidden" name="_action" value="provision_a2p" />
-              <Button type="submit" disabled={isProvisioningA2P} aria-busy={isProvisioningA2P}>
-                {isProvisioningA2P ? "Provisioning A2P resources..." : "Provision A2P resources"}
-              </Button>
-            </Form>
-          ) : null}
         </div>
+        ) : null}
         {showRcsOnboarding ? (
         <div className="space-y-4 rounded-lg border p-4">
           <div className="space-y-3">
             <div className="font-medium">Twilio RCS sender onboarding</div>
             <p className="text-sm text-muted-foreground">
-              Twilio currently runs RCS sender creation and compliance review in Console. Save the sender package here,
-              then finish the registration flow in Twilio.
+              Twilio does not offer a public API to create or approve RCS senders — creating the sender and passing
+              Google/carrier compliance review still happens in Twilio Console. Save the sender package here to keep
+              a record and pre-fill Console fields, submit the sender in Console, then paste the resulting Sender SID
+              (starts with &quot;XE&quot;) back into the field below once it&apos;s approved. From there, attaching
+              it to this workspace&apos;s Messaging Service sender pool is automatic — no further Console step is
+              required.
             </p>
             <div className="flex flex-wrap gap-3 text-sm">
               <a className="underline" href={TWILIO_RCS_SENDERS_URL} target="_blank" rel="noreferrer">
@@ -354,6 +403,20 @@ export function OnboardingProviderActionsStep({
               </Button>
             ) : null}
           </Form>
+          {!isReadOnly && onboarding.rcs.senderId ? (
+            <Form method="post">
+              <input type="hidden" name="_action" value="attach_rcs_sender" />
+              <Button type="submit" variant="outline" disabled={isAttachingRcsSender} aria-busy={isAttachingRcsSender}>
+                {isAttachingRcsSender
+                  ? "Attaching RCS sender..."
+                  : "Attach RCS sender to Messaging Service pool"}
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Adds sender {onboarding.rcs.senderId} to the Messaging Service&apos;s sender pool via the Twilio
+                ChannelSenders API. Safe to run again — it no-ops if already attached.
+              </p>
+            </Form>
+          ) : null}
         </div>
         ) : null}
       </CardContent>
