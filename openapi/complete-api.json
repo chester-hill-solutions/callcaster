@@ -7175,7 +7175,7 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId",
         "summary": "GET /api/workspaces/:workspaceId",
-        "description": "",
+        "description": "Middleware layout for nested workspace API routes; no direct handler.\n\nDuplicate/legacy route registration.",
         "tags": [
           "User API",
           "workspace"
