@@ -1,5 +1,5 @@
 import { Audience, Contact, QueueItem } from "@/lib/types";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams, useNavigation, Form, useFetcher } from "react-router";
 import { useOptimisticMutation } from "@/hooks/utils/useOptimisticMutation";
@@ -115,7 +115,7 @@ export function QueueTable({
     const [optimisticQueue, setOptimisticQueue] = useState(queue);
 
     // Add these state hooks at the top of your component
-    const [optimisticQueueStatus, setOptimisticQueueStatus] = useState("");
+    const [optimisticQueueStatus, setOptimisticQueueStatus] = useState(defaultFilters.queueStatus || "");
     const [optimisticDisposition, setOptimisticDisposition] = useState(defaultFilters.disposition || "");
     const [optimisticAudience, setOptimisticAudience] = useState(defaultFilters.audiences || "");
     const [optimisticInputs, setOptimisticInputs] = useState({
@@ -125,9 +125,11 @@ export function QueueTable({
         address: defaultFilters.address || ""
     });
 
-    useEffect(() => {
+    const [prevQueue, setPrevQueue] = useState(queue);
+    if (prevQueue !== queue) {
+        setPrevQueue(queue);
         setOptimisticQueue(queue);
-    }, [queue]);
+    }
 
     const snapshotRef = useRef<QueueItem[]>(queue ?? []);
     const fallbackFetcher = useFetcher();
@@ -140,7 +142,9 @@ export function QueueTable({
         errorMessage: "Queue update failed. Changes reverted.",
     });
 
-    useEffect(() => {
+    const [prevDefaultFilters, setPrevDefaultFilters] = useState(defaultFilters);
+    if (prevDefaultFilters !== defaultFilters) {
+        setPrevDefaultFilters(defaultFilters);
         setOptimisticInputs({
             name: defaultFilters.name || "",
             phone: defaultFilters.phone || "",
@@ -148,7 +152,9 @@ export function QueueTable({
             address: defaultFilters.address || ""
         });
         setOptimisticDisposition(defaultFilters.disposition || "");
-    }, [defaultFilters]);
+        setOptimisticAudience(defaultFilters.audiences || "");
+        setOptimisticQueueStatus(defaultFilters.queueStatus || "");
+    }
 
     const selectAllVisible = useCallback(() => {
         const newSelection: RowSelectionState = {};

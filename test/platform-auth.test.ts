@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   updateUser: vi.fn(),
   changePassword: vi.fn(),
+  signUpEmail: vi.fn(),
+  isSignupOpen: vi.fn(() => true),
 }));
 
 vi.mock("@/lib/env.server", () => ({
   env: new Proxy({}, { get: () => () => "test" }),
+  isSignupOpen: mocks.isSignupOpen,
 }));
 
 vi.mock("@/server/auth-instance", () => ({
@@ -14,6 +17,7 @@ vi.mock("@/server/auth-instance", () => ({
     api: {
       updateUser: mocks.updateUser,
       changePassword: mocks.changePassword,
+      signUpEmail: mocks.signUpEmail,
     },
   },
 }));
@@ -37,6 +41,27 @@ describe("platform-auth.server.ts", () => {
     vi.resetModules();
     mocks.updateUser.mockReset();
     mocks.changePassword.mockReset();
+    mocks.signUpEmail.mockReset();
+    mocks.isSignupOpen.mockReturnValue(true);
+  });
+
+  describe("registerUser", () => {
+    test("returns 403 when signup is closed", async () => {
+      mocks.isSignupOpen.mockReturnValue(false);
+      const mod = await import("../app/lib/platform-auth.server");
+
+      const result = await mod.registerUser(new Request("http://localhost"), {
+        email: "a@b.com",
+        password: "password123",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: "Registration is closed.",
+        status: 403,
+      });
+      expect(mocks.signUpEmail).not.toHaveBeenCalled();
+    });
   });
 
   describe("updateMeProfile", () => {

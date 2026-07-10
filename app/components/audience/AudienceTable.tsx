@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { AudienceForm } from "./AudienceForm";
 import { Download, Search, X } from "lucide-react";
@@ -75,11 +75,17 @@ export function AudienceTable({
     errorMessage: "Failed to remove contact. Changes reverted.",
   });
 
-  useEffect(() => {
-    const transformed = initialContacts?.map(item => item.contact) || [];
-    setContacts(transformed);
+  const [prevInitialContacts, setPrevInitialContacts] = useState(initialContacts);
+  if (prevInitialContacts !== initialContacts) {
+    setPrevInitialContacts(initialContacts);
+    setContacts(initialContacts?.map(item => item.contact) || []);
+  }
+
+  const [prevInitialAudience, setPrevInitialAudience] = useState(initialAudience);
+  if (prevInitialAudience !== initialAudience) {
+    setPrevInitialAudience(initialAudience);
     setAudienceInfo(initialAudience);
-  }, [initialContacts, initialAudience]);
+  }
 
   const handlePageChange = (newPage: number) => {
     const newParams = new URLSearchParams(searchParams);

@@ -1,20 +1,14 @@
-import { Form, useActionData, useFetcher } from "react-router";
-import { useEffect, useState } from "react";
+import { useFetcher } from "react-router";
+import { useState } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { useFetcherOnIdle } from "@/hooks/utils/useFetcherOnIdle";
+import { useApiKeys, type ApiKeyRecord } from "@/hooks/workspace/useApiKeys";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-
-type ApiKeyRecord = {
-  id: string;
-  name: string;
-  key_prefix: string;
-  created_at: string;
-  last_used_at: string | null;
-};
 
 type ApiKeysSectionProps = {
   workspaceId: string;
@@ -31,38 +25,33 @@ export default function ApiKeysSection({
   defaultShowCreateForm = false,
   variant = "elevated",
 }: ApiKeysSectionProps) {
-  const listFetcher = useFetcher<{ keys?: ApiKeyRecord[]; error?: string }>({
-    key: "api-keys-list",
-  });
   const mutateFetcher = useFetcher<
     | { success?: boolean }
     | { error?: string }
   >({ key: "api-keys-mutate" });
-  const actionData = useActionData<{ key?: string; error?: string }>();
+  const createFetcher = useFetcher<{ key?: string; error?: string }>({
+    key: "api-keys-create",
+  });
 
-  const [showCreateForm, setShowCreateForm] = useState(
-    defaultShowCreateForm && !actionData?.key,
-  );
-  const [newKeyReveal, setNewKeyReveal] = useState<string | null>(actionData?.key ?? null);
-  const revealedKey = newKeyReveal ?? actionData?.key ?? null;
+  const [showCreateForm, setShowCreateForm] = useState(defaultShowCreateForm);
+  const [newKeyReveal, setNewKeyReveal] = useState<string | null>(null);
+  const revealedKey = newKeyReveal;
 
-  useEffect(() => {
-    if (workspaceId && hasAccess && initialKeys.length === 0) {
-      listFetcher.load(`/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`);
-    }
-  }, [workspaceId, hasAccess, initialKeys.length]);
+  const { keys, isLoading, error: listError, refresh } = useApiKeys({
+    workspaceId,
+    hasAccess,
+    initialKeys,
+  });
 
-  useEffect(() => {
-    if (actionData?.key) {
-      setNewKeyReveal(actionData.key);
+  useFetcherOnIdle(createFetcher, (data) => {
+    if (data?.key) {
+      setNewKeyReveal(data.key);
       setShowCreateForm(false);
-      listFetcher.load(
-        `/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`,
-      );
+      refresh();
     }
-  }, [actionData, workspaceId]);
+  });
 
-  useActionFeedback(actionData, {
+  useActionFeedback(createFetcher.data, {
     getError: (data) =>
       data && typeof data === "object" && "error" in data
         ? String((data as { error?: string }).error ?? "")
@@ -77,21 +66,12 @@ export default function ApiKeysSection({
         : undefined,
     onSuccess: (data) => {
       if (data && "success" in data) {
-        listFetcher.load(
-          `/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`,
-        );
+        refresh();
       }
     },
     getSuccess: (data) =>
       Boolean(data && "success" in data && data.success),
   });
-
-  const keys: ApiKeyRecord[] = listFetcher.data?.keys ?? initialKeys;
-  const isLoading =
-    listFetcher.state === "loading" ||
-    (listFetcher.state === "idle" &&
-      listFetcher.data === undefined &&
-      initialKeys.length === 0);
 
   const handleRevoke = (id: string) => {
     if (!confirm("Revoke this API key? It will stop working immediately.")) return;
@@ -124,8 +104,8 @@ export default function ApiKeysSection({
         description="Use API keys to send SMS programmatically (for example from scripts or Zapier)."
       />
       <div className="space-y-4">
-        {listFetcher.data?.error ? (
-          <p className="text-sm text-destructive">{listFetcher.data.error}</p>
+        {listError ? (
+          <p className="text-sm text-destructive">{listError}</p>
         ) : null}
         {isLoading && keys.length === 0 ? (
           <div className="space-y-2">
@@ -195,7 +175,7 @@ export default function ApiKeysSection({
         ) : null}
 
         {showCreateForm && !revealedKey ? (
-          <Form method="post" className="flex flex-col gap-2" data-testid="api-key-create-form">
+          <createFetcher.Form method="post" className="flex flex-col gap-2" data-testid="api-key-create-form">
               <input type="hidden" name="formName" value="createApiKey" />
               <FormField htmlFor="api-key-name" label="Key name">
                 <Input
@@ -220,7 +200,7 @@ export default function ApiKeysSection({
                   Cancel
                 </Button>
               </div>
-          </Form>
+          </createFetcher.Form>
         ) : (
           <Button
             type="button"

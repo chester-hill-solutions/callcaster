@@ -231,6 +231,7 @@ export function CallScreenLayout({
           />
         </div>
         <CallQuestionnaire
+          key={questionContact?.contact_id ?? "none"}
           isBusy={isBusy}
           handleResponse={(response: { pageId: string; blockId: string; value: string | number | boolean | string[] | null | undefined }) => {
             const value = response.value;

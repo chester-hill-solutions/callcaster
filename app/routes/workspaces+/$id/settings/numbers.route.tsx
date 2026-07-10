@@ -6,10 +6,10 @@ import type { NumbersSearchFetcherData } from "@/components/phone-numbers/Number
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { useActionFeedback, useFetcherOnIdle } from "@/hooks/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -101,19 +101,20 @@ const WorkspaceSettings = () => {
   >(null);
 
   // Toast the outcome of inline row edits (and removals), which otherwise
-  // save silently through updateFetcher.
+  // save silently through updateFetcher. formData is only present while the
+  // submission is in flight, so mirror the form name into a ref for the
+  // idle callback.
   const pendingFormNameRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (updateFetcher.state === "submitting") {
-      pendingFormNameRef.current = String(
-        updateFetcher.formData?.get("formName") ?? "",
-      );
-      return;
-    }
-    if (updateFetcher.state !== "idle" || !pendingFormNameRef.current) return;
+  if (updateFetcher.formData) {
+    pendingFormNameRef.current = String(
+      updateFetcher.formData.get("formName") ?? "",
+    );
+  }
+  useFetcherOnIdle(updateFetcher, (data) => {
     const formName = pendingFormNameRef.current;
+    if (!formName) return;
     pendingFormNameRef.current = null;
-    const error = (updateFetcher.data as { error?: string } | null)?.error;
+    const error = (data as { error?: string } | null)?.error;
     if (error) {
       toast.error(error);
     } else if (formName === "remove-number") {
@@ -121,7 +122,7 @@ const WorkspaceSettings = () => {
     } else {
       toast.success("Number settings saved");
     }
-  }, [updateFetcher.state, updateFetcher.formData, updateFetcher.data]);
+  });
 
   const { phoneNumbers, setPhoneNumbers } = useWorkspaceRealtime({
     user,

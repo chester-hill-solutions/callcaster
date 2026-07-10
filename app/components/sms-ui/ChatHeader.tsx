@@ -1,7 +1,8 @@
-import React, { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { RefObject, useCallback, useMemo, useState } from "react";
 import { MdEdit, MdExpandMore } from "react-icons/md";
 import { toast } from "sonner";
-import { useFetcher, useMatches, useParams, useRevalidator } from "react-router";
+import { useFetcher, useMatches, useParams } from "react-router";
+import { useFetcherOnIdle } from "@/hooks/utils/useFetcherOnIdle";
 import { Contact } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -113,8 +114,6 @@ export default function ChatHeader({
   const matches = useMatches();
   const linkFetcher = useFetcher<LinkContactFetcherData>();
   const contactSearchFetcher = useFetcher<ContactSearchFetcherData>();
-  const revalidator = useRevalidator();
-  const lastHandledLinkDataRef = useRef<unknown>(null);
 
   const activeContactLabel = contact
     ? getDisplayName(contact)
@@ -171,17 +170,15 @@ export default function ChatHeader({
     [isLinking, linkFetcher],
   );
 
-  useEffect(() => {
-    if (linkFetcher.state !== "idle" || !linkFetcher.data) return;
-    if (lastHandledLinkDataRef.current === linkFetcher.data) return;
-    lastHandledLinkDataRef.current = linkFetcher.data;
+  useFetcherOnIdle(linkFetcher, (data) => {
+    if (!data) return;
 
-    if (linkFetcher.data.error) {
-      toast.error(linkFetcher.data.error);
+    if (data.error) {
+      toast.error(data.error);
       return;
     }
 
-    const linkedCount = linkFetcher.data.linkedCount ?? 0;
+    const linkedCount = data.linkedCount ?? 0;
     toast.success(
       linkedCount > 0
         ? `Linked — ${linkedCount} earlier message${linkedCount === 1 ? "" : "s"} attached`
@@ -191,8 +188,7 @@ export default function ChatHeader({
     setIsContactSearchOpen(false);
     setContactSearchQuery("");
     setHasSearchedContacts(false);
-    revalidator.revalidate();
-  }, [linkFetcher.state, linkFetcher.data, revalidator]);
+  });
 
   const runContactSearch = useCallback(() => {
     const query = contactSearchQuery.trim();

@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { useLoaderData, useOutletContext, useSubmit } from "react-router";
+import { useCallback, useState } from "react";
+import { useLoaderData, useSubmit } from "react-router";
 import { toast } from "sonner";
 
 import ContactDetails from "@/components/contact/ContactDetails";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
-import type { Contact } from "@/lib/types";
 
 import type { ContactIdLoaderData } from "./$contactId.loader.server";
 
@@ -16,9 +15,6 @@ export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteEr
 export default function ContactScreen() {
   const { contact, selected_id, userRole, audiences } =
     useLoaderData<ContactIdLoaderData>();
-  const { setContact } = useOutletContext<{
-    setContact: (contact: Contact) => void;
-  }>();
   const submit = useSubmit();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -38,12 +34,6 @@ export default function ContactScreen() {
   const handleReset = useCallback((): void => {
     setHasChanges(false);
   }, []);
-
-  useEffect(() => {
-    if (contact && typeof contact.id === "number") {
-      setContact(contact);
-    }
-  }, [contact, setContact]);
 
   return (
     <PageShell

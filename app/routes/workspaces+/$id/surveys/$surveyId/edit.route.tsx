@@ -1,7 +1,7 @@
 export { loader } from "./edit.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, Link, useLoaderData, useSubmit, useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { data as routeData, type LoaderFunctionArgs, Link, useLoaderData, useSubmit } from "react-router";
+import { useState } from "react";
 
 import { SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,7 @@ import { Plus, Trash2, Save, ArrowLeft } from "lucide-react";
 export default function EditSurveyPage() {
   const { survey, formData: initialFormData, workspaceId } = useLoaderData();
   const submit = useSubmit();
-  const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState<SurveyFormData>(initialFormData);
 
   const handleSubmit = async (e: React.FormEvent) => {

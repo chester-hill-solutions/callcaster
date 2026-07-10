@@ -1,77 +1,20 @@
-import { useEffect, useState, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
-import { fetchAudienceUploads } from "@/lib/chats/messaging-client";
 import { Loader2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import type { Database } from "@/lib/db-types";
-import { logger } from "@/lib/logger.client";
+import { useAudienceUploads, type AudienceUpload } from "@/hooks/audience/useAudienceUploads";
 
 interface AudienceUploadHistoryProps {
   audienceId: number;
   workspaceId: string;
 }
 
-interface AudienceUpload {
-  id: number;
-  audience_id: number;
-  created_at: string;
-  status: string;
-  file_name: string | null;
-  file_size: number | null;
-  total_contacts: number;
-  processed_contacts: number;
-  processed_at: string | null;
-  error_message: string | null;
-}
-
 export default function AudienceUploadHistory({
   audienceId,
   workspaceId,
   }: AudienceUploadHistoryProps) {
-  const [uploads, setUploads] = useState<AudienceUpload[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchUploads = useCallback(async () => {
-    if (!audienceId || !workspaceId) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchAudienceUploads(workspaceId, audienceId);
-      setUploads(data as AudienceUpload[]);
-    } catch (err) {
-      logger.error("Error fetching audience uploads:", err);
-      setError(err instanceof Error ? err.message : "An error occurred while fetching uploads");
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceId, audienceId]);
-
-  useEffect(() => {
-    fetchUploads();
-  }, [fetchUploads]);
-
-  // Phase 3B: Postgres Realtime subscription for live upload progress updates.
-  useWorkspaceEventSubscription({
+  const { uploads, loading, error, refresh } = useAudienceUploads({
     workspaceId,
-    table: "audience_upload",
-    filter: `audience_id=eq.${audienceId}`,
-    onChange: (payload) => {
-      if (payload.eventType === "INSERT" && payload.new) {
-        setUploads(prev => [payload.new as unknown as AudienceUpload, ...prev]);
-      } else if (payload.eventType === "UPDATE" && payload.new) {
-        const newData = payload.new as Partial<AudienceUpload> & { id?: number };
-        setUploads(prev =>
-          prev.map(upload =>
-            newData.id && upload.id === newData.id ? { ...upload, ...newData } : upload
-          )
-        );
-      } else if (payload.eventType === "DELETE") {
-        setUploads(prev => prev.filter(upload => upload["id"] !== (payload.old as { id?: number })["id"]));
-      }
-    },
+    audienceId,
   });
 
   if (loading) {
@@ -89,7 +32,7 @@ export default function AudienceUploadHistory({
         <p className="font-semibold">Error loading upload history</p>
         <p className="text-sm">{error}</p>
         <button
-          onClick={() => fetchUploads()}
+          onClick={() => refresh()}
           className="mt-2 text-sm underline hover:text-destructive/80"
         >
           Try again

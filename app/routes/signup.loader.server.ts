@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth.server";
+import { isSignupOpen } from "@/lib/env.server";
 import { data as routeData, redirect } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -8,5 +9,5 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (user) {
     return redirect("/workspaces", { headers });
   }
-  return routeData({ user }, { headers });
+  return routeData({ signupOpen: isSignupOpen() }, { headers });
 };

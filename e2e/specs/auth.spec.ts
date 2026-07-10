@@ -49,8 +49,10 @@ test.describe("Auth @smoke", () => {
     await expect(page).toHaveURL(/\/\/127\.0\.0\.1:3100\/?$/);
   });
 
-  test("AUTH-08 invite-only signup UI", async ({ page }) => {
+  test("AUTH-08 open signup UI when SIGNUP_OPEN is enabled", async ({ page }) => {
     await page.goto("/signup");
-    await expect(page.getByText("Request Access")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Create Account" })).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
   });
 });

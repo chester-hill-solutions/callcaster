@@ -31,6 +31,8 @@ export function useUnreadConversationsCount(
 ): number {
   const [unreadCount, setUnreadCount] = useState(0);
   const inFlightRef = useRef(false);
+  const currentWorkspaceIdRef = useRef(workspaceId);
+  currentWorkspaceIdRef.current = workspaceId;
 
   const refresh = useCallback(async () => {
     if (!workspaceId || inFlightRef.current) return;
@@ -47,7 +49,11 @@ export function useUnreadConversationsCount(
         (sum, conversation) => sum + (conversation.unread_count || 0),
         0,
       );
-      setUnreadCount(total);
+      // A late response for a previous workspace must not clobber the
+      // count for the workspace we've since switched to.
+      if (currentWorkspaceIdRef.current === workspaceId) {
+        setUnreadCount(total);
+      }
     } catch (error) {
       logger.error("Failed to load unread conversation count", error);
     } finally {
@@ -56,11 +62,8 @@ export function useUnreadConversationsCount(
   }, [workspaceId]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  useEffect(() => {
     if (!workspaceId) return;
+    void refresh();
     const interval = setInterval(() => {
       void refresh();
     }, POLL_INTERVAL_MS);

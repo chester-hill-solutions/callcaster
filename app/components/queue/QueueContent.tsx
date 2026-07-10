@@ -2,7 +2,6 @@ import { Audience, CampaignQueue, Contact, Queue, QueueItem } from "@/lib/types"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { QueueHeader } from "./QueueHeader";
 import { QueueTable } from "@/components/queue/QueueTable";
-import { useEffect, useState, useRef } from "react";
 
 interface QueueContentProps {
   client?: unknown;
@@ -62,29 +61,6 @@ export function QueueContent({
     campaignId,
     queueFetcher,
 }: QueueContentProps) {
-    const [queueCount, setQueueCount] = useState(queueValue.totalCount ?? 0);
-    const [queueData, setQueueData] = useState(queueValue.queueData ?? []);
-    const pendingUpdates = useRef<Set<number>>(new Set());
-
-    const fetchContactById = async (id: number) => {
-        if (pendingUpdates.current.has(id)) return null;
-
-        pendingUpdates.current.add(id);
-        try {
-            const response = await fetch(`/api/contacts/${id}`);
-            if (!response.ok) return null;
-            const body = (await response.json()) as { contact?: Contact };
-            return body.contact ?? null;
-        } finally {
-            pendingUpdates.current.delete(id);
-        }
-    }
-
-    // Update queue data when parent data changes
-    useEffect(() => {
-        setQueueData(queueValue.queueData ?? []);
-    }, [queueValue.queueData]);
-
     if (queueValue?.queueError) {
         return (
             <div className="p-2">
@@ -115,7 +91,7 @@ export function QueueContent({
             <QueueTable
                 unfilteredCount={queueValue.unfilteredCount ?? 0}
                 handleFilterChange={handleFilterChange}
-                queue={queueData || []}
+                queue={queueValue.queueData ?? []}
                 audiences={audiences}
                 totalCount={queueValue.totalCount}
                 currentPage={queueValue.currentPage}

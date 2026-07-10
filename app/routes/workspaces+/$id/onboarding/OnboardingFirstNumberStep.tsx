@@ -1,5 +1,6 @@
 import { Link, useFetcher, useRevalidator } from "react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFetcherOnIdle } from "@/hooks/utils";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
@@ -156,17 +157,11 @@ export function OnboardingFirstNumberStep({
     [routingFetcher, actionPath],
   );
 
-  useEffect(() => {
-    if (verifyFetcher.data?.validationRequest) {
+  useFetcherOnIdle(verifyFetcher, (data) => {
+    if (data?.validationRequest) {
       setVerificationDialogOpen(true);
     }
-  }, [verifyFetcher.data?.validationRequest]);
-
-  useEffect(() => {
-    if (verifyFetcher.state === "idle" && verifyFetcher.data?.success && hasFirstNumber) {
-      revalidator.revalidate();
-    }
-  }, [hasFirstNumber, revalidator, verifyFetcher.data?.success, verifyFetcher.state]);
+  });
 
   if (!messagingReady) {
     return (

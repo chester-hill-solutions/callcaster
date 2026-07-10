@@ -19,6 +19,7 @@ const env = {
   // (localhost BASE_URL check, 2FA-bypass refusal) that would otherwise
   // reject this intentionally local "production" server.
   E2E_TEST: "1",
+  SIGNUP_OPEN: process.env.SIGNUP_OPEN ?? "true",
   HOST: process.env.HOST ?? "0.0.0.0",
   PORT: port,
   BASE_URL: baseURL,

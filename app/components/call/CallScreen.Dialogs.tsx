@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,7 +51,8 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   const [errorDescription, setErrorDescription] = useState<string>('');
   const noCredits = Number(credits ?? 0) <= 0;
   const shouldBlockForCredits = noCredits || Boolean(creditsError);
-  const [isCreditsDialogOpen, setCreditsDialogOpen] = useState(shouldBlockForCredits);
+  const [creditsDialogDismissed, setCreditsDialogDismissed] = useState(false);
+  const showCreditsDialog = shouldBlockForCredits && !creditsDialogDismissed;
   const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
   const navigate = useNavigate();
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
@@ -76,12 +77,6 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       setErrorDescription("");
     },
   });
-
-  useEffect(() => {
-    setCreditsDialogOpen(shouldBlockForCredits);
-  }, [shouldBlockForCredits]);
-
-  const showCreditsDialog = shouldBlockForCredits || isCreditsDialogOpen;
 
   return (
     <>
@@ -208,7 +203,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       </Dialog>
 
       <Dialog
-        onOpenChange={setCreditsDialogOpen}
+        onOpenChange={(open) => setCreditsDialogDismissed(!open)}
         open={showCreditsDialog}
       >
         <DialogContent

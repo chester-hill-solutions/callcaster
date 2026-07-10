@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Result from "@/components/campaign/settings/script/Result";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,10 +55,6 @@ const CallQuestionnaire = ({
     pageKeys[0] || undefined,
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
-
-  useEffect(() => {
-    setLocalUpdate(update || {});
-  }, [update]);
 
   const handleBlockResponse = (
     blockId: string,

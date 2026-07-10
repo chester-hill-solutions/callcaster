@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useFetcher,
   useLoaderData,
@@ -289,17 +289,20 @@ export function useCallScreen() {
 
   const house = householdMap[nextRecipient?.contact?.address || ""];
 
+  const handleDTMFRef = useRef(audioControls.handleDTMF);
+  handleDTMFRef.current = audioControls.handleDTMF;
+
   useEffect(() => {
     const handleKeypress = (e: KeyboardEvent) => {
-      KEYPAD_KEYS.includes(e.key)
-        ? audioControls.handleDTMF(e.key)
-        : null;
+      if (KEYPAD_KEYS.includes(e.key)) {
+        handleDTMFRef.current(e.key);
+      }
     };
 
     window.addEventListener("keypress", handleKeypress);
 
     return () => window.removeEventListener("keypress", handleKeypress);
-  }, [activeCall, audioControls.handleDTMF]);
+  }, []);
 
   useNextRecipientSync({
     nextRecipient,
@@ -317,14 +320,22 @@ export function useCallScreen() {
     setUpdate,
   });
 
-  useEffect(() => {
-    if (phoneVerification.selectedDevice !== "computer") {
-      phoneVerification.handlePhoneDeviceSelection(
-        phoneVerification.selectedDevice,
-        audioControls.requestMicrophoneAccess,
-      );
-    }
-  }, [phoneVerification.selectedDevice]);
+  const handleDeviceSelect = useCallback(
+    (device: string) => {
+      phoneVerification.setSelectedDevice(device);
+      if (device !== "computer") {
+        void phoneVerification.handlePhoneDeviceSelection(
+          device,
+          audioControls.requestMicrophoneAccess,
+        );
+      }
+    },
+    [
+      phoneVerification.setSelectedDevice,
+      phoneVerification.handlePhoneDeviceSelection,
+      audioControls.requestMicrophoneAccess,
+    ],
+  );
 
   const currentState = {
     callState,
@@ -428,7 +439,10 @@ export function useCallScreen() {
     formState,
     dialogControls,
     audioControls: audioControlsGroup,
-    phoneVerification,
+    phoneVerification: {
+      ...phoneVerification,
+      setSelectedDevice: handleDeviceSelect,
+    },
   };
 }
 

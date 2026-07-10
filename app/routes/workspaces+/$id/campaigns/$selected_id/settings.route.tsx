@@ -25,7 +25,8 @@ import {
   TwilioAccountData,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useFetcherOnIdle } from "@/hooks/utils";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import {
   buildCampaignDetailsForType,
@@ -152,48 +153,49 @@ export default function CampaignSettingsRoute() {
     !deepEqual(draftCampaignData, savedCampaignData) ||
     !deepEqual(draftCampaignDetails, savedCampaignDetails);
 
-  useEffect(() => {
-    if (isChanged) {
+  const [prevInitialCampaignData, setPrevInitialCampaignData] =
+    useState(initialCampaignData);
+  const [prevCampaignDetails, setPrevCampaignDetails] = useState(campaignDetails);
+  if (
+    prevInitialCampaignData !== initialCampaignData ||
+    prevCampaignDetails !== campaignDetails
+  ) {
+    setPrevInitialCampaignData(initialCampaignData);
+    setPrevCampaignDetails(campaignDetails);
+    if (!isChanged) {
+      setSavedCampaignData(initialCampaignData);
+      setSavedCampaignDetails(campaignDetails);
+      setDraftCampaignData(initialCampaignData);
+      setDraftCampaignDetails(campaignDetails);
+    }
+  }
+
+  useFetcherOnIdle(fetcher, (data) => {
+    if (!data?.success) {
       return;
     }
 
-    setSavedCampaignData(initialCampaignData);
-    setSavedCampaignDetails(campaignDetails);
-    setDraftCampaignData(initialCampaignData);
-    setDraftCampaignDetails(campaignDetails);
-  }, [campaignDetails, initialCampaignData, isChanged]);
+    if (data.actionType === "save" && data.campaign && data.campaignDetails) {
+      const nextCampaignData = normalizeCampaignData(
+        data.campaign as CampaignWithAudiences,
+      );
 
-  useEffect(() => {
-    if (
-      fetcher.state !== "idle" ||
-      fetcher.data?.actionType !== "save" ||
-      !fetcher.data.success ||
-      !fetcher.data.campaign ||
-      !fetcher.data.campaignDetails
-    ) {
+      setSavedCampaignData(nextCampaignData);
+      setSavedCampaignDetails(data.campaignDetails);
+      setDraftCampaignData(nextCampaignData);
+      setDraftCampaignDetails(data.campaignDetails);
       return;
     }
 
-    const nextCampaignData = normalizeCampaignData(
-      fetcher.data.campaign as CampaignWithAudiences,
-    );
-
-    setSavedCampaignData(nextCampaignData);
-    setSavedCampaignDetails(fetcher.data.campaignDetails);
-    setDraftCampaignData(nextCampaignData);
-    setDraftCampaignDetails(fetcher.data.campaignDetails);
-  }, [fetcher.data, fetcher.state]);
-
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data?.success && fetcher.data.actionType === "status") {
+    if (data.actionType === "status") {
       setConfirmStatus("none");
-      const newStatus = (fetcher.data as { status?: string }).status;
+      const newStatus = data.status;
       if (newStatus) {
         setDraftCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
         setSavedCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
       }
     }
-  }, [fetcher.data, fetcher.state]);
+  });
 
   const activeIntent = fetcher.formData ? String(fetcher.formData.get("intent") ?? "") : null;
   const isBusy = fetcher.state !== "idle";

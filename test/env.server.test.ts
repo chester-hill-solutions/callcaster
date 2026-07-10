@@ -117,4 +117,31 @@ describe("env.server", () => {
       /Missing required environment variable: VERIFICATION_PHONE_NUMBER/,
     );
   });
+
+  test("isSignupOpen is true only when SIGNUP_OPEN is true or 1", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+
+    delete process.env.SIGNUP_OPEN;
+    let mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(false);
+
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.SIGNUP_OPEN = "false";
+    mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(false);
+
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.SIGNUP_OPEN = "true";
+    mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(true);
+
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.SIGNUP_OPEN = "1";
+    mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(true);
+  });
 });

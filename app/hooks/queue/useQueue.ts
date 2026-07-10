@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import type { Tables } from "@/lib/db-types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
 import { Contact, QueueItem, User } from "@/lib/types";
@@ -81,17 +81,19 @@ export const useQueue = ({
   const [predictiveQueue, setPredictiveQueue] = useState<QueueItem[]>(
     initialPredictiveQueue,
   );
-  const [householdMap, setHouseholdMap] = useState(createHouseholdMap(queue));
+  const householdMap = useMemo(() => createHouseholdMap(queue), [queue]);
   const [nextRecipient, setNextRecipient] = useState<QueueItem | null>(() => {
     return !isPredictive && queue.length > 0 ? (queue[0] ?? null) : null;
   });
-  
+  const effectiveNextRecipient =
+    nextRecipient ?? (!isPredictive ? queue[0] ?? null : null);
+
   // Use ref to avoid including nextRecipient in updateQueue dependencies
-  const nextRecipientRef = useRef(nextRecipient);
-  
+  const nextRecipientRef = useRef(effectiveNextRecipient);
+
   useEffect(() => {
-    nextRecipientRef.current = nextRecipient;
-  }, [nextRecipient]);
+    nextRecipientRef.current = effectiveNextRecipient;
+  }, [effectiveNextRecipient]);
 
   const isDuplicate = useCallback((newItem: QueueItem, currentQueue: QueueItem[]) => {
     return currentQueue.some(item => item.contact_id === newItem.contact_id);
@@ -169,16 +171,6 @@ export const useQueue = ({
     [isPredictive, user?.id, setCallDuration, isDuplicate],
   );
 
-  useEffect(() => {
-    setHouseholdMap(createHouseholdMap(queue));
-  }, [queue]);
-
-  useEffect(() => {
-    if (!nextRecipient && queue.length > 0 && !isPredictive) {
-      setNextRecipient(queue[0] ?? null);
-    }
-  }, [queue, nextRecipient, isPredictive]);
-
   return {
     queue,
     setQueue,
@@ -186,7 +178,7 @@ export const useQueue = ({
     setPredictiveQueue,
     updateQueue,
     householdMap,
-    nextRecipient,
+    nextRecipient: effectiveNextRecipient,
     setNextRecipient,
   };
 };

@@ -1,5 +1,5 @@
 import { Link, useLoaderData, useNavigate, useFetcher, useOutletContext } from "react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { BellOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 import { SoftphonePanel } from "@/components/calls/SoftphonePanel";
 import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { useAgentStatus } from "@/hooks/agent/useAgentStatus";
+import { useEndSessionOnUnmount } from "@/hooks/handset/useEndSessionOnUnmount";
 import { useSoftphoneController } from "@/hooks/call/useSoftphoneController";
 import { useSoftphoneAudioDevices } from "@/hooks/call/useSoftphoneAudioDevices";
 import type { Database } from "@/lib/db-types";
@@ -73,11 +74,7 @@ export default function AgentDesktop() {
     );
   }, [fetcher, workspaceId]);
 
-  useEffect(() => {
-    return () => {
-      endSession();
-    };
-  }, [endSession]);
+  useEndSessionOnUnmount(endSession);
 
   const handleSetStatus = useCallback(
     async (to: AgentState, reason?: string) => {

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useState } from "react";
 import Result from "./Result";
 import QuestionBlockOption from "./CampaignSettings.Script.QuestionBlock.Option";
 import { GrAddCircle, GrSubtractCircle } from "react-icons/gr";
@@ -213,7 +213,6 @@ export default function CampaignSettingsScriptQuestionBlock({
   handleNextChange,
 }: CampaignSettingsScriptQuestionBlockProps) {
   const [question, setQuestion] = useState(initQuestion);
-  const focusedInputRef = useRef(null);
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const newState = { ...question, [e.target.name]: e.target.value };
     setQuestion(newState);
@@ -285,16 +284,6 @@ export default function CampaignSettingsScriptQuestionBlock({
     setQuestion(newState);
     dispatchState(newState);
   };
-
-  useEffect(() => {
-    if (focusedInputRef.current) {
-      const input = document.getElementById(focusedInputRef.current);
-      if (input) {
-        input.focus();
-      }
-      focusedInputRef.current = null;
-    }
-  }, [question.id]);
 
   return (
     <div className="border rounded-lg p-4 mb-4">

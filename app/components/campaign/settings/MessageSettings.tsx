@@ -1,8 +1,9 @@
 import { MdAddAPhoto , MdTag } from "react-icons/md";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
+import { useFetcherOnIdle } from "@/hooks/utils";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -62,10 +63,15 @@ function getErrorMessage(error: MessageMediaActionData["error"]) {
 }
 
 export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: MessageSettingsProps) => {
-    const [displayText, setDisplayText] = useState(details?.body_text || '');
+    const displayText = details?.body_text || '';
     const [eraseVisible, setEraseVisible] = useState<Record<string, boolean>>({});
     const [showTemplateTags, setShowTemplateTags] = useState(false);
     const [resolvedMediaLinks, setResolvedMediaLinks] = useState<string[]>(mediaLinks);
+    const [prevMediaLinks, setPrevMediaLinks] = useState(mediaLinks);
+    if (prevMediaLinks !== mediaLinks) {
+        setPrevMediaLinks(mediaLinks);
+        setResolvedMediaLinks(mediaLinks);
+    }
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mediaFetcher = useFetcher<MessageMediaActionData>();
     const segmentInfo = getSmsSegmentInfo(displayText);
@@ -100,39 +106,29 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     ];
 
 
-    useEffect(() => {
-        setDisplayText(details?.body_text || '');
-    }, [details?.body_text]);
-    
-    useEffect(() => {
-        setResolvedMediaLinks(mediaLinks);
-    }, [mediaLinks]);
+    useFetcherOnIdle(mediaFetcher, (data) => {
+        if (!data?.success) return;
 
-    useEffect(() => {
-        if (mediaFetcher.state !== "idle" || !mediaFetcher.data?.success) {
-            return;
-        }
-
-        const nextMedia = mediaFetcher.data.campaignUpdate?.[0]?.message_media;
+        const nextMedia = data.campaignUpdate?.[0]?.message_media;
         if (Array.isArray(nextMedia)) {
             onChange("message_media", nextMedia);
         }
 
-        if (mediaFetcher.data.uploadedFileName && mediaFetcher.data.url) {
-            setResolvedMediaLinks((current) => [...current, mediaFetcher.data?.url as string]);
+        if (data.uploadedFileName && data.url) {
+            setResolvedMediaLinks((current) => [...current, data.url as string]);
             return;
         }
 
-        if (mediaFetcher.data.removedFileName) {
+        if (data.removedFileName) {
             const currentMedia = details.message_media ?? [];
             const removedIndex = currentMedia.findIndex(
-                (mediaName) => mediaName === mediaFetcher.data?.removedFileName,
+                (mediaName) => mediaName === data.removedFileName,
             );
             if (removedIndex >= 0) {
                 setResolvedMediaLinks((current) => current.filter((_, index) => index !== removedIndex));
             }
         }
-    }, [details.message_media, mediaFetcher.data, mediaFetcher.state, onChange]);
+    });
     const showErase = (imageId: string) => {
         setEraseVisible((prevState) => ({
             ...prevState,
@@ -182,7 +178,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
         const currentText = displayText;
 
         const newText = currentText.substring(0, start) + tag + currentText.substring(end);
-        setDisplayText(newText);
 
         // Update the parent component
         onChange("body_text", newText);
@@ -203,7 +198,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
         const end = textarea.selectionEnd;
         const currentText = displayText;
         const newText = currentText.substring(0, start) + example + currentText.substring(end);
-        setDisplayText(newText);
         onChange("body_text", newText);
         setTimeout(() => {
             textarea.focus();
@@ -220,7 +214,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
         const currentText = displayText;
         const surveyFunction = `survey({{contact_id}}, "${surveyId}")`;
         const newText = currentText.substring(0, start) + surveyFunction + currentText.substring(end);
-        setDisplayText(newText);
         onChange("body_text", newText);
         setTimeout(() => {
             textarea.focus();
@@ -266,9 +259,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     };
 
     const handleBodyTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newText = event.target.value;
-        setDisplayText(newText);
-        onChange("body_text", newText);
+        onChange("body_text", event.target.value);
     };
 
     return (

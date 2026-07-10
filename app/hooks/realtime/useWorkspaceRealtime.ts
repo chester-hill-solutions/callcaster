@@ -118,106 +118,109 @@ export const useWorkspaceRealtime = ({
     workspaceRef.current = workspace;
   }, [workspace]);
 
-  useEffect(() => {
-    if (!workspace) return;
-
-    const handleChange = (payload: PostgresChangePayload) => {
-      const tableName = payload.table;
-      switch (tableName) {
-        case "outreach_attempt":
-          if ((payload.eventType === "INSERT" || payload.eventType === "UPDATE") && payload.new) {
-            const attemptCampaignId = (payload.new as { campaign_id?: number }).campaign_id;
-            if (Number(attemptCampaignId) !== Number(campaignIdRef.current)) return;
-            updateAttempts(
-              { new: payload.new as OutreachAttempt },
-              userRef.current,
-              Number(campaignIdRef.current),
-              callsListRef.current,
-            );
-          }
-          break;
-        case "call":
-          if ((payload.eventType === "INSERT" || payload.eventType === "UPDATE") && payload.new) {
-            const callCampaignId = (payload.new as { campaign_id?: number }).campaign_id;
-            if (callCampaignId != null && Number(callCampaignId) !== Number(campaignIdRef.current)) {
-              return;
-            }
-            updateCalls(
-              {
-                new: payload.new as Call,
-                eventType: payload.eventType as "INSERT" | "UPDATE",
-              },
-              queueRef.current,
-              recentAttemptRef.current,
-              setNextRecipient,
-              setQuestionContact,
-              setRecentAttempt as (attempt: Tables<"outreach_attempt"> | null) => void,
-            );
-          }
-          break;
-        case "campaign_queue":
-          if (
-            payload.new &&
-            Number((payload.new as { campaign_id?: number }).campaign_id) !==
-              Number(campaignIdRef.current)
-          ) {
+  const handleChange = (payload: PostgresChangePayload) => {
+    const tableName = payload.table;
+    switch (tableName) {
+      case "outreach_attempt":
+        if ((payload.eventType === "INSERT" || payload.eventType === "UPDATE") && payload.new) {
+          const attemptCampaignId = (payload.new as { campaign_id?: number }).campaign_id;
+          if (Number(attemptCampaignId) !== Number(campaignIdRef.current)) return;
+          updateAttempts(
+            { new: payload.new as OutreachAttempt },
+            userRef.current,
+            Number(campaignIdRef.current),
+            callsListRef.current,
+          );
+        }
+        break;
+      case "call":
+        if ((payload.eventType === "INSERT" || payload.eventType === "UPDATE") && payload.new) {
+          const callCampaignId = (payload.new as { campaign_id?: number }).campaign_id;
+          if (callCampaignId != null && Number(callCampaignId) !== Number(campaignIdRef.current)) {
             return;
           }
-          if ((payload.eventType === "INSERT" || payload.eventType === "UPDATE") && payload.new) {
-            const queueItem = payload.new as Tables<"campaign_queue"> & { contact?: Contact | null };
-            if (queueItem.contact) {
-              updateQueue({ new: queueItem as Tables<"campaign_queue"> & { contact: Contact } });
-              return;
-            }
+          updateCalls(
+            {
+              new: payload.new as Call,
+              eventType: payload.eventType as "INSERT" | "UPDATE",
+            },
+            queueRef.current,
+            recentAttemptRef.current,
+            setNextRecipient,
+            setQuestionContact,
+            setRecentAttempt as (attempt: Tables<"outreach_attempt"> | null) => void,
+          );
+        }
+        break;
+      case "campaign_queue":
+        if (
+          payload.new &&
+          Number((payload.new as { campaign_id?: number }).campaign_id) !==
+            Number(campaignIdRef.current)
+        ) {
+          return;
+        }
+        if ((payload.eventType === "INSERT" || payload.eventType === "UPDATE") && payload.new) {
+          const queueItem = payload.new as Tables<"campaign_queue"> & { contact?: Contact | null };
+          if (queueItem.contact) {
+            updateQueue({ new: queueItem as Tables<"campaign_queue"> & { contact: Contact } });
+            return;
+          }
 
-            void fetchCampaignQueueItemWithContact(
-              campaignIdRef.current,
-              queueItem.id,
-            ).then(
-              (data) => {
-                if (data?.contact) {
-                  updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
-                  return;
-                }
+          void fetchCampaignQueueItemWithContact(
+            campaignIdRef.current,
+            queueItem.id,
+          ).then(
+            (data) => {
+              if (data?.contact) {
+                updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
+                return;
+              }
 
-                const existingContact =
-                  queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
-                if (existingContact) {
-                  updateQueue({
-                    new: {
-                      ...queueItem,
-                      contact: existingContact,
-                    } as Tables<"campaign_queue"> & { contact: Contact },
-                  });
-                }
-              },
-              (err: unknown) =>
-                logger.error("Failed to hydrate queue item from realtime payload", err),
-            );
-          }
-          break;
-        case "workspace_number":
-          if (workspaceRef.current && payload.new) {
-            const rowWorkspace = (payload.new as { workspace?: string }).workspace;
-            if (rowWorkspace !== workspaceRef.current) return;
-          }
-          updateWorkspaceNumbers({
-            eventType: payload.eventType,
-            old: payload.old as Tables<"workspace_number"> | null,
-            new: payload.new as Tables<"workspace_number"> | null,
-          });
-          break;
-        case "transaction_history":
-          if (workspaceRef.current && payload.new) {
-            const rowWorkspace = (payload.new as { workspace?: string }).workspace;
-            if (rowWorkspace !== workspaceRef.current) return;
-          }
-          updateCredits(payload);
-          break;
-        default:
-          break;
-      }
-    };
+              const existingContact =
+                queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
+              if (existingContact) {
+                updateQueue({
+                  new: {
+                    ...queueItem,
+                    contact: existingContact,
+                  } as Tables<"campaign_queue"> & { contact: Contact },
+                });
+              }
+            },
+            (err: unknown) =>
+              logger.error("Failed to hydrate queue item from realtime payload", err),
+          );
+        }
+        break;
+      case "workspace_number":
+        if (workspaceRef.current && payload.new) {
+          const rowWorkspace = (payload.new as { workspace?: string }).workspace;
+          if (rowWorkspace !== workspaceRef.current) return;
+        }
+        updateWorkspaceNumbers({
+          eventType: payload.eventType,
+          old: payload.old as Tables<"workspace_number"> | null,
+          new: payload.new as Tables<"workspace_number"> | null,
+        });
+        break;
+      case "transaction_history":
+        if (workspaceRef.current && payload.new) {
+          const rowWorkspace = (payload.new as { workspace?: string }).workspace;
+          if (rowWorkspace !== workspaceRef.current) return;
+        }
+        updateCredits(payload);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleChangeRef = useRef(handleChange);
+  handleChangeRef.current = handleChange;
+
+  useEffect(() => {
+    if (!workspace) return;
 
     const url = `/api/workspaces/${encodeURIComponent(workspace)}/events`;
     const eventSource = new EventSource(url);
@@ -226,7 +229,7 @@ export const useWorkspaceRealtime = ({
       try {
         const record = parseWorkspaceEventData(message.data);
         if (record.event_type !== "postgres_change") return;
-        handleChange(record.payload as PostgresChangePayload);
+        handleChangeRef.current(record.payload as PostgresChangePayload);
       } catch (error) {
         logger.error("Failed to handle campaign workspace SSE event", error);
       }
@@ -241,17 +244,7 @@ export const useWorkspaceRealtime = ({
       eventSource.removeEventListener("workspace_event", onWorkspaceEvent);
       eventSource.close();
     };
-  }, [
-    workspace,
-    updateAttempts,
-    updateCalls,
-    updateQueue,
-    updateWorkspaceNumbers,
-    updateCredits,
-    setNextRecipient,
-    setQuestionContact,
-    setRecentAttempt,
-  ]);
+  }, [workspace]);
 
   const handleSetDisposition = useCallback(
     (value: string) => {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import type { Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
@@ -134,13 +134,9 @@ export const useCalls = (
       logger.error('Error updating calls:', error);
     }
   }, [isPredictive]);
-  
 
-  useEffect(() => {
-    if (!recentCall && callsList.length > 0) {
-      setRecentCall(callsList[callsList.length - 1] ?? null);
-    }
-  }, [callsList, recentCall]);
+  const effectiveRecentCall =
+    recentCall ?? callsList[callsList.length - 1] ?? null;
 
-  return { callsList, setCalls, recentCall, setRecentCall, updateCalls };
+  return { callsList, setCalls, recentCall: effectiveRecentCall, setRecentCall, updateCalls };
 };

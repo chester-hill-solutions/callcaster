@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFetcherOnIdle } from "@/hooks/utils";
 import { isBulkSmsSenderMisaligned } from "@/lib/throughput-config";
 import type { TwilioSmsSenderClass } from "@/lib/types";
 
@@ -69,22 +70,22 @@ export function SplitCampaignPrompt({
 
   const isSubmitting = fetcher.state !== "idle";
 
-  useEffect(() => {
-    if (fetcher.state !== "idle" || !fetcher.data) {
+  useFetcherOnIdle(fetcher, (data) => {
+    if (!data) {
       return;
     }
-    if (fetcher.data.success && fetcher.data.actionType === "split") {
-      const count = fetcher.data.segments?.length ?? segmentCount;
-      const moved = fetcher.data.movedContactCount ?? 0;
+    if (data.success && data.actionType === "split") {
+      const count = data.segments?.length ?? segmentCount;
+      const moved = data.movedContactCount ?? 0;
       toast.success(
         `Split into ${count} campaign${count === 1 ? "" : "s"} — ${moved.toLocaleString()} contact${moved === 1 ? "" : "s"} distributed.`,
       );
       setOpen(false);
       setAcknowledged(false);
-    } else if (fetcher.data.actionType === "split" && fetcher.data.error) {
-      toast.error(fetcher.data.error);
+    } else if (data.actionType === "split" && data.error) {
+      toast.error(data.error);
     }
-  }, [fetcher.state, fetcher.data, segmentCount]);
+  });
 
   if (!isBulkSmsSenderMisaligned(senderClass, queueCount)) {
     return null;

@@ -1,5 +1,5 @@
 import { Link, NavLink, Params, useLocation } from "react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
@@ -136,17 +136,15 @@ export default function Navbar({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const workspaceId = params.id;
   const location = useLocation();
-  const [loc, setLoc] = useState(location);
+  const [prevPathname, setPrevPathname] = useState(location.pathname);
 
-  useEffect(() => {
-    if (location.pathname !== loc.pathname) {
-      setMobileMenuOpen(false);
-      setLoc(location);
-    }
-  }, [loc, location]);
-  return loc.pathname.endsWith("call") ||
-    (loc.pathname.includes("survey") &&
-      !loc.pathname.includes("workspaces")) ? (
+  if (prevPathname !== location.pathname) {
+    setPrevPathname(location.pathname);
+    setMobileMenuOpen(false);
+  }
+  return location.pathname.endsWith("call") ||
+    (location.pathname.includes("survey") &&
+      !location.pathname.includes("workspaces")) ? (
     <div></div>
   ) : (
     <header className={`w-full border-b border-border/70 ${className}`}>

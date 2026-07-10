@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { NavLink } from "react-router";
 import { MdAdd } from "react-icons/md";
 import { Search, X } from "lucide-react";
@@ -14,6 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { useInfiniteScroll } from "@/hooks";
+import { useDebounce } from "@/hooks/utils";
 import { getChatSortOption } from "@/lib/chat-conversation-sort";
 import type { ConversationSummary } from "@/lib/chat-conversation-sort";
 import { ALL_CAMPAIGNS_VALUE } from "./conversation-utils";
@@ -68,30 +69,28 @@ export function ConversationSidebar({
 
   // Keep the input in sync when the URL search param changes from outside
   // this component (e.g. back/forward navigation).
-  useEffect(() => {
+  const [prevSearchTerm, setPrevSearchTerm] = useState(searchTerm);
+  if (prevSearchTerm !== searchTerm) {
+    setPrevSearchTerm(searchTerm);
     setSearchInput(searchTerm);
-  }, [searchTerm]);
+  }
 
   // Debounce 300ms before pushing the search term into the URL, which is
   // what actually triggers the loader (and the paginated fetcher) to refetch
   // conversations filtered by contact name/phone/last message body.
-  useEffect(() => {
-    const trimmed = searchInput.trim();
+  const debouncedSearchUpdate = useDebounce((value: string) => {
+    const trimmed = value.trim();
     if (trimmed === searchTerm) return;
 
-    const timeoutId = window.setTimeout(() => {
-      updateFilters((nextParams) => {
-        if (trimmed) {
-          nextParams.set("search", trimmed);
-        } else {
-          nextParams.delete("search");
-        }
-        return nextParams;
-      });
-    }, 300);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [searchInput, searchTerm, updateFilters]);
+    updateFilters((nextParams) => {
+      if (trimmed) {
+        nextParams.set("search", trimmed);
+      } else {
+        nextParams.delete("search");
+      }
+      return nextParams;
+    });
+  }, 300);
 
   const [loadMoreRef] = useInfiniteScroll({
     root: scrollRoot,
@@ -121,7 +120,10 @@ export function ConversationSidebar({
           <Input
             type="search"
             value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              debouncedSearchUpdate(event.target.value);
+            }}
             placeholder="Search name, phone, or message"
             aria-label="Search conversations"
             className="h-9 pl-9"

@@ -3,7 +3,7 @@ export { loader } from "./exports.loader.server";
 import { data as routeData, LoaderFunctionArgs, useLoaderData, useRevalidator } from "react-router";
 
 import { Download, RefreshCw } from "lucide-react";
-import { useEffect } from "react";
+import { usePollingRevalidator } from "@/hooks/utils";
 
 import {
   Table,
@@ -63,17 +63,10 @@ export default function WorkspaceExports() {
   }));
 
   // Poll for updates if there are any in-progress exports
-  useEffect(() => {
-    const hasInProgressExports = exports.some(exp => 
-      exp.status === "processing" || exp.status === "started"
-    );
-
-    if (hasInProgressExports) {
-      const interval = setInterval(revalidate, 5000); // Poll every 5 seconds
-      return () => clearInterval(interval);
-    }
-    return undefined;
-  }, [exports, revalidate]);
+  const hasInProgressExports = exports.some(exp =>
+    exp.status === "processing" || exp.status === "started"
+  );
+  usePollingRevalidator(hasInProgressExports, 5000);
 
   const getProgressDisplay = (exportItem: ExportItem) => {
     if (exportItem.status === "completed") {

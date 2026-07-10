@@ -1,28 +1,30 @@
 import { getSession } from "@/lib/auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
+import { isSignupOpen } from "@/lib/env.server";
 import { registerBodySchema } from "@/lib/schemas/api/platform-auth";
 import { registerUser } from "@/lib/platform-auth.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { data as routeData, redirect } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-  const { headers, user } = await getSession(request);
-
-  if (user) {
-    return redirect("/workspaces", { headers });
-  }
-  return routeData({ user }, { headers });
-};
 
 type ActionData = {
   error?: string;
-  success?: boolean;
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  if (!isSignupOpen()) {
+    const contentType = request.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      return jsonError("Registration is closed.", 403);
+    }
+    const { headers } = await getSession(request);
+    return routeData<ActionData>(
+      { error: "Registration is closed." },
+      { headers, status: 403 },
+    );
+  }
+
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json")) {
@@ -36,20 +38,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse(result.data, 201);
   }
 
-  const { headers } = await getSession(request);
+  const { headers: sessionHeaders } = await getSession(request);
   const formData = await request.formData();
   const email = formData.get("email");
   const password = formData.get("password");
   const firstName = formData.get("firstName");
   const lastName = formData.get("lastName");
 
-  if (
-    typeof email !== "string" ||
-    typeof password !== "string"
-  ) {
+  if (typeof email !== "string" || typeof password !== "string") {
     return routeData<ActionData>(
       { error: "Email and password are required." },
-      { headers, status: 400 },
+      { headers: sessionHeaders, status: 400 },
     );
   }
 
@@ -63,9 +62,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!result.ok) {
     return routeData<ActionData>(
       { error: result.error },
-      { headers, status: result.status },
+      { headers: sessionHeaders, status: result.status },
     );
   }
 
-  return routeData<ActionData>({ success: true }, { headers });
+  const headers = mergeBetterAuthSetCookieHeaders(result.headers, sessionHeaders);
+  return redirect("/workspaces", { headers });
 };

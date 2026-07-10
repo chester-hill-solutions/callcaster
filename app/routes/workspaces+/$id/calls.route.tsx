@@ -2,7 +2,6 @@ export { loader } from "./calls.loader.server";
 export { action } from "./calls.action.server";
 
 import { Link, useFetcher, useLoaderData } from "react-router";
-import { useEffect, useState } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { CallLogTable } from "@/components/calls/CallLogTable";
@@ -25,35 +24,21 @@ export default function WorkspaceCallLogPage() {
     listening,
   } = useLoaderData<CallLogLoaderData>();
   const pickupFetcher = useFetcher<CallLogActionData>();
-  const [isListening, setIsListening] = useState(listening.active);
-  const [listenToken, setListenToken] = useState<string | null>(listening.token);
-  const [listenTokenError, setListenTokenError] = useState<string | null>(
-    listening.tokenError,
-  );
-
-  useEffect(() => {
-    setIsListening(listening.active);
-    setListenToken(listening.token);
-    setListenTokenError(listening.tokenError);
-  }, [listening.active, listening.token, listening.tokenError]);
+  const live =
+    pickupFetcher.data?.listening === true ||
+    pickupFetcher.data?.listening === false
+      ? pickupFetcher.data
+      : null;
+  const isListening = live ? live.listening === true : listening.active;
+  const listenToken = live ? (live.token ?? null) : listening.token;
+  const listenTokenError = live
+    ? (live.tokenError ?? null)
+    : listening.tokenError;
 
   useActionFeedback(pickupFetcher.data, {
     getError: (data) =>
       data?.error ??
       (data?.listening === true && data?.tokenError ? data.tokenError : undefined),
-    onSuccess: (data) => {
-      if (data.listening === true) {
-        setIsListening(true);
-        setListenToken(data.token ?? null);
-        setListenTokenError(data.tokenError ?? null);
-        return;
-      }
-      if (data.listening === false) {
-        setIsListening(false);
-        setListenToken(null);
-        setListenTokenError(null);
-      }
-    },
     getSuccess: (data) =>
       data?.listening === true || data?.listening === false,
     successMessage: (data) => {

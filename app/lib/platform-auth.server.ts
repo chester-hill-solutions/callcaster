@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger.server";
+import { isSignupOpen } from "@/lib/env.server";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { isTwoFactorRedirectResponse } from "@/lib/two-factor.server";
@@ -139,6 +140,10 @@ export async function registerUser(
   | { ok: true; data: AuthTokensResponse | { user: AuthTokensResponse["user"]; message: string }; headers?: Headers }
   | { ok: false; error: string; status: number }
 > {
+  if (!isSignupOpen()) {
+    return { ok: false, error: "Registration is closed.", status: 403 };
+  }
+
   const displayName = [body.first_name, body.last_name].filter(Boolean).join(" ").trim();
 
   try {

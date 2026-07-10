@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { parse } from "csv-parse/sync";
 import { MdAdd, MdClose, MdCheck } from "react-icons/md";
@@ -11,6 +11,7 @@ import { Contact } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import type { Database } from "@/lib/db-types";
 import { useInterval } from "@/hooks/utils/useInterval";
+import { useTimeoutFn } from "@/hooks/utils/useTimeoutFn";
 
 export const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
 
@@ -90,6 +91,20 @@ export default function AudienceUploader({
   const [currentUploadId, setCurrentUploadId] = useState<number | null>(null);
   const [pollFailureCount, setPollFailureCount] = useState(0);
 
+  const scheduleRedirect = useTimeoutFn();
+
+  const registerPollFailure = () => {
+    setUploadWarning("Live progress is delayed. Retrying automatically...");
+    setPollFailureCount((count) => {
+      const next = count + 1;
+      if (next >= 5) {
+        setUploadError("We could not refresh upload progress right now. You can stay on this page or try again in a moment.");
+        setStatusPollingEnabled(false);
+      }
+      return next;
+    });
+  };
+
   const applyUploadState = (nextState: {
     status?: string | null;
     total_contacts?: number | null;
@@ -123,6 +138,15 @@ export default function AudienceUploader({
       setStatusPollingEnabled(false);
       if (onUploadComplete && nextState.audience_id) {
         onUploadComplete(String(nextState.audience_id));
+      } else if (!onUploadComplete) {
+        const completedAudienceId =
+          nextState.audience_id != null ? String(nextState.audience_id) : audienceId;
+        if (completedAudienceId) {
+          // Wait a moment to show the completion state before redirecting
+          scheduleRedirect(2000, () => {
+            navigate(`/workspaces/${workspaceId}/audiences/${completedAudienceId}`);
+          });
+        }
       }
     }
 
@@ -163,8 +187,7 @@ export default function AudienceUploader({
         const data = await response.json();
 
         if (data.error) {
-          setPollFailureCount((count) => count + 1);
-          setUploadWarning("Live progress is delayed. Retrying automatically...");
+          registerPollFailure();
           return;
         }
 
@@ -173,21 +196,11 @@ export default function AudienceUploader({
         applyUploadState(data);
       } catch (error) {
         logger.error("Error polling status:", error);
-        setPollFailureCount((count) => count + 1);
-        setUploadWarning("Live progress is delayed. Retrying automatically...");
+        registerPollFailure();
       }
     },
     statusPollingEnabled ? 2000 : null // Poll every 2 seconds when enabled
   );
-
-  useEffect(() => {
-    if (pollFailureCount < 5) {
-      return;
-    }
-
-    setUploadError("We could not refresh upload progress right now. You can stay on this page or try again in a moment.");
-    setStatusPollingEnabled(false);
-  }, [pollFailureCount]);
 
   const displayFileToUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -306,18 +319,6 @@ export default function AudienceUploader({
       setUploadStatus("error");
     }
   };
-
-  // Redirect to audience page when upload is complete
-  useEffect(() => {
-    if (uploadStatus === "completed" && audienceId && !onUploadComplete) {
-      // Wait a moment to show the completion state
-      const timer = setTimeout(() => {
-        navigate(`/workspaces/${workspaceId}/audiences/${audienceId}`);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [uploadStatus, audienceId, workspaceId, navigate, onUploadComplete]);
 
   return (
     <div className="space-y-6">

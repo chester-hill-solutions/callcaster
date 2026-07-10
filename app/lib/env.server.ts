@@ -174,3 +174,9 @@ export { validateRequiredEnv, REQUIRED_ENV_KEYS };
 export function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
+
+/** Self-service signup is opt-in via SIGNUP_OPEN=true|1 (non-prod deployments). */
+export function isSignupOpen(): boolean {
+  const v = process.env.SIGNUP_OPEN;
+  return v === "true" || v === "1";
+}

@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { GrSubtractCircle } from "react-icons/gr";
+import { useClickOutside } from "@/hooks/utils";
 import { iconMapping } from "./Result.IconMap";
 
 interface Block {
@@ -47,11 +48,7 @@ export default function QuestionBlockOption({
     const buttonRef = useRef<HTMLButtonElement>(null);
     const iconContainerRef = useRef<HTMLDivElement>(null);
 
-    const handleClickOutside = (event: MouseEvent) => {
-        if (iconContainerRef.current && !iconContainerRef.current.contains(event.target as Node)) {
-            setShowIcons(false);
-        }
-    };
+    useClickOutside(iconContainerRef, () => setShowIcons(false));
 
     const handleIconClick = (iconName: string) => {
         handleIconChange({ index, iconName });
@@ -59,13 +56,6 @@ export default function QuestionBlockOption({
     };
 
     const IconComponent = option.Icon ? iconMapping[option.Icon] || null : null;
-
-    useEffect(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
 
     const handleNextStepChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.currentTarget.value;

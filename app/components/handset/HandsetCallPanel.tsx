@@ -1,5 +1,5 @@
 import { Link, useLoaderData, useNavigate, useFetcher } from "react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { BrandedCard as Card } from "@/components/shared/BrandedCard";
@@ -7,6 +7,7 @@ import { SoftphonePanel } from "@/components/calls/SoftphonePanel";
 import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { useSoftphoneController } from "@/hooks/call/useSoftphoneController";
 import { useSoftphoneAudioDevices } from "@/hooks/call/useSoftphoneAudioDevices";
+import { useEndSessionOnUnmount } from "@/hooks/handset/useEndSessionOnUnmount";
 
 export default function HandsetCallPanel() {
   const { handsetNumber, clientIdentity, workspaceId, token, tokenError } =
@@ -25,11 +26,7 @@ export default function HandsetCallPanel() {
     );
   }, [fetcher, workspaceId]);
 
-  useEffect(() => {
-    return () => {
-      endSession();
-    };
-  }, [endSession]);
+  useEndSessionOnUnmount(endSession);
 
   if (!handsetNumber) {
     return (

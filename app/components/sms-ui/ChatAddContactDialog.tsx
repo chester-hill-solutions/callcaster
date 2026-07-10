@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ContactForm } from "@/components/contact/ContactForm";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Contact } from "@/lib/types";
 
 const getDisplayName = (contact: Partial<Contact>) => {
@@ -39,9 +39,17 @@ const ChatAddContactDialog = ({
     existingContact || { phone: contact_number },
   );
 
-  useEffect(() => {
+  const [prevContactSource, setPrevContactSource] = useState({
+    existingContact,
+    contact_number,
+  });
+  if (
+    prevContactSource.existingContact !== existingContact ||
+    prevContactSource.contact_number !== contact_number
+  ) {
+    setPrevContactSource({ existingContact, contact_number });
     setContact(existingContact || { phone: contact_number });
-  }, [existingContact, contact_number]);
+  }
 
   const handleUpdateContact = (e: React.ChangeEvent<HTMLInputElement>) => {
     setContact((curr) => ({

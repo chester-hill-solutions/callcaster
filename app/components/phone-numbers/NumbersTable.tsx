@@ -1,6 +1,6 @@
 import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
 import { Form, Link } from "react-router";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -62,10 +62,11 @@ export const NumbersTable = ({
 }) => {
   const [numbers, setNumbers] = useState(phoneNumbers);
 
-  useEffect(() => {
-
+  const [prevPhoneNumbers, setPrevPhoneNumbers] = useState(phoneNumbers);
+  if (prevPhoneNumbers !== phoneNumbers) {
+    setPrevPhoneNumbers(phoneNumbers);
     setNumbers(phoneNumbers);
-  }, [phoneNumbers]);
+  }
 
   const updateNumber = useCallback(
     (id: number, updates: Partial<WorkspaceNumbers>) => {
