@@ -21,7 +21,25 @@ const messagingMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/chats/messaging-client", () => messagingMocks);
 
-const imageFetcher = createMockFetcher({ state: "idle", data: { success: true, url: "https://img" } });
+vi.mock("@/hooks/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/utils")>();
+  const { useEffect } = await import("react");
+  return {
+    ...actual,
+    useFetcherOnIdle: (
+      fetcher: { state: string; data?: unknown },
+      onIdle: (data: unknown) => void,
+    ) => {
+      useEffect(() => {
+        if (fetcher.state === "idle") {
+          onIdle(fetcher.data);
+        }
+      }, [fetcher.state, fetcher.data]);
+    },
+  };
+});
+
+const imageFetcher = createMockFetcher({ state: "idle", data: undefined });
 const olderFetcher = createMockFetcher({ state: "idle" });
 
 vi.mock("react-router", async () => {
@@ -56,13 +74,18 @@ describe("chats hooks", () => {
 
   test("useImageHandling uploads and removes images", async () => {
     const { useImageHandling } = await import("@/hooks/chats/useImageHandling");
-    const { result } = renderHook(() => useImageHandling("ws"));
+    const { result, rerender } = renderHook(() => useImageHandling("ws"));
 
     const file = new File(["x"], "a.png", { type: "image/png" });
     act(() => {
       result.current.handleImageSelect({
         target: { files: [file] },
       } as React.ChangeEvent<HTMLInputElement>);
+    });
+    act(() => {
+      imageFetcher.state = "idle";
+      imageFetcher.data = { success: true, url: "https://img" };
+      rerender();
     });
     expect(result.current.selectedImages).toContain("https://img");
 

@@ -4,10 +4,9 @@ import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
 
   const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
-  const url = new URL(request.url);
   const search = new URLSearchParams(url.search);
   const ref = search.get("ref") || null;
   if (workspaceId == null) {

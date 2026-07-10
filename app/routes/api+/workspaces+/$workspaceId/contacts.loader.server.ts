@@ -6,14 +6,12 @@ import {
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
   getDataPlaneRouteContext(context, workspaceId);
-
-  const url = new URL(request.url);
   const phone = url.searchParams.get("phone");
   if (phone) {
     try {

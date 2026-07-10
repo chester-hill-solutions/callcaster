@@ -1,10 +1,10 @@
 import { data as routeData } from "react-router";
 import { updateAdminUser } from "@/lib/platform-admin.server";
-import { requireSudoAdmin } from "../../requireSudoAdmin.server";
+import { getAdminRouteContext } from "@/lib/admin-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-  await requireSudoAdmin(request);
+export const action = async ({ request, context, params }: ActionFunctionArgs) => {
+  getAdminRouteContext(context);
   const userId = params.userId;
 
   if (!userId) {

@@ -3,7 +3,7 @@ import { data as routeData, redirect } from "react-router";
 import { getAdminWorkspaceDetail } from "@/lib/platform-admin.server";
 import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { requireSudoAdmin } from "../requireSudoAdmin.server";
+import { getAdminRouteContext } from "@/lib/admin-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 interface TwilioPhoneNumber {
@@ -41,8 +41,8 @@ interface TwilioUsageRecord {
   endDate?: Date;
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { userData } = await requireSudoAdmin(request);
+export const loader = async ({ context, params }: LoaderFunctionArgs) => {
+  const { userData } = getAdminRouteContext(context);
   const workspaceId = params.workspaceId;
 
   if (!workspaceId) {

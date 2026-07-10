@@ -13,11 +13,10 @@ function getSafeRedirectPath(next: string | null): string {
   return next.startsWith("//") ? "/" : next;
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const requestUrl = new URL(request.url);
-  const token_hash = requestUrl.searchParams.get("token_hash");
-  const type = requestUrl.searchParams.get("type");
-  const next = getSafeRedirectPath(requestUrl.searchParams.get("next"));
+export async function loader({ request, url}: LoaderFunctionArgs) {
+  const token_hash = url.searchParams.get("token_hash");
+  const type = url.searchParams.get("type");
+  const next = getSafeRedirectPath(url.searchParams.get("next"));
 
   if (token_hash && type) {
     try {

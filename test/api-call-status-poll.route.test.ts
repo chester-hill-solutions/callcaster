@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
@@ -89,7 +89,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: null,
     });
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({ request: new Request("http://localhost/api/call-status-poll") } as any));
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({ request: new Request("http://localhost/api/call-status-poll") } as any)));
     expect(res.status).toBe(401);
   }, 30000);
 
@@ -101,7 +101,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({ request: new Request("http://localhost/api/call-status-poll?callSid=CA") } as any));
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({ request: new Request("http://localhost/api/call-status-poll?callSid=CA") } as any)));
     expect(res.status).toBe(400);
   }, 30000);
 
@@ -116,9 +116,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     setCallRow(null);
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(404);
     expect(mocks.logger.debug).toHaveBeenCalled();
   }, 30000);
@@ -135,9 +135,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
     const mod = await import("../app/routes/api+/call-status-poll");
 
-    const resMismatch = await asRouteResponse(await mod.loader({
+    const resMismatch = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(resMismatch.status).toBe(403);
 
     queueJsonAuthSession({
@@ -150,9 +150,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND),
     );
     setCallRow({ workspace: "w1", status: null });
-    const resNoMembership = await asRouteResponse(await mod.loader({
+    const resNoMembership = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(resNoMembership.status).toBe(404);
   }, 30000);
 
@@ -171,9 +171,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce(null);
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: undefined, error: "Unsupported status" });
   }, 30000);
@@ -193,9 +193,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: "completed" });
     expect(telephonyDbMocks.updateCallBySid).not.toHaveBeenCalled();
@@ -218,9 +218,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
   }, 30000);
@@ -245,9 +245,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: "completed" });
     expect(telephonyDbMocks.updateCallBySid).toHaveBeenCalled();
@@ -269,9 +269,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   }, 30000);
@@ -292,9 +292,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalled();
   }, 30000);
@@ -310,9 +310,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/call-status-poll");
-    const r1 = await asRouteResponse(await mod.loader({
+    const r1 = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     expect(r1.status).toBe(500);
     await expect(r1.json()).resolves.toEqual({
       error: "Failed to fetch call status",
@@ -326,9 +326,9 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: { id: "u1" },
     });
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce(new Error("boom"));
-    const r2 = await asRouteResponse(await mod.loader({
+    const r2 = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
-    } as any));
+    } as any)));
     await expect(r2.json()).resolves.toEqual({
       error: "boom",
       code: "INTERNAL_SERVER_ERROR",

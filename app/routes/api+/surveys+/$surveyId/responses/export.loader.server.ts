@@ -6,7 +6,7 @@ import { exportSurveyResponsesApi } from "@/lib/platform-analytics.server";
 import { jsonError } from "@/lib/platform-api.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, url}: LoaderFunctionArgs) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
@@ -14,8 +14,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!surveyId) {
     return jsonError("surveyId is required", 400);
   }
-
-  const url = new URL(request.url);
   const workspaceId = url.searchParams.get("workspace_id")?.trim();
   if (!workspaceId) {
     return jsonError("workspace_id query parameter is required", 400);

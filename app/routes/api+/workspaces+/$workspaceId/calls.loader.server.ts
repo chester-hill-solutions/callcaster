@@ -5,7 +5,7 @@ import { getWorkspaceCallLogApi } from "@/lib/platform-telephony.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, url}: LoaderFunctionArgs) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
@@ -15,9 +15,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    const result = await getWorkspaceCallLogApi(      auth.user.id,
+    const result = await getWorkspaceCallLogApi(
+      auth.user.id,
       workspaceId,
-      request.url,
+      url.href,
     );
 
     const { ok: _ok, ...payload } = result;

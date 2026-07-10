@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueDualAuthSession, queueJsonAuthSession, setDualAuthSession, setJsonAuthSession } from "./helpers/route-auth-mock";
 
 const listMock = vi.fn();
@@ -169,9 +169,9 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   test("loader returns 400 when search query is missing", async () => {
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(
-      await mod.loader({
+      await mod.loader(withRouteUrl({
         request: new Request("http://localhost/api/numbers?searchMode=areaCode"),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -195,11 +195,11 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("token");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(
-      await mod.loader({
+      await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=416",
         ),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -228,11 +228,11 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     });
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(
-      await mod.loader({
+      await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=613&workspace_id=w1",
         ),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(200);
     expect(mocks.requireWorkspaceAccess).toHaveBeenCalled();
@@ -247,11 +247,11 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     listMock.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(
-      await mod.loader({
+      await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=416",
         ),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
@@ -276,12 +276,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
@@ -302,12 +302,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(402);
     await expect(res.json()).resolves.toEqual({ creditsError: true });
@@ -326,12 +326,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
@@ -353,12 +353,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1666");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000002");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({ newNumber: { id: 10 } });
@@ -377,12 +377,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000003");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
@@ -403,12 +403,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1777");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -430,12 +430,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1888");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
   });
@@ -452,12 +452,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -479,12 +479,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
   });
@@ -501,12 +501,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
   });

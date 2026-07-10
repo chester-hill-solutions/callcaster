@@ -10,7 +10,7 @@ import {
 
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url}: LoaderFunctionArgs) => {
 
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
@@ -20,7 +20,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   
   try {
-    const url = new URL(request.url);
     const exportId = url.searchParams.get("exportId");
     const workspaceId = url.searchParams.get("workspaceId");
     

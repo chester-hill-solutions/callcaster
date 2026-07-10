@@ -9,7 +9,7 @@ import {
 import { campaignStatusBodySchema } from "@/lib/schemas/api/platform-data";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, url}: LoaderFunctionArgs) {
   const campaignId = params.campaignId;
   if (!campaignId) {
     return jsonError("campaignId is required", 400);
@@ -29,7 +29,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return jsonResponse({ campaign: result.campaign }, 200);
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, url}: ActionFunctionArgs) {
   const campaignId = params.campaignId;
   if (!campaignId) {
     return jsonError("campaignId is required", 400);
@@ -37,8 +37,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const auth = await authForCampaign(request, campaignId);
   if (auth instanceof Response) return auth;
-
-  const url = new URL(request.url);
   const operation = url.searchParams.get("operation");
 
   if (request.method === "POST" && operation === "duplicate") {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import {
   queueDualAuthSession,
   setDualAuthSession,
@@ -73,9 +73,9 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 400 when exportId/workspaceId missing", async () => {
     const mod = await import("../app/routes/api+/campaign-export-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/campaign-export-status?exportId=e1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(400);
   });
 
@@ -83,11 +83,11 @@ describe("api.campaign-export-status error handling", () => {
     downloadBehavior = "not_found";
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(404);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
   });
@@ -95,11 +95,11 @@ describe("api.campaign-export-status error handling", () => {
   test("returns 401 when user is missing", async () => {
     queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/campaign-export-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(401);
   });
 
@@ -107,11 +107,11 @@ describe("api.campaign-export-status error handling", () => {
     statusJsonText = JSON.stringify({ status: "done", url: "x" });
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: "done", url: "x" });
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
@@ -121,22 +121,22 @@ describe("api.campaign-export-status error handling", () => {
     downloadThrows = new Error("storage down");
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "storage down" });
 
     downloadThrows = null;
     statusJsonText = "{";
     applyDualAuth();
-    const res2 = await asRouteResponse(await mod.loader({
+    const res2 = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res2.status).toBe(500);
     await expect(res2.json()).resolves.toMatchObject({ error: expect.any(String) });
   });
@@ -145,11 +145,11 @@ describe("api.campaign-export-status error handling", () => {
     downloadBehavior = "other_error";
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Storage exploded" });
   });
@@ -158,11 +158,11 @@ describe("api.campaign-export-status error handling", () => {
     downloadThrows = "nope";
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });
@@ -178,11 +178,11 @@ describe("api.campaign-export-status error handling", () => {
       });
       applyDualAuth();
       const mod = await import("../app/routes/api+/campaign-export-status");
-      const res = await asRouteResponse(await mod.loader({
+      const res = await asRouteResponse(await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
         ),
-      } as any));
+      } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.status).toBe("error");
@@ -200,11 +200,11 @@ describe("api.campaign-export-status error handling", () => {
       });
       applyDualAuth();
       const mod = await import("../app/routes/api+/campaign-export-status");
-      const res = await asRouteResponse(await mod.loader({
+      const res = await asRouteResponse(await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
         ),
-      } as any));
+      } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.status).toBe("processing");
@@ -220,11 +220,11 @@ describe("api.campaign-export-status error handling", () => {
       });
       applyDualAuth();
       const mod = await import("../app/routes/api+/campaign-export-status");
-      const res = await asRouteResponse(await mod.loader({
+      const res = await asRouteResponse(await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
         ),
-      } as any));
+      } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.status).toBe("completed");

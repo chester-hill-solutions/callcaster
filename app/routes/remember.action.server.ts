@@ -2,7 +2,7 @@ import { auth } from "@/server/auth-instance";
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request, url}: ActionFunctionArgs) => {
   const formData = await request.formData();
   const email = formData.get("email");
   if (typeof email !== "string" || !email) {
@@ -10,7 +10,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   try {
     await auth.api.requestPasswordReset({
-      body: { email, redirectTo: `${new URL(request.url).origin}/api/auth/callback` },
+      body: { email, redirectTo: `${url.origin}/api/auth/callback` },
       headers: request.headers,
     });
     return routeData({ data: { success: true }, error: null });

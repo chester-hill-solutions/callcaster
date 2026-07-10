@@ -44,4 +44,4 @@ export async function searchContactsLoader(request: Request) {
   }
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => searchContactsLoader(request);
+export const loader = async ({ request, url}: LoaderFunctionArgs) => searchContactsLoader(request);

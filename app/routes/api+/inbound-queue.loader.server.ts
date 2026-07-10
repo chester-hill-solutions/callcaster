@@ -5,9 +5,9 @@ import { loadInboundQueueSettings } from "@/lib/inbound-queue-db.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, url }: LoaderFunctionArgs) => {
   const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;  const url = new URL(request.url);
+  if (auth instanceof Response) return auth;
   const workspaceId = url.searchParams.get("workspace_id") || params.id;
   if (!workspaceId) {
     return jsonError("workspace_id required", 400);

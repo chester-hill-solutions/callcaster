@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
   requestPasswordReset: vi.fn(),
@@ -18,12 +18,12 @@ describe("app/routes/remember.action.server.ts", () => {
   test("requires email", async () => {
     const mod = await import("../app/routes/remember");
     const response = await asRouteResponse(
-      await mod.action({
+      await mod.action(withRouteUrl({
         request: new Request("http://localhost/remember", {
           method: "POST",
           body: new FormData(),
         }),
-      } as any),
+      } as any)),
     );
 
     expect(response.status).toBe(200);
@@ -41,12 +41,12 @@ describe("app/routes/remember.action.server.ts", () => {
 
     const mod = await import("../app/routes/remember");
     const response = await asRouteResponse(
-      await mod.action({
+      await mod.action(withRouteUrl({
         request: new Request("http://localhost/remember", {
           method: "POST",
           body: form,
         }),
-      } as any),
+      } as any)),
     );
 
     expect(response.status).toBe(200);
@@ -71,12 +71,12 @@ describe("app/routes/remember.action.server.ts", () => {
 
     const mod = await import("../app/routes/remember");
     const response = await asRouteResponse(
-      await mod.action({
+      await mod.action(withRouteUrl({
         request: new Request("http://localhost/remember", {
           method: "POST",
           body: form,
         }),
-      } as any),
+      } as any)),
     );
 
     expect(response.status).toBe(200);

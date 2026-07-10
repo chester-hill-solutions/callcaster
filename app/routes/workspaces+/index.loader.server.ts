@@ -1,6 +1,8 @@
 import { listUserWorkspaces } from "@/lib/platform-workspace.server";
-import { data as routeData, redirect } from "react-router";
-import { getSession } from "@/lib/auth.server";
+import { data as routeData } from "react-router";
+import {
+  createAuthLayoutLoader,
+} from "@/lib/auth-layout.server";
 import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -21,19 +23,27 @@ interface LoaderData {
   error: string | null;
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { user, headers } = await getSession(request);
-  if (!user) {
-    const url = new URL(request.url);
-    throw redirect(
-      `/signin?next=${encodeURIComponent(`${url.pathname}${url.search}`)}`,
-    );
+const authLayoutLoader = createAuthLayoutLoader({
+  onAuthenticated: async ({ user, request }) => {
+    await requireTwoFactorEnrollmentForPrivilegedUser({
+      userId: user.id,
+      request,
+    });
+    return null;
+  },
+});
+
+export const loader = async (args: LoaderFunctionArgs) => {
+  const layout = await authLayoutLoader(args);
+  if (layout instanceof Response) {
+    return layout;
   }
 
-  await requireTwoFactorEnrollmentForPrivilegedUser({
-    userId: user.id,
-    request,
-  });
+  const { user, userId } = layout.data;
+  const headers =
+    layout.init?.headers instanceof Headers
+      ? layout.init.headers
+      : new Headers();
 
   const result = await listUserWorkspaces(user.id);
 
@@ -41,7 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return routeData(
       {
         workspaces: null,
-        userId: user.id,
+        userId,
         error: result.error,
       } satisfies LoaderData,
       { headers },
@@ -51,7 +61,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return routeData(
     {
       workspaces: result.workspaces as WorkspaceUser[],
-      userId: user.id,
+      userId,
       error: null,
     } satisfies LoaderData,
     { headers },

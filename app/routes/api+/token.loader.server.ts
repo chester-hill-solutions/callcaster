@@ -7,11 +7,9 @@ import { logger } from "@/lib/logger.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url}: LoaderFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-
-  const url = new URL(request.url);
   const workspace = url.searchParams.get("workspace") ?? "";
 
   if (!workspace) {

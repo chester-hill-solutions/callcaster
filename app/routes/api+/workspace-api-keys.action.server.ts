@@ -21,11 +21,9 @@ const legacyDeleteApiKeySchema = deleteApiKeyBodySchema.extend({
   workspace_id: z.string().uuid(),
 });
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url}: LoaderFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
-
-  const url = new URL(request.url);
   const workspaceId = url.searchParams.get("workspace_id");
   if (!workspaceId) {
     return jsonError("workspace_id is required", 400);
@@ -42,7 +40,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return jsonResponse({ keys: result.keys }, 200);
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request, url}: ActionFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
   if (request.method === "POST") {

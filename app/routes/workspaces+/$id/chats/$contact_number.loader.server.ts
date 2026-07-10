@@ -13,10 +13,9 @@ import type { LoaderFunctionArgs } from "react-router";
 import type { Message } from "@/lib/types";
 import { fetchMessagePage } from "./$contact_number.messages.server";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
   const { id, contact_number } = params;
   const { headers, user, workspaceId } = getWorkspaceRouteContext(context);
-  const url = new URL(request.url);
   const before = url.searchParams.get("before");
   let messages: Message[] = [];
   let hasMore = false;

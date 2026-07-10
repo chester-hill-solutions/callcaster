@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { createRouteContextProvider, withAdminRouteArgs } from "./helpers/route-context-mock";
 
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
@@ -244,21 +245,18 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     vi.useRealTimers();
   });
 
-  test("action redirects non-sudo users", async () => {
-    currentAccessLevel = "admin";
-    mocks.verifyAuth.mockResolvedValueOnce({
-      user: { id: "u1" },
-    });
-
+  test("action throws when admin context is missing", async () => {
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();
     formData.set("_action", "update_twilio_portal");
+    const context = await createRouteContextProvider({});
     await expect(
       mod.action({
         request: new Request("http://x", { method: "POST", body: formData }),
         params: { workspaceId: "w1" },
+        context,
       } as any),
-    ).rejects.toMatchObject({ status: 302 });
+    ).rejects.toThrow("Admin context missing");
   });
 
   test("action updates Twilio portal settings", async () => {
@@ -282,10 +280,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     formData.set("voiceConcurrentCallLimit", "75");
     formData.set("parallelDispatchEnabled", "on");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
 
     expect(res.status).toBe(200);
     expect(mocks.updateWorkspaceTwilioPortalConfig).toHaveBeenCalledWith(
@@ -326,10 +331,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const formData = new FormData();
     formData.set("_action", "sync_twilio_workspace");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
 
     expect(res.status).toBe(200);
     expect(mocks.syncWorkspaceTwilioSnapshot).toHaveBeenCalledWith({
@@ -355,10 +367,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const formData = new FormData();
     formData.set("_action", "bootstrap_workspace_messaging");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
 
     expect(res.status).toBe(200);
     expect(mocks.ensureWorkspaceTwilioBootstrap).toHaveBeenCalledWith({
@@ -377,10 +396,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const provisionData = new FormData();
     provisionData.set("_action", "provision_workspace_a2p");
-    const provisionRes = await asRouteResponse(await mod.action({
+    const provisionRes = await asRouteResponse(await mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: provisionData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
     expect(provisionRes.status).toBe(200);
     expect(mocks.provisionWorkspaceA2P).toHaveBeenCalledWith({
       workspaceId: "w1",
@@ -409,10 +435,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     rcsData.set("rcsRegions", "US, CA");
     rcsData.set("rcsNotes", "beta");
     rcsData.set("rcsStatus", "in_review");
-    const rcsRes = await asRouteResponse(await mod.action({
+    const rcsRes = await asRouteResponse(await mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: rcsData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
     expect(rcsRes.status).toBe(200);
     expect(mocks.updateWorkspaceRcsOnboarding).toHaveBeenCalledWith({
       workspaceId: "w1",

@@ -5,15 +5,13 @@ import {
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   const audienceId = params.audienceId;
   if (!workspaceId || !audienceId) {
     return jsonError("workspaceId and audienceId are required", 400);
   }
   getDataPlaneRouteContext(context, workspaceId);
-
-  const url = new URL(request.url);
   const result = await getAudienceDetailApi(
     workspaceId,
     audienceId,

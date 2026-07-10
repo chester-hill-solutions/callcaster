@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import {
   queueDualAuthSession,
   setDualAuthSession,
@@ -138,27 +138,27 @@ describe("api.audience-upload-status loader", () => {
   test("returns 401 when no user", async () => {
     queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api.audience-upload-status"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(401);
   });
 
   test("returns 400 when params missing", async () => {
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api.audience-upload-status"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(400);
   });
 
   test("returns 400 when uploadId invalid", async () => {
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=not-a-number&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(400);
   });
 
@@ -169,11 +169,11 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       file_name: "f.csv",
@@ -189,11 +189,11 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "db" });
   });
@@ -218,11 +218,11 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=2&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
@@ -247,11 +247,11 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       uploadId: 1,
@@ -267,11 +267,11 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       uploadId: 1,
@@ -305,11 +305,11 @@ describe("api.audience-upload-status loader", () => {
         user: { id: "u1" },
       });
       const mod = await import("../app/routes/api+/audience-upload-status");
-      const res = await asRouteResponse(await mod.loader({
+      const res = await asRouteResponse(await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
         ),
-      } as any));
+      } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.status).toBe("error");
@@ -342,11 +342,11 @@ describe("api.audience-upload-status loader", () => {
         user: { id: "u1" },
       });
       const mod = await import("../app/routes/api+/audience-upload-status");
-      const res = await asRouteResponse(await mod.loader({
+      const res = await asRouteResponse(await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
         ),
-      } as any));
+      } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.status).toBe("processing");
@@ -378,11 +378,11 @@ describe("api.audience-upload-status loader", () => {
         user: { id: "u1" },
       });
       const mod = await import("../app/routes/api+/audience-upload-status");
-      const res = await asRouteResponse(await mod.loader({
+      const res = await asRouteResponse(await mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
         ),
-      } as any));
+      } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.status).toBe("completed");

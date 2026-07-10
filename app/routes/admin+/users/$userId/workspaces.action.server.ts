@@ -6,7 +6,7 @@ import {
   updateUserWorkspaceRoleAdmin,
 } from "@/lib/platform-admin.server";
 import { MemberRole } from "@/lib/member-role";
-import { requireSudoAdmin } from "../../requireSudoAdmin.server";
+import { getAdminRouteContext } from "@/lib/admin-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
 type WorkspaceRole = "owner" | "member" | "caller" | "admin";
@@ -19,8 +19,8 @@ function parseWorkspaceRole(value: FormDataEntryValue | null): WorkspaceRole | n
   return null;
 }
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-  await requireSudoAdmin(request);
+export const action = async ({ request, context, params }: ActionFunctionArgs) => {
+  getAdminRouteContext(context);
   const userId = params.userId;
 
   if (!userId) {

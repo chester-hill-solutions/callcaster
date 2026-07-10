@@ -24,10 +24,9 @@ export function createAuthLayoutLoader(
 ) {
   const signInPath = options.signInPath ?? "/signin";
 
-  return async function authLayoutLoader({ request }: LoaderFunctionArgs) {
+  return async function authLayoutLoader({ request, url }: LoaderFunctionArgs) {
     const { user, headers } = await getSession(request);
     if (!user) {
-      const url = new URL(request.url);
       const next = `${url.pathname}${url.search}`;
       throw redirect(`${signInPath}?next=${encodeURIComponent(next)}`);
     }

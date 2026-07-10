@@ -9,7 +9,7 @@ import { AppError } from "@/lib/errors.server";
 import { downloadObject } from "@/lib/object-storage.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url}: LoaderFunctionArgs) => {
 
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
@@ -22,8 +22,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401, headers });
   }
-
-  const url = new URL(request.url);
   const uploadIdStr = url.searchParams.get("uploadId");
   const workspaceId = url.searchParams.get("workspaceId");
 

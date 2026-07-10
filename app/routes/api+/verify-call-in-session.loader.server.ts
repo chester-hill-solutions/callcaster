@@ -1,4 +1,5 @@
 import { data as routeData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { getSession } from "@/lib/auth.server";
 import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
@@ -7,7 +8,7 @@ import { insertVerificationSession } from "@/lib/verification-db.server";
 
 const SESSION_EXPIRY_MINUTES = 10;
 
-export const loader = async ({ request }: { request: Request }) => {
+export const loader = async ({ request, url }: LoaderFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
   const { headers } = await getSession(request);
@@ -17,8 +18,6 @@ export const loader = async ({ request }: { request: Request }) => {
   if (!verificationNumber) {
     return routeData({ error: "Call-in verification is not configured" }, { status: 503 });
   }
-
-  const url = new URL(request.url);
   const phoneNumberParam = url.searchParams.get("phoneNumber");
   if (!phoneNumberParam || !isValidPhoneNumber(phoneNumberParam)) {
     return routeData({ error: "Valid phone number is required" }, { status: 400 });

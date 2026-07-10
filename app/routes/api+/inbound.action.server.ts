@@ -73,9 +73,9 @@ function inboundUnavailableTwiml(): Response {
   });
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request, url }: ActionFunctionArgs) => {
   try {
-    return await handleInboundAction(request);
+    return await handleInboundAction(request, url);
   } catch (error) {
     logger.error("Unhandled error in api.inbound", {
       error: error instanceof Error ? error.message : String(error),
@@ -84,7 +84,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
-async function handleInboundAction(request: ActionFunctionArgs["request"]) {
+async function handleInboundAction(
+  request: ActionFunctionArgs["request"],
+  url: URL,
+) {
   const twiml = new Twilio.twiml.VoiceResponse();
   const formData = await request.clone().formData();
   const data = Object.fromEntries(
@@ -111,7 +114,7 @@ async function handleInboundAction(request: ActionFunctionArgs["request"]) {
     workspaceId,
     authTokenSource: "validated",
     hasSignature: Boolean(request.headers.get("x-twilio-signature")),
-    requestUrl: new URL(request.url).href,
+    url: url.href,
   });
 
   const dialTimeout = inboundRingCountToDialTimeoutSeconds(

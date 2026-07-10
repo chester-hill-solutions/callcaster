@@ -48,7 +48,7 @@ export type OnboardingLoaderData = {
   scripts: { id: number; name: string }[];
 };
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
   const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
   if (!workspaceId) {
     throw redirect("/workspaces", { headers });
@@ -105,9 +105,7 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
     })),
     recentOutboundCount,
   });
-
-  const requestUrl = new URL(request.url);
-  const stepParam = requestUrl.searchParams.get("step");
+  const stepParam = url.searchParams.get("step");
   const serverStep =
     hydratedOnboarding.currentStep === "use_case"
       ? "business_profile"
@@ -116,13 +114,13 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
         : "business_profile";
 
   if (stepParam && !isWizardOnboardingStepId(stepParam)) {
-    requestUrl.searchParams.set("step", serverStep);
-    throw redirect(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`, { headers });
+    url.searchParams.set("step", serverStep);
+    throw redirect(`${url.pathname}?${url.searchParams.toString()}`, { headers });
   }
 
   if (!stepParam && hydratedOnboarding.status !== "not_started") {
-    requestUrl.searchParams.set("step", serverStep);
-    throw redirect(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`, { headers });
+    url.searchParams.set("step", serverStep);
+    throw redirect(`${url.pathname}?${url.searchParams.toString()}`, { headers });
   }
 
   return routeData<OnboardingLoaderData>(

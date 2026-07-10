@@ -6,7 +6,7 @@ import {
 } from "@/lib/platform-data.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, url}: LoaderFunctionArgs) {
   const surveyId = params.surveyId;
   if (!surveyId) {
     return jsonError("surveyId is required", 400);
@@ -14,8 +14,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const auth = await authForSurvey(request, surveyId);
   if (auth instanceof Response) return auth;
-
-  const url = new URL(request.url);
   if (url.searchParams.get("export") === "csv") {
     const result = await exportSurveyResponsesCsv(
       surveyId,

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 
 const authApiMocks = vi.hoisted(() => ({
   verifyEmail: vi.fn(),
@@ -40,11 +40,11 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
       ),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/ok");
@@ -63,11 +63,11 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
 
     const { logger } = await import("@/lib/logger.server");
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
       ),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/auth/auth-code-error");
@@ -81,11 +81,11 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=https%3A%2F%2Fevil.example",
       ),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/");
@@ -99,14 +99,14 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     }));
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res1 = await asRouteResponse(await mod.loader({
+    const res1 = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/auth/callback?type=signup"),
-    } as any));
+    } as any)));
     expect(res1.headers.get("Location")).toBe("/auth/auth-code-error");
 
-    const res2 = await asRouteResponse(await mod.loader({
+    const res2 = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/auth/callback?token_hash=th"),
-    } as any));
+    } as any)));
     expect(res2.headers.get("Location")).toBe("/auth/auth-code-error");
   });
 });

@@ -2,11 +2,10 @@ import { redirect, type LoaderFunctionArgs } from "react-router";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const requestUrl = new URL(request.url);
-  const token_hash = requestUrl.searchParams.get("token_hash");
-  const type = requestUrl.searchParams.get("type");
-  const next = requestUrl.searchParams.get("next") || "/";
+export async function loader({ request, url}: LoaderFunctionArgs) {
+  const token_hash = url.searchParams.get("token_hash");
+  const type = url.searchParams.get("type");
+  const next = url.searchParams.get("next") || "/";
 
   if (token_hash && type) {
     try {

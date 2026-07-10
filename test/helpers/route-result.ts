@@ -1,3 +1,18 @@
+/** Build loader/action args with RR8 `url` param for route unit tests. */
+export function routeArgs(request: Request, params: Record<string, string> = {}) {
+  return { request, params, url: new URL(request.url) };
+}
+
+/** Ensure RR8 `url` is present when a test passes `{ request }` without it. */
+export function withRouteUrl<T extends { request: Request; url?: URL }>(
+  args: T,
+): T & { url: URL } {
+  if (args.url instanceof URL) {
+    return args as T & { url: URL };
+  }
+  return { ...args, url: new URL(args.request.url) };
+}
+
 /** Normalize RR7 loader/action return values in route unit tests. */
 function statusFromInit(init: number | { status?: number; headers?: Headers } | null | undefined): number {
   if (typeof init === "number") return init;

@@ -1,5 +1,6 @@
 import { RouterContextProvider } from "react-router";
 import type {
+  AdminContextValue,
   DataPlaneAuthContextValue,
   SessionContextValue,
   WorkspaceContextValue,
@@ -9,6 +10,7 @@ export type RouteContextMockOptions = {
   session?: SessionContextValue | null;
   workspace?: WorkspaceContextValue | null;
   dataPlane?: DataPlaneAuthContextValue | null;
+  admin?: AdminContextValue | null;
 };
 
 async function loadRouteContextModule() {
@@ -19,6 +21,7 @@ export async function createRouteContextProvider(
   options: RouteContextMockOptions = {},
 ): Promise<RouterContextProvider> {
   const {
+    adminContext,
     dataPlaneAuthContext,
     sessionContext,
     workspaceContext,
@@ -26,6 +29,9 @@ export async function createRouteContextProvider(
   const provider = new RouterContextProvider();
   if (options.session !== undefined) {
     provider.set(sessionContext, options.session);
+  }
+  if (options.admin !== undefined) {
+    provider.set(adminContext, options.admin);
   }
   if (options.workspace !== undefined) {
     provider.set(workspaceContext, options.workspace);
@@ -61,22 +67,70 @@ export function mockSessionContext(
 type RouteHandlerArgs = {
   context?: RouterContextProvider;
   params?: Record<string, string | undefined>;
+  request?: Request;
+  url?: URL;
 };
+
+function withRouteUrl<T extends RouteHandlerArgs>(
+  args: T,
+): T & { url: URL } {
+  if (args.url instanceof URL) {
+    return args as T & { url: URL };
+  }
+  if (args.request) {
+    return { ...args, url: new URL(args.request.url) };
+  }
+  return { ...args, url: new URL("http://localhost") };
+}
+
+export function mockAdminContext(
+  overrides: Partial<AdminContextValue> = {},
+): AdminContextValue {
+  return {
+    userId: "admin-1",
+    accessLevel: "sudo",
+    headers: new Headers(),
+    userData: {
+      id: "admin-1",
+      username: "ops@example.com",
+      first_name: "Admin",
+      access_level: "sudo",
+    } as AdminContextValue["userData"],
+    ...overrides,
+  };
+}
+
+/** Merge admin middleware context into loader/action test args. */
+export async function withAdminRouteArgs<T extends RouteHandlerArgs>(
+  args: T,
+  adminOverrides: Partial<AdminContextValue> = {},
+): Promise<T & { context: RouterContextProvider; url: URL }> {
+  const withUrl = withRouteUrl(args);
+  return {
+    ...withUrl,
+    context:
+      withUrl.context ??
+      (await createRouteContextProvider({
+        admin: mockAdminContext(adminOverrides),
+      })),
+  };
+}
 
 /** Merge workspace middleware context into loader/action test args. */
 export async function withWorkspaceRouteArgs<T extends RouteHandlerArgs>(
   args: T,
   workspaceOverrides: Partial<WorkspaceContextValue> = {},
-): Promise<T & { context: RouterContextProvider }> {
+): Promise<T & { context: RouterContextProvider; url: URL }> {
+  const withUrl = withRouteUrl(args);
   const workspaceId =
     workspaceOverrides.workspaceId ??
-    args.params?.id ??
-    args.params?.workspaceId ??
+    withUrl.params?.id ??
+    withUrl.params?.workspaceId ??
     "w1";
   return {
-    ...args,
+    ...withUrl,
     context:
-      args.context ??
+      withUrl.context ??
       (await createRouteContextProvider({
         workspace: mockWorkspaceContext({
           workspaceId,

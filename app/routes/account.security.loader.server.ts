@@ -7,9 +7,8 @@ import {
 } from "@/lib/two-factor.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url}: LoaderFunctionArgs) => {
   const { headers, user } = await verifyAuth(request);
-  const url = new URL(request.url);
   const enrollRequired = url.searchParams.get("enroll") === "1";
   const next = url.searchParams.get("next");
   const [privileged, enabled] = await Promise.all([
@@ -29,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request, url}: ActionFunctionArgs) => {
   const { headers, user } = await verifyAuth(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");

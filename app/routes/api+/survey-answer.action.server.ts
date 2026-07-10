@@ -114,7 +114,7 @@ async function handleSaveAnswer(request: Request) {
   });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, url}: ActionFunctionArgs) {
   if (request.method === "POST") {
     return handleSaveAnswer(request);
   }

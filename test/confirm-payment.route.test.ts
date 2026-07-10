@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 
 vi.mock("@/lib/env.server", () => {
   const handler = { get: (_target: unknown, prop: string) => () => `test-${prop}` };
@@ -44,8 +44,8 @@ describe("confirm-payment route", () => {
       "http://localhost/confirm-payment?session_id=sess_123",
     );
 
-    const first = await asRouteResponse(await mod.loader({ request } as any));
-    const second = await asRouteResponse(await mod.loader({ request } as any));
+    const first = await asRouteResponse(await mod.loader(withRouteUrl({ request } as any)));
+    const second = await asRouteResponse(await mod.loader(withRouteUrl({ request } as any)));
 
     expect(first.status).toBe(302);
     expect(second.status).toBe(302);
@@ -63,9 +63,9 @@ describe("confirm-payment route", () => {
     });
 
     const mod = await import("../app/routes/confirm-payment");
-    const response = await asRouteResponse(await mod.loader({
+    const response = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/confirm-payment?session_id=sess_123"),
-    } as any));
+    } as any)));
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe(
@@ -75,9 +75,9 @@ describe("confirm-payment route", () => {
 
   test("redirects to workspaces when no session_id", async () => {
     const mod = await import("../app/routes/confirm-payment");
-    const response = await asRouteResponse(await mod.loader({
+    const response = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/confirm-payment"),
-    } as any));
+    } as any)));
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("/workspaces");
@@ -91,9 +91,9 @@ describe("confirm-payment route", () => {
     });
 
     const mod = await import("../app/routes/confirm-payment");
-    const response = await asRouteResponse(await mod.loader({
+    const response = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/confirm-payment?session_id=sess_123"),
-    } as any));
+    } as any)));
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe(

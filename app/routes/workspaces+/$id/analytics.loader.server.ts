@@ -43,7 +43,7 @@ function emptyAnalytics(): WorkspaceAnalyticsResult {
   };
 }
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
   const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
 
   if (!workspaceId || !user) {
@@ -92,7 +92,7 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
       listWorkspaceMembersEnriched(workspaceId),
       loadWorkspaceAnalytics({
         workspaceId,
-        requestUrl: request.url,
+        requestUrl: url.href,
         currentUserId: user.id,
         canViewAllUsers,
       }),

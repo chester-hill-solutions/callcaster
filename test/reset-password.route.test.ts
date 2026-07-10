@@ -1,10 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
-
-function routeArgs(request: Request, params: Record<string, string> = {}) {
-  return { request, params, url: new URL(request.url) };
-}
+import { asRouteResponse, routeArgs } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
   resetPassword: vi.fn(),

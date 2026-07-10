@@ -16,8 +16,7 @@ function buildBillingRedirect(
   return redirect(`/workspaces/${workspaceId}/billing?${searchParams.toString()}`);
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const url = new URL(request.url);
+export async function loader({ request, url}: LoaderFunctionArgs) {
   const sessionId = url.searchParams.get("session_id");
 
   if (!sessionId) {

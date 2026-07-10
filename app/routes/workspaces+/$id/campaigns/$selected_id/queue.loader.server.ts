@@ -27,9 +27,8 @@ interface QueueResponse {
   filters: QueueSearchFilters;
 }
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
   const { selected_id, id: workspaceId } = params;
-  const url = new URL(request.url);
   const searchParams = url.searchParams;
 
   const page = Number(searchParams.get("page")) || 1;

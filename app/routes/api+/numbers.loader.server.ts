@@ -14,7 +14,7 @@ import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import type Twilio from "twilio";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url}: LoaderFunctionArgs) => {
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
   const user = getDualAuthUser(auth);
@@ -24,8 +24,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!user) {
     return jsonNumbersSearchResponse({ ok: false, error: "Unauthorized." }, 401);
   }
-
-  const url = new URL(request.url);
   const parsed = parseNumberSearchRequest(url.searchParams);
   if (!parsed.ok) {
     return jsonNumbersSearchResponse({ ok: false, error: parsed.error }, 400);

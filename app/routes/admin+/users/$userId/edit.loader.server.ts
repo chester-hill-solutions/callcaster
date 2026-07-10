@@ -1,10 +1,10 @@
 import { data as routeData, redirect } from "react-router";
 import { getAdminUser } from "@/lib/platform-admin.server";
-import { requireSudoAdmin } from "../../requireSudoAdmin.server";
+import { getAdminRouteContext } from "@/lib/admin-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { userData } = await requireSudoAdmin(request);
+export const loader = async ({ context, params }: LoaderFunctionArgs) => {
+  const { userData } = getAdminRouteContext(context);
   const userId = params.userId;
 
   if (!userId) {

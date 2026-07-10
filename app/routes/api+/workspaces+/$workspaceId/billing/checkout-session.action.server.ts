@@ -7,7 +7,7 @@ import { withIdempotency } from "@/lib/platform-idempotency.server";
 import { checkoutSessionBodySchema } from "@/lib/schemas/api/platform-billing";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, url}: ActionFunctionArgs) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
@@ -31,7 +31,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         userId: auth.user.id,
         workspaceId,
         amount: parsed.amount,
-        requestUrl: request.url,
+        requestUrl: url.href,
       });
 
       if (!result.ok) {

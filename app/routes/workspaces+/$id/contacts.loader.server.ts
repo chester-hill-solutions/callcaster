@@ -36,10 +36,9 @@ function errorPayload(
   };
 }
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
   try {
     const { headers, user, workspaceId, userRole: roleStr } = getWorkspaceRouteContext(context);
-    const url = new URL(request.url);
     const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
 
     if (!workspaceId) {

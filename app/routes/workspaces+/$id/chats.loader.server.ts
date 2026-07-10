@@ -14,10 +14,9 @@ import { createTenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
   const { headers, user, workspaceId, userRole } =
     getWorkspaceRouteContext(context);
-  const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
   const search = url.searchParams.get("search") ?? undefined;

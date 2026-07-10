@@ -11,9 +11,9 @@ import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url }: LoaderFunctionArgs) => {
   const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;  const url = new URL(request.url);
+  if (auth instanceof Response) return auth;
   const campaignId = url.searchParams.get("campaign_id");
   const workspaceIdParam = url.searchParams.get("workspace_id");
   const limit = url.searchParams.get("limit") ?? "10";

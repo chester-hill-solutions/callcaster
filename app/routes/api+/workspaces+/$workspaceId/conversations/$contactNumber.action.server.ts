@@ -3,7 +3,6 @@ import {
   markMessageAsDeliveredBySid,
   markReceivedMessagesAsDeliveredForPhone,
 } from "@/lib/message-db.server";
-import { resolveDataPlaneAuth } from "@/lib/platform-data.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs } from "react-router";
 

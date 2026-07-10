@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -122,10 +122,10 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -154,10 +154,10 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "77" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -179,10 +179,10 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -223,10 +223,10 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
 
-    await mod.loader({
+    await mod.loader(withRouteUrl({
       request: new Request("http://x/workspaces/w1/campaigns/99/queue"),
       params: { selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(queueEqCalls).not.toContainEqual([
       "contact.outreach_attempt.campaign_id",
@@ -256,10 +256,10 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });

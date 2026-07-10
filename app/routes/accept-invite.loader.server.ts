@@ -130,9 +130,8 @@ async function handleTokenVerification(
   }
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, url}: LoaderFunctionArgs) {
   const { user, headers } = await getSession(request);
-  const url = new URL(request.url);
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type");
   const email = url.searchParams.get("email");

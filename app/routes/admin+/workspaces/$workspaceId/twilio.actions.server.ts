@@ -29,9 +29,9 @@ import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
-import { requireSudoAdmin } from "../../requireSudoAdmin.server";
-export const action = async ({ request, params }: ActionFunctionArgs) => {
-    const { user, userData } = await requireSudoAdmin(request);
+import { getAdminRouteContext } from "@/lib/admin-route.server";
+export const action = async ({ request, context, params }: ActionFunctionArgs) => {
+    const { user, userData } = getAdminRouteContext(context);
 
     const workspaceId = params.workspaceId;
     if (!workspaceId) {

@@ -105,7 +105,7 @@ async function handleCompleteSurvey(request: Request) {
   });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, url}: ActionFunctionArgs) {
   if (request.method === "POST") {
     return handleCompleteSurvey(request);
   }

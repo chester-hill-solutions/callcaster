@@ -6,7 +6,7 @@ import {
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   const contactNumber = params.contactNumber;
   if (!workspaceId || !contactNumber) {
@@ -15,7 +15,6 @@ export async function loader({ request, params, context }: LoaderFunctionArgs) {
   getDataPlaneRouteContext(context, workspaceId);
 
   const decodedContactNumber = decodeURIComponent(contactNumber);
-  const url = new URL(request.url);
 
   if (url.searchParams.get("latest") === "1") {
     try {

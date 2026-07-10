@@ -15,14 +15,12 @@ import {
 } from "@/lib/telephony-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, url}: LoaderFunctionArgs) => {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
   const { headers } = await getSession(request);
   const user = auth.user;
-
-  const url = new URL(request.url);
   const callSid = url.searchParams.get("callSid");
   const workspaceId = url.searchParams.get("workspaceId");
 

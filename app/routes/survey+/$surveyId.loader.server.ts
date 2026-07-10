@@ -6,9 +6,8 @@ import {
 } from "@/lib/survey-db.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params, url}: LoaderFunctionArgs) {
   const { surveyId } = params;
-  const url = new URL(request.url);
   const contactIdParam = url.searchParams.get("contact");
 
   if (!surveyId) {

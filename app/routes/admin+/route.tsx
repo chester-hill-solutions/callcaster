@@ -1,5 +1,6 @@
 export { loader } from "./route.loader.server";
 export { action } from "./route.action.server";
+export { middleware } from "./route.middleware.server";
 
 import { Outlet, useActionData, useLoaderData, useSearchParams } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";

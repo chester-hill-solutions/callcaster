@@ -1,10 +1,10 @@
 import { data as routeData, redirect } from "react-router";
 import { loadTwilioData } from "./loadTwilioData.server";
-import { requireSudoAdmin } from "../../requireSudoAdmin.server";
+import { getAdminRouteContext } from "@/lib/admin-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-    await requireSudoAdmin(request);
+export const loader = async ({ context, params }: LoaderFunctionArgs) => {
+    getAdminRouteContext(context);
 
     const workspaceId = params.workspaceId;
     if (!workspaceId) {

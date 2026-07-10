@@ -5,7 +5,7 @@ vi.hoisted(() => {
     process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 });
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => ({
@@ -59,9 +59,9 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?id=u1&workspace=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toEqual({ error: "workspace not found" });
   });
@@ -70,9 +70,9 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "workspace is required" });
   });
@@ -86,9 +86,9 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?id=other-user&workspace=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ token: "jwt-token" });
     expect(mocks.generateToken).toHaveBeenCalledWith({
@@ -111,9 +111,9 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "me" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?workspace=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     expect(mocks.generateToken).toHaveBeenCalledWith({
       twilioAccountSid: "",
@@ -133,9 +133,9 @@ describe("app/routes/api+/token/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockRejectedValueOnce(new Error("denied"));
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?workspace=w1"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(500);
   });
 });

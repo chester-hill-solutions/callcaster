@@ -4,12 +4,10 @@ import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
   const result = await requireWorkspaceLoaderContext(request, params.id, { context });
   if (!result.ok) return result.response;
   const { headers, workspaceId: workspace_id } = result.ctx;
-
-  const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
   const pageSize = parseInt(url.searchParams.get("pageSize") || "50", 10);
   const sortKey = url.searchParams.get("sortKey") || "id";

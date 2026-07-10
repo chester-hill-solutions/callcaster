@@ -1,15 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { withAdminRouteArgs } from "./helpers/route-context-mock";
 
 const mocks = vi.hoisted(() => ({
-  requireSudoAdmin: vi.fn(),
   syncWorkspaceTwilio: vi.fn(),
   toggleWorkspaceStatus: vi.fn(),
-}));
-
-vi.mock("../app/routes/admin+/requireSudoAdmin.server", () => ({
-  requireSudoAdmin: (...args: unknown[]) => mocks.requireSudoAdmin(...args),
 }));
 
 vi.mock("@/lib/platform-admin.server", () => ({
@@ -23,12 +19,8 @@ vi.mock("@/lib/platform-admin.server", () => ({
 describe("app/routes/admin+.tsx action", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.requireSudoAdmin.mockReset();
     mocks.syncWorkspaceTwilio.mockReset();
     mocks.toggleWorkspaceStatus.mockReset();
-    mocks.requireSudoAdmin.mockResolvedValue({ user: { id: "u1" },
-      userData: { id: "u1", access_level: "sudo" },
-    });
   });
 
   test("sync_workspace_twilio runs direct sync helper", async () => {
@@ -40,9 +32,11 @@ describe("app/routes/admin+.tsx action", () => {
     formData.set("workspaceId", "w1");
 
     const res = await asRouteResponse(
-      await mod.action({
-        request: new Request("http://x", { method: "POST", body: formData }),
-      } as any),
+      await mod.action(
+        await withAdminRouteArgs({
+          request: new Request("http://x", { method: "POST", body: formData }),
+        }),
+      ),
     );
 
     expect(res.status).toBe(200);
@@ -59,9 +53,11 @@ describe("app/routes/admin+.tsx action", () => {
     formData.set("currentStatus", "false");
 
     const res = await asRouteResponse(
-      await mod.action({
-        request: new Request("http://x", { method: "POST", body: formData }),
-      } as any),
+      await mod.action(
+        await withAdminRouteArgs({
+          request: new Request("http://x", { method: "POST", body: formData }),
+        }),
+      ),
     );
 
     expect(res.status).toBe(200);

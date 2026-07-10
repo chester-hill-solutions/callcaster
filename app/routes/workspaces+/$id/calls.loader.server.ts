@@ -70,7 +70,7 @@ export type CallLogLoaderData = Awaited<ReturnType<typeof loadCallLogPage>> & {
   };
 };
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
   const { headers, user, workspaceId, userRole } =
     getWorkspaceRouteContext(context);
 
@@ -156,7 +156,7 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
     const [callLog, incomingState] = await Promise.all([
       loadCallLogPage({
         workspaceId,
-        requestUrl: request.url,
+        requestUrl: url.href,
       }),
       user
         ? loadIncomingListeningState({

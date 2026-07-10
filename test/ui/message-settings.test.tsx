@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -183,7 +183,7 @@ describe("app/components/MessageSettings.tsx", () => {
     vi.useFakeTimers();
     const { MessageSettings } = await import("@/components/MessageSettings");
     const onChange = vi.fn();
-    const props = baseProps({
+    const initialProps = baseProps({
       onChange,
       mediaLinks: [],
       details: { ...baseProps().details, message_media: [], body_text: "" },
@@ -193,7 +193,23 @@ describe("app/components/MessageSettings.tsx", () => {
       ],
     });
 
-    const { container } = render(<MessageSettings {...props} />);
+    function ControlledMessageSettings() {
+      const [bodyText, setBodyText] = useState(initialProps.details.body_text ?? "");
+      return (
+        <MessageSettings
+          {...initialProps}
+          details={{ ...initialProps.details, body_text: bodyText }}
+          onChange={(field: string, value: unknown) => {
+            if (field === "body_text") {
+              setBodyText(String(value));
+            }
+            onChange(field, value);
+          }}
+        />
+      );
+    }
+
+    const { container } = render(<ControlledMessageSettings />);
 
     const tagBtn = container.querySelector(
       'button[title="Insert template tags"]',

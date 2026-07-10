@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => {
@@ -58,9 +58,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
   test("loader returns [] when limit is 0", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=0"),
-    } as any));
+    } as any)));
     await expect(res.json()).resolves.toEqual([]);
   });
 
@@ -68,9 +68,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.rpcSelectAndUpdateCampaignContacts.mockResolvedValueOnce([]);
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=7"),
-    } as any));
+    } as any)));
     await expect(res.json()).resolves.toEqual([]);
     expect(mocks.rpcSelectAndUpdateCampaignContacts).toHaveBeenCalledWith("u1", {
       campaignId: 7,
@@ -82,9 +82,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.rpcSelectAndUpdateCampaignContacts.mockResolvedValueOnce([]);
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=10"),
-    } as any));
+    } as any)));
     await expect(res.json()).resolves.toEqual([]);
   });
 
@@ -94,9 +94,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(await mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=99&limit=2"),
-    } as any));
+    } as any)));
 
     await expect(res.json()).resolves.toEqual([{ id: 1 }, { id: 2 }]);
     expect(mocks.rpcSelectAndUpdateCampaignContacts).toHaveBeenCalledWith("u1", {
@@ -112,9 +112,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "rpc fail" });
@@ -127,9 +127,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -141,9 +141,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "update fail" });
@@ -155,9 +155,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -170,9 +170,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
   test("action returns 405 for unsupported method", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(await mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "PUT" }),
-    } as any));
+    } as any)));
     expect(res.status).toBe(405);
   });
 });

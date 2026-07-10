@@ -7,11 +7,11 @@ import {
   syncWorkspaceTwilio,
   toggleWorkspaceStatus,
 } from "@/lib/platform-admin.server";
-import { requireSudoAdmin } from "./requireSudoAdmin.server";
+import { getAdminRouteContext } from "@/lib/admin-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  await requireSudoAdmin(request);
+export const action = async ({ request, context }: ActionFunctionArgs) => {
+  getAdminRouteContext(context);
   const formData = await request.formData();
   const actionType = formData.get("_action") as string;
 
