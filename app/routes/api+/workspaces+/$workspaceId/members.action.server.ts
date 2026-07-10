@@ -1,5 +1,3 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
   deleteMemberBodySchema,
@@ -14,18 +12,21 @@ import {
   updateWorkspaceMemberRole,
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function loader({ request, params, context }: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
 
-  const result = await listWorkspaceMembers(    auth.user.id,
+
+  const result = await listWorkspaceMembers(    userId,
     workspaceId,
   );
 
@@ -42,20 +43,22 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
+
   if (request.method === "POST") {
     const parsed = await parseJsonBodyOrResponse(request, inviteMemberBodySchema);
     if (parsed instanceof Response) return parsed;
 
     const result = await inviteWorkspaceMember(
-      auth.user.id,
+      userId,
       workspaceId,
       parsed.email,
       parsed.role,
@@ -80,7 +83,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (parsed instanceof Response) return parsed;
 
     const result = await updateWorkspaceMemberRole(
-      auth.user.id,
+      userId,
       workspaceId,
       parsed.user_id,
       parsed.role,
@@ -99,7 +102,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (parsed.target === "invite") {
       const inviteResult = await cancelWorkspaceInvite(
-        auth.user.id,
+        userId,
         workspaceId,
         parsed.user_id,
       );
@@ -110,7 +113,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const removeResult = await removeWorkspaceMember(
-      auth.user.id,
+      userId,
       workspaceId,
       parsed.user_id,
     );
@@ -119,7 +122,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const inviteResult = await cancelWorkspaceInvite(
-      auth.user.id,
+      userId,
       workspaceId,
       parsed.user_id,
     );

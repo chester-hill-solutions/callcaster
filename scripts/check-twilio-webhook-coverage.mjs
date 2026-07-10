@@ -10,6 +10,7 @@ const ROOT = join(import.meta.dirname, "..");
 const API_DIR = join(ROOT, "app/routes/api+");
 
 const VALIDATION_PATTERNS = [
+  /requireTwilioSignature/,
   /validateTwilioWebhook/,
   /validateWorkspaceTwilioWebhook/,
   /requireWorkspaceAccess/,

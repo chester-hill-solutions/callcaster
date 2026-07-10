@@ -1,25 +1,26 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
   startCallListeningApi,
   stopCallListeningApi,
 } from "@/lib/platform-telephony.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
+
   try {
     if (request.method === "POST") {
       const result = await startCallListeningApi(
-        auth.user,
+        { id: userId },
         workspaceId,
       );
 
@@ -41,7 +42,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (request.method === "DELETE") {
       const result = await stopCallListeningApi(
-        auth.user.id,
+        userId,
         workspaceId,
       );
 

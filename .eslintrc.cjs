@@ -137,6 +137,101 @@ module.exports = {
             ],
           },
         ],
+        "no-restricted-syntax": [
+          "error",
+          {
+            selector:
+              "ImportExpression[source.value='@/server/db'], ImportExpression[source.value='@/server/admin-db']",
+            message:
+              "Routes must use createTenantDb from @/server/tenant-db for tenant data.",
+          },
+        ],
+      },
+    },
+    // ADR-0031 workspace middleware tree: child handlers read workspaceContext.
+    {
+      files: ["app/routes/workspaces+/$id/**/*.server.ts"],
+      excludedFiles: [
+        "app/routes/workspaces+/$id/chats/$contact_number.messages.server.ts",
+      ],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              {
+                name: "@/lib/auth.server",
+                importNames: ["verifyAuth", "getSession"],
+                message:
+                  "Workspace child routes must use getWorkspaceRouteContext from @/lib/workspace-route.server.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    // ADR-0031 data-plane middleware tree: child handlers read dataPlaneAuthContext.
+    {
+      files: ["app/routes/api+/workspaces+/$workspaceId/**/*.server.ts"],
+      excludedFiles: [
+        "app/routes/api+/workspaces+/$workspaceId/api-keys.loader.server.ts",
+      ],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              {
+                name: "@/lib/auth.server",
+                importNames: ["verifyAuth"],
+                message:
+                  "Data-plane child routes must use getDataPlaneRouteContext from @/lib/data-plane-route.server.",
+              },
+              {
+                name: "@/lib/api-auth.server",
+                importNames: ["requireJsonAuth"],
+                message:
+                  "Data-plane child routes must use getDataPlaneRouteContext from @/lib/data-plane-route.server.",
+              },
+              {
+                name: "@/lib/platform-data.server",
+                importNames: ["resolveDataPlaneAuth"],
+                message:
+                  "Data-plane child routes must use getDataPlaneRouteContext from @/lib/data-plane-route.server.",
+              },
+              {
+                name: "@/lib/workspace-api-route.server",
+                importNames: ["withWorkspaceApiLoader", "withWorkspaceApiAction"],
+                message:
+                  "Data-plane child routes must use getDataPlaneRouteContext from @/lib/data-plane-route.server.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    // ADR-0031 admin middleware tree: child handlers read adminContext.
+    {
+      files: ["app/routes/admin+/**/*.server.ts"],
+      excludedFiles: [
+        "app/routes/admin+/route.middleware.server.ts",
+        "app/routes/admin+/requireSudoAdmin.server.ts",
+        "app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts",
+      ],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              {
+                name: "@/lib/auth.server",
+                importNames: ["verifyAuth"],
+                message:
+                  "Admin child routes must use getAdminRouteContext from @/lib/admin-route.server.",
+              },
+            ],
+          },
+        ],
       },
     },
     {

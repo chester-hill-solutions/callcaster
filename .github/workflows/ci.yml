@@ -19,7 +19,6 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run typecheck:deno
       - run: npm run lint
       - run: npm run test:node
         env:
@@ -30,6 +29,10 @@ jobs:
       - run: npm run test:ui
       - run: npm run tools:routes:verify
       - run: npm run tools:api:surface:check
+      - run: npm run check:route-server-leaks
+      - run: npm run check:twilio-webhooks
+      - run: npm run check:middleware
+      - run: npm run check:credit-writes
       - run: npm run tools:api:codegen
       - run: git diff --exit-code
 

@@ -1,5 +1,3 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
@@ -8,21 +6,21 @@ import {
 } from "@/lib/platform-analytics.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { campaignExportBodySchema } from "@/lib/schemas/api/platform-analytics";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function loader({ params, context }: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
 
   try {
-    const result = await listWorkspaceExportsApi(      auth.user.id,
-      workspaceId,
-    );
+    const result = await listWorkspaceExportsApi(userId, workspaceId);
 
     if (!result.ok) {
       return jsonError(result.error, result.status);
@@ -34,24 +32,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  if (request.method !== "POST") {
-    return jsonError("Method not allowed", 405);
-  }
-
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
+  }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
+
+  if (request.method !== "POST") {
+    return jsonError("Method not allowed", 405);
   }
 
   const parsed = await parseJsonBodyOrResponse(request, campaignExportBodySchema);
   if (parsed instanceof Response) return parsed;
 
   try {
-    const result = await startCampaignExportApi(      auth.user.id,
+    const result = await startCampaignExportApi(
+      userId,
       workspaceId,
       parsed.campaign_id,
     );

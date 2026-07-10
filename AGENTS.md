@@ -31,6 +31,8 @@
 - **Auth layout adapter:** Until `@chester-hill-solutions/auth-react-router` is installable, use [`app/lib/auth-layout.server.ts`](app/lib/auth-layout.server.ts) (`createAuthLayoutLoader`, `createRequireSessionUserId`).
 - **`@react-router/fs-routes`:** Deferred — `remix-flat-routes` + route tooling baselines remain; evaluate fs-routes only after RR8 is stable in production.
 - Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).
+- **Pre-PR CI bar:** `npm run ci:local` mirrors the quality + bundle-guard jobs (typecheck, lint, tests, route-tree verify, API surface/codegen drift, structural guards).
+- **Structural guards:** `check:route-server-leaks`, `check:twilio-webhooks`, `check:middleware`, `check:credit-writes` — wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## Public APIs (doc-first / Hey API)
 

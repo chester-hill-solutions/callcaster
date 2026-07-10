@@ -1,26 +1,24 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
   deleteHandsetSessionApi,
   getHandsetSessionApi,
 } from "@/lib/platform-telephony.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function loader({ params, context }: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
 
   try {
-    const result = await getHandsetSessionApi(      auth.user.id,
-      workspaceId,
-    );
+    const result = await getHandsetSessionApi(userId, workspaceId);
 
     return jsonResponse(
       {
@@ -34,23 +32,22 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export async function action({ request, params, context }: ActionFunctionArgs) {
+  const workspaceId = params.workspaceId;
+  if (!workspaceId) {
+    return jsonError("workspaceId is required", 400);
+  }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
 
   if (request.method !== "DELETE") {
     return jsonError("Method not allowed", 405);
   }
 
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-
   try {
-    const result = await deleteHandsetSessionApi(      auth.user.id,
-      workspaceId,
-    );
+    const result = await deleteHandsetSessionApi(userId, workspaceId);
 
     return jsonResponse({ success: result.success }, 200);
   } catch (error) {

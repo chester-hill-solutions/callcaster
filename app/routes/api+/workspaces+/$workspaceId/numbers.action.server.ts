@@ -1,19 +1,20 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { purchaseNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { purchaseWorkspaceNumber } from "@/lib/platform-workspace-numbers.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
+
 
   if (request.method !== "POST") {
     return jsonError("Method not allowed", 405);
@@ -23,7 +24,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (parsed instanceof Response) return parsed;
 
   const result = await purchaseWorkspaceNumber(
-    auth.user.id,
+    userId,
     workspaceId,
     parsed.phone_number,
   );

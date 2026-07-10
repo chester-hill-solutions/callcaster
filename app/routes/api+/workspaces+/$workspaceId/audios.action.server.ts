@@ -1,26 +1,24 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
   listWorkspaceAudiosApi,
   uploadWorkspaceAudioApi,
 } from "@/lib/platform-media.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function loader({ params, context }: LoaderFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
 
   try {
-    const result = await listWorkspaceAudiosApi(      auth.user.id,
-      workspaceId,
-    );
+    const result = await listWorkspaceAudiosApi(userId, workspaceId);
 
     if (!result.ok) {
       return jsonError(result.error, result.status);
@@ -32,17 +30,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  if (request.method !== "POST") {
-    return jsonError("Method not allowed", 405);
-  }
-
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
+  }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
+
+  if (request.method !== "POST") {
+    return jsonError("Method not allowed", 405);
   }
 
   const formData = await request.formData();
@@ -58,11 +57,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await uploadWorkspaceAudioApi(      auth.user.id,
-      workspaceId,
-      mediaName,
-      file,
-    );
+    const result = await uploadWorkspaceAudioApi(userId, workspaceId, mediaName, file);
 
     if (!result.ok) {
       return jsonError(result.error, result.status);

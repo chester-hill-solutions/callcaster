@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { withDataPlaneRouteArgs } from "./helpers/route-context-mock";
 
 vi.hoisted(() => {
   process.env.DATABASE_URL =
@@ -9,21 +10,11 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   listWorkspaceAudiencesApi: vi.fn(),
-  resolveDataPlaneAuth: vi.fn(),
 }));
 
 vi.mock("@/lib/platform-data.server", () => ({
   listWorkspaceAudiencesApi: (...args: unknown[]) =>
     mocks.listWorkspaceAudiencesApi(...args),
-  resolveDataPlaneAuth: (...args: unknown[]) => mocks.resolveDataPlaneAuth(...args),
-}));
-
-vi.mock("@/lib/database.server", () => ({
-  getUserRole: vi.fn(async () => ({ role: "admin" })),
-}));
-
-vi.mock("@/server/db", () => ({
-  db: {},
 }));
 
 describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
@@ -32,10 +23,6 @@ describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
   });
 
   test("lists audiences for an authorized workspace", async () => {
-    mocks.resolveDataPlaneAuth.mockResolvedValueOnce({
-      client: { from: vi.fn() },
-      userId: "u1",
-    });
     mocks.listWorkspaceAudiencesApi.mockResolvedValueOnce({
       ok: true,
       audiences: [{ id: 1, name: "Main" }],
@@ -45,10 +32,12 @@ describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
       "../app/routes/api+/workspaces+/$workspaceId/audiences.route"
     );
     const response = await asRouteResponse(
-      await mod.loader({
-        request: new Request("http://localhost/api/workspaces/w1/audiences"),
-        params: { workspaceId: "w1" },
-      } as never),
+      await mod.loader(
+        await withDataPlaneRouteArgs({
+          request: new Request("http://localhost/api/workspaces/w1/audiences"),
+          params: { workspaceId: "w1" },
+        }),
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -57,21 +46,28 @@ describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
     });
   });
 
-  test("returns 401 when auth fails", async () => {
-    mocks.resolveDataPlaneAuth.mockResolvedValueOnce(
-      Response.json({ error: "Unauthorized" }, { status: 401 }),
-    );
+  test("allows API key context without userId", async () => {
+    mocks.listWorkspaceAudiencesApi.mockResolvedValueOnce({
+      ok: true,
+      audiences: [],
+    });
 
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/audiences.route"
     );
     const response = await asRouteResponse(
-      await mod.loader({
-        request: new Request("http://localhost/api/workspaces/w1/audiences"),
-        params: { workspaceId: "w1" },
-      } as never),
+      await mod.loader(
+        await withDataPlaneRouteArgs(
+          {
+            request: new Request("http://localhost/api/workspaces/w1/audiences"),
+            params: { workspaceId: "w1" },
+          },
+          { userId: null },
+        ),
+      ),
     );
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(200);
+    expect(mocks.listWorkspaceAudiencesApi).toHaveBeenCalledWith("w1");
   });
 });

@@ -1,6 +1,5 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { listAudienceUploadsByAudienceId } from "@/lib/audience-upload-db.server";
-import { resolveDataPlaneAuth } from "@/lib/platform-data.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { LoaderFunctionArgs } from "react-router";
 

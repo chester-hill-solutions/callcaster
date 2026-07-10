@@ -1,5 +1,3 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -7,23 +5,26 @@ import {
   deleteWorkspaceNumber,
   patchWorkspaceNumber,
 } from "@/lib/platform-workspace-numbers.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   const numberId = params.numberId;
   if (!workspaceId || !numberId) {
     return jsonError("workspaceId and numberId are required", 400);
   }
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
+  }
+
   if (request.method === "PATCH") {
     const parsed = await parseJsonBodyOrResponse(request, patchNumberBodySchema);
     if (parsed instanceof Response) return parsed;
 
     const result = await patchWorkspaceNumber(
-      auth.user.id,
+      userId,
       workspaceId,
       numberId,
       parsed,
@@ -38,7 +39,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (request.method === "DELETE") {
     const result = await deleteWorkspaceNumber(
-      auth.user.id,
+      userId,
       workspaceId,
       numberId,
     );
