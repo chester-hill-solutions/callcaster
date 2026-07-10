@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     testWebhook: vi.fn(),
     verifyAuth: vi.fn(),
+    assertSafeOutboundUrl: vi.fn(),
     logger: { warn: vi.fn() },
   };
 });
@@ -22,6 +23,10 @@ vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+// The real guard does live DNS resolution — never in unit tests.
+vi.mock("@/lib/safe-outbound-url.server", () => ({
+  assertSafeOutboundUrl: (...args: any[]) => mocks.assertSafeOutboundUrl(...args),
+}));
 
 describe("app/routes/api+/test-webhook/route.tsx", () => {
   beforeEach(() => {
@@ -29,6 +34,8 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
     mocks.safeParseJson.mockReset();
     mocks.testWebhook.mockReset();
     mocks.logger.warn.mockReset();
+    mocks.assertSafeOutboundUrl.mockReset();
+    mocks.assertSafeOutboundUrl.mockResolvedValue(new URL("http://hook"));
     setDualAuthSession({ user: { id: "u1" } });
   });
 
@@ -43,6 +50,24 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "Invalid input" });
     expect(mocks.logger.warn).toHaveBeenCalledWith("Invalid input for webhook test");
+  });
+
+  test("returns 400 and skips the webhook when the destination URL is blocked", async () => {
+    mocks.safeParseJson.mockResolvedValueOnce({
+      event: JSON.stringify({ category: "outbound_sms" }),
+      destination_url: "http://169.254.169.254/latest",
+      custom_headers: JSON.stringify([]),
+    });
+    mocks.assertSafeOutboundUrl.mockRejectedValueOnce(
+      new Error("Destination URL host is not allowed"),
+    );
+    const mod = await import("../app/routes/api+/test-webhook");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "Destination URL host is not allowed",
+    });
+    expect(mocks.testWebhook).not.toHaveBeenCalled();
   });
 
   test("parses headers and returns testWebhook result", async () => {

@@ -34,7 +34,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   try {
-    assertSafeOutboundUrl(destination_url);
+    await assertSafeOutboundUrl(destination_url);
   } catch (urlError) {
     const message =
       urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
