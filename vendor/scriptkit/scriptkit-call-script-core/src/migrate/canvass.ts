@@ -1,11 +1,18 @@
 import {
+  CANVASS_BLOCK_TYPES,
   quickCanvassBlockSchema,
   type QuickCanvassBlock,
   type ScriptDocument,
 } from "../types.js";
 import { createId } from "../ids.js";
 
-const CANVASS_TYPES = new Set(["instruction", "yes_no", "choice", "text", "support"]);
+type CanvassBlockType = (typeof CANVASS_BLOCK_TYPES)[number];
+
+const CANVASS_TYPES: ReadonlySet<string> = new Set(CANVASS_BLOCK_TYPES);
+
+function isCanvassBlockType(type: string): type is CanvassBlockType {
+  return CANVASS_TYPES.has(type);
+}
 
 export function migrateFromQuickCanvassBlocks(blocksInput: unknown): ScriptDocument {
   const linear = quickCanvassBlockSchema.array().parse(blocksInput);
@@ -92,7 +99,7 @@ export function serializeToQuickCanvassBlocks(doc: ScriptDocument): QuickCanvass
 
   for (const blockId of startPage.blockIds) {
     const block = doc.blocks[blockId];
-    if (!block || !CANVASS_TYPES.has(block.type)) {
+    if (!block || !isCanvassBlockType(block.type)) {
       continue;
     }
 

@@ -1,19 +1,16 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-var bun_test_1 = require("bun:test");
-var service_js_1 = require("./service.js");
-var ids_js_1 = require("./ids.js");
-(0, bun_test_1.describe)("createCallScriptService", function () {
-    var scripts = (0, service_js_1.createCallScriptService)();
-    (0, bun_test_1.test)("createEmptyDocument returns valid document", function () {
-        (0, ids_js_1.resetIdCounter)();
-        var doc = scripts.createEmptyDocument({ palette: "canvass" });
-        var result = scripts.validateDocument(doc);
-        (0, bun_test_1.expect)(result.ok).toBe(true);
+import { describe, expect, test } from "bun:test";
+import { createCallScriptService } from "./service.js";
+import { resetIdCounter } from "./ids.js";
+describe("createCallScriptService", () => {
+    const scripts = createCallScriptService();
+    test("createEmptyDocument returns valid document", () => {
+        resetIdCounter();
+        const doc = scripts.createEmptyDocument({ palette: "canvass" });
+        const result = scripts.validateDocument(doc);
+        expect(result.ok).toBe(true);
     });
-    (0, bun_test_1.test)("migrateFromCallcasterFlow round-trips", function () {
-        var _a, _b;
-        var flow = {
+    test("migrateFromCallcasterFlow round-trips", () => {
+        const flow = {
             pages: {
                 p1: { id: "p1", title: "Intro", blocks: ["b1"] },
             },
@@ -21,14 +18,13 @@ var ids_js_1 = require("./ids.js");
                 b1: { type: "textarea", prompt: "Hello {{name}}" },
             },
         };
-        var doc = scripts.migrateFromCallcasterFlow(flow);
-        var back = scripts.serializeToCallcasterFlow(doc);
-        (0, bun_test_1.expect)((_a = back.pages.p1) === null || _a === void 0 ? void 0 : _a.blocks).toEqual(["b1"]);
-        (0, bun_test_1.expect)((_b = back.blocks.b1) === null || _b === void 0 ? void 0 : _b.type).toBe("textarea");
+        const doc = scripts.migrateFromCallcasterFlow(flow);
+        const back = scripts.serializeToCallcasterFlow(doc);
+        expect(back.pages.p1?.blocks).toEqual(["b1"]);
+        expect(back.blocks.b1?.type).toBe("textarea");
     });
-    (0, bun_test_1.test)("migrateFromCallcasterFlow accepts blockType alias", function () {
-        var _a;
-        var flow = {
+    test("migrateFromCallcasterFlow accepts blockType alias", () => {
+        const flow = {
             pages: {
                 p1: { id: "p1", title: "Intro", blocks: ["b1"] },
             },
@@ -36,30 +32,29 @@ var ids_js_1 = require("./ids.js");
                 b1: { blockType: "instruction", body: "Welcome" },
             },
         };
-        var doc = scripts.migrateFromCallcasterFlow(flow);
-        (0, bun_test_1.expect)((_a = doc.blocks.b1) === null || _a === void 0 ? void 0 : _a.type).toBe("instruction");
+        const doc = scripts.migrateFromCallcasterFlow(flow);
+        expect(doc.blocks.b1?.type).toBe("instruction");
     });
-    (0, bun_test_1.test)("migrateFromQuickCanvassBlocks serializes back", function () {
-        var _a;
-        (0, ids_js_1.resetIdCounter)();
-        var blocks = [
+    test("migrateFromQuickCanvassBlocks serializes back", () => {
+        resetIdCounter();
+        const blocks = [
             { id: "i1", type: "instruction", body: "Knock knock" },
             { id: "y1", type: "yes_no", prompt: "Home?" },
         ];
-        var doc = scripts.migrateFromQuickCanvassBlocks(blocks);
-        var linear = scripts.serializeToQuickCanvassBlocks(doc);
-        (0, bun_test_1.expect)(linear).toHaveLength(2);
-        (0, bun_test_1.expect)((_a = linear[0]) === null || _a === void 0 ? void 0 : _a.type).toBe("instruction");
+        const doc = scripts.migrateFromQuickCanvassBlocks(blocks);
+        const linear = scripts.serializeToQuickCanvassBlocks(doc);
+        expect(linear).toHaveLength(2);
+        expect(linear[0]?.type).toBe("instruction");
     });
-    (0, bun_test_1.test)("applyMergeTags replaces tokens", function () {
-        var out = scripts.applyMergeTags("Hi {{first_name}}", { first_name: "Alex" });
-        (0, bun_test_1.expect)(out).toBe("Hi Alex");
+    test("applyMergeTags replaces tokens", () => {
+        const out = scripts.applyMergeTags("Hi {{first_name}}", { first_name: "Alex" });
+        expect(out).toBe("Hi Alex");
     });
-    (0, bun_test_1.test)("evaluateRouting finds next unanswered block", function () {
-        (0, ids_js_1.resetIdCounter)();
-        var doc = scripts.createEmptyDocument();
-        var page = doc.pages[doc.startPageId];
-        var blockId = page === null || page === void 0 ? void 0 : page.blockIds[0];
+    test("evaluateRouting finds next unanswered block", () => {
+        resetIdCounter();
+        const doc = scripts.createEmptyDocument();
+        const page = doc.pages[doc.startPageId];
+        const blockId = page?.blockIds[0];
         if (!blockId) {
             throw new Error("missing block");
         }
@@ -69,10 +64,10 @@ var ids_js_1 = require("./ids.js");
             prompt: "Interested?",
             routingRules: [{ answerValue: "yes", targetPageId: doc.startPageId }],
         };
-        var pending = scripts.evaluateRouting(doc, []);
-        (0, bun_test_1.expect)(pending.complete).toBe(false);
-        (0, bun_test_1.expect)(pending.nextBlockId).toBe(blockId);
-        var done = scripts.evaluateRouting(doc, [{ blockId: blockId, value: "yes" }]);
-        (0, bun_test_1.expect)(done.complete).toBe(true);
+        const pending = scripts.evaluateRouting(doc, []);
+        expect(pending.complete).toBe(false);
+        expect(pending.nextBlockId).toBe(blockId);
+        const done = scripts.evaluateRouting(doc, [{ blockId, value: "yes" }]);
+        expect(done.complete).toBe(true);
     });
 });

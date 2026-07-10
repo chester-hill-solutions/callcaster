@@ -1,12 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-var bun_test_1 = require("bun:test");
-var callcaster_js_1 = require("./callcaster.js");
+import { describe, expect, test } from "bun:test";
+import { migrateFromCallcasterFlow, serializeToCallcasterFlow, } from "./callcaster.js";
 // Mirrors the shape documented in docs/script-json-format.md and
 // docs/example-script.json in the consuming app: options are keyed by
 // { content, next } (not { value, label }), and every block carries an
 // audioFile reference (possibly empty).
-var callcasterFlow = {
+const callcasterFlow = {
     pages: {
         page_1: {
             id: "page_1",
@@ -87,44 +85,35 @@ var callcasterFlow = {
         },
     },
 };
-(0, bun_test_1.describe)("callcaster migrate/serialize round-trip", function () {
-    (0, bun_test_1.test)("every option.next survives migrate -> serialize", function () {
-        var _a, _b, _c;
-        var doc = (0, callcaster_js_1.migrateFromCallcasterFlow)(callcasterFlow);
-        var back = (0, callcaster_js_1.serializeToCallcasterFlow)(doc);
-        var _loop_1 = function (blockId, rawBlock) {
-            var originalOptions = (_a = rawBlock.options) !== null && _a !== void 0 ? _a : [];
-            var roundTrippedOptions = (_c = (_b = back.blocks[blockId]) === null || _b === void 0 ? void 0 : _b.options) !== null && _c !== void 0 ? _c : [];
-            (0, bun_test_1.expect)(roundTrippedOptions).toHaveLength(originalOptions.length);
-            originalOptions.forEach(function (original, index) {
-                var _a, _b;
-                (0, bun_test_1.expect)((_a = roundTrippedOptions[index]) === null || _a === void 0 ? void 0 : _a.next).toBe(original.next);
-                (0, bun_test_1.expect)((_b = roundTrippedOptions[index]) === null || _b === void 0 ? void 0 : _b.content).toBe(original.content);
+describe("callcaster migrate/serialize round-trip", () => {
+    test("every option.next survives migrate -> serialize", () => {
+        const doc = migrateFromCallcasterFlow(callcasterFlow);
+        const back = serializeToCallcasterFlow(doc);
+        for (const [blockId, rawBlock] of Object.entries(callcasterFlow.blocks)) {
+            const originalOptions = rawBlock.options ?? [];
+            const roundTrippedOptions = back.blocks[blockId]?.options ?? [];
+            expect(roundTrippedOptions).toHaveLength(originalOptions.length);
+            originalOptions.forEach((original, index) => {
+                expect(roundTrippedOptions[index]?.next).toBe(original.next);
+                expect(roundTrippedOptions[index]?.content).toBe(original.content);
             });
-        };
-        for (var _i = 0, _d = Object.entries(callcasterFlow.blocks); _i < _d.length; _i++) {
-            var _e = _d[_i], blockId = _e[0], rawBlock = _e[1];
-            _loop_1(blockId, rawBlock);
         }
     });
-    (0, bun_test_1.test)("every block.audioFile survives migrate -> serialize", function () {
-        var _a;
-        var doc = (0, callcaster_js_1.migrateFromCallcasterFlow)(callcasterFlow);
-        var back = (0, callcaster_js_1.serializeToCallcasterFlow)(doc);
-        for (var _i = 0, _b = Object.entries(callcasterFlow.blocks); _i < _b.length; _i++) {
-            var _c = _b[_i], blockId = _c[0], rawBlock = _c[1];
-            (0, bun_test_1.expect)((_a = back.blocks[blockId]) === null || _a === void 0 ? void 0 : _a.audioFile).toBe(rawBlock.audioFile);
+    test("every block.audioFile survives migrate -> serialize", () => {
+        const doc = migrateFromCallcasterFlow(callcasterFlow);
+        const back = serializeToCallcasterFlow(doc);
+        for (const [blockId, rawBlock] of Object.entries(callcasterFlow.blocks)) {
+            expect(back.blocks[blockId]?.audioFile).toBe(rawBlock.audioFile);
         }
     });
-    (0, bun_test_1.test)("option value/label are populated from wire content (not left empty)", function () {
-        var _a, _b, _c;
-        var doc = (0, callcaster_js_1.migrateFromCallcasterFlow)(callcasterFlow);
-        var block2 = doc.blocks.block_2;
-        (0, bun_test_1.expect)(block2 === null || block2 === void 0 ? void 0 : block2.type).toBe("select");
-        if ((block2 === null || block2 === void 0 ? void 0 : block2.type) === "select") {
-            (0, bun_test_1.expect)((_a = block2.options[0]) === null || _a === void 0 ? void 0 : _a.value).toBe("Yes");
-            (0, bun_test_1.expect)((_b = block2.options[0]) === null || _b === void 0 ? void 0 : _b.label).toBe("Yes");
-            (0, bun_test_1.expect)((_c = block2.options[0]) === null || _c === void 0 ? void 0 : _c.next).toBe("block_3");
+    test("option value/label are populated from wire content (not left empty)", () => {
+        const doc = migrateFromCallcasterFlow(callcasterFlow);
+        const block2 = doc.blocks.block_2;
+        expect(block2?.type).toBe("select");
+        if (block2?.type === "select") {
+            expect(block2.options[0]?.value).toBe("Yes");
+            expect(block2.options[0]?.label).toBe("Yes");
+            expect(block2.options[0]?.next).toBe("block_3");
         }
     });
 });

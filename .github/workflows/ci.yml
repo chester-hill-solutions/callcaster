@@ -14,6 +14,9 @@ jobs:
         with:
           node-version: "20"
           cache: npm
+      # test:node shells out to `bun test`, and the media-stream service tests
+      # spawn `bun run services/media-stream/index.ts`.
+      - uses: oven-sh/setup-bun@v2
       - run: npm ci
       - run: npm run typecheck
       - run: npm run typecheck:deno
@@ -45,6 +48,8 @@ jobs:
         with:
           node-version: "20"
           cache: npm
+      # The media-stream service tests spawn `bun run`.
+      - uses: oven-sh/setup-bun@v2
       - run: npm ci
       - run: npm run test:coverage
         env:

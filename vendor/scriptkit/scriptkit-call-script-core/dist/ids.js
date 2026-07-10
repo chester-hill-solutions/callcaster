@@ -1,12 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createId = createId;
-exports.resetIdCounter = resetIdCounter;
-var counter = 0;
-function createId(prefix) {
+let counter = 0;
+export function createId(prefix) {
     counter += 1;
-    return "".concat(prefix, "_").concat(Date.now().toString(36), "_").concat(counter);
+    return `${prefix}_${Date.now().toString(36)}_${counter}`;
 }
-function resetIdCounter() {
+export function resetIdCounter() {
     counter = 0;
 }

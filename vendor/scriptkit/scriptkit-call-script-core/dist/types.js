@@ -1,32 +1,18 @@
-"use strict";
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CALLCASTER_BLOCK_TYPES = exports.CANVASS_BLOCK_TYPES = exports.quickCanvassBlockSchema = exports.callcasterFlowSchema = exports.scriptDocumentSchema = exports.scriptPageSchema = exports.scriptBlockSchema = exports.checkboxBlockSchema = exports.radioBlockSchema = exports.selectBlockSchema = exports.textareaBlockSchema = exports.supportBlockSchema = exports.textBlockSchema = exports.choiceBlockSchema = exports.yesNoBlockSchema = exports.instructionBlockSchema = exports.routingRuleSchema = exports.scriptPaletteSchema = void 0;
-var zod_1 = require("zod");
-exports.scriptPaletteSchema = zod_1.z.enum(["callcaster", "canvass"]);
-exports.routingRuleSchema = zod_1.z.object({
-    answerValue: zod_1.z.string(),
-    targetPageId: zod_1.z.string().optional(),
-    targetBlockId: zod_1.z.string().optional(),
+import { z } from "zod";
+export const scriptPaletteSchema = z.enum(["callcaster", "canvass"]);
+export const routingRuleSchema = z.object({
+    answerValue: z.string(),
+    targetPageId: z.string().optional(),
+    targetBlockId: z.string().optional(),
 });
-var baseBlockFields = {
-    id: zod_1.z.string().min(1),
-    label: zod_1.z.string().optional(),
-    prompt: zod_1.z.string().optional(),
-    required: zod_1.z.boolean().optional(),
-    routingRules: zod_1.z.array(exports.routingRuleSchema).optional(),
+const baseBlockFields = {
+    id: z.string().min(1),
+    label: z.string().optional(),
+    prompt: z.string().optional(),
+    required: z.boolean().optional(),
+    routingRules: z.array(routingRuleSchema).optional(),
     /** Recorded-audio reference carried through from/to the Callcaster wire format. */
-    audioFile: zod_1.z.string().optional(),
+    audioFile: z.string().optional(),
 };
 /**
  * Option shape shared by choice/select/radio/checkbox blocks. `value`/`label`
@@ -35,70 +21,111 @@ var baseBlockFields = {
  * options by `{ content, next }` rather than `{ value, label }`) so a
  * migrate -> serialize round-trip doesn't drop routing or original text.
  */
-var scriptOptionSchema = zod_1.z.object({
-    value: zod_1.z.string(),
-    label: zod_1.z.string(),
-    next: zod_1.z.string().optional(),
-    content: zod_1.z.string().optional(),
+const scriptOptionSchema = z.object({
+    value: z.string(),
+    label: z.string(),
+    next: z.string().optional(),
+    content: z.string().optional(),
 });
-exports.instructionBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("instruction"), body: zod_1.z.string().default("") }));
-exports.yesNoBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("yes_no"), prompt: zod_1.z.string().default("") }));
-exports.choiceBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("choice"), prompt: zod_1.z.string().default(""), options: zod_1.z.array(scriptOptionSchema).default([]) }));
-exports.textBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("text"), prompt: zod_1.z.string().default(""), placeholder: zod_1.z.string().optional() }));
-exports.supportBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("support"), prompt: zod_1.z.string().default("") }));
-exports.textareaBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("textarea"), prompt: zod_1.z.string().default("") }));
-exports.selectBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("select"), prompt: zod_1.z.string().default(""), options: zod_1.z.array(scriptOptionSchema).default([]) }));
-exports.radioBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("radio"), prompt: zod_1.z.string().default(""), options: zod_1.z.array(scriptOptionSchema).default([]) }));
-exports.checkboxBlockSchema = zod_1.z.object(__assign(__assign({}, baseBlockFields), { type: zod_1.z.literal("checkbox"), prompt: zod_1.z.string().default(""), options: zod_1.z.array(scriptOptionSchema).default([]) }));
-exports.scriptBlockSchema = zod_1.z.discriminatedUnion("type", [
-    exports.instructionBlockSchema,
-    exports.yesNoBlockSchema,
-    exports.choiceBlockSchema,
-    exports.textBlockSchema,
-    exports.supportBlockSchema,
-    exports.textareaBlockSchema,
-    exports.selectBlockSchema,
-    exports.radioBlockSchema,
-    exports.checkboxBlockSchema,
+export const instructionBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("instruction"),
+    body: z.string().default(""),
+});
+export const yesNoBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("yes_no"),
+    prompt: z.string().default(""),
+});
+export const choiceBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("choice"),
+    prompt: z.string().default(""),
+    options: z.array(scriptOptionSchema).default([]),
+});
+export const textBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("text"),
+    prompt: z.string().default(""),
+    placeholder: z.string().optional(),
+});
+export const supportBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("support"),
+    prompt: z.string().default(""),
+});
+export const textareaBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("textarea"),
+    prompt: z.string().default(""),
+});
+export const selectBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("select"),
+    prompt: z.string().default(""),
+    options: z.array(scriptOptionSchema).default([]),
+});
+export const radioBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("radio"),
+    prompt: z.string().default(""),
+    options: z.array(scriptOptionSchema).default([]),
+});
+export const checkboxBlockSchema = z.object({
+    ...baseBlockFields,
+    type: z.literal("checkbox"),
+    prompt: z.string().default(""),
+    options: z.array(scriptOptionSchema).default([]),
+});
+export const scriptBlockSchema = z.discriminatedUnion("type", [
+    instructionBlockSchema,
+    yesNoBlockSchema,
+    choiceBlockSchema,
+    textBlockSchema,
+    supportBlockSchema,
+    textareaBlockSchema,
+    selectBlockSchema,
+    radioBlockSchema,
+    checkboxBlockSchema,
 ]);
-exports.scriptPageSchema = zod_1.z.object({
-    id: zod_1.z.string().min(1),
-    title: zod_1.z.string().default("Page"),
-    blockIds: zod_1.z.array(zod_1.z.string()).default([]),
+export const scriptPageSchema = z.object({
+    id: z.string().min(1),
+    title: z.string().default("Page"),
+    blockIds: z.array(z.string()).default([]),
 });
-exports.scriptDocumentSchema = zod_1.z.object({
-    version: zod_1.z.literal(1),
-    startPageId: zod_1.z.string().min(1),
-    pages: zod_1.z.record(zod_1.z.string(), exports.scriptPageSchema),
-    blocks: zod_1.z.record(zod_1.z.string(), exports.scriptBlockSchema),
+export const scriptDocumentSchema = z.object({
+    version: z.literal(1),
+    startPageId: z.string().min(1),
+    pages: z.record(z.string(), scriptPageSchema),
+    blocks: z.record(z.string(), scriptBlockSchema),
 });
-exports.callcasterFlowSchema = zod_1.z.object({
-    pages: zod_1.z.record(zod_1.z.string(), zod_1.z.object({
-        id: zod_1.z.string().optional(),
-        title: zod_1.z.string().optional(),
-        blocks: zod_1.z.array(zod_1.z.string()).optional(),
+export const callcasterFlowSchema = z.object({
+    pages: z.record(z.string(), z.object({
+        id: z.string().optional(),
+        title: z.string().optional(),
+        blocks: z.array(z.string()).optional(),
     })),
-    blocks: zod_1.z.record(zod_1.z.string(), zod_1.z.record(zod_1.z.string(), zod_1.z.unknown())),
+    blocks: z.record(z.string(), z.record(z.string(), z.unknown())),
 });
-exports.quickCanvassBlockSchema = zod_1.z.object({
-    id: zod_1.z.string(),
-    type: zod_1.z.enum(["instruction", "yes_no", "choice", "text", "support"]),
-    prompt: zod_1.z.string().optional(),
-    body: zod_1.z.string().optional(),
-    options: zod_1.z
-        .array(zod_1.z.object({ value: zod_1.z.string(), label: zod_1.z.string() }))
+export const quickCanvassBlockSchema = z.object({
+    id: z.string(),
+    type: z.enum(["instruction", "yes_no", "choice", "text", "support"]),
+    prompt: z.string().optional(),
+    body: z.string().optional(),
+    options: z
+        .array(z.object({ value: z.string(), label: z.string() }))
         .optional(),
-    placeholder: zod_1.z.string().optional(),
-    required: zod_1.z.boolean().optional(),
+    placeholder: z.string().optional(),
+    required: z.boolean().optional(),
 });
-exports.CANVASS_BLOCK_TYPES = [
+export const CANVASS_BLOCK_TYPES = [
     "instruction",
     "yes_no",
     "choice",
     "text",
     "support",
 ];
-exports.CALLCASTER_BLOCK_TYPES = [
+export const CALLCASTER_BLOCK_TYPES = [
     "instruction",
     "textarea",
     "select",
