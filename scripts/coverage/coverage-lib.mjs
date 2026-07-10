@@ -14,10 +14,7 @@ export const lcovInputs = [
     name: "vitest-ui",
     path: path.join(coverageDir, "vitest-ui", "lcov.info"),
   },
-  {
-    name: "deno",
-    path: path.join(coverageDir, "deno", "lcov.info"),
-  },
+  // "deno" input removed with the client edge functions (see typecheck:deno).
 ];
 
 /** @param {string} sf */

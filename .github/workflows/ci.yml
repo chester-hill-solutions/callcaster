@@ -22,6 +22,11 @@ jobs:
       - run: npm run typecheck:deno
       - run: npm run lint
       - run: npm run test:node
+        env:
+          # The bun-test step imports server/bun.ts, which eagerly constructs
+          # the parent Twilio client at module scope. Tests never hit Twilio.
+          TWILIO_SID: AC_ci_test_placeholder
+          TWILIO_AUTH_TOKEN: ci_test_placeholder
       - run: npm run test:ui
       - run: npm run tools:routes:verify
       - run: npm run tools:api:surface:check
