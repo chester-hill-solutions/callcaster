@@ -279,8 +279,30 @@ describe("twilio-bootstrap server", () => {
     expect(result.outcome).toBe("success");
     expect(result.onboarding.messagingService.serviceSid).toBe("MG123");
     expect(result.onboarding.subaccountBootstrap.status).toBe("live");
-    expect(result.onboarding.currentStep).toBe("first_number");
+    // Bootstrap must not fast-forward the wizard: a fresh workspace stays on
+    // business_profile so the user starts at step 1.
+    expect(result.onboarding.currentStep).toBe("business_profile");
     expect(adminDb.updateCalls.length).toBeGreaterThan(0);
+  });
+
+  test("ensureWorkspaceTwilioBootstrap advances only the legacy messaging_service step", async () => {
+    mocks.createService.mockResolvedValue({
+      sid: "MG123",
+      friendlyName: "Svc",
+    });
+    setWorkspaceTwilioData({
+      sid: "AC123",
+      authToken: "token",
+      onboarding: makeOnboarding({ currentStep: "messaging_service" }),
+    });
+    const mod = await import("../app/lib/twilio-bootstrap.server");
+
+    const result = await mod.ensureWorkspaceTwilioBootstrap({
+      workspaceId: "w1",
+      actorUserId: "u1",
+    });
+
+    expect(result.onboarding.currentStep).toBe("first_number");
   });
 
   test("ensureWorkspaceTwilioBootstrap skips create when service already exists", async () => {
@@ -305,7 +327,8 @@ describe("twilio-bootstrap server", () => {
 
     expect(mocks.createService).not.toHaveBeenCalled();
     expect(result.onboarding.messagingService.serviceSid).toBe("MG_EXISTING");
-    expect(result.onboarding.currentStep).toBe("first_number");
+    // A user already on a later step must not be pulled back/forward by a re-run.
+    expect(result.onboarding.currentStep).toBe("provider_provisioning");
   });
 
   test("ensureWorkspaceTwilioBootstrap captures bootstrap failure details", async () => {

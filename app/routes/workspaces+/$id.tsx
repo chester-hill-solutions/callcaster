@@ -13,6 +13,7 @@ import {
   type WorkspaceMessagingReadiness,
 } from "@/lib/types";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
+import { LOW_CREDIT_THRESHOLD } from "../../../shared/pricing";
 
 type LoaderData = {
   userRole: string | null | undefined;
@@ -83,6 +84,9 @@ function WorkspaceResolvedView({
     audiences,
   );
 
+  const liveCredits = workspaceData?.[0]?.credits ?? workspace.credits;
+  const canManageBilling = userRole === "admin" || userRole === "owner";
+
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
       <WorkspaceNav
@@ -98,43 +102,74 @@ function WorkspaceResolvedView({
           (userRole as MemberRole | null | undefined) ?? MemberRole.Member
         }
       />
-      <div
-        className={`min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6 ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
-      >
-        {!outlet ? (
-          <div className="space-y-4">
-            {onboardingReadiness.shouldShowOnboardingBanner ? (
-              <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
-                <div className="font-medium">
-                  Messaging onboarding still has required steps.
-                </div>
-                <p className="mt-1">{onboardingReadiness.warnings.join(" ")}</p>
-                {userRole === "admin" || userRole === "owner" ? (
-                  <Button asChild className="mt-3">
-                    <a href={`/workspaces/${workspace.id}/onboarding`}>
-                      Continue onboarding
-                    </a>
-                  </Button>
-                ) : null}
-              </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {liveCredits <= 0 ? (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+            <div className="font-medium">
+              You&apos;re out of credits. Campaigns and calls are paused
+              until you top up.
+            </div>
+            {canManageBilling ? (
+              <Button asChild variant="destructive" className="mt-3">
+                <a href={`/workspaces/${workspace.id}/billing`}>
+                  Add credits
+                </a>
+              </Button>
             ) : null}
-            <CampaignEmptyState
-              hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
-              type={(phoneNumbersData?.length ?? 0) > 0 ? "campaign" : "number"}
-            />
           </div>
-        ) : (
-          <Outlet
-            context={{
-              workspace: workspaceData?.[0],
-              audiences: audiencesData,
-              campaigns: campaignsData,
-              phoneNumbers: phoneNumbersData,
-              userRole,
-              ...context,
-            }}
-          />
-        )}
+        ) : liveCredits < LOW_CREDIT_THRESHOLD ? (
+          <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
+            <div className="font-medium">
+              Credits are running low ({liveCredits} left). Top up to avoid
+              interruptions.
+            </div>
+            {canManageBilling ? (
+              <Button asChild className="mt-3">
+                <a href={`/workspaces/${workspace.id}/billing`}>
+                  Add credits
+                </a>
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        <div
+          className={`min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6 ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
+        >
+          {!outlet ? (
+            <div className="space-y-4">
+              {onboardingReadiness.shouldShowOnboardingBanner ? (
+                <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
+                  <div className="font-medium">
+                    Messaging onboarding still has required steps.
+                  </div>
+                  <p className="mt-1">{onboardingReadiness.warnings.join(" ")}</p>
+                  {userRole === "admin" || userRole === "owner" ? (
+                    <Button asChild className="mt-3">
+                      <a href={`/workspaces/${workspace.id}/onboarding`}>
+                        Continue onboarding
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              <CampaignEmptyState
+                hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
+                type={(phoneNumbersData?.length ?? 0) > 0 ? "campaign" : "number"}
+              />
+            </div>
+          ) : (
+            <Outlet
+              context={{
+                workspace: workspaceData?.[0],
+                audiences: audiencesData,
+                campaigns: campaignsData,
+                phoneNumbers: phoneNumbersData,
+                userRole,
+                ...context,
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

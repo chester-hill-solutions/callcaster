@@ -12,6 +12,20 @@ vi.mock("@/lib/object-storage.server", () => ({
   listObjects: (...args: unknown[]) => objectStorageMocks.listObjects(...args),
 }));
 
+// removeWorkspacePhoneNumber (SID-based cleanup, Phase E) reads/updates the
+// messaging onboarding state to detach the released number from the MS sender
+// pool. Stub those two calls; keep the rest of the module real.
+vi.mock("@/lib/messaging-onboarding.server", async () => {
+  const actual = await vi.importActual<any>("@/lib/messaging-onboarding.server");
+  return {
+    ...actual,
+    getWorkspaceMessagingOnboardingState: vi.fn(async () => ({
+      ...actual.DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+    })),
+    updateWorkspaceMessagingOnboardingState: vi.fn(async () => undefined),
+  };
+});
+
 const adminDbMocks = vi.hoisted(() => ({
   workspaceFindFirst: vi.fn(),
   selectChain: vi.fn(),
@@ -34,12 +48,14 @@ const tdbMocks = vi.hoisted(() => ({
   },
   campaign: {
     findMany: vi.fn(),
+    insert: vi.fn(),
   },
   audience: {
     findMany: vi.fn(),
   },
   script: {
     findMany: vi.fn(),
+    insert: vi.fn(),
   },
   message: {
     findMany: vi.fn(),
@@ -47,6 +63,9 @@ const tdbMocks = vi.hoisted(() => ({
   contact: {
     findMany: vi.fn(),
   },
+  // fetchConversationSummary aggregates conversations via a raw SQL query
+  // (tdb.execute) rather than paging tdb.message.findMany.
+  execute: vi.fn(),
 }));
 
 const authApiMocks = vi.hoisted(() => ({
@@ -70,17 +89,29 @@ const rpcMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/db-rpc.server", () => rpcMocks);
 
+const transactionHistoryMocks = vi.hoisted(() => ({
+  insertTransactionHistoryIdempotent: vi.fn(),
+}));
+
+vi.mock("@/lib/transaction-history.server", () => transactionHistoryMocks);
+
+/**
+ * fetchConversationSummary now aggregates conversations via a single raw SQL
+ * query (tdb.execute) instead of paging tdb.message.findMany and grouping in
+ * JS. `aggregatedRows` stands in for what that query would return: one row
+ * per conversation, already grouped/sorted/paginated by the (mocked) "database".
+ */
 function mockConversationTenantData({
   workspaceNumbers = [{ phone_number: "+15551111111" }],
-  messageRows = [],
+  aggregatedRows = [],
   contactRows = [],
 }: {
   workspaceNumbers?: Array<{ phone_number: string }>;
-  messageRows?: unknown[];
+  aggregatedRows?: unknown[];
   contactRows?: unknown[];
 }) {
   tdbMocks.workspace_number.findMany.mockResolvedValue(workspaceNumbers);
-  tdbMocks.message.findMany.mockResolvedValue(messageRows);
+  tdbMocks.execute.mockResolvedValue(aggregatedRows);
   tdbMocks.contact.findMany.mockResolvedValue(contactRows);
   rpcMocks.rpcFindContactsByPhones.mockResolvedValue(contactRows);
 }
@@ -103,10 +134,23 @@ describe("app/lib/database/workspace.server.ts", () => {
       fn.mockReset();
     }
     for (const table of Object.values(tdbMocks)) {
+      if (typeof table === "function") {
+        (table as ReturnType<typeof vi.fn>).mockReset();
+        continue;
+      }
       for (const fn of Object.values(table)) {
         (fn as ReturnType<typeof vi.fn>).mockReset();
       }
     }
+    // Sample-data seeding runs as a best-effort step inside createNewWorkspace;
+    // default to success so unrelated assertions on provisioningWarning are
+    // unaffected. Individual tests override these to exercise the warning path.
+    tdbMocks.script.insert.mockResolvedValue([{ id: 1 }]);
+    tdbMocks.campaign.insert.mockResolvedValue([{ id: 1 }]);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue({
+      inserted: true,
+    });
 
     vi.doMock("@/server/admin-db", () => ({
       adminDb: {
@@ -300,6 +344,32 @@ describe("app/lib/database/workspace.server.ts", () => {
       provisioningWarning: "Twilio bootstrap is still running",
     });
     expect(stripe.createStripeContact).toHaveBeenCalled();
+    expect(
+      transactionHistoryMocks.insertTransactionHistoryIdempotent,
+    ).toHaveBeenCalledWith({
+      workspaceId: "w_new",
+      type: "CREDIT",
+      amount: mod.NEW_WORKSPACE_WELCOME_CREDITS,
+      note: expect.stringContaining("Welcome bonus"),
+      idempotencyKey: "welcome-credits:w_new",
+    });
+
+    // Welcome credit grant failure is non-fatal; workspace still created with warning
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockRejectedValueOnce(
+      new Error("ledger down"),
+    );
+    await expect(
+      mod.createNewWorkspace({
+        workspaceName: "W",
+        user_id: "u1",
+      }),
+    ).resolves.toMatchObject({
+      data: "w_new",
+      error: null,
+      provisioningWarning: expect.stringContaining(
+        "Welcome credits were not granted",
+      ),
+    });
 
     // rpc error now aborts before any provisioning
     rpcMocks.rpcCreateNewWorkspace.mockRejectedValueOnce(new Error("rpc"));
@@ -888,34 +958,37 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("fetchConversationSummary paginates and applies campaign filtering", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
+    // Two conversations with the workspace number +15551111111: the first
+    // (15550000001) has an outbound message on 03-03 and an inbound
+    // "received" reply on 03-01 (message_count 2, unread_count 1); the
+    // second (15550000002) has a single outbound message on 03-02. Rows
+    // below are what the aggregation query would return, already sorted by
+    // conversation_last_update DESC and capped at limit+1 (2).
     mockConversationTenantData({
-      messageRows: [
+      aggregatedRows: [
         {
-          campaign_id: 1,
-          contact_id: 10,
-          date_created: "2026-03-03T00:00:00.000Z",
-          direction: "outbound",
-          from: "+15551111111",
-          status: "delivered",
-          to: "+15550000001",
+          conv_key: "15550000001",
+          contact_phone: "+15550000001",
+          user_phone: "+15551111111",
+          conversation_start: "2026-03-01T00:00:00.000Z",
+          conversation_last_update: "2026-03-03T00:00:00.000Z",
+          message_count: 2,
+          unread_count: 1,
+          has_replied: true,
+          last_inbound_body: null,
+          primary_contact_id: 10,
         },
         {
-          campaign_id: 1,
-          contact_id: 10,
-          date_created: "2026-03-01T00:00:00.000Z",
-          direction: "inbound",
-          from: "+15550000001",
-          status: "received",
-          to: "+15551111111",
-        },
-        {
-          campaign_id: 1,
-          contact_id: 11,
-          date_created: "2026-03-02T00:00:00.000Z",
-          direction: "outbound",
-          from: "+15551111111",
-          status: "delivered",
-          to: "+15550000002",
+          conv_key: "15550000002",
+          contact_phone: "+15550000002",
+          user_phone: "+15551111111",
+          conversation_start: "2026-03-02T00:00:00.000Z",
+          conversation_last_update: "2026-03-02T00:00:00.000Z",
+          message_count: 1,
+          unread_count: 0,
+          has_replied: false,
+          last_inbound_body: null,
+          primary_contact_id: 11,
         },
       ],
       contactRows: [
@@ -940,7 +1013,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       sort: "recent",
     });
 
-    expect(tdbMocks.message.findMany).toHaveBeenCalled();
+    expect(tdbMocks.execute).toHaveBeenCalled();
     expect(result.hasMore).toBe(true);
     expect(result.chats).toEqual([
       expect.objectContaining({
@@ -956,34 +1029,34 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("fetchConversationSummary applies strict hasReplied filtering before pagination", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
+    // Conversation 15550000003 never replied (outbound only), so the
+    // "hasReplied" filter excludes it at the aggregation/WHERE stage before
+    // LIMIT/OFFSET — only the two replied conversations are returned here.
     mockConversationTenantData({
-      messageRows: [
+      aggregatedRows: [
         {
-          campaign_id: 1,
-          contact_id: 10,
-          date_created: "2026-03-05T00:00:00.000Z",
-          direction: "inbound",
-          from: "+15550000001",
-          status: "received",
-          to: "+15551111111",
+          conv_key: "15550000001",
+          contact_phone: "+15550000001",
+          user_phone: "+15551111111",
+          conversation_start: "2026-03-05T00:00:00.000Z",
+          conversation_last_update: "2026-03-05T00:00:00.000Z",
+          message_count: 1,
+          unread_count: 1,
+          has_replied: true,
+          last_inbound_body: null,
+          primary_contact_id: 10,
         },
         {
-          campaign_id: 1,
-          contact_id: 11,
-          date_created: "2026-03-04T00:00:00.000Z",
-          direction: "inbound",
-          from: "+15550000002",
-          status: "read",
-          to: "+15551111111",
-        },
-        {
-          campaign_id: 1,
-          contact_id: 12,
-          date_created: "2026-03-03T00:00:00.000Z",
-          direction: "outbound",
-          from: "+15551111111",
-          status: "delivered",
-          to: "+15550000003",
+          conv_key: "15550000002",
+          contact_phone: "+15550000002",
+          user_phone: "+15551111111",
+          conversation_start: "2026-03-04T00:00:00.000Z",
+          conversation_last_update: "2026-03-04T00:00:00.000Z",
+          message_count: 1,
+          unread_count: 0,
+          has_replied: true,
+          last_inbound_body: null,
+          primary_contact_id: 11,
         },
       ],
       contactRows: [
@@ -1011,34 +1084,22 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("fetchConversationSummary applies strict hasUnreadReply filtering", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
+    // Only 15550000001 has an unread ("received") inbound message; the
+    // aggregation's WHERE (unread_count > 0) excludes the other two
+    // conversations before LIMIT/OFFSET.
     mockConversationTenantData({
-      messageRows: [
+      aggregatedRows: [
         {
-          campaign_id: 1,
-          contact_id: 10,
-          date_created: "2026-03-05T00:00:00.000Z",
-          direction: "inbound",
-          from: "+15550000001",
-          status: "received",
-          to: "+15551111111",
-        },
-        {
-          campaign_id: 1,
-          contact_id: 11,
-          date_created: "2026-03-04T00:00:00.000Z",
-          direction: "inbound",
-          from: "+15550000002",
-          status: "read",
-          to: "+15551111111",
-        },
-        {
-          campaign_id: 1,
-          contact_id: 12,
-          date_created: "2026-03-03T00:00:00.000Z",
-          direction: "outbound",
-          from: "+15551111111",
-          status: "delivered",
-          to: "+15550000003",
+          conv_key: "15550000001",
+          contact_phone: "+15550000001",
+          user_phone: "+15551111111",
+          conversation_start: "2026-03-05T00:00:00.000Z",
+          conversation_last_update: "2026-03-05T00:00:00.000Z",
+          message_count: 1,
+          unread_count: 1,
+          has_replied: true,
+          last_inbound_body: null,
+          primary_contact_id: 10,
         },
       ],
       contactRows: [
@@ -1069,15 +1130,18 @@ describe("app/lib/database/workspace.server.ts", () => {
     const mod = await import("../app/lib/database/workspace.server");
 
     mockConversationTenantData({
-      messageRows: [
+      aggregatedRows: [
         {
-          campaign_id: 1,
-          contact_id: 10,
-          date_created: "2026-03-03T00:00:00.000Z",
-          direction: "outbound",
-          from: "+15551111111",
-          status: "delivered",
-          to: "+15550000001",
+          conv_key: "15550000001",
+          contact_phone: "+15550000001",
+          user_phone: "+15551111111",
+          conversation_start: "2026-03-03T00:00:00.000Z",
+          conversation_last_update: "2026-03-03T00:00:00.000Z",
+          message_count: 1,
+          unread_count: 0,
+          has_replied: false,
+          last_inbound_body: null,
+          primary_contact_id: 10,
         },
       ],
       contactRows: [
@@ -1109,15 +1173,18 @@ describe("app/lib/database/workspace.server.ts", () => {
     const mod = await import("../app/lib/database/workspace.server");
 
     mockConversationTenantData({
-      messageRows: [
+      aggregatedRows: [
         {
-          campaign_id: 1,
-          contact_id: null,
-          date_created: "2026-03-03T00:00:00.000Z",
-          direction: "outbound",
-          from: "+15551111111",
-          status: "delivered",
-          to: "+15550000001",
+          conv_key: "15550000001",
+          contact_phone: "+15550000001",
+          user_phone: "+15551111111",
+          conversation_start: "2026-03-03T00:00:00.000Z",
+          conversation_last_update: "2026-03-03T00:00:00.000Z",
+          message_count: 1,
+          unread_count: 0,
+          has_replied: false,
+          last_inbound_body: null,
+          primary_contact_id: null,
         },
       ],
       contactRows: [],

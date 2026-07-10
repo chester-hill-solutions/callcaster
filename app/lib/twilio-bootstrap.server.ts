@@ -40,7 +40,9 @@ function buildBootstrapUrls(callbackBaseUrl: string) {
     callbackBaseUrl,
     inboundVoiceUrl: `${callbackBaseUrl}/api/inbound`,
     inboundSmsUrl: `${callbackBaseUrl}/api/inbound-sms`,
-    statusCallbackUrl: `${callbackBaseUrl}/api/caller-id/status`,
+    // SMS delivery status callback (distinct from caller-ID verification, which
+    // stays on /api/caller-id/status).
+    statusCallbackUrl: `${callbackBaseUrl}/api/sms/status`,
   };
 }
 
@@ -67,6 +69,10 @@ async function configureMessagingServiceInTwilio({
         onboarding.messagingService.friendlyName ??
         undefined,
       statusCallback: urls.statusCallbackUrl,
+      fallbackUrl: urls.inboundSmsUrl,
+      fallbackMethod: "POST",
+      mmsConverter: true,
+      validityPeriod: 36000,
       stickySender: onboarding.messagingService.stickySenderEnabled,
       areaCodeGeomatch: true,
       useInboundWebhookOnNumber: true,
@@ -129,6 +135,10 @@ export async function ensureWorkspaceTwilioBootstrap({
   }
 
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
+  // Bootstrap provisions infrastructure; it must not fast-forward the wizard
+  // past steps the user hasn't seen. Remember where they were so the final
+  // merge can restore it (only the legacy "messaging_service" marker advances).
+  const preBootstrapStep = onboarding.currentStep;
   const callbackBaseUrl = env.BASE_URL();
   const urls = buildBootstrapUrls(callbackBaseUrl);
   const createdResources: string[] = [...onboarding.subaccountBootstrap.createdResources];
@@ -220,7 +230,9 @@ export async function ensureWorkspaceTwilioBootstrap({
         ? "collecting_business"
         : "provisioning",
       currentStep: nextOnboarding.messagingService.serviceSid
-        ? "first_number"
+        ? preBootstrapStep === "messaging_service"
+          ? "first_number"
+          : preBootstrapStep
         : "messaging_service",
       steps: buildOnboardingStepsForState(nextOnboarding),
       subaccountBootstrap: {

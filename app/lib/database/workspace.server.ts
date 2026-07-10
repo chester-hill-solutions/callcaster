@@ -27,9 +27,13 @@ import { AppError, ErrorCode } from "@/lib/errors.server";
 import {
   buildOnboardingStepsForState,
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+  getWorkspaceMessagingOnboardingState,
   mergeWorkspaceMessagingOnboardingState,
+  updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { seedWorkspaceSampleData } from "@/lib/seed/seed-workspace-sample-data.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { data as routeData } from "react-router";
@@ -168,6 +172,9 @@ function twilioAccountToPersistableJson(account: unknown): Record<string, unknow
   return out;
 }
 
+/** Every new workspace starts with free credits so teams can try calling/texting before paying. */
+export const NEW_WORKSPACE_WELCOME_CREDITS = 100;
+
 export async function createNewWorkspace({
   workspaceName,
   user_id,
@@ -240,7 +247,7 @@ export async function createNewWorkspace({
           status: "provisioning",
         },
         status: "provisioning",
-        currentStep: "messaging_service",
+        currentStep: "business_profile",
         lastUpdatedBy: user_id,
       },
     );
@@ -292,6 +299,32 @@ export async function createNewWorkspace({
         );
         provisioningWarnings.push("Twilio bootstrap is still running");
       }
+    }
+
+    try {
+      await insertTransactionHistoryIdempotent({
+        workspaceId: createdWorkspaceId,
+        type: "CREDIT",
+        amount: NEW_WORKSPACE_WELCOME_CREDITS,
+        note: `Welcome bonus: ${NEW_WORKSPACE_WELCOME_CREDITS} free credits to get started`,
+        idempotencyKey: `welcome-credits:${createdWorkspaceId}`,
+      });
+    } catch (welcomeCreditError) {
+      logger.error(
+        "Welcome credit grant failed after workspace creation:",
+        welcomeCreditError,
+      );
+      provisioningWarnings.push("Welcome credits were not granted");
+    }
+
+    try {
+      await seedWorkspaceSampleData(createdWorkspaceId, user_id);
+    } catch (seedError) {
+      logger.error(
+        "Sample data seeding failed after workspace creation:",
+        seedError,
+      );
+      provisioningWarnings.push("Sample data seeding failed");
     }
 
     return {
@@ -727,26 +760,84 @@ export async function removeWorkspacePhoneNumber({
     const twilio = await createWorkspaceTwilioInstance({
       workspace_id: workspaceId,
     });
-    if (!number.friendly_name) {
-      throw new Error("Friendly name is required");
+
+    // Prefer the stored Twilio IncomingPhoneNumber SID for a direct,
+    // SID-based release. Only fall back to friendly_name matching for legacy
+    // rows that predate the twilio_phone_number_sid column.
+    const storedSid = number.twilio_phone_number_sid ?? null;
+    let incomingSids: string[];
+    if (storedSid) {
+      incomingSids = [storedSid];
+    } else {
+      if (!number.friendly_name) {
+        throw new Error("Friendly name is required");
+      }
+      const incomingIds = await twilio.incomingPhoneNumbers.list({
+        friendlyName: number.friendly_name,
+      });
+      incomingSids = incomingIds.map((id) => id.sid);
     }
-    const outgoingIds = await twilio.outgoingCallerIds.list({
-      friendlyName: number.friendly_name,
+
+    // Explicitly detach from the workspace Messaging Service before releasing
+    // the number, so the MS sender pool does not hold a dangling reference.
+    const onboarding = await getWorkspaceMessagingOnboardingState({
+      workspaceId,
     });
-    const incomingIds = await twilio.incomingPhoneNumbers.list({
-      friendlyName: number.friendly_name,
-    });
+    const msSid = onboarding.messagingService.serviceSid;
+    if (msSid) {
+      for (const sid of incomingSids) {
+        try {
+          await twilio.messaging.v1.services(msSid).phoneNumbers(sid).remove();
+        } catch (detachError) {
+          // Ignore "not attached" / already-detached errors.
+          logger.warn(
+            `MS detach skipped for ${sid}: ${
+              detachError instanceof Error
+                ? detachError.message
+                : String(detachError)
+            }`,
+          );
+        }
+      }
+    }
+
+    // Outgoing caller-ID cleanup (match by friendly_name when available).
+    const outgoingIds = number.friendly_name
+      ? await twilio.outgoingCallerIds.list({
+          friendlyName: number.friendly_name,
+        })
+      : [];
+
     await Promise.all([
       ...outgoingIds.map(async (id) => {
         return await twilio.outgoingCallerIds(id.sid).remove();
       }),
-      ...incomingIds.map(async (id) => {
-        return await twilio.incomingPhoneNumbers(id.sid).remove();
+      ...incomingSids.map(async (sid) => {
+        return await twilio.incomingPhoneNumbers(sid).remove();
       }),
     ]);
     await tdb.workspace_number.delete({
       where: eq(workspace_number.id, normalizedNumberId),
     });
+
+    // Drop the released number from the Messaging Service attached senders.
+    if (number.phone_number) {
+      const releasedPhone = number.phone_number;
+      await updateWorkspaceMessagingOnboardingState({
+        workspaceId,
+        updates: {
+          messagingService: {
+            ...onboarding.messagingService,
+            attachedSenderPhoneNumbers:
+              onboarding.messagingService.attachedSenderPhoneNumbers.filter(
+                (p) => p !== releasedPhone,
+              ),
+          },
+        },
+        actorUserId: null,
+      });
+    }
+
     return { error: null };
   } catch (error) {
     return { error };

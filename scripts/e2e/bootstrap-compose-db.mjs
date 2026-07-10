@@ -26,6 +26,13 @@ const steps = [
   "drizzle/0006_app_schema_tail.sql",
   "scripts/e2e/bootstrap-compose-cleanup.sql",
   "client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql",
+  "client/migrations/20260708000000_transaction_history_workspace_created_idx.sql",
+  "client/migrations/20260708010000_message_workspace_campaign_date_idx.sql",
+  "client/migrations/20260709000000_add_message_scheduled_at.sql",
+  "client/migrations/20260709100000_contact_line_type.sql",
+  "client/migrations/20260710000000_workspace_number_twilio_sid.sql",
+  "client/migrations/20260710010000_campaign_send_window.sql",
+  "client/migrations/20260710020000_fix_apply_ledger_entry_enum_cast.sql",
 ];
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
