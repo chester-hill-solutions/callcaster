@@ -1,131 +1,58 @@
 /**
- * By default, Remix will handle generating the HTTP Response for you.
- * You are free to delete this file if you'd like to, but if you ever want it revealed again, you can run `npx remix reveal` ✨
- * For more information, see https://remix.run/file-conventions/entry.server
+ * React Router streaming SSR entry.
+ *
+ * Uses renderToReadableStream (web streams): Bun resolves `react-dom/server`
+ * to `server.bun.js`, which — as of React 19 — no longer exports the
+ * node-streams renderToPipeableStream. The web-streams renderer works under
+ * both Bun (production server) and Node (vite dev).
  */
 
 import { ServerRouter } from "react-router";
 import type { AppLoadContext, EntryContext } from "react-router";
-import { PassThrough } from "node:stream";
-
-import { createReadableStreamFromReadable } from "@react-router/node";
 
 import { isbot } from "isbot";
-import { renderToPipeableStream } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server";
 import { logger } from "@/lib/logger.server";
 
 const ABORT_DELAY = 5_000;
 
-export default function handleRequest(
+export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   reactRouterContext: EntryContext,
-  loadContext: AppLoadContext
+  _loadContext: AppLoadContext,
 ) {
-  return isbot(request.headers.get("user-agent") || "")
-    ? handleBotRequest(
-        request,
-        responseStatusCode,
-        responseHeaders,
-        reactRouterContext
-      )
-    : handleBrowserRequest(
-        request,
-        responseStatusCode,
-        responseHeaders,
-        reactRouterContext,
-      );
-}
+  let shellRendered = false;
+  const controller = new AbortController();
+  // Matches the previous renderToPipeableStream behavior: abort any Suspense
+  // boundaries still pending after the delay so responses always complete.
+  setTimeout(() => controller.abort(), ABORT_DELAY);
 
-function handleBotRequest(
-  request: Request,
-  responseStatusCode: number,
-  responseHeaders: Headers,
-  reactRouterContext: EntryContext
-) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
-    const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={reactRouterContext} url={request.url} />,
-      {
-        onAllReady() {
-          shellRendered = true;
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
+  const body = await renderToReadableStream(
+    <ServerRouter context={reactRouterContext} url={request.url} />,
+    {
+      signal: controller.signal,
+      onError(error: unknown) {
+        responseStatusCode = 500;
+        // Log streaming rendering errors from inside the shell. Shell errors
+        // reject the render promise and are logged by handleDocumentRequest.
+        if (shellRendered) {
+          logger.error("Streaming render error:", error);
+        }
+      },
+    },
+  );
+  shellRendered = true;
 
-          responseHeaders.set("Content-Type", "text/html");
+  // Bots get the fully rendered document (parity with onAllReady).
+  if (isbot(request.headers.get("user-agent") || "")) {
+    await body.allReady;
+  }
 
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-
-          pipe(body);
-        },
-        onShellError(error: unknown) {
-          reject(error);
-        },
-        onError(error: unknown) {
-          responseStatusCode = 500;
-          // Log streaming rendering errors from inside the shell.  Don't log
-          // errors encountered during initial shell rendering since they'll
-          // reject and get logged in handleDocumentRequest.
-          if (shellRendered) {
-            logger.error("Streaming render error:", error);
-          }
-        },
-      }
-    );
-
-    setTimeout(abort, ABORT_DELAY);
-  });
-}
-
-function handleBrowserRequest(
-  request: Request,
-  responseStatusCode: number,
-  responseHeaders: Headers,
-  reactRouterContext: EntryContext
-) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
-    const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={reactRouterContext} url={request.url} />,
-      {
-        onShellReady() {
-          shellRendered = true;
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
-
-          responseHeaders.set("Content-Type", "text/html");
-
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-
-          pipe(body);
-        },
-        onShellError(error: unknown) {
-          reject(error);
-        },
-        onError(error: unknown) {
-          responseStatusCode = 500;
-          // Log streaming rendering errors from inside the shell.  Don't log
-          // errors encountered during initial shell rendering since they'll
-          // reject and get logged in handleDocumentRequest.
-          if (shellRendered) {
-            logger.error("Streaming render error:", error);
-          }
-        },
-      }
-    );
-
-    setTimeout(abort, ABORT_DELAY);
+  responseHeaders.set("Content-Type", "text/html");
+  return new Response(body, {
+    headers: responseHeaders,
+    status: responseStatusCode,
   });
 }

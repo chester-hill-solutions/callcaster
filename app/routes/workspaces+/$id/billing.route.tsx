@@ -37,7 +37,7 @@ import {
   getBillingEventSource,
   getBillingEventSourceLabel,
   type TransactionType,
-} from "@/lib/transaction-history.server";
+} from "@/lib/transaction-history-display";
 import {
   CREDIT_PRICE_CAD,
   MIN_CREDITS,

@@ -287,9 +287,7 @@ export function buildDequeuedQueueUpdate(
   };
 }
 
-/**
- * Release every campaign_queue row still assigned to `userId` back to the
- * queued pool. Collapses the duplicated select → filter → requeue logic that
- * previously lived inline in the call-screen action and platform-telephony.
- */
-export { releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
+// NOTE: releaseAssignedQueueForUser lives in @/lib/campaign-queue-db.server —
+// import it from there. Re-exporting it here dragged the entire server db
+// graph into the client bundle (this file is imported by client components),
+// which crashed client-side navigation with "DATABASE_URL is required".

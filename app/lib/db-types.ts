@@ -1,6 +1,11 @@
 // Drizzle-inferred database types — replaces app/lib/database.types.ts (Track 2)
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-import {
+// import type (not a value import): this module is consumed by client
+// components, and a value import of the schema drags drizzle-orm — and, via
+// chunk-mates, app/server/db.ts — into the client bundle, crashing client
+// navigations with "DATABASE_URL is required". `typeof` works on type-only
+// imports, so nothing here needs the runtime objects.
+import type {
   agent_state,
   answered_by,
   call_status,

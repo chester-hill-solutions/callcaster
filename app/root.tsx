@@ -91,6 +91,11 @@ export default function App() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
+        {/* Synchronous classic script: csv-parse (in the client route graph)
+            reads Buffer at module scope, and RR8's bootstrap statically
+            imports route modules BEFORE entry.client runs — so the polyfill
+            must be installed before any module executes. */}
+        <script src="/buffer-polyfill.mjs" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){var t=localStorage.getItem("callcaster-theme");if(t==="dark")document.documentElement.classList.add("dark");else if(t==="light")document.documentElement.classList.remove("dark");else if(window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,

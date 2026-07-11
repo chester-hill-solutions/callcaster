@@ -62,9 +62,6 @@ function baseProps(overrides: Partial<any> = {}) {
     fetchMore: vi.fn(),
     householdMap: {},
     isActive: true,
-    credits: 500,
-    creditsError: false,
-    hasAccess: true,
     ...overrides,
   };
 }
@@ -175,22 +172,10 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
     expect(setReportDialog).toHaveBeenCalledWith(false);
   });
 
-  test("credits dialog copy + link target depends on hasAccess; opens when creditsError is true", async () => {
-    const { CampaignDialogs } = await import("@/components/call/CallScreen.Dialogs");
-
-    const { rerender } = render(
-      <CampaignDialogs {...baseProps({ creditsError: false, hasAccess: true })} />,
-    );
-    rerender(<CampaignDialogs {...baseProps({ credits: 0, creditsError: true, hasAccess: true })} />);
-    expect(screen.getByText("No Credits Remaining")).toBeInTheDocument();
-    expect(screen.getByText(/purchase more credits/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Purchase Credits" }).getAttribute("href")).toContain("billing");
-
-    // hasAccess=false branch
-    rerender(<CampaignDialogs {...baseProps({ credits: 0, creditsError: true, hasAccess: false })} />);
-    expect(screen.getByText("Campaign Disabled")).toBeInTheDocument();
-    expect(screen.getByText(/contact your administrator/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go Back" }).getAttribute("href")).toBe("..");
-  });
+  // The zero-credits dialog was removed: it duplicated the credits-error-banner
+  // in CallScreen.Layout (both rendered "No Credits Remaining"/"Campaign
+  // Disabled", breaking Playwright strict mode once RR8 hydration made the
+  // dialog actually mount). The banner — including its Purchase Credits billing
+  // link — is covered by e2e specs DIAL-08 and RBAC-18.
 });
 

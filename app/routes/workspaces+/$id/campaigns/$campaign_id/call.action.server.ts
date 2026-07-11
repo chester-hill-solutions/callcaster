@@ -1,5 +1,5 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
-import { releaseAssignedQueueForUser } from "@/lib/queue-status";
+import { releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import {
   handleCall,
   handleConference,

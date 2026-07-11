@@ -40,10 +40,9 @@ export const workspaceMiddleware: MiddlewareFunction = async (
 
   const userRoleRow = await getUserRole({ user, workspaceId });
   if (!userRoleRow || !VALID_ROLES.includes(userRoleRow.role)) {
-    return routeData(
-      { error: "Workspace not found" },
-      { headers, status: 404 },
-    );
+    // Non-members land back on the workspace picker (RBAC-17). A redirect
+    // also avoids leaking whether the workspace exists.
+    throw redirect("/workspaces", { headers });
   }
 
   context.set(workspaceContext, {

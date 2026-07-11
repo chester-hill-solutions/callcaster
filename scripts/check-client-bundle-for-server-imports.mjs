@@ -9,6 +9,11 @@ import path from "node:path";
 const BUILD_CLIENT = path.join(process.cwd(), "build", "client");
 const FORBIDDEN = [
   "AUTH_SERVICE_KEY",
+  // app/server/db.ts boot error — fires when the server db graph leaks into
+  // a client chunk (e.g. a shared lib re-exporting from a *.server module).
+  "DATABASE_URL is required",
+  // drizzle-orm runtime marker — the ORM has no business in the browser.
+  "drizzle:entityKind",
   "env.server",
   "twilio-webhook.server",
   "throughput-config.server",

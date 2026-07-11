@@ -22,7 +22,7 @@ import { handset_session as handsetSessionTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { generateToken } from "@/lib/twilio-token.server";
-import { releaseAssignedQueueForUser } from "@/lib/queue-status";
+import { releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
 
 const EMPTY_LISTENING = {

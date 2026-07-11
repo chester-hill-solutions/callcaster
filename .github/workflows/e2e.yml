@@ -3,6 +3,10 @@ name: E2E
 on:
   push:
     branches: [main, master]
+  # The app server runs under Bun in production; PR-level CI otherwise never
+  # boots it, so Bun-only regressions (e.g. react-dom/server export shape)
+  # would only surface after merge.
+  pull_request:
   schedule:
     - cron: "0 6 * * *"
 
@@ -17,6 +21,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+
+      # start-e2e-server.mjs spawns `bun run ./server/bun.ts`.
+      - uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
         run: npm ci

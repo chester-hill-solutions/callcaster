@@ -5,6 +5,8 @@ import { Household } from "@/components/call/CallScreen.Household";
 import { CampaignHeader } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
+import { Button } from "@/components/ui/button";
+import { NavLink } from "react-router";
 import {
   declineIncomingCall,
   IncomingCallPanel,
@@ -130,6 +132,13 @@ export function CallScreenLayout({
               ? "Purchase more credits to continue this campaign."
               : "Please contact your administrator to enable the campaign."}
           </p>
+          {hasAccess ? (
+            <Button asChild className="mt-3">
+              <NavLink to="../../../billing" relative="path">
+                Purchase Credits
+              </NavLink>
+            </Button>
+          ) : null}
         </div>
       ) : null}
       <div className="flex flex-col gap-4 rounded-2xl border-2 border-brand-secondary/40 p-4 sm:p-6 lg:flex-row lg:items-start">
@@ -274,9 +283,6 @@ export function CallScreenLayout({
         householdMap={householdMap}
         currentState={currentState}
         isActive={isActive}
-        credits={credits}
-        creditsError={Number(credits) <= 0 || creditsError}
-        hasAccess={hasAccess}
       />
     </div>
   );

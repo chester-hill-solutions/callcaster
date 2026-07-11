@@ -27,9 +27,6 @@ interface CampaignDialogsProps {
   fetchMore: (params: Record<string, unknown>) => void;
   householdMap: Record<string, QueueItem[]>;
   isActive: boolean;
-  credits?: number;
-  creditsError?: boolean;
-  hasAccess: boolean;
 }
 
 export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
@@ -44,15 +41,8 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   householdMap,
   currentState,
   isActive,
-  credits,
-  creditsError,
-  hasAccess
 }) => {
   const [errorDescription, setErrorDescription] = useState<string>('');
-  const noCredits = Number(credits ?? 0) <= 0;
-  const shouldBlockForCredits = noCredits || Boolean(creditsError);
-  const [creditsDialogDismissed, setCreditsDialogDismissed] = useState(false);
-  const showCreditsDialog = shouldBlockForCredits && !creditsDialogDismissed;
   const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
   const navigate = useNavigate();
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
@@ -202,33 +192,6 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        onOpenChange={(open) => setCreditsDialogDismissed(!open)}
-        open={showCreditsDialog}
-      >
-        <DialogContent
-          className="flex w-[450px] flex-col items-center bg-card"
-          data-testid="credits-error-dialog"
-        >
-          <DialogHeader>
-            <DialogTitle className="text-center font-Zilla-Slab text-2xl">
-              {hasAccess ? 'No Credits Remaining' : 'Campaign Disabled'}
-            </DialogTitle>
-            <div className="my-6 w-[400px]">
-              <p>
-                You have no credits remaining for this campaign. {hasAccess ? 'Purchase more credits to continue this campaign.' : 'Please contact your administrator to enable the campaign.'}
-              </p>
-            </div>
-            <DialogFooter>
-              <Button asChild>
-                <NavLink to={hasAccess ? "../../../billing" : ".."} relative="path">
-                  {hasAccess ? 'Purchase Credits' : 'Go Back'}
-                </NavLink>
-              </Button>
-            </DialogFooter>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
