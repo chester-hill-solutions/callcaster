@@ -176,7 +176,7 @@ describe("app/entry.server", () => {
     expect(res.status).toBe(500);
   });
 
-  test("passes an abort signal that fires after the abort delay", async () => {
+  test("passes an abort signal, and clears the timer once the response completes", async () => {
     vi.useFakeTimers();
     try {
       isbotMock.isbot.mockReturnValueOnce(false);
@@ -193,10 +193,44 @@ describe("app/entry.server", () => {
 
       expect(lastRenderOpts?.signal).toBeInstanceOf(AbortSignal);
       expect(lastRenderOpts!.signal!.aborted).toBe(false);
+      // The abort timer is cleared in `finally`, so a completed fast response
+      // is never aborted after the fact (no leaked timer firing on a closed
+      // stream).
       vi.advanceTimersByTime(5_000);
-      expect(lastRenderOpts!.signal!.aborted).toBe(true);
+      expect(lastRenderOpts!.signal!.aborted).toBe(false);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  test("a slow-Suspense abort keeps the bot response at 200, not 500", async () => {
+    isbotMock.isbot.mockReturnValueOnce(true);
+    renderImpl = async (opts) => {
+      const stream = makeStream();
+      queueMicrotask(() => {
+        // Simulate ABORT_DELAY firing: the render's own signal is aborted and
+        // React then reports that abort via onError. The shell already
+        // streamed, so entry.server must keep the 200.
+        opts.signal?.dispatchEvent?.(new Event("abort"));
+        Object.defineProperty(opts.signal!, "aborted", {
+          value: true,
+          configurable: true,
+        });
+        opts.onError?.(new DOMException("The operation was aborted", "AbortError"));
+        allReadyResolve?.();
+      });
+      return stream;
+    };
+    const mod = await import("../app/entry.server");
+
+    const res = await mod.default(
+      new Request("http://localhost/", { headers: { "user-agent": "bot" } }),
+      200,
+      new Headers(),
+      {} as any,
+      {} as any,
+    );
+    expect(res.status).toBe(200);
+    expect(loggerMock.error).not.toHaveBeenCalled();
   });
 });

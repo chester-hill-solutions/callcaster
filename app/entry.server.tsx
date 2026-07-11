@@ -25,34 +25,42 @@ export default async function handleRequest(
 ) {
   let shellRendered = false;
   const controller = new AbortController();
-  // Matches the previous renderToPipeableStream behavior: abort any Suspense
-  // boundaries still pending after the delay so responses always complete.
-  setTimeout(() => controller.abort(), ABORT_DELAY);
+  // Abort any Suspense boundaries still pending after the delay so responses
+  // always complete (parity with the old renderToPipeableStream abort timer).
+  const abortTimer = setTimeout(() => controller.abort(), ABORT_DELAY);
 
-  const body = await renderToReadableStream(
-    <ServerRouter context={reactRouterContext} url={request.url} />,
-    {
-      signal: controller.signal,
-      onError(error: unknown) {
-        responseStatusCode = 500;
-        // Log streaming rendering errors from inside the shell. Shell errors
-        // reject the render promise and are logged by handleDocumentRequest.
-        if (shellRendered) {
-          logger.error("Streaming render error:", error);
-        }
+  try {
+    const body = await renderToReadableStream(
+      <ServerRouter context={reactRouterContext} url={request.url} />,
+      {
+        signal: controller.signal,
+        onError(error: unknown) {
+          // An intentional abort (slow Suspense past ABORT_DELAY) is not a
+          // render failure — the shell already streamed, so keep the 2xx and
+          // let the flushed content stand. Only real errors become a 500.
+          if (controller.signal.aborted) return;
+          responseStatusCode = 500;
+          // Shell errors reject the render promise and are logged by
+          // handleDocumentRequest; only log post-shell streaming errors here.
+          if (shellRendered) {
+            logger.error("Streaming render error:", error);
+          }
+        },
       },
-    },
-  );
-  shellRendered = true;
+    );
+    shellRendered = true;
 
-  // Bots get the fully rendered document (parity with onAllReady).
-  if (isbot(request.headers.get("user-agent") || "")) {
-    await body.allReady;
+    // Bots get the fully rendered document (parity with onAllReady).
+    if (isbot(request.headers.get("user-agent") || "")) {
+      await body.allReady;
+    }
+
+    responseHeaders.set("Content-Type", "text/html");
+    return new Response(body, {
+      headers: responseHeaders,
+      status: responseStatusCode,
+    });
+  } finally {
+    clearTimeout(abortTimer);
   }
-
-  responseHeaders.set("Content-Type", "text/html");
-  return new Response(body, {
-    headers: responseHeaders,
-    status: responseStatusCode,
-  });
 }
