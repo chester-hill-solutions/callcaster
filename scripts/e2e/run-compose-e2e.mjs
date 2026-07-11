@@ -55,13 +55,22 @@ run("docker", ["compose", "-f", composeFile, "up", "-d", "postgres", "minio", "i
 
 console.log("[e2e-compose] waiting for Postgres…");
 await (async function waitForPostgres() {
-  for (let i = 0; i < 60; i += 1) {
-    const probe = spawnSync(
-      "docker",
-      ["compose", "-f", composeFile, "exec", "-T", "postgres", "pg_isready", "-U", "callcaster"],
-      { stdio: "ignore" },
-    );
-    if (probe.status === 0) return;
+  // The official postgres image starts a temporary server for initdb, then
+  // RESTARTS the real server — so an early host connection to the mapped port
+  // gets "server closed the connection unexpectedly". Probe the SAME host path
+  // the bootstrap uses (psql → DATABASE_URL) and require two consecutive
+  // successes so a mid-restart drop can't be mistaken for readiness.
+  let consecutive = 0;
+  for (let i = 0; i < 90; i += 1) {
+    const probe = spawnSync("psql", [databaseUrl, "-tAc", "select 1"], {
+      stdio: "ignore",
+    });
+    if (probe.status === 0) {
+      consecutive += 1;
+      if (consecutive >= 2) return;
+    } else {
+      consecutive = 0;
+    }
     await new Promise((r) => setTimeout(r, 1000));
   }
   throw new Error("Postgres did not become ready");
