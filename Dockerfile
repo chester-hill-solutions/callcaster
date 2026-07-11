@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ─── Build stage ──────────────────────────────────────────────────────
-FROM oven/bun:1.2.15 AS builder
+FROM oven/bun:1.3.5 AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN bun run build
 RUN rm -rf node_modules && bun install --frozen-lockfile --production
 
 # ─── Production stage ─────────────────────────────────────────────────
-FROM oven/bun:1.2.15-slim AS production
+FROM oven/bun:1.3.5-slim AS production
 
 WORKDIR /app
 
