@@ -23,11 +23,6 @@ export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;
 export const IVR_HANDLER_NEXT_DELAY_MS = 500;
 
-/** @deprecated Use configuredDispatcherSmsMps with portal config instead. */
-export const MESSAGE_PIPELINE_MESSAGES_PER_SECOND = LEGACY_MESSAGE_PIPELINE_MPS;
-/** @deprecated Use configuredDispatcherVoiceCps with portal config instead. */
-export const IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND = LEGACY_IVR_PIPELINE_CPS;
-
 type ThroughputContext = {
   smsSenderClass: WorkspaceTwilioOpsConfig["smsSenderClass"];
   trafficClass: TwilioTrafficClass;

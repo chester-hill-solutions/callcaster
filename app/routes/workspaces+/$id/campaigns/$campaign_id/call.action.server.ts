@@ -19,7 +19,7 @@ import type {
   LoaderData,
   QueueItem,
   OutreachAttempt,
-  UseWorkspaceRealtimePropsAlias,
+  UseWorkspaceRealtimeProps,
   AppUser,
   BaseUser,
   ActiveCall,

@@ -14,8 +14,6 @@ export async function createHandsetAccessToken({
 }: {
   workspaceId: string;
   clientIdentity: string;
-  /** @deprecated Drizzle lookup — ignored when workspaceId is set. */
-  null?: unknown;
 }): Promise<HandsetAccessTokenResult> {
   if (!workspaceId || !clientIdentity) {
     return { token: null, error: "workspace and client_identity are required" };

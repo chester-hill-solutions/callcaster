@@ -775,9 +775,6 @@ export interface UseWorkspaceRealtimeProps {
   setUpdate: (update: Record<string, unknown> | null) => void;
 }
 
-/** @deprecated Use UseWorkspaceRealtimeProps */
-export type UseWorkspaceRealtimePropsAlias = UseWorkspaceRealtimeProps;
-
 // Utility function to generate survey links
 export function generateSurveyLink(contactId: number, surveyId: string, baseUrl: string): string {
   const encoded = btoa(`${contactId}:${surveyId}`);

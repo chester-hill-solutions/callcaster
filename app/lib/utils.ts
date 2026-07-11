@@ -187,7 +187,6 @@ export const days = [
 // Re-exports for backward compatibility. Implementations live in dedicated
 // modules so `utils.ts` is no longer a grab-bag; callers can migrate to the
 // canonical modules incrementally.
-export { escapeCSV } from "@/lib/csv";
 export { processTemplateTags } from "@/lib/message-templates";
 export {
   normalizePhoneNumber,

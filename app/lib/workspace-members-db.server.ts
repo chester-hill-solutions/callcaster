@@ -15,6 +15,7 @@ import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { mergeWorkspaceTwilioData as mergeWorkspaceTwilioDataCore } from "@/lib/merge-workspace-twilio-data.server";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -575,20 +576,18 @@ export async function mergeWorkspaceTwilioData(
     throw new Error("Workspace not found");
   }
 
-  const existingTwilioData =
-    workspace.twilio_data &&
-    typeof workspace.twilio_data === "object" &&
-    !Array.isArray(workspace.twilio_data)
-      ? (workspace.twilio_data as Record<string, unknown>)
-      : {};
+  // `twilio_data` is a `text().notNull()` column holding a JSON string, not
+  // an object at runtime. Delegate the read-modify-write to the sibling
+  // helper in merge-workspace-twilio-data.server.ts, which correctly
+  // JSON.parse/JSON.stringify's the column and busts the in-process Twilio
+  // credentials cache on write. This preserves this function's external
+  // signature/return shape (the full updated workspace row, or null).
+  await mergeWorkspaceTwilioDataCore(workspaceId, (current) => ({
+    ...current,
+    ...patch,
+  }));
 
-  const [updated] = await adminDb
-    .update(workspaceTable)
-    .set({ twilio_data: { ...existingTwilioData, ...patch } as unknown as string })
-    .where(eq(workspaceTable.id, workspaceId))
-    .returning();
-
-  return updated ?? null;
+  return await getWorkspaceById(workspaceId);
 }
 
 export async function getWorkspaceWithCampaigns(workspaceId: string) {

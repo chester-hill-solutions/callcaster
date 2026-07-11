@@ -140,9 +140,6 @@ export async function verifyApiKeyOrSession(
   return resolveCookieSession(request);
 }
 
-/** @deprecated Use verifyApiKeyOrSession — alias for dual-auth rollout. */
-export const verifyApiKeyOrBearerOrSession = verifyApiKeyOrSession;
-
 export async function requireJsonAuth(
   request: Request,
 ): Promise<BearerSessionAuthResult | SessionAuthResult | Response> {

@@ -299,8 +299,6 @@ export const createContact = async (
      * `createContact` caller keeps its existing no-audience behavior.
      */
     assignDefaultAudienceIfMissing?: boolean;
-    /** @deprecated ignored */
-    null?: never;
   },
 ) => {
   if (!contactData.workspace) {
@@ -347,8 +345,6 @@ export const bulkCreateContacts = async (
   user_id: string,
   opts?: {
     tdb?: TenantDb;
-    /** @deprecated ignored */
-    null?: never;
   },
 ) => {
   const tenantDb = opts?.tdb ?? createTenantDb(workspace_id);

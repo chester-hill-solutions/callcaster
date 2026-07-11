@@ -119,8 +119,6 @@ export async function removeContactFromAudience(
   opts?: {
     workspaceId?: string;
     tdb?: TenantDb;
-    /** @deprecated ignored */
-    null?: never;
   },
 ) {
   const workspaceId = opts?.workspaceId ?? (await resolveAudienceWorkspaceId(audienceId));
@@ -151,8 +149,6 @@ export async function removeContactsFromAudience(
   opts?: {
     workspaceId?: string;
     tdb?: TenantDb;
-    /** @deprecated ignored */
-    null?: never;
   },
 ) {
   const workspaceId = opts?.workspaceId ?? (await resolveAudienceWorkspaceId(audienceId));

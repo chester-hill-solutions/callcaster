@@ -42,8 +42,6 @@ export async function startWorkspaceCallerIdVerification({
   phoneNumber,
   friendlyName,
 }: {
-  /** @deprecated Drizzle path — ignored. */
-  null?: unknown;
   workspaceId: string;
   phoneNumber: string;
   friendlyName: string;

@@ -116,5 +116,3 @@ export function classifyTwilioPhoneInventory(
   };
 }
 
-/** @deprecated Use inferSmsSenderClassFromSenderTypes with Twilio inventory sender types. */
-export { inferSmsSenderClassFromSenderTypes as inferSmsSenderClassFromNumberTypes };

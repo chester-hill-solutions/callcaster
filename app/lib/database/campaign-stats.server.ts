@@ -150,8 +150,6 @@ export async function fetchCampaignCounts({
 }: {
   workspaceId: string;
   campaignId: string;
-  /** @deprecated Postgres no longer used; kept for call-site compatibility */
-  null?: never;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
@@ -272,8 +270,6 @@ export async function fetchQueueCounts({
 }: {
   workspaceId: string;
   campaignId: string;
-  /** @deprecated Postgres no longer used; kept for call-site compatibility */
-  null?: never;
 }) {
   const campaignIdNum = Number(campaignId);
   const [fullCount, queuedCount] = await Promise.all([
@@ -294,8 +290,6 @@ export async function fetchCampaignAudience({
 }: {
   workspaceId: string;
   campaignId: string;
-  /** @deprecated Postgres no longer used; kept for call-site compatibility */
-  null?: never;
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);

@@ -231,17 +231,24 @@ export async function runAutoDialerTurn(
         dequeuedReasonText: "Predictive Dialer called contact",
       });
 
-      const callData = {
+      // `call.dateUpdated`/`startTime`/`endTime` are `Date` in the Twilio SDK's
+      // `CallInstance` type, while `Call.date_updated`/`start_time`/`end_time`
+      // are `text()` (string) columns — convert them here so `callData` is a
+      // real `Partial<Call>` the compiler checks, instead of force-casting a
+      // mismatched shape past it. The `? … : null` guards are defensive: Twilio's
+      // docs note these fields come back empty for a call that hasn't
+      // started/ended yet, despite the SDK typing them as always-present.
+      const callData: Partial<Call> = {
         sid: call.sid,
-        date_updated: call.dateUpdated,
+        date_updated: call.dateUpdated ? call.dateUpdated.toISOString() : null,
         parent_call_sid: call.parentCallSid,
         account_sid: call.accountSid,
         to: toNumber,
         from: call.from,
         phone_number_sid: call.phoneNumberSid,
         status: call.status,
-        start_time: call.startTime,
-        end_time: call.endTime,
+        start_time: call.startTime ? call.startTime.toISOString() : null,
+        end_time: call.endTime ? call.endTime.toISOString() : null,
         duration: call.duration,
         price: call.price,
         direction: call.direction,
@@ -258,7 +265,7 @@ export async function runAutoDialerTurn(
         conference_id: conferenceId,
       };
 
-      await saveCallToDatabase(workspace_id, callData as unknown as Partial<Call>);
+      await saveCallToDatabase(workspace_id, callData);
       return { success: true };
     }
 

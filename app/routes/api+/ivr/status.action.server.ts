@@ -139,12 +139,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             callStatus !== 'completed';
 
         if (isMachine) {
-            await handleVoicemail(
-                twilio,
-                callSid,
-                dbCall as unknown as Call,
-                campaignData as unknown as Campaign & { script: Script | Script[] | null },
-            );
+            // `dbCall` is already typed as `Call` (`Call` and `findCallBySid`'s
+            // `CallRow` both alias the same Drizzle-inferred `call` row via
+            // `@/lib/db-types`), so it needs no cast here. `fetchCampaignWithScript`'s
+            // `script` field can be `undefined` (a `script_id` set on the campaign
+            // with no matching `script` row), which `handleVoicemail`'s
+            // `Script | Script[] | null` parameter type doesn't cover — normalize
+            // that one field to `null` instead of casting the whole shape away, so
+            // a genuinely ill-shaped campaign/call row still fails to compile
+            // rather than silently becoming `undefined` at runtime.
+            await handleVoicemail(twilio, callSid, dbCall, {
+                ...campaignData,
+                script: campaignData.script ?? null,
+            });
         } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
             const updateData = buildCallUpsertFromTwilioParams(params);
             await processCallStatusWebhook(updateData, {
