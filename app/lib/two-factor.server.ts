@@ -2,7 +2,7 @@ import { redirect } from "react-router";
 import { eq } from "drizzle-orm";
 import { adminDb } from "@/server/admin-db";
 import { authUser } from "@/db/auth-schema";
-import { workspace_users } from "@/db/schema";
+import { user as platformUser, workspace_users } from "@/db/schema";
 
 /** Workspace roles that must enroll in TOTP 2FA (owner/admin/field_director per security baseline). */
 export const PRIVILEGED_WORKSPACE_ROLES = ["owner", "admin", "field_director"] as const;
@@ -18,6 +18,22 @@ export async function userHasPrivilegedWorkspaceRole(userId: string): Promise<bo
   return memberships.some((m) =>
     PRIVILEGED_WORKSPACE_ROLES.includes(m.role as PrivilegedWorkspaceRole),
   );
+}
+
+/**
+ * Single source of truth for "this user is required to keep 2FA": a platform
+ * sudo admin OR a privileged workspace role. Used both to FORCE enrollment
+ * (admin/workspace middleware) and to FORBID disabling — the two must agree, or
+ * a sudo-only account could disable the 2FA the admin panel then re-mandates.
+ */
+export async function userIsTwoFactorProtected(userId: string): Promise<boolean> {
+  const [account] = await adminDb
+    .select({ accessLevel: platformUser.access_level })
+    .from(platformUser)
+    .where(eq(platformUser.id, userId))
+    .limit(1);
+  if (account?.accessLevel === "sudo") return true;
+  return userHasPrivilegedWorkspaceRole(userId);
 }
 
 export async function isTwoFactorEnabled(userId: string): Promise<boolean> {

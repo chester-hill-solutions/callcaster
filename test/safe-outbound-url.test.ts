@@ -102,6 +102,32 @@ describe("safe-outbound-url", () => {
     await expect(assertSafeOutboundUrl("file:///etc/passwd")).rejects.toThrow(/http or https/i);
   });
 
+  test("blocks IPv4-mapped IPv6 metadata/private literals", async () => {
+    // ::ffff:169.254.169.254 (dotted) and ::ffff:a9fe:a9fe (hex) both encode
+    // the cloud metadata IPv4 169.254.169.254; :: is the unspecified address.
+    await expect(
+      assertSafeOutboundUrl("http://[::ffff:169.254.169.254]/latest/meta-data"),
+    ).rejects.toThrow(/not allowed/i);
+    await expect(
+      assertSafeOutboundUrl("http://[::ffff:a9fe:a9fe]/latest/meta-data"),
+    ).rejects.toThrow(/not allowed/i);
+    await expect(assertSafeOutboundUrl("http://[::ffff:10.0.0.1]/")).rejects.toThrow(
+      /not allowed/i,
+    );
+    await expect(assertSafeOutboundUrl("http://[::]/")).rejects.toThrow(/not allowed/i);
+  });
+
+  test("rejects a hostname whose AAAA record is IPv4-mapped metadata", async () => {
+    dns.resolve.mockImplementation(async (_host: string, type: string) => {
+      if (type === "AAAA") return ["::ffff:169.254.169.254"];
+      throw new Error("no A");
+    });
+    await expect(safeOutboundFetch("https://rebind6.example.com/hook")).rejects.toThrow(
+      /not allowed/i,
+    );
+    expect(https.lastOptions).toBeUndefined();
+  });
+
   test("rejects a hostname that resolves to a private IP", async () => {
     mockAResolves("169.254.169.254");
     await expect(safeOutboundFetch("https://rebind.example.com/hook")).rejects.toThrow(

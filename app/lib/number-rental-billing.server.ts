@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 import { eq, and, gte } from "drizzle-orm";
-import { workspace_number as workspaceNumberTable, workspace as workspaceTable } from "@/db/schema";
+import {
+  workspace_number as workspaceNumberTable,
+  workspace as workspaceTable,
+  transaction_history as transactionHistoryTable,
+} from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
@@ -190,36 +194,50 @@ export async function runNumberRentalBilling(args: {
     const cycleKey = getCycleKey(today);
     const idempotencyKey = numberRentalCycleKey(number.id, cycleKey);
 
-    // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
-    // failed charge does NOT throw — it would silently drive the balance
-    // negative and keep the number active for free. Check funds explicitly and
-    // route insufficient balances to the unpaid/grace path instead.
-    const balance = await getWorkspaceCreditsBalance(number.workspace);
-    if (balance != null && balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
-      unpaid++;
-      logger.info("Number rental left unpaid: insufficient credits", {
-        numberId: number.id,
-        workspaceId: number.workspace,
-        balance,
-        required: NUMBER_RENTAL_MONTHLY_CREDITS,
-      });
+    // Idempotency is authoritative: if this cycle was already billed on an
+    // earlier (at-least-once) cron run, take no action. Checking the balance
+    // first would be wrong — a re-run after the charge (or any other spend)
+    // dropped the balance below the rental cost would falsely re-mark a paid
+    // number as unpaid.
+    const alreadyBilled = await tdb.transaction_history.findFirst({
+      where: eq(transactionHistoryTable.idempotency_key, idempotencyKey),
+      columns: { id: true },
+    });
+
+    if (alreadyBilled) {
+      // No-op: already paid this cycle.
     } else {
-      try {
-        await insertTransactionHistoryIdempotent({
-          workspaceId: number.workspace,
-          type: "DEBIT",
-          amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
-          note: `Monthly rental for ${phoneNumberLabel}`,
-          idempotencyKey,
-        });
-        charged++;
-      } catch (error) {
+      // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
+      // failed charge does NOT throw — it would silently drive the balance
+      // negative and keep the number active for free. Check funds explicitly
+      // and route an unaffordable new charge to the unpaid/grace path instead.
+      const balance = await getWorkspaceCreditsBalance(number.workspace);
+      if (balance != null && balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
         unpaid++;
-        logger.error("Number rental charge failed", {
+        logger.info("Number rental left unpaid: insufficient credits", {
           numberId: number.id,
           workspaceId: number.workspace,
-          error: error instanceof Error ? error.message : String(error),
+          balance,
+          required: NUMBER_RENTAL_MONTHLY_CREDITS,
         });
+      } else {
+        try {
+          await insertTransactionHistoryIdempotent({
+            workspaceId: number.workspace,
+            type: "DEBIT",
+            amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
+            note: `Monthly rental for ${phoneNumberLabel}`,
+            idempotencyKey,
+          });
+          charged++;
+        } catch (error) {
+          unpaid++;
+          logger.error("Number rental charge failed", {
+            numberId: number.id,
+            workspaceId: number.workspace,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
 

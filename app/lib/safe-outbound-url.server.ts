@@ -25,6 +25,22 @@ const BLOCKED_HOSTNAMES = new Set([
   "metadata.google.internal",
 ]);
 
+/** Upper bound on DNS resolution so a hostile/slow authoritative nameserver
+ * can't hold the request handler open past the outbound timeout. */
+const DNS_RESOLVE_TIMEOUT_MS = 5_000;
+
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
 function isPrivateIpv4(host: string): boolean {
   const parts = host.split(".").map((part) => Number.parseInt(part, 10));
   if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) {
@@ -40,10 +56,35 @@ function isPrivateIpv4(host: string): boolean {
   return false;
 }
 
+/**
+ * If `host` is an IPv4-mapped/compatible IPv6 address (`::ffff:169.254.169.254`
+ * or its hex form `::ffff:a9fe:a9fe`, and `::a.b.c.d`), return the embedded
+ * dotted IPv4. Attackers use these to smuggle a private/metadata IPv4 past an
+ * IPv6-only check. Returns null when there is no embedded IPv4.
+ */
+function embeddedIpv4(host: string): string | null {
+  const normalized = host.toLowerCase().replace(/^\[|\]$/g, "");
+  // Dotted tail: ::ffff:169.254.169.254 or ::169.254.169.254
+  const dotted = normalized.match(/:((?:\d{1,3}\.){3}\d{1,3})$/);
+  if (dotted?.[1]) return dotted[1];
+  // Hex-mapped: ::ffff:a9fe:a9fe
+  const hex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hex?.[1] && hex[2]) {
+    const hi = Number.parseInt(hex[1], 16);
+    const lo = Number.parseInt(hex[2], 16);
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+  }
+  return null;
+}
+
 function isPrivateIpv6(host: string): boolean {
-  const normalized = host.toLowerCase();
+  const normalized = host.toLowerCase().replace(/^\[|\]$/g, "");
+  // Any IPv4 smuggled inside an IPv6 literal is judged by IPv4 rules.
+  const mapped = embeddedIpv4(normalized);
+  if (mapped) return isPrivateIpv4(mapped) || mapped === "169.254.169.254";
   return (
     normalized === "::1" ||
+    normalized === "::" ||
     normalized.startsWith("fc") ||
     normalized.startsWith("fd") ||
     normalized.startsWith("fe80")
@@ -52,6 +93,10 @@ function isPrivateIpv6(host: string): boolean {
 
 function isPrivateOrMetadataIp(ip: string): boolean {
   if (ip === "169.254.169.254") return true;
+  // Unwrap IPv4-mapped IPv6 first so a mapped private/metadata IPv4 can't pass
+  // as a "public" IPv6 address.
+  const mapped = embeddedIpv4(ip);
+  if (mapped) return isPrivateIpv4(mapped) || mapped === "169.254.169.254";
   if (isIP(ip) === 4) return isPrivateIpv4(ip);
   if (isIP(ip) === 6) return isPrivateIpv6(ip);
   // Unknown / unparseable address: fail closed.
@@ -102,14 +147,18 @@ export async function resolveSafeOutboundTarget(rawUrl: string): Promise<SafeOut
 
   const records: string[] = [];
   try {
-    records.push(...(await resolve(hostname, "A")));
+    records.push(
+      ...(await withTimeout(resolve(hostname, "A"), DNS_RESOLVE_TIMEOUT_MS, "DNS A resolve")),
+    );
   } catch {
-    // host may only have AAAA records
+    // host may only have AAAA records (or the A lookup timed out)
   }
   try {
-    records.push(...(await resolve(hostname, "AAAA")));
+    records.push(
+      ...(await withTimeout(resolve(hostname, "AAAA"), DNS_RESOLVE_TIMEOUT_MS, "DNS AAAA resolve")),
+    );
   } catch {
-    // host may only have A records
+    // host may only have A records (or the AAAA lookup timed out)
   }
 
   if (records.length === 0) {

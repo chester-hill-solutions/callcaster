@@ -4,6 +4,7 @@ import {
   isTwoFactorEnabled,
   PRIVILEGED_WORKSPACE_ROLES,
   userHasPrivilegedWorkspaceRole,
+  userIsTwoFactorProtected,
 } from "@/lib/two-factor.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
@@ -98,10 +99,14 @@ export const action = async ({ request, url}: ActionFunctionArgs) => {
 
   if (intent === "disable") {
     const password = String(formData.get("password") ?? "");
-    const privileged = await userHasPrivilegedWorkspaceRole(user.id);
-    if (privileged) {
+    // Mirror the enrollment mandate: anyone forced to keep 2FA (sudo admins or
+    // privileged workspace roles) cannot disable it. Checking only workspace
+    // role here would let a sudo-only account turn off the 2FA the admin panel
+    // then re-mandates, bouncing them out until they re-enroll.
+    const protectedUser = await userIsTwoFactorProtected(user.id);
+    if (protectedUser) {
       return routeData(
-        { error: "Privileged workspace roles cannot disable two-factor authentication." },
+        { error: "Privileged accounts cannot disable two-factor authentication." },
         { headers },
       );
     }

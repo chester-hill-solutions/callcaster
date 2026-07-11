@@ -4,6 +4,9 @@ const tdbMocks = vi.hoisted(() => ({
   workspace_number: {
     findMany: vi.fn(),
   },
+  transaction_history: {
+    findFirst: vi.fn(),
+  },
 }));
 
 const transactionHistoryMocks = vi.hoisted(() => ({
@@ -62,6 +65,9 @@ function makeNumber(overrides: Partial<Record<string, unknown>> = {}) {
 describe("runNumberRentalBilling", () => {
   beforeEach(() => {
     tdbMocks.workspace_number.findMany.mockReset();
+    tdbMocks.transaction_history.findFirst.mockReset();
+    // Default: this cycle has not been billed yet.
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
     creditsMocks.getWorkspaceCreditsBalance.mockReset();
     // Default: plenty of credits so existing charge assertions hold.
@@ -202,6 +208,28 @@ describe("runNumberRentalBilling", () => {
     });
 
     expect(result).toMatchObject({ charged: 0, unpaid: 1 });
+    expect(
+      transactionHistoryMocks.insertTransactionHistoryIdempotent,
+    ).not.toHaveBeenCalled();
+  });
+
+  test("re-run of an already-billed cycle is a no-op, not a false unpaid, even when the balance is now low", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+    // This cycle was already charged on an earlier at-least-once cron run…
+    tdbMocks.transaction_history.findFirst.mockResolvedValue({ id: 42 });
+    // …and the balance has since dropped below the rental cost (the charge
+    // itself, or other spend). Idempotency must win: no re-charge, no false
+    // unpaid.
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(10);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 0, unpaid: 0 });
     expect(
       transactionHistoryMocks.insertTransactionHistoryIdempotent,
     ).not.toHaveBeenCalled();

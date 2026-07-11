@@ -5,7 +5,11 @@ import {
   requireTwoFactorEnrollmentForPrivilegedUser,
 } from "@/lib/two-factor.server";
 
-const adminDbState = vi.hoisted(() => ({ enrolled: false }));
+const adminDbState = vi.hoisted(() => ({
+  enrolled: false,
+  accessLevel: null as string | null,
+  roles: [] as string[],
+}));
 
 describe("two-factor.server", () => {
   test("isTwoFactorRedirectResponse detects Better Auth 2FA challenge", () => {
@@ -25,10 +29,52 @@ vi.mock("@/server/admin-db", () => {
   const chain: Record<string, unknown> = {};
   chain.select = () => chain;
   chain.from = () => chain;
-  chain.where = () => chain;
-  // Terminal for isTwoFactorEnabled(): [{ twoFactorEnabled }]
-  chain.limit = async () => [{ twoFactorEnabled: adminDbState.enrolled }];
+  // `.where()` is awaited directly by userHasPrivilegedWorkspaceRole (→ role
+  // rows) AND chained with `.limit(1)` by isTwoFactorEnabled / the access_level
+  // lookup. Return a thenable that also carries `.limit`.
+  chain.where = () => {
+    const rolesRows = adminDbState.roles.map((role) => ({ role }));
+    const result: any = Promise.resolve(rolesRows);
+    result.limit = async () => [
+      {
+        twoFactorEnabled: adminDbState.enrolled,
+        accessLevel: adminDbState.accessLevel,
+      },
+    ];
+    return result;
+  };
+  chain.limit = async () => [
+    { twoFactorEnabled: adminDbState.enrolled, accessLevel: adminDbState.accessLevel },
+  ];
   return { adminDb: chain };
+});
+
+describe("userIsTwoFactorProtected", () => {
+  beforeEach(() => {
+    adminDbState.accessLevel = null;
+    adminDbState.roles = [];
+  });
+
+  test("sudo account is protected even with no privileged workspace role", async () => {
+    const { userIsTwoFactorProtected } = await import("@/lib/two-factor.server");
+    adminDbState.accessLevel = "sudo";
+    adminDbState.roles = ["caller"];
+    expect(await userIsTwoFactorProtected("u1")).toBe(true);
+  });
+
+  test("non-sudo with a privileged workspace role is protected", async () => {
+    const { userIsTwoFactorProtected } = await import("@/lib/two-factor.server");
+    adminDbState.accessLevel = null;
+    adminDbState.roles = ["admin"];
+    expect(await userIsTwoFactorProtected("u1")).toBe(true);
+  });
+
+  test("non-sudo with only non-privileged roles is not protected", async () => {
+    const { userIsTwoFactorProtected } = await import("@/lib/two-factor.server");
+    adminDbState.accessLevel = "member";
+    adminDbState.roles = ["caller", "member"];
+    expect(await userIsTwoFactorProtected("u1")).toBe(false);
+  });
 });
 
 describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
