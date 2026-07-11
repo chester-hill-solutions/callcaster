@@ -9,7 +9,12 @@ import {
   transaction_history as transactionHistoryTable,
 } from "@/db/schema";
 import { TERMINAL_BILLABLE_SMS_STATUSES } from "@/lib/pricing";
-import { smsKey, callKey, bucketFromIdempotencyKey } from "@/lib/billing-keys";
+import {
+  smsKey,
+  callKey,
+  legacyCallKeys,
+  bucketFromIdempotencyKey,
+} from "@/lib/billing-keys";
 import { createTenantDb } from "@/server/tenant-db";
 
 export type { CampaignBillingSummary };
@@ -42,7 +47,7 @@ export async function loadCampaignBillingSummary(args: {
 
   const idempotencyKeys = [
     ...messageRows.map((row) => smsKey(row.sid)),
-    ...callRows.flatMap((row) => [callKey(row.sid, "ivr"), callKey(row.sid, "staffed")]),
+    ...callRows.flatMap((row) => [callKey(row.sid), ...legacyCallKeys(row.sid)]),
   ];
 
   let smsDebitCredits = 0;

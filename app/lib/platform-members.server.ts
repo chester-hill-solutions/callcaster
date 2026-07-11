@@ -7,6 +7,7 @@ import { getUserRole, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/da
 import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
+import { WORKSPACE_ROLE_RANK } from "@/lib/workspace-route.server";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
@@ -39,7 +40,10 @@ type UpsertWebhookInput = z.infer<typeof upsertWebhookBodySchema>;
 async function requireMemberManager(
   userId: string,
   workspaceId: string,
-): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+): Promise<
+  | { ok: true; actorRole: string }
+  | { ok: false; error: string; status: number }
+> {
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
@@ -54,6 +58,28 @@ async function requireMemberManager(
     return { ok: false, error: "Not authorized", status: 403 };
   }
 
+  return { ok: true, actorRole: userRole.role };
+}
+
+/**
+ * Prevent privilege escalation: an actor may never grant a role that outranks
+ * their own. Without this, a `member` (who can manage members) could promote
+ * themselves or anyone to `admin`/`owner`. Applies to both role edits and
+ * invites.
+ */
+function assertNoRoleEscalation(
+  actorRole: string,
+  assignedRole: string,
+): { ok: true } | { ok: false; error: string; status: number } {
+  const actorRank = WORKSPACE_ROLE_RANK[actorRole] ?? 0;
+  const assignedRank = WORKSPACE_ROLE_RANK[assignedRole] ?? 0;
+  if (assignedRank > actorRank) {
+    return {
+      ok: false,
+      error: "You cannot grant a role higher than your own.",
+      status: 403,
+    };
+  }
   return { ok: true };
 }
 
@@ -167,6 +193,9 @@ export async function inviteWorkspaceMember(
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
+  const escalation = assertNoRoleEscalation(access.actorRole, role);
+  if (!escalation.ok) return escalation;
+
   const cleanedEmail = email.toLowerCase().trim();
   const { data: users } = await getWorkspaceUsers({
     workspaceId,
@@ -214,8 +243,15 @@ export async function updateWorkspaceMemberRole(
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
+  // Owner-role transitions keep their specific owner-only gate first.
   const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId, role);
   if (!ownerCheck.ok) return ownerCheck;
+
+  // No privilege escalation: an actor cannot grant a role above their own.
+  // This is what stops a `member` (who may manage members) from promoting
+  // themselves or anyone to `admin`.
+  const escalation = assertNoRoleEscalation(access.actorRole, role);
+  if (!escalation.ok) return escalation;
 
   const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
   if (!soleOwnerCheck.ok) return soleOwnerCheck;

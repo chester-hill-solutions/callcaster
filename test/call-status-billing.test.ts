@@ -185,7 +185,7 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: req.clone() } as any);
 
     const matching = transactionRowsState.rows.filter(
-      (r) => r.idempotency_key === "call:CA_DUP:staffed",
+      (r) => r.idempotency_key === "call:CA_DUP",
     );
     expect(matching.length).toBe(1);
   });
@@ -226,10 +226,11 @@ describe("processCallStatusWebhook single source of truth", () => {
     );
 
     expect(transactionRowsState.rows).toHaveLength(1);
-    expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_MULTI:staffed");
+    // Key is CallSid-only — the billing kind is never part of the key.
+    expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_MULTI");
   });
 
-  test("IVR completed calls are billed once with the ivr idempotency key", async () => {
+  test("IVR completed calls are billed once under the CallSid key", async () => {
     const {
       processCallStatusWebhook,
       buildCallUpsertFromTwilioParams,
@@ -245,7 +246,29 @@ describe("processCallStatusWebhook single source of truth", () => {
     );
 
     expect(transactionRowsState.rows).toHaveLength(1);
-    expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_IVR:ivr");
+    expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_IVR");
+  });
+
+  test("same CallSid billed once even when deliveries resolve different kinds (double-charge guard)", async () => {
+    const {
+      processCallStatusWebhook,
+      buildCallUpsertFromTwilioParams,
+    } = await import("../app/lib/twilio-call-status.server");
+
+    // Delivery A resolves robocall→ivr; delivery B (transient lookup failure)
+    // falls back to staffed. Pre-fix these hashed to call:sid:ivr vs
+    // call:sid:staffed and BOTH debited. Now both map to call:CA_KIND.
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("completed", "10", "CA_KIND")),
+      { campaignType: "robocall" },
+    );
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("completed", "10", "CA_KIND")),
+      { campaignType: "predictive" },
+    );
+
+    expect(transactionRowsState.rows).toHaveLength(1);
+    expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_KIND");
   });
 });
 

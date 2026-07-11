@@ -105,6 +105,53 @@ describe("workspace member RBAC", () => {
       const result = await mod.updateWorkspaceMemberRole("u1", "w1", "u1", "admin");
       expect(result).toMatchObject({ ok: false, status: 403, error: expect.stringContaining("sole owner") });
     });
+
+    test("blocks a member from promoting anyone to admin (privilege escalation)", async () => {
+      accessMocks.getUserRole.mockResolvedValue({ role: "member" });
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.updateWorkspaceMemberRole("u1", "w1", "u2", "admin");
+      expect(result).toMatchObject({
+        ok: false,
+        status: 403,
+        error: expect.stringContaining("higher than your own"),
+      });
+      expect(membersDbMocks.updateWorkspaceMemberRole).not.toHaveBeenCalled();
+    });
+
+    test("blocks a member from self-promoting to admin", async () => {
+      accessMocks.getUserRole.mockResolvedValue({ role: "member" });
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.updateWorkspaceMemberRole("u1", "w1", "u1", "admin");
+      expect(result).toMatchObject({ ok: false, status: 403 });
+      expect(membersDbMocks.updateWorkspaceMemberRole).not.toHaveBeenCalled();
+    });
+
+    test("allows an admin to assign a member role (no escalation)", async () => {
+      accessMocks.getUserRole.mockResolvedValue({ role: "admin" });
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.updateWorkspaceMemberRole("u1", "w1", "u2", "member");
+      expect(result).toEqual({ ok: true, member: { id: "u2" } });
+    });
+  });
+
+  describe("platform-members inviteWorkspaceMember", () => {
+    test("blocks a member from inviting an admin (privilege escalation)", async () => {
+      accessMocks.getUserRole.mockResolvedValue({ role: "member" });
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.inviteWorkspaceMember(
+        "u1",
+        "w1",
+        "new@example.com",
+        "admin",
+      );
+      expect(result).toMatchObject({
+        ok: false,
+        status: 403,
+        error: expect.stringContaining("higher than your own"),
+      });
+      // Blocked before any user lookup / invite send.
+      expect(accessMocks.getWorkspaceUsers).not.toHaveBeenCalled();
+    });
   });
 
   describe("platform-members removeWorkspaceMember", () => {

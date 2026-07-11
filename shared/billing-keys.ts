@@ -20,8 +20,25 @@ export function smsKey(sid: string): string {
   return `${SMS_PREFIX}${sid}`;
 }
 
-export function callKey(sid: string, kind: string): string {
-  return `${CALL_PREFIX}${sid}:${kind}`;
+/**
+ * Voice idempotency key. Keyed on the immutable CallSid ALONE — never on the
+ * billing kind. Twilio delivers terminal status callbacks at-least-once, and
+ * the derived kind (ivr vs staffed) can differ between deliveries when the
+ * campaign-type lookup transiently fails and falls back to the default. If the
+ * kind were part of the key, those two deliveries would hash to different keys
+ * and BOTH debit the same call. One call → one key → one charge.
+ */
+export function callKey(sid: string): string {
+  return `${CALL_PREFIX}${sid}`;
+}
+
+/**
+ * Pre-2026-07 voice keys embedded the billing kind (`call:<sid>:ivr` /
+ * `call:<sid>:staffed`). Reconciliation lookups over historical rows must still
+ * match those; new writes use {@link callKey}.
+ */
+export function legacyCallKeys(sid: string): string[] {
+  return [`${CALL_PREFIX}${sid}:ivr`, `${CALL_PREFIX}${sid}:staffed`];
 }
 
 export function numberRentalPurchaseKey(workspaceId: string, numberSid: string): string {

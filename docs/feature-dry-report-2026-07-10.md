@@ -5,6 +5,25 @@
 
 ---
 
+## 0. Security & correctness review addendum (2026-07-11)
+
+A four-track specialist review (billing, auth/tenancy, RR8 correctness, DB
+migration) ran after this report. Verified outcomes:
+
+**Fixed and merged into the branch:**
+- ✅ **Auth privilege escalation (HIGH):** a `member` could promote themselves/others to `admin` (and via invite) through `updateWorkspaceMemberRole` / `inviteWorkspaceMember`. Added an escalation guard (cannot grant a role above your own) in `platform-members.server.ts` + regression tests.
+- ✅ **Voice double-charge (HIGH):** the call-billing idempotency key embedded the derived billing kind, so two deliveries of one Twilio callback that resolved different kinds both debited. Key is now CallSid-only (`billing-keys.ts`), reconciliation reads legacy keys for historical rows, + double-charge guard test.
+- ✅ **RR8 SSR entry:** slow-Suspense abort no longer returns 500 to crawlers; abort timer cleared. Bundle guard hardened with minification-robust secret markers. Unused server import removed from an admin client route.
+
+**Open P0 backlog (pre-existing; fold into §6 roadmap):**
+- Debit underflow bypasses number-rental grace path (dead `catch`); balances can go negative unbounded.
+- Duplicate migration version prefix `20260705000200` (×3) hides files from the ledger check; a committed queue migration references a nonexistent `status` column (masked by the E2E tail's corrected copy).
+- Systemic `numeric`-vs-`integer()` schema drift incl. `workspace.credits` (safe today only via JS coercion; breaks on `+`).
+- SSRF DNS-rebind window in the webhook-test guard (validates a resolved IP, then `fetch`es the hostname again).
+- Sudo-admins never forced into 2FA; data-plane mutations have no role differentiation (dead min-role middleware).
+
+---
+
 ## 1. Executive summary
 
 - **26 product features** across 7 surfaces: workspace web UI, admin panel, integrator REST API, internal fetcher API, Twilio webhooks, cron jobs, public pages.

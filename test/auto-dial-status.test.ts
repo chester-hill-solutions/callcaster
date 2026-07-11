@@ -372,7 +372,7 @@ describe("api.auto-dial.status", () => {
 
     expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
     const matching = postgresStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_DUP:staffed",
+      (r) => r.idempotency_key === "call:CA_DUP",
     );
     expect(matching.length).toBe(1);
   });
@@ -397,7 +397,7 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
     expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
     const matching = postgresStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_IVR_KIND:ivr",
+      (r) => r.idempotency_key === "call:CA_IVR_KIND",
     );
     expect(matching.length).toBe(1);
   });

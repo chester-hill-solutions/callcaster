@@ -241,7 +241,7 @@ export async function processCallStatusWebhook(
       type: "DEBIT",
       amount: debitAmountFromCredits(credits),
       note,
-      idempotencyKey: callKey(call.sid, billingKind),
+      idempotencyKey: callKey(call.sid),
       callSid: call.sid,
       campaignId: call.campaign_id ?? null,
     });

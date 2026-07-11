@@ -348,7 +348,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
       expect.objectContaining({
-        idempotencyKey: "call:CA1:ivr",
+        idempotencyKey: "call:CA1",
         type: "DEBIT",
       }),
     );
