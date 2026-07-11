@@ -8,7 +8,7 @@ import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { WORKSPACE_ROLE_RANK } from "@/lib/workspace-route.server";
-import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
+import { assertSafeOutboundUrl, safeOutboundFetch } from "@/lib/safe-outbound-url.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import type {
@@ -405,14 +405,13 @@ export async function testWorkspaceWebhook(
   const headersObject = normalizeCustomHeaders(customHeaders);
 
   try {
-    const response = await fetch(destinationUrl, {
+    const response = await safeOutboundFetch(destinationUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...headersObject,
       },
       body: JSON.stringify(testData),
-      redirect: "error",
       signal: AbortSignal.timeout(10000),
     });
 

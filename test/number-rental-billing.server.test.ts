@@ -10,6 +10,10 @@ const transactionHistoryMocks = vi.hoisted(() => ({
   insertTransactionHistoryIdempotent: vi.fn(),
 }));
 
+const creditsMocks = vi.hoisted(() => ({
+  getWorkspaceCreditsBalance: vi.fn(),
+}));
+
 const workspaceMembersMocks = vi.hoisted(() => ({
   listWorkspaceOwnerAdminEmails: vi.fn(),
 }));
@@ -27,6 +31,8 @@ vi.mock("@/lib/database.server", () => ({
 }));
 
 vi.mock("@/lib/transaction-history.server", () => transactionHistoryMocks);
+
+vi.mock("@/lib/workspace-credits.server", () => creditsMocks);
 
 vi.mock("@/lib/workspace-members-db.server", () => workspaceMembersMocks);
 
@@ -57,6 +63,9 @@ describe("runNumberRentalBilling", () => {
   beforeEach(() => {
     tdbMocks.workspace_number.findMany.mockReset();
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
+    creditsMocks.getWorkspaceCreditsBalance.mockReset();
+    // Default: plenty of credits so existing charge assertions hold.
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(10_000);
     workspaceMembersMocks.listWorkspaceOwnerAdminEmails.mockReset();
     workspaceMembersMocks.listWorkspaceOwnerAdminEmails.mockResolvedValue([
       "owner@example.com",
@@ -180,6 +189,24 @@ describe("runNumberRentalBilling", () => {
     expect(resendMocks.send).not.toHaveBeenCalled();
   });
 
+  test("leaves the rental unpaid (no debit) when the workspace can't afford it", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+    // Below the 100-credit monthly rental — must not charge into a negative balance.
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(40);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 0, unpaid: 1 });
+    expect(
+      transactionHistoryMocks.insertTransactionHistoryIdempotent,
+    ).not.toHaveBeenCalled();
+  });
+
   test("result shape is always honest about auto-release: released is 0 and autoReleaseImplemented is false", async () => {
     tdbMocks.workspace_number.findMany.mockResolvedValue([]);
 
@@ -192,6 +219,7 @@ describe("runNumberRentalBilling", () => {
       ok: true,
       processed: 0,
       charged: 0,
+      unpaid: 0,
       released: 0,
       remindersSent: 0,
       remindersFailed: 0,

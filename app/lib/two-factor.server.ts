@@ -38,6 +38,14 @@ export async function requireTwoFactorEnrollmentForPrivilegedUser(args: {
   userId: string;
   request: Request;
   nextPath?: string;
+  /**
+   * Caller-supplied privilege override. Sudo admins are privileged regardless of
+   * workspace role, but that fact is known to the admin-layout middleware (via
+   * access_level) — pass `true` there to avoid an extra workspace-role lookup on
+   * the workspace hot path and to gate sudo accounts that hold no privileged
+   * workspace membership.
+   */
+  isPrivileged?: boolean;
 }): Promise<void> {
   // Test-only escape hatch. Never honored in real production: a leaked env var
   // must not silently disable a security control (mirrors
@@ -63,7 +71,8 @@ export async function requireTwoFactorEnrollmentForPrivilegedUser(args: {
     return;
   }
 
-  const privileged = await userHasPrivilegedWorkspaceRole(args.userId);
+  const privileged =
+    args.isPrivileged || (await userHasPrivilegedWorkspaceRole(args.userId));
   if (!privileged) {
     return;
   }

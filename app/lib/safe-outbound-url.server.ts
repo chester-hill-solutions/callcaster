@@ -1,8 +1,21 @@
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { resolve } from "node:dns/promises";
 import { isIP } from "node:net";
+import type { LookupFunction } from "node:net";
 
 /**
  * SSRF guard for server-side outbound fetches to user-supplied URLs (e.g. webhook tests).
+ *
+ * The naive pattern — validate the hostname's DNS records, then `fetch(rawUrl)` — is
+ * vulnerable to DNS-rebinding (TOCTOU): the guard's lookup and fetch's lookup are
+ * independent resolutions, so an attacker with a low-TTL record can answer the guard with a
+ * public IP and answer fetch with a private/metadata IP (169.254.169.254, etc.).
+ *
+ * `safeOutboundFetch` closes that hole by resolving the host ONCE, validating the resulting
+ * address, and then pinning the outbound connection to that exact IP via a custom `lookup`
+ * on `node:http`/`node:https`. There is no second DNS resolution at connect time, so the
+ * address that was validated is guaranteed to be the address that is dialed.
  */
 const BLOCKED_HOSTNAMES = new Set([
   "localhost",
@@ -41,10 +54,26 @@ function isPrivateOrMetadataIp(ip: string): boolean {
   if (ip === "169.254.169.254") return true;
   if (isIP(ip) === 4) return isPrivateIpv4(ip);
   if (isIP(ip) === 6) return isPrivateIpv6(ip);
-  return false;
+  // Unknown / unparseable address: fail closed.
+  return true;
 }
 
-export async function assertSafeOutboundUrl(rawUrl: string): Promise<URL> {
+export interface SafeOutboundTarget {
+  /** The validated destination URL (hostname unchanged from the caller's input). */
+  url: URL;
+  /** Pre-validated public IP addresses the host resolves to. `addresses[0]` is pinned. */
+  addresses: string[];
+}
+
+/**
+ * Parse, validate and resolve a user-supplied outbound URL.
+ *
+ * Rejects non-http(s) schemes, blocked/loopback/link-local hostnames, `.local`/`.internal`
+ * suffixes, hosts that resolve to no records, and hosts that resolve to any
+ * private/metadata/loopback address. On success returns the URL together with the exact set
+ * of validated IP addresses, so the caller can pin its connection instead of re-resolving.
+ */
+export async function resolveSafeOutboundTarget(rawUrl: string): Promise<SafeOutboundTarget> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -68,7 +97,7 @@ export async function assertSafeOutboundUrl(rawUrl: string): Promise<URL> {
     if (isPrivateOrMetadataIp(hostname)) {
       throw new Error("Destination URL host is not allowed");
     }
-    return parsed;
+    return { url: parsed, addresses: [hostname] };
   }
 
   const records: string[] = [];
@@ -93,5 +122,128 @@ export async function assertSafeOutboundUrl(rawUrl: string): Promise<URL> {
     }
   }
 
-  return parsed;
+  return { url: parsed, addresses: records };
+}
+
+/**
+ * Back-compat guard: validate a URL and return it. Prefer {@link safeOutboundFetch} for the
+ * validate-then-fetch flow, since this on its own is still exposed to DNS rebinding if the
+ * caller subsequently fetches the raw URL (the very TOCTOU this module exists to prevent).
+ */
+export async function assertSafeOutboundUrl(rawUrl: string): Promise<URL> {
+  const { url } = await resolveSafeOutboundTarget(rawUrl);
+  return url;
+}
+
+export interface SafeOutboundFetchInit {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  /** Abort signal, e.g. `AbortSignal.timeout(10000)`. */
+  signal?: AbortSignal;
+}
+
+/**
+ * Perform an outbound HTTP(S) request to a user-supplied URL with full SSRF protection.
+ *
+ * The host is resolved and validated exactly once; the connection is then pinned to the
+ * validated IP through a custom `lookup`, eliminating the rebind window. The original Host
+ * header and TLS SNI are preserved (the URL's hostname is left intact and only the socket's
+ * lookup is overridden), so certificate validation still runs against the real hostname.
+ * Redirects are treated as errors — matching the previous `fetch(redirect: "error")`
+ * contract — so a 3xx cannot bounce the request onto a rebind target.
+ *
+ * Returns a standard {@link Response} so existing callers can keep using `.status`,
+ * `.statusText`, `.headers` and `.json()`/`.text()` unchanged.
+ */
+export async function safeOutboundFetch(
+  rawUrl: string,
+  init: SafeOutboundFetchInit = {},
+): Promise<Response> {
+  const { url, addresses } = await resolveSafeOutboundTarget(rawUrl);
+  const pinnedIp = addresses[0];
+  if (!pinnedIp) {
+    // Unreachable: resolveSafeOutboundTarget rejects empty results. Fail closed anyway.
+    throw new Error("Destination URL host is not allowed");
+  }
+  const pinnedFamily = isIP(pinnedIp);
+
+  // Custom lookup: never performs DNS. Always returns the address validated above, and
+  // re-checks it (defense in depth) so a poisoned `addresses[0]` still cannot be dialed.
+  const lookup: LookupFunction = (_hostname, options, callback) => {
+    if (pinnedFamily === 0 || isPrivateOrMetadataIp(pinnedIp)) {
+      callback(new Error("Destination resolved to a disallowed address"), "", 0);
+      return;
+    }
+    if (options && typeof options === "object" && (options as { all?: boolean }).all) {
+      // Node's typings don't model the `{ all: true }` overload on LookupFunction.
+      (callback as unknown as (
+        err: NodeJS.ErrnoException | null,
+        addresses: Array<{ address: string; family: number }>,
+      ) => void)(null, [{ address: pinnedIp, family: pinnedFamily }]);
+      return;
+    }
+    callback(null, pinnedIp, pinnedFamily);
+  };
+
+  const isHttps = url.protocol === "https:";
+  const requestImpl = isHttps ? httpsRequest : httpRequest;
+
+  return await new Promise<Response>((resolvePromise, rejectPromise) => {
+    const req = requestImpl(
+      url,
+      {
+        method: init.method ?? "GET",
+        headers: init.headers,
+        lookup,
+        // Preserve SNI / cert hostname against the real host, not the pinned IP.
+        servername: isHttps ? url.hostname : undefined,
+        signal: init.signal,
+      },
+      (res) => {
+        // Belt-and-suspenders: confirm the socket actually connected to a validated address.
+        const remote = res.socket?.remoteAddress;
+        if (remote && isPrivateOrMetadataIp(remote)) {
+          res.destroy();
+          rejectPromise(new Error("Destination connected to a disallowed address"));
+          return;
+        }
+
+        const status = res.statusCode ?? 0;
+        if (status >= 300 && status < 400) {
+          res.destroy();
+          rejectPromise(new Error("Destination URL responded with a redirect"));
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const headers = new Headers();
+          for (const [key, value] of Object.entries(res.headers)) {
+            if (Array.isArray(value)) {
+              for (const v of value) headers.append(key, v);
+            } else if (value != null) {
+              headers.set(key, value);
+            }
+          }
+          const body = Buffer.concat(chunks);
+          resolvePromise(
+            new Response(body.length > 0 ? body : null, {
+              status: status || 200,
+              statusText: res.statusMessage ?? "",
+              headers,
+            }),
+          );
+        });
+        res.on("error", rejectPromise);
+      },
+    );
+
+    req.on("error", rejectPromise);
+    if (init.body !== undefined) {
+      req.write(init.body);
+    }
+    req.end();
+  });
 }

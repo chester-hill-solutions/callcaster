@@ -3,6 +3,7 @@ import { eq, and, gte } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable, workspace as workspaceTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { numberRentalCycleKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
@@ -111,6 +112,7 @@ export async function runNumberRentalBilling(args: {
   ok: true;
   processed: number;
   charged: number;
+  unpaid: number;
   released: number;
   remindersSent: number;
   remindersFailed: number;
@@ -139,6 +141,7 @@ export async function runNumberRentalBilling(args: {
   });
 
   let charged = 0;
+  let unpaid = 0;
   const released = 0;
   let remindersSent = 0;
   let remindersFailed = 0;
@@ -187,22 +190,37 @@ export async function runNumberRentalBilling(args: {
     const cycleKey = getCycleKey(today);
     const idempotencyKey = numberRentalCycleKey(number.id, cycleKey);
 
-    try {
-      await insertTransactionHistoryIdempotent({
-        workspaceId: number.workspace,
-        type: "DEBIT",
-        amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
-        note: `Monthly rental for ${phoneNumberLabel}`,
-        idempotencyKey,
-      });
-      charged++;
-    } catch (error) {
-      // Insufficient credits or other error — leave unpaid for grace handling
-      logger.error("Number rental charge failed", {
+    // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
+    // failed charge does NOT throw — it would silently drive the balance
+    // negative and keep the number active for free. Check funds explicitly and
+    // route insufficient balances to the unpaid/grace path instead.
+    const balance = await getWorkspaceCreditsBalance(number.workspace);
+    if (balance != null && balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
+      unpaid++;
+      logger.info("Number rental left unpaid: insufficient credits", {
         numberId: number.id,
         workspaceId: number.workspace,
-        error: error instanceof Error ? error.message : String(error),
+        balance,
+        required: NUMBER_RENTAL_MONTHLY_CREDITS,
       });
+    } else {
+      try {
+        await insertTransactionHistoryIdempotent({
+          workspaceId: number.workspace,
+          type: "DEBIT",
+          amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
+          note: `Monthly rental for ${phoneNumberLabel}`,
+          idempotencyKey,
+        });
+        charged++;
+      } catch (error) {
+        unpaid++;
+        logger.error("Number rental charge failed", {
+          numberId: number.id,
+          workspaceId: number.workspace,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     // Check if previous cycle is unpaid and past grace period (+30 days)
@@ -220,6 +238,7 @@ export async function runNumberRentalBilling(args: {
     ok: true,
     processed: numbers.length,
     charged,
+    unpaid,
     released,
     remindersSent,
     remindersFailed,

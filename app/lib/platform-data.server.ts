@@ -21,6 +21,7 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database.server";
 import type { Database } from "@/lib/db-types";
+import { AppError } from "@/lib/errors.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { logger } from "@/lib/logger.server";
 import { jsonError } from "@/lib/platform-api.server";
@@ -191,9 +192,35 @@ async function getSurveyWorkspaceId(
   return rows[0]?.workspace ?? null;
 }
 
+/**
+ * Membership + min-role gate for session (member) data-plane auth. Reuses
+ * `requireWorkspaceAccess` (single role lookup) and converts its thrown
+ * `AppError` into a JSON `Response` so callers can `return` it — matching the
+ * rest of this module. Returns `null` when access is allowed.
+ *
+ * `minRole` is undefined for read paths (any member/caller) and `"member"` for
+ * destructive mutations, blocking the lowest `caller` role.
+ */
+async function enforceWorkspaceRole(
+  user: { id: string },
+  workspaceId: string,
+  minRole?: string,
+): Promise<Response | null> {
+  try {
+    await requireWorkspaceAccess({ user, workspaceId, minRole });
+    return null;
+  } catch (error) {
+    if (error instanceof AppError) {
+      return jsonError(error.message, error.statusCode);
+    }
+    throw error;
+  }
+}
+
 export async function authForCampaign(
   request: Request,
   campaignId: string,
+  minRole?: string,
 ): Promise<(DataPlaneAuthContext & { workspaceId: string }) | Response> {
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
@@ -207,19 +234,20 @@ export async function authForCampaign(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Campaign not found", 404);
     }
+    // Workspace-scoped API keys retain full data-plane access; role gating
+    // applies to session (member) auth only.
     return { userId: null, workspaceId };
   }
 
-  await requireWorkspaceAccess({
-    user: auth.user,
-    workspaceId,
-  });
+  const denied = await enforceWorkspaceRole(auth.user, workspaceId, minRole);
+  if (denied) return denied;
   return { userId: auth.user.id, workspaceId };
 }
 
 export async function authForContact(
   request: Request,
   contactId: string,
+  minRole?: string,
 ): Promise<(DataPlaneAuthContext & { workspaceId: string }) | Response> {
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
@@ -233,13 +261,13 @@ export async function authForContact(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Contact not found", 404);
     }
+    // Workspace-scoped API keys retain full data-plane access; role gating
+    // applies to session (member) auth only.
     return { userId: null, workspaceId };
   }
 
-  await requireWorkspaceAccess({
-    user: auth.user,
-    workspaceId,
-  });
+  const denied = await enforceWorkspaceRole(auth.user, workspaceId, minRole);
+  if (denied) return denied;
   return { userId: auth.user.id, workspaceId };
 }
 

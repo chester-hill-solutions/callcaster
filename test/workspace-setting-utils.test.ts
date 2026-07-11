@@ -18,6 +18,20 @@ vi.mock("@/lib/env.server", () => ({
   },
 }));
 
+// testWebhook now routes outbound calls through the SSRF-safe helper (pins the
+// validated IP). Mock it so the test drives the response without real DNS/HTTP;
+// assertSafeOutboundUrl stays a no-op for the pre-check.
+const safeOutboundMocks = vi.hoisted(() => ({
+  assertSafeOutboundUrl: vi.fn(async () => new URL("https://example.com")),
+  safeOutboundFetch: vi.fn(),
+}));
+vi.mock("@/lib/safe-outbound-url.server", () => ({
+  assertSafeOutboundUrl: (...args: unknown[]) =>
+    safeOutboundMocks.assertSafeOutboundUrl(...args),
+  safeOutboundFetch: (...args: unknown[]) =>
+    safeOutboundMocks.safeOutboundFetch(...args),
+}));
+
 const membersDbMocks = vi.hoisted(() => ({
   findUserIdByUsername: vi.fn(async () => null as string | null),
   findWorkspaceInviteForUser: vi.fn(async () => null as unknown),
@@ -239,8 +253,9 @@ describe("WorkspaceSettingUtils", () => {
   test("testWebhook handles json vs text responses and catches errors", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
 
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    fetchMock.mockResolvedValueOnce(
+    const safeFetch = safeOutboundMocks.safeOutboundFetch;
+    safeFetch.mockReset();
+    safeFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: 1 }), {
         status: 201,
         headers: { "content-type": "application/json" },
@@ -255,7 +270,7 @@ describe("WorkspaceSettingUtils", () => {
     );
     expect(r1).toMatchObject({ data: { ok: 1 }, status: 201, statusText: "Created", error: null });
 
-    fetchMock.mockResolvedValueOnce(
+    safeFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: 1 }), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -267,14 +282,14 @@ describe("WorkspaceSettingUtils", () => {
       "https://example.com",
       JSON.stringify([["", "ignored"], ["X-Yes", "1"]]),
     );
-    expect(fetchMock).toHaveBeenLastCalledWith(
+    expect(safeFetch).toHaveBeenLastCalledWith(
       "https://example.com",
       expect.objectContaining({
         headers: expect.objectContaining({ "Content-Type": "application/json", "X-Yes": "1" }),
       }),
     );
 
-    fetchMock.mockResolvedValueOnce(
+    safeFetch.mockResolvedValueOnce(
       new Response("ok", {
         status: 200,
         headers: { "content-type": "text/plain" },
@@ -284,11 +299,11 @@ describe("WorkspaceSettingUtils", () => {
     const r2 = await mod.testWebhook({ a: 1 }, "https://example.com", { X: "1" });
     expect(r2).toMatchObject({ data: "ok", status: 200, error: null });
 
-    fetchMock.mockRejectedValueOnce(new Error("nope"));
+    safeFetch.mockRejectedValueOnce(new Error("nope"));
     const r3 = await mod.testWebhook({ a: 1 }, "https://example.com", {});
     expect(r3).toMatchObject({ data: null, status: 500, error: "nope" });
 
-    fetchMock.mockRejectedValueOnce("boom");
+    safeFetch.mockRejectedValueOnce("boom");
     const r4 = await mod.testWebhook({ a: 1 }, "https://example.com", {});
     expect(r4).toMatchObject({ data: null, status: 500, error: "boom" });
   });

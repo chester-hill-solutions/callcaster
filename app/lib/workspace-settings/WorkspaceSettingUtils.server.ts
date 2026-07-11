@@ -4,7 +4,7 @@ import { getWorkspaceUsers } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import { logger } from "@/lib/logger.server";
-import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
+import { assertSafeOutboundUrl, safeOutboundFetch } from "@/lib/safe-outbound-url.server";
 import {
   removeWorkspaceMember,
   updateWorkspaceMemberRole,
@@ -286,14 +286,13 @@ export async function testWebhook(
       Object.assign(headersObject, parsedHeaders);
     }
 
-    const response = await fetch(destination_url, {
+    const response = await safeOutboundFetch(destination_url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...headersObject,
       },
       body: JSON.stringify(parsedTestData),
-      redirect: "error",
       signal: AbortSignal.timeout(10000),
     });
 

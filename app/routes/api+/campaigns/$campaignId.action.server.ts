@@ -35,7 +35,9 @@ export async function action({ request, params, url}: ActionFunctionArgs) {
     return jsonError("campaignId is required", 400);
   }
 
-  const auth = await authForCampaign(request, campaignId);
+  // Both branches below (duplicate, status transition) are destructive
+  // mutations: require at least `member`, blocking the `caller` role.
+  const auth = await authForCampaign(request, campaignId, "member");
   if (auth instanceof Response) return auth;
   const operation = url.searchParams.get("operation");
 

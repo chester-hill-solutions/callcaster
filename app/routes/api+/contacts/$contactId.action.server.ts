@@ -36,7 +36,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return jsonError("Method not allowed", 405);
   }
 
-  const auth = await authForContact(request, contactId);
+  // Destructive mutation: require at least `member`, blocking the `caller` role.
+  const auth = await authForContact(request, contactId, "member");
   if (auth instanceof Response) return auth;
 
   const result = await deleteContactApi(

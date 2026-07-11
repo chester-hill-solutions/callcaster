@@ -67,7 +67,8 @@ export async function action({ request, params, url}: ActionFunctionArgs) {
     return jsonError("Method not allowed", 405);
   }
 
-  const auth = await authForCampaign(request, campaignId);
+  // Destructive mutation: require at least `member`, blocking the `caller` role.
+  const auth = await authForCampaign(request, campaignId, "member");
   if (auth instanceof Response) return auth;
 
   const parsed = await parseJsonBodyOrResponse(request, patchCampaignQueueBodySchema);

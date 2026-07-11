@@ -15,12 +15,17 @@ migration) ran after this report. Verified outcomes:
 - ✅ **Voice double-charge (HIGH):** the call-billing idempotency key embedded the derived billing kind, so two deliveries of one Twilio callback that resolved different kinds both debited. Key is now CallSid-only (`billing-keys.ts`), reconciliation reads legacy keys for historical rows, + double-charge guard test.
 - ✅ **RR8 SSR entry:** slow-Suspense abort no longer returns 500 to crawlers; abort timer cleared. Bundle guard hardened with minification-robust secret markers. Unused server import removed from an admin client route.
 
-**Open P0 backlog (pre-existing; fold into §6 roadmap):**
-- Debit underflow bypasses number-rental grace path (dead `catch`); balances can go negative unbounded.
-- Duplicate migration version prefix `20260705000200` (×3) hides files from the ledger check; a committed queue migration references a nonexistent `status` column (masked by the E2E tail's corrected copy).
-- Systemic `numeric`-vs-`integer()` schema drift incl. `workspace.credits` (safe today only via JS coercion; breaks on `+`).
-- SSRF DNS-rebind window in the webhook-test guard (validates a resolved IP, then `fetch`es the hostname again).
-- Sudo-admins never forced into 2FA; data-plane mutations have no role differentiation (dead min-role middleware).
+**Second hardening pass (2026-07-11) — fixed and verified:**
+- ✅ **Debit underflow / number-rental grace:** the sweep now checks the workspace balance before debiting and routes an unaffordable rental to the unpaid path instead of driving the balance negative. + test.
+- ✅ **Money-column type drift:** `workspace.credits` and `transaction_history.amount` migrated `numeric`→`integer` (migration `20260711000000`), killing the postgres.js string-coercion footgun on money. Ledger RPC additionally hardened: rejects blank idempotency keys, type-filters the conflict-loser lookup.
+- ✅ **SSRF DNS-rebind:** new `safeOutboundFetch` pins the validated IP at connect time (no re-resolution), preserves Host/SNI, re-checks the socket address, and rejects 3xx. Both webhook-test callers migrated. + tests.
+- ✅ **Sudo 2FA:** `adminMiddleware` now forces 2FA enrollment for sudo admins (respecting the E2E bypass).
+- ✅ **Data-plane role gate:** contact-delete, campaign status/duplicate, and queue-patch now require `member` (blocks `caller`), enforced at the real `authForContact`/`authForCampaign` layer. + tests.
+
+**Still deferred — needs production migration-ledger visibility (Railway access):**
+- Duplicate migration version prefix `20260705000200` (×3) and the queue migration referencing a nonexistent `status` column. The DB ledger keys on the numeric version prefix, so renaming/rewriting already-applied migrations risks a re-apply of non-idempotent DDL. Requires confirming prod `schema_migrations` state before touching. (The running app is unaffected — it uses the corrected function from the drizzle tail.)
+- Remaining non-money `numeric`/`bigint`-vs-`integer()` drift (`audience.*`, `audience_upload.*`, `campaign.dial_ratio` — the last may be intentionally fractional).
+- Bun runtime smoke check that `safeOutboundFetch`'s custom `node:http` `lookup` pin holds under Bun (Node 22/24 verified via tests).
 
 ---
 
