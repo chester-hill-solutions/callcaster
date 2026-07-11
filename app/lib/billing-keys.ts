@@ -1,6 +1,7 @@
 export {
   smsKey,
   callKey,
+  legacyCallKeys,
   numberRentalPurchaseKey,
   numberRentalCycleKey,
   stripeSessionKey,
