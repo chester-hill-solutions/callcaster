@@ -25,6 +25,8 @@ vi.mock("@/server/tenant-db", () => ({
   })),
 }));
 
+import { SQL } from "drizzle-orm";
+
 import { canTransitionCallStatus, updateCallBySid } from "../app/lib/telephony-db.server";
 
 describe("canTransitionCallStatus", () => {
@@ -65,12 +67,17 @@ describe("updateCallBySid status regression guard", () => {
     tenantDbMocks.update.mockReset();
   });
 
-  test("strips status from the write when the existing row is terminal and the incoming status is not", async () => {
-    tenantDbMocks.findFirst.mockResolvedValueOnce({
-      sid: "CA1",
-      status: "completed",
-      workspace: "w1",
-    });
+  // The guard is now enforced atomically inside a single UPDATE via a CASE
+  // expression (see updateCallBySid) rather than a read-then-conditional-write.
+  // These tests pin that contract: the row is never read first, exactly one
+  // guarded UPDATE is issued whenever a status is present, and the status the
+  // DB actually applies is a SQL CASE expression (not the raw incoming value),
+  // so an out-of-order terminal->non-terminal webhook can't win a race.
+  const getSetArg = () =>
+    (tenantDbMocks.update.mock.calls[0]?.[0] as { set: Record<string, unknown> })
+      .set;
+
+  test("issues a single guarded UPDATE (no prior read) and passes other fields through when a status is present", async () => {
     tenantDbMocks.update.mockResolvedValueOnce([
       { sid: "CA1", status: "completed", workspace: "w1", duration: "42" },
     ]);
@@ -80,43 +87,47 @@ describe("updateCallBySid status regression guard", () => {
       duration: "42",
     });
 
-    expect(tenantDbMocks.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        set: { duration: "42" },
-      }),
-    );
+    // No read-then-write round trip: the guard lives in the UPDATE itself.
+    expect(tenantDbMocks.findFirst).not.toHaveBeenCalled();
+    expect(tenantDbMocks.update).toHaveBeenCalledTimes(1);
+
+    const set = getSetArg();
+    // status is written as a guarded CASE expression, not the raw value, so a
+    // terminal existing row is protected in-SQL (the DB keeps "completed").
+    expect(set.status).toBeInstanceOf(SQL);
+    expect(set.status).not.toBe("in-progress");
+    expect(set.duration).toBe("42");
     expect(result).toMatchObject({ status: "completed", duration: "42" });
   });
 
-  test("skips the write entirely and returns the existing row when status is the only field", async () => {
-    const existing = { sid: "CA1", status: "completed", workspace: "w1" };
-    tenantDbMocks.findFirst.mockResolvedValueOnce(existing);
+  test("still issues one guarded UPDATE (no skip, no read) when status is the only field", async () => {
+    tenantDbMocks.update.mockResolvedValueOnce([
+      { sid: "CA1", status: "completed", workspace: "w1" },
+    ]);
 
     const result = await updateCallBySid("w1", "CA1", { status: "queued" });
 
-    expect(tenantDbMocks.update).not.toHaveBeenCalled();
-    expect(result).toBe(existing);
+    expect(tenantDbMocks.findFirst).not.toHaveBeenCalled();
+    expect(tenantDbMocks.update).toHaveBeenCalledTimes(1);
+    expect(getSetArg().status).toBeInstanceOf(SQL);
+    // The RETURNING row reflects what the DB actually applied — here the CASE
+    // keeps the terminal "completed" rather than regressing to "queued".
+    expect(result).toMatchObject({ status: "completed" });
   });
 
-  test("applies the status update normally when the existing status is not terminal", async () => {
-    tenantDbMocks.findFirst.mockResolvedValueOnce({
-      sid: "CA1",
-      status: "ringing",
-      workspace: "w1",
-    });
+  test("applies the incoming status via the guarded write when the existing status is not terminal", async () => {
     tenantDbMocks.update.mockResolvedValueOnce([
       { sid: "CA1", status: "in-progress", workspace: "w1" },
     ]);
 
     const result = await updateCallBySid("w1", "CA1", { status: "in-progress" });
 
-    expect(tenantDbMocks.update).toHaveBeenCalledWith(
-      expect.objectContaining({ set: { status: "in-progress" } }),
-    );
+    expect(tenantDbMocks.findFirst).not.toHaveBeenCalled();
+    expect(getSetArg().status).toBeInstanceOf(SQL);
     expect(result).toMatchObject({ status: "in-progress" });
   });
 
-  test("does not read the row when the update has no status field", async () => {
+  test("does not wrap the write in the guard when the update has no status field", async () => {
     tenantDbMocks.update.mockResolvedValueOnce([
       { sid: "CA1", recording_url: "https://rec" },
     ]);

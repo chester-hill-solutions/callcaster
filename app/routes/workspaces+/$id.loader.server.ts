@@ -29,11 +29,13 @@ export const loader = async ({ request, params, context, url }: LoaderFunctionAr
 
   try {
     const pathname = url.pathname;
-    const [onboarding, phoneNumbersResult, recentOutboundCount] = await Promise.all([
-      getWorkspaceMessagingOnboardingState({ workspaceId }),
-      getWorkspacePhoneNumbers({ workspaceId }),
-      getWorkspaceRecentOutboundMessageCount({ workspaceId }),
-    ]);
+    const [onboarding, phoneNumbersResult, recentOutboundCount, workspaceData] =
+      await Promise.all([
+        getWorkspaceMessagingOnboardingState({ workspaceId }),
+        getWorkspacePhoneNumbers({ workspaceId }),
+        getWorkspaceRecentOutboundMessageCount({ workspaceId }),
+        getWorkspaceInfoWithDetails({ workspaceId, userId }),
+      ]);
     const readiness = deriveWorkspaceMessagingReadiness({
       onboarding,
       workspaceNumbers: (phoneNumbersResult.data ?? []).map((number) => ({
@@ -50,11 +52,6 @@ export const loader = async ({ request, params, context, url }: LoaderFunctionAr
     ) {
       throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
     }
-
-    const workspaceData = await getWorkspaceInfoWithDetails({
-      workspaceId,
-      userId,
-    });
 
     return routeData({
       userRole,

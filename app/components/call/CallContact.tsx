@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { Tables } from "@/lib/db-types";
 
 type Contact = Tables<"contact">;
@@ -12,7 +13,7 @@ type QueueContactProps = {
   isLast?: boolean;
 };
 
-const QueueContact = ({
+const QueueContactImpl = ({
   contact,
   household = null,
   firstInHouse = false,
@@ -65,5 +66,8 @@ const QueueContact = ({
     </tr>
   );
 };
+
+const QueueContact = memo(QueueContactImpl);
+QueueContact.displayName = "QueueContact";
 
 export default QueueContact;

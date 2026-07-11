@@ -142,6 +142,14 @@ export async function requireTwilioSignature(
     messageSid?: string;
     phoneNumber?: string;
     workspaceId?: string;
+    /**
+     * Pre-parsed webhook params, when the caller already read and parsed
+     * the raw body (e.g. server/twilio-webhook.ts, which parses it once for
+     * routing before validation). When omitted, the body is parsed here via
+     * `parseTwilioWebhookParams` as before. Either way, this is exactly the
+     * param set that gets signature-verified.
+     */
+    params?: Record<string, string>;
   },
 ): Promise<Response | null> {
   if (!shouldValidateTwilioWebhooks()) {
@@ -152,7 +160,7 @@ export async function requireTwilioSignature(
     return twilioWebhookForbiddenHangup();
   }
 
-  const params = await parseTwilioWebhookParams(request);
+  const params = options?.params ?? (await parseTwilioWebhookParams(request));
   const canonicalUrl = resolveCanonicalTwilioWebhookUrl(request);
 
   let attemptedWorkspace = false;

@@ -4,7 +4,6 @@ import {
   buildDequeuedQueueUpdate,
   buildProviderStatusQueueUpdate,
   buildQueuedQueueUpdate,
-  isAssignedToUser,
   QUEUE_STATUS_DEQUEUED,
   QUEUE_STATUS_QUEUED,
 } from "@/lib/queue-status";
@@ -269,7 +268,10 @@ export async function fetchCampaignQueueRowsByIds(queueIds: number[], workspaceI
 }
 
 export async function findActiveAssignedQueueForUser(userId: string, workspaceId?: string) {
-  const conditions = [isNull(campaignQueueTable.dequeued_at)];
+  const conditions = [
+    isNull(campaignQueueTable.dequeued_at),
+    eq(campaignQueueTable.assigned_to_user_id, userId),
+  ];
   if (workspaceId) {
     conditions.push(eq(campaignQueueTable.workspace, workspaceId));
   }
@@ -287,9 +289,10 @@ export async function findActiveAssignedQueueForUser(userId: string, workspaceId
     })
     .from(campaignQueueTable)
     .innerJoin(campaignTable, eq(campaignQueueTable.campaign_id, campaignTable.id))
-    .where(and(...conditions));
+    .where(and(...conditions))
+    .limit(1);
 
-  return rows.find((row) => isAssignedToUser(row, userId)) ?? null;
+  return rows[0] ?? null;
 }
 
 export async function resolveContactWorkspaceIdFromQueue(
@@ -343,25 +346,18 @@ export async function releaseAssignedQueueForUser(
     const conditions = [
       eq(campaignQueueTable.campaign_id, Number(campaignId)),
       isNull(campaignQueueTable.dequeued_at),
+      eq(campaignQueueTable.assigned_to_user_id, userId),
     ];
     if (workspaceId) {
       conditions.push(eq(campaignQueueTable.workspace, workspaceId));
     }
 
     const assignedRows = await db
-      .select({
-        id: campaignQueueTable.id,
-        dequeued_at: campaignQueueTable.dequeued_at,
-        assigned_to_user_id: campaignQueueTable.assigned_to_user_id,
-        queue_state: campaignQueueTable.queue_state,
-        provider_status: campaignQueueTable.provider_status,
-      })
+      .select({ id: campaignQueueTable.id })
       .from(campaignQueueTable)
       .where(and(...conditions));
 
-    const assignedIds = assignedRows
-      .filter((row) => isAssignedToUser(row, userId))
-      .map((row) => row.id);
+    const assignedIds = assignedRows.map((row) => row.id);
 
     if (assignedIds.length === 0) {
       return { ok: true, released: 0 };

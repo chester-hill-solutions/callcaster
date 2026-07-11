@@ -16,6 +16,10 @@ import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import {
+  getWorkspaceTwilioDataVersion,
+  invalidateWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 import { logger } from "../logger.server";
 import {
   rpcCreateNewWorkspace,
@@ -278,6 +282,10 @@ export async function createNewWorkspace({
         .update(workspace)
         .set(workspaceUpdate)
         .where(eq(workspace.id, createdWorkspaceId));
+      // workspaceUpdate always carries twilio_data (and, when Twilio keys
+      // were minted above, key/token) — bust the cached credentials/client
+      // for this workspace so subsequent lookups don't serve stale data.
+      invalidateWorkspaceTwilioData(createdWorkspaceId);
     } catch (insertWorkspaceUsersError) {
       logger.error(
         "Workspace metadata update failed after workspace insert:",
@@ -709,12 +717,48 @@ export async function handleNewUserOTPVerification(
   }
 }
 
+/**
+ * Per-process TTL cache of constructed `Twilio.Twilio` clients, keyed by
+ * workspace id. `createWorkspaceTwilioInstance` is called on essentially
+ * every workspace-scoped Twilio REST call, and building a client means both
+ * a DB round trip for credentials and constructing a new `Twilio.Twilio`
+ * instance; neither is needed on every call since credentials rarely
+ * change.
+ *
+ * Entries are tagged with the workspace's Twilio-data version (from
+ * merge-workspace-twilio-data.server.ts) so a credential write anywhere in
+ * the app invalidates the memoized client immediately, without waiting out
+ * the TTL — the TTL alone only bounds staleness for writes this cache can't
+ * observe directly (see loadWorkspaceTwilioData's cache comment). This does
+ * not touch the separate parent/global Twilio client singleton in
+ * app/twilio.server.ts.
+ */
+const WORKSPACE_TWILIO_CLIENT_CACHE_TTL_MS = 60_000;
+
+type WorkspaceTwilioClientCacheEntry = {
+  client: Twilio.Twilio;
+  version: number;
+  expiresAt: number;
+};
+
+const workspaceTwilioClientCache = new Map<string, WorkspaceTwilioClientCacheEntry>();
+
 export async function createWorkspaceTwilioInstance({
   workspace_id,
 }: {
   workspace_id: string;
   client?: never;
 }) {
+  const currentVersion = getWorkspaceTwilioDataVersion(workspace_id);
+  const cached = workspaceTwilioClientCache.get(workspace_id);
+  if (
+    cached &&
+    cached.version === currentVersion &&
+    cached.expiresAt > Date.now()
+  ) {
+    return cached.client;
+  }
+
   const data = await adminDb.query.workspace.findFirst({
     where: eq(workspace.id, workspace_id),
     columns: { twilio_data: true, key: true, token: true },
@@ -735,6 +779,13 @@ export async function createWorkspaceTwilioInstance({
     apiKey && apiSecret
       ? new Twilio.Twilio(apiKey, apiSecret, { accountSid: creds.sid })
       : new Twilio.Twilio(creds.sid, creds.authToken);
+
+  workspaceTwilioClientCache.set(workspace_id, {
+    client: twilio,
+    version: currentVersion,
+    expiresAt: Date.now() + WORKSPACE_TWILIO_CLIENT_CACHE_TTL_MS,
+  });
+
   return twilio;
 }
 

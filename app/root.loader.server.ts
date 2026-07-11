@@ -53,8 +53,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
   }
   try {
-    const userData = await loadUserWithInvites(authUser.id);
-    const workspaces = await listUserWorkspaceSummaries(authUser.id);
+    const [userData, workspaces] = await Promise.all([
+      loadUserWithInvites(authUser.id),
+      listUserWorkspaceSummaries(authUser.id),
+    ]);
 
     return routeData(
       {

@@ -60,12 +60,14 @@ export const loader = async ({ request, params, context, url}: LoaderFunctionArg
       { headers, status: 400 },
     );
   }
-  const workspace = await getWorkspaceById(workspaceId);
   const tdb = createTenantDb(workspaceId);
-  const campaigns = await tdb.campaign.findMany({
-    columns: { id: true, title: true, status: true },
-    orderBy: [desc(campaignTable.created_at)],
-  });
+  const [workspace, campaigns] = await Promise.all([
+    getWorkspaceById(workspaceId),
+    tdb.campaign.findMany({
+      columns: { id: true, title: true, status: true },
+      orderBy: [desc(campaignTable.created_at)],
+    }),
+  ]);
 
   if (!workspace) {
     return routeData(

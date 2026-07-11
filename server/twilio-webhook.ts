@@ -6,15 +6,27 @@ const MAX_RAW_BODY_BYTES = 1 * 1024 * 1024;
 const HANGUP_TWIML =
   '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>';
 
-function resolveTwilioWebhookOptions(
+/**
+ * Parse the raw body into the same param set Twilio signature validation
+ * needs. Twilio webhooks are always `application/x-www-form-urlencoded`, so
+ * `URLSearchParams` over the raw body text is equivalent to (and cheaper
+ * than) `Request#formData()` here — see `requireTwilioSignature`'s `params`
+ * option, which is threaded through so it doesn't re-parse the same body.
+ */
+function buildTwilioWebhookParams(
   request: Request,
   bodyText: string,
+): URLSearchParams {
+  return request.method === "GET" || request.method === "HEAD"
+    ? new URL(request.url).searchParams
+    : new URLSearchParams(bodyText);
+}
+
+function resolveTwilioWebhookOptions(
+  request: Request,
+  params: URLSearchParams,
 ): Parameters<typeof requireTwilioSignature>[1] {
   const pathname = new URL(request.url).pathname;
-  const params =
-    request.method === "GET" || request.method === "HEAD"
-      ? new URL(request.url).searchParams
-      : new URLSearchParams(bodyText);
 
   if (
     pathname.startsWith("/api/caller-id/status") ||
@@ -115,8 +127,16 @@ export async function handleTwilioWebhookRequest(
     const body = await readRawBody(request);
     const bodyText = new TextDecoder().decode(body);
     const validatedRequest = requestWithBody(request, body);
-    const options = resolveTwilioWebhookOptions(validatedRequest, bodyText);
-    const forbidden = await requireTwilioSignature(validatedRequest, options);
+    const params = buildTwilioWebhookParams(validatedRequest, bodyText);
+    const options = resolveTwilioWebhookOptions(validatedRequest, params);
+    const forbidden = await requireTwilioSignature(validatedRequest, {
+      ...options,
+      // Already parsed above from the same raw body bytes — pass it through
+      // so requireTwilioSignature doesn't parse the body a second time via
+      // request.clone().formData(). The signature-verification inputs
+      // (param set + URL) are unchanged; only how the params were parsed.
+      params: Object.fromEntries(params.entries()),
+    });
 
     if (forbidden) {
       return { kind: "response", response: forbidden };

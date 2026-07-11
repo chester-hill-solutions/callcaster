@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import QueueContact from "@/components/call/CallContact";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/typography";
@@ -48,9 +49,23 @@ const QueueList = ({
   count,
   completed,
 }: QueueListProps) => {
-  const renderQueueContacts = () => {
-    if (groupByHousehold && Object.keys(householdMap).length) {
-      return Object.values(householdMap).flatMap((household) =>
+  // Households are derived once per householdMap identity change, not per render,
+  // so QueueContact's `household` prop stays referentially stable across renders
+  // that don't touch the queue (e.g. a call-advance that only moves nextRecipient).
+  const households = useMemo(
+    () => Object.values(householdMap),
+    [householdMap],
+  );
+
+  const selectedContactId = nextRecipient?.contact?.id ?? null;
+
+  // Recomputed only when the queue/grouping/selection actually change, so a
+  // QueueList re-render triggered by unrelated props (isBusy, etc.) doesn't
+  // rebuild this array. React.memo on QueueContact then skips re-rendering any
+  // row whose props (contact/household/selected/...) didn't change.
+  const queueRows = useMemo(() => {
+    if (groupByHousehold && households.length) {
+      return households.flatMap((household) =>
         household.map((contact, index) => (
           <QueueContact
             key={`household-${contact.contact?.id}`}
@@ -58,7 +73,7 @@ const QueueList = ({
             household={household}
             firstInHouse={index === 0}
             grouped={true}
-            selected={nextRecipient?.contact?.id === contact.contact?.id}
+            selected={selectedContactId === contact.contact?.id}
           />
         )),
       );
@@ -68,10 +83,10 @@ const QueueList = ({
       <QueueContact
         key={contact.contact?.id}
         contact={contact.contact}
-        selected={nextRecipient?.contact?.id === contact.contact?.id}
+        selected={selectedContactId === contact.contact?.id}
       />
     ));
-  };
+  }, [groupByHousehold, households, queue, selectedContactId]);
 
   return (
     <div className={callPanelShellClass}>
@@ -114,7 +129,7 @@ const QueueList = ({
             </TableRow>
           </TableHeader>
           {queue.length > 0 ? (
-            <TableBody>{renderQueueContacts()}</TableBody>
+            <TableBody>{queueRows}</TableBody>
           ) : (
             <TableBody>
               {!predictive && (

@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useMemo, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { AudienceForm } from "./AudienceForm";
 import { Download, Search, X } from "lucide-react";
@@ -58,8 +58,13 @@ export function AudienceTable({
   pagination,
   sorting
 }: AudienceTableProps) {
-  // Transform the contacts data to extract the nested contact info
-  const transformedContacts = initialContacts?.map(item => item.contact) || [];
+  // Transform the contacts data to extract the nested contact info.
+  // Memoized so this map only reruns when the loader actually hands us a new
+  // `initialContacts` reference, not on every unrelated re-render.
+  const transformedContacts = useMemo(
+    () => initialContacts?.map(item => item.contact) || [],
+    [initialContacts],
+  );
   const [contacts, setContacts] = useState<Contact[]>(transformedContacts);
   const [audienceInfo, setAudienceInfo] = useState(initialAudience);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -78,7 +83,9 @@ export function AudienceTable({
   const [prevInitialContacts, setPrevInitialContacts] = useState(initialContacts);
   if (prevInitialContacts !== initialContacts) {
     setPrevInitialContacts(initialContacts);
-    setContacts(initialContacts?.map(item => item.contact) || []);
+    // `transformedContacts` is already recomputed for the new `initialContacts`
+    // in this same render pass (useMemo above), so reuse it instead of re-mapping.
+    setContacts(transformedContacts);
   }
 
   const [prevInitialAudience, setPrevInitialAudience] = useState(initialAudience);
@@ -199,17 +206,23 @@ export function AudienceTable({
     }
   };
 
-  // Filter contacts based on search term (client-side filtering only)
-  const filteredContacts = contacts.filter(contact => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (contact.firstname?.toLowerCase().includes(searchLower) || false) ||
-      (contact.surname?.toLowerCase().includes(searchLower) || false) ||
-      (contact.email?.toLowerCase().includes(searchLower) || false) ||
-      (contact.phone?.toLowerCase().includes(searchLower) || false)
-    );
-  });
+  // Filter contacts based on search term (client-side filtering only).
+  // Memoized on [contacts, searchTerm] so this doesn't rerun on renders
+  // triggered by unrelated state (e.g. selection toggles, dropdown opens).
+  const filteredContacts = useMemo(
+    () =>
+      contacts.filter(contact => {
+        if (!searchTerm) return true;
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          (contact.firstname?.toLowerCase().includes(searchLower) || false) ||
+          (contact.surname?.toLowerCase().includes(searchLower) || false) ||
+          (contact.email?.toLowerCase().includes(searchLower) || false) ||
+          (contact.phone?.toLowerCase().includes(searchLower) || false)
+        );
+      }),
+    [contacts, searchTerm],
+  );
 
   const totalPages = Math.ceil((pagination.totalCount || 0) / pagination.pageSize);
 

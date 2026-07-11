@@ -34,6 +34,7 @@ const steps = [
   "client/migrations/20260710010000_campaign_send_window.sql",
   "client/migrations/20260710020000_fix_apply_ledger_entry_enum_cast.sql",
   "client/migrations/20260711000000_money_columns_integer_and_ledger_hardening.sql",
+  "client/migrations/20260711130000_call_and_workspace_users_perf_indexes.sql",
 ];
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);

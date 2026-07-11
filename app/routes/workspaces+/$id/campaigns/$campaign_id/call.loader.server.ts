@@ -19,7 +19,10 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
   const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context);
   if (!user || !workspaceId || !id) throw redirect("/signin");
 
-  const verifiedNumbers = await getVerifiedNumbers(user.id);
+  const [verifiedNumbers, callScreenData] = await Promise.all([
+    getVerifiedNumbers(user.id),
+    getCallScreenData(id, workspaceId, user.id),
+  ]);
   const {
     workspaceData,
     campaign,
@@ -28,7 +31,7 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
     queueCount,
     completedCount,
     attempts,
-  } = await getCallScreenData(id, workspaceId, user.id);
+  } = callScreenData;
   if (!workspaceData || !campaign) throw redirect("/signin");
   const rawTwilioData = workspaceData.twilio_data;
   const twilioData = (
@@ -36,13 +39,15 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
       ? JSON.parse(rawTwilioData)
       : rawTwilioData
   ) as { sid: string };
-  const queue = await getQueueByDialType(id, campaign.dial_type ?? "", user.id);
-  const token = await generateToken({
-    twilioAccountSid: twilioData.sid,
-    twilioApiKey: workspaceData.key as string,
-    twilioApiSecret: workspaceData.token as string,
-    identity: user.id,
-  });
+  const [queue, token] = await Promise.all([
+    getQueueByDialType(id, campaign.dial_type ?? "", user.id),
+    generateToken({
+      twilioAccountSid: twilioData.sid,
+      twilioApiKey: workspaceData.key as string,
+      twilioApiSecret: workspaceData.token as string,
+      identity: user.id,
+    }),
+  ]);
   const nextRecipient = getNextRecipient(queue, campaign.dial_type ?? "", user.id);
   const initalCallsList = getInitialCallsList(attempts || []);
   const initialRecentCall = getInitialRecentCall(attempts || []);

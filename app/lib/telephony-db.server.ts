@@ -44,6 +44,18 @@ export function canTransitionCallStatus(
   return !(TERMINAL_CALL_STATUSES.has(c) && !TERMINAL_CALL_STATUSES.has(n));
 }
 
+/**
+ * `ARRAY[...]` SQL literal for {@link TERMINAL_CALL_STATUSES}, used to encode
+ * the status-transition guard directly in an UPDATE statement (see
+ * {@link updateCallBySid}). Safe to inline via `sql.raw`: the set is a fixed
+ * module-level constant, never user input.
+ */
+const TERMINAL_CALL_STATUSES_SQL = sql.raw(
+  `ARRAY[${Array.from(TERMINAL_CALL_STATUSES)
+    .map((status) => `'${status}'`)
+    .join(", ")}]`,
+);
+
 /** Global lookup by Twilio SID (webhooks do not carry workspace id). */
 export async function findCallBySid(sid: string): Promise<CallRow | null> {
   const rows = await db
@@ -117,32 +129,45 @@ export async function updateCallBySid(
   options?: { tdb?: TenantDb },
 ): Promise<CallRow | null> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
-  let set: Partial<CallRow> = update;
 
-  if (update.status != null) {
-    const existing = (await tdb.call.findFirst({
+  if (update.status == null) {
+    const [row] = await tdb.call.update({
+      set: update,
       where: eq(callTable.sid, sid),
-    })) as CallRow | undefined;
-
-    if (existing && !canTransitionCallStatus(existing.status, update.status)) {
-      logger.debug("Skipping call status regression", {
-        sid,
-        current: existing.status,
-        next: update.status,
-      });
-      const { status: _status, ...rest } = update;
-      set = rest;
-      if (Object.keys(set).length === 0) {
-        return existing;
-      }
-    }
+    });
+    return row ?? null;
   }
 
+  // Status-transition guard, enforced atomically inside the UPDATE itself
+  // (previously a separate `findFirst` + conditional update). The CASE
+  // expression re-implements canTransitionCallStatus: keep the row's
+  // current status when it's already terminal and the incoming status is
+  // not, otherwise apply the incoming status. Doing this in one statement
+  // removes the read-then-write round trip and the race between the guard
+  // check and the write.
+  const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
+
   const [row] = await tdb.call.update({
-    set,
+    set: {
+      ...update,
+      status: guardedStatus,
+    } as unknown as Partial<CallRow>,
     where: eq(callTable.sid, sid),
   });
-  return row ?? null;
+
+  if (!row) {
+    return null;
+  }
+
+  if (row.status !== update.status) {
+    logger.debug("Skipped call status regression", {
+      sid,
+      current: row.status,
+      next: update.status,
+    });
+  }
+
+  return row;
 }
 
 export async function findOutreachAttemptById(
