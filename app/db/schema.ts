@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import {
-  pgTable, text, integer, bigint, boolean, timestamp, jsonb, uuid, serial, smallint, pgEnum,
+  pgTable, text, integer, bigint, numeric, boolean, timestamp, jsonb, uuid, serial, smallint, pgEnum,
   uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -107,7 +107,7 @@ export const campaign = pgTable("campaign", {
   body_text: text(),
   caller_id: text(),
   created_at: text().notNull(),
-  dial_ratio: integer().notNull(),
+  dial_ratio: numeric({ mode: "number" }).notNull(),
   dial_type: text(),
   disposition_options: jsonb(),
   end_date: text(),
@@ -218,8 +218,8 @@ export const audience = pgTable("audience", {
   name: text(),
   workspace: uuid(),
   status: text(),
-  total_contacts: integer(),
-  processed_contacts: integer(),
+  total_contacts: numeric({ mode: "number" }),
+  processed_contacts: numeric({ mode: "number" }),
   processed_at: text(),
   error_message: text(),
 });
@@ -232,9 +232,9 @@ export const audience_upload = pgTable("audience_upload", {
   created_at: text().notNull(),
   status: text().notNull(),
   file_name: text(),
-  file_size: integer(),
-  total_contacts: integer().notNull(),
-  processed_contacts: integer().notNull(),
+  file_size: bigint({ mode: "number" }),
+  total_contacts: bigint({ mode: "number" }).notNull(),
+  processed_contacts: bigint({ mode: "number" }).notNull(),
   processed_at: text(),
   error_message: text(),
   header_mapping: jsonb(),
