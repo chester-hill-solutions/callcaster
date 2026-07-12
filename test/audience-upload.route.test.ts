@@ -54,8 +54,9 @@ const objectStorageMocks = vi.hoisted(() => ({
 vi.mock("@/lib/object-storage.server", () => ({
   uploadObject: (...args: unknown[]) => objectStorageMocks.uploadObject(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: (...args: any[]) => requireWorkspaceAccessMock.requireWorkspaceAccess(...args),
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    requireWorkspaceAccessMock.requireWorkspaceAccess(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger }));

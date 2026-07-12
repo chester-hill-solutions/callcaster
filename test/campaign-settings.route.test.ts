@@ -34,14 +34,19 @@ vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("@/lib/database.server", () => ({
-  fetchCampaignAudience: (...args: any[]) => mocks.fetchCampaignAudience(...args),
+vi.mock("@/lib/database/campaign.server", () => ({
+  fetchCampaignAudience: (...args: any[]) =>
+    mocks.fetchCampaignAudience(...args),
   fetchCampaignDetails: (...args: any[]) => mocks.fetchCampaignDetails(...args),
   fetchQueueCounts: (...args: any[]) => mocks.fetchQueueCounts(...args),
+  updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
   getSignedUrls: (...args: any[]) => mocks.getSignedUrls(...args),
   getWorkspacePhoneNumbers: vi.fn(async () => ({ data: [], error: null })),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
-  updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
 }));
 
 const campaignIvrMocks = vi.hoisted(() => ({

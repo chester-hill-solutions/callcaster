@@ -1,5 +1,5 @@
 import { env } from "@/lib/env.server";
-import { getHandsetNumberForWorkspace } from "@/lib/database.server";
+import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
 import { findActiveHandsetSession } from "@/lib/handset/handset-session.server";
 import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";

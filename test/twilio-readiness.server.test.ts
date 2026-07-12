@@ -22,7 +22,7 @@ vi.mock("@/lib/rcs-onboarding-flags", () => ({
   isRcsOnboardingEnabled: () => false,
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   getWorkspaceTwilioPortalConfig: vi.fn(),
   getWorkspaceTwilioSyncSnapshotFromTwilioData: vi.fn(),
 }));
@@ -51,7 +51,7 @@ import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.ser
 import {
   getWorkspaceTwilioPortalConfig,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 
 describe("twilio-readiness.server", () => {
   test("blocks bulk SMS when toll-free verification is blocked", async () => {

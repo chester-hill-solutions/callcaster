@@ -27,9 +27,11 @@ vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers(),
   }),
 }));
-vi.mock("@/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+vi.mock("@/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/call-status", () => ({
   normalizeProviderStatus: (...args: any[]) => mocks.normalizeProviderStatus(...args),

@@ -1,6 +1,6 @@
 import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { loadInboundQueueSettings } from "@/lib/inbound-queue-db.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import type { LoaderFunctionArgs } from "react-router";

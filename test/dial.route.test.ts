@@ -34,10 +34,14 @@ vi.mock("../app/lib/client.server", () => ({
   getSession: (...args: any[]) => mocks.getSession(...args),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
-vi.mock("../app/lib/database.server", () => ({
+vi.mock("../app/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
+}));
+vi.mock("../app/lib/request-utils.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
 }));
 vi.mock("../app/lib/messaging-onboarding.server", () => ({
   getWorkspaceMessagingOnboardingState: (...args: any[]) => mocks.getWorkspaceMessagingOnboardingState(...args),

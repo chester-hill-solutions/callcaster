@@ -1,6 +1,6 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
-import { getUserRole, listMedia } from "@/lib/database.server";
+import { getUserRole, listMedia } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { getScriptDetailApi } from "@/lib/platform-data.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";

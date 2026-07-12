@@ -1,7 +1,7 @@
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { updateWorkspaceNumberCapabilitiesByPhone } from "@/lib/inbound-call-db.server";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,

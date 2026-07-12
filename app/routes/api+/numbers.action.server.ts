@@ -1,5 +1,5 @@
 import { createErrorResponse } from "@/lib/errors.server";
-import { parseActionRequest } from "@/lib/database.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import { purchaseWorkspaceNumber } from "@/lib/platform-workspace-numbers.server";
 import { requireJsonAuth,
 } from "@/lib/api-auth.server";

@@ -38,8 +38,9 @@ const transactionHistoryMocks = vi.hoisted(() => ({
   insertTransactionHistoryIdempotent: vi.fn(),
 }));
 
-vi.mock("../app/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
+vi.mock("../app/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: (...a: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...a),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) =>

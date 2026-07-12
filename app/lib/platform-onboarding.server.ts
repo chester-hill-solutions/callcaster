@@ -3,7 +3,7 @@ import {
   getUserRole,
   getWorkspacePhoneNumbers,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,

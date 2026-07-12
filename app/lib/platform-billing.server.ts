@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { createStripeContact } from "@/lib/database/stripe.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import {
   CREDIT_PRICE_CAD,

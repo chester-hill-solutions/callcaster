@@ -1,6 +1,6 @@
 import { Call } from "@/lib/types";
 import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";

@@ -1,4 +1,4 @@
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";

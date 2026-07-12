@@ -35,7 +35,7 @@ vi.mock("@/lib/auth.server", () => ({
   getSession: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })),
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 

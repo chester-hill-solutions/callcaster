@@ -20,7 +20,7 @@ vi.mock("@/server/tenant-db", () => ({
     execute: vi.fn(async () => []),
   }),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
 

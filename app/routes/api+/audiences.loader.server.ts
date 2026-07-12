@@ -1,7 +1,8 @@
 import { csvResponse, toCsvString, type CsvCell } from "@/lib/csv";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import {
   listAudienceContactsForExport,
   listAudienceContactsJson,

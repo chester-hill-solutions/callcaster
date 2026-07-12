@@ -23,8 +23,9 @@ const creditsState = vi.hoisted(() => ({
   credits: 10 as number | null,
 }));
 
-vi.mock("../app/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
+vi.mock("../app/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: (...a: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...a),
   requireWorkspaceAccess: (...a: any[]) => mocks.requireWorkspaceAccess(...a),
 }));
 vi.mock("@/lib/api-auth.server", () => ({

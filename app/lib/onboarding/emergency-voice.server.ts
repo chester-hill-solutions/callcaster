@@ -2,7 +2,7 @@ import {
   createWorkspaceTwilioInstance,
   getWorkspacePhoneNumbers,
   updateWorkspacePhoneNumber,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { hasVoiceCapability } from "@/lib/onboarding/voice-capabilities";

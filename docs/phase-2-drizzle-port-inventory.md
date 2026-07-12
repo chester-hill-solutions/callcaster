@@ -43,7 +43,7 @@
 | `workspace-twilio-recommendations.server.ts` | N/A | No SupabaseClient |
 | `workspace-twilio.server.ts` | N/A | barrel |
 
-Also: `app/lib/database.server.ts` — barrel; port after modules.
+Also: `app/lib/database.server.ts` — barrel; **removed** once all modules ported (helpers relocated to `app/lib/request-utils.server.ts` and `app/lib/database/call-actions.server.ts`).
 
 ## Sprint 2 helpers (reuse for remaining ports)
 

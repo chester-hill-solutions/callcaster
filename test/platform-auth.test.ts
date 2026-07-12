@@ -30,7 +30,7 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
   listUserWorkspaceMembershipsForProfile: vi.fn(async () => []),
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   acceptWorkspaceInvitations: vi.fn(async () => ({ errors: [] })),
   createNewWorkspace: vi.fn(async () => ({ data: "w1", error: null })),
   getInvitesByUserId: vi.fn(async () => []),

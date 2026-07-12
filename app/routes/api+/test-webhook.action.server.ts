@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { safeParseJson } from "@/lib/database.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
 import { getDualAuthUser, requireDualAuth, requireJsonAuth } from "@/lib/api-auth.server";

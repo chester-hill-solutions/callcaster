@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@/lib/env.server", () => ({ env: { RESEND_API_KEY: () => "rk" } }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/database.server", () => ({ safeParseJson: (...a: any[]) => mocks.safeParseJson(...a) }));
+vi.mock("@/lib/request-utils.server", () => ({
+  safeParseJson: (...a: any[]) => mocks.safeParseJson(...a),
+}));
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers(),
   }),

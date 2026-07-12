@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const twilioCreate = vi.hoisted(() => vi.fn().mockResolvedValue({ sid: "CA123" }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: vi.fn().mockResolvedValue({
     calls: { create: twilioCreate },
   }),

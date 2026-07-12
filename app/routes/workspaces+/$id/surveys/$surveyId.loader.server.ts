@@ -1,6 +1,6 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { getSurveyDetailApi } from "@/lib/platform-data.server";
 import { loadRecentSurveyResponses } from "@/lib/survey-db.server";
 import type { LoaderFunctionArgs } from "react-router";

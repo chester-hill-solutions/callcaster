@@ -11,7 +11,7 @@ import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { numberRentalCycleKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { listWorkspaceOwnerAdminEmails } from "@/lib/workspace-members-db.server";
 import { env } from "@/lib/env.server";
 

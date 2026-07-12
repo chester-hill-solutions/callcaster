@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { submitSurveyResponse, getSurveyWorkspaceByPublicId } from "@/lib/survey-db.server";
 import { requireDualAuth, getDualAuthUser } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 
 import type { ActionFunctionArgs } from "react-router";

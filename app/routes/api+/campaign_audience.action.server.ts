@@ -15,7 +15,7 @@ import {
   listContactIdsForAudiences,
 } from "@/lib/campaign-audience-db.server";
 import { logger } from "@/lib/logger.server";
-import { safeParseJson } from "@/lib/database.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { requireDualAuth } from "@/lib/api-auth.server";
 
 import type { ActionFunctionArgs } from "react-router";

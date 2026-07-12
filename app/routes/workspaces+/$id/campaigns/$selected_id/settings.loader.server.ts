@@ -2,7 +2,16 @@ import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { eq } from "drizzle-orm";
 import { data as routeData, redirect } from "react-router";
 import { campaign as campaignTable, workspace as workspaceTable } from "@/db/schema";
-import { fetchCampaignAudience, fetchCampaignDetails, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData } from "@/lib/database.server";
+import {
+  fetchCampaignAudience,
+  fetchCampaignDetails,
+} from "@/lib/database/campaign.server";
+import {
+  getSignedUrls,
+  getWorkspacePhoneNumbers,
+  getWorkspaceTwilioPortalConfigFromTwilioData,
+  getWorkspaceTwilioSyncSnapshotFromTwilioData,
+} from "@/lib/database/workspace.server";
 import { loadCampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";

@@ -24,12 +24,10 @@ vi.mock("@/lib/sms-campaign-db.server", () => ({
     telephonyMocks.loadCampaignVoicedropAudio(...args),
 }));
 
-vi.mock("@/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
-  return {
-    ...actual,
-    createWorkspaceTwilioInstance: vi.fn(),
-  };
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/workspace.server")>();
+  return { ...actual, createWorkspaceTwilioInstance: vi.fn() };
 });
 
 describe("api.audiodrop action", () => {
@@ -155,7 +153,9 @@ describe("api.audiodrop action", () => {
     telephonyMocks.loadCampaignVoicedropAudio.mockResolvedValue("a.mp3");
 
     setJsonAuthSession({ user: { id: "u1" } });
-    vi.doMock("@/lib/database.server", () => ({ createWorkspaceTwilioInstance }));
+    vi.doMock("@/lib/database/workspace.server", () => ({
+      createWorkspaceTwilioInstance,
+    }));
 
     const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();

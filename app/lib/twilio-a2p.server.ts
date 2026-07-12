@@ -7,7 +7,7 @@ import {
   type WorkspaceReadinessContext,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import {
   loadWorkspaceTwilioData,
   persistWorkspaceTwilioData,

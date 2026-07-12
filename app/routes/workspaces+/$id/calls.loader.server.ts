@@ -1,6 +1,6 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { loadCallLogPage } from "@/lib/call-log.server";
-import { getHandsetNumberForWorkspace } from "@/lib/database.server";
+import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";

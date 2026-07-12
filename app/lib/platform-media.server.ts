@@ -3,7 +3,10 @@ import {
   getSafeMediaBaseName,
   normalizeUploadedAudio,
 } from "@/lib/audio.server";
-import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  getUserRole,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";

@@ -3,7 +3,7 @@ import {
   resolveDataPlaneAuth,
   type DataPlaneAuthContext,
 } from "@/lib/platform-data.server";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
 import type { Database } from "@/lib/db-types";
 import type { LoaderFunctionArgs } from "react-router";

@@ -1,5 +1,10 @@
-import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
-import { searchContactsForQueuePicker } from "@/lib/database/contact.server";
+import { handleError, parseRequestData } from "@/lib/request-utils.server";
+import {
+  searchContactsForQueuePicker,
+  bulkCreateContacts,
+  createContact,
+  updateContact,
+} from "@/lib/database/contact.server";
 import { getQueuedContactIdsForCampaign } from "@/lib/campaign-queue-db.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";

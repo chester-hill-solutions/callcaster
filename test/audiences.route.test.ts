@@ -254,7 +254,10 @@ describe("api.audiences route", () => {
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
     setDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
-    vi.doMock("@/lib/database.server", () => ({ parseActionRequest, requireWorkspaceAccess }));
+    vi.doMock("@/lib/database/workspace.server", () => ({
+      requireWorkspaceAccess,
+    }));
+    vi.doMock("@/lib/request-utils.server", () => ({ parseActionRequest }));
 
     const mod = await import("../app/routes/api+/audiences");
     const res = await asRouteResponse(await mod.action({

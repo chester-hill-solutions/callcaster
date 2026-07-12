@@ -29,9 +29,13 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: unknown[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
-  getCampaignQueueById: (...args: unknown[]) => mocks.getCampaignQueueById(...args),
+vi.mock("@/lib/database/campaign.server", () => ({
+  getCampaignQueueById: (...args: unknown[]) =>
+    mocks.getCampaignQueueById(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mocks.requireWorkspaceAccess(...args),
   getWorkspaceTwilioPortalConfig: (...args: unknown[]) =>
     mocks.getWorkspaceTwilioPortalConfig(...args),
   createWorkspaceTwilioInstance: (...args: unknown[]) =>

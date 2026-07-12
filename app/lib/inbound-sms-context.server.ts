@@ -7,7 +7,7 @@ import {
   workspace_number as workspaceNumberTable,
 } from "@/db/schema";
 import type { Database } from "@/lib/db-types";
-import { findPotentialContacts } from "@/lib/database.server";
+import { findPotentialContacts } from "@/lib/database/contact.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { adminDb } from "@/server/admin-db";

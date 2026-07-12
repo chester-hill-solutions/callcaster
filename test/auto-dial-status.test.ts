@@ -87,10 +87,10 @@ const twilioClientMock = {
   ),
 };
 
-vi.mock("../app/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("../app/lib/database.server")>(
-    "../app/lib/database.server",
-  );
+vi.mock("../app/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("../app/lib/database/workspace.server")
+  >("../app/lib/database/workspace.server");
   return {
     ...actual,
     createWorkspaceTwilioInstance: vi.fn(async () => twilioClientMock as any),
@@ -788,7 +788,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("action catch formats non-Error as Unknown error", async () => {
-    const dbMod = await import("../app/lib/database.server");
+    const dbMod = await import("../app/lib/database/workspace.server");
     (dbMod.createWorkspaceTwilioInstance as any).mockRejectedValueOnce("nope");
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");

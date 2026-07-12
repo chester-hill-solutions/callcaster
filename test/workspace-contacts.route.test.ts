@@ -21,7 +21,7 @@ vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
 }));
 

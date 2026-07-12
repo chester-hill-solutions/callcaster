@@ -1,12 +1,12 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { getChatSortOption } from "@/lib/chat-conversation-sort";
 import { data as routeData, redirect } from "react-router";
+import { fetchCampaignsByType } from "@/lib/database/campaign.server";
+import { fetchContactData } from "@/lib/database/contact.server";
 import {
-  fetchCampaignsByType,
-  fetchContactData,
   fetchConversationSummary,
   getUserRole,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";

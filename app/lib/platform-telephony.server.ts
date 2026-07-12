@@ -1,5 +1,10 @@
 import { and, eq, gt } from "drizzle-orm";
-import { checkSchedule, getHandsetNumberForWorkspace, getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import { checkSchedule } from "@/lib/database/campaign.server";
+import {
+  getHandsetNumberForWorkspace,
+  getUserRole,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { findCampaignById } from "@/lib/campaign-audience-db.server";
 import {
   getCallScreenData,

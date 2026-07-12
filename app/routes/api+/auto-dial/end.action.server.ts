@@ -1,4 +1,5 @@
-import { createWorkspaceTwilioInstance, safeParseJson } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { resolveJsonAuthSession } from "@/lib/api-auth.server";

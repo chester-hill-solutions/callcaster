@@ -9,7 +9,7 @@ import {
 } from "@/lib/campaign-queue-db.server";
 import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { parseActionRequest } from "@/lib/database.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 import { contact_audience as contactAudienceTable } from "@/db/schema";
 // contact_audience is a join table without a workspace column; tdb cannot scope it.

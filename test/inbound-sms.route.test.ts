@@ -78,8 +78,9 @@ vi.mock("@/lib/inbound-sms-context.server", () => ({
   }),
 }));
 
-vi.mock("@/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+vi.mock("@/lib/database/contact.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/contact.server")>();
   return {
     ...actual,
     findPotentialContacts: vi.fn(async () => ({

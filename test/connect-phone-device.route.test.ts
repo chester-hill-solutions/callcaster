@@ -28,13 +28,19 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/database.server", () => ({
-  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+vi.mock("@/lib/database/campaign.server", () => ({
   checkSchedule: (...args: any[]) => mocks.checkSchedule(...args),
-  getHandsetNumberForWorkspace: (...args: any[]) => mocks.getHandsetNumberForWorkspace(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+  getHandsetNumberForWorkspace: (...args: any[]) =>
+    mocks.getHandsetNumberForWorkspace(...args),
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
+  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/auth.server", () => ({
   getSession: (...args: any[]) => mocks.getSession(...args),

@@ -1,7 +1,10 @@
 import { data as routeData } from "react-router";
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { createErrorResponse } from "@/lib/errors.server";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";

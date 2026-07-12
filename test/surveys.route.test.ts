@@ -36,7 +36,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   getUserRole: (...args: any[]) => mocks.getUserRole(...args),
 }));
 vi.mock("@/lib/errors.server", async (importOriginal) => {

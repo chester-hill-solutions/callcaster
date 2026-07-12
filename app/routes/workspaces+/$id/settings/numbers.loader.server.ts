@@ -5,7 +5,7 @@ import {
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";

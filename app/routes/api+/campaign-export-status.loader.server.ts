@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { downloadObject } from "@/lib/object-storage.server";
 import {

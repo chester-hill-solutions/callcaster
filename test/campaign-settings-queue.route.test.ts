@@ -27,10 +27,10 @@ vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("../app/lib/database.server")>(
-    "../app/lib/database.server",
-  );
+vi.mock("@/lib/request-utils.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/request-utils.server")
+  >("@/lib/request-utils.server");
   return {
     ...actual,
     parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),

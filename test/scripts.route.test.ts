@@ -24,9 +24,12 @@ vi.mock("@/lib/api-auth.server", () => ({
   getDualAuthUser: (...args: unknown[]) => mocks.getDualAuthUser(...args),
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
-  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
 }));
 
 vi.mock("@/lib/script-api-db.server", () => ({

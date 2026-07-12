@@ -4,7 +4,7 @@ import { rpcResetCampaign } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 
 import type { ActionFunctionArgs } from "react-router";

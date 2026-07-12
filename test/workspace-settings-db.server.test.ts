@@ -26,7 +26,7 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
     vi.doMock("@/server/tenant-db", () => ({
       createTenantDb: vi.fn(() => tdbMocks),
     }));
-    vi.doMock("@/lib/database.server", () => ({
+    vi.doMock("@/lib/database/workspace.server", () => ({
       requireWorkspaceAccess: vi.fn(async () => undefined),
     }));
   });

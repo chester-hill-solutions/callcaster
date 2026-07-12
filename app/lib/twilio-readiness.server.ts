@@ -10,7 +10,7 @@ import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.ser
 import {
   getWorkspaceTwilioPortalConfig,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import type { TwilioAccountData } from "@/lib/types";
 

@@ -1,6 +1,6 @@
 import { Call, Campaign, OutreachAttempt, Script, type Block } from "@/lib/types";
 import { resolveCampaignScript, fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";

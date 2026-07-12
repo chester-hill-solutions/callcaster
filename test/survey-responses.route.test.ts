@@ -23,8 +23,9 @@ vi.mock("@/lib/survey-db.server", () => ({
   getSurveyWorkspaceByPublicId: (...args: unknown[]) => surveyDbMocks.getSurveyWorkspaceByPublicId(...args),
 }));
 
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: (...args: unknown[]) => wsAccessMock.requireWorkspaceAccess(...args),
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    wsAccessMock.requireWorkspaceAccess(...args),
 }));
 
 function makeReq(form: Record<string, string>) {

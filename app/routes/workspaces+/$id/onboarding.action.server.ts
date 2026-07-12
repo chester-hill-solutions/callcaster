@@ -2,7 +2,7 @@ import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import {
   getUserRole,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { data as routeData, redirect } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import {

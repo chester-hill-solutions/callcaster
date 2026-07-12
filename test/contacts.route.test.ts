@@ -23,13 +23,13 @@ vi.mock("@/lib/audience-upload-db.server", () => ({
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers() }),
 }));
-vi.mock("../app/lib/database.server", () => ({
+vi.mock("../app/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("../app/lib/request-utils.server", () => ({
   parseRequestData: (...args: any[]) => mocks.parseRequestData(...args),
-  updateContact: (...args: any[]) => mocks.updateContact(...args),
-  bulkCreateContacts: (...args: any[]) => mocks.bulkCreateContacts(...args),
-  createContact: (...args: any[]) => mocks.createContact(...args),
   handleError: (...args: any[]) => mocks.handleError(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 
 const contactSearchMocks = vi.hoisted(() => ({
@@ -38,11 +38,15 @@ const contactSearchMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/database/contact.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database/contact.server")>();
+  const actual =
+    await importOriginal<typeof import("@/lib/database/contact.server")>();
   return {
     ...actual,
     searchContactsForQueuePicker: (...args: unknown[]) =>
       contactSearchMocks.searchContactsForQueuePicker(...args),
+    updateContact: (...args: any[]) => mocks.updateContact(...args),
+    bulkCreateContacts: (...args: any[]) => mocks.bulkCreateContacts(...args),
+    createContact: (...args: any[]) => mocks.createContact(...args),
   };
 });
 

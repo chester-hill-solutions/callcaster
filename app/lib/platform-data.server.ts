@@ -19,7 +19,7 @@ import { csvResponse, formatDateUtc, safeFilenamePart, toCsvString } from "@/lib
 import {
   fetchConversationSummary,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { AppError } from "@/lib/errors.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";

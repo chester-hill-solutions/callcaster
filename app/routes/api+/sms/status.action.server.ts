@@ -1,8 +1,6 @@
 import { Campaign, OutreachAttempt } from "@/lib/types";
-import {
-  cancelQueuedMessagesForCampaign,
-  createWorkspaceTwilioInstance,
-} from "@/lib/database.server";
+import { cancelQueuedMessagesForCampaign } from "@/lib/database/call-actions.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";

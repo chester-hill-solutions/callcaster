@@ -7,7 +7,7 @@ import {
   acceptWorkspaceInvitations,
   createNewWorkspace,
   getInvitesByUserId,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { listUserWorkspaceMembershipsForProfile } from "@/lib/workspace-members-db.server";
 import type {
   acceptInvitesBodySchema,

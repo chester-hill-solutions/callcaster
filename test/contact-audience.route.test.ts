@@ -29,10 +29,16 @@ vi.mock("@/lib/audience-upload-db.server", () => ({
   findAudienceWorkspaceById: (...args: unknown[]) => mocks.findAudienceWorkspaceById(...args),
 }));
 
-vi.mock("../app/lib/database.server", () => ({
+vi.mock("../app/lib/database/contact-audience.server", () => ({
+  removeContactFromAudience: (...args: unknown[]) =>
+    mocks.removeContactFromAudience(...args),
+}));
+vi.mock("../app/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("../app/lib/request-utils.server", () => ({
   parseActionRequest: (...args: unknown[]) => mocks.parseActionRequest(...args),
-  removeContactFromAudience: (...args: unknown[]) => mocks.removeContactFromAudience(...args),
-  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
 }));
 
 vi.mock("@/lib/errors.server", () => ({

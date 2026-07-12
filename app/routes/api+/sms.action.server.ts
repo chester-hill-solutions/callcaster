@@ -7,7 +7,12 @@ import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { countCampaignMessagesToPhone } from "@/lib/message-db.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess } from "@/lib/database.server";
+import { getCampaignQueueById } from "@/lib/database/campaign.server";
+import {
+  createWorkspaceTwilioInstance,
+  getWorkspaceTwilioPortalConfig,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";

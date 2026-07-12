@@ -19,9 +19,11 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/api-auth.server", () => ({
   requireJsonAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })),
 }));
-vi.mock("@/lib/database.server", () => ({
-  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
+vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
+  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({

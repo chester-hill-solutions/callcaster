@@ -1,7 +1,8 @@
 import { data as routeData } from "react-router";
 import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { getWorkspaceById, mergeWorkspaceTwilioData } from "@/lib/workspace-members-db.server";
 

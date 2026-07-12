@@ -4,7 +4,10 @@ import {
   patchWorkspaceNumber,
   verifyWorkspaceCallerId,
 } from "@/lib/platform-workspace-numbers.server";
-import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  getUserRole,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { normalizeInboundRingCount } from "../../../../../shared/inbound-rings";
 import type { ActionFunctionArgs } from "react-router";

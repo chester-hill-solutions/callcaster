@@ -1,6 +1,7 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { requireWorkspaceAccess, updateContact } from "@/lib/database.server";
+import { updateContact } from "@/lib/database/contact.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { ActionFunctionArgs } from "react-router";

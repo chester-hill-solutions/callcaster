@@ -14,10 +14,10 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const requireWorkspaceAccess = vi.fn(async () => undefined);
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>(
-    "@/lib/database.server",
-  );
+vi.mock("@/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/workspace.server")
+  >("@/lib/database/workspace.server");
   return { ...actual, requireWorkspaceAccess };
 });
 

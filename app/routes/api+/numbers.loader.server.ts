@@ -6,7 +6,10 @@ import {
   mapTwilioAvailableNumbers,
   parseNumberSearchRequest,
 } from "@/lib/numbers-search.server";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { createParentTwilioInstance } from "@/twilio.server";
 

@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import type { MiddlewareFunction } from "react-router";
 import { resolveDataPlaneAuth } from "@/lib/platform-data.server";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
 import { dataPlaneAuthContext } from "@/lib/route-context.server";
 

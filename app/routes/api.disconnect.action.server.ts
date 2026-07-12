@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { safeParseJson } from "@/lib/database.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { createParentTwilioInstance } from "@/twilio.server";
 import { pauseTwiml } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";

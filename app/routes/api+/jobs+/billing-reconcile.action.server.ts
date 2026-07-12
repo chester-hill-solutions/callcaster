@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { logger } from "@/lib/logger.server";

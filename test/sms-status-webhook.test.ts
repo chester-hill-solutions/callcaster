@@ -46,10 +46,13 @@ vi.mock("@/lib/workspace-webhooks.server", () => ({
   sendWorkspaceWebhookNotification: (...args: any[]) =>
     mocks.sendWorkspaceWebhookNotification(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
+vi.mock("@/lib/database/call-actions.server", () => ({
   cancelQueuedMessagesForCampaign: (...args: any[]) =>
     mocks.cancelQueuedMessagesForCampaign(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/sms-status", async (importOriginal) => {

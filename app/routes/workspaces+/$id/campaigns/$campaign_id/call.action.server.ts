@@ -10,7 +10,8 @@ import {
   normalizeProviderStatus,
   getStateMachineAction,
 } from "@/lib/call-status";
-import { checkSchedule, getUserRole } from "@/lib/database.server";
+import { checkSchedule } from "@/lib/database/campaign.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { generateToken } from "@/lib/twilio-token.server";
 import { playTone } from "@/lib/utils";
 import { redirect } from "react-router";

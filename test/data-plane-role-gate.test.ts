@@ -23,8 +23,9 @@ vi.mock("@/lib/api-auth.server", () => ({
 }));
 
 // The single role lookup that authFor* delegates to. `minRole` gating lives here.
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: (...a: unknown[]) => mocks.requireWorkspaceAccess(...a),
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...a: unknown[]) =>
+    mocks.requireWorkspaceAccess(...a),
   fetchConversationSummary: vi.fn(),
 }));
 

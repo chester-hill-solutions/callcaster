@@ -1,7 +1,7 @@
 
 import type { Database } from "@/lib/db-types";
 import { handset_session as handsetSessionTable } from "@/db/schema";
-import { getHandsetNumberForWorkspace } from "@/lib/database.server";
+import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { getAgentStatus } from "@/lib/agent-status.server";
 import { createTenantDb } from "@/server/tenant-db";

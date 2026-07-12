@@ -2,7 +2,7 @@ import {
   buildDefaultWorkspaceTwilioPortalSnapshot,
   createWorkspaceTwilioInstance,
   getWorkspaceTwilioPortalSnapshot,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import {

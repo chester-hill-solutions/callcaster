@@ -17,9 +17,11 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/database.server", () => ({
-  safeParseJson: mocks.safeParseJson,
+vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: mocks.requireWorkspaceAccess,
+}));
+vi.mock("@/lib/request-utils.server", () => ({
+  safeParseJson: mocks.safeParseJson,
 }));
 
 vi.mock("@/lib/workspace-members-db.server", () => ({

@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import type { RouterContextProvider } from "react-router";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { verifyAuth } from "@/lib/auth.server";
 import { workspaceContext } from "@/lib/route-context.server";
 

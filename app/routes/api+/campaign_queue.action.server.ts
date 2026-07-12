@@ -5,7 +5,8 @@ import {
 } from "@/lib/campaign-queue-db.server";
 import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { parseRequestData, requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { parseRequestData } from "@/lib/request-utils.server";
 import { safeNumber } from "@/lib/type-safety-utils";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";

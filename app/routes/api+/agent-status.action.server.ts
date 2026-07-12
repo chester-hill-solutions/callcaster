@@ -2,7 +2,8 @@ import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { updateAgentStatus } from "@/lib/agent-status.server";
 import { logger } from "@/lib/logger.server";

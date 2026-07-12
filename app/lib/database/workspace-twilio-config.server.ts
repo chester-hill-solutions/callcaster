@@ -24,7 +24,7 @@ import {
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { mergeWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
-import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import {
   classifyPhoneNumberSenderType,
   inferSmsSenderClassFromSenderTypes,

@@ -7,7 +7,7 @@ import {
   runAutoDialerTurn,
   saveCallToDatabase,
 } from "@/lib/auto-dial.server";
-import { safeParseJson } from "@/lib/database.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 
 export {
   completeAllConferences,

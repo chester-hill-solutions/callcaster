@@ -7,7 +7,7 @@ import {
   getUserRole,
   getWorkspaceInfo,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import {
   handleDeleteWorkspace,
   handleTransferWorkspace,

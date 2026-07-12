@@ -46,14 +46,11 @@ vi.mock("@/lib/object-storage.server", () => ({
   downloadObject: vi.fn(async () => Buffer.from(JSON.stringify({ status: "processing" }))),
 }));
 
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>(
-    "@/lib/database.server",
-  );
-  return {
-    ...actual,
-    requireWorkspaceAccess,
-  };
+vi.mock("@/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/workspace.server")
+  >("@/lib/database/workspace.server");
+  return { ...actual, requireWorkspaceAccess };
 });
 
 function buildMockDb() {

@@ -1,6 +1,6 @@
 import { data as routeData, redirect } from "react-router";
 import type { Database } from "@/lib/db-types";
-import { getWorkspaceUsers } from "@/lib/database.server";
+import { getWorkspaceUsers } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import { logger } from "@/lib/logger.server";

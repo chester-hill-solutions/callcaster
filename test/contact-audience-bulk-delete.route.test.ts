@@ -17,10 +17,16 @@ vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: postgresServerMocks.headers,
   }),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/contact-audience.server", () => ({
+  removeContactsFromAudience: (...args: any[]) =>
+    mocks.removeContactsFromAudience(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
-  removeContactsFromAudience: (...args: any[]) => mocks.removeContactsFromAudience(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/audience-upload-db.server", () => ({
   findAudienceWorkspaceById: vi.fn(async () => "w1"),

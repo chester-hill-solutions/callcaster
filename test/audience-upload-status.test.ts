@@ -88,7 +88,7 @@ vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers({ "set-cookie": "x=y" }),
   }),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
 

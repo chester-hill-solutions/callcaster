@@ -13,7 +13,7 @@ import {
   findAudienceInWorkspace,
   markAudienceUpdating,
 } from "@/lib/audience-upload-db.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 import type { Database } from "@/lib/db-types";
 

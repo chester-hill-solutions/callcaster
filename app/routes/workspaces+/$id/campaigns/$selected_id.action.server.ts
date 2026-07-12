@@ -9,7 +9,15 @@ import {
   rpcGetCampaignAttemptsCsv,
   rpcGetCampaignMessagesCsv,
 } from "@/lib/db-rpc.server";
-import { fetchBasicResults, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } from "@/lib/database.server";
+import {
+  fetchBasicResults,
+  fetchCampaignDetails,
+  fetchQueueCounts,
+} from "@/lib/database/campaign.server";
+import {
+  getUserRole,
+  getWorkspaceUsers,
+} from "@/lib/database/workspace.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { logger as loggerServer } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";

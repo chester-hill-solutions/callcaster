@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
-import { getInvitesByUserId } from "@/lib/database.server";
+import { getInvitesByUserId } from "@/lib/database/workspace.server";
 import { listUserInvitesWithWorkspace } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import { auth } from "@/server/auth-instance";

@@ -10,7 +10,27 @@ async function passthrough<T extends Record<string, unknown>>(id: string) {
   return { ...actual };
 }
 
-vi.mock("@/lib/database.server", () => passthrough("@/lib/database.server"));
+vi.mock("@/lib/database/workspace.server", () =>
+  passthrough("@/lib/database/workspace.server"),
+);
+vi.mock("@/lib/database/campaign.server", () =>
+  passthrough("@/lib/database/campaign.server"),
+);
+vi.mock("@/lib/database/contact.server", () =>
+  passthrough("@/lib/database/contact.server"),
+);
+vi.mock("@/lib/database/contact-audience.server", () =>
+  passthrough("@/lib/database/contact-audience.server"),
+);
+vi.mock("@/lib/database/stripe.server", () =>
+  passthrough("@/lib/database/stripe.server"),
+);
+vi.mock("@/lib/database/call-actions.server", () =>
+  passthrough("@/lib/database/call-actions.server"),
+);
+vi.mock("@/lib/request-utils.server", () =>
+  passthrough("@/lib/request-utils.server"),
+);
 vi.mock("@/lib/auth.server", () => passthrough("@/lib/auth.server"));
 vi.mock("@/lib/logger.server", () => passthrough("@/lib/logger.server"));
 vi.mock("@/lib/env.server", () => passthrough("@/lib/env.server"));

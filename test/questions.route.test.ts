@@ -24,8 +24,11 @@ vi.mock("@/lib/auth.server", () => ({
 vi.mock("@/lib/api-auth.server", () => ({
   requireJsonAuth: (...args: any[]) => mocks.requireJsonAuth(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({

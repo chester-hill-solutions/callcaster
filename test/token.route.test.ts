@@ -22,8 +22,9 @@ vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers(),
   }),
 }));
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/twilio-token.server", () => ({
   generateToken: (...args: unknown[]) => mocks.generateToken(...args),

@@ -2,7 +2,7 @@ import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireDualAuth, getDualAuthUser } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import {
   findCampaignMessageMedia,
   updateCampaignMessageMedia,

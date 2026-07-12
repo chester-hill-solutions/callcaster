@@ -1,7 +1,9 @@
 import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { parseActionRequest, removeContactsFromAudience, requireWorkspaceAccess } from "@/lib/database.server";
+import { removeContactsFromAudience } from "@/lib/database/contact-audience.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { AppError } from "@/lib/errors.server";

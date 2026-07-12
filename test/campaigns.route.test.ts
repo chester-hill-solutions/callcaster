@@ -22,13 +22,18 @@ vi.mock("@/lib/platform-telephony.server", () => ({
 vi.mock("@/lib/auth.server", () => ({
   getSession: vi.fn(async (request: Request) => ({ user: { id: "u1" }, headers: new Headers(request.headers) })),
 }));
-vi.mock("@/lib/database.server", () => ({
-  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
+vi.mock("@/lib/database/campaign.server", () => ({
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
   deleteCampaign: (...args: any[]) => mocks.deleteCampaign(...args),
   createCampaign: (...args: any[]) => mocks.createCampaign(...args),
   updateOrCopyScript: (...args: any[]) => mocks.updateOrCopyScript(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
+  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
 }));
 vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),

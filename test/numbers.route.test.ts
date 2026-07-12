@@ -40,9 +40,7 @@ vi.mock("@/lib/platform-workspace-numbers.server", () => ({
   purchaseWorkspaceNumber: (...args: unknown[]) =>
     mocks.purchaseWorkspaceNumber(...args),
 }));
-vi.mock("../app/lib/database.server", () => ({
-  parseActionRequest: async (request: Request) =>
-    Object.fromEntries((await request.formData()).entries()),
+vi.mock("../app/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
   getWorkspaceUsers: (...args: any[]) => mocks.getWorkspaceUsers(...args),
@@ -50,6 +48,10 @@ vi.mock("../app/lib/database.server", () => ({
     mocks.getWorkspacePhoneNumbers(...args),
   requireWorkspaceAccess: (...args: any[]) =>
     mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("../app/lib/request-utils.server", () => ({
+  parseActionRequest: async (request: Request) =>
+    Object.fromEntries((await request.formData()).entries()),
 }));
 vi.mock("../app/lib/messaging-onboarding.server", () => ({
   getWorkspaceMessagingOnboardingState: (...args: any[]) =>

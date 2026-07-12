@@ -1,4 +1,4 @@
-import { createCampaign, requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import {
   createScriptForCampaign,
   linkAudiencesToNewCampaign,
@@ -12,7 +12,10 @@ import {
   type CreateWithScriptBody,
 } from "@/lib/schemas/api/create-with-script";
 import type { ActionFunctionArgs } from "react-router";
-import type { CampaignData } from "@/lib/database/campaign.server";
+import {
+  type CampaignData,
+  createCampaign,
+} from "@/lib/database/campaign.server";
 
 function jsonResponse(data: unknown, status: number) {
   return new Response(JSON.stringify(data), {

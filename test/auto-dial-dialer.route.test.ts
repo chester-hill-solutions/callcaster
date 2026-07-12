@@ -38,8 +38,11 @@ vi.mock("@client/client-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
 }));
 
-vi.mock("../app/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
+vi.mock("../app/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
+}));
+vi.mock("../app/lib/request-utils.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 

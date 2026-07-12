@@ -7,7 +7,7 @@ import {
 import {
   getWorkspaceInfoWithDetails,
   getWorkspacePhoneNumbers,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { workspaceContext } from "@/lib/route-context.server";
 import type { LoaderFunctionArgs } from "react-router";

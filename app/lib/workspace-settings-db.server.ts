@@ -1,6 +1,6 @@
 import { MemberRole } from "@/lib/member-role";
 import type { User, WorkspaceInvite, WorkspaceWebhook } from "@/lib/types";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import {
   getWorkspaceById,
   getWorkspaceWebhookRow,

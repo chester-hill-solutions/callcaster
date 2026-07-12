@@ -158,7 +158,7 @@ describe("database.server helpers", () => {
   });
 
   test("parseRequestData handles json, urlencoded, missing, and unsupported content-types", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
 
     const missing = new Request("http://localhost/x", { method: "POST" });
     await expect(mod.parseRequestData(missing)).resolves.toBeUndefined();
@@ -202,7 +202,7 @@ describe("database.server helpers", () => {
   }, 30000);
 
   test("safeParseJson returns data, throws 400 Response on SyntaxError, and rethrows non-SyntaxError", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
 
     const ok = new Request("http://localhost/x", {
       method: "POST",
@@ -234,7 +234,7 @@ describe("database.server helpers", () => {
   });
 
   test("parseActionRequest parses json and form bodies (including duplicate keys)", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
 
     const jsonReq = new Request("http://localhost/x", {
       method: "POST",
@@ -279,7 +279,7 @@ describe("database.server helpers", () => {
   });
 
   test("handleError logs and returns json response", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
     const res = await asRouteResponse(mod.handleError(new Error("boom"), "nope", 418));
     expect(res.status).toBe(418);
     await expect(res.json()).resolves.toEqual({ error: "nope" });
@@ -291,7 +291,7 @@ describe("database.server helpers", () => {
   });
 
   test("endConferenceByUser throws when workspace lookup fails or user_id missing", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     adminDbMocks.workspaceError = new Error("no row");
     await expect(
@@ -325,7 +325,7 @@ describe("database.server helpers", () => {
   });
 
   test("endConferenceByUser completes conferences and attempts to hang up calls, logging per-call/per-conf failures", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     vi.mocked(findActiveConferenceIdsForUser).mockResolvedValueOnce([
       "CONF_BAD",
@@ -376,7 +376,7 @@ describe("database.server helpers", () => {
   });
 
   test("endConferenceByUser logs when call lookup errors for a conference", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     vi.mocked(findActiveConferenceIdsForUser).mockResolvedValueOnce(["CONF_X"]);
     vi.mocked(findCallsByConferenceId).mockRejectedValueOnce(new Error("call-select-failed"));
@@ -401,7 +401,7 @@ describe("database.server helpers", () => {
   });
 
   test("cancelQueuedCalls returns canceled IDs, aggregates per-call errors, and handles list() failures", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi
       .fn()
@@ -453,7 +453,7 @@ describe("database.server helpers", () => {
   });
 
   test("cancelQueuedMessages returns canceled IDs, aggregates per-message errors, and handles list() failures", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi
       .fn()
@@ -505,7 +505,7 @@ describe("database.server helpers", () => {
   });
 
   test("cancelQueuedMessagesForCampaign only cancels queued rows for the requested campaign", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi
       .fn()
@@ -540,7 +540,7 @@ describe("database.server helpers", () => {
   });
 
   test("cancelQueuedMessagesForCampaign handles query errors and thrown exceptions", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const twilio = {
       messages: ((sid: string) => ({ update: async () => ({ sid }) })) as any,
@@ -596,7 +596,7 @@ describe("database.server helpers", () => {
   });
 
   test("cancelQueuedMessagesForCampaign continues when page size equals batch size", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi.fn(async (sid: string) => ({ sid }));
     adminDbMocks.messageRows = [{ sid: "SM1" }, { sid: "SM2" }];
@@ -620,7 +620,7 @@ describe("database.server helpers", () => {
   });
 
   test("cancelQueuedMessagesForCampaign handles null queuedMessages payload", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     adminDbMocks.messageRows = [];
     adminDbMocks.messageSelectCalls = 0;

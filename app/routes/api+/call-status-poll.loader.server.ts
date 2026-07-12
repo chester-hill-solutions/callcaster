@@ -3,7 +3,10 @@ import {
   type CallStatusEnum,
 } from "@/lib/call-status";
 import { createErrorResponse } from "@/lib/errors.server";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { getSession } from "@/lib/auth.server";

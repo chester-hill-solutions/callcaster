@@ -1,6 +1,6 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { listWorkspaceScriptsApi } from "@/lib/platform-data.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { Json , Database } from "@/lib/db-types";

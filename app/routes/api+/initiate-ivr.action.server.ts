@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { initiateIvrBodySchema } from "@/lib/schemas/api/common";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";

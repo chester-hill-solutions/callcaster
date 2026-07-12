@@ -1,7 +1,7 @@
 import {
   createWorkspaceTwilioInstance,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { env } from "@/lib/env.server";

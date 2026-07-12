@@ -50,7 +50,7 @@ const tdbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth.server", () => ({ ...authMocks }));
-vi.mock("@/lib/database.server", () => ({ ...dbMocks }));
+vi.mock("@/lib/database/workspace.server", () => ({ ...dbMocks }));
 vi.mock("@/lib/workspace-settings-db.server", () => ({
   ...settingsPageMocks,
 }));

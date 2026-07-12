@@ -5,7 +5,12 @@ import {
   MessageCampaign,
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import { fetchBasicResults, fetchCampaignDetails, fetchQueueCounts, getUserRole } from "@/lib/database.server";
+import {
+  fetchBasicResults,
+  fetchCampaignDetails,
+  fetchQueueCounts,
+} from "@/lib/database/campaign.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { MemberRole } from "@/lib/member-role";

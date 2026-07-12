@@ -5,7 +5,7 @@ import {
 } from "@/lib/twilio-call-status.server";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-db.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";

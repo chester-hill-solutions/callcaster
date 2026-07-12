@@ -20,7 +20,7 @@ import type {
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
 import { presentTwilioError } from "@/lib/twilio-errors";
-import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import {
   getWorkspaceMessagingOnboardingFromTwilioData,
 } from "@/lib/messaging-onboarding.server";

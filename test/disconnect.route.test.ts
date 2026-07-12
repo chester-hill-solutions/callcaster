@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));

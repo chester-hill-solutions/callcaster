@@ -12,7 +12,7 @@ import {
 } from "@/lib/db-rpc.server";
 import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { db } from "@/server/db";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 
 type TwilioClient = TwilioSDK.Twilio;
 

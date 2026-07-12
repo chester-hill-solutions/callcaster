@@ -1,7 +1,8 @@
 
 import { data as routeData, redirect } from "react-router";
 import { parseCSV } from "@/lib/utils";
-import { bulkCreateContacts, getWorkspacePhoneNumbers } from "@/lib/database.server";
+import { bulkCreateContacts } from "@/lib/database/contact.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import {
   DEFAULT_WEEKDAY_CALLING_SCHEDULE,
   getDefaultCampaignDates,

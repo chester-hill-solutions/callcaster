@@ -6,7 +6,7 @@ import {
   createWorkspaceTwilioInstance,
   syncWorkspaceTwilioSnapshot,
   updateWorkspaceTwilioPortalConfig,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";

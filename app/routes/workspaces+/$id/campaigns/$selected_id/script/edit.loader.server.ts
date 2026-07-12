@@ -1,6 +1,12 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
+import {
+  getMedia,
+  getSignedUrls,
+  getUserRole,
+  getWorkspaceScripts,
+  listMedia,
+} from "@/lib/database/workspace.server";
 import { fetchCampaignForScriptEdit } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
 import type { LoaderFunctionArgs } from "react-router";

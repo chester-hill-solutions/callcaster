@@ -8,7 +8,7 @@ import {
   requireWorkspaceAccess,
   updateCallerId,
   updateWorkspacePhoneNumber,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";

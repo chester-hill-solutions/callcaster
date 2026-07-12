@@ -14,7 +14,7 @@ import {
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { mergeWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
 
 async function syncWorkspaceTwilioBootstrapStateSafely(args: {

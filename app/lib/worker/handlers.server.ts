@@ -2,7 +2,7 @@ import { triggerTwilioOpenSync } from "@/lib/twilio-open-sync.server";
 import { runNumberRentalBilling } from "@/lib/number-rental-billing.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { processAudienceUpload } from "@/lib/audience-upload-process.server";

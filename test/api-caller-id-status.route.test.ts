@@ -30,8 +30,9 @@ vi.mock("@/lib/messaging-onboarding.server", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/workspace.server")>();
   return {
     ...actual,
     getWorkspacePhoneNumbers: databaseMocks.getWorkspacePhoneNumbers,

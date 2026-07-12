@@ -1,4 +1,7 @@
-import { acceptWorkspaceInvitations, getInvitesByUserId } from "@/lib/database.server";
+import {
+  acceptWorkspaceInvitations,
+  getInvitesByUserId,
+} from "@/lib/database/workspace.server";
 import { getSession, verifyAuth } from "@/lib/auth.server";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { auth } from "@/server/auth-instance";

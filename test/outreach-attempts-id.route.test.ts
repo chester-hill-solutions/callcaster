@@ -17,8 +17,10 @@ vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers({ "Set-Cookie": "x=1" }),
   }),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/platform-data.server", () => ({

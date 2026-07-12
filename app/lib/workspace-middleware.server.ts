@@ -1,6 +1,6 @@
 import { data as routeData, redirect } from "react-router";
 import type { MiddlewareFunction } from "react-router";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { getSession } from "@/lib/auth.server";
 import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import {

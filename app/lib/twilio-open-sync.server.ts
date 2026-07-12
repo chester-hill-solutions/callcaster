@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { call, message } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";

@@ -1,5 +1,6 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
-import { checkSchedule, getUserRole } from "@/lib/database.server";
+import { checkSchedule } from "@/lib/database/campaign.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { generateToken } from "@/lib/twilio-token.server";
 import {
   getCallScreenData,

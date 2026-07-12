@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { createTenantDb } from "@/server/tenant-db";

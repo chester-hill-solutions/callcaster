@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
-import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
 import { AppError } from "@/lib/errors.server";

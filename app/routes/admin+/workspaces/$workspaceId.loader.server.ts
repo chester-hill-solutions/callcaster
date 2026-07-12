@@ -1,4 +1,7 @@
-import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  getWorkspaceTwilioPortalSnapshot,
+} from "@/lib/database/workspace.server";
 import { data as routeData, redirect } from "react-router";
 import { getAdminWorkspaceDetail } from "@/lib/platform-admin.server";
 import { logger } from "@/lib/logger.server";

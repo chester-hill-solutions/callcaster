@@ -4,9 +4,17 @@ import { asRouteResponse } from "./helpers/route-result";
 const bulkCreateContacts = vi.fn(async () => ({ insert: [], audience_insert: [] }));
 const getWorkspacePhoneNumbers = vi.fn(async () => ({ data: [], error: null }));
 
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>("@/lib/database.server");
-  return { ...actual, bulkCreateContacts, getWorkspacePhoneNumbers };
+vi.mock("@/lib/database/contact.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/contact.server")
+  >("@/lib/database/contact.server");
+  return { ...actual, bulkCreateContacts };
+});
+vi.mock("@/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/workspace.server")
+  >("@/lib/database/workspace.server");
+  return { ...actual, getWorkspacePhoneNumbers };
 });
 
 const enqueueContactsForCampaign = vi.fn(async () => undefined);

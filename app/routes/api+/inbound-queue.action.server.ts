@@ -1,6 +1,6 @@
 import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import {
   addInboundQueueMember,
   createInboundQueue,

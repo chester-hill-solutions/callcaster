@@ -21,11 +21,15 @@ vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("../app/lib/database.server", () => ({
-  updateWorkspaceTwilioPortalConfig: (...args: any[]) => mocks.updateWorkspaceTwilioPortalConfig(...args),
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
-  getWorkspaceTwilioPortalSnapshot: (...args: any[]) => mocks.getWorkspaceTwilioPortalSnapshot(...args),
-  syncWorkspaceTwilioSnapshot: (...args: any[]) => mocks.syncWorkspaceTwilioSnapshot(...args),
+vi.mock("../app/lib/database/workspace.server", () => ({
+  updateWorkspaceTwilioPortalConfig: (...args: any[]) =>
+    mocks.updateWorkspaceTwilioPortalConfig(...args),
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
+  getWorkspaceTwilioPortalSnapshot: (...args: any[]) =>
+    mocks.getWorkspaceTwilioPortalSnapshot(...args),
+  syncWorkspaceTwilioSnapshot: (...args: any[]) =>
+    mocks.syncWorkspaceTwilioSnapshot(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({

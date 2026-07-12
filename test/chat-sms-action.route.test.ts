@@ -24,10 +24,11 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: unknown[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   getWorkspaceTwilioPortalConfig: (...args: unknown[]) =>
     mocks.getWorkspaceTwilioPortalConfig(...args),
-  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/chat-sms.server", () => ({

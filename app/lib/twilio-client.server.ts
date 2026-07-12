@@ -6,7 +6,7 @@ import type { TrustProductsListInstanceCreateOptions } from "twilio/lib/rest/tru
 import type { SinkListInstanceCreateOptions } from "twilio/lib/rest/events/v1/sink";
 import type { SubscriptionListInstanceCreateOptions } from "twilio/lib/rest/events/v1/subscription";
 
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { isRetryableTwilioError, presentTwilioError } from "@/lib/twilio-errors";
 

@@ -1,4 +1,4 @@
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { resolveJsonAuthSession } from "@/lib/api-auth.server";
 import { playTwiml } from "@/lib/twilio-twiml.server";

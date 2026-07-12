@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import type { LoaderFunctionArgs } from "react-router";
 

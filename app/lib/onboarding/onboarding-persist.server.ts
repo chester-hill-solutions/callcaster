@@ -6,7 +6,7 @@ import {
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
-import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { hydrateWorkspaceRcsOnboardingState } from "@/lib/rcs-onboarding.server";
 
 export async function persistWorkspaceOnboardingState(args: {

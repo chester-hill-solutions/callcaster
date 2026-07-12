@@ -1,6 +1,6 @@
 import { AppError, ErrorCode, createErrorResponse, handleDatabaseError } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { SurveyFormData } from "@/lib/types";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";

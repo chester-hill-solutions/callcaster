@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
 import { markAudienceUploadInterruptedIfStale } from "@/lib/audience-upload-process.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 import { downloadObject } from "@/lib/object-storage.server";
 import type { LoaderFunctionArgs } from "react-router";

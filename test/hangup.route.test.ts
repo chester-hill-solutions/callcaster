@@ -16,10 +16,14 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../app/lib/database.server", () => ({
+vi.mock("../app/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("../app/lib/request-utils.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 

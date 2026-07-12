@@ -39,7 +39,7 @@ vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
   }),
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: vi.fn(async () => {
     if (mocks.twilioInstanceError) {
       throw mocks.twilioInstanceError;

@@ -29,7 +29,7 @@ vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => tdbMocks),
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: vi.fn(),
 }));
 

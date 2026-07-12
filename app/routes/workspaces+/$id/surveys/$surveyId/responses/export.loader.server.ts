@@ -1,6 +1,6 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { csvResponse } from "@/lib/csv";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { buildSurveyResponsesCsv } from "@/lib/platform-analytics.server";
 import type { LoaderFunctionArgs } from "react-router";
 

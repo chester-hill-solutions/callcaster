@@ -1,6 +1,6 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
 import { loadInboundQueueSettings } from "@/lib/inbound-queue-db.server";
 import { MemberRole } from "@/lib/member-role";
 import type { LoaderFunctionArgs } from "react-router";

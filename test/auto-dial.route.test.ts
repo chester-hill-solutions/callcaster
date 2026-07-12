@@ -47,13 +47,17 @@ vi.mock("@/lib/telephony-db.server", () => ({
   }),
 }));
 
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: async () => undefined,
+vi.mock("@/lib/database/campaign.server", () => ({
   checkSchedule: async () => true,
-  safeParseJson: async () => ({}),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: async () => undefined,
   createWorkspaceTwilioInstance: async () => ({
     calls: { create: async () => ({ sid: "CA1" }) },
   }),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
+  safeParseJson: async () => ({}),
 }));
 
 vi.mock("@/server/tenant-db", () => ({
@@ -330,16 +334,11 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
     vi.doMock("../app/lib/auth.server", () => ({
       getSession: async () => ({ headers: new Headers(), user: { id: "u1" } }),
     }));
-    vi.doMock("../app/lib/database.server", () => ({
-      requireWorkspaceAccess: async () => undefined,
+    vi.doMock("../app/lib/database/campaign.server", () => ({
       checkSchedule: async () => true,
-      safeParseJson: async () => ({
-        user_id: "u1",
-        caller_id: "+1555",
-        campaign_id: 1,
-        workspace_id: "w1",
-        selected_device: "computer",
-      }),
+    }));
+    vi.doMock("../app/lib/database/workspace.server", () => ({
+      requireWorkspaceAccess: async () => undefined,
       createWorkspaceTwilioInstance: async () => ({
         calls: Object.assign(
           (sid: string) => ({
@@ -347,6 +346,15 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
           }),
           { create: callsCreate },
         ),
+      }),
+    }));
+    vi.doMock("../app/lib/request-utils.server", () => ({
+      safeParseJson: async () => ({
+        user_id: "u1",
+        caller_id: "+1555",
+        campaign_id: 1,
+        workspace_id: "w1",
+        selected_device: "computer",
       }),
     }));
     vi.doMock("@/lib/env.server", () => ({

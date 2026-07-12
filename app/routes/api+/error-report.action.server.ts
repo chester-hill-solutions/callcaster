@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { Resend } from "resend";
-import { safeParseJson } from "@/lib/database.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 
 

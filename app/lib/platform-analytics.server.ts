@@ -1,9 +1,11 @@
 import {
   fetchBasicResults,
   fetchQueueCounts,
+} from "@/lib/database/campaign.server";
+import {
   getUserRole,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import {
   generateCampaignExportId,
   processCallCampaignExport,

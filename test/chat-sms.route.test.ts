@@ -35,15 +35,19 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
-vi.mock("../app/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+vi.mock("../app/lib/database/workspace.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../app/lib/database/workspace.server")
+    >();
   return {
     ...actual,
     createWorkspaceTwilioInstance: (...args: any[]) =>
       mocks.createWorkspaceTwilioInstance(...args),
     getWorkspaceTwilioPortalConfig: (...args: any[]) =>
       mocks.getWorkspaceTwilioPortalConfig(...args),
-    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+    requireWorkspaceAccess: (...args: any[]) =>
+      mocks.requireWorkspaceAccess(...args),
   };
 });
 vi.mock("@/lib/utils", () => ({

@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import type { ZodError, ZodType } from "zod";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { parseActionRequest, safeParseJson } from "@/lib/database.server";
+import { parseActionRequest, safeParseJson } from "@/lib/request-utils.server";
 
 export function formatZodError(error: ZodError): string {
   const message = error.issues

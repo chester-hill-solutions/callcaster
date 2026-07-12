@@ -2,7 +2,7 @@ import { env } from "@/lib/env.server";
 import {
   getWorkspaceTwilioPortalConfig,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { parseOptionalString } from "@/lib/parse-utils.server";

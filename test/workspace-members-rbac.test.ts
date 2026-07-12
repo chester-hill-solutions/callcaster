@@ -31,7 +31,7 @@ const tenantDbMock = vi.hoisted(() => ({
   createTenantDb: vi.fn(() => txDb),
 }));
 
-vi.mock("@/lib/database.server", () => ({ ...accessMocks }));
+vi.mock("@/lib/database/workspace.server", () => ({ ...accessMocks }));
 vi.mock("@/lib/workspace-members-db.server", () => ({ ...membersDbMocks }));
 vi.mock("@/server/db", () => ({ db: dbMock }));
 vi.mock("@/server/tenant-db", () => ({ ...tenantDbMock }));

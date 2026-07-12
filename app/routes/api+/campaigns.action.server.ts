@@ -1,5 +1,12 @@
 import { getSession } from "@/lib/auth.server";
-import { createCampaign, deleteCampaign, parseActionRequest, requireWorkspaceAccess, updateCampaign, updateOrCopyScript } from "@/lib/database.server";
+import {
+  createCampaign,
+  deleteCampaign,
+  updateCampaign,
+  updateOrCopyScript,
+} from "@/lib/database/campaign.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
 import { parseJsonField } from "@/lib/parse-utils.server";

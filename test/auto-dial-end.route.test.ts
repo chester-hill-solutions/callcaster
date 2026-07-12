@@ -172,9 +172,11 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     vi.resetModules();
 
     setJsonAuthSession({ user: { id: "u1" } });
-    vi.doMock("../app/lib/database.server", () => ({
-      safeParseJson: async () => ({ workspaceId: "w1" }),
+    vi.doMock("../app/lib/database/workspace.server", () => ({
       createWorkspaceTwilioInstance: async () => ({}) as any,
+    }));
+    vi.doMock("../app/lib/request-utils.server", () => ({
+      safeParseJson: async () => ({ workspaceId: "w1" }),
     }));
     vi.doMock("@/lib/telephony-db.server", () => ({
       findActiveConferenceIdsForUser: async () => Promise.reject("nope"),

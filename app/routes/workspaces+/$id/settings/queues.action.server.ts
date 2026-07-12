@@ -1,6 +1,9 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  getUserRole,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import {
   addInboundQueueMember,
   createInboundQueue,

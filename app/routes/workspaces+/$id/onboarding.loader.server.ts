@@ -11,7 +11,7 @@ import {
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import {
   getWorkspaceRcsBlockingIssues,
   hydrateWorkspaceRcsOnboardingState,

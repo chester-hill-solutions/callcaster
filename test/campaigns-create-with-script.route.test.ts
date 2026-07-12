@@ -46,12 +46,21 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
-vi.mock("@/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+vi.mock("@/lib/database/campaign.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/campaign.server")>();
   return {
     ...actual,
     createCampaign: (...args: any[]) => mocks.createCampaign(...args),
-    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+  };
+});
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/workspace.server")>();
+  return {
+    ...actual,
+    requireWorkspaceAccess: (...args: any[]) =>
+      mocks.requireWorkspaceAccess(...args),
   };
 });
 vi.mock("@/lib/queue.server", () => ({

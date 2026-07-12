@@ -3,7 +3,7 @@ import type { Database } from "@/lib/db-types";
 import {
   createWorkspaceTwilioInstance,
   getWorkspaceTwilioPortalConfig,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";

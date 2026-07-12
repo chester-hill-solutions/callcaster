@@ -1,181 +1,16 @@
 /**
- * Database server functions - Re-exports from modular files
- * 
- * This file maintains backward compatibility by re-exporting all functions
- * from the modular database files. New code should import directly from
- * the module files (e.g., ~/lib/database/workspace.server.ts)
+ * Database-backed call/message cancellation actions.
+ *
+ * Relocated out of the former `database.server.ts` re-export barrel. These
+ * functions coordinate Twilio-side cancellation with the local database.
  */
-
-// Re-export workspace functions
-export {
-  requireWorkspaceAccess,
-  getUserWorkspaces,
-  createKeys,
-  createSubaccount,
-  createNewWorkspace,
-  getWorkspaceInfo,
-  getWorkspaceInfoWithDetails,
-  getWorkspaceUsers,
-  getWorkspacePhoneNumbers,
-  getHandsetNumberForWorkspace,
-  updateWorkspacePhoneNumber,
-  addUserToWorkspace,
-  getUserRole,
-  updateUserWorkspaceAccessDate,
-  handleExistingUserSession,
-  handleNewUserOTPVerification,
-  createWorkspaceTwilioInstance,
-  normalizeWorkspaceTwilioOpsConfig,
-  getWorkspaceTwilioPortalConfigFromTwilioData,
-  getEffectiveWorkspaceTwilioPortalConfig,
-  normalizeWorkspaceTwilioSyncSnapshot,
-  getWorkspaceTwilioSyncSnapshotFromTwilioData,
-  getWorkspaceTwilioPortalConfig,
-  updateWorkspaceTwilioPortalConfig,
-  updateWorkspaceTwilioSyncSnapshot,
-  syncWorkspaceTwilioSnapshot,
-  buildDefaultWorkspaceTwilioPortalSnapshot,
-  getWorkspaceTwilioPortalSnapshot,
-  removeWorkspacePhoneNumber,
-  updateCallerId,
-  fetchWorkspaceData,
-  getWorkspaceScripts,
-  getRecordingFileNames,
-  getMedia,
-  listMedia,
-  getSignedUrls,
-  acceptWorkspaceInvitations,
-  getInvitesByUserId,
-  fetchConversationSummary,
-  type WorkspaceInfoWithDetails,
-} from "./database/workspace.server";
-
-// Re-export campaign functions
-export {
-  updateCampaign,
-  deleteCampaign,
-  createCampaign,
-  updateOrCopyScript,
-  updateCampaignScript,
-  fetchBasicResults,
-  fetchCampaignCounts,
-  fetchCampaignData,
-  fetchCampaignDetails,
-  fetchQueueCounts,
-  fetchCampaignAudience,
-  fetchAdvancedCampaignDetails,
-  fetchCampaignsByType,
-  getCampaignQueueById,
-  checkSchedule,
-  getCampaignTableKey,
-  type CampaignType,
-  type CampaignData,
-  type CampaignDetails,
-} from "./database/campaign.server";
-
-// Re-export contact functions
-export {
-  findPotentialContacts,
-  fetchContactData,
-  updateContact,
-  createContact,
-  bulkCreateContacts,
-} from "./database/contact.server";
-
-// Re-export contact-audience functions
-export {
-  removeContactFromAudience,
-  removeContactsFromAudience,
-} from "./database/contact-audience.server";
-
-// Re-export Stripe functions
-export {
-  createStripeContact,
-  meterEvent,
-} from "./database/stripe.server";
-
-// Re-export utility functions that are still used
-import { data as routeData } from "react-router";
-import { logger } from "./logger.server";
-
-export const parseRequestData = async (request: Request) => {
-  const contentType = request.headers.get("Content-Type") ?? "";
-  if (!contentType) return;
-  if (contentType.includes("application/json")) {
-    return await request.json();
-  } else if (contentType.startsWith("application/x-www-form-urlencoded")) {
-    const formData = await request.formData();
-    return Object.fromEntries(formData);
-  }
-  throw new Error("Unsupported content type");
-};
-
-function formDataToObject(formData: FormData): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of formData.entries()) {
-    const v = value instanceof File ? value : String(value);
-    if (key in result) {
-      const existing = result[key];
-      if (Array.isArray(existing)) {
-        existing.push(v);
-      } else {
-        result[key] = [existing, v];
-      }
-    } else {
-      result[key] = v;
-    }
-  }
-  return result;
-}
-
-/**
- * Parse JSON request body safely. On malformed JSON or empty body, throws a
- * Response with status 400 instead of letting SyntaxError bubble.
- */
-export async function safeParseJson<T = Record<string, unknown>>(
-  request: Request
-): Promise<T> {
-  try {
-    return (await request.json()) as T;
-  } catch (e) {
-    if (e instanceof SyntaxError) {
-      throw routeData({ error: "Invalid JSON" }, { status: 400 });
-    }
-    throw e;
-  }
-}
-
-/**
- * Parse action request body as either JSON or FormData.
- * Use when the action may receive either Content-Type from fetchers or forms.
- * FormData with duplicate keys (e.g. contact_ids[]) is collected into arrays.
- * Malformed JSON returns 400 via safeParseJson.
- */
-export const parseActionRequest = async (
-  request: Request
-): Promise<Record<string, unknown>> => {
-  const contentType = request.headers.get("Content-Type") ?? "";
-  if (contentType.includes("application/json")) {
-    return await safeParseJson(request);
-  }
-  const formData = await request.formData();
-  return formDataToObject(formData);
-};
-
-export const handleError = (error: Error, message: string, status = 500) => {
-  logger.error(`${message}:`, error);
-  return routeData({ error: message }, { status });
-};
-
-// Legacy functions that need to be kept for now
 import type Twilio from "twilio";
-import type { Database } from "@/lib/db-types";
-import { hangupTwiml } from "@/lib/twilio-twiml.server";
-import { createWorkspaceTwilioInstance } from "./database/workspace.server";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { call as callTable, message as messageTable } from "@/db/schema";
+import { message as messageTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { logger } from "@/lib/logger.server";
 import {
   findActiveConferenceIdsForUser,
   findCallsByConferenceId,
@@ -184,6 +19,7 @@ import {
   rpcCancelMessages,
   rpcCancelOutreachAttemptsByCallIds,
 } from "@/lib/db-rpc.server";
+import { createWorkspaceTwilioInstance } from "./workspace.server";
 
 // Marked for deprecation
 export async function endConferenceByUser({
@@ -193,19 +29,23 @@ export async function endConferenceByUser({
   workspace_id: string;
   user_id: string;
 }) {
-  const twilio = await createWorkspaceTwilioInstance({     workspace_id,
-  });
+  const twilio = await createWorkspaceTwilioInstance({ workspace_id });
   if (!user_id) {
     throw new Error("User ID is required");
   }
 
-  const conferenceIds = await findActiveConferenceIdsForUser(workspace_id, user_id);
+  const conferenceIds = await findActiveConferenceIdsForUser(
+    workspace_id,
+    user_id,
+  );
 
   await Promise.all(
     conferenceIds.map(async (conferenceId) => {
       try {
         if (conferenceId.startsWith("CF")) {
-          await twilio.conferences(conferenceId).update({ status: "completed" });
+          await twilio
+            .conferences(conferenceId)
+            .update({ status: "completed" });
         } else {
           const conferences = await twilio.conferences.list({
             friendlyName: conferenceId,
@@ -223,9 +63,7 @@ export async function endConferenceByUser({
         await Promise.all(
           calls.map(async (call) => {
             try {
-              await twilio
-                .calls(call.sid)
-                .update({ twiml: hangupTwiml() });
+              await twilio.calls(call.sid).update({ twiml: hangupTwiml() });
             } catch (callError) {
               logger.error(`Error updating call ${call.sid}:`, callError);
             }
@@ -308,7 +146,10 @@ async function cancelMessageAndUpdateDB(
   }
 }
 
-async function processBatchCancellation(twilio: Twilio.Twilio, calls: { sid: string }[]) {
+async function processBatchCancellation(
+  twilio: Twilio.Twilio,
+  calls: { sid: string }[],
+) {
   const results = await Promise.allSettled(
     calls.map((call) => cancelCallAndUpdateDB(twilio, call)),
   );
@@ -331,9 +172,7 @@ async function processBatchMessageCancellation(
   messages: { sid: string }[],
 ) {
   const results = await Promise.allSettled(
-    messages.map((message) =>
-      cancelMessageAndUpdateDB(twilio, message),
-    ),
+    messages.map((message) => cancelMessageAndUpdateDB(twilio, message)),
   );
 
   return results.reduce(
@@ -376,7 +215,8 @@ export async function cancelQueuedCalls(
 
       hasMoreCalls = calls.length === batchSize;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       allErrors.push(`Error retrieving calls: ${errorMessage}`);
       hasMoreCalls = false;
     }
@@ -405,17 +245,16 @@ export async function cancelQueuedMessages(
         break;
       }
 
-      const { cancelledMessages, errors } = await processBatchMessageCancellation(
-        twilio,
-        messages,
-      );
+      const { cancelledMessages, errors } =
+        await processBatchMessageCancellation(twilio, messages);
 
       allCanceledMessages = allCanceledMessages.concat(cancelledMessages);
       allErrors = allErrors.concat(errors);
 
       hasMoreMessages = messages.length === batchSize;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       allErrors.push(`Error retrieving messages: ${errorMessage}`);
       hasMoreMessages = false;
     }
@@ -450,7 +289,8 @@ export async function cancelQueuedMessagesForCampaign(
         .limit(batchSize);
 
       const messages = rows.filter(
-        (message): message is { sid: string } => typeof message?.sid === "string" && message.sid.length > 0,
+        (message): message is { sid: string } =>
+          typeof message?.sid === "string" && message.sid.length > 0,
       );
 
       if (messages.length === 0) {
@@ -458,10 +298,8 @@ export async function cancelQueuedMessagesForCampaign(
         continue;
       }
 
-      const { cancelledMessages, errors } = await processBatchMessageCancellation(
-        twilio,
-        messages,
-      );
+      const { cancelledMessages, errors } =
+        await processBatchMessageCancellation(twilio, messages);
 
       allCanceledMessages = allCanceledMessages.concat(cancelledMessages);
       allErrors = allErrors.concat(errors);
@@ -471,7 +309,9 @@ export async function cancelQueuedMessagesForCampaign(
       }
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error && error.message ? error.message : "Unknown error";
+        error instanceof Error && error.message
+          ? error.message
+          : "Unknown error";
       allErrors.push(`Error retrieving messages: ${errorMessage}`);
       hasMore = false;
     }

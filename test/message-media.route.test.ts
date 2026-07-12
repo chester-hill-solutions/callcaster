@@ -44,8 +44,9 @@ vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: vi.fn(),
   deleteObject: vi.fn(),
 }));
-vi.mock("@/lib/database.server", () => ({
-  requireWorkspaceAccess: (...args: unknown[]) => mocks.requireWorkspaceAccess(...args),
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mocks.requireWorkspaceAccess(...args),
 }));
 
 function makeDbClient(opts?: {

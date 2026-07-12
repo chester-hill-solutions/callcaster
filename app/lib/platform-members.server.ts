@@ -3,7 +3,11 @@ import {
   API_KEY_PREFIX_LENGTH,
   hashApiKeyForStorage,
 } from "@/lib/api-auth.server";
-import { getUserRole, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  getUserRole,
+  getWorkspaceUsers,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";

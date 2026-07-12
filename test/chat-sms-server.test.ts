@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   env: { BASE_URL: () => "https://app.example" },
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: (...args: unknown[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
   getWorkspaceTwilioPortalConfig: (...args: unknown[]) =>

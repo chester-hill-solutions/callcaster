@@ -68,16 +68,30 @@ vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
 
-vi.mock("../app/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+vi.mock("../app/lib/database/campaign.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../app/lib/database/campaign.server")
+    >();
   return {
     ...actual,
-    getCampaignQueueById: (...args: any[]) => mocks.getCampaignQueueById(...args),
+    getCampaignQueueById: (...args: any[]) =>
+      mocks.getCampaignQueueById(...args),
+  };
+});
+vi.mock("../app/lib/database/workspace.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../app/lib/database/workspace.server")
+    >();
+  return {
+    ...actual,
     getWorkspaceTwilioPortalConfig: (...args: any[]) =>
       mocks.getWorkspaceTwilioPortalConfig(...args),
     createWorkspaceTwilioInstance: (...args: any[]) =>
       mocks.createWorkspaceTwilioInstance(...args),
-    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+    requireWorkspaceAccess: (...args: any[]) =>
+      mocks.requireWorkspaceAccess(...args),
   };
 });
 

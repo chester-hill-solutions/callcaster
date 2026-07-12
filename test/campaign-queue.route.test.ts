@@ -22,9 +22,12 @@ vi.mock("@/lib/auth.server", () => ({
 vi.mock("@/lib/platform-telephony.server", () => ({
   resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
   parseRequestData: (...args: any[]) => mocks.parseRequestData(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: any[]) => mocks.enqueueContactsForCampaign(...args),

@@ -1,4 +1,10 @@
-import { bulkCreateContacts, createContact, handleError, parseRequestData, requireWorkspaceAccess, updateContact } from "@/lib/database.server";
+import {
+  bulkCreateContacts,
+  createContact,
+  updateContact,
+} from "@/lib/database/contact.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { handleError, parseRequestData } from "@/lib/request-utils.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { searchContactsLoader } from "./contacts.loader.server";
 import { data as routeData } from "react-router";

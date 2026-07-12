@@ -49,9 +49,11 @@ vi.mock("@/lib/transaction-history.server", () => ({
   insertTransactionHistoryIdempotent: (...args: unknown[]) =>
     mocks.insertTransactionHistoryIdempotent(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/call-actions.server", () => ({
   cancelQueuedMessagesForCampaign: (...args: unknown[]) =>
     mocks.cancelQueuedMessagesForCampaign(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: (...args: unknown[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
 }));
