@@ -13,7 +13,7 @@ const adminDbMocks = vi.hoisted(() => ({
   userFindFirst: vi.fn(),
 }));
 
-const workspaceUsersFindFirst = vi.hoisted(() => vi.fn());
+const workspaceMemberFindFirst = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/logger.server", () => ({ logger }));
 vi.mock("../app/lib/env.server", () => ({
@@ -34,13 +34,13 @@ vi.mock("@/server/admin-db", () => ({
 }));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => ({
-    workspace_users: { findFirst: workspaceUsersFindFirst },
+    workspace_member: { findFirst: workspaceMemberFindFirst },
   })),
 }));
 
 function makeTdb(): TenantDb {
   return {
-    workspace_users: { findFirst: workspaceUsersFindFirst },
+    workspace_member: { findFirst: workspaceMemberFindFirst },
   } as unknown as TenantDb;
 }
 
@@ -53,7 +53,7 @@ describe("app/lib/database/stripe.server.ts", () => {
     logger.debug.mockReset();
     adminDbMocks.workspaceFindFirst.mockReset();
     adminDbMocks.userFindFirst.mockReset();
-    workspaceUsersFindFirst.mockReset();
+    workspaceMemberFindFirst.mockReset();
   });
 
   test("createStripeContact: throws and logs on workspace query error", async () => {
@@ -92,12 +92,12 @@ describe("app/lib/database/stripe.server.ts", () => {
     const mod = await import("../app/lib/database/stripe.server");
 
     adminDbMocks.workspaceFindFirst.mockResolvedValue({ name: "W" });
-    workspaceUsersFindFirst.mockResolvedValue(null);
+    workspaceMemberFindFirst.mockResolvedValue(null);
     await expect(
       mod.createStripeContact({ workspace_id: "w1", tdb: makeTdb() }),
     ).rejects.toThrow("No owner found for the workspace");
 
-    workspaceUsersFindFirst.mockResolvedValue({ user_id: "u1" });
+    workspaceMemberFindFirst.mockResolvedValue({ user_id: "u1" });
     adminDbMocks.userFindFirst.mockResolvedValue(null);
     await expect(
       mod.createStripeContact({ workspace_id: "w1", tdb: makeTdb() }),
@@ -126,7 +126,7 @@ describe("app/lib/database/stripe.server.ts", () => {
     const mod = await import("../app/lib/database/stripe.server");
 
     adminDbMocks.workspaceFindFirst.mockResolvedValue({ name: "Workspace" });
-    workspaceUsersFindFirst.mockResolvedValue({ user_id: "u1" });
+    workspaceMemberFindFirst.mockResolvedValue({ user_id: "u1" });
     adminDbMocks.userFindFirst.mockResolvedValue({
       id: "u1",
       username: "owner@example.com",

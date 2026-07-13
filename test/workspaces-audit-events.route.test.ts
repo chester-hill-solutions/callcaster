@@ -9,7 +9,12 @@ vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
+  getUserRole: vi.fn(),
   listWorkspaceAuditEventsApi: vi.fn(),
+}));
+
+vi.mock("@/lib/database/workspace.server", () => ({
+  getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
 }));
 
 vi.mock("@/lib/platform-audit.server", () => ({
@@ -20,6 +25,7 @@ vi.mock("@/lib/platform-audit.server", () => ({
 describe("app/routes/api+/workspaces/$workspaceId/audit-events/route.tsx", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getUserRole.mockResolvedValue({ role: "owner" });
   });
 
   test("returns audit events for owner session", async () => {
@@ -52,30 +58,29 @@ describe("app/routes/api+/workspaces/$workspaceId/audit-events/route.tsx", () =>
     );
   });
 
-  test("returns 403 when platform audit rejects API key auth", async () => {
+  test("propagates listWorkspaceAuditEventsApi errors after capability gate", async () => {
     mocks.listWorkspaceAuditEventsApi.mockResolvedValueOnce({
       ok: false,
-      error: "Audit log access requires a signed-in owner session",
-      status: 403,
+      error: "Invalid cursor",
+      status: 400,
     });
 
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/audit-events.route"
     );
     const response = await asRouteResponse(mod.loader(
-        await withDataPlaneRouteArgs(
-          {
-            request: new Request("http://localhost/api/workspaces/w1/audit-events"),
-            params: { workspaceId: "w1" },
-          },
-          { userId: null },
-        ),
+        await withDataPlaneRouteArgs({
+          request: new Request(
+            "http://localhost/api/workspaces/w1/audit-events?cursor=bad",
+          ),
+          params: { workspaceId: "w1" },
+        }),
       ),
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: "Audit log access requires a signed-in owner session",
+      error: "Invalid cursor",
     });
   });
 });

@@ -177,7 +177,11 @@ describe("data-plane mutation role gate (authForContact / authForCampaign)", () 
       "member",
     );
 
-    expect(result).toEqual({ userId: null, workspaceId: "w1" });
+    expect(result).toEqual({
+      userId: null,
+      workspaceId: "w1",
+      apiKey: { keyId: undefined, scopes: undefined },
+    });
     expect(mocks.requireWorkspaceAccess).not.toHaveBeenCalled();
   });
 });
