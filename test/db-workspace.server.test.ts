@@ -154,6 +154,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     // unaffected. Individual tests override these to exercise the warning path.
     tdbMocks.script.insert.mockResolvedValue([{ id: 1 }]);
     tdbMocks.campaign.insert.mockResolvedValue([{ id: 1 }]);
+    tdbMocks.workspace_member.insert.mockResolvedValue([
+      { id: "wm:w:u", role_id: "owner" },
+    ]);
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue({
       inserted: true,

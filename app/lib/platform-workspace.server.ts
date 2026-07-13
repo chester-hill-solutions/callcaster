@@ -40,7 +40,16 @@ export async function listUserWorkspaces(
       .where(eq(workspaceMemberTable.user_id, userId))
       .orderBy(desc(workspaceMemberTable.created_at));
 
-    return { ok: true as const, workspaces: rows };
+    return {
+      ok: true as const,
+      workspaces: rows.map((row) => ({
+        ...row,
+        last_accessed:
+          row.last_accessed instanceof Date
+            ? row.last_accessed.toISOString()
+            : String(row.last_accessed ?? ""),
+      })),
+    };
   } catch (error) {
     logger.error("listUserWorkspaces error", error);
     return {

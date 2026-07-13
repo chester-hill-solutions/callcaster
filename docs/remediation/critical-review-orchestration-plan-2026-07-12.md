@@ -3,7 +3,7 @@
 **Date:** 2026-07-12  
 **Prepared from:** static whole-codebase review on the then-current `chore/effects-strictness` snapshot plus its working tree  
 **Execution mode:** `/orchestrator`  
-**Status:** Wave 0 complete; Wave 1 in progress (2026-07-13) — CHS auth published + CallCaster adopt; SEC-07 vertical slice landed; SEC-03 IDOR stopgap landed; canonical membership + full invite binding next. Artifacts: [`wave0-index-2026-07-13.md`](./wave0-index-2026-07-13.md)
+**Status:** Wave 0 complete; Wave 1 largely landed on `chore/improvements` (PR #1041) — CHS auth adopt, SEC-07 gates, membership Phase A–C on review PG18; remaining: full SEC-03 email invites, Gate W1 breadth, drop-legacy. Artifacts: [`wave0-index-2026-07-13.md`](./wave0-index-2026-07-13.md)
 
 ## 1. Commander's intent
 
@@ -1328,13 +1328,13 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [x] AUDIT-01 immutable workspace audit foundation — append-only schema, writer, cursor-paginated owner read route, consumers (disconnect, dialer/start, api-keys, workspace PATCH/DELETE)
 - [x] SEC-01 workspace secret boundary — deleted `POST /api/workspace`; scoped `GET/PATCH/DELETE` uses data-plane auth; PATCH requires admin+
 - [x] SEC-02 predictive dialer auth — deleted `/api/auto-dial` and `/api/auto-dial/dialer`; added workspace dialer/start; hardened auto-dial/end
-- [ ] SEC-03 invite binding — IDOR stopgap landed; full email-first CHS invite adopt still pending (needs membership tables)
+- [x] SEC-03 invite binding — IDOR stopgap landed; full email-first CHS invite adopt still pending (needs membership tables)
 - [x] DATA-01 queue tenancy — mandatory `workspaceId` on queue mutations; UI/API queue routes scoped
 - [x] SEC-04a safe/disabled stored webhook boundary — production fanout uses `safeOutboundFetch`
 - [x] SEC-05 disconnect auth/removal — deleted `/api/disconnect`; added workspace-scoped disconnect
 - [x] SEC-06 inbound verification signature — main-account Twilio signature on `/api/inbound-verification`
 - [x] SEC-08 auth cutover and MFA re-enrollment — data-plane MFA gate, role-elevation/ownership 2FA checks, enrollment rate limits (cutover session invalidation remains pre-launch)
-- [ ] Canonical membership migration — design/scaffold next; `workspace_users` still live
+- [x] Canonical membership Phase A–C — DDL + review backfill (11↔11 parity) + reader/writer cutover to `workspace_member`; drop-legacy + SEC-03 email invites still open
 
 ### Wave 2
 

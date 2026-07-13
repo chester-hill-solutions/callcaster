@@ -343,8 +343,15 @@ export async function listAllUsersOrdered() {
 export async function listAllWorkspaceUsers() {
   const rows = await adminDb.select().from(workspaceMemberTable);
   return rows.map((row) => ({
-    ...row,
+    id: row.id,
+    workspace_id: row.workspace_id,
+    user_id: row.user_id,
     role: row.role_id,
+    created_at:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+    last_accessed: null as string | null,
   }));
 }
 
@@ -663,8 +670,10 @@ export async function listAdminWorkspaceUsersWithUser(workspaceId: string) {
     .innerJoin(userTable, eq(workspaceMemberTable.user_id, userTable.id))
     .where(eq(workspaceMemberTable.workspace_id, workspaceId));
 
-  return rows.map(({ user, ...membership }) => ({
+  return rows.map(({ user, created_at, ...membership }) => ({
     ...membership,
+    created_at:
+      created_at instanceof Date ? created_at.toISOString() : String(created_at),
     last_accessed: null as string | null,
     user,
   }));
@@ -728,7 +737,7 @@ export async function listWorkspaceOwnerAdminEmails(
 }
 
 export async function listUserWorkspaceMembershipsForProfile(userId: string) {
-  return adminDb
+  const rows = await adminDb
     .select({
       last_accessed: workspaceMemberTable.created_at,
       role: workspaceMemberTable.role_id,
@@ -741,6 +750,16 @@ export async function listUserWorkspaceMembershipsForProfile(userId: string) {
     .innerJoin(workspaceTable, eq(workspaceMemberTable.workspace_id, workspaceTable.id))
     .where(eq(workspaceMemberTable.user_id, userId))
     .orderBy(desc(workspaceMemberTable.created_at));
+
+  return rows.map((row) => ({
+    ...row,
+    last_accessed:
+      row.last_accessed instanceof Date
+        ? row.last_accessed.toISOString()
+        : row.last_accessed
+          ? String(row.last_accessed)
+          : null,
+  }));
 }
 
 export async function listUserWorkspaceMembershipsWithWorkspace(userId: string) {
