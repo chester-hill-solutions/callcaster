@@ -565,20 +565,11 @@ export async function listUserInvitesWithWorkspace(userId: string) {
 }
 
 export async function listUserWorkspaceSummaries(userId: string) {
-  const rows = await adminDb
-    .select({
-      id: workspaceTable.id,
-      name: workspaceTable.name,
-    })
-    .from(workspaceMemberTable)
-    .innerJoin(
-      workspaceTable,
-      eqChsTextToUuid(workspaceMemberTable.workspace_id, workspaceTable.id),
-    )
-    .where(eq(workspaceMemberTable.user_id, userId))
-    .orderBy(desc(workspaceMemberTable.created_at));
-
-  return rows;
+  const rows = await listUserWorkspaceMembershipsForProfile(userId);
+  return rows.map((row) => ({
+    id: row.workspace.id,
+    name: row.workspace.name,
+  }));
 }
 
 export async function loadUserWithInvites(userId: string) {
