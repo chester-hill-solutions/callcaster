@@ -17,6 +17,7 @@ import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { adminDb } from "@/server/admin-db";
 import { hasMinRole } from "@/lib/workspace-route.server";
+import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
 import { isTwoFactorEnabled } from "@/lib/two-factor.server";
 
 export async function listUserWorkspaces(
@@ -115,6 +116,17 @@ export async function updateWorkspaceName(
     return { ok: false as const, error: "Workspace not found", status: 404 };
   }
 
+  await safeRecordWorkspaceAuditEvent({
+    workspaceId,
+    actorType: "session",
+    actorId: userId,
+    action: "workspace.update",
+    targetType: "workspace",
+    targetId: workspaceId,
+    outcome: "success",
+    metadata: { name },
+  });
+
   return { ok: true as const, workspace: data };
 }
 
@@ -140,6 +152,16 @@ export async function deleteWorkspaceApi(
   if (result && typeof result === "object" && "error" in result && result.error) {
     return { ok: false as const, error: String(result.error), status: 400 };
   }
+
+  await safeRecordWorkspaceAuditEvent({
+    workspaceId,
+    actorType: "session",
+    actorId: userId,
+    action: "workspace.delete",
+    targetType: "workspace",
+    targetId: workspaceId,
+    outcome: "success",
+  });
 
   return { ok: true as const };
 }

@@ -1324,8 +1324,8 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 
 - [ ] Publish/adopt CHS auth package extensions
 - [ ] SEC-07 shared capability authorization
-- [ ] API-01 existing OpenAPI/Hey API cutover foundation — telephony routes documented; capability stubs for SEC-07
-- [x] AUDIT-01 immutable workspace audit foundation — append-only schema, writer, disconnect consumer
+- [ ] API-01 existing OpenAPI/Hey API cutover foundation — telephony + audit read routes documented; capability stubs for SEC-07
+- [x] AUDIT-01 immutable workspace audit foundation — append-only schema, writer, cursor-paginated owner read route, consumers (disconnect, dialer/start, api-keys, workspace PATCH/DELETE)
 - [x] SEC-01 workspace secret boundary — deleted `POST /api/workspace`; scoped `GET/PATCH/DELETE` uses data-plane auth; PATCH requires admin+
 - [x] SEC-02 predictive dialer auth — deleted `/api/auto-dial` and `/api/auto-dial/dialer`; added workspace dialer/start; hardened auto-dial/end
 - [ ] SEC-03 invite binding

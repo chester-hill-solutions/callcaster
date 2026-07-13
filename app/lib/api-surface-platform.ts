@@ -313,6 +313,17 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     ],
   }),
   platformSeed({
+    path: "/api/workspaces/:workspaceId/audit-events",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId/audit-events.route.tsx",
+    authClass: "workspaceAdmin",
+    ownerArea: "workspace",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.workspace,
+    workspaceScoped: true,
+    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    notes: "Owner-only session access until SEC-07 audit.read scopes land for API keys.",
+  }),
+  platformSeed({
     path: "/api/workspaces/:workspaceId/campaigns",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/campaigns.route.tsx",
     authClass: "apiKeyOrSession",

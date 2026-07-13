@@ -136,6 +136,51 @@ export const platformOpenApiComponents = {
         success: { type: "boolean" as const, enum: [true] as const },
       },
     },
+    WorkspaceAuditEvent: {
+      type: "object" as const,
+      required: [
+        "id",
+        "workspace_id",
+        "created_at",
+        "actor_type",
+        "action",
+        "outcome",
+      ] as const,
+      properties: {
+        id: { type: "integer" as const },
+        workspace_id: { type: "string" as const, format: "uuid" },
+        created_at: { type: "string" as const, format: "date-time" },
+        actor_type: {
+          type: "string" as const,
+          enum: ["session", "api_key", "system", "support"] as const,
+        },
+        actor_id: { type: "string" as const, nullable: true },
+        api_key_id: { type: "integer" as const, nullable: true },
+        action: { type: "string" as const },
+        target_type: { type: "string" as const, nullable: true },
+        target_id: { type: "string" as const, nullable: true },
+        outcome: {
+          type: "string" as const,
+          enum: ["success", "failure", "denied"] as const,
+        },
+        request_id: { type: "string" as const, nullable: true },
+        metadata: {
+          type: "object" as const,
+          additionalProperties: true,
+        },
+      },
+    },
+    WorkspaceAuditEventListResponse: {
+      type: "object" as const,
+      required: ["events"] as const,
+      properties: {
+        events: {
+          type: "array" as const,
+          items: { $ref: "#/components/schemas/WorkspaceAuditEvent" },
+        },
+        next_cursor: { type: "string" as const, nullable: true },
+      },
+    },
   },
 };
 
@@ -335,6 +380,45 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         "403": errorResponse("Forbidden"),
         "404": errorResponse("Call not found"),
         "500": errorResponse("Twilio disconnect failed"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/audit-events": {
+    get: {
+      operationId: "listWorkspaceAuditEvents",
+      summary: "List workspace audit events",
+      tags: ["Platform API", "Workspace"],
+      "x-callcaster-capability": "audit.read",
+      security: [{ sessionCookie: [] }],
+      description:
+        "Cursor-paginated immutable audit log for privileged workspace actions. Owner session only until API key scopes ship in SEC-07.",
+      parameters: [
+        {
+          name: "cursor",
+          in: "query",
+          required: false,
+          schema: { type: "string" },
+          description: "Opaque cursor from a previous page's next_cursor.",
+        },
+        {
+          name: "limit",
+          in: "query",
+          required: false,
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+        },
+      ],
+      responses: {
+        "200": {
+          description: "Audit events page",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkspaceAuditEventListResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Invalid cursor"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Owner session required"),
       },
     },
   },

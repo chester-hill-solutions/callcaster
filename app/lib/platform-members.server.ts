@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { WORKSPACE_ROLE_RANK } from "@/lib/workspace-route.server";
 import { requireTwoFactorForPrivilegedRoleAssignment } from "@/lib/two-factor.server";
+import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
 import { assertSafeOutboundUrl, safeOutboundFetch } from "@/lib/safe-outbound-url.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
@@ -489,6 +490,17 @@ export async function createWorkspaceApiKey(
       return { ok: false as const, error: "Failed to create API key", status: 500 };
     }
 
+    await safeRecordWorkspaceAuditEvent({
+      workspaceId,
+      actorType: "session",
+      actorId: userId,
+      action: "api_keys.create",
+      targetType: "api_key",
+      targetId: String(row.id),
+      outcome: "success",
+      metadata: { name: row.name, key_prefix: row.key_prefix },
+    });
+
     return {
       ok: true as const,
       key,
@@ -519,6 +531,15 @@ export async function deleteWorkspaceApiKey(
 
   try {
     await deleteWorkspaceApiKeyRow({ workspaceId, keyId });
+    await safeRecordWorkspaceAuditEvent({
+      workspaceId,
+      actorType: "session",
+      actorId: userId,
+      action: "api_keys.delete",
+      targetType: "api_key",
+      targetId: keyId,
+      outcome: "success",
+    });
     return { ok: true as const };
   } catch (error) {
     logger.error("deleteWorkspaceApiKey error", error);

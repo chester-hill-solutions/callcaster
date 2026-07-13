@@ -186,4 +186,16 @@ describe("openapi spec", () => {
       dialer?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
     ).toContain("DialerStartResponse");
   });
+
+  test("audit events route is owner-session documented with audit.read capability", () => {
+    const audit =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/audit-events"].get;
+
+    expect(audit?.operationId).toBe("listWorkspaceAuditEvents");
+    expect(audit?.security).toEqual([{ sessionCookie: [] }]);
+    expect(audit?.["x-callcaster-capability"]).toBe("audit.read");
+    expect(
+      audit?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("WorkspaceAuditEventListResponse");
+  });
 });

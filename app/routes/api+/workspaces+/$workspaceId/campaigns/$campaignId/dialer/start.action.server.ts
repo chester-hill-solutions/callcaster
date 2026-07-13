@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { defineAction } from "@/lib/handler.server";
@@ -18,7 +19,7 @@ const dialerStartBodySchema = z.object({
   agentUserId: z.string().min(1).optional(),
 });
 
-function resolveDialerAuth({ params, context }: ActionFunctionArgs) {
+function resolveDialerAuth({ params, context, request }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   const campaignIdParam = params.campaignId;
   if (!workspaceId) {
@@ -34,7 +35,14 @@ function resolveDialerAuth({ params, context }: ActionFunctionArgs) {
   }
 
   const auth = getDataPlaneRouteContext(context, workspaceId);
-  return { workspaceId, campaignId, auth };
+  return {
+    workspaceId,
+    campaignId,
+    auth,
+    actorType: auth.userId ? ("session" as const) : ("api_key" as const),
+    actorId: auth.userId,
+    requestId: request.headers.get("x-request-id"),
+  };
 }
 
 async function resolveAgentUserId(
@@ -95,11 +103,40 @@ export const action = defineAction({
     });
 
     if (!result.ok) {
+      await safeRecordWorkspaceAuditEvent({
+        workspaceId: auth.workspaceId,
+        actorType: auth.actorType,
+        actorId: agentUserId,
+        action: "calls.start",
+        targetType: "campaign",
+        targetId: String(auth.campaignId),
+        outcome: "failure",
+        requestId: auth.requestId,
+        metadata: {
+          caller_id: parsed.caller_id,
+          status: result.status,
+        },
+      });
       if (result.creditsError) {
         return autoDialCreditsErrorResponse();
       }
       return jsonError(result.error, result.status);
     }
+
+    await safeRecordWorkspaceAuditEvent({
+      workspaceId: auth.workspaceId,
+      actorType: auth.actorType,
+      actorId: agentUserId,
+      action: "calls.start",
+      targetType: "campaign",
+      targetId: String(auth.campaignId),
+      outcome: "success",
+      requestId: auth.requestId,
+      metadata: {
+        caller_id: parsed.caller_id,
+        conference_name: result.conferenceName,
+      },
+    });
 
     return jsonResponse({ success: true, conferenceName: result.conferenceName }, 200);
   },

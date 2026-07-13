@@ -6683,6 +6683,87 @@
         }
       }
     },
+    "/api/workspaces/{workspaceId}/audit-events": {
+      "get": {
+        "operationId": "listWorkspaceAuditEvents",
+        "summary": "List workspace audit events",
+        "tags": [
+          "Platform API",
+          "Workspace"
+        ],
+        "x-callcaster-capability": "audit.read",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Cursor-paginated immutable audit log for privileged workspace actions. Owner session only until API key scopes ship in SEC-07.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque cursor from a previous page's next_cursor."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit events page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceAuditEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner session required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{workspaceId}/campaigns": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_campaigns",
@@ -10169,6 +10250,92 @@
             "enum": [
               true
             ]
+          }
+        }
+      },
+      "WorkspaceAuditEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "created_at",
+          "actor_type",
+          "action",
+          "outcome"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor_type": {
+            "type": "string",
+            "enum": [
+              "session",
+              "api_key",
+              "system",
+              "support"
+            ]
+          },
+          "actor_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "target_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "target_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failure",
+              "denied"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "WorkspaceAuditEventListResponse": {
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceAuditEvent"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
           }
         }
       }
