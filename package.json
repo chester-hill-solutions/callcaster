@@ -59,7 +59,7 @@
     "tools:dry:baseline": "node scripts/check-dry.mjs --update",
     "check:handlers": "node scripts/check-handlers.mjs",
     "tools:handlers:baseline": "node scripts/check-handlers.mjs --update-baseline",
-    "ci:local": "npm run typecheck && npm run lint && npm run test:node && npm run test:ui && npm run tools:routes:verify && npm run tools:api:surface:check && npm run check:route-server-leaks && npm run check:twilio-webhooks && npm run check:middleware && npm run check:credit-writes && npm run check:effects && npm run check:type-safety && npm run check:dry && npm run check:handlers && npm run build && npm run check:client-bundle && npm run tools:api:codegen && git diff --exit-code",
+    "ci:local": "npm run typecheck && npm run lint && npm run test:node && npm run test:ui && npm run tools:routes:verify && npm run tools:api:surface:check && npm run check:route-server-leaks && npm run check:twilio-webhooks && npm run check:middleware && npm run check:credit-writes && npm run check:effects && npm run check:type-safety && npm run check:dry && npm run check:handlers && npm run db:ledger:check && npm run build && npm run check:client-bundle && npm run tools:api:codegen && git diff --exit-code",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
     "test:e2e:debug": "playwright test -c e2e/playwright.config.ts --headed --debug",

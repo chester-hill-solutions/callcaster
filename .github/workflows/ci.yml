@@ -37,6 +37,7 @@ jobs:
       - run: npm run check:type-safety
       - run: npm run check:dry
       - run: npm run check:handlers
+      - run: npm run db:ledger:check
       - run: npm run tools:api:codegen
       - run: git diff --exit-code
 
