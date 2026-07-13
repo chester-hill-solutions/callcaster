@@ -1329,10 +1329,10 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [x] SEC-01 workspace secret boundary — deleted `POST /api/workspace`; scoped `GET/PATCH/DELETE` uses data-plane auth; PATCH requires admin+
 - [x] SEC-02 predictive dialer auth — deleted `/api/auto-dial` and `/api/auto-dial/dialer`; added workspace dialer/start; hardened auto-dial/end
 - [ ] SEC-03 invite binding
-- [ ] DATA-01 queue tenancy
-- [ ] SEC-04a safe/disabled stored webhook boundary
+- [x] DATA-01 queue tenancy — mandatory `workspaceId` on queue mutations; UI/API queue routes scoped
+- [x] SEC-04a safe/disabled stored webhook boundary — production fanout uses `safeOutboundFetch`
 - [x] SEC-05 disconnect auth/removal — deleted `/api/disconnect`; added workspace-scoped disconnect
-- [ ] SEC-06 inbound verification signature
+- [x] SEC-06 inbound verification signature — main-account Twilio signature on `/api/inbound-verification`
 - [ ] SEC-08 auth cutover and MFA re-enrollment
 
 ### Wave 2

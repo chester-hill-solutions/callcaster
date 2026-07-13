@@ -63,8 +63,22 @@ vi.mock("@/lib/campaign-queue-search.server", () => ({
 }));
 
 vi.mock("@/lib/workspace-route.server", () => ({
+  getWorkspaceRouteContext: vi.fn(() => ({
+    headers: new Headers(),
+    user: { id: "u1" },
+    workspaceId: "w1",
+    userRole: "admin",
+  })),
   requireWorkspaceLoaderContext: (...args: any[]) =>
     mocks.requireWorkspaceLoaderContext(...args),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  findCampaignInWorkspace: vi.fn(async () => ({ id: 99 })),
+}));
+
+vi.mock("@/lib/campaign-audience-db.server", () => ({
+  campaignAndAudienceShareWorkspace: vi.fn(async () => true),
 }));
 
 vi.mock("@/server/db", () => ({
@@ -265,6 +279,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.searchCampaignQueueIds).toHaveBeenCalledWith({
       campaignId: 99,
+      workspaceId: "w1",
       filters: {
         name: "",
         phone: "",
@@ -278,6 +293,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     expect(mocks.updateCampaignQueueStatusByIds).toHaveBeenCalledWith(
       [11, 12],
       "paused",
+      "w1",
     );
   });
 });

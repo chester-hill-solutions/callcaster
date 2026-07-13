@@ -8,6 +8,8 @@ import {
   updateCampaignQueueStatusByIds,
 } from "@/lib/campaign-queue-db.server";
 import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
+import { campaignAndAudienceShareWorkspace } from "@/lib/campaign-audience-db.server";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
@@ -29,13 +31,18 @@ const EMPTY_FILTERS: QueueSearchFilters = {
 
 export const action = async ({ request, params, context }: ActionFunctionArgs) => {
   const { selected_id } = params;
-  
+  const { workspaceId } = getWorkspaceRouteContext(context);
 
   if (!selected_id) throw redirect("../../");
 
   const data = await parseActionRequest(request);
   const intent = data.intent as string;
   const campaignIdNum = parseInt(selected_id, 10);
+
+  const campaign = await findCampaignInWorkspace(workspaceId, campaignIdNum);
+  if (!campaign) {
+    return routeData({ success: false, error: "Campaign not found" }, { status: 404 });
+  }
 
   if (intent === "update_status") {
     const ids = data.ids;
@@ -52,8 +59,9 @@ export const action = async ({ request, params, context }: ActionFunctionArgs) =
         const filteredIds = await searchCampaignQueueIds({
           campaignId: campaignIdNum,
           filters,
+          workspaceId,
         });
-        await updateCampaignQueueStatusByIds(filteredIds, newStatus);
+        await updateCampaignQueueStatusByIds(filteredIds, newStatus, workspaceId);
       } else {
         const updateIds = (
           Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))
@@ -63,7 +71,7 @@ export const action = async ({ request, params, context }: ActionFunctionArgs) =
           )
           .filter((id: unknown): id is number => typeof id === "number" && Number.isFinite(id));
 
-        await updateCampaignQueueStatusByIds(updateIds, newStatus);
+        await updateCampaignQueueStatusByIds(updateIds, newStatus, workspaceId);
       }
 
       return routeData({ success: true });
@@ -77,6 +85,14 @@ export const action = async ({ request, params, context }: ActionFunctionArgs) =
 
   if (intent === "add_from_audience") {
     const audienceId = parseInt(String(data.audienceId ?? ""), 10);
+
+    if (!Number.isFinite(audienceId)) {
+      return routeData({ success: false, error: "Invalid audience" }, { status: 400 });
+    }
+
+    if (!(await campaignAndAudienceShareWorkspace(campaignIdNum, audienceId))) {
+      return routeData({ success: false, error: "Audience not found" }, { status: 404 });
+    }
 
     try {
       const contacts = await db
@@ -129,7 +145,7 @@ export const action = async ({ request, params, context }: ActionFunctionArgs) =
 
     try {
       if (isAllSelected) {
-        await deleteAllCampaignQueueForCampaign(campaignIdNum);
+        await deleteAllCampaignQueueForCampaign(campaignIdNum, workspaceId);
       } else {
         const removeIds = (
           Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))
@@ -139,7 +155,7 @@ export const action = async ({ request, params, context }: ActionFunctionArgs) =
           )
           .filter((id: unknown): id is number => typeof id === "number" && Number.isFinite(id));
 
-        await deleteCampaignQueueByIds(removeIds);
+        await deleteCampaignQueueByIds(removeIds, workspaceId);
       }
 
       return routeData({ success: true });

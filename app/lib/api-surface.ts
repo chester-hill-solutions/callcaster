@@ -578,7 +578,7 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "internalOnly",
     docsGuide: GUIDE.internal,
     operations: [{ method: "POST", handler: "action", bodyType: "form" }],
-    securityWarning: "Call-in verification TwiML; service role, no Twilio signature.",
+    securityWarning: "Call-in verification TwiML; validated with main-account Twilio signature.",
     notes: "Returns TwiML.",
   }),
   seed({

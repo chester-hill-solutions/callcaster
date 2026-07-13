@@ -60,38 +60,43 @@ export function buildQueueStatusUpdatePayload(status: string) {
 export async function updateCampaignQueueStatusByIds(
   ids: number[],
   status: string,
-  workspaceId?: string,
+  workspaceId: string,
 ) {
   if (ids.length === 0) {
     return;
   }
 
-  const where = workspaceId
-    ? and(inArray(campaignQueueTable.id, ids), eq(campaignQueueTable.workspace, workspaceId))
-    : inArray(campaignQueueTable.id, ids);
-
-  await db.update(campaignQueueTable).set(buildQueueStatusUpdatePayload(status)).where(where);
+  await db
+    .update(campaignQueueTable)
+    .set(buildQueueStatusUpdatePayload(status))
+    .where(
+      and(inArray(campaignQueueTable.id, ids), eq(campaignQueueTable.workspace, workspaceId)),
+    );
 }
 
-export async function deleteCampaignQueueByIds(ids: number[], workspaceId?: string) {
+export async function deleteCampaignQueueByIds(ids: number[], workspaceId: string) {
   if (ids.length === 0) {
     return [];
   }
 
-  const where = workspaceId
-    ? and(inArray(campaignQueueTable.id, ids), eq(campaignQueueTable.workspace, workspaceId))
-    : inArray(campaignQueueTable.id, ids);
-
-  return db.delete(campaignQueueTable).where(where).returning();
+  return db
+    .delete(campaignQueueTable)
+    .where(
+      and(inArray(campaignQueueTable.id, ids), eq(campaignQueueTable.workspace, workspaceId)),
+    )
+    .returning();
 }
 
-export async function deleteAllCampaignQueueForCampaign(campaignId: number, workspaceId?: string) {
-  const conditions = [eq(campaignQueueTable.campaign_id, campaignId)];
-  if (workspaceId) {
-    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
-  }
-
-  return db.delete(campaignQueueTable).where(and(...conditions)).returning();
+export async function deleteAllCampaignQueueForCampaign(campaignId: number, workspaceId: string) {
+  return db
+    .delete(campaignQueueTable)
+    .where(
+      and(
+        eq(campaignQueueTable.campaign_id, campaignId),
+        eq(campaignQueueTable.workspace, workspaceId),
+      ),
+    )
+    .returning();
 }
 
 export async function deleteCampaignQueueByCampaignAndContactIds(args: {

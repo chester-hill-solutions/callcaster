@@ -22,6 +22,15 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+const twilioWebhookMocks = vi.hoisted(() => ({
+  requireTwilioSignature: vi.fn(async () => null),
+}));
+
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  requireTwilioSignature: (...args: unknown[]) =>
+    twilioWebhookMocks.requireTwilioSignature(...args),
+}));
+
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("twilio", () => ({
@@ -49,6 +58,8 @@ vi.mock("@/lib/verification-db.server", () => ({
 describe("app/routes/api+/inbound/route-verification.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
+    twilioWebhookMocks.requireTwilioSignature.mockReset();
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.VoiceResponse.mockClear();
     mocks.say.mockReset();
     mocks.hangup.mockReset();
@@ -58,6 +69,28 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
     verificationDbMocks.getUserVerifiedAudioNumbers.mockReset();
     verificationDbMocks.appendVerifiedAudioNumber.mockReset();
     verificationDbMocks.markVerificationSessionVerified.mockReset();
+  });
+
+  test("action rejects requests with invalid Twilio signature", async () => {
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValueOnce(
+      new Response("<Response><Hangup/></Response>", {
+        status: 403,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("From", "+15551234567");
+    const mod = await import("../app/routes/api+/inbound-verification");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", {
+        method: "POST",
+        body: formData,
+      }),
+    } as never));
+
+    expect(res.status).toBe(403);
+    expect(verificationDbMocks.findPendingVerificationSession).not.toHaveBeenCalled();
   });
 
   test("action returns error TwiML when From missing", async () => {
