@@ -107,7 +107,6 @@
   "app/routes/api+/numbers.action.server.ts": 1,
   "app/routes/api+/numbers.loader.server.ts": 1,
   "app/routes/api+/outreach-attempts.action.server.ts": 1,
-  "app/routes/api+/outreach_attempts/$id.action.server.ts": 1,
   "app/routes/api+/questions.action.server.ts": 1,
   "app/routes/api+/queues.action.server.ts": 1,
   "app/routes/api+/queues.loader.server.ts": 1,
