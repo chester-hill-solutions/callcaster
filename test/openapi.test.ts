@@ -215,4 +215,26 @@ describe("openapi spec", () => {
       workspace.get?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
     ).toContain("WorkspaceDetailResponse");
   });
+
+  test("workspace admin routes have stable operationIds and session auth", () => {
+    const apiKeys = openApiSpec.paths["/api/workspaces/{workspaceId}/api-keys"];
+    const members = openApiSpec.paths["/api/workspaces/{workspaceId}/members"];
+    const webhook = openApiSpec.paths["/api/workspaces/{workspaceId}/webhook"];
+
+    expect(apiKeys.get?.operationId).toBe("listWorkspaceApiKeys");
+    expect(apiKeys.post?.operationId).toBe("createWorkspaceApiKey");
+    expect(apiKeys.delete?.operationId).toBe("deleteWorkspaceApiKey");
+    expect(members.post?.operationId).toBe("inviteWorkspaceMember");
+    expect(members.post?.["x-callcaster-capability"]).toBe("members.invite");
+    expect(webhook.put?.operationId).toBe("upsertWorkspaceWebhook");
+    expect(webhook.post?.operationId).toBe("testWorkspaceWebhook");
+
+    for (const pathItem of [apiKeys, members, webhook]) {
+      for (const op of Object.values(pathItem)) {
+        if (op && typeof op === "object" && "security" in op) {
+          expect(op.security).toEqual([{ sessionCookie: [] }]);
+        }
+      }
+    }
+  });
 });

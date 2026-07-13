@@ -24,7 +24,7 @@
 | Workspace | List/create workspaces | **proved** | |
 | Workspace | Scoped GET/PATCH/DELETE | **partial** | OpenAPI documented; GET dual-auth, PATCH admin+, DELETE owner |
 | Workspace | `POST /api/workspace` | **deprecated-hard-cut** | SEC-01 — deleted |
-| Workspace | Members, API keys, numbers, billing | **partial** | Session trust-root |
+| Workspace | Members, API keys, numbers, billing | **partial** | Admin routes OpenAPI documented; session trust-root |
 | Campaigns | create-with-script integrator | **proved** | 3 integrator paths |
 | Campaigns | Legacy CRUD + data-plane | **partial** | Weak schemas |
 | Campaigns | Queue/audience legacy | **partial** | DATA-01 tenancy gaps |
@@ -35,8 +35,8 @@
 | SMS | Campaign + chat SMS integrator | **proved** | |
 | SMS | Conversations read | **partial** | Read-only API key |
 | Webhooks | Provider (Twilio/Stripe) | **proved** | complete-api.json |
-| Webhooks | Customer configure | **partial** | Session-only |
-| Webhooks | Customer delivery | **partial** | SEC-04 raw fetch |
+| Webhooks | Customer configure | **partial** | Session-only; OpenAPI documented |
+| Webhooks | Customer delivery | **partial** | SEC-04a safeOutboundFetch |
 | Surveys | Admin CRUD | **partial** | Session-only |
 | Surveys | Public respondent | **partial** | SURVEY-01 open |
 | Surveys | Data-plane reads | **partial** | API-key reads only |

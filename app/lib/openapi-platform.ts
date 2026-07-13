@@ -226,6 +226,204 @@ export const platformOpenApiComponents = {
         success: { type: "boolean" as const, enum: [true] as const },
       },
     },
+    WorkspaceMemberRole: {
+      type: "string" as const,
+      enum: ["owner", "admin", "member", "caller"] as const,
+    },
+    ApiKeySummary: {
+      type: "object" as const,
+      required: ["id", "name", "key_prefix", "created_at"] as const,
+      properties: {
+        id: { type: "integer" as const },
+        name: { type: "string" as const },
+        key_prefix: { type: "string" as const },
+        created_at: { type: "string" as const, format: "date-time" },
+        last_used_at: { type: "string" as const, format: "date-time", nullable: true },
+      },
+    },
+    ApiKeyListResponse: {
+      type: "object" as const,
+      required: ["keys"] as const,
+      properties: {
+        keys: {
+          type: "array" as const,
+          items: { $ref: "#/components/schemas/ApiKeySummary" },
+        },
+      },
+    },
+    CreateApiKeyRequest: {
+      type: "object" as const,
+      required: ["name"] as const,
+      properties: {
+        name: { type: "string" as const, minLength: 1, maxLength: 200 },
+      },
+    },
+    CreateApiKeyResponse: {
+      type: "object" as const,
+      required: ["key", "id", "name", "key_prefix", "created_at"] as const,
+      properties: {
+        key: {
+          type: "string" as const,
+          description: "Full secret key; shown once at creation.",
+        },
+        id: { type: "string" as const },
+        name: { type: "string" as const },
+        key_prefix: { type: "string" as const },
+        created_at: { type: "string" as const, format: "date-time" },
+      },
+    },
+    DeleteApiKeyRequest: {
+      type: "object" as const,
+      required: ["id"] as const,
+      properties: {
+        id: { type: "string" as const, format: "uuid" },
+      },
+    },
+    WorkspaceMember: {
+      type: "object" as const,
+      required: ["user_id", "username", "role"] as const,
+      properties: {
+        user_id: { type: "string" as const, format: "uuid" },
+        username: { type: "string" as const, nullable: true },
+        first_name: { type: "string" as const, nullable: true },
+        last_name: { type: "string" as const, nullable: true },
+        role: { $ref: "#/components/schemas/WorkspaceMemberRole" },
+      },
+    },
+    WorkspaceInvite: {
+      type: "object" as const,
+      properties: {
+        id: { type: "integer" as const },
+        user_id: { type: "string" as const, format: "uuid" },
+        role: { $ref: "#/components/schemas/WorkspaceMemberRole" },
+        created_at: { type: "string" as const, format: "date-time", nullable: true },
+        user: {
+          type: "object" as const,
+          nullable: true,
+          properties: {
+            id: { type: "string" as const, format: "uuid" },
+            username: { type: "string" as const, nullable: true },
+            first_name: { type: "string" as const, nullable: true },
+            last_name: { type: "string" as const, nullable: true },
+          },
+        },
+      },
+    },
+    WorkspaceMembersListResponse: {
+      type: "object" as const,
+      required: ["members", "pending_invites"] as const,
+      properties: {
+        members: {
+          type: "array" as const,
+          items: { $ref: "#/components/schemas/WorkspaceMember" },
+        },
+        pending_invites: {
+          type: "array" as const,
+          items: { $ref: "#/components/schemas/WorkspaceInvite" },
+        },
+      },
+    },
+    InviteMemberRequest: {
+      type: "object" as const,
+      required: ["email", "role"] as const,
+      properties: {
+        email: { type: "string" as const, format: "email" },
+        role: { $ref: "#/components/schemas/WorkspaceMemberRole" },
+      },
+    },
+    InviteMemberResponse: {
+      type: "object" as const,
+      required: ["success"] as const,
+      properties: {
+        success: { type: "boolean" as const, enum: [true] as const },
+        invite: { $ref: "#/components/schemas/WorkspaceInvite" },
+        warning: { type: "string" as const },
+      },
+    },
+    UpdateMemberRequest: {
+      type: "object" as const,
+      required: ["user_id", "role"] as const,
+      properties: {
+        user_id: { type: "string" as const, format: "uuid" },
+        role: { $ref: "#/components/schemas/WorkspaceMemberRole" },
+      },
+    },
+    UpdateMemberResponse: {
+      type: "object" as const,
+      required: ["member"] as const,
+      properties: {
+        member: { $ref: "#/components/schemas/WorkspaceMember" },
+      },
+    },
+    DeleteMemberRequest: {
+      type: "object" as const,
+      required: ["user_id"] as const,
+      properties: {
+        user_id: { type: "string" as const, format: "uuid" },
+        target: { type: "string" as const, enum: ["member", "invite"] as const },
+      },
+    },
+    WorkspaceWebhookConfig: {
+      type: "object" as const,
+      properties: {
+        id: { type: "integer" as const },
+        destination_url: { type: "string" as const, format: "uri" },
+        events: { type: "array" as const, items: { type: "string" as const } },
+        custom_headers: {
+          type: "object" as const,
+          additionalProperties: { type: "string" as const },
+        },
+        created_at: { type: "string" as const, format: "date-time", nullable: true },
+        updated_at: { type: "string" as const, format: "date-time", nullable: true },
+      },
+    },
+    WorkspaceWebhookResponse: {
+      type: "object" as const,
+      required: ["webhook"] as const,
+      properties: {
+        webhook: {
+          allOf: [{ $ref: "#/components/schemas/WorkspaceWebhookConfig" }],
+          nullable: true,
+        },
+      },
+    },
+    UpsertWebhookRequest: {
+      type: "object" as const,
+      required: ["destination_url", "events"] as const,
+      properties: {
+        destination_url: { type: "string" as const, format: "uri" },
+        events: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          minItems: 1,
+        },
+        custom_headers: {
+          type: "object" as const,
+          additionalProperties: { type: "string" as const },
+        },
+        webhook_id: { type: "integer" as const },
+      },
+    },
+    TestWebhookRequest: {
+      type: "object" as const,
+      required: ["destination_url", "event"] as const,
+      properties: {
+        destination_url: { type: "string" as const, format: "uri" },
+        custom_headers: {
+          type: "object" as const,
+          additionalProperties: { type: "string" as const },
+        },
+        event: { type: "object" as const, additionalProperties: true },
+      },
+    },
+    TestWebhookResponse: {
+      type: "object" as const,
+      properties: {
+        data: {},
+        status: { type: "integer" as const },
+        statusText: { type: "string" as const },
+      },
+    },
   },
 };
 
@@ -537,6 +735,273 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         "400": errorResponse("Invalid cursor"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Owner session required"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/api-keys": {
+    get: {
+      operationId: "listWorkspaceApiKeys",
+      summary: "List workspace API keys",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description: "Session-only trust-root route. Lists key metadata without secrets.",
+      responses: {
+        "200": {
+          description: "API keys",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ApiKeyListResponse" },
+            },
+          },
+        },
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required"),
+      },
+    },
+    post: {
+      operationId: "createWorkspaceApiKey",
+      summary: "Create a workspace API key",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description:
+        "Session-only trust-root route. Returns the full secret once; store it immediately.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/CreateApiKeyRequest" },
+          },
+        },
+      },
+      responses: {
+        "201": {
+          description: "API key created",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateApiKeyResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required"),
+      },
+    },
+    delete: {
+      operationId: "deleteWorkspaceApiKey",
+      summary: "Revoke a workspace API key",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description: "Session-only trust-root route.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/DeleteApiKeyRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "API key revoked",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DeleteWorkspaceResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/members": {
+    get: {
+      operationId: "listWorkspaceMembers",
+      summary: "List workspace members and pending invites",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description: "Session-only trust-root route.",
+      responses: {
+        "200": {
+          description: "Members and invites",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkspaceMembersListResponse" },
+            },
+          },
+        },
+        "401": errorResponse("Unauthorized"),
+      },
+    },
+    post: {
+      operationId: "inviteWorkspaceMember",
+      summary: "Invite a workspace member",
+      tags: ["Platform API", "Workspace"],
+      "x-callcaster-capability": "members.invite",
+      security: sessionOnlySecurity,
+      description:
+        "Session-only trust-root route. Privileged role assignment may require MFA enrollment.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/InviteMemberRequest" },
+          },
+        },
+      },
+      responses: {
+        "201": {
+          description: "Invite sent",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/InviteMemberResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required or MFA enrollment required"),
+      },
+    },
+    patch: {
+      operationId: "updateWorkspaceMemberRole",
+      summary: "Update a member role",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description:
+        "Session-only trust-root route. Owner-role changes require an owner actor with MFA.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/UpdateMemberRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Member updated",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateMemberResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Insufficient role or MFA enrollment required"),
+        "404": errorResponse("Member not found"),
+      },
+    },
+    delete: {
+      operationId: "removeWorkspaceMember",
+      summary: "Remove a member or cancel an invite",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description:
+        "Session-only trust-root route. Pass `target: invite` to cancel a pending invite.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/DeleteMemberRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Member removed or invite cancelled",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DeleteWorkspaceResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required"),
+        "404": errorResponse("Member or invite not found"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/webhook": {
+    get: {
+      operationId: "getWorkspaceWebhook",
+      summary: "Get workspace webhook configuration",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description: "Session-only trust-root route.",
+      responses: {
+        "200": {
+          description: "Webhook config",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkspaceWebhookResponse" },
+            },
+          },
+        },
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required"),
+      },
+    },
+    put: {
+      operationId: "upsertWorkspaceWebhook",
+      summary: "Create or update workspace webhook",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description:
+        "Session-only trust-root route. Destination URL must pass SSRF-safe outbound validation.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/UpsertWebhookRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Webhook saved",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkspaceWebhookResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error or blocked destination URL"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required"),
+      },
+    },
+    post: {
+      operationId: "testWorkspaceWebhook",
+      summary: "Send a test webhook payload",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description:
+        "Session-only trust-root route. Delivers a sample event via safe outbound fetch.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/TestWebhookRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Test delivery result",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/TestWebhookResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error or blocked destination URL"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Member manager role required"),
       },
     },
   },

@@ -18,11 +18,34 @@ Legacy `POST /api/workspace` is removed (SEC-01). Use the scoped routes above.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/workspace-api-keys` | List workspace API keys |
-| POST | `/api/workspace-api-keys` | Create `cc_` prefixed API key |
-| DELETE | `/api/workspace-api-keys` | Revoke API key |
+| GET | `/api/workspaces/:workspaceId/api-keys` | List workspace API keys (metadata only) |
+| POST | `/api/workspaces/:workspaceId/api-keys` | Create `cc_live_` prefixed API key |
+| DELETE | `/api/workspaces/:workspaceId/api-keys` | Revoke API key |
 
-Auth: workspace admin session + `requireWorkspaceAccess`.
+Legacy flat routes (`/api/workspace-api-keys`) remain for UI compatibility; prefer scoped routes above.
+
+Auth: workspace member manager session (admin+ or member with manage rights).
+
+## Members
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/workspaces/:workspaceId/members` | List members and pending invites |
+| POST | `/api/workspaces/:workspaceId/members` | Invite member by email |
+| PATCH | `/api/workspaces/:workspaceId/members` | Update member role |
+| DELETE | `/api/workspaces/:workspaceId/members` | Remove member or cancel invite |
+
+Auth: workspace member manager session. Privileged role changes require MFA (SEC-08).
+
+## Customer webhooks
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/workspaces/:workspaceId/webhook` | Read webhook configuration |
+| PUT | `/api/workspaces/:workspaceId/webhook` | Create or update webhook |
+| POST | `/api/workspaces/:workspaceId/webhook` | Send test payload |
+
+Production delivery uses `safeOutboundFetch` (SEC-04a). Destination URLs must pass SSRF validation.
 
 ## Phone numbers
 

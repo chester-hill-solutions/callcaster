@@ -6081,41 +6081,25 @@
     },
     "/api/workspaces/{workspaceId}/webhook": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_webhook",
-        "summary": "GET /api/workspaces/:workspaceId/webhook",
-        "description": "POST tests webhook delivery.",
+        "operationId": "getWorkspaceWebhook",
+        "summary": "Get workspace webhook configuration",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
+        "description": "Session-only trust-root route.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Webhook config",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceWebhookResponse"
                 }
               }
             }
@@ -6125,17 +6109,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6143,42 +6127,45 @@
         }
       },
       "put": {
-        "operationId": "putWorkspaces_workspaceId_webhook",
-        "summary": "PUT /api/workspaces/:workspaceId/webhook",
-        "description": "POST tests webhook delivery.",
+        "operationId": "upsertWorkspaceWebhook",
+        "summary": "Create or update workspace webhook",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Destination URL must pass SSRF-safe outbound validation.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/UpsertWebhookRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Webhook saved",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceWebhookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or blocked destination URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6188,17 +6175,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6206,42 +6193,45 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_webhook",
-        "summary": "POST /api/workspaces/:workspaceId/webhook",
-        "description": "POST tests webhook delivery.",
+        "operationId": "testWorkspaceWebhook",
+        "summary": "Send a test webhook payload",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Delivers a sample event via safe outbound fetch.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/TestWebhookRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Test delivery result",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/TestWebhookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or blocked destination URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6251,17 +6241,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6271,41 +6261,25 @@
     },
     "/api/workspaces/{workspaceId}/members": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_members",
-        "summary": "GET /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "listWorkspaceMembers",
+        "summary": "List workspace members and pending invites",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
+        "description": "Session-only trust-root route.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Members and invites",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceMembersListResponse"
                 }
               }
             }
@@ -6315,17 +6289,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6333,42 +6297,46 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_members",
-        "summary": "POST /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "inviteWorkspaceMember",
+        "summary": "Invite a workspace member",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "x-callcaster-capability": "members.invite",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Privileged role assignment may require MFA enrollment.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/InviteMemberRequest"
+              }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Success",
+          "201": {
+            "description": "Invite sent",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/InviteMemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6378,17 +6346,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required or MFA enrollment required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6396,42 +6364,45 @@
         }
       },
       "patch": {
-        "operationId": "patchWorkspaces_workspaceId_members",
-        "summary": "PATCH /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "updateWorkspaceMemberRole",
+        "summary": "Update a member role",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Owner-role changes require an owner actor with MFA.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/UpdateMemberRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Member updated",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/UpdateMemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6441,17 +6412,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Insufficient role or MFA enrollment required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Member not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6459,30 +6440,45 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId_members",
-        "summary": "DELETE /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "removeWorkspaceMember",
+        "summary": "Remove a member or cancel an invite",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Pass `target: invite` to cancel a pending invite.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteMemberRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Member removed or invite cancelled",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6492,17 +6488,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Member or invite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6512,41 +6518,25 @@
     },
     "/api/workspaces/{workspaceId}/api-keys": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_api_keys",
-        "summary": "GET /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "operationId": "listWorkspaceApiKeys",
+        "summary": "List workspace API keys",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
+        "description": "Session-only trust-root route. Lists key metadata without secrets.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "API keys",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/ApiKeyListResponse"
                 }
               }
             }
@@ -6556,17 +6546,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6574,42 +6564,45 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_api_keys",
-        "summary": "POST /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "operationId": "createWorkspaceApiKey",
+        "summary": "Create a workspace API key",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Returns the full secret once; store it immediately.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Success",
+          "201": {
+            "description": "API key created",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/CreateApiKeyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6619,17 +6612,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6637,30 +6630,45 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId_api_keys",
-        "summary": "DELETE /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "operationId": "deleteWorkspaceApiKey",
+        "summary": "Revoke a workspace API key",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteApiKeyRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "API key revoked",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6670,17 +6678,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -10426,6 +10434,400 @@
             "enum": [
               true
             ]
+          }
+        }
+      },
+      "WorkspaceMemberRole": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "admin",
+          "member",
+          "caller"
+        ]
+      },
+      "ApiKeySummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "key_prefix",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "key_prefix": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ApiKeyListResponse": {
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeySummary"
+            }
+          }
+        }
+      },
+      "CreateApiKeyRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "CreateApiKeyResponse": {
+        "type": "object",
+        "required": [
+          "key",
+          "id",
+          "name",
+          "key_prefix",
+          "created_at"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Full secret key; shown once at creation."
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "key_prefix": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeleteApiKeyRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "WorkspaceMember": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "role"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          }
+        }
+      },
+      "WorkspaceInvite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "username": {
+                "type": "string",
+                "nullable": true
+              },
+              "first_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "last_name": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "WorkspaceMembersListResponse": {
+        "type": "object",
+        "required": [
+          "members",
+          "pending_invites"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceMember"
+            }
+          },
+          "pending_invites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceInvite"
+            }
+          }
+        }
+      },
+      "InviteMemberRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          }
+        }
+      },
+      "InviteMemberResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "invite": {
+            "$ref": "#/components/schemas/WorkspaceInvite"
+          },
+          "warning": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateMemberRequest": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "role"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          }
+        }
+      },
+      "UpdateMemberResponse": {
+        "type": "object",
+        "required": [
+          "member"
+        ],
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/WorkspaceMember"
+          }
+        }
+      },
+      "DeleteMemberRequest": {
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "member",
+              "invite"
+            ]
+          }
+        }
+      },
+      "WorkspaceWebhookConfig": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "destination_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "WorkspaceWebhookResponse": {
+        "type": "object",
+        "required": [
+          "webhook"
+        ],
+        "properties": {
+          "webhook": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceWebhookConfig"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "UpsertWebhookRequest": {
+        "type": "object",
+        "required": [
+          "destination_url",
+          "events"
+        ],
+        "properties": {
+          "destination_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "webhook_id": {
+            "type": "integer"
+          }
+        }
+      },
+      "TestWebhookRequest": {
+        "type": "object",
+        "required": [
+          "destination_url",
+          "event"
+        ],
+        "properties": {
+          "destination_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "TestWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "data": {},
+          "status": {
+            "type": "integer"
+          },
+          "statusText": {
+            "type": "string"
           }
         }
       }
