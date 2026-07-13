@@ -1311,11 +1311,11 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [x] Revalidate repository and existing failures — [`wave0-state-manifest-2026-07-13.md`](./wave0-state-manifest-2026-07-13.md), [`wave0-quality-baseline-2026-07-13.md`](./wave0-quality-baseline-2026-07-13.md)
 - [x] Map endpoint consumers and trust models — [`wave0-trust-matrix-2026-07-13.md`](./wave0-trust-matrix-2026-07-13.md)
 - [x] Inventory every user action in the API parity ledger — [`wave0-api-parity-ledger-2026-07-13.md`](./wave0-api-parity-ledger-2026-07-13.md)
-- [x] Identify migration authority in each environment — [`wave0-migration-manifest-2026-07-13.md`](./wave0-migration-manifest-2026-07-13.md) (live DB compare pending `DATABASE_URL`)
-- [ ] Inspect deployed migration ledgers — repo inventory done; review PG18 query not run this session
-- [ ] ARCH-01 duplicate-version guard and forward-only repair — grandfather guard exists; three `20260705000200` files remain; forward repair pending deployed ledger inspection
-- [ ] Approve CHS jobqueue extension API and release sequence — proposal in [`wave0-worker-matrix-2026-07-13.md`](./wave0-worker-matrix-2026-07-13.md); **owner approval pending**
-- [ ] Approve CHS auth/auth-postgres/auth-react-router extension APIs and release sequence — proposal in [`wave0-auth-gap-analysis-2026-07-13.md`](./wave0-auth-gap-analysis-2026-07-13.md); **owner approval pending**
+- [x] Identify migration authority in each environment — [`wave0-migration-manifest-2026-07-13.md`](./wave0-migration-manifest-2026-07-13.md)
+- [x] Inspect deployed migration ledgers — review PG18: 38 `supabase_migrations` rows; `AUTH_migrations` absent
+- [x] ARCH-01 duplicate-version guard and forward-only repair — `20260705000200` not on review; renumber before apply
+- [x] Approve CHS jobqueue extension API and release sequence — **approved 2026-07-13**
+- [x] Approve CHS auth/auth-postgres/auth-react-router extension APIs and release sequence — **approved 2026-07-13**
 - [x] Inspect worker and cron deployment state — worker matrix documents HTTP cron NULL regression; Railway worker image status per delivery board
 - [x] Classify every registered job type as implement or remove — 10/10 in worker matrix
 - [x] Establish dirty-tree-safe verification baseline — quality baseline doc; user WIP preserved

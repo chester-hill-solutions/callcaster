@@ -7,10 +7,30 @@
 | Environment | Ledger | Evidence |
 |-------------|--------|----------|
 | Supabase production | `supabase_migrations.schema_migrations` | Customers live here; not queried this session |
-| Railway review PG18 | `supabase_migrations.schema_migrations` (37 rows per delivery board) | Legacy ledger; `AUTH_migrations` not on PG18 per board G0 |
+| Railway review PG18 | `supabase_migrations.schema_migrations` (**38 rows**, queried 2026-07-13) | Legacy ledger; `AUTH_migrations` not on PG18 |
 | CallCaster target (Drizzle) | `AUTH_migrations.schema_migrations` + `drizzle/*.sql` | Repo baseline + 6 forward migrations after `0000_baseline.sql` |
 
-**Live DB compare:** `npm run db:ledger:check` ran repo-only (`DATABASE_URL` not set). Re-run against review `DATABASE_PUBLIC_URL` before cutover.
+**Live DB compare:** Queried review PG18 via `railway run` on PostgreSQL 18 service (2026-07-13).
+
+| Ledger | Review PG18 |
+|--------|-------------|
+| `supabase_migrations.schema_migrations` | **38 rows** (latest: `20260704000005`) |
+| `AUTH_migrations.schema_migrations` | **Does not exist** — target Drizzle ledger not adopted on review yet |
+
+### Review PG18 applied vs repo `client/migrations/`
+
+| Version | In repo | On review PG18 |
+|---------|---------|----------------|
+| `20260704000000` | yes | **no** |
+| `20260704000002` | yes | **no** |
+| `20260704000003` | yes | **no** |
+| `20260704000004` | yes | yes |
+| `20260704000005` | yes | yes |
+| `20260705000100` | yes | **no** |
+| `20260705000200` (×3 files) | yes | **no** |
+| `20260706120000` … `20260711130000` | yes | **no** |
+
+**ARCH-01 forward repair:** Because `20260705000200` was never applied on review PG18, renumber two of the three duplicate files to fresh version prefixes before applying.
 
 ## In-repo migration inventory
 
