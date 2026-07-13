@@ -3,6 +3,7 @@ import { submitSurveyResponse, getSurveyWorkspaceByPublicId } from "@/lib/survey
 import { requireDualAuth, getDualAuthUser } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -57,7 +58,12 @@ async function handleSubmitResponse(formData: FormData) {
   });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+// NOTE: the 405 method check intentionally precedes auth and returns
+// `routeData` (not a Response), so it cannot live in the factory's `auth:`
+// slot without changing the response shape — the guard stays in the handler.
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
     return routeData({ error: "Method not allowed" }, { status: 405 });
   }
@@ -95,4 +101,5 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   return handleSubmitResponse(formData);
-}
+  },
+});

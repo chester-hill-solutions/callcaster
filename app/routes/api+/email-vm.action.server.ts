@@ -11,125 +11,155 @@ import {
   updateCallRecordingUrlBySid,
 } from "@/lib/telephony-db.server";
 import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const resend = new Resend(env.RESEND_API_KEY());
+type EmailVmAuth = { preflight: "ok" } | { preflight: "failed" };
 
-  try {
-    const formData = await request.clone().formData();
-    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const recordingUrl = params.RecordingUrl;
-    const callSid = params.CallSid;
-    const accountSid = params.AccountSid;
-    const recordingSid = params.RecordingSid;
-    const recordingDuration = params.RecordingDuration;
-
-    if (!recordingUrl || typeof recordingUrl !== "string") {
-      throw new Error("Missing or invalid RecordingUrl");
-    }
-    if (!callSid || typeof callSid !== "string") {
-      throw new Error("Missing or invalid CallSid");
-    }
-
-    const forbidden = await requireTwilioSignature(request, { callSid });
-    if (forbidden) return forbidden;
-
-    const callRow = await findCallBySid(callSid);
-
-    if (!callRow) {
-      throw new Error("Error fetching call: not found");
-    }
-    if (!callRow.to) {
-      throw new Error("Call destination number not found");
-    }
-
-    // Idempotency guard: Twilio retries the recordingStatusCallback on
-    // timeout, and the retry carries the exact same RecordingUrl/RecordingSid
-    // as the original. If this call's recording URL was already persisted
-    // (by a prior run of this same handler, below), the voicemail has
-    // already been fetched, stored, and emailed — ack success without
-    // reprocessing so we don't send a duplicate email.
-    if (callRow.recording_url && callRow.recording_url === recordingUrl) {
-      logger.debug("Voicemail webhook retry detected; skipping duplicate processing", {
-        callSid,
-        recordingSid,
-      });
-      return routeData({ success: true, message: "Already processed" });
-    }
-
-    const number = await findWorkspaceNumberVoicemailContextByPhone(callRow.to);
-
-    if (!number) {
-      throw new Error("Error fetching workspace number: not found");
-    }
-    if (!number.workspace) {
-      throw new Error("Workspace not found");
-    }
-
-    const vmTwilioCreds = readTwilioWorkspaceCredentials(number.workspace.twilio_data);
-    if (!vmTwilioCreds) {
-      throw new Error("Workspace twilio data not found");
-    }
-
-    const call = await updateCallRecordingUrlBySid(callSid, recordingUrl);
-
-    if (!call) {
-      throw new Error("Error updating call: not found");
-    }
-
-    const action = number.inbound_action;
-    const now = new Date();
-
-    if (!accountSid || typeof accountSid !== "string") {
-      throw new Error("Missing or invalid AccountSid");
-    }
-    if (!recordingSid || typeof recordingSid !== "string") {
-      throw new Error("Missing or invalid RecordingSid");
-    }
-
-    const recordingResponse = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`,
-      {
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${vmTwilioCreds.sid}:${vmTwilioCreds.authToken}`).toString("base64")}`,
-        },
-      },
-    );
-
-    if (!recordingResponse.ok) {
-      throw new Error(`Failed to fetch recording: ${recordingResponse.statusText}`);
-    }
-
-    const recording = await recordingResponse.blob();
-
-    const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
+export const action = defineAction({
+  auth: async ({ request }: ActionFunctionArgs): Promise<EmailVmAuth | Response> => {
     try {
-      await uploadObject(
-        "workspaceAudio",
-        fileName,
-        recording,
+      const formData = await request.clone().formData();
+      const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+      const recordingUrl = params.RecordingUrl;
+      const callSid = params.CallSid;
+
+      if (!recordingUrl || typeof recordingUrl !== "string") {
+        // The handler re-runs this validation and produces the original 500.
+        return { preflight: "ok" };
+      }
+      if (!callSid || typeof callSid !== "string") {
+        return { preflight: "ok" };
+      }
+
+      const forbidden = await requireTwilioSignature(request, { callSid });
+      if (forbidden) return forbidden;
+
+      return { preflight: "ok" };
+    } catch (error) {
+      logger.error("Error processing voicemail:", error);
+      return { preflight: "failed" };
+    }
+  },
+  sideEffects: ["db-write", "twilio", "email", "external"],
+  handler: async ({ request, auth }) => {
+    if (auth.preflight === "failed") {
+      return routeData({ error: "Failed to process voicemail" }, { status: 500 });
+    }
+
+    const resend = new Resend(env.RESEND_API_KEY());
+
+    try {
+      const formData = await request.clone().formData();
+      const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+      const recordingUrl = params.RecordingUrl;
+      const callSid = params.CallSid;
+      const accountSid = params.AccountSid;
+      const recordingSid = params.RecordingSid;
+      const recordingDuration = params.RecordingDuration;
+
+      if (!recordingUrl || typeof recordingUrl !== "string") {
+        throw new Error("Missing or invalid RecordingUrl");
+      }
+      if (!callSid || typeof callSid !== "string") {
+        throw new Error("Missing or invalid CallSid");
+      }
+
+      const callRow = await findCallBySid(callSid);
+
+      if (!callRow) {
+        throw new Error("Error fetching call: not found");
+      }
+      if (!callRow.to) {
+        throw new Error("Call destination number not found");
+      }
+
+      // Idempotency guard: Twilio retries the recordingStatusCallback on
+      // timeout, and the retry carries the exact same RecordingUrl/RecordingSid
+      // as the original. If this call's recording URL was already persisted
+      // (by a prior run of this same handler, below), the voicemail has
+      // already been fetched, stored, and emailed — ack success without
+      // reprocessing so we don't send a duplicate email.
+      if (callRow.recording_url && callRow.recording_url === recordingUrl) {
+        logger.debug("Voicemail webhook retry detected; skipping duplicate processing", {
+          callSid,
+          recordingSid,
+        });
+        return routeData({ success: true, message: "Already processed" });
+      }
+
+      const number = await findWorkspaceNumberVoicemailContextByPhone(callRow.to);
+
+      if (!number) {
+        throw new Error("Error fetching workspace number: not found");
+      }
+      if (!number.workspace) {
+        throw new Error("Workspace not found");
+      }
+
+      const vmTwilioCreds = readTwilioWorkspaceCredentials(number.workspace.twilio_data);
+      if (!vmTwilioCreds) {
+        throw new Error("Workspace twilio data not found");
+      }
+
+      const call = await updateCallRecordingUrlBySid(callSid, recordingUrl);
+
+      if (!call) {
+        throw new Error("Error updating call: not found");
+      }
+
+      const action = number.inbound_action;
+      const now = new Date();
+
+      if (!accountSid || typeof accountSid !== "string") {
+        throw new Error("Missing or invalid AccountSid");
+      }
+      if (!recordingSid || typeof recordingSid !== "string") {
+        throw new Error("Missing or invalid RecordingSid");
+      }
+
+      const recordingResponse = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`,
         {
-          contentType: "audio/mpeg",
-          cacheControl: "60",
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${vmTwilioCreds.sid}:${vmTwilioCreds.authToken}`).toString("base64")}`,
+          },
         },
       );
-    } catch (error) {
-      throw new Error(`Error uploading to storage: ${error instanceof Error ? error.message : String(error)}`);
-    }
 
-    let signedUrl: string;
-    try {
-      signedUrl = await createSignedObjectUrl("workspaceAudio", fileName, 8640000);
-    } catch (error) {
-      throw new Error(`Error creating signed URL: ${error instanceof Error ? error.message : String(error)}`);
-    }
+      if (!recordingResponse.ok) {
+        throw new Error(`Failed to fetch recording: ${recordingResponse.statusText}`);
+      }
 
-    const result = await resend.emails.send({
-      from: "Callcaster <info@callcaster.ca>",
-      to: [action?.toString() || ""],
-      subject: `New Voicemail from ${call.from}`,
-      html: `
+      const recording = await recordingResponse.blob();
+
+      const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
+      try {
+        await uploadObject(
+          "workspaceAudio",
+          fileName,
+          recording,
+          {
+            contentType: "audio/mpeg",
+            cacheControl: "60",
+          },
+        );
+      } catch (error) {
+        throw new Error(`Error uploading to storage: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      let signedUrl: string;
+      try {
+        signedUrl = await createSignedObjectUrl("workspaceAudio", fileName, 8640000);
+      } catch (error) {
+        throw new Error(`Error creating signed URL: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      const result = await resend.emails.send({
+        from: "Callcaster <info@callcaster.ca>",
+        to: [action?.toString() || ""],
+        subject: `New Voicemail from ${call.from}`,
+        html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>New Voicemail Received</h2>
           <p><strong>From:</strong> ${call.from}</p>
@@ -140,7 +170,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           <p><a href="${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails" style="color: #007bff;">View in Workspace</a></p>
         </div>
       `,
-      text: `
+        text: `
         New Voicemail Received
         
         From: ${call.from}
@@ -151,34 +181,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         Listen to voicemail: ${signedUrl}
         View in workspace: ${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails
       `,
-    });
-
-    const voicemailWebhook = number.workspace.webhook.filter((webhook) =>
-      Array.isArray(webhook.events) && (webhook.events as string[]).includes("voicemail"),
-    );
-    if (voicemailWebhook.length > 0) {
-      await sendWebhookNotification({
-        eventCategory: "voicemail",
-        eventType: "INSERT",
-        workspaceId: number.workspace.id,
-        payload: {
-          call_sid: call.sid,
-          from: call.from,
-          to: call.to,
-          recording_url: signedUrl,
-          duration: recordingDuration ? String(recordingDuration) : undefined,
-          timestamp: now.toISOString(),
-        },
       });
-    }
 
-    return routeData({
-      success: true,
-      message: "Voicemail processed and email sent",
-      result,
-    });
-  } catch (error) {
-    logger.error("Error processing voicemail:", error);
-    return routeData({ error: "Failed to process voicemail" }, { status: 500 });
-  }
-};
+      const voicemailWebhook = number.workspace.webhook.filter((webhook) =>
+        Array.isArray(webhook.events) && (webhook.events as string[]).includes("voicemail"),
+      );
+      if (voicemailWebhook.length > 0) {
+        await sendWebhookNotification({
+          eventCategory: "voicemail",
+          eventType: "INSERT",
+          workspaceId: number.workspace.id,
+          payload: {
+            call_sid: call.sid,
+            from: call.from,
+            to: call.to,
+            recording_url: signedUrl,
+            duration: recordingDuration ? String(recordingDuration) : undefined,
+            timestamp: now.toISOString(),
+          },
+        });
+      }
+
+      return routeData({
+        success: true,
+        message: "Voicemail processed and email sent",
+        result,
+      });
+    } catch (error) {
+      logger.error("Error processing voicemail:", error);
+      return routeData({ error: "Failed to process voicemail" }, { status: 500 });
+    }
+  },
+});

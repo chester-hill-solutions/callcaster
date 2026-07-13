@@ -2,29 +2,24 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrPageContext } from "@/lib/inbound-ivr-db.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<string, unknown>;
 }
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrPage(request, [params.numberId, params.pageId]),
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
   const twiml = new Twilio.twiml.VoiceResponse();
   const { numberId, pageId } = params as { numberId: string; pageId: string };
-  const formData = await request.formData();
-  const paramsObj = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const callSid = paramsObj.CallSid ?? null;
-
-  if (!callSid || !numberId || !pageId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const forbidden = await requireTwilioSignature(request, { callSid });
-  if (forbidden) return forbidden;
+  const { callSid } = auth;
 
   try {
     const call = await findCallBySid(callSid);
@@ -62,4 +57,5 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" },
   });
-};
+  },
+});

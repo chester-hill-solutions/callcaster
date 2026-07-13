@@ -3,7 +3,7 @@
 **Date:** 2026-07-12  
 **Prepared from:** static whole-codebase review on the then-current `chore/effects-strictness` snapshot plus its working tree  
 **Execution mode:** `/orchestrator`  
-**Status:** Ready for implementation planning; no remediation work in this document has been applied
+**Status:** Wave 0 complete (2026-07-13) — artifacts in [`wave0-index-2026-07-13.md`](./wave0-index-2026-07-13.md); Gate W0 partially met pending CHS extension approval and live ledger compare
 
 ## 1. Commander's intent
 
@@ -32,18 +32,13 @@ The orchestrator should not declare this plan complete until all five results ar
 
 ### Audit snapshot and current repository state
 
-At review time:
+Refreshed for handoff on 2026-07-13:
 
 - Branch: `chore/effects-strictness`
-- HEAD: `e22fe163`
-- Existing working-tree changes:
-  - `.eslintrc.cjs`
-  - `app/lib/object-storage.server.ts`
-  - `package.json`
-  - `scripts/check-type-safety.mjs` (untracked)
-  - `scripts/type-safety-baseline.json` (untracked)
+- HEAD: `5e8716a6`
+- Working tree: 139 changed/untracked paths, dominated by the in-progress `defineAction`/`defineLoader` handler-strictness migration across route modules, associated tests, and new `app/lib/ivr-webhook-auth.server.ts`.
 
-These changes belong to the ongoing type/effects strictness work. The orchestrator must re-run `git status` before implementation and must not overwrite, reset, or accidentally fold unrelated user changes into remediation work.
+These are user-owned in-flight changes, not remediation output. Boundary work must extend `app/lib/handler.server.ts`, the handler checks, and the new IVR signature helper rather than adding parallel route preambles. The orchestrator must re-run `git status` before implementation and must not overwrite, reset, or accidentally fold unrelated user changes into remediation work.
 
 This is an audit snapshot, not an assertion about the later execution state. Wave 0 must replace it with:
 
@@ -52,6 +47,8 @@ This is an audit snapshot, not an assertion about the later execution state. Wav
 - tracked, staged, and untracked changes;
 - which changes belong to the user versus the remediation effort;
 - baseline generated-file differences.
+
+`docs/migration-delivery-board.md` describes work on `feat/supabase-postgres-migration`, while this handoff is on `chore/effects-strictness`. Before remediation, establish the intended integration branch and reconcile those histories without resetting either working tree. Do not treat delivery-board “Done” claims as present on the current branch until verified in the chosen integration base.
 
 Do not run a command ending in `git diff --exit-code` against a knowingly dirty shared tree and interpret the expected user diff as a quality failure. Run the constituent checks, compare generated differences with the captured baseline, or use an isolated worktree after the remediation changes have a committed branch. Never stash, reset, commit, or discard the user's existing work without explicit authorization.
 
@@ -74,6 +71,7 @@ All agents must read `AGENTS.md` and `docs/AGENT-PLATFORM-GUIDE.md` before editi
 - Authorization uses stable, deny-by-default capability IDs. Session users resolve capabilities through CHS `auth-postgres` workspace role/feature permissions; CallCaster workspace API keys store an explicit allowlist of the same capability IDs. API-key storage and lifecycle remain product-specific to CallCaster.
 - Before implementing worker or scheduler infrastructure, inspect `@chester-hill-solutions/jobqueue`; the platform guide identifies it as the intended Phase 3 replacement. Record whether it is installable and sufficient before approving bespoke job primitives.
 - **Decision (2026-07-12):** extend and publish `@chester-hill-solutions/jobqueue` as the canonical worker foundation before CallCaster replaces its local poller. The package must gain claim-token fencing, lease heartbeat/extension, scheduled execution, idempotency keys, retry/dead-letter metadata, and a consumer-defined typed job registry.
+- This intentionally supersedes ADR-0007's proposed `@chester-hill-solutions/job-worker` name and HTTP-wake/self-catch-up scheduler details. Update ADR-0007 before implementation so the accepted package name and durable schedule-definition model are unambiguous.
 - Do not modify `.env`.
 - Do not rename already-applied migrations without first inspecting deployed migration ledgers.
 - Use top-level imports and exhaustive TypeScript switches.
@@ -99,6 +97,7 @@ As clarified on 2026-07-12, no customers are running on the Railway/Postgres tar
 Consequences:
 
 - Change the target Postgres schema atomically before customer cutover.
+- Promote the Railway review Postgres/database shape that passed staging, applying only the rehearsed final Supabase data delta; do not construct an untested production schema independently.
 - Update the Supabase export/import transform to write canonical CHS membership, role, feature, permission, and invitation structures directly.
 - Preserve each Supabase auth user UUID as the Better Auth/public user UUID and remap membership/profile foreign keys without generating replacement identities.
 - Validate conversion against production-shaped dumps and review-environment rehearsals.
@@ -107,6 +106,35 @@ Consequences:
 - The later customer cutover uses the already-planned one-shot maintenance/read-only window: pause Supabase writes, export/import the final delta, run count/parity and smoke checks, then move traffic. A failed gate resumes the unchanged Supabase source; it does not attempt to run mixed app/schema versions.
 - The traffic switch is the data-authority point of no return. Before it, any failed gate resumes Supabase. After the first accepted Postgres write, recovery is roll-forward or Postgres PITR/restore; Supabase remains a read-only retained snapshot and is never made writable again without an explicit reverse-migration project.
 - Retain the frozen Supabase source read-only for 90 days with least-privilege access and access logging. Disable app/provider/cron writes at cutover; after reconciliation and owner sign-off, export legally required audit records and destroy the Supabase project/data according to the runbook.
+- The 90-day read-only retention and post-switch Postgres-authority decisions supersede the 24-hour/fallback wording in `docs/supabase-postgres-migration-plan.md` and historical ADR-0008; update those documents in the same cutover-plan PR.
+- The atomic target-schema setup is a pre-customer exception. After cutover, ordinary changes use expand → backfill/migrate → switch readers/writers → contract across releases. App and worker rolling deployments support the previous schema/payload version until old instances and queued jobs are drained.
+- Before the final export, stop new campaign/call/message/export dispatch and pause schedulers. Drain voice to zero active calls within the cutover window; if it does not drain, abort/postpone rather than terminating customers unexpectedly.
+- Import unresolved messages by provider SID, queued campaign/contact state, job/schedule definitions, and resumable export/upload checkpoints. Repoint Twilio/provider callbacks, then run canonical open-sync/reconciliation before reopening dispatch. Deterministic idempotency/occurrence keys prevent re-enqueue duplication.
+- Do not import Supabase sessions, transient presence, stale leases, or already-derived caches; rebuild those on Postgres.
+- Treat this as a coordinated low-traffic migration (currently roughly one active user), not an enterprise rollout ceremony. Name one accountable cutover owner, run the automated/parity checklist, record the UTC go/no-go decision, and target a maintenance window under two hours.
+- Coordinate the window directly with the active user and confirm completion/re-login afterward. A full status-page campaign, seven-day notice sequence, or multi-party approval ceremony is not required at the current scale.
+
+### Delivery split: cutover versus follow-up
+
+Do not make the low-traffic Postgres migration wait for every improvement in this document.
+
+**Cutover blockers — fix, prove, or deliberately disable**
+
+- Wave 0 repository/deployment evidence, Drizzle target baseline, transformed data-import rehearsal, and parity checks.
+- Canonical CHS auth/membership adoption, session invalidation, MFA re-enrollment, and the Critical/High tenant/auth boundaries in SEC-01 through SEC-08 and DATA-01.
+- Minimal redacted audit events for privileged cutover-era mutations; tamper anchoring and full export UX may follow.
+- Telephony, SMS, campaign, worker, scheduler, and billing paths that the active user actually needs: CHS jobqueue fencing plus the relevant TEL/BILL/ASYNC items. Any unfinished path must be disabled rather than exposed in a known-unsafe state.
+- SURVEY-01 if public surveys remain enabled; otherwise disable public survey submission until repaired. Preserve the migration gate that publishes/adopts `scriptkit-survey-core` and `scriptkit-survey-react`; respondent security must extend those package/domain seams rather than entrenching another standalone survey engine.
+- Production build/typecheck, focused security/money/telephony tests, route/schema checks, the existing 77/77 compose E2E gate, manual Twilio/auth smoke on the Railway review URL, verified storage copy, deployed/healthy worker, backup/PITR configuration, and one restore rehearsal.
+- Directly verify Twilio callback targets, current balances/ledger totals, active API consumers, and the single active user's required journeys.
+
+**Sequenced post-cutover remediation**
+
+- Full API-01 programmatic parity, Hey API SDK breadth, and legacy-route sunset beyond operations needed at cutover.
+- DATA-02 retention automation, COMPLIANCE-01/02, full AUDIT-01 integrity/export features, adaptive survey abuse controls, and upload quarantine/ClamAV unless their affected feature remains enabled at cutover.
+- UX-01 through UX-03, PRODUCT-01/02 presentation cleanup, OPS-02 Grafana/SLO maturity, coverage ratcheting, module deepening, and documentation consolidation.
+
+The orchestrator must produce a short cutover manifest listing each in-scope feature as **proved**, **disabled**, or **deferred**. “Deferred but still enabled” is not an acceptable state for a Critical/High finding.
 
 ## 4. Evidence snapshot
 
@@ -140,7 +168,7 @@ Any workspace member passes `requireWorkspaceAccess`. The route accepts arbitrar
 
 **Required outcome**
 
-- **Decision (2026-07-12):** hard-delete `/api/workspace` and replace it with secret-free `GET/PATCH /api/v1/workspaces/:workspaceId` using the canonical data-plane dual-auth boundary.
+- **Adjusted decision (2026-07-13):** hard-delete `/api/workspace` and finish the existing secret-free `GET/PATCH /api/workspaces/:workspaceId` route at `app/routes/api+/workspaces+/$workspaceId.action.server.ts`. Put the route root behind the same canonical data-plane dual-auth boundary as its children rather than creating a parallel cutover route tree.
 - Session mutation requires `admin` or `owner`; reads return a public/settings projection rather than the database row.
 - API-key access remains programmatic but is governed by the API-key authority decision in the decision log.
 - Replace the open update object with a strict allowlisted schema.
@@ -162,7 +190,7 @@ The action trusts body-supplied user, campaign, workspace, device, and conferenc
 **Required outcome**
 
 - **Decision (2026-07-12):** expose dialer start as a canonical workspace-scoped action that accepts either an authenticated session or a workspace API key. The lower-level “next turn” remains an internal function invoked by signed callbacks, not a public HTTP operation.
-- Canonical route: `POST /api/v1/workspaces/:workspaceId/campaigns/:campaignId/dialer/start`.
+- Cutover route: `POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start`; API-01 may add a `/api/v1` alias post-cutover without duplicating domain logic.
 - Session callers must be `caller` or higher and act as themselves.
 - API-key callers must provide `agentUserId`; the server verifies that the agent is a `caller`-or-higher member of the route workspace before using that identity for the Twilio client target, conference ownership, queue attribution, and audit.
 - Derive workspace and campaign from route parameters; do not trust body-supplied workspace/campaign identity.
@@ -200,7 +228,6 @@ Invitation rows are fetched by submitted IDs only, then their roles are granted 
 
 - `app/routes/workspaces+/$id/campaigns/$selected_id/queue.action.server.ts:30-154`
 - `app/lib/campaign-queue-db.server.ts:60-104`
-- `app/lib/platform-data.server.ts` queue mutations
 
 The workspace route imports context access but never reads it. Queue update/delete helpers make workspace scope optional, and audience/contact inputs are not consistently verified against the campaign workspace.
 
@@ -221,7 +248,7 @@ The workspace route imports context access but never reads it. Queue update/dele
 - `app/lib/workspace-webhooks.server.ts:58-88`
 - `app/lib/safe-outbound-url.server.ts`
 
-Configuration-time validation exists, but production delivery later performs a raw `fetch`, follows the current DNS result, has no bounded timeout, and accepts custom headers.
+`safeOutboundFetch` already exists and is used by configuration/test paths. Production delivery in `workspace-webhooks.server.ts` still performs a raw `fetch`, follows the current DNS result, has no bounded timeout, and accepts custom headers.
 
 **Impact:** internal-service probing, metadata access, redirect/rebinding bypass, credential forwarding, and hung application requests.
 
@@ -233,6 +260,7 @@ Configuration-time validation exists, but production delivery later performs a r
 - Add timeout, body-size, and safe-header policies.
 - Sign outbound payloads.
 - Move delivery to the durable worker before enabling retries.
+- Wave 1 must either disable stored production delivery or route every attempt through the safe fetch primitive. Durable retries/signing/history land with the Wave 3 webhook worker; do not claim all of SEC-04 complete in Wave 1.
 
 ### High
 
@@ -242,7 +270,7 @@ Configuration-time validation exists, but production delivery later performs a r
 
 The endpoint accepts an arbitrary CallSid and updates it with parent Twilio credentials.
 
-**Decision (2026-07-12):** replace the legacy endpoint with `POST /api/v1/workspaces/:workspaceId/calls/:callSid/disconnect`. It uses the canonical dual-auth capability boundary and verifies the CallSid belongs to the route workspace before using workspace-scoped Twilio credentials. Delete `/api/disconnect`.
+**Adjusted decision (2026-07-13):** replace the legacy endpoint with `POST /api/workspaces/:workspaceId/calls/:callSid/disconnect`. It uses the existing data-plane dual-auth boundary and verifies the CallSid belongs to the route workspace before using workspace-scoped Twilio credentials. Delete `/api/disconnect`; API-01 may add a `/api/v1` alias post-cutover.
 
 **Required outcome:** any `caller`-or-higher session member with the call-control capability may control any call in their workspace; a scoped API key with that capability has the same workspace-wide call-control authority. Verify workspace/call ownership, use workspace rather than parent credentials, and add unauthenticated, missing-capability, and cross-workspace tests.
 
@@ -280,7 +308,7 @@ The route trusts form `From` and mutates phone-verification state without Twilio
 - At cutover, owner/admin/member/caller are fixed seeded product role templates. Although the shared schema can represent workspace-specific overrides, CallCaster does not expose custom roles or a role-capability editor/API in this program.
 - Introduce one actor-aware authorization helper for session and API-key callers.
 - Make route declarations and implementations use the same capability metadata.
-- Programmatic parity applies to product and workspace operations, but not to the human trust root. Identity changes, 2FA, workspace ownership transfer, provider-secret mutation, workspace deletion, and API-key issuance/rotation/revocation require an owner session with step-up authentication and are never authorized by a workspace API key.
+- Programmatic parity applies to product and workspace operations, but not to the human trust root. Identity changes, 2FA, workspace ownership transfer, provider-secret mutation, and API-key issuance/rotation/revocation require an owner session with step-up authentication. Workspace deletion may be initiated by an admin or owner session with step-up. None are authorized by a workspace API key.
 - Step-up requires a fresh password re-authentication plus a fresh 2FA challenge when enrolled/required. The grant is bound to the current session, expires after 10 minutes, is audited, and is invalidated by password/security/session changes.
 - Require explicit scopes when issuing a key; display them in settings and audit output.
 - API-key expiry is mandatory: default 90 days, maximum one year. Preserve one-time secret reveal, rotation/revocation, last-used metadata, and advance expiry warnings.
@@ -291,20 +319,39 @@ The route trusts form `From` and mutates phone-verification state without Twilio
 
 #### API-01 — Product actions lack a complete programmatic contract
 
-**Decision (2026-07-12):** bootstrap `openapi/public-api.yaml` as the integrator contract and generate TypeScript types, Zod schemas, and a fetch SDK with Hey API. The served `/api/docs/openapi` document and generated artifacts derive from that file.
+**Adjusted decision (2026-07-13):** extend the repository's existing TypeScript-authored OpenAPI pipeline rather than replacing it with a nonexistent YAML source. `app/lib/openapi*.ts` exports `openapi/public-api.json`, `openapi/complete-api.json`, and the SDK-focused `openapi/integrator-api.json`; Hey API generates TypeScript, Zod, and the fetch SDK from `integrator-api.json`.
 
 **Required outcome**
 
 - Wave 0 inventories every user-visible action and classifies it as public product API, owner-session trust root, provider callback, identity flow, or internal worker/control operation.
-- Every product/workspace action outside the trust-root exclusions has a canonical JSON operation under `/api/v1/workspaces/:workspaceId/...`, supports session and scoped API-key actors, and declares exactly one stable capability.
-- Version 1 changes are additive/compatible. Breaking request/response/auth semantics require a new URL major version.
-- Existing campaign-create/SMS routes remain thin compatibility adapters for 90 days after their `/api/v1` replacements ship. Emit standard `Deprecation` and `Sunset` headers, record usage telemetry, publish a migration guide, notify known integrators, and remove adapters after the announced date.
+- At cutover, secure and document the existing `/api/workspaces/:workspaceId/...` data plane and the three current integrator operations. Do not make the migration wait for a second REST tree.
+- Post-cutover, introduce `/api/v1/workspaces/:workspaceId/...` as aliases before declaring them canonical. Update/supersede ADR-0018 explicitly, preserve the existing `@chester-hill-solutions/scriptkit-callcaster-client`/Adagio contract, and never duplicate domain services.
+- Existing `/api/campaigns/create-with-script`, `/api/sms`, and `/api/chat_sms` routes remain thin compatibility adapters for 90 days after their versioned replacements ship. Emit standard `Deprecation` and `Sunset` headers, record usage telemetry, publish a migration guide, notify known integrators, and remove adapters after the announced date.
+- Path-scoped operations derive tenancy from `workspaceId`; request bodies omit `workspace_id` (legacy adapters may accept it only when it matches the authenticated/path workspace).
 - Existing React Router form actions may remain browser adapters, but they and public JSON routes call the same domain service and authorization policy; business behavior is not duplicated.
-- Write the OpenAPI operation, examples, security, success/error responses, and stable `operationId` before the route. Generate base Zod/types/SDK; retain thin handwritten refinements only for constraints OpenAPI cannot express.
+- Write the OpenAPI operation, examples, security, success/error responses, and stable `operationId` before the route. Generate SDK artifacts only for explicitly promoted integrator operations; session/platform operations remain in the public/complete specs without automatically expanding SDK scope.
 - Generate artifacts in CI and fail on drift. Do not hand-edit generated files.
 - Define consistent pagination, filtering, error envelopes, idempotency keys for externally effective creates, `201`/`202`/`204` semantics, and request correlation/audit metadata.
+- Require `Idempotency-Key` for externally effective creates. Scope records by workspace, operation, and key; retain them for seven days with a canonical request hash and original response reference. An exact replay returns the original resource/result, while reuse with a different payload returns `409 Conflict`. Domain uniqueness/audit records outlive the API replay window where required.
+- New versioned collection operations use opaque keyset cursors with stable `(created_at,id)` ordering, `next_cursor`, a default page size of 50, and maximum 100. Existing unversioned endpoints retain their offset contract until sunset.
+- Rate limits are tiered by operation and enforced on both actor/API-key and workspace aggregate dimensions. Return `429` with standard limit, remaining, reset, and retry metadata. Provider-effect operations additionally obey workspace Twilio throughput/concurrency limits even when HTTP request limits remain.
+- Post-cutover, back distributed API limits with the atomic Postgres window tables already anticipated by ADR-0007. Use bounded cardinality/cleanup and hash sensitive identifiers; this does not block the one-user cutover unless a live integrator requires it.
 - Provider webhooks, Better Auth endpoints, public respondent flows, and internal worker/dialer-next controls are documented separately and are not mislabeled as integrator APIs.
-- Each domain PR adds/updates its own operations and SDK contract tests. The program cannot close while an in-scope UI action exists only as an undocumented form action.
+- Each domain PR updates its relevant inventory/spec and contract tests. Full product-action parity remains a post-cutover completion criterion, not a migration gate.
+
+#### SEC-08 — MFA factors cannot be assumed portable across auth cutover
+
+**Decision (2026-07-12):** preserve user UUIDs, verified email state, and compatible bcrypt password hashes, but do not migrate Supabase MFA factor secrets. Invalidate every Supabase session at cutover.
+
+**Required outcome**
+
+- Notify affected users before cutover and explain the one-time login/MFA re-enrollment.
+- After password authentication, owner/admin users must enroll a new Better Auth factor and store fresh recovery codes before accessing workspace data. There is no post-cutover MFA bypass grace period.
+- Bind bootstrap enrollment to the imported verified identity/session, rate-limit attempts, audit completion/reset, and prevent other trust-root actions until enrollment is complete.
+- Lost-factor recovery uses one-time recovery codes first. If both factor and codes are unavailable, only platform support may reset MFA after documented identity verification, two-person approval, a 24-hour delay, and notification to every workspace owner; verified email alone is insufficient.
+- Caller/member users may follow the normal role policy, but any later role elevation to admin/owner requires MFA enrollment first.
+- Preflight the Supabase source for legacy `field_director` memberships. Because the fixed cutover templates omit that role while current MFA policy treats it as privileged, map any existing `field_director` membership to `admin` unless the cutover owner approves an explicit per-user lower-role mapping; never silently downgrade or discard it.
+- Add imported-password login, session invalidation, mandatory enrollment, recovery, role-elevation, and wrong-account tests.
 
 #### TEL-01 — Complete and verify monotonic call status
 
@@ -332,7 +379,9 @@ Twilio call creation occurs before dequeue and durable call persistence; persist
 
 **Required outcome**
 
-- Persist a durable call intent before provider creation, or compensate by terminating the provider call.
+- Persist a durable call intent and queue/contact claim before provider creation, with a unique provider SID constraint and signed intent correlation in callback URLs.
+- Dispatch at most one automatic provider-create attempt per intent. If the response is ambiguous, perform bounded reconciliation; attach only a unique matching provider call, otherwise mark the intent unknown and quarantine the queue/contact for explicit resolution. Never automatically redial an ambiguous attempt.
+- If a known provider call cannot be durably attached, retry persistence/reconcile and terminate it only as an explicit compensation path; callback correlation must be able to recover the intent after a response-write failure.
 - Never report failure while leaving an untracked live call.
 - Make dequeue and persistence idempotent.
 - Add crash-point/failure-injection tests after every external step.
@@ -349,9 +398,10 @@ Inbound TwiML hardcodes `entry_id=0`, and failed agent dialing logs without rele
 **Required outcome**
 
 - Correlate completion to a real queue entry.
-- Release offers and agents on every provider error.
-- Add stale-offer lease recovery.
-- Reconcile implementation or ADR-0013 so the documented conference lifecycle is truthful.
+- Preserve the canonical lifecycle already defined in `docs/contact-center-platform-plan.md` and ADR-0013: Postgres is authoritative; realtime is only a UI accelerator; each offer binds one entry, agent, and lease generation.
+- Release/requeue offers and agents on decline, timeout, caller abandonment, provider error, bridge failure, stale heartbeat, and worker loss. A stale lease holder cannot accept or complete a reclaimed offer.
+- Keep `enqueued_at` stable across re-offers, enforce server-authoritative offer timeout/max-offer/overflow behavior, and auto-set missed/connect-failed agents away as documented.
+- Reconcile implementation and ADR-0013 so conference-per-entry correlation, wrap-up, disposition, and recovery behavior are truthful.
 
 #### TEL-04 — Open-sync does not recover terminal billing
 
@@ -397,6 +447,7 @@ The migration posts `workspaceId: NULL`; the handlers require a valid workspace.
 - **Decision (2026-07-12):** durable database schedule definitions are the source of recurring work. The worker materializes due schedules into idempotent occurrence jobs; HTTP pg_cron, Railway Cron, and handler self-enqueue are not the recurrence source.
 - Each schedule occurrence uses a deterministic uniqueness key and enqueues bounded per-workspace jobs or a coordinator that durably fans out per-workspace jobs.
 - Global schedules create one coordinator occurrence. The coordinator durably records fan-out progress and enqueues deterministic per-workspace child jobs keyed by job type, workspace, and UTC occurrence. It does not process every workspace inline or create a permanent schedule row per workspace.
+- Reuse `runLowCreditNotify`'s current all-workspace enumeration as the interim coordinator pattern while migrating it to durable child jobs; do not invent a second workspace-discovery path.
 - Add singleton/idempotency keys for recurring periods.
 - Alert when a required recurring job has no future occurrence.
 - Add scheduler-to-handler integration tests.
@@ -448,6 +499,19 @@ The provider purchase and local number creation can succeed before the ledger de
 
 **Required outcome:** concurrent purchases cannot overspend; every crash point converges to either one active paid number or no number plus one refund.
 
+#### BILL-05 — Provider dispatch needs explicit prepaid reservation
+
+**Decision (2026-07-12):** reserve exact estimated SMS/MMS credits before dispatch and at least the first voice minute before dialing. Voice may use only a documented bounded settlement exposure.
+
+**Required outcome**
+
+- Add atomic, idempotent credit reservations/holds distinct from final ledger settlement; available-to-spend excludes active holds.
+- SMS/MMS reserves the canonical estimator amount, then settles against provider `num_segments`/media outcome exactly once and releases or adjusts the hold.
+- Voice reserves the first minute and atomically allocates a bounded duration budget based on remaining available credits and workspace concurrency. Pass the resulting maximum duration to Twilio and prevent concurrent calls from allocating the same exposure.
+- Final call billing settles actual started minutes and releases unused authorization. Any provider rounding/status discrepancy is bounded, visible in reconciliation, and cannot silently grant unlimited negative credit.
+- Expired/failed/unknown intents have explicit hold-release rules; unknown provider outcomes retain the hold until reconciliation or an audited resolution.
+- Add concurrent-dispatch, estimator-difference, long-call, timeout, compensation, and insufficient-credit tests.
+
 #### ASYNC-01 — SMS send is not durable or idempotent
 
 **Evidence**
@@ -498,6 +562,9 @@ Exports/uploads run as unawaited promises, while `campaign_export`, `campaign_di
 **Required outcome**
 
 - Store inputs in durable object storage or normalized job data.
+- Upload into a private quarantine namespace, enforce streaming size/content/type limits, and scan through a private-network ClamAV Railway service whose signature freshness is monitored. Fail closed when the scanner is unavailable or stale.
+- Promote only clean, normalized output to application storage. Parse CSV defensively against encoding/row/column/decompression abuse and neutralize spreadsheet formulas in generated exports; transcode media with strict resource/time limits.
+- Automatically expire rejected/orphaned quarantine objects and retain only redacted scan metadata/audit evidence.
 - Implement idempotent handlers and resumable checkpoints.
 - Ensure domain failures reject jobs instead of being converted to successful returns.
 - Add restart, retry, and stale-processing recovery tests.
@@ -533,10 +600,72 @@ The page does not consistently preserve the respondent token, completion is disp
 - Mint or load one respondent token and preserve it across answers, reload, and completion.
 - Support two explicit identity modes. Anonymous respondent tokens cannot attach a contact; contact-specific links bind the workspace, survey, result, and contact ID inside the signed token, and the client may not override that association.
 - Respondent tokens expire at the survey close time, capped at 90 days from issuance. A completed response is immutable/read-only; reopening requires an explicit workspace-side action and a newly issued token.
+- Keep honeypot and distributed rate limits, and require server-verified Cloudflare Turnstile adaptively when anonymous traffic crosses risk/rate thresholds. Valid contact-bound links normally bypass the challenge unless abuse signals require it.
 - Validate survey → page → question before creating or advancing a response.
 - Make answer/progress/completion transactional where needed.
 - Display completion only after successful server confirmation.
 - Add a full multi-page E2E covering required fields, reload/resume, failure/retry, and completion.
+
+#### DATA-02 — Sensitive-data retention is not enforced end to end
+
+**Decision (2026-07-12):** use category-specific, workspace-configurable retention with automatic deletion and legal holds.
+
+**Default profile**
+
+- Call recordings: 90 days.
+- Generated exports and processed raw-upload objects: 7 days.
+- Webhook delivery and non-audit job payload/results: 30 days.
+- Call/SMS content and metadata: 2 years.
+- Contacts and survey data: while the workspace is active, then 30 days after workspace deletion.
+- Security, access, and billing audit records: 7 years, with secrets and unnecessary message/contact content excluded.
+
+**Required outcome**
+
+- Admins/owners may choose shorter periods; any extension requires an explicit documented platform policy. Legal hold pauses deletion for identified records without silently changing the workspace policy.
+- Durable UTC schedules enqueue bounded, idempotent deletion jobs across Postgres and object storage, with dry-run/count preview and auditable completion.
+- Deletion covers derived files, exports, recordings, payload copies, search/index material, and caches. Telemetry must never receive the sensitive payload in the first place.
+- PITR/backups expire deleted data through the backup retention lifecycle; restore procedures reapply deletion tombstones so erased data is not silently resurrected.
+- Workspace deletion is a step-up-confirmed staged process with a 30-day recovery period, then irreversible purge except records subject to legal/audit retention.
+- Admins may configure retention and initiate staged workspace deletion with step-up authentication. Notify every owner immediately; any owner may cancel during the 30-day recovery period. Legal holds require platform-admin authority. API keys may read the effective policy but cannot mutate retention, holds, or deletion state.
+- Add clock-boundary, retry, legal-hold, restore, and cross-workspace tests.
+
+#### COMPLIANCE-01 — Recording and monitoring configuration needs accountable consent controls
+
+**Decision (2026-07-12):** customers remain responsible for determining lawful recording/monitoring consent and announcement requirements; CallCaster does not force one jurisdictional announcement.
+
+**Required outcome**
+
+- Recording/monitoring is not enabled accidentally: an admin must explicitly configure it, attest that the workspace has an appropriate legal basis/process, and re-attest when the material policy changes.
+- Persist attestation actor/time/version and every recording/monitoring configuration change in the security audit trail.
+- Show persistent compliance status/warnings in queue, number, recording, and supervisor-monitoring settings.
+- Provide configurable announcement/consent tooling and documentation without claiming that one template guarantees compliance.
+- Log supervisor listen/whisper/barge events and expose them to owners; recordings follow DATA-02 retention and access controls.
+- Add unauthorized-enable, missing-attestation, audit, and role tests.
+
+#### COMPLIANCE-02 — Data location and subprocessors need explicit disclosure
+
+**Decision (2026-07-13):** CallCaster does not promise Canada-only residency. It documents processor/storage regions, minimizes transfers, and obtains the appropriate customer agreement.
+
+**Required outcome**
+
+- Maintain a data-flow/subprocessor register for Railway, Twilio, Stripe, object replication, Grafana Cloud, Cloudflare Turnstile, email delivery, and any support tooling, including data categories, purposes, regions, retention, and transfer mechanism.
+- Configure Canadian/North-American regions where practical without claiming all data remains in Canada.
+- Keep sensitive payloads out of telemetry and support tools; send each processor only the minimum fields needed.
+- Publish customer-facing residency/subprocessor disclosures and change-notification terms; align contracts/DPA and internal support access with the actual deployment.
+- Verify primary, backup, object-replica, and telemetry regions before cutover and whenever infrastructure changes.
+
+#### AUDIT-01 — Privileged actions need one immutable audit contract
+
+**Decision (2026-07-12):** workspace owners may view/export their workspace audit trail; API keys require `audit.read`; platform-support access requires a reason and creates its own audit event.
+
+**Required outcome**
+
+- Define one append-only security/administration audit schema and writer used by session, API-key, support, worker, retention, billing, recording/monitoring, and trust-root paths.
+- Record UTC time, workspace, actor type/ID, API key ID where applicable, capability/action, target type/ID, outcome, request/correlation ID, and redacted structured change metadata. Never record secrets, tokens, credentials, message bodies, survey answers, or raw contact data.
+- Prevent update/delete through application roles. Chain/batch integrity digests and periodically anchor them in immutable object storage so privileged database mutation is detectable.
+- Retain audit records for seven years, expose cursor-paginated `/api/v1/workspaces/:workspaceId/audit-events` with `audit.read`, and generate large exports through the durable worker.
+- Owners receive UI access. Platform support must supply a reason code/ticket; the access event is visible to owners. Admin/member/caller templates do not receive `audit.read`.
+- Add tamper, redaction, capability, support-access, export, and cross-workspace tests.
 
 ### Medium product and assurance findings
 
@@ -594,10 +723,25 @@ Descriptions and errors are not reliably connected to controls; invalid controls
 **Required outcome**
 
 - Configure and document backup/PITR retention sufficient to meet the RPO.
+- Apply the recovery objective to durable customer objects as well as Postgres. Version/replicate source audio, retained recordings, and other non-regenerable clean objects to a separate failure domain; generated exports, quarantine, caches, and reproducible derivatives are disposable.
+- Replication and restore preserve DATA-02 expiry/legal-hold semantics and do not resurrect deleted objects.
 - Restore into an isolated environment at least quarterly; never test restoration over production.
 - Time the full restore, run schema/count/integrity and application smoke checks, and retain a redacted evidence record.
 - Maintain an owner, escalation path, and practiced cutover/rollback/restore runbook.
 - Block customer cutover until one production-shaped rehearsal meets both objectives.
+
+#### OPS-02 — Reliability objectives lack end-to-end telemetry
+
+**Decision (2026-07-12):** target 99.9% monthly app/API availability and instrument with vendor-neutral OpenTelemetry exported via OTLP to Grafana Cloud.
+
+**Required outcome**
+
+- Define SLIs and budgets for availability, API read/write latency, provider-webhook acknowledgement latency, worker queue/schedule lag, dead-letter rate, and recurring-job freshness.
+- Initial budgets: p95 API reads ≤500 ms, non-provider writes ≤1 s, provider webhook acknowledgement ≤1 s, and immediate-job queue lag ≤15 s; tune only from measured evidence without weakening the 99.9% availability target.
+- Propagate correlation, workspace, actor/key, request, job, provider SID, and idempotency identifiers through traces and structured logs, using hashed/redacted values where sensitive.
+- Never emit message bodies, phone numbers, tokens, provider credentials, API keys, survey answers, or raw contact data into telemetry.
+- Add multi-window burn-rate, dead-letter, stale-schedule, billing variance, callback failure, and backup/restore alerts with owners and runbooks.
+- Instrument app, worker, scheduler, webhook, DB, and provider-client boundaries; verify trace continuity in the review environment before cutover.
 
 #### QA-01 — Coverage gate overstates assurance
 
@@ -607,20 +751,22 @@ Non-strict coverage verifies presence in LCOV rather than a meaningful threshold
 
 #### QA-02 — Hosted CI omits strictness and runtime checks
 
-Hosted CI does not run the effects or new type-safety ratchets, and the primary TypeScript project does not semantically check every server/worker/service/test surface.
+`ci:local` now includes the type-safety and handler/effects checks in the current working tree. The remaining question is hosted-CI parity and whether the TypeScript projects semantically check every server/worker/service/test surface and build both production images.
 
-**Required outcome:** hosted CI and `ci:local` must enforce the same invariants; create explicit TS projects for runtime/test roots and build both production images.
+**Required outcome:** preserve the in-progress `defineAction`/`defineLoader` and type-safety ratchets, make hosted CI enforce the same invariants, close any remaining TS-project root gaps, and build both production images.
 
 #### ARCH-01 — Migration ledger permits duplicate versions
 
 Three active migrations share `20260705000200`, while the checker collapses duplicate versions in a `Map`.
+
+The current checker explicitly grandfathers that historical version. Treat the three filenames as frozen applied history: do not rename them merely to satisfy uniqueness.
 
 **Decision (2026-07-12):** Drizzle migrations are the sole schema authority for Railway Postgres after cutover. `client/migrations` becomes frozen Supabase source history/import support and is never replayed as the target schema history.
 
 **Required outcome**
 
 - Inspect the live Supabase source ledger and retain applied filenames/checksums unchanged; do not rename historical files.
-- Freeze `client/migrations` against new product-schema evolution and make duplicate versions/modifications a hard checker failure.
+- Freeze `client/migrations` against new product-schema evolution, preserve the explicit historical grandfather entry, and make any new duplicate version or modification a hard checker failure.
 - Establish a reviewed Drizzle baseline plus forward migrations for the canonical target schema; `__drizzle_migrations` is authoritative on Railway.
 - Rebuild disposable pre-customer Railway databases from the Drizzle baseline rather than reconciling Supabase migration ledgers into them.
 - The customer cutover imports transformed data into that target schema; it does not replay `client/migrations`.
@@ -710,9 +856,9 @@ Do not launch all implementers simultaneously. Parallelize only work with disjoi
 
 **Purpose:** own API-01 and coordinate the contract slice of every domain PR.
 
-**Inputs:** the Wave 0 user-action inventory, capability registry, `.cursor/skills/hey-api-openapi/SKILL.md`, and existing `app/lib/openapi.ts`.
+**Inputs:** the Wave 0 user-action inventory, capability registry, `.cursor/skills/hey-api-openapi/SKILL.md`, `app/lib/openapi*.ts`, `app/lib/api-surface*.ts`, `scripts/export-openapi-spec.ts`, `openapi-ts.config.ts`, and ADR-0018.
 
-**Output:** `openapi/public-api.yaml`, Hey API configuration/scripts, generated TypeScript/Zod/fetch SDK artifacts, served docs integration, drift checks, contract tests, and a parity ledger keyed by user action and `operationId`.
+**Output:** corrected TypeScript-authored specs and JSON exports, generated TypeScript/Zod/fetch SDK artifacts for the narrow integrator surface, served docs integration, drift checks, compatibility/path matrix, contract tests, and a parity ledger keyed by user action and `operationId`.
 
 **Constraints:** spec first; no handwritten duplicate request/response types; no provider/internal endpoints in the public tag; route and UI adapters share domain services.
 
@@ -728,7 +874,7 @@ Do not launch all implementers simultaneously. Parallelize only work with disjoi
 
 ### Billing and scheduler implementer
 
-**Purpose:** own BILL-01 through BILL-04 and coordinate with ARCH-01.
+**Purpose:** own BILL-01 through BILL-05 and coordinate with ARCH-01.
 
 **Constraints:** no migration rename until deployed ledgers are inspected; no direct credit writes; do not approve a scheduler implementation until the CHS jobqueue decision is recorded.  
 **Output:** scheduler design, catch-up logic, unit-correct reconciliation, migrations, and tests.  
@@ -750,8 +896,11 @@ Do not launch all implementers simultaneously. Parallelize only work with disjoi
 **Required package capabilities**
 
 - Consumer-defined Zod job registry rather than a fixed package-owned product job list.
+- Versioned payload envelopes with explicit parse/migration failure; deployments must remain able to drain jobs produced by the previous app version.
 - Atomic `SKIP LOCKED` claim returning a unique claim token/generation.
 - Heartbeat, complete, fail, and cancel compare-and-set on job ID plus claim token and running status.
+- Transaction-bound enqueue support so domain state and its job become visible atomically.
+- Cooperative cancellation: queued jobs cancel immediately; running jobs record `cancellation_requested`, handlers observe an abort signal/checkpoint, and irreversible provider effects use domain compensation rather than pretending cancellation undid them.
 - Configurable lease duration and stale-claim recovery.
 - `scheduledFor`, priority, max attempts, bounded backoff, result/error/dead-letter metadata.
 - Optional unique idempotency key with a database uniqueness guarantee.
@@ -765,6 +914,8 @@ Do not launch all implementers simultaneously. Parallelize only work with disjoi
 ### Survey and UX implementer
 
 **Purpose:** own SURVEY-01, PRODUCT-01/02, and UX-01/02 after security and state designs stabilize.
+
+**Constraint:** coordinate survey domain/editor changes through the published `@chester-hill-solutions/scriptkit-survey-*` packages required by the migration plan. CallCaster retains route/auth/respondent persistence adapters, not a duplicate survey model.
 
 **Constraints:** use existing design-system primitives and preserve public compatibility where safe.  
 **Output:** end-to-end journey tests, corrected pricing source, permission-driven navigation, accessible mobile/form primitives.  
@@ -839,7 +990,7 @@ If uncertain, say so and explain why. If blocked, stop and report the blocker.
 
 May run in parallel:
 
-- **Repository-state investigator:** capture branch, HEAD, merge-base, all working-tree changes, generated-file baseline, and pre-existing quality failures. Output: a dated state manifest with user-owned changes clearly marked.
+- **Repository-state investigator:** capture branch, HEAD, merge-base, all working-tree changes, generated-file baseline, and pre-existing quality failures. Reconcile every claimed cutover blocker against `docs/migration-delivery-board.md` and the current handler/IVR working tree. Output: a dated state manifest with user-owned changes clearly marked and each delivery-board item mapped to **proved**, **still required**, or **superseded**.
 - **Boundary investigator:** map consumers and legitimate caller identities for `/api/workspace`, predictive dialer, disconnect, inbound verification, invitation, survey, queue, and stored-webhook paths. Output: one trust matrix with route, caller, auth mechanism, tenant derivation, consumers, and compatibility decision.
 - **Migration investigator:** inspect the live Supabase source ledger and every relevant Railway environment read-only. Record source versions/checksums and target Drizzle state without assuming a ledger name. Output: a redacted source-history manifest, target-baseline validation, and cutover import recommendation.
 - **Worker investigator:** inspect deployed worker/cron state, job producers, registered handlers, recurrence rows, and current HTTP cron payloads. Compare the current `@chester-hill-solutions/jobqueue` package with CallCaster requirements. Output: package extension API, producer-handler matrix, migration plan from the local job table/poller, and scheduler architecture decision.
@@ -868,21 +1019,24 @@ Suggested PRs:
 
 **Authorization foundation:** after the package tranche is consumable, implement `SEC-07` in CallCaster: typed product capability registry, session-role resolution through CHS feature permissions, API-key scope storage, and one actor-aware route guard. This precedes every dual-auth programmatic action below.
 
-**Public API foundation:** after the capability registry is stable, implement API-01's YAML contract, Hey API generation, served-spec integration, drift checks, common errors/pagination/idempotency conventions, and migrate the existing campaign/SMS public operations before adding new domain operations.
+**Cutover API foundation:** extend the existing TypeScript → JSON → Hey API pipeline, secure/document the routes required by SEC-01/02/05 and the active integrator surface, and keep current campaign/SMS/chat-SMS contracts compatible. Versioned aliases, keyset pagination, broad SDK growth, and 90-day sunsets are post-cutover API-01 work.
 
-**Canonical membership migration:** atomically replace the unused target Postgres membership schema, update every reader/writer, and modify the Supabase-to-Postgres import transform so customer membership data lands directly in the shared UUID-based role/member/feature schema. Rehearse the full import and verify role/membership parity before cutover.
+**Canonical membership migration:** this is not present in the current `drizzle/0000_baseline.sql`, `app/db/schema.ts`, or `scripts/schema-transform/09-drop-legacy-presence.sql`; treat it as an explicit new cutover blocker, not completed migration work. After the CHS package schema release, update the Drizzle baseline/forward migration, every reader/writer, E2E seeds, and the Supabase-to-Postgres transform so customer membership/invitation data lands directly in the shared UUID-based role/member/feature schema. Rehearse clean install and full import, then verify per-workspace/user/role parity before cutover.
+
+**Audit foundation:** implement AUDIT-01 before merging trust-root, key, invitation, retention, recording, or support mutations that depend on it.
 
 1. `SEC-01`: secret-free workspace API with strict role/schema.
 2. `SEC-02`: predictive-dialer caller authentication and tenant derivation.
 3. `SEC-05`: disconnect deletion or authenticated workspace ownership.
 4. `SEC-06`: signed inbound phone verification.
+4a. `SEC-08`: imported identity/session cutover and mandatory owner/admin MFA re-enrollment.
 5. `SEC-03`: invite binding and transactional consumption.
 6. `DATA-01`: mandatory queue tenancy.
-7. `SEC-04`: safe production webhook delivery.
+7. `SEC-04a`: enforce safe fetch or disable stored production delivery; defer durable retry/signing/history to Wave 3.
 
 Parallelism:
 
-- SEC-01, SEC-03, and SEC-04 are largely independent after their Wave 0 decisions.
+- SEC-01, SEC-03, and SEC-04a are largely independent after their Wave 0 decisions.
 - SEC-02, SEC-05, and SEC-06 have distinct caller identities and should remain separate even if one reviewer owns all three.
 - DATA-01 should not overlap with telephony queue-state changes in Wave 2.
 
@@ -893,7 +1047,10 @@ Parallelism:
 - No response snapshot contains provider credentials.
 - Every telephony control path has an explicit trust classification.
 - SSRF tests cover private addresses, metadata, redirects, DNS changes, timeouts, and unsafe headers.
-- Generated API artifacts match `openapi/public-api.yaml`, and the migrated existing public operations pass SDK contract tests.
+- No enabled stored-webhook path can reach the raw-fetch implementation.
+- `tools:api:surface:check`, OpenAPI export/codegen drift checks, and SDK contract tests pass for the existing integrator surface plus cutover-critical operations.
+- Imported owner/admin users cannot enter a workspace or perform trust-root actions until new Better Auth MFA enrollment completes.
+- Every privileged mutation emits a redacted append-only audit event, and cross-workspace/support access tests prove the owner-visible boundary.
 
 ### Wave 2 — Restore telephony and money integrity
 
@@ -901,7 +1058,7 @@ Suggested PRs:
 
 **Shared jobqueue tranche:** extend, test, and publish `@chester-hill-solutions/jobqueue` with the approved fencing, scheduling, idempotency, recurrence, and typed-registry APIs.
 
-**Worker foundation:** install the published package, migrate the job schema, replace/delete the local poller (`ASYNC-02`), and prove stale-worker rejection before billing schedules or provider-effect jobs depend on it.
+**Worker foundation:** install the published package, migrate the job schema and each implemented local handler, deploy/health-check `callcaster-worker` on Railway review, and prove stale-worker rejection before billing schedules or provider-effect jobs depend on it. Delete the local poller only after producer/handler/state parity is demonstrated; do not discard the existing open-sync, billing, compliance, and webhook-audit handlers.
 
 8. `TEL-01`: monotonic call-state transition module and replay tests.
 9. `TEL-05`: monotonic message-state transition module and replay tests.
@@ -911,6 +1068,7 @@ Suggested PRs:
 13. `BILL-01` + `BILL-02`: durable per-workspace scheduling and rental catch-up.
 14. `BILL-03`: unit-correct reconciliation.
 14a. `BILL-04`: durable reserve-first number-purchase saga and recovery.
+14b. `BILL-05`: prepaid SMS and bounded voice credit reservations/settlement.
 
 Dependencies:
 
@@ -927,6 +1085,7 @@ Dependencies:
 - One delayed scheduler run catches up all due rental cycles once.
 - Reconciliation fixtures report zero variance for valid multi-unit usage.
 - Number-purchase crash-point tests converge to one paid active number or one idempotent refund.
+- Concurrent SMS/call starts cannot allocate the same credits; final settlement releases unused holds and stays within the documented voice exposure bound.
 - A stale worker cannot heartbeat, complete, fail, or cancel a reclaimed job.
 
 ### Wave 3 — Make asynchronous work durable
@@ -936,13 +1095,14 @@ Suggested PRs:
 16. `ASYNC-01`: outbound-message intent, explicit unknown-outcome state, and worker dispatch.
 17. `ASYNC-03a`: campaign export handler.
 18. `ASYNC-03b`: audience upload handler and resumable/idempotent chunks.
-19. `ASYNC-03c`: signed webhook-delivery handler with retries/dead letters.
+19. `SEC-04b` + `ASYNC-03c`: signed safe webhook-delivery handler with retries, history, and dead letters.
 20. `ASYNC-04`: implement automated message/robocall campaign dispatch with per-contact durable child jobs; exclude predictive/manual campaigns.
+20a. `DATA-02`: retention policy schema, deletion/tombstone jobs, object/database purge, legal holds, and restore behavior.
 
 Dependencies:
 
 - Wave 2's published jobqueue adoption and `ASYNC-02` precede every worker-backed feature.
-- SEC-04 safe delivery precedes webhook retries.
+- SEC-04a safe-delivery enforcement precedes SEC-04b/ASYNC-03c retries.
 - Upload field allowlisting and size limits belong in PR 18.
 
 **Gate W3**
@@ -952,6 +1112,7 @@ Dependencies:
 - Restart tests leave no permanently processing export/upload.
 - A confirmed SMS attempt cannot be redispatched for the same client request; ambiguous provider outcomes are quarantined and surfaced rather than automatically resent.
 - Webhook recipients can verify signatures and inspect delivery history.
+- Retention dry-runs and deletion jobs prove tenant-safe database/object cleanup, legal-hold preservation, and no resurrection after a restore rehearsal.
 
 ### Wave 4 — Repair journeys and UX
 
@@ -961,7 +1122,9 @@ Suggested PRs:
 22. `PRODUCT-01`: shared permission matrix and role-driven navigation.
 23. `PRODUCT-02`: canonical pricing presentation.
 24. `UX-01` + `UX-02`: mobile navigation and form accessibility.
-25. `UX-03`: campaign return context and actionable empty states; separately decide Calls versus Handset.
+25. `UX-03`: campaign return context, actionable empty states, Call History cleanup, and Handset as the sole live agent destination.
+25a. `COMPLIANCE-01`: recording/monitoring attestation, warnings, audit trail, and configurable announcement tooling.
+25b. `COMPLIANCE-02`: data-flow/subprocessor register, region verification, and customer disclosures.
 
 **Gate W4**
 
@@ -970,6 +1133,8 @@ Suggested PRs:
 - Public and billing prices are rendered from one canonical source.
 - Keyboard tests cover opening, traversing, closing, and restoring focus for mobile navigation.
 - Error descriptions are programmatically associated with invalid controls.
+- Recording/monitoring settings require current attestation, and published residency/subprocessor disclosures match verified infrastructure.
+- Recording/monitoring cannot be enabled without current admin attestation, and supervisor actions are owner-visible in audit history.
 
 ### Wave 5 — Ratchet assurance and architecture
 
@@ -980,6 +1145,7 @@ Suggested PRs:
 28. `ARCH-02`: deepen one proven module seam at a time.
 29. `DOC-01`: current-state documentation reconciliation, including the completed ARCH-01 evidence and repair.
 30. `OPS-01`: PITR configuration, restore runbook, and production-shaped isolated restore rehearsal.
+31. `OPS-02`: OpenTelemetry/Grafana Cloud instrumentation, dashboards, SLOs, alerts, and runbooks.
 
 **Gate W5**
 
@@ -991,6 +1157,7 @@ Suggested PRs:
 - Active docs agree on runtime, worker, migration, route, and package status.
 - The parity ledger has no unimplemented in-scope action and no undocumented exception.
 - A dated isolated restore rehearsal meets RPO ≤5 minutes and RTO ≤60 minutes with integrity and app smoke evidence.
+- Review-environment traces cross request/job/provider boundaries, dashboards calculate the agreed SLIs, and synthetic alert tests reach the assigned owner.
 
 ## 10. Verification matrix
 
@@ -1063,20 +1230,27 @@ A finding is complete only when:
 
 Record these decisions in the PR or an ADR before dependent work proceeds:
 
-- **Resolved:** predictive dialer start is `POST /api/v1/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` with dual auth. Sessions require `caller+` and act as themselves; API keys provide a verified `caller+` workspace member as `agentUserId`. Both legacy auto-dial endpoints are deleted, while next-turn remains internal-only.
-- **Resolved:** replace `/api/disconnect` with workspace-scoped dual-auth call control at `POST /api/v1/workspaces/:workspaceId/calls/:callSid/disconnect`. Any `caller+` session or API key with the call-control capability may control any call in that workspace.
-- **Resolved:** hard-delete `/api/workspace`; replace it with secret-free `GET/PATCH /api/v1/workspaces/:workspaceId`. Session mutation requires `admin` or `owner`; API-key authority follows the cross-cutting API-key policy.
+- **Deferred by decision (2026-07-13):** encrypted per-workspace credential vault work is outside this remediation. Do not adopt `@chester-hill-solutions/vault` as currently implemented: its key derivation imports but does not incorporate the master secret, and its Postgres upsert target lacks a declared unique constraint. SEC-01 must still remove credentials from API responses/logs and preserve least-privilege database/backup access, but provider credentials remaining under the current at-rest model are an explicit residual risk and require a separate security-reviewed project.
+- **Adjusted:** predictive dialer start is `POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` at cutover, with a post-cutover `/api/v1` alias. Sessions require `caller+` and act as themselves; API keys provide a verified `caller+` workspace member as `agentUserId`. Both legacy auto-dial endpoints are deleted, while next-turn remains internal-only.
+- **Adjusted:** replace `/api/disconnect` with workspace-scoped dual-auth call control at `POST /api/workspaces/:workspaceId/calls/:callSid/disconnect`; a `/api/v1` alias follows post-cutover. Any `caller+` session or API key with the call-control capability may control any call in that workspace.
+- **Adjusted:** hard-delete `/api/workspace`; finish the existing secret-free `GET/PATCH /api/workspaces/:workspaceId` route and its data-plane dual-auth boundary. Session mutation requires `admin` or `owner`; API-key authority follows the cross-cutting API-key policy.
 - **Resolved:** sessions and workspace API keys share stable, deny-by-default capability IDs. CHS role/feature permissions resolve session capabilities; CallCaster keys store explicit capability allowlists.
 - **Resolved:** capability granularity is resource-operation level, independent of HTTP route layout.
 - **Resolved:** CallCaster uses fixed seeded owner/admin/member/caller capability templates for cutover; custom roles and workspace overrides are deferred.
 - **Resolved:** existing unscoped keys receive only the legacy campaign-create/SMS capability set; new programmatic powers require explicit grant or reissue.
 - **Resolved:** API keys expire by default after 90 days and may not exceed one year.
 - **Resolved:** API-key capability sets are immutable; changing scopes requires key replacement.
-- **Resolved:** programmatic parity excludes trust-root actions. Identity, 2FA, ownership transfer, provider-secret changes, workspace deletion, and API-key lifecycle remain owner-session operations with step-up authentication.
-- **Resolved:** public product APIs are contract-first from `openapi/public-api.yaml`; Hey API generates TypeScript, Zod, and fetch SDK artifacts, and CI rejects drift.
-- **Resolved:** canonical integrator operations use `/api/v1/...`; v1 evolves compatibly and breaking changes require a new URL major.
-- **Resolved:** existing campaign-create/SMS API routes receive a 90-day measured deprecation window before removal.
+- **Resolved:** programmatic parity excludes trust-root actions. Identity, 2FA, ownership transfer, provider-secret changes, and API-key lifecycle remain owner-session operations; admins or owners may initiate staged workspace deletion. All require step-up and none allow API keys.
+- **Adjusted:** extend the current TypeScript-authored OpenAPI pipeline; JSON exports feed served docs and the narrow `integrator-api.json` Hey API SDK, and CI rejects drift.
+- **Adjusted:** existing unversioned APIs remain stable through cutover. `/api/v1/...` aliases and any ADR-0018 supersession are post-cutover work; breaking changes require a new URL major.
+- **Resolved:** existing campaign-create/SMS/chat-SMS API routes receive a 90-day measured deprecation window after versioned replacements ship.
+- **Resolved:** externally effective API creates require idempotency records retained for seven days; changed-payload key reuse returns `409`.
+- **Resolved:** new `/api/v1` collections use opaque keyset cursors, default 50 and maximum 100 items; unversioned collections retain offset pagination until sunset.
+- **Resolved:** API rate limits are operation-tiered and enforced per actor/key plus workspace aggregate, with provider throughput as an additional bound.
+- **Resolved:** distributed API rate limits use atomic Postgres buckets initially; in-memory enforcement is not authoritative.
 - **Resolved:** trust-root step-up is session-bound recent password re-auth plus 2FA when required, valid for 10 minutes.
+- **Resolved:** Supabase MFA secrets are not migrated; sessions invalidate and imported owner/admin users must re-enroll in Better Auth before workspace access.
+- **Resolved:** MFA recovery without a factor/code requires platform-support identity verification, dual control, 24-hour delay, and owner notifications.
 - **Resolved:** workspace invitations are email-first, hashed-token Better Auth magic links modeled on Quick Canvass, with explicit expiry and atomic single-use redemption bound to the authenticated verified email.
 - **Resolved:** invitation grants are strictly downward: admin→member/caller, member→caller; API keys also require an explicit assign-role capability, and ownership is never invitational.
 - **Resolved:** `member` is a content/data collaborator; campaign dispatch, peer administration, bulk export, and workspace/provider/billing configuration begin at admin.
@@ -1091,56 +1265,72 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - **Resolved:** `campaign_dispatch` owns automated message/robocall campaigns only; predictive/manual calling remains agent-driven.
 - **Resolved:** surveys support explicit anonymous and contact-bound modes; only a signed contact-bound token may associate a response with a contact.
 - **Resolved:** respondent links expire at survey close, capped at 90 days; completed responses are read-only unless explicitly reopened and reissued.
+- **Resolved:** anonymous survey abuse controls use adaptive Turnstile plus shared rate limits/honeypots; contact-bound links normally avoid challenge friction.
+- **Resolved:** use the balanced category-specific retention profile in DATA-02, automatic deletion, admin-configurable periods, and legal-hold override.
+- **Resolved:** admins may change retention and initiate staged deletion with step-up; owners are notified and may cancel during 30 days; API keys are read-only for retention policy.
+- **Resolved:** recording/monitoring compliance remains customer-owned, but explicit admin attestation, persistent warnings, configuration tooling, and audit logs are mandatory.
+- **Resolved:** there is no Canada-only residency promise; processor regions/transfers are documented, minimized, contractually disclosed, and verified.
+- **Resolved:** workspace audit trails are owner-visible and available to API keys with `audit.read`; platform-support access is reason-coded and owner-visible.
 - **Resolved:** CHS workspace auth uses UUID workspace/user foreign keys; CallCaster migrates to the canonical role/member/feature tables rather than keeping a legacy membership adapter.
 - **Resolved:** membership-schema replacement is atomic on the not-yet-customer-facing Postgres target and ships as part of the Supabase cutover; no long-lived dual-write or compatibility view.
 - **Resolved:** the production traffic switch is the authority boundary; Supabase is rollback only before the switch and read-only afterward, while post-switch recovery stays on Postgres.
 - **Resolved:** retain the frozen Supabase source read-only for 90 days after cutover, then export required audit records and destroy it after sign-off.
+- **Resolved:** post-cutover schema and app/worker changes use expand-contract compatibility; atomic replacement is limited to the unused pre-customer target.
+- **Resolved:** cutover stops new effects, drains active voice, migrates unresolved durable work, repoints callbacks, and reconciles on Postgres before dispatch resumes.
+- **Resolved:** cutover is a directly coordinated, low-traffic migration with one accountable owner, automated/parity gates, a recorded go/no-go decision, and a target window under two hours.
 - **Resolved:** Drizzle migrations are the sole Railway/Postgres schema authority; Supabase `client/migrations` is frozen source history and is not replayed on the target.
 - **Resolved:** coverage uses a truthful all-runtime baseline ratchet plus changed-file coverage; thresholds may only rise.
 - **Resolved:** Call History is historical/reporting only; Handset is the sole live inbound/agent destination.
 - **Resolved:** campaign dependency creation uses a persisted draft plus validated return context, then resumes the same setup step with the new resource selected.
 - **Resolved:** pricing displays both credits and CAD equivalents from one shared rate card with explicit segment, started-minute, and rental semantics.
 - **Resolved:** production database recovery targets are RPO ≤5 minutes and RTO ≤60 minutes with PITR and quarterly isolated restore tests.
+- **Resolved:** the same recovery commitment covers non-regenerable customer objects; generated exports, quarantine, caches, and reproducible derivatives are not backed up.
+- **Resolved:** app/API availability target is 99.9% monthly; OpenTelemetry exports metrics/traces/logs via OTLP to Grafana Cloud with burn-rate alerts.
 - **Resolved:** the dedicated Bun worker using CHS jobqueue is the sole durable background executor; web requests enqueue work and do not launch unawaited product effects.
 - **Resolved:** global schedules enqueue durable coordinator occurrences, which fan out idempotent per-workspace jobs.
 - **Resolved:** SMS promises durable submission and at most one automatic provider attempt per intent, with ambiguous outcomes quarantined; outbound webhooks are at-least-once.
 - **Resolved:** seven-day grace, then suspension, then automatic provider release after 30 unpaid days with owner/admin warnings; payment before release restores service.
 - **Resolved:** phone-number purchases reserve/debit credits before provider provisioning and use an idempotent refund compensation on failure.
+- **Resolved:** SMS/MMS requires exact estimated reservation; voice reserves the first minute and receives a concurrency-aware bounded duration budget before dialing.
 - **Resolved:** call statuses use provider sequence ordering when available; without it, first terminal wins and conflicts go to reconciliation.
 - **Resolved:** call/message reducers enforce the canonical forward state machines in TEL-01/TEL-05; provider sequence wins, otherwise rank plus first-terminal conflict handling applies.
+- **Resolved:** ambiguous call creation is reconciled and quarantined without automatic redial; durable intent/callback correlation recovers known provider calls.
 - **Resolved:** SMS submission creates a durable resource synchronously (`201` new, `200` idempotent replay); provider delivery proceeds asynchronously.
 - **Resolved:** ambiguous SMS provider outcomes receive bounded reconciliation, never automatic resend; an explicit warned user action may create a new message.
 - **Resolved:** outbound webhooks are signed, at-least-once, and retried at most eight times over 24 hours; redirects are rejected and `410` disables the endpoint.
 - **Resolved:** outbound webhook destinations are public HTTPS only with delivery-time DNS/IP validation and rebinding protection.
+- **Resolved:** uploads use private quarantine and fail-closed ClamAV scanning on Railway before normalized output is promoted.
 
 ## 13. Progress tracker
 
 ### Wave 0
 
-- [ ] Revalidate repository and existing failures
-- [ ] Map endpoint consumers and trust models
-- [ ] Inventory every user action in the API parity ledger
-- [ ] Identify migration authority in each environment
-- [ ] Inspect deployed migration ledgers
-- [ ] ARCH-01 duplicate-version guard and forward-only repair
-- [ ] Approve CHS jobqueue extension API and release sequence
-- [ ] Approve CHS auth/auth-postgres/auth-react-router extension APIs and release sequence
-- [ ] Inspect worker and cron deployment state
-- [ ] Classify every registered job type as implement or remove
-- [ ] Establish dirty-tree-safe verification baseline
+- [x] Revalidate repository and existing failures — [`wave0-state-manifest-2026-07-13.md`](./wave0-state-manifest-2026-07-13.md), [`wave0-quality-baseline-2026-07-13.md`](./wave0-quality-baseline-2026-07-13.md)
+- [x] Map endpoint consumers and trust models — [`wave0-trust-matrix-2026-07-13.md`](./wave0-trust-matrix-2026-07-13.md)
+- [x] Inventory every user action in the API parity ledger — [`wave0-api-parity-ledger-2026-07-13.md`](./wave0-api-parity-ledger-2026-07-13.md)
+- [x] Identify migration authority in each environment — [`wave0-migration-manifest-2026-07-13.md`](./wave0-migration-manifest-2026-07-13.md) (live DB compare pending `DATABASE_URL`)
+- [ ] Inspect deployed migration ledgers — repo inventory done; review PG18 query not run this session
+- [ ] ARCH-01 duplicate-version guard and forward-only repair — grandfather guard exists; three `20260705000200` files remain; forward repair pending deployed ledger inspection
+- [ ] Approve CHS jobqueue extension API and release sequence — proposal in [`wave0-worker-matrix-2026-07-13.md`](./wave0-worker-matrix-2026-07-13.md); **owner approval pending**
+- [ ] Approve CHS auth/auth-postgres/auth-react-router extension APIs and release sequence — proposal in [`wave0-auth-gap-analysis-2026-07-13.md`](./wave0-auth-gap-analysis-2026-07-13.md); **owner approval pending**
+- [x] Inspect worker and cron deployment state — worker matrix documents HTTP cron NULL regression; Railway worker image status per delivery board
+- [x] Classify every registered job type as implement or remove — 10/10 in worker matrix
+- [x] Establish dirty-tree-safe verification baseline — quality baseline doc; user WIP preserved
 
 ### Wave 1
 
 - [ ] Publish/adopt CHS auth package extensions
 - [ ] SEC-07 shared capability authorization
-- [ ] API-01 OpenAPI YAML + Hey API foundation
+- [ ] API-01 existing OpenAPI/Hey API cutover foundation
+- [ ] AUDIT-01 immutable workspace audit foundation
 - [ ] SEC-01 workspace secret boundary
 - [ ] SEC-02 predictive dialer auth
 - [ ] SEC-03 invite binding
 - [ ] DATA-01 queue tenancy
-- [ ] SEC-04 safe stored webhook delivery
+- [ ] SEC-04a safe/disabled stored webhook boundary
 - [ ] SEC-05 disconnect auth/removal
 - [ ] SEC-06 inbound verification signature
+- [ ] SEC-08 auth cutover and MFA re-enrollment
 
 ### Wave 2
 
@@ -1155,12 +1345,14 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [ ] BILL-02 rental catch-up
 - [ ] BILL-03 reconciliation units
 - [ ] BILL-04 reserve-first number purchase
+- [ ] BILL-05 prepaid provider reservations
 
 ### Wave 3
 
 - [ ] ASYNC-01 durable SMS intent
 - [ ] ASYNC-03 export/upload/webhook handlers
 - [ ] ASYNC-04 automated campaign dispatch
+- [ ] DATA-02 retention and deletion lifecycle
 
 ### Wave 4
 
@@ -1170,6 +1362,8 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [ ] UX-01 mobile navigation
 - [ ] UX-02 form accessibility
 - [ ] UX-03 journey dead ends and agent surfaces
+- [ ] COMPLIANCE-01 recording/monitoring controls
+- [ ] COMPLIANCE-02 residency/subprocessor disclosures
 
 ### Wave 5
 
@@ -1179,6 +1373,7 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [ ] ARCH-02 module deepening
 - [ ] DOC-01 current-state docs
 - [ ] OPS-01 PITR and restore rehearsal
+- [ ] OPS-02 telemetry, SLOs, and alerts
 
 ## 14. Final orchestration handoff
 

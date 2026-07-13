@@ -10,9 +10,13 @@ import {
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+function requireDataPlaneUser({
+  params,
+  context,
+}: LoaderFunctionArgs | ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
@@ -22,70 +26,72 @@ export async function loader({ request, params, context }: LoaderFunctionArgs) {
     return jsonError("Unauthorized", 401);
   }
 
-
-  const result = await listWorkspaceApiKeys(    userId,
-    workspaceId,
-  );
-
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse({ keys: result.keys }, 200);
+  return { userId, workspaceId };
 }
 
-export async function action({ request, params, context }: ActionFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
-
-  if (request.method === "POST") {
-    const parsed = await parseJsonBodyOrResponse(request, createApiKeyBodySchema);
-    if (parsed instanceof Response) return parsed;
-
-    const result = await createWorkspaceApiKey(
-      userId,
-      workspaceId,
-      parsed.name,
+export const loader = defineLoader({
+  auth: requireDataPlaneUser,
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const result = await listWorkspaceApiKeys(    auth.userId,
+      auth.workspaceId,
     );
 
     if (!result.ok) {
       return jsonError(result.error, result.status);
     }
 
-    return jsonResponse(
-      {
-        key: result.key,
-        id: result.api_key.id,
-        name: result.api_key.name,
-        key_prefix: result.api_key.key_prefix,
-        created_at: result.api_key.created_at,
-      },
-      201,
-    );
-  }
+    return jsonResponse({ keys: result.keys }, 200);
+  },
+});
 
-  if (request.method === "DELETE") {
-    const parsed = await parseJsonBodyOrResponse(request, deleteApiKeyBodySchema);
-    if (parsed instanceof Response) return parsed;
+export const action = defineAction({
+  auth: requireDataPlaneUser,
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+    if (request.method === "POST") {
+      const parsed = await parseJsonBodyOrResponse(request, createApiKeyBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-    const result = await deleteWorkspaceApiKey(
-      userId,
-      workspaceId,
-      parsed.id,
-    );
+      const result = await createWorkspaceApiKey(
+        auth.userId,
+        auth.workspaceId,
+        parsed.name,
+      );
 
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse(
+        {
+          key: result.key,
+          id: result.api_key.id,
+          name: result.api_key.name,
+          key_prefix: result.api_key.key_prefix,
+          created_at: result.api_key.created_at,
+        },
+        201,
+      );
     }
 
-    return jsonResponse({ success: true }, 200);
-  }
+    if (request.method === "DELETE") {
+      const parsed = await parseJsonBodyOrResponse(request, deleteApiKeyBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-  return jsonError("Method not allowed", 405);
-}
+      const result = await deleteWorkspaceApiKey(
+        auth.userId,
+        auth.workspaceId,
+        parsed.id,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ success: true }, 200);
+    }
+
+    return jsonError("Method not allowed", 405);
+  },
+});

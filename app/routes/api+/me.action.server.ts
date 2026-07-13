@@ -12,30 +12,33 @@ import {
   listPendingInvites,
   updateMeProfile,
 } from "@/lib/platform-auth.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export const loader = defineLoader({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const profile = await getMeProfile(    auth.user.id,
+    );
+    return jsonResponse(profile, 200);
+  },
+});
 
-  const profile = await getMeProfile(    auth.user.id,
-  );
-  return jsonResponse(profile, 200);
-}
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request }) => {
+    if (request.method === "PATCH") {
+      const parsed = await parseJsonBodyOrResponse(request, updateMeBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-export async function action({ request }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  if (request.method === "PATCH") {
-    const parsed = await parseJsonBodyOrResponse(request, updateMeBodySchema);
-    if (parsed instanceof Response) return parsed;
-
-    const result = await updateMeProfile(request, parsed);
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      const result = await updateMeProfile(request, parsed);
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+      return jsonResponse({ user: result.data }, 200);
     }
-    return jsonResponse({ user: result.data }, 200);
-  }
 
-  return jsonError("Method not allowed", 405);
-}
+    return jsonError("Method not allowed", 405);
+  },
+});

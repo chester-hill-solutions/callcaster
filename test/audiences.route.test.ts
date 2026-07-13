@@ -237,12 +237,14 @@ describe("api.audiences route", () => {
     expect(await resEmpty.text()).toContain("\r\n");
 
     contactAudienceMocks.listAudienceContactsForExport.mockRejectedValueOnce(new Error("q"));
-    await expect(
-      mod.loader({
-        request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
-        deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-      } as any),
-    ).rejects.toBeTruthy();
+    // The handler factory maps rethrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const resErr = await asRouteResponse(await mod.loader({
+      request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
+      deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
+    } as any));
+    expect(resErr.status).toBe(500);
+    await expect(resErr.json()).resolves.toMatchObject({ error: "q" });
   }, 30000);
 
   test("resolveDeps fallbacks are covered via module mocks", async () => {
@@ -293,12 +295,14 @@ describe("api.audiences route", () => {
     expect(contactAudienceMocks.listAudienceContactsJson).toHaveBeenLastCalledWith(12);
 
     contactAudienceMocks.listAudienceContactsJson.mockRejectedValueOnce(new Error("q"));
-    await expect(
-      mod.loader({
-        request: new Request("http://localhost/api/audiences?workspaceId=w1"),
-        deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-      } as any),
-    ).rejects.toBeTruthy();
+    // The handler factory maps rethrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const resErr = await asRouteResponse(await mod.loader({
+      request: new Request("http://localhost/api/audiences?workspaceId=w1"),
+      deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
+    } as any));
+    expect(resErr.status).toBe(500);
+    await expect(resErr.json()).resolves.toMatchObject({ error: "q" });
   }, 30000);
 });
 

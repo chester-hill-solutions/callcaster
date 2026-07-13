@@ -2,11 +2,11 @@ import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campa
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignatureForIvrBlock } from "@/lib/ivr-webhook-auth.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -106,28 +106,19 @@ const handleBlock = async (
   handleOptions(twiml, block, campaignId, pageId, blockId, script, baseUrl);
 };
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrBlock(request, [params.campaignId, params.pageId, params.blockId]),
+  sideEffects: ["db-read", "external"],
+  handler: async ({ params, auth }) => {
 
   const baseUrl = env.BASE_URL();
 
   const twiml = new Twilio.twiml.VoiceResponse();
 
   const { pageId, blockId, campaignId } = params as { pageId: string; blockId: string; campaignId: string };
-  
-  if (!campaignId || !pageId || !blockId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
 
-  const formData = await request.formData();
-  const formParams = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const callSid = formParams.CallSid ?? null;
-
-  if (!callSid) {
-    return new Response("Missing CallSid parameter", { status: 400 });
-  }
-
-  const forbidden = await requireTwilioSignature(request, { callSid });
-  if (forbidden) return forbidden;
+  const { callSid } = auth;
 
   try {
     const call = await findCallBySid(callSid);
@@ -177,4 +168,5 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "application/xml" },
   });
-}
+  },
+});

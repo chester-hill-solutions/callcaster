@@ -37,6 +37,7 @@ import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup
 import { createTenantDb } from "@/server/tenant-db";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { defineAction } from "@/lib/handler.server";
 
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
 const OPTED_OUT_SMS_DEQUEUED_REASON = "Contact opted out";
@@ -192,15 +193,19 @@ const createOutreachAttempt = async ({
   }
 };
 
-export const action = async ({ request }: { request: Request }) => {
-
-  const authResult = await verifyApiKeyOrSession(request);
-  if ("error" in authResult) {
-    return new Response(JSON.stringify({ error: authResult.error }), {
-      headers: { "Content-Type": "application/json" },
-      status: authResult.status,
-    });
-  }
+export const action = defineAction({
+  auth: async ({ request }: { request: Request }) => {
+    const authResult = await verifyApiKeyOrSession(request);
+    if ("error" in authResult) {
+      return new Response(JSON.stringify({ error: authResult.error }), {
+        headers: { "Content-Type": "application/json" },
+        status: authResult.status,
+      });
+    }
+    return authResult;
+  },
+  sideEffects: ["db-write", "credit", "twilio"],
+  handler: async ({ request, auth: authResult }) => {
 
   try {
     const parsed = await parseJsonBodyOrResponse(
@@ -448,4 +453,5 @@ export const action = async ({ request }: { request: Request }) => {
       }
     );
   }
-}
+  },
+});

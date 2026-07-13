@@ -1,39 +1,43 @@
 import { data as routeData } from "react-router";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { createErrorResponse } from "@/lib/errors.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, url}: LoaderFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const workspace = url.searchParams.get("workspace") ?? "";
-  const clientIdentity = url.searchParams.get("client_identity") ?? "";
+export const loader = defineLoader({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-read"],
+  handler: async ({ url, auth }) => {
+    const workspace = url.searchParams.get("workspace") ?? "";
+    const clientIdentity = url.searchParams.get("client_identity") ?? "";
 
-  if (!workspace || !clientIdentity) {
-    return routeData(
-      { error: "workspace and client_identity are required" },
-      { status: 400 },
-    );
-  }
-
-  try {    await requireWorkspaceAccess({ user: auth.user,
-      workspaceId: workspace,
-    });
-
-    const result = await createHandsetAccessToken({ workspaceId: workspace,
-      clientIdentity,
-    });
-
-    if (result.error) {
-      const status = result.error === "Workspace not found" ? 404 : 400;
-      return routeData({ error: result.error }, { status });
+    if (!workspace || !clientIdentity) {
+      return routeData(
+        { error: "workspace and client_identity are required" },
+        { status: 400 },
+      );
     }
 
-    return routeData({ token: result.token });
-  } catch (error) {
-    return createErrorResponse(error, "Failed to generate handset token");
-  }
-};
+    try {
+      await requireWorkspaceAccess({
+        user: auth.user,
+        workspaceId: workspace,
+      });
+
+      const result = await createHandsetAccessToken({
+        workspaceId: workspace,
+        clientIdentity,
+      });
+
+      if (result.error) {
+        const status = result.error === "Workspace not found" ? 404 : 400;
+        return routeData({ error: result.error }, { status });
+      }
+
+      return routeData({ token: result.token });
+    } catch (error) {
+      return createErrorResponse(error, "Failed to generate handset token");
+    }
+  },
+});

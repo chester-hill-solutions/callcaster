@@ -59,15 +59,19 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "Invalid campaign_id" });
   }, 30000);
 
-  test("throws when rpc errors", async () => {
+  test("returns a mapped 500 when rpc errors", async () => {
     mocks.rpcResetCampaign.mockRejectedValueOnce({ message: "bad" });
     queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
-    await expect(
-      mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any),
-    ).rejects.toEqual({ message: "bad" });
+    // The handler factory maps rethrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST", body: fd }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "bad" });
     expect(mocks.logger.error).toHaveBeenCalledWith("Error resetting campaign:", { message: "bad" });
   }, 30000);
 

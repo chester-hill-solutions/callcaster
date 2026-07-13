@@ -13,6 +13,7 @@ import {
   loadContactById,
   saveSurveyAnswer,
 } from "@/lib/survey-db.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
 const SURVEY_RATE_LIMIT = { limit: 10, windowMs: 60_000 };
@@ -114,10 +115,13 @@ async function handleSaveAnswer(request: Request) {
   });
 }
 
-export async function action({ request, url}: ActionFunctionArgs) {
-  if (request.method === "POST") {
-    return handleSaveAnswer(request);
-  }
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({ request }: ActionFunctionArgs) => {
+    if (request.method === "POST") {
+      return handleSaveAnswer(request);
+    }
 
-  return routeData({ error: "Method not allowed" }, { status: 405 });
-}
+    return routeData({ error: "Method not allowed" }, { status: 405 });
+  },
+});

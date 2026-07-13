@@ -9,8 +9,7 @@ import { getQueuedContactIdsForCampaign } from "@/lib/campaign-queue-db.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
 export async function searchContactsLoader(request: Request) {
   const auth = await requireDualAuth(request);
@@ -49,4 +48,7 @@ export async function searchContactsLoader(request: Request) {
   }
 }
 
-export const loader = async ({ request, url}: LoaderFunctionArgs) => searchContactsLoader(request);
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: ({ request }) => searchContactsLoader(request),
+});

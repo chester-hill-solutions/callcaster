@@ -3,27 +3,39 @@ import {
   listWorkspaceConversationsApi,
 } from "@/lib/platform-data.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
+function requireWorkspaceDataPlane({
+  params,
+  context,
+}: Pick<LoaderFunctionArgs, "params" | "context">) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
   getDataPlaneRouteContext(context, workspaceId);
-  const result = await listWorkspaceConversationsApi(
-    workspaceId,
-    url.searchParams,
-  );
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse(
-    {
-      conversations: result.conversations,
-      pagination: result.pagination,
-    },
-    200,
-  );
+  return { workspaceId };
 }
+
+export const loader = defineLoader({
+  auth: requireWorkspaceDataPlane,
+  sideEffects: ["db-read"],
+  handler: async ({ auth, url }) => {
+    const result = await listWorkspaceConversationsApi(
+      auth.workspaceId,
+      url.searchParams,
+    );
+    if (!result.ok) {
+      return jsonError(result.error, result.status);
+    }
+
+    return jsonResponse(
+      {
+        conversations: result.conversations,
+        pagination: result.pagination,
+      },
+      200,
+    );
+  },
+});

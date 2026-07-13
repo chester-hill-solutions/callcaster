@@ -1,6 +1,6 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { isSignupOpen } from "@/lib/env.server";
 import { jsonError } from "@/lib/platform-api.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 import { auth } from "@/server/auth-instance";
 
 function isBetterAuthSignUpPath(url: URL): boolean {
@@ -14,10 +14,12 @@ async function handleAuthRequest(request: Request, url: URL) {
   return auth.handler(request);
 }
 
-export async function loader({ request, url }: LoaderFunctionArgs) {
-  return handleAuthRequest(request, url);
-}
+export const loader = defineLoader({
+  sideEffects: ["db-write", "external"],
+  handler: ({ request, url }) => handleAuthRequest(request, url),
+});
 
-export async function action({ request, url }: ActionFunctionArgs) {
-  return handleAuthRequest(request, url);
-}
+export const action = defineAction({
+  sideEffects: ["db-write", "external"],
+  handler: ({ request, url }) => handleAuthRequest(request, url),
+});

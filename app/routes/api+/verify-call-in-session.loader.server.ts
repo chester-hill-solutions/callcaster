@@ -1,16 +1,17 @@
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { getSession } from "@/lib/auth.server";
 import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { insertVerificationSession } from "@/lib/verification-db.server";
+import { defineLoader } from "@/lib/handler.server";
 
 const SESSION_EXPIRY_MINUTES = 10;
 
-export const loader = async ({ request, url }: LoaderFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export const loader = defineLoader({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, url, auth }) => {
   const { headers } = await getSession(request);
   const user = auth.user;
 
@@ -62,4 +63,5 @@ export const loader = async ({ request, url }: LoaderFunctionArgs) => {
       { status: 500 },
     );
   }
-};
+  },
+});

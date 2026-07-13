@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { safeParseJson } from "@/lib/request-utils.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
+import { defineAction } from "@/lib/handler.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { outreach_attempt as outreachAttemptTable } from "@/db/schema";
@@ -153,10 +154,11 @@ export function extractTypedOutreachFields(update: Json | undefined): TypedOutre
   return result;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request }: ActionFunctionArgs) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
 
-    const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
   const { headers } = await getSession(request);  const user = auth.user;
     const { update, contact_id, campaign_id, workspace, disposition, queue_id }: RequestData = await safeParseJson(request);
     await requireWorkspaceAccess({ user, workspaceId: workspace });
@@ -214,4 +216,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     return routeData(finalUpdated, { headers });
-}
+  },
+});

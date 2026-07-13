@@ -13,9 +13,15 @@ import {
   transferWorkspaceOwnershipApi,
   updateWorkspaceName,
 } from "@/lib/platform-workspace.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+async function requireJsonAuthWithWorkspaceId({
+  request,
+  params,
+}: {
+  request: Request;
+  params: Record<string, string | undefined>;
+}) {
   const auth = await requireJsonAuth(request);
   if (auth instanceof Response) return auth;
 
@@ -24,39 +30,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const result = await getWorkspaceDetail(    auth.user.id,
-    workspaceId,
-  );
-
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse({ workspace: result.workspace }, 200);
+  return { ...auth, workspaceId };
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-
-  const { headers } = await getSession(request);
-  if (request.method === "PATCH") {
-    const parsed = await parseJsonBodyOrResponse(request, updateWorkspaceBodySchema);
-    if (parsed instanceof Response) return parsed;
-
-    if (!parsed.name) {
-      return jsonError("name is required", 400);
-    }
-
-    const result = await updateWorkspaceName(
-      auth.user.id,
-      workspaceId,
-      parsed.name,
+export const loader = defineLoader({
+  auth: requireJsonAuthWithWorkspaceId,
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const result = await getWorkspaceDetail(    auth.user.id,
+      auth.workspaceId,
     );
 
     if (!result.ok) {
@@ -64,21 +46,49 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     return jsonResponse({ workspace: result.workspace }, 200);
-  }
+  },
+});
 
-  if (request.method === "DELETE") {
-    const result = await deleteWorkspaceApi(
-      auth.user.id,
-      workspaceId,
-      headers,
-    );
+export const action = defineAction({
+  auth: requireJsonAuthWithWorkspaceId,
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+    const { headers } = await getSession(request);
+    if (request.method === "PATCH") {
+      const parsed = await parseJsonBodyOrResponse(request, updateWorkspaceBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      if (!parsed.name) {
+        return jsonError("name is required", 400);
+      }
+
+      const result = await updateWorkspaceName(
+        auth.user.id,
+        auth.workspaceId,
+        parsed.name,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ workspace: result.workspace }, 200);
     }
 
-    return jsonResponse({ success: true }, 200);
-  }
+    if (request.method === "DELETE") {
+      const result = await deleteWorkspaceApi(
+        auth.user.id,
+        auth.workspaceId,
+        headers,
+      );
 
-  return jsonError("Method not allowed", 405);
-}
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ success: true }, 200);
+    }
+
+    return jsonError("Method not allowed", 405);
+  },
+});

@@ -1,4 +1,5 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 import {
   authForContact,
   deleteContactApi,
@@ -6,47 +7,59 @@ import {
 } from "@/lib/platform-data.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const contactId = params.contactId;
-  if (!contactId) {
-    return jsonError("contactId is required", 400);
-  }
+export const loader = defineLoader({
+  auth: async ({ request, params }: LoaderFunctionArgs) => {
+    const contactId = params.contactId;
+    if (!contactId) {
+      return jsonError("contactId is required", 400);
+    }
 
-  const auth = await authForContact(request, contactId);
-  if (auth instanceof Response) return auth;
+    const auth = await authForContact(request, contactId);
+    if (auth instanceof Response) return auth;
 
-  const result = await getContactDetailApi(
-    contactId,
-    auth.workspaceId,
-  );
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
+    return { ...auth, contactId };
+  },
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const result = await getContactDetailApi(
+      auth.contactId,
+      auth.workspaceId,
+    );
+    if (!result.ok) {
+      return jsonError(result.error, result.status);
+    }
 
-  return jsonResponse({ contact: result.contact }, 200);
-}
+    return jsonResponse({ contact: result.contact }, 200);
+  },
+});
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const contactId = params.contactId;
-  if (!contactId) {
-    return jsonError("contactId is required", 400);
-  }
+export const action = defineAction({
+  auth: async ({ request, params }: ActionFunctionArgs) => {
+    const contactId = params.contactId;
+    if (!contactId) {
+      return jsonError("contactId is required", 400);
+    }
 
-  if (request.method !== "DELETE") {
-    return jsonError("Method not allowed", 405);
-  }
+    if (request.method !== "DELETE") {
+      return jsonError("Method not allowed", 405);
+    }
 
-  // Destructive mutation: require at least `member`, blocking the `caller` role.
-  const auth = await authForContact(request, contactId, "member");
-  if (auth instanceof Response) return auth;
+    // Destructive mutation: require at least `member`, blocking the `caller` role.
+    const auth = await authForContact(request, contactId, "member");
+    if (auth instanceof Response) return auth;
 
-  const result = await deleteContactApi(
-    contactId,
-    auth.workspaceId,
-  );
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
+    return { ...auth, contactId };
+  },
+  sideEffects: ["db-write"],
+  handler: async ({ auth }) => {
+    const result = await deleteContactApi(
+      auth.contactId,
+      auth.workspaceId,
+    );
+    if (!result.ok) {
+      return jsonError(result.error, result.status);
+    }
 
-  return jsonResponse({ success: true, contact_id: result.contact_id }, 200);
-}
+    return jsonResponse({ success: true, contact_id: result.contact_id }, 200);
+  },
+});

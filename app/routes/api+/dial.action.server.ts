@@ -15,8 +15,8 @@ import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from 'twilio';
-import type { ActionFunctionArgs } from "react-router";
 import { requireJsonAuth } from "@/lib/api-auth.server";
+import { defineAction } from "@/lib/handler.server";
 
 interface DialRequest {
   to_number: string;
@@ -30,9 +30,11 @@ interface DialRequest {
   selected_device?: string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-    const auth = await requireJsonAuth(request);
-    if (auth instanceof Response) return auth;    const user = auth.user;
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, auth }) => {
+    const user = auth.user;
     const raw = await parseActionRequest(request) as Partial<DialRequest>;
     const {
         to_number,
@@ -122,7 +124,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         } else {
             outreach_attempt_id = Number(outreach_id)
         }
-        
+
         await saveCallToDatabase(workspace_id, {
             sid: call.sid,
             date_updated: call.dateUpdated?.toISOString() ?? new Date().toISOString(),
@@ -160,4 +162,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             'Content-Type': 'text/xml'
         }
     });
-}
+  },
+});

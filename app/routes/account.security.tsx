@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/typography";
 
 export default function AccountSecurity() {
-  const data = useLoaderData<typeof import("./account.security.loader.server").loader>();
+  const data = useLoaderData<{
+    privileged: boolean;
+    twoFactorEnabled: boolean;
+    enrollRequired: boolean;
+    next: string | null;
+    privilegedRoles: readonly string[];
+  }>();
   const actionData = useActionData<{
     error?: string;
     success?: string;

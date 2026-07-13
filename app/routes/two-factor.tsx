@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/typography";
 
 export default function TwoFactorVerify() {
-  const { methods, next } = useLoaderData<typeof import("./two-factor.loader.server").loader>();
+  const { methods, next } = useLoaderData<{
+    methods: string[];
+    next: string | null;
+  }>();
   const actionData = useActionData<{ error?: string }>();
 
   return (

@@ -106,11 +106,15 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   test("throws when call upsert fails", async () => {
     setUpsertRow(null);
     const mod = await import("../app/routes/api+/call-status");
-    await expect(
-      mod.action({
-        request: makeReq({ CallSid: "CA1", CallStatus: "completed", Workspace: "w1", OutreachAttemptId: "10" }),
-      } as any),
-    ).rejects.toThrow("Failed to upsert call CA1");
+    // The handler factory maps thrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(await mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "completed", Workspace: "w1", OutreachAttemptId: "10" }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining("Failed to upsert call CA1"),
+    });
   });
 
   test("uses workspace authToken when present", async () => {
@@ -132,11 +136,15 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     telephonyDbMocks.findOutreachAttemptWithCampaignType.mockRejectedValue(new Error("Failed to fetch current attempt"));
 
     const mod = await import("../app/routes/api+/call-status");
-    await expect(
-      mod.action({
-        request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed", ParentCallSid: "CA_PARENT", Workspace: "w1" }),
-      } as any),
-    ).rejects.toThrow("Failed to fetch current attempt");
+    // The handler factory maps thrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(await mod.action({
+      request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed", ParentCallSid: "CA_PARENT", Workspace: "w1" }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining("Failed to fetch current attempt"),
+    });
   });
 
   test("skips realtime.send when no currentAttempt and still bills with workspaceId", async () => {

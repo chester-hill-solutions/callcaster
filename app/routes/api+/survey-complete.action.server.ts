@@ -13,6 +13,7 @@ import {
   getActiveSurveyByPublicId,
   loadContactById,
 } from "@/lib/survey-db.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
 
@@ -105,10 +106,13 @@ async function handleCompleteSurvey(request: Request) {
   });
 }
 
-export async function action({ request, url}: ActionFunctionArgs) {
-  if (request.method === "POST") {
-    return handleCompleteSurvey(request);
-  }
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({ request }: ActionFunctionArgs) => {
+    if (request.method === "POST") {
+      return handleCompleteSurvey(request);
+    }
 
-  return routeData({ error: "Method not allowed" }, { status: 405 });
-}
+    return routeData({ error: "Method not allowed" }, { status: 405 });
+  },
+});

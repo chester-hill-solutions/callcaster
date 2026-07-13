@@ -10,9 +10,13 @@ import {
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { defineAction, defineLoader } from "@/lib/handler.server";
+import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+function requireWorkspaceUser({
+  params,
+  context,
+}: Pick<LoaderFunctionArgs, "params" | "context">) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
@@ -21,37 +25,15 @@ export async function loader({ request, params, context }: LoaderFunctionArgs) {
   if (!userId) {
     return jsonError("Unauthorized", 401);
   }
-
-
-  const result = await getWorkspaceWebhook(    userId,
-    workspaceId,
-  );
-
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse({ webhook: result.webhook }, 200);
+  return { workspaceId, userId };
 }
 
-export async function action({ request, params, context }: ActionFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
-
-  if (request.method === "PUT") {
-    const parsed = await parseJsonBodyOrResponse(request, upsertWebhookBodySchema);
-    if (parsed instanceof Response) return parsed;
-
-    const result = await upsertWorkspaceWebhook(
-      userId,
-      workspaceId,
-      parsed,
+export const loader = defineLoader({
+  auth: requireWorkspaceUser,
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const result = await getWorkspaceWebhook(    auth.userId,
+      auth.workspaceId,
     );
 
     if (!result.ok) {
@@ -59,31 +41,56 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
     }
 
     return jsonResponse({ webhook: result.webhook }, 200);
-  }
+  },
+});
 
-  if (request.method === "POST") {
-    const parsed = await parseJsonBodyOrResponse(request, testWebhookBodySchema);
-    if (parsed instanceof Response) return parsed;
+export const action = defineAction({
+  auth: requireWorkspaceUser,
+  sideEffects: ["db-write", "external"],
+  handler: async ({ request, auth }) => {
+    const { workspaceId, userId } = auth;
 
-    const result = await testWorkspaceWebhook(
-      parsed.destination_url,
-      parsed.custom_headers as Record<string, string> | [string, string][],
-      parsed.event,
-    );
+    if (request.method === "PUT") {
+      const parsed = await parseJsonBodyOrResponse(request, upsertWebhookBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      const result = await upsertWorkspaceWebhook(
+        userId,
+        workspaceId,
+        parsed,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ webhook: result.webhook }, 200);
     }
 
-    return jsonResponse(
-      {
-        data: result.data,
-        status: result.status,
-        statusText: result.statusText,
-      },
-      200,
-    );
-  }
+    if (request.method === "POST") {
+      const parsed = await parseJsonBodyOrResponse(request, testWebhookBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-  return jsonError("Method not allowed", 405);
-}
+      const result = await testWorkspaceWebhook(
+        parsed.destination_url,
+        parsed.custom_headers as Record<string, string> | [string, string][],
+        parsed.event,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse(
+        {
+          data: result.data,
+          status: result.status,
+          statusText: result.statusText,
+        },
+        200,
+      );
+    }
+
+    return jsonError("Method not allowed", 405);
+  },
+});

@@ -1,13 +1,15 @@
 import { getSession } from "@/lib/auth.server";
 import { data as routeData, redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: async ({ request }) => {
+    const { user, headers } = await getSession(request);
 
-  const { headers, user } = await getSession(request);
-
-  if (user) {
-    return redirect("/workspaces", { headers });
-  }
-  return routeData({ user }, { headers });
-}
+    if (user) {
+      return redirect("/workspaces", { headers });
+    }
+    return routeData({ user: null }, { headers });
+  },
+});

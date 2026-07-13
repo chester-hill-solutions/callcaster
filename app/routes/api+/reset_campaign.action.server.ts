@@ -6,13 +6,15 @@ import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request }: ActionFunctionArgs) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
 
-    const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
     const user = auth.user;
     if (!user) {
       return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -46,4 +48,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       throw error;
     }
     return routeData({ success: true });
-}
+  },
+});

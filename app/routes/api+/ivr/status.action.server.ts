@@ -17,8 +17,8 @@ import {
 } from "@/lib/twilio-call-status.server";
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { defineAction } from "@/lib/handler.server";
 import type Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
 
 export interface CallEvent {
     Called: string;
@@ -108,18 +108,28 @@ const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: C
     }
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-    const formData = await request.formData();
-    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const underCase = twilioParamsToUnderCase(params);
-    const callSid = typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+export const action = defineAction({
+    auth: async ({ request }) => {
+        const formData = await request.clone().formData();
+        const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+        const underCase = twilioParamsToUnderCase(params);
+        const callSid = typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+        if (!callSid) {
+            // Preserve the original order: the handler throws "Missing CallSid"
+            // (caught into `{ success: false }`) before any signature check.
+            return { params, underCase, callSid };
+        }
+        const forbidden = await requireTwilioSignature(request, { callSid });
+        return forbidden ?? { params, underCase, callSid };
+    },
+    sideEffects: ["db-write", "credit", "twilio", "external"],
+    handler: async ({ auth }) => {
+    const { params, underCase, callSid } = auth;
 
     try {
         if (!callSid) {
             throw new Error("Missing CallSid");
         }
-        const forbidden = await requireTwilioSignature(request, { callSid });
-        if (forbidden) return forbidden;
 
         const dbCall = await findCallBySid(callSid);
         if (!dbCall) throw new Error("Call not found");
@@ -169,4 +179,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return routeData({ success: false, error });
     }
     return routeData({ success: true });
-};
+    },
+});

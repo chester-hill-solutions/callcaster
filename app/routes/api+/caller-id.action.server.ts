@@ -1,10 +1,9 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { defineAction } from "@/lib/handler.server";
 import { verifyWorkspaceCallerId } from "@/lib/platform-workspace-numbers.server";
 import { z } from "zod";
-import type { ActionFunctionArgs } from "react-router";
 
 const legacyCallerIdBodySchema = z
   .object({
@@ -26,32 +25,34 @@ const legacyCallerIdBodySchema = z
     friendly_name: value.friendly_name ?? value.friendlyName ?? "",
   }));
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, auth }) => {
+    if (request.method !== "POST") {
+      return jsonError("Method not allowed", 405);
+    }
 
-  if (request.method !== "POST") {
-    return jsonError("Method not allowed", 405);
-  }
+    const parsed = await parseJsonBodyOrResponse(request, legacyCallerIdBodySchema);
+    if (parsed instanceof Response) return parsed;
 
-  const parsed = await parseJsonBodyOrResponse(request, legacyCallerIdBodySchema);
-  if (parsed instanceof Response) return parsed;
+    const result = await verifyWorkspaceCallerId(
+      auth.user.id,
+      parsed.workspace_id,
+      parsed.phone_number,
+      parsed.friendly_name,
+    );
 
-  const result = await verifyWorkspaceCallerId(    auth.user.id,
-    parsed.workspace_id,
-    parsed.phone_number,
-    parsed.friendly_name,
-  );
+    if (!result.ok) {
+      return jsonError(result.error, result.status);
+    }
 
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse(
-    {
-      validationRequest: result.validationRequest,
-      numberRequest: result.numberRequest,
-    },
-    200,
-  );
-};
+    return jsonResponse(
+      {
+        validationRequest: result.validationRequest,
+        numberRequest: result.numberRequest,
+      },
+      200,
+    );
+  },
+});

@@ -216,11 +216,15 @@ describe("app/routes/api+/dial/tsx.route", () => {
       caller_id: "+1555",
     });
     queueJsonAuthSession({ user: { id: "u1" } });
-    await expect(
-      (await import("../app/routes/api+/dial")).action({
-        request: new Request("http://localhost/api/dial", { method: "POST" }),
-      } as any),
-    ).rejects.toThrow("Invalid phone number length");
+    // The handler factory maps thrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(await (await import("../app/routes/api+/dial")).action({
+      request: new Request("http://localhost/api/dial", { method: "POST" }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining("Invalid phone number length"),
+    });
   });
 
   test("call create error logs and says message", async () => {
@@ -261,7 +265,11 @@ describe("app/routes/api+/dial/tsx.route", () => {
     queueJsonAuthSession({ user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/dial");
-    await expect(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any)).rejects.toThrow("db");
+    // The handler factory maps thrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining("db") });
   });
 
   test("throws when create_outreach_attempt rpc errors", async () => {
@@ -331,9 +339,10 @@ describe("app/routes/api+/dial/tsx.route", () => {
     });
 
     const mod = await import("../app/routes/api+/dial");
-    await expect(
-      mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any),
-    ).rejects.toMatchObject({ status: 400 });
+    // The handler factory returns thrown Responses as-is instead of
+    // letting them propagate to the framework.
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+    expect(res.status).toBe(400);
   });
 
   test("does not enforce emergency voice when the voice track is not selected", async () => {

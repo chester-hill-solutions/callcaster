@@ -1,8 +1,11 @@
-import { redirect, data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { data as routeData } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, url}: LoaderFunctionArgs) => {
-  const methods = (url.searchParams.get("methods") ?? "totp").split(",");
-  const next = url.searchParams.get("next");
-  return routeData({ methods, next });
-};
+export const loader = defineLoader({
+  sideEffects: ["none"],
+  handler: ({ url }) => {
+    const methods = (url.searchParams.get("methods") ?? "totp").split(",");
+    const next = url.searchParams.get("next");
+    return routeData({ methods, next });
+  },
+});

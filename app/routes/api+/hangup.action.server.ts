@@ -10,12 +10,13 @@ import { requireJsonAuth } from "@/lib/api-auth.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { defineAction } from "@/lib/handler.server";
 
-
-export const action = async ({ request }: { request: Request }) => {
-
-    const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;  const user = auth.user;
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, auth }) => {
+    const user = auth.user;
     const data = await parseActionRequest(request);
     const workspaceId =
         typeof data.workspaceId === "string" ? data.workspaceId : null;
@@ -57,9 +58,10 @@ export const action = async ({ request }: { request: Request }) => {
             );
         }
         return routeData({ success: true });
-   
+
     } catch (error) {
         logger.error('Error hanging up call:', error);
         return routeData({ success: false, message: 'An error occurred while hanging up the call' }, { status: 500 });
     }
-}
+  },
+});

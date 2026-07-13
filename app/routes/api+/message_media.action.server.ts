@@ -9,8 +9,7 @@ import {
 } from "@/lib/campaign-ivr.server";
 import { uploadObject, createSignedObjectUrl, deleteObject } from "@/lib/object-storage.server";
 import { AppError } from "@/lib/errors.server";
-
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -122,9 +121,10 @@ async function resolveWorkspaceAuth(
   return null;
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
+export const action = defineAction({
+  auth: ({ request }) => requireDualAuth(request),
+  sideEffects: ["db-write", "external"],
+  handler: async ({ request, auth }) => {
   const { headers } = await getSession(request);
   const method = request.method;
   const formData = await request.formData();
@@ -270,4 +270,5 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
   return routeData({ success: false, error: "Method not allowed" }, { status: 405 });
-}
+  },
+});

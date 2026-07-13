@@ -1,8 +1,8 @@
 import { handleAcdRouterRequest } from "@/lib/acd/acd-router.server";
 import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
 
 /** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
  * hears a graceful message instead of an HTML error page. */
@@ -17,17 +17,29 @@ function acdRouterUnavailableTwiml(): Response {
 }
 
 /** Twilio ACD wait URL — default `/api/acd-router`. */
-export const action = async ({ request }: ActionFunctionArgs) => {
-  try {
-    const formData = await request.clone().formData();
-    const callSid = String(formData.get("CallSid") ?? "");
-    const forbidden = await requireTwilioSignature(request, callSid ? { callSid } : {});
-    if (forbidden) return forbidden;
-    return await handleAcdRouterRequest(request, "wait");
-  } catch (error) {
-    logger.error("Unhandled error in api.acd-router", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return acdRouterUnavailableTwiml();
-  }
-};
+export const action = defineAction({
+  auth: async ({ request }) => {
+    try {
+      const formData = await request.clone().formData();
+      const callSid = String(formData.get("CallSid") ?? "");
+      const forbidden = await requireTwilioSignature(request, callSid ? { callSid } : {});
+      return forbidden ?? null;
+    } catch (error) {
+      logger.error("Unhandled error in api.acd-router", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return acdRouterUnavailableTwiml();
+    }
+  },
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request }) => {
+    try {
+      return await handleAcdRouterRequest(request, "wait");
+    } catch (error) {
+      logger.error("Unhandled error in api.acd-router", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return acdRouterUnavailableTwiml();
+    }
+  },
+});

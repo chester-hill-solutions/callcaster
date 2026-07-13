@@ -4,48 +4,51 @@ import {
   loadExistingResponseWithAnswers,
   loadSurveyDetailByPublicId,
 } from "@/lib/survey-db.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params, url}: LoaderFunctionArgs) {
-  const { surveyId } = params;
-  const contactIdParam = url.searchParams.get("contact");
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: async ({ params, url }) => {
+    const { surveyId } = params;
+    const contactIdParam = url.searchParams.get("contact");
 
-  if (!surveyId) {
-    throw new Response("Survey ID is required", { status: 400 });
-  }
-
-  const survey = await loadSurveyDetailByPublicId(surveyId, { activeOnly: true });
-  if (!survey) {
-    throw new Response("Survey not found or inactive", { status: 404 });
-  }
-
-  let contact = null;
-  if (contactIdParam) {
-    const contactId = parseInt(contactIdParam, 10);
-    if (!Number.isNaN(contactId)) {
-      contact = await loadContactById(contactId);
+    if (!surveyId) {
+      throw new Response("Survey ID is required", { status: 400 });
     }
-  }
 
-  const resultId = `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const survey = await loadSurveyDetailByPublicId(surveyId, { activeOnly: true });
+    if (!survey) {
+      throw new Response("Survey not found or inactive", { status: 404 });
+    }
 
-  let existingResponse = null;
-  let existingAnswers: Record<string, string | string[]> = {};
+    let contact = null;
+    if (contactIdParam) {
+      const contactId = parseInt(contactIdParam, 10);
+      if (!Number.isNaN(contactId)) {
+        contact = await loadContactById(contactId);
+      }
+    }
 
-  if (contact?.id) {
-    const existing = await loadExistingResponseWithAnswers({
-      surveyInternalId: survey.id,
-      contactId: contact.id,
+    const resultId = `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    let existingResponse = null;
+    let existingAnswers: Record<string, string | string[]> = {};
+
+    if (contact?.id) {
+      const existing = await loadExistingResponseWithAnswers({
+        surveyInternalId: survey.id,
+        contactId: contact.id,
+      });
+      existingResponse = existing.response;
+      existingAnswers = existing.answers;
+    }
+
+    return routeData({
+      survey,
+      resultId: existingResponse?.result_id || resultId,
+      contact,
+      existingResponse,
+      existingAnswers,
     });
-    existingResponse = existing.response;
-    existingAnswers = existing.answers;
-  }
-
-  return routeData({
-    survey,
-    resultId: existingResponse?.result_id || resultId,
-    contact,
-    existingResponse,
-    existingAnswers,
-  });
-}
+  },
+});
