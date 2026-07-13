@@ -21,7 +21,8 @@ describe("defineAction", () => {
       sideEffects: ["none"],
       handler,
     });
-    await expect(action(args(post({})))).rejects.toMatchObject({ status: 401 });
+    const res = await action(args(post({})));
+    expect(res.status).toBe(401);
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -50,7 +51,7 @@ describe("defineAction", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  test("rethrows a thrown Response (React Router semantics), not a mapped 500", async () => {
+  test("returns a thrown Response as-is (React Router semantics), not a mapped 500", async () => {
     const action = defineAction({
       sideEffects: ["none"],
       handler: () => {
@@ -58,10 +59,12 @@ describe("defineAction", () => {
         throw new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
       },
     });
-    await expect(action(args(post({})))).rejects.toMatchObject({ status: 401 });
+    const res = await action(args(post({})));
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(401);
   });
 
-  test("rethrows a Response thrown from the auth strategy", async () => {
+  test("returns a Response thrown from the auth strategy as-is", async () => {
     const handler = vi.fn();
     const action = defineAction({
       auth: () => {
@@ -70,7 +73,8 @@ describe("defineAction", () => {
       sideEffects: ["none"],
       handler,
     });
-    await expect(action(args(post({})))).rejects.toMatchObject({ status: 403 });
+    const res = await action(args(post({})));
+    expect((res as Response).status).toBe(403);
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -97,9 +101,7 @@ describe("defineLoader", () => {
       sideEffects: ["db-read"],
       handler: () => new Response("ok"),
     });
-    await expect(denied(args(new Request("http://test/x")) as never)).rejects.toMatchObject({
-      status: 403,
-    });
+    expect((await denied(args(new Request("http://test/x")) as never)).status).toBe(403);
 
     const ok = defineLoader({
       auth: () => ({ userId: "u1" }),

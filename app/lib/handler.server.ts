@@ -51,14 +51,14 @@ async function withGuards<Args extends { request: Request }, A, R>(
     let auth = undefined as A;
     if (authFn) {
       const result = await authFn(args);
-      if (result instanceof Response) throw result;
+      if (result instanceof Response) return result;
       auth = result;
     }
     return await run(auth);
   } catch (error) {
     // Thrown Responses keep React Router semantics: they ARE the response
     // (e.g. resolveDualAuthSession throws a 401), never a mapped 500.
-    if (error instanceof Response) throw error;
+    if (error instanceof Response) return error;
     return createErrorResponse(error);
   }
 }
