@@ -219,21 +219,14 @@ export default function ApiKeysSection({
                   <label
                     key={id}
                     className="flex items-start gap-2 text-sm"
-                    htmlFor={`api-key-scope-${id}`}
                   >
                     <input
-                      id={`api-key-scope-${id}`}
                       type="checkbox"
                       name="scopes"
                       value={id}
                       className="mt-1"
                     />
-                    <span>
-                      <span className="font-mono text-xs">{id}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {description}
-                      </span>
-                    </span>
+                    {`${id} — ${description}`}
                   </label>
                 ))}
               </div>
