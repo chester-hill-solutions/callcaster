@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { formatDateUtc, safeFilenamePart, toCsvString } from "@/lib/csv";
 import { logger } from "@/lib/logger.server";
 import { isUniqueViolation } from "@/lib/parse-utils.server";
@@ -54,6 +55,10 @@ export async function loadSurveyDetailByPublicId(
   surveyPublicId: string,
   loadOptions?: { workspaceId?: string; activeOnly?: boolean },
 ) {
+  if (!z.uuid().safeParse(surveyPublicId).success) {
+    return null;
+  }
+
   let survey: SurveyRow | null | undefined;
 
   if (loadOptions?.workspaceId) {
