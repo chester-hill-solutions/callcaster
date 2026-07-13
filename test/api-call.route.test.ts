@@ -110,7 +110,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -137,7 +137,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "not-a-phone");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -159,7 +159,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -182,7 +182,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
     fd.set("CallSid", "CA_HANDSET");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -223,7 +223,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -242,7 +242,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -258,7 +258,7 @@ describe("app/routes/api+/call/route.tsx", () => {
   test("says invalid when To is missing", async () => {
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,

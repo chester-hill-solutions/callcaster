@@ -24,14 +24,34 @@ function versionFromFilename(name) {
   return match[1];
 }
 
+/**
+ * Duplicate ledger versions already applied to deployed databases (ARCH-01).
+ * These three cannot be renamed without inspecting every deployed ledger, so
+ * they are grandfathered; any NEW duplicate version is a hard failure because
+ * the ledger comparison below keys by version and would silently collapse it.
+ */
+const GRANDFATHERED_DUPLICATE_VERSIONS = new Set(["20260705000200"]);
+
 function loadRepoVersions() {
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql"))
     .sort();
   const byVersion = new Map();
+  const duplicates = [];
   for (const file of files) {
     const version = versionFromFilename(file);
+    if (byVersion.has(version) && !GRANDFATHERED_DUPLICATE_VERSIONS.has(version)) {
+      duplicates.push(`${version}: ${byVersion.get(version)} vs ${file}`);
+    }
     byVersion.set(version, file);
+  }
+  if (duplicates.length > 0) {
+    console.error("Duplicate migration versions (each version must be unique):");
+    for (const d of duplicates) console.error(`  ${d}`);
+    console.error(
+      "Pick a fresh version prefix for the new migration. Never renumber an already-applied one.",
+    );
+    process.exit(1);
   }
   return { files, byVersion };
 }

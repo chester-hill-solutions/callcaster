@@ -40,7 +40,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
       ),
@@ -63,7 +63,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
 
     const { logger } = await import("@/lib/logger.server");
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
       ),
@@ -81,7 +81,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=https%3A%2F%2Fevil.example",
       ),
@@ -99,12 +99,12 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     }));
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res1 = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res1 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/auth/callback?type=signup"),
     } as any)));
     expect(res1.headers.get("Location")).toBe("/auth/auth-code-error");
 
-    const res2 = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res2 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/auth/callback?token_hash=th"),
     } as any)));
     expect(res2.headers.get("Location")).toBe("/auth/auth-code-error");

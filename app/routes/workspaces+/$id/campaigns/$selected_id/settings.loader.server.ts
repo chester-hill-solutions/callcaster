@@ -1,4 +1,4 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { eq } from "drizzle-orm";
 import { data as routeData, redirect } from "react-router";
 import { campaign as campaignTable, workspace as workspaceTable } from "@/db/schema";
@@ -24,11 +24,14 @@ import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 // eslint-disable-next-line no-restricted-imports
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read", "external"],
+  handler: async ({ params, auth }) => {
   const { id: workspace_id, selected_id } = params;
-  const { user } = getWorkspaceRouteContext(context)
+  const { user } = auth;
 
   if (!selected_id || !workspace_id) return redirect("/");
 
@@ -167,4 +170,5 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
     campaignBilling,
     readiness,
   });
-};
+  },
+});

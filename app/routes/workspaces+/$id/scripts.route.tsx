@@ -1,9 +1,9 @@
 export { loader } from "./scripts.loader.server";
 export { action } from "./scripts.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext , useFetcher } from "react-router";
 import type { MetaFunction } from "react-router";
-import type { ContextType } from "@/lib/types";
+import type { ContextType , User } from "@/lib/types";
 
 export const meta: MetaFunction = () => [{ title: "Scripts — CallCaster" }];
 import { MdDownload, MdEdit } from "react-icons/md";
@@ -14,11 +14,9 @@ import { Button } from "@/components/ui/button";
 
 import { formatDateToLocale } from "@/lib/utils";
 import { downloadBlobPart } from "@/lib/download-blob.client";
-import { useFetcher } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import type { Json , Database } from "@/lib/db-types";
-import type { User } from "@/lib/types";
 
 type ScriptSteps = {
   pages?: Record<string, unknown>;

@@ -54,6 +54,20 @@ export function useSoftphoneAudioDevices({
   }, [selectedMicId, selectedSpeakerId]);
 
   const permissionRequestedRef = useRef(false);
+  /**
+   * @effect On mount, enumerate audio devices, request microphone permission
+   * once (so device labels are populated), and subscribe to the OS
+   * "devicechange" event to keep the mic/speaker lists fresh as hardware is
+   * plugged/unplugged.
+   * @effect-deps refreshDevices (a useCallback that changes identity only when
+   * selectedMicId/selectedSpeakerId change, causing a controlled resubscribe
+   * so the "pick a default device" logic inside it sees current selections)
+   * @effect-side-effects subscription (mediaDevices "devicechange" listener,
+   * removed on unmount/refreshDevices change) + dom (getUserMedia permission
+   * prompt, requested at most once via permissionRequestedRef)
+   * @effect-why-not-loader Browser hardware device enumeration and permission
+   * prompts are client-only APIs, not app request/response data.
+   */
   useEffect(() => {
     refreshDevices();
     if (
@@ -74,6 +88,18 @@ export function useSoftphoneAudioDevices({
       navigator.mediaDevices?.removeEventListener("devicechange", refreshDevices);
   }, [refreshDevices]);
 
+  /**
+   * @effect When a call becomes active (or the selected mic/speaker changes
+   * while a call is active), apply the currently selected input/output
+   * devices to the live Twilio Device's audio helper.
+   * @effect-deps activeCall, device, selectedMicId, selectedSpeakerId (reacts
+   * to a call starting or the user changing device selection mid-call)
+   * @effect-side-effects dom (imperative Device.audio.setInputDevice /
+   * speakerDevices.set calls against the WebRTC audio hardware); no
+   * timer/subscription/fetch.
+   * @effect-why-not-loader Imperative SDK/audio-hardware binding tied to an
+   * active call, not request/response data.
+   */
   useEffect(() => {
     if (!activeCall || !device?.audio) return;
     if (selectedMicId) {

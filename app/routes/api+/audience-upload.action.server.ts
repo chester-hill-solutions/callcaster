@@ -15,6 +15,8 @@ import {
 } from "@/lib/audience-upload-db.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
+import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/db-types";
 
 interface StorageBucket {
@@ -56,13 +58,12 @@ type AudienceUploadDeps = Partial<{
   }) => Promise<void>;
 }>;
 
-export const action = async ({
-  request,
-  deps,
-}: {
-  request: Request;
-  deps?: AudienceUploadDeps;
-}) => {
+export const action = defineAction({
+  sideEffects: ["db-write", "external"],
+  handler: async ({
+    request,
+    deps,
+  }: ActionFunctionArgs & { deps?: AudienceUploadDeps }) => {
 
   const d = {
     verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
@@ -192,8 +193,9 @@ export const action = async ({
     if (error instanceof AppError) {
       return routeData({ error: error.message }, { status: error.statusCode, headers });
     }
-    return routeData({ 
-      error: error instanceof Error ? error.message : "Unknown error" 
+    return routeData({
+      error: error instanceof Error ? error.message : "Unknown error"
     }, { status: 500, headers });
   }
-}
+  },
+});

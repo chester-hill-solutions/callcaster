@@ -7,11 +7,11 @@ import {
 import { logger } from "@/lib/logger.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { defineAction } from "@/lib/handler.server";
 import {
   createWithScriptBodySchema,
   type CreateWithScriptBody,
 } from "@/lib/schemas/api/create-with-script";
-import type { ActionFunctionArgs } from "react-router";
 import {
   type CampaignData,
   createCampaign,
@@ -26,16 +26,21 @@ function jsonResponse(data: unknown, status: number) {
   });
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  if (request.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed" }, 405);
-  }
+export const action = defineAction({
+  auth: async ({ request }) => {
+    if (request.method !== "POST") {
+      return jsonResponse({ error: "Method not allowed" }, 405);
+    }
 
-  const authResult = await verifyApiKeyOrSession(request);
-  if ("error" in authResult) {
-    return jsonResponse({ error: authResult.error }, authResult.status);
-  }
+    const authResult = await verifyApiKeyOrSession(request);
+    if ("error" in authResult) {
+      return jsonResponse({ error: authResult.error }, authResult.status);
+    }
 
+    return authResult;
+  },
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth: authResult }) => {
   const parsed = await parseJsonBodyOrResponse(request, createWithScriptBodySchema);
   if (parsed instanceof Response) {
     return parsed;
@@ -145,4 +150,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     },
     201,
   );
-};
+  },
+});

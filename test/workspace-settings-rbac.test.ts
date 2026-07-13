@@ -98,8 +98,7 @@ describe("workspace settings RBAC", () => {
       for (const formName of ["addUser", "updateUser", "deleteUser", "cancelInvite", "updateWebhook"]) {
         const fd = new FormData();
         fd.set("formName", formName);
-        const res = await asRouteResponse(
-          await mod.action(
+        const res = await asRouteResponse(mod.action(
             await withWorkspaceRouteArgs(
               { request: buildRequest(fd), params: { id: "w1" } },
               { userId: "u1", workspaceId: "w1", userRole: "caller" },
@@ -122,8 +121,7 @@ describe("workspace settings RBAC", () => {
       for (const formName of ["transferWorkspaceOwnership", "deleteWorkspace"]) {
         const fd = new FormData();
         fd.set("formName", formName);
-        const res = await asRouteResponse(
-          await mod.action(
+        const res = await asRouteResponse(mod.action(
             await withWorkspaceRouteArgs(
               { request: buildRequest(fd), params: { id: "w1" } },
               { userId: "u1", workspaceId: "w1", userRole: "admin" },
@@ -143,8 +141,7 @@ describe("workspace settings RBAC", () => {
       const fd = new FormData();
       fd.set("formName", "deleteSelf");
       fd.set("user_id", "u2");
-      const res = await asRouteResponse(
-        await mod.action(
+      const res = await asRouteResponse(mod.action(
           await withWorkspaceRouteArgs(
             { request: buildRequest(fd), params: { id: "w1" } },
             { userId: "u1", workspaceId: "w1", userRole: "member" },
@@ -183,8 +180,7 @@ describe("workspace settings RBAC", () => {
       dbMocks.getUserRole.mockResolvedValue(null);
       const mod = await import("../app/routes/workspaces+/$id/settings.loader.server");
 
-      const res = await asRouteResponse(
-        await mod.loader({
+      const res = await asRouteResponse(mod.loader({
           request: new Request("http://localhost"),
           params: { id: "w1" },
           context: await createRouteContextProvider({ workspace: null }),
@@ -200,8 +196,7 @@ describe("workspace settings RBAC", () => {
       dbMocks.requireWorkspaceAccess.mockRejectedValue(new Error("Workspace not found"));
       const mod = await import("../app/routes/workspaces+/$id/settings/numbers.loader.server");
 
-      const res = await asRouteResponse(
-        await mod.loader(
+      const res = await asRouteResponse(mod.loader(
           await withWorkspaceRouteArgs(
             { request: new Request("http://localhost"), params: { id: "w1" } },
             { userId: "u1", workspaceId: "w1", userRole: "member" },

@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { defineAction } from "@/lib/handler.server";
 import { Resend } from "resend";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -9,7 +10,9 @@ const MAX_MESSAGE_LENGTH = 5000;
 
 const MAX_NAME_LENGTH = 200;
 
-export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
+export const action = defineAction({
+  sideEffects: ["email"],
+  handler: async ({ request }) => {
 
   const resend = new Resend(env.RESEND_API_KEY());
 
@@ -48,4 +51,5 @@ export const action = async ({ request, params }: { request: Request, params: { 
     logger.error('Error processing contact form:', error);
     return routeData({ error: 'Failed to process message' }, { status: 500 });
   }
-}
+  },
+});

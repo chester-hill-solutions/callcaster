@@ -92,7 +92,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/connect-phone-device");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/connect-phone-device", {
         method: "POST",
         body: JSON.stringify({}),
@@ -120,7 +120,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.twilioCreate.mockResolvedValueOnce({ sid: "CA1" });
 
     const mod = await import("../app/routes/api+/connect-phone-device");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
     } as any));
 
@@ -158,7 +158,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.twilioCreate.mockRejectedValueOnce(new Error("twilio"));
 
     const mod = await import("../app/routes/api+/connect-phone-device");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
     } as any));
     expect(res.status).toBe(500);

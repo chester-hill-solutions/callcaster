@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => {
     countCampaignQueueRows: vi.fn(),
     countQueuedCampaignQueueRows: vi.fn(),
     requireWorkspaceLoaderContext: vi.fn(),
+    workspaceAuth: {
+      headers: new Headers(),
+      user: { id: "u1" },
+      workspaceId: "w1",
+      userRole: "admin",
+    },
   };
 });
 
@@ -63,8 +69,18 @@ vi.mock("@/lib/campaign-queue-search.server", () => ({
 }));
 
 vi.mock("@/lib/workspace-route.server", () => ({
+  getWorkspaceRouteContext: vi.fn(() => mocks.workspaceAuth),
+  workspaceRouteAuth: () => mocks.workspaceAuth,
   requireWorkspaceLoaderContext: (...args: any[]) =>
     mocks.requireWorkspaceLoaderContext(...args),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  findCampaignInWorkspace: vi.fn(async () => ({ id: 99 })),
+}));
+
+vi.mock("@/lib/campaign-audience-db.server", () => ({
+  campaignAndAudienceShareWorkspace: vi.fn(async () => true),
 }));
 
 vi.mock("@/server/db", () => ({
@@ -103,7 +119,12 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     mocks.countQueuedCampaignQueueRows.mockResolvedValue(0);
     mocks.requireWorkspaceLoaderContext.mockResolvedValue({
       ok: true,
-      context: { user: { id: "u1" }, workspace: { id: "w1" } },
+      ctx: {
+        headers: new Headers(),
+        user: { id: "u1" },
+        workspaceId: "w1",
+        userRole: "admin",
+      },
     });
     dbMocks.selectChain.mockResolvedValue([]);
   });
@@ -122,7 +143,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
     } as any)));
@@ -154,7 +175,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "77" },
     } as any)));
@@ -179,7 +200,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
     } as any)));
@@ -256,7 +277,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
     } as any)));
@@ -265,6 +286,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.searchCampaignQueueIds).toHaveBeenCalledWith({
       campaignId: 99,
+      workspaceId: "w1",
       filters: {
         name: "",
         phone: "",
@@ -278,6 +300,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     expect(mocks.updateCampaignQueueStatusByIds).toHaveBeenCalledWith(
       [11, 12],
       "paused",
+      "w1",
     );
   });
 });

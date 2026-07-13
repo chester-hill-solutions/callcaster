@@ -13,14 +13,16 @@ import { createTenantDb } from "@/server/tenant-db";
 import { jsonError } from "@/lib/platform-api.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
 type DequeueRequest = { contact_id: string | number; household: boolean };
 type ResetRequest = { campaignId: string | number };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export const action = defineAction({
+  auth: ({ request }: ActionFunctionArgs) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
   try {
     if (request.method === "POST") {
       const { contact_id, household }: DequeueRequest = await safeParseJson(request);
@@ -70,4 +72,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } catch (error) {
     return createErrorResponse(error, "Queue action failed");
   }
-};
+  },
+});

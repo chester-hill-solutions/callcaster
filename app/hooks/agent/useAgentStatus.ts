@@ -76,6 +76,14 @@ export function useAgentStatus({
     [workspaceId],
   );
 
+  /**
+   * @effect Load the agent's current status on mount and send a heartbeat POST every 30s while mounted.
+   * @effect-deps workspaceId, userId (guards + re-arms the heartbeat when either changes), refreshStatus
+   * @effect-side-effects timer (setInterval heartbeat) + fetch (initial refreshStatus() and each heartbeat POST); interval cleared on unmount/dep change
+   * @effect-why-not-loader The recurring heartbeat is live client-only polling a loader can't express;
+   *   the initial refreshStatus() call rides along on the same effect for simplicity rather than
+   *   being a separate loader round-trip.
+   */
   useEffect(() => {
     if (!workspaceId || !userId) return;
     refreshStatus();

@@ -17,7 +17,12 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ title: string; description: string; type: "success" | "error" | "info" } | null>(null);
 
-  // Poll for export status if an export is in progress
+  /**
+   * @effect CANDIDATE-REMOVE: Poll `/api/campaign-export-status` every 2s while an export is running and update status/progress/download state. This is fetch-in-an-effect polling that duplicates data React Router's fetcher/revalidation model already covers — a `useFetcher` with an interval-driven `.load()` (or server-sent progress) would remove the manual setInterval/setState bookkeeping here. (Near-identical duplicate of the same effect in AdminAsyncExportButton.tsx — worth de-duplicating into a shared hook alongside the fetcher migration.)
+   * @effect-deps exportId, exportStatus — starts/stops the poll based on whether an export is currently processing.
+   * @effect-side-effects fetch (polling GET on a 2s interval) + state updates; interval cleared on completion, error, unmount, or dep change.
+   * @effect-why-not-loader Polling is inherently effect-shaped in the current architecture (no live subscription/websocket for export progress); flagged above as a candidate to move to useFetcher-driven polling instead of raw fetch+setInterval.
+   */
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
@@ -26,10 +31,10 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
         try {
           const response = await fetch(`/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`);
           const data = await response.json();
-          
+
           setExportStatus(data.status);
           if (data.progress) setProgress(data.progress);
-          
+
           if (data.status === "completed") {
             setIsExporting(false);
             setDownloadUrl(data.downloadUrl);
@@ -57,9 +62,14 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [exportId, exportStatus]);
+  }, [exportId, exportStatus, workspaceId]);
 
-  // Display toast message when it changes
+  /**
+   * @effect Auto-dismiss the toast notification 3s after it's shown.
+   * @effect-deps toastMessage — (re)starts the dismiss timer whenever a new toast is set.
+   * @effect-side-effects timer (setTimeout to clear toastMessage; cleared on cleanup/re-run)
+   * @effect-why-not-loader Ephemeral UI-only auto-dismiss timing; not data, so there's no loader/fetcher equivalent.
+   */
   useEffect(() => {
     if (toastMessage) {
       logger.debug(`Toast: ${toastMessage.title} - ${toastMessage.description}`);

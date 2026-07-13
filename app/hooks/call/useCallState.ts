@@ -181,6 +181,15 @@ export function useCallState() {
     contextDispatch(action);
   }, []);
 
+  /**
+   * @effect Tick the call FSM's duration counter (dispatch TICK) once per
+   * second while the state machine is 'connected'.
+   * @effect-deps state, send (starts/stops the interval based on FSM state;
+   * send is the stable dispatch wrapper)
+   * @effect-side-effects timer (setInterval), cleared on state change/unmount
+   * @effect-why-not-loader Wall-clock elapsed time is live client timer state,
+   * not request/response data.
+   */
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (state === 'connected') {

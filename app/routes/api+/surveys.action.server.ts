@@ -11,6 +11,7 @@ import {
   getSurveyWorkspaceByPublicId,
   updateSurveyMetadata,
 } from "@/lib/survey-db.server";
+import { defineAction } from "@/lib/handler.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
@@ -146,10 +147,12 @@ async function handleDeleteSurvey(
   }
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export const action = defineAction({
+  auth: ({ request }: ActionFunctionArgs) => requireDualAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
   try {
-    const auth = await requireDualAuth(request);
-    if (auth instanceof Response) return auth;    const user = getDualAuthUser(auth);
+    const user = getDualAuthUser(auth);
     if (!user) {
       return routeData({ error: "Unauthorized" }, { status: 401 });
     }
@@ -168,4 +171,5 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return createErrorResponse(error, "Failed to process survey request");
   }
-}
+  },
+});

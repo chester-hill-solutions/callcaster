@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -36,7 +36,9 @@ function errorPayload(
   };
 }
 
-export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: async ({ context, url }) => {
   try {
     const { headers, user, workspaceId, userRole: roleStr } = getWorkspaceRouteContext(context);
     const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
@@ -236,4 +238,5 @@ export const loader = async ({ request, params, context, url}: LoaderFunctionArg
       { status: 500 },
     );
   }
-};
+  },
+});

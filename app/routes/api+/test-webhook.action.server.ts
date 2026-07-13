@@ -4,59 +4,59 @@ import { safeParseJson } from "@/lib/request-utils.server";
 import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
 import { getDualAuthUser, requireDualAuth, requireJsonAuth } from "@/lib/api-auth.server";
+import { defineAction } from "@/lib/handler.server";
 
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["external"],
+  handler: async ({ request, auth }) => {
+    const user = auth.user;
 
-import type { ActionFunctionArgs } from "react-router";
+    const { event, destination_url, custom_headers } = await safeParseJson<{
+      event: string;
+      destination_url: string;
+      custom_headers: string;
+    }>(request);
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const user = auth.user;
+    let eventData: unknown;
+    let customHeaders: unknown;
+    try {
+      eventData = JSON.parse(event);
+      customHeaders = JSON.parse(custom_headers);
+    } catch {
+      return routeData({ error: "Invalid JSON payload" }, { status: 400 });
+    }
 
-  const { event, destination_url, custom_headers } = await safeParseJson<{
-    event: string;
-    destination_url: string;
-    custom_headers: string;
-  }>(request);
+    if (typeof eventData !== "object" || eventData === null || typeof destination_url !== "string") {
+      logger.warn("Invalid input for webhook test");
+      return routeData({ error: "Invalid input" }, { status: 400 });
+    }
 
-  let eventData: unknown;
-  let customHeaders: unknown;
-  try {
-    eventData = JSON.parse(event);
-    customHeaders = JSON.parse(custom_headers);
-  } catch {
-    return routeData({ error: "Invalid JSON payload" }, { status: 400 });
-  }
+    try {
+      await assertSafeOutboundUrl(destination_url);
+    } catch (urlError) {
+      const message =
+        urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
+      return routeData({ error: message }, { status: 400 });
+    }
 
-  if (typeof eventData !== "object" || eventData === null || typeof destination_url !== "string") {
-    logger.warn("Invalid input for webhook test");
-    return routeData({ error: "Invalid input" }, { status: 400 });
-  }
+    const cleanHeaders: Record<string, string> = {};
+    if (Array.isArray(customHeaders)) {
+      customHeaders.forEach((header: [string, string]) => {
+        if (header?.[0]) {
+          cleanHeaders[header[0]] = header[1];
+        }
+      });
+    } else if (customHeaders && typeof customHeaders === "object") {
+      Object.assign(cleanHeaders, customHeaders as Record<string, string>);
+    }
 
-  try {
-    await assertSafeOutboundUrl(destination_url);
-  } catch (urlError) {
-    const message =
-      urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
-    return routeData({ error: message }, { status: 400 });
-  }
+    const result = await testWebhook(
+      eventData as Record<string, unknown>,
+      destination_url,
+      cleanHeaders,
+    );
 
-  const cleanHeaders: Record<string, string> = {};
-  if (Array.isArray(customHeaders)) {
-    customHeaders.forEach((header: [string, string]) => {
-      if (header?.[0]) {
-        cleanHeaders[header[0]] = header[1];
-      }
-    });
-  } else if (customHeaders && typeof customHeaders === "object") {
-    Object.assign(cleanHeaders, customHeaders as Record<string, string>);
-  }
-
-  const result = await testWebhook(
-    eventData as Record<string, unknown>,
-    destination_url,
-    cleanHeaders,
-  );
-
-  return routeData(result);
-};
+    return routeData(result);
+  },
+});

@@ -1,8 +1,8 @@
 import { data as routeData } from "react-router";
 import { loadAdminWorkspaceInvitePage } from "@/lib/platform-admin.server";
-import { getAdminRouteContext } from "@/lib/admin-route.server";
+import { adminRouteAuth } from "@/lib/admin-route.server";
 import { MemberRole } from "@/lib/member-role";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 import type { Tables } from "@/lib/db-types";
 
 type MemberUser = Pick<
@@ -24,13 +24,16 @@ const memberRoles = new Set(Object.values(MemberRole));
 const isMemberRole = (role: string | null | undefined): role is MemberRole =>
   !!role && memberRoles.has(role as MemberRole);
 
-export const loader = async ({ params, context }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  auth: adminRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     throw new Error("No workspace id found!");
   }
 
-  const { headers, user } = getAdminRouteContext(context);
+  const { headers, user } = auth;
   const page = await loadAdminWorkspaceInvitePage(workspaceId, user.id);
   if (!page.ok) {
     throw new Error(page.error);
@@ -49,4 +52,5 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
     },
     { headers },
   );
-};
+  },
+});

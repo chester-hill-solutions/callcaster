@@ -61,6 +61,12 @@ export function useUnreadConversationsCount(
     }
   }, [workspaceId]);
 
+  /**
+   * @effect Fetch the workspace-wide unread count on mount/workspace change, then keep it fresh by polling every POLL_INTERVAL_MS (realtime INSERTs bump it optimistically between polls; see useWorkspaceEventSubscription below).
+   * @effect-deps workspaceId (refetch and restart polling when switching workspaces), refresh (useCallback memoized on workspaceId, so identity is stable per workspace)
+   * @effect-side-effects fetch (initial refresh() call via fetchConversationSummaries) + timer (setInterval, cleared on unmount/workspaceId change)
+   * @effect-why-not-loader This hook backs a persistent nav badge that lives outside any single route's loader lifecycle and must keep refreshing on a timer independent of navigation — a loader only runs once per navigation/revalidation, not periodically. It's deliberately paired with optimistic realtime bumps for immediate feedback that a request/response loader cycle can't provide.
+   */
   useEffect(() => {
     if (!workspaceId) return;
     void refresh();

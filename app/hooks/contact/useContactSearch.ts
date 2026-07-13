@@ -116,6 +116,15 @@ export function useContactSearch({
     }
   }, [workspace_id]);
 
+  /**
+   * @effect CANDIDATE-REMOVE Fetch contact matches and the latest conversation for the typed phone number.
+   * @effect-deps phoneNumber, isValid (only searches once the number is valid), searchContact, searchConversation
+   * @effect-side-effects fetch (fetchContactsByPhone + fetchLatestMessageForPhone via lib/chats/messaging-client)
+   * @effect-why-not-loader This is disguised data fetching driven by local input state rather than
+   *   route params — it calls imperative HTTP helpers directly instead of a loader/useFetcher. Could
+   *   be migrated to a debounced useFetcher().load() pair (workspace_id + phoneNumber as query params)
+   *   so React Router owns request de-duplication/cancellation instead of this hook doing it by hand.
+   */
   useEffect(() => {
     if (isValid && phoneNumber) {
       searchContact(phoneNumber);

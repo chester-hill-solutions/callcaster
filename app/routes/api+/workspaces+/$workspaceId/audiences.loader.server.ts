@@ -1,19 +1,26 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { listWorkspaceAudiencesApi } from "@/lib/platform-data.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ params, context }: LoaderFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  getDataPlaneRouteContext(context, workspaceId);
+export const loader = defineLoader({
+  auth: ({ params, context }: LoaderFunctionArgs) => {
+    const workspaceId = params.workspaceId;
+    if (!workspaceId) {
+      return jsonError("workspaceId is required", 400);
+    }
+    getDataPlaneRouteContext(context, workspaceId);
 
-  const result = await listWorkspaceAudiencesApi(workspaceId);
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
+    return { workspaceId };
+  },
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const result = await listWorkspaceAudiencesApi(auth.workspaceId);
+    if (!result.ok) {
+      return jsonError(result.error, result.status);
+    }
 
-  return jsonResponse({ audiences: result.audiences }, 200);
-}
+    return jsonResponse({ audiences: result.audiences }, 200);
+  },
+});

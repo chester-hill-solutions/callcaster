@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { resolveContactWorkspaceId } from "@/lib/platform-telephony.server";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 interface OutreachAttemptRequest {
   campaign_id: number | string;
@@ -13,10 +13,10 @@ interface OutreachAttemptRequest {
   queue_id: number | string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-
-    const auth = await requireJsonAuth(request);
-    if (auth instanceof Response) return auth;
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
     const { headers } = await getSession(request);
     const user = auth.user;
     const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest =
@@ -40,4 +40,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch (error) {
       return routeData({ error }, { headers });
     }
-}
+  },
+});

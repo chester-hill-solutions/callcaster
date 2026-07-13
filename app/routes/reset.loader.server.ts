@@ -1,0 +1,12 @@
+import { defineAction, defineLoader } from "@/lib/handler.server";
+import { redirectTo } from "@/lib/redirect-route.server";
+
+export const loader = defineLoader({
+  sideEffects: ["none"],
+  handler: redirectTo("/reset-password"),
+});
+
+export const action = defineAction({
+  sideEffects: ["none"],
+  handler: redirectTo("/reset-password"),
+});

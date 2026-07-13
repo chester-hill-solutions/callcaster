@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { script as scriptTable } from "@/db/schema";
-import type { Json } from "@/lib/db-types";
+import type { Json , Database } from "@/lib/db-types";
 import type { CampaignType } from "@/lib/database/campaign.server";
 import { logger } from "@/lib/logger.server";
 import {
@@ -10,7 +10,6 @@ import {
 } from "@/lib/campaign-audience-db.server";
 import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import type { Database } from "@/lib/db-types";
 import { createTenantDb } from "@/server/tenant-db";
 
 const SCRIPT_TYPES_FOR_CAMPAIGN: Record<CampaignType, string> = {

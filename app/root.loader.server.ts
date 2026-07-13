@@ -1,5 +1,4 @@
-import { data as routeData, redirect, type LoaderFunctionArgs } from "react-router";
-import type { Params } from "react-router";
+import { data as routeData, redirect, type LoaderFunctionArgs , Params } from "react-router";
 
 import { getSession } from "@/lib/auth.server";
 import { env as envUtil } from "@/lib/env.server";

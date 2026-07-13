@@ -9,11 +9,13 @@ import { fetchCampaignQueueRowsByIds } from "@/lib/campaign-queue-db.server";
 import { rpcSelectAndUpdateCampaignContacts } from "@/lib/db-rpc.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { data as routeData } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, url }: LoaderFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export const loader = defineLoader({
+  auth: ({ request }: LoaderFunctionArgs) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ url, auth }) => {
   const campaignId = url.searchParams.get("campaign_id");
   const workspaceIdParam = url.searchParams.get("workspace_id");
   const limit = url.searchParams.get("limit") ?? "10";
@@ -57,4 +59,5 @@ export const loader = async ({ request, url }: LoaderFunctionArgs) => {
   } catch (error) {
     return createErrorResponse(error, "Failed to load queue");
   }
-};
+  },
+});

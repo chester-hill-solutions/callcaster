@@ -92,7 +92,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     fd.set("audience-name", "New Audience");
     tenantDbState.audienceId = 10;
 
-    const res = await asRouteResponse(await mod.handleNewAudience({
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -112,7 +112,7 @@ describe("WorkspaceSelectedNewUtils", () => {
 
     bulkCreateContacts.mockResolvedValueOnce({ insert: [{ id: 1 }, { id: 2 }], audience_insert: [] });
 
-    const res = await asRouteResponse(await mod.handleNewAudience({
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -135,7 +135,7 @@ describe("WorkspaceSelectedNewUtils", () => {
 
     bulkCreateContacts.mockResolvedValueOnce({ insert: [], audience_insert: [] });
 
-    const res = await asRouteResponse(await mod.handleNewAudience({
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -156,7 +156,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     tenantDbState.audienceId = 12;
     tenantDbState.campaignAudienceInsertError = new Error("link");
 
-    const res = await asRouteResponse(await mod.handleNewAudience({
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -174,7 +174,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     const fd = new FormData();
     fd.set("audience-name", "boom");
 
-    const res1 = await asRouteResponse(await mod.handleNewAudience({
+    const res1 = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -188,7 +188,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     bulkCreateContacts.mockImplementationOnce(async () => {
       throw "boom";
     });
-    const res2 = await asRouteResponse(await mod.handleNewAudience({
+    const res2 = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -210,17 +210,17 @@ describe("WorkspaceSelectedNewUtils", () => {
 
     tenantDbState.campaignInsertError = new Error("duplicate");
     tenantDbState.campaignInsertErrorCode = "23505";
-    const r1 = await asRouteResponse(await mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
+    const r1 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect((await r1.json()).error.message).toContain("already a campaign");
 
     tenantDbState.campaignInsertError = new Error("nope");
     tenantDbState.campaignInsertErrorCode = "X";
-    const r2 = await asRouteResponse(await mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
+    const r2 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect((await r2.json()).error).toMatchObject({ code: "X", message: "nope" });
 
     tenantDbState.campaignInsertError = null;
     tenantDbState.campaignId = 2;
-    const r3 = await asRouteResponse(await mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
+    const r3 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect(r3.status).toBe(302);
     expect(r3.headers.get("Location")).toBe("/workspaces/w1/campaigns/2/settings");
   });
@@ -234,14 +234,14 @@ describe("WorkspaceSelectedNewUtils", () => {
     const fdMsg = new FormData();
     fdMsg.set("campaign-name", "C");
     fdMsg.set("campaign-type", "message");
-    const r1 = await asRouteResponse(await mod.handleNewCampaign({ formData: fdMsg, workspaceId: "w1", headers }));
+    const r1 = await asRouteResponse(mod.handleNewCampaign({ formData: fdMsg, workspaceId: "w1", headers }));
     expect(r1.status).toBe(302);
 
     tenantDbState.campaignId = 100;
     const fdRobo = new FormData();
     fdRobo.set("campaign-name", "C");
     fdRobo.set("campaign-type", "robocall");
-    const r2 = await asRouteResponse(await mod.handleNewCampaign({ formData: fdRobo, workspaceId: "w1", headers }));
+    const r2 = await asRouteResponse(mod.handleNewCampaign({ formData: fdRobo, workspaceId: "w1", headers }));
     expect(r2.status).toBe(302);
   });
 
@@ -259,7 +259,7 @@ describe("WorkspaceSelectedNewUtils", () => {
       error: null,
     });
 
-    const res = await asRouteResponse(await mod.handleNewCampaign({
+    const res = await asRouteResponse(mod.handleNewCampaign({
       formData: fd,
       workspaceId: "w1",
       headers,

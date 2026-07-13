@@ -94,26 +94,62 @@ export const useWorkspaceRealtime = ({
   const userRef = useRef(user);
   const workspaceRef = useRef(workspace);
 
+  /**
+   * @effect Keep a ref to the latest callsList so handleChange (used inside the SSE subscription's stable closure) reads current data instead of a stale render's value.
+   * @effect-deps callsList (from useCalls; changes as calls are updated locally or via realtime)
+   * @effect-side-effects none — updates callsListRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleChange; not data fetching.
+   */
   useEffect(() => {
     callsListRef.current = callsList;
   }, [callsList]);
 
+  /**
+   * @effect Keep a ref to the latest queue so handleChange reads current data instead of a stale render's value.
+   * @effect-deps queue (from useQueue; changes as the campaign queue is updated locally or via realtime)
+   * @effect-side-effects none — updates queueRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleChange; not data fetching.
+   */
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
 
+  /**
+   * @effect Keep a ref to the latest recentAttempt so handleChange reads current data instead of a stale render's value.
+   * @effect-deps recentAttempt (from useAttempts; changes as outreach attempts are updated locally or via realtime)
+   * @effect-side-effects none — updates recentAttemptRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleChange; not data fetching.
+   */
   useEffect(() => {
     recentAttemptRef.current = recentAttempt;
   }, [recentAttempt]);
 
+  /**
+   * @effect Keep a ref to the latest campaign_id so handleChange filters incoming events against the current campaign instead of a stale render's value.
+   * @effect-deps campaign_id (prop; identifies which campaign's rows to accept)
+   * @effect-side-effects none — updates campaignIdRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleChange; not data fetching.
+   */
   useEffect(() => {
     campaignIdRef.current = campaign_id;
   }, [campaign_id]);
 
+  /**
+   * @effect Keep a ref to the latest user so handleChange (and the updaters it calls) read current user data instead of a stale render's value.
+   * @effect-deps user (prop; the agent/user object passed down from the route)
+   * @effect-side-effects none — updates userRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleChange; not data fetching.
+   */
   useEffect(() => {
     userRef.current = user;
   }, [user]);
 
+  /**
+   * @effect Keep a ref to the latest workspace so handleChange filters workspace_number/transaction_history events against the current workspace instead of a stale render's value.
+   * @effect-deps workspace (prop; identifies which workspace's rows to accept)
+   * @effect-side-effects none — updates workspaceRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleChange; not data fetching.
+   */
   useEffect(() => {
     workspaceRef.current = workspace;
   }, [workspace]);
@@ -219,6 +255,12 @@ export const useWorkspaceRealtime = ({
   const handleChangeRef = useRef(handleChange);
   handleChangeRef.current = handleChange;
 
+  /**
+   * @effect Open an SSE connection to the workspace events endpoint and route postgres_change events (outreach_attempt, call, campaign_queue, workspace_number, transaction_history) to the appropriate local updater via handleChangeRef.
+   * @effect-deps workspace (prop; a change means the campaign session moved to a different workspace and must resubscribe to that workspace's event stream)
+   * @effect-side-effects subscription — opens an EventSource (SSE) connection on mount/workspace-change; removes the listener and closes the connection on cleanup
+   * @effect-why-not-loader Live server-pushed queue/call/attempt/credit changes can't be modeled as a request/response loader; the connection must persist for the campaign session and fan out to multiple local updaters (updateQueue, updateCalls, updateAttempts, updateWorkspaceNumbers, updateCredits) as events arrive.
+   */
   useEffect(() => {
     if (!workspace) return;
 
@@ -256,6 +298,12 @@ export const useWorkspaceRealtime = ({
     [setRecentAttempt],
   );
 
+  /**
+   * @effect CANDIDATE-REMOVE: Pushes nextRecipient up to the parent via setQuestionContact whenever it changes.
+   * @effect-deps nextRecipient (derived queue state from useQueue); setQuestionContact (parent-supplied setter)
+   * @effect-side-effects none — calls the parent's setQuestionContact with the current nextRecipient
+   * @effect-why-not-loader This isn't fetch/loader territory — it's the "adjust state based on a prop/state change" anti-pattern from the React docs (you-might-not-need-an-effect). nextRecipient is already derived local state (from useQueue); syncing it to a parent-owned setState on every change via an effect causes an extra render pass. It would likely be cleaner for the parent to own/derive questionContact directly, or for callers here to invoke setQuestionContact at the point nextRecipient is actually produced (inside useQueue/updateQueue/updateCalls) rather than reactively mirroring it. Left as-is per scope (annotate + flag only, not rewrite).
+   */
   useEffect(() => {
     setQuestionContact(nextRecipient);
   }, [nextRecipient, setQuestionContact]);

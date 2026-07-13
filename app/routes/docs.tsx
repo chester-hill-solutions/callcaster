@@ -58,6 +58,12 @@ export default function DocsPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  /**
+   * @effect Dynamically import and imperatively mount the Scalar API-reference widget into containerRef for the active spec.
+   * @effect-deps config.url — remounts the widget against the newly selected spec (public vs. complete) when it changes.
+   * @effect-side-effects dom (imperative third-party widget mount) + dynamic import; instance destroyed on cleanup/re-run.
+   * @effect-why-not-loader Scalar's `createApiReference` is an imperative DOM-mounting API from a lazily-loaded client bundle, not data a loader could hand to a component tree.
+   */
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;

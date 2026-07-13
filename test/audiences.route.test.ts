@@ -80,7 +80,7 @@ describe("api.audiences route", () => {
 
     parseActionRequest.mockResolvedValueOnce({ name: "x" });
     const mod = await import("../app/routes/api+/audiences");
-    const resMissing = await asRouteResponse(await mod.action({
+    const resMissing = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -88,14 +88,14 @@ describe("api.audiences route", () => {
 
     // Covers `value ?? ""` branch for null id
     parseActionRequest.mockResolvedValueOnce({ id: null, name: "x" });
-    const resNullId = await asRouteResponse(await mod.action({
+    const resNullId = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
     expect(resNullId.status).toBe(400);
 
     parseActionRequest.mockResolvedValueOnce({ id: "1", name: "New", extra: { skip: true } });
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -108,7 +108,7 @@ describe("api.audiences route", () => {
     // Covers null update branch
     contactAudienceMocks.upsertAudienceById.mockResolvedValueOnce(null);
     parseActionRequest.mockResolvedValueOnce({ id: "3", name: "Maybe" });
-    const resNull = await asRouteResponse(await mod.action({
+    const resNull = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -123,14 +123,14 @@ describe("api.audiences route", () => {
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
     parseActionRequest.mockResolvedValueOnce({});
-    const resMissing = await asRouteResponse(await mod.action({
+    const resMissing = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
     expect(resMissing.status).toBe(400);
 
     parseActionRequest.mockResolvedValueOnce({ id: "nope" });
-    const resInvalid = await asRouteResponse(await mod.action({
+    const resInvalid = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -138,7 +138,7 @@ describe("api.audiences route", () => {
 
     contactAudienceMocks.deleteAudienceById.mockResolvedValueOnce(false);
     parseActionRequest.mockResolvedValueOnce({ id: "2" });
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -146,7 +146,7 @@ describe("api.audiences route", () => {
 
     contactAudienceMocks.deleteAudienceById.mockResolvedValueOnce(true);
     parseActionRequest.mockResolvedValueOnce({ id: "3" });
-    const resOk = await asRouteResponse(await mod.action({
+    const resOk = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -165,20 +165,20 @@ describe("api.audiences route", () => {
     contactAudienceMocks.findAudienceWorkspaceById.mockResolvedValue("w1");
     contactAudienceMocks.listAudienceContactsForExport.mockResolvedValue([]);
 
-    const resMissing = await asRouteResponse(await mod.loader({
+    const resMissing = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
     expect(resMissing.status).toBe(400);
 
-    const resInvalid = await asRouteResponse(await mod.loader({
+    const resInvalid = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=nope"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
     expect(resInvalid.status).toBe(400);
 
     contactAudienceMocks.findAudienceWorkspaceById.mockResolvedValueOnce(null);
-    const res404 = await asRouteResponse(await mod.loader({
+    const res404 = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -186,7 +186,7 @@ describe("api.audiences route", () => {
 
     contactAudienceMocks.findAudienceWorkspaceById.mockResolvedValueOnce("w1");
     contactAudienceMocks.listAudienceContactsForExport.mockResolvedValueOnce([]);
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request(
         "http://localhost/api/audiences?returnType=csv&audienceId=1&q=joe&sortKey=firstname&sortDirection=desc",
       ),
@@ -221,7 +221,7 @@ describe("api.audiences route", () => {
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -229,7 +229,7 @@ describe("api.audiences route", () => {
     expect(text).toContain("X");
 
     contactAudienceMocks.listAudienceContactsForExport.mockResolvedValueOnce([]);
-    const resEmpty = await asRouteResponse(await mod.loader({
+    const resEmpty = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1&sortKey=__bad__"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -237,12 +237,14 @@ describe("api.audiences route", () => {
     expect(await resEmpty.text()).toContain("\r\n");
 
     contactAudienceMocks.listAudienceContactsForExport.mockRejectedValueOnce(new Error("q"));
-    await expect(
-      mod.loader({
-        request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
-        deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-      } as any),
-    ).rejects.toBeTruthy();
+    // The handler factory maps rethrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const resErr = await asRouteResponse(mod.loader({
+      request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
+      deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
+    } as any));
+    expect(resErr.status).toBe(500);
+    await expect(resErr.json()).resolves.toMatchObject({ error: "q" });
   }, 30000);
 
   test("resolveDeps fallbacks are covered via module mocks", async () => {
@@ -260,7 +262,7 @@ describe("api.audiences route", () => {
     vi.doMock("@/lib/request-utils.server", () => ({ parseActionRequest }));
 
     const mod = await import("../app/routes/api+/audiences");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
     } as any));
     expect(await res.json()).toEqual([{ id: 1, name: "x" }]);
@@ -274,7 +276,7 @@ describe("api.audiences route", () => {
     const verifyAuth = vi.fn(async () => ({ headers: new Headers(), user: { id: "u1" } }));
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/audiences?workspaceId=w1"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
@@ -293,12 +295,14 @@ describe("api.audiences route", () => {
     expect(contactAudienceMocks.listAudienceContactsJson).toHaveBeenLastCalledWith(12);
 
     contactAudienceMocks.listAudienceContactsJson.mockRejectedValueOnce(new Error("q"));
-    await expect(
-      mod.loader({
-        request: new Request("http://localhost/api/audiences?workspaceId=w1"),
-        deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-      } as any),
-    ).rejects.toBeTruthy();
+    // The handler factory maps rethrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const resErr = await asRouteResponse(mod.loader({
+      request: new Request("http://localhost/api/audiences?workspaceId=w1"),
+      deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
+    } as any));
+    expect(resErr.status).toBe(500);
+    await expect(resErr.json()).resolves.toMatchObject({ error: "q" });
   }, 30000);
 });
 

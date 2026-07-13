@@ -53,15 +53,15 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
       friendlyName: "n",
     };
 
-    const r1 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: makeReq(body) } as any));
     expect(r1.status).toBe(500);
     await expect(r1.json()).resolves.toMatchObject({ error: "Postgres query error: q" });
 
-    const r2 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: makeReq(body) } as any));
     expect(r2.status).toBe(500);
     await expect(r2.json()).resolves.toMatchObject({ error: "No workspace data found" });
 
-    const r3 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
+    const r3 = await asRouteResponse(mod.action({ request: makeReq(body) } as any));
     expect(r3.status).toBe(500);
     await expect(r3.json()).resolves.toMatchObject({ error: "Workspace twilio_data not found" });
   });
@@ -75,7 +75,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "+123",
         workspace_id: "00000000-0000-4000-8000-000000000001",
@@ -97,7 +97,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "5555550100",
         workspace_id: "00000000-0000-4000-8000-000000000001",
@@ -117,7 +117,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "5555550100",
         workspace_id: "00000000-0000-4000-8000-000000000001",
@@ -139,7 +139,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "1+5555550100",
         workspace_id: "00000000-0000-4000-8000-000000000001",

@@ -4,7 +4,7 @@ import {
   getWorkspacePhoneNumbers,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import type { Database } from "@/lib/db-types";
+import type { Database , Tables } from "@/lib/db-types";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   applyWorkspaceOnboardingChannelPolicy,
@@ -48,7 +48,6 @@ import type {
   WorkspaceOperatingCountry,
 } from "@/lib/types";
 import { WORKSPACE_OPERATING_COUNTRY_VALUES } from "@/lib/types";
-import type { Tables } from "@/lib/db-types";
 
 export type OnboardingHandlerResult =
   | {

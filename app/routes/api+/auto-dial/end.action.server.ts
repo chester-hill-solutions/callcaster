@@ -1,9 +1,13 @@
-import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { safeParseJson } from "@/lib/request-utils.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { resolveJsonAuthSession } from "@/lib/api-auth.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database, Tables } from "@/lib/db-types";
 import {
@@ -22,23 +26,35 @@ type AutoDialEndDeps = Partial<{
   logger: typeof logger;
 }>;
 
-export const action = async ({
-  request,
-  deps,
-}: ActionFunctionArgs & { deps?: AutoDialEndDeps }) => {
+export const action = defineAction({
+  auth: async (args) => {
+    const { deps } = args as ActionFunctionArgs & { deps?: AutoDialEndDeps };
+    const verifyAuth = deps?.verifyAuth ?? resolveJsonAuthSession;
+    const { user } = await verifyAuth(args.request);
+    return user;
+  },
+  sideEffects: ["db-write", "twilio"],
+  handler: async (ctx) => {
+  const { request, auth: user } = ctx;
+  const { deps } = ctx as typeof ctx & { deps?: AutoDialEndDeps };
 
   const d = {
-    verifyAuth: deps?.verifyAuth ?? resolveJsonAuthSession,
     safeParseJson: deps?.safeParseJson ?? safeParseJson,
     createWorkspaceTwilioInstance:
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
     logger: deps?.logger ?? logger,
   };
-  const { user } = await d.verifyAuth(request);
   const { workspaceId: workspace_id } = await d.safeParseJson<{ workspaceId?: string }>(request);
   if (typeof workspace_id !== "string") {
     return routeData({ error: "Missing workspaceId" }, { status: 400 });
   }
+
+  try {
+    await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+  } catch {
+    return routeData({ error: "Forbidden" }, { status: 403 });
+  }
+
   const twilio = await d.createWorkspaceTwilioInstance({ workspace_id });
 
   const updateOutreachAttempt = async (
@@ -103,4 +119,5 @@ export const action = async ({
   }
 
   return routeData({ success: true });
-}
+  },
+});

@@ -60,7 +60,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
     postgresServerMocks.headers = new Headers({ "X-Test": "1" });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "", audience_id: "" });
     const mod = await import("../app/routes/api+/contact-audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(400);
@@ -76,7 +76,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
     mocks.removeContactFromAudience.mockResolvedValueOnce({ ok: true });
 
     const mod = await import("../app/routes/api+/contact-audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
@@ -93,7 +93,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
     mocks.removeContactFromAudience.mockRejectedValueOnce(new Error("nope"));
 
     const mod = await import("../app/routes/api+/contact-audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(500);
@@ -104,7 +104,7 @@ describe("app/routes/api+/contact-audience/route.tsx", () => {
     postgresServerMocks.headers = new Headers({ "X": "1" });
     queueDualAuthSession({ user: { id: "test-user" } });
     const mod = await import("../app/routes/api+/contact-audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);

@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/typography";
 
 export default function AccountSecurity() {
-  const data = useLoaderData<typeof import("./account.security.loader.server").loader>();
+  const data = useLoaderData<{
+    privileged: boolean;
+    twoFactorEnabled: boolean;
+    enrollRequired: boolean;
+    next: string | null;
+    privilegedRoles: readonly string[];
+  }>();
   const actionData = useActionData<{
     error?: string;
     success?: string;
@@ -65,6 +71,7 @@ export default function AccountSecurity() {
             ) : null}
             <Form method="POST" className="flex flex-col gap-4">
               <input type="hidden" name="intent" value="verify" />
+              {data.next ? <input type="hidden" name="next" value={data.next} /> : null}
               <FormField htmlFor="code" label="Verification code">
                 <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" />
               </FormField>

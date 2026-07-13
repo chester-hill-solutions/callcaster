@@ -16,9 +16,15 @@ import { useEffect, useState } from 'react';
 export function useCallDuration(callState: string) {
   const [callDuration, setCallDuration] = useState<number>(0);
 
+  /**
+   * @effect Tick the call-duration counter once per second while connected.
+   * @effect-deps callState (starts the timer on 'connected', resets otherwise)
+   * @effect-side-effects timer (setInterval) + functional setState; cleared on unmount/state change
+   * @effect-why-not-loader Wall-clock elapsed time is live client state, not server request data.
+   */
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
-    
+
     if (callState === 'connected') {
       interval = setInterval(() => {
         setCallDuration(prev => prev + 1);

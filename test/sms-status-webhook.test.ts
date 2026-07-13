@@ -136,16 +136,14 @@ describe("api.sms.status webhook behavior", () => {
   test("rejects invalid Twilio signature", async () => {
     mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }));
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest({ SmsSid: "SM_BAD", SmsStatus: "delivered" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: makeRequest({ SmsSid: "SM_BAD", SmsStatus: "delivered" }) } as any),
     );
     expect(res.status).toBe(403);
   }, 15000);
 
   test("normalizes unknown SmsStatus to failed", async () => {
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest({ SmsSid: "SM123", SmsStatus: "not-a-real-status" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: makeRequest({ SmsSid: "SM123", SmsStatus: "not-a-real-status" }) } as any),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -160,8 +158,7 @@ describe("api.sms.status webhook behavior", () => {
   test("does not overwrite terminal outreach disposition", async () => {
     mocks.findOutreachAttemptById.mockResolvedValueOnce({ id: 7, disposition: "delivered" });
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest({ SmsSid: "SM123", SmsStatus: "failed" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: makeRequest({ SmsSid: "SM123", SmsStatus: "failed" }) } as any),
     );
     expect(res.status).toBe(200);
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
@@ -169,8 +166,7 @@ describe("api.sms.status webhook behavior", () => {
 
   test("accepts MessageStatus when SmsStatus is absent", async () => {
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest({ SmsSid: "SM123", MessageStatus: "delivered" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: makeRequest({ SmsSid: "SM123", MessageStatus: "delivered" }) } as any),
     );
     expect(res.status).toBe(200);
     expect(mocks.updateMessageBySid).toHaveBeenCalledWith(

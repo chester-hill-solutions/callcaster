@@ -4,15 +4,9 @@ import { FaPhoneVolume, FaMicrophone } from "react-icons/fa6";
 import type { ReactNode } from "react";
 import type { MetaFunction } from "react-router";
 
+export { loader, action } from "./pricing.loader.server";
+
 export const meta: MetaFunction = () => [{ title: "Pricing — CallCaster" }];
-
-export async function loader() {
-  return {};
-}
-
-export async function action() {
-  return {};
-}
 
 const SectionTitle = ({ children }: { children: ReactNode }) => (
   <h1 className="mb-12 text-center font-Zilla-Slab text-5xl font-bold">

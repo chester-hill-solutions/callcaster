@@ -629,10 +629,14 @@ export async function patchCampaignQueueApi(
     switch (body.action) {
       case "update_status": {
         if (body.all) {
-          const ids = await searchCampaignQueueIds({ campaignId: campaignIdNum, filters });
-          await updateCampaignQueueStatusByIds(ids, body.status!);
+          const ids = await searchCampaignQueueIds({
+            campaignId: campaignIdNum,
+            filters,
+            workspaceId,
+          });
+          await updateCampaignQueueStatusByIds(ids, body.status!, workspaceId);
         } else if (body.ids?.length) {
-          await updateCampaignQueueStatusByIds(body.ids, body.status!);
+          await updateCampaignQueueStatusByIds(body.ids, body.status!, workspaceId);
         }
         return { ok: true as const, success: true };
       }
@@ -658,9 +662,9 @@ export async function patchCampaignQueueApi(
       }
       case "remove": {
         if (body.all) {
-          await deleteAllCampaignQueueForCampaign(campaignIdNum);
+          await deleteAllCampaignQueueForCampaign(campaignIdNum, workspaceId);
         } else if (body.ids?.length) {
-          await deleteCampaignQueueByIds(body.ids);
+          await deleteCampaignQueueByIds(body.ids, workspaceId);
         }
         return { ok: true as const, success: true };
       }

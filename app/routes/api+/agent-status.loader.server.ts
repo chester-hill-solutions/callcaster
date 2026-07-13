@@ -6,11 +6,12 @@ import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { getAgentStatus } from "@/lib/agent-status.server";
 import { logger } from "@/lib/logger.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, url}: LoaderFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+export const loader = defineLoader({
+  auth: ({ request }: LoaderFunctionArgs) => requireJsonAuth(request),
+  sideEffects: ["db-read"],
+  handler: async ({ url, auth }) => {
   try {
     const workspaceId = url.searchParams.get("workspace_id");
     if (!workspaceId) {
@@ -25,4 +26,5 @@ export const loader = async ({ request, url}: LoaderFunctionArgs) => {
     logger.error("agent-status loader error:", error);
     return createErrorResponse(error, "Failed to get agent status");
   }
-};
+  },
+});

@@ -21,8 +21,7 @@ vi.mock("@/lib/env.server", () => ({
 describe("app/routes/api+/auth/signout.action.server.ts", () => {
   test("rejects non-POST methods", async () => {
     const mod = await import("../app/routes/api+/auth/signout.action.server");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/auth/signout", {
           method: "GET",
         }),
@@ -39,8 +38,7 @@ describe("app/routes/api+/auth/signout.action.server.ts", () => {
     mocks.signOut.mockResolvedValueOnce({ headers });
 
     const mod = await import("../app/routes/api+/auth/signout.action.server");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/auth/signout", {
           method: "POST",
         }),

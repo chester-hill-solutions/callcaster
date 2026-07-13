@@ -5,6 +5,8 @@ import { playTwiml } from "@/lib/twilio-twiml.server";
 import { loadCampaignVoicedropAudio } from "@/lib/sms-campaign-db.server";
 import { findCallSidByParentCallSid } from "@/lib/telephony-db.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { defineAction } from "@/lib/handler.server";
+import type { ActionFunctionArgs } from "react-router";
 import type TwilioSDK from "twilio";
 
 type TwilioClient = TwilioSDK.Twilio;
@@ -19,13 +21,12 @@ type AudiodropDeps = Partial<{
   createSignedObjectUrl: typeof createSignedObjectUrl;
 }>;
 
-export const action = async ({
-  request,
-  deps,
-}: {
-  request: Request;
-  deps?: AudiodropDeps;
-}) => {
+export const action = defineAction({
+  sideEffects: ["db-read", "twilio", "external"],
+  handler: async ({
+    request,
+    deps,
+  }: ActionFunctionArgs & { deps?: AudiodropDeps }) => {
   const d = {
     verifyAuth: deps?.verifyAuth ?? resolveJsonAuthSession,
     createWorkspaceTwilioInstance:
@@ -89,4 +90,5 @@ export const action = async ({
     return { success: false, error };
   }
   return { success: true };
-};
+  },
+});

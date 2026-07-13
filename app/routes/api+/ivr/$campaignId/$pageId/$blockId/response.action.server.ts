@@ -7,9 +7,9 @@ import {
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
 const getOutreach = async (workspaceId: string, outreachId: number) => {
   const row = await findOutreachAttemptById(workspaceId, outreachId);
   if (!row) throw new Error("Outreach attempt not found");
@@ -103,39 +103,20 @@ const handleNextStep = (
   }
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrResponse(request, [params.campaignId, params.pageId, params.blockId]),
+  sideEffects: ["db-write"],
+  handler: async ({ params, auth }) => {
   const baseUrl = env.BASE_URL();
 
   const twiml = new Twilio.twiml.VoiceResponse();
 
-  const pageId = params.pageId;
-  const blockId = params.blockId;
-  const campaignId = params.campaignId;
+  const pageId = params.pageId as string;
+  const blockId = params.blockId as string;
+  const campaignId = params.campaignId as string;
 
-  if (!campaignId || !pageId || !blockId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const formData = await request.formData();
-  const formParams = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const digitsValue = formParams.Digits;
-  const speechResultValue = formParams.SpeechResult;
-  const callSidValue = formParams.CallSid;
-
-  const userInput =
-    typeof digitsValue === "string"
-      ? digitsValue
-      : typeof speechResultValue === "string"
-        ? speechResultValue
-        : null;
-  const callSid = typeof callSidValue === "string" ? callSidValue : null;
-
-  if (!callSid) {
-    return new Response("Missing CallSid parameter", { status: 400 });
-  }
-
-  const forbidden = await requireTwilioSignature(request, { callSid });
-  if (forbidden) return forbidden;
+  const { callSid, userInput } = auth;
 
   try {
     const [call, campaignData] = await Promise.all([
@@ -217,4 +198,5 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "application/xml" },
   });
-};
+  },
+});

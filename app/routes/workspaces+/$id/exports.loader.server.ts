@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import { listObjects, downloadObject } from "@/lib/object-storage.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
 interface ExportItem {
   id: string;
@@ -38,11 +38,12 @@ interface LoaderData {
   exports: SerializedExportItem[];
 }
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
-
-  const result = await requireWorkspaceLoaderContext(request, params["id"]);
-  if (!result.ok) return result.response;
-  const { user, workspaceId } = result.ctx;
+export const loader = defineLoader({
+  auth: ({ request, params }) => requireWorkspaceLoaderContext(request, params["id"]),
+  sideEffects: ["external"],
+  handler: async ({ auth }) => {
+  if (!auth.ok) return auth.response;
+  const { user, workspaceId } = auth.ctx;
 
   try {
     // List all files in the workspace's exports directory
@@ -114,4 +115,5 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
     const message = error instanceof Error ? error.message : "Unknown error";
     return routeData({ error: message }, { status: 500 });
   }
-}
+  },
+});

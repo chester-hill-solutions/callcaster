@@ -6,8 +6,8 @@ import {
   updateUserWorkspaceRoleAdmin,
 } from "@/lib/platform-admin.server";
 import { MemberRole } from "@/lib/member-role";
-import { getAdminRouteContext } from "@/lib/admin-route.server";
-import type { ActionFunctionArgs } from "react-router";
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineAction } from "@/lib/handler.server";
 
 type WorkspaceRole = "owner" | "member" | "caller" | "admin";
 
@@ -19,8 +19,10 @@ function parseWorkspaceRole(value: FormDataEntryValue | null): WorkspaceRole | n
   return null;
 }
 
-export const action = async ({ request, context, params }: ActionFunctionArgs) => {
-  getAdminRouteContext(context);
+export const action = defineAction({
+  auth: adminRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ request, params }) => {
   const userId = params.userId;
 
   if (!userId) {
@@ -100,4 +102,5 @@ export const action = async ({ request, context, params }: ActionFunctionArgs) =
   }
 
   return routeData({ error: "Invalid action" });
-};
+  },
+});

@@ -10,6 +10,7 @@ import {
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { env } from "@/lib/env.server";
+import { defineAction } from "@/lib/handler.server";
 
 interface FormData {
   VerificationStatus: string;
@@ -29,72 +30,77 @@ interface Capabilities {
   emergency_compliance_status: string;
 }
 
-import type { ActionFunctionArgs } from "react-router";
+export const action = defineAction({
+  auth: async ({ request }) => {
+    const formData = await request.clone().formData();
+    const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const formData = await request.clone().formData();
-  const parsedBody: FormData = Object.fromEntries(formData) as FormData;
-
-  try {
     const forbidden = await requireTwilioSignature(request, { phoneNumber: parsedBody.To });
     if (forbidden) return forbidden;
 
-    if (
-      parsedBody.VerificationStatus === "success" ||
-      parsedBody.VerificationStatus === "failed"
-    ) {
-      const capabilities: Capabilities = {
-        fax: false,
-        mms: parsedBody.VerificationStatus === "success",
-        sms: parsedBody.VerificationStatus === "success",
-        voice: parsedBody.VerificationStatus === "success",
-        verification_status: parsedBody.VerificationStatus,
-        emergency_address_status: "not_started",
-        emergency_address_sid: null,
-        emergency_eligible: false,
-        emergency_compliance_status: "not_started",
-      };
+    return parsedBody;
+  },
+  sideEffects: ["db-write"],
+  handler: async ({ auth }) => {
+    const parsedBody = auth;
 
-      const numberRequest = await updateWorkspaceNumberCapabilitiesByPhone(
-        parsedBody.To,
-        capabilities as unknown as Record<string, unknown>,
-      );
+    try {
+      if (
+        parsedBody.VerificationStatus === "success" ||
+        parsedBody.VerificationStatus === "failed"
+      ) {
+        const capabilities: Capabilities = {
+          fax: false,
+          mms: parsedBody.VerificationStatus === "success",
+          sms: parsedBody.VerificationStatus === "success",
+          voice: parsedBody.VerificationStatus === "success",
+          verification_status: parsedBody.VerificationStatus,
+          emergency_address_status: "not_started",
+          emergency_address_sid: null,
+          emergency_eligible: false,
+          emergency_compliance_status: "not_started",
+        };
 
-      if (numberRequest.length === 0) {
-        throw new Error("No matching record found");
-      }
+        const numberRequest = await updateWorkspaceNumberCapabilitiesByPhone(
+          parsedBody.To,
+          capabilities as unknown as Record<string, unknown>,
+        );
 
-      if (parsedBody.VerificationStatus === "success") {
-        const updatedNumber = numberRequest[0]!;
-        const workspaceId = updatedNumber.workspace;
-        if (workspaceId) {
-          const [current, phoneNumbersResult] = await Promise.all([
-            getWorkspaceMessagingOnboardingState({workspaceId,
-            }),
-            getWorkspacePhoneNumbers({workspaceId,
-            }),
-          ]);
-          let nextState = updateMessagingServiceSenders(current, parsedBody.To);
-          nextState = applyOnboardingStepsWithWorkspaceNumbers(
-            nextState,
-            phoneNumbersResult.data ?? [],
-          );
-          await updateWorkspaceMessagingOnboardingState({workspaceId,
-            updates: nextState,
-            actorUserId: null,
-          });
+        if (numberRequest.length === 0) {
+          throw new Error("No matching record found");
         }
+
+        if (parsedBody.VerificationStatus === "success") {
+          const updatedNumber = numberRequest[0]!;
+          const workspaceId = updatedNumber.workspace;
+          if (workspaceId) {
+            const [current, phoneNumbersResult] = await Promise.all([
+              getWorkspaceMessagingOnboardingState({ workspaceId }),
+              getWorkspacePhoneNumbers({ workspaceId }),
+            ]);
+            let nextState = updateMessagingServiceSenders(current, parsedBody.To);
+            nextState = applyOnboardingStepsWithWorkspaceNumbers(
+              nextState,
+              phoneNumbersResult.data ?? [],
+            );
+            await updateWorkspaceMessagingOnboardingState({
+              workspaceId,
+              updates: nextState,
+              actorUserId: null,
+            });
+          }
+        }
+
+        return routeData(numberRequest[0]);
       }
 
-      return routeData(numberRequest[0]);
+      return routeData(parsedBody);
+    } catch (error) {
+      logger.error("Error processing request:", error);
+      return routeData(
+        { error: "An error occurred while processing the request" },
+        { status: 500 },
+      );
     }
-
-    return routeData(parsedBody);
-  } catch (error) {
-    logger.error("Error processing request:", error);
-    return routeData(
-      { error: "An error occurred while processing the request" },
-      { status: 500 },
-    );
-  }
-};
+  },
+});

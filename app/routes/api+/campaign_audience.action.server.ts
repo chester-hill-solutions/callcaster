@@ -17,12 +17,14 @@ import {
 import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/request-utils.server";
 import { requireDualAuth } from "@/lib/api-auth.server";
+import { defineAction } from "@/lib/handler.server";
 
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
+export const action = defineAction({
+  auth: ({ request }: ActionFunctionArgs) => requireDualAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request }) => {
   const { headers } = await getSession(request);  const method = request.method;
 
   try {
@@ -149,4 +151,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { status: 500, headers },
     );
   }
-};
+  },
+});

@@ -21,6 +21,7 @@ import {
   webhook,
   workspace_api_key,
   workspace_events,
+  workspace_audit_event,
   workspace_invite,
   workspace_number,
   workspace_users,
@@ -31,7 +32,7 @@ import {
  *
  * `createTenantDb(workspaceId)` auto-scopes each of these tables on every
  * read/update/delete and auto-injects the tenancy column on every insert (ADR-0004).
- * Count: 23 tables after Phase 1 schema transform (vestigial/subtype tables removed).
+ * Count: 25 tables after Phase 1 schema transform (vestigial/subtype tables removed).
  */
 export const WORKSPACE_SCOPED_TABLES = {
   campaign: { table: campaign, workspaceColumn: campaign.workspace },
@@ -75,6 +76,10 @@ export const WORKSPACE_SCOPED_TABLES = {
   workspace_events: {
     table: workspace_events,
     workspaceColumn: workspace_events.workspace_id,
+  },
+  workspace_audit_event: {
+    table: workspace_audit_event,
+    workspaceColumn: workspace_audit_event.workspace_id,
   },
 } as const;
 

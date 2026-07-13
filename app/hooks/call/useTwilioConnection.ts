@@ -52,6 +52,21 @@ export function useTwilioConnection({
   onCallStateChangeRef.current = onCallStateChange;
   onDeviceBusyChangeRef.current = onDeviceBusyChange;
 
+  /**
+   * @effect Create and register a Twilio Voice SDK `Device` for the given auth
+   * token, lazily loading the SDK, and wire all device-level lifecycle events
+   * (registered/unregistered/connecting/connected/disconnected/cancel/error/
+   * incoming) to the latest caller-supplied callbacks.
+   * @effect-deps token, deviceOptions (a new/changed token or device options
+   * means a new Device must be created and registered; callback props are read
+   * via refs so they don't need to be deps and don't retrigger setup)
+   * @effect-side-effects subscription (Twilio Device event listeners) + network
+   * (lazy SDK import, device.register()/unregister()); all listeners detached
+   * and the device unregistered in the cleanup function.
+   * @effect-why-not-loader Establishes and tears down a stateful, imperative
+   * WebRTC device registration with the Twilio SDK that must persist for the
+   * component's lifetime; it isn't a request/response data fetch.
+   */
   useEffect(() => {
     if (!token) {
       logger.error("No token provided");

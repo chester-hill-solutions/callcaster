@@ -17,6 +17,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { findMatchingContactIds } from "@/lib/inbound-sms-context.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
+import { defineAction } from "@/lib/handler.server";
 
 /**
  * Fail-open contact-level opt-out lookup: resolves by contact_id when known,
@@ -94,16 +95,21 @@ async function findLandlineContact(
   }
 }
 
-export const action = async ({ request }: { request: Request }) => {
-  const authResult = await verifyApiKeyOrSession(request);
+export const action = defineAction({
+  auth: async ({ request }) => {
+    const authResult = await verifyApiKeyOrSession(request);
 
-  if ("error" in authResult) {
-    return new Response(JSON.stringify({ error: authResult.error }), {
-      headers: { "Content-Type": "application/json" },
-      status: authResult.status,
-    });
-  }
+    if ("error" in authResult) {
+      return new Response(JSON.stringify({ error: authResult.error }), {
+        headers: { "Content-Type": "application/json" },
+        status: authResult.status,
+      });
+    }
 
+    return authResult;
+  },
+  sideEffects: ["db-write", "credit", "twilio"],
+  handler: async ({ request, auth: authResult }) => {
   const parsed = await parseJsonBodyOrResponse(request, chatSmsBodySchema);
   if (parsed instanceof Response) {
     return parsed;
@@ -246,4 +252,5 @@ export const action = async ({ request }: { request: Request }) => {
       },
     );
   }
-};
+  },
+});

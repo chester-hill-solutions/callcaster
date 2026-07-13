@@ -17,6 +17,7 @@ import {
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
 
 const getAdmin = () => null /* removed service client */;
@@ -208,8 +209,16 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
     return false;
 }
 
-export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
-    const conferenceName = params.roomId;
+export const action = defineAction({
+    auth: async ({ request }) => {
+        const formData = await request.clone().formData();
+        const callSid = formData.get('CallSid') as string;
+        const forbidden = await requireTwilioSignature(request, { callSid });
+        return forbidden ?? null;
+    },
+    sideEffects: ["db-write", "twilio", "external"],
+    handler: async ({ request, params }) => {
+    const conferenceName = params.roomId as string;
     const formData = await request.clone().formData();
     const parsedBody = Object.fromEntries(formData) as Record<string, string>;
     const callSid = formData.get('CallSid') as string;
@@ -220,8 +229,6 @@ export const action = async ({ request, params }: { request: Request, params: { 
     let response: Response;
 
     try {
-        const forbidden = await requireTwilioSignature(request, { callSid });
-        if (forbidden) return forbidden;
         const dbCall = await fetchCallData(callSid);
         const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
 
@@ -262,4 +269,5 @@ export const action = async ({ request, params }: { request: Request, params: { 
     }
 
     return response;
-};
+    },
+});

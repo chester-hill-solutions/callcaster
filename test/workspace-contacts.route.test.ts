@@ -88,7 +88,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=jo")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    const res = await asRouteResponse(await mod.loader(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=jo`,
       ),
@@ -110,7 +110,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=example.com")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    const res = await asRouteResponse(await mod.loader(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=example.com`,
       ),
@@ -132,7 +132,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=1234")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    const res = await asRouteResponse(await mod.loader(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=1234`,
       ),

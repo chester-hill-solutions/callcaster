@@ -42,6 +42,12 @@ export function IncomingCallReceiver({
     onDeviceBusyChange: noop,
   });
 
+  /**
+   * @effect Keep receiveIncomingRef pointed at the latest callHandling.receiveIncoming so useTwilioConnection's onIncomingCall (bound once) never calls a stale closure.
+   * @effect-deps callHandling.receiveIncoming — re-points the ref whenever call handling produces a new handler.
+   * @effect-side-effects none (ref mutation only; no DOM/timer/subscription/fetch)
+   * @effect-why-not-loader This is a ref-freshness fix for a callback captured by an unrelated hook, not data — there's no loader equivalent for keeping a mutable ref current.
+   */
   useEffect(() => {
     receiveIncomingRef.current = callHandling.receiveIncoming;
   }, [callHandling.receiveIncoming]);

@@ -85,7 +85,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
   test("returns 402 creditsError when workspace balance is <= 0", async () => {
     creditsState.credits = 0;
     const mod = await import("../app/routes/api+/ivr");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeRequest({
         to_number: "+1555",
         campaign_id: "1",
@@ -104,7 +104,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
   test("returns 404 when workspace credits balance is not found", async () => {
     creditsState.credits = null;
     const mod = await import("../app/routes/api+/ivr");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeRequest({
         to_number: "+1555",
         campaign_id: "1",
@@ -121,7 +121,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
 
   test("success creates outreach, places call, inserts call, dequeues, returns JSON", async () => {
     const mod = await import("../app/routes/api+/ivr");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeRequest({
         to_number: "+1555",
         campaign_id: "1",
@@ -175,7 +175,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     });
 
     mocks.rpcCreateOutreachAttempt.mockRejectedValueOnce(new Error("rpc"));
-    let res = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    let res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
       error: "rpc",
@@ -184,7 +184,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     });
 
     mocks.insertCallForWorkspace.mockResolvedValueOnce(null);
-    res = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
       error: "Failed to insert call record",
@@ -193,7 +193,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     });
 
     mocks.dequeueCampaignQueueById.mockRejectedValueOnce(new Error("dequeue"));
-    res = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
       error: "dequeue",

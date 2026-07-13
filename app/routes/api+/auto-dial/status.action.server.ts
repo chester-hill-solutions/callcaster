@@ -25,7 +25,7 @@ import {
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 type TwilioClient = Twilio.Twilio;
 
@@ -301,12 +301,10 @@ const handleParticipantJoin = async (
   }
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  let realtime: any;
-  try {
+export const action = defineAction({
+  auth: async ({ request }) => {
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const parsedBody = params;
     const underCase = twilioParamsToUnderCase(params);
 
     const callSidValue =
@@ -318,6 +316,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const forbidden = await requireTwilioSignature(request, { callSid: callSidValue });
     if (forbidden) return forbidden;
 
+    return { parsedBody: params, underCase, callSidValue };
+  },
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ auth }) => {
+    const { parsedBody, underCase, callSidValue } = auth;
+    let realtime: any;
+    try {
     const dbCall = await findCallBySid(callSidValue);
     if (!dbCall?.workspace) {
       throw new Error("Failed to fetch call data");
@@ -376,4 +381,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       (adminDb as any).removeChannel(realtime);
     }
   }
-};
+  },
+});

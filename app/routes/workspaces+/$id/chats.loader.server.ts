@@ -1,4 +1,4 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { getChatSortOption } from "@/lib/chat-conversation-sort";
 import { data as routeData, redirect } from "react-router";
 import { fetchCampaignsByType } from "@/lib/database/campaign.server";
@@ -12,11 +12,13 @@ import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
-  const { headers, user, workspaceId, userRole } =
-    getWorkspaceRouteContext(context);
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ params, url, auth }) => {
+  const { headers, user, workspaceId, userRole } = auth;
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
   const search = url.searchParams.get("search") ?? undefined;
@@ -140,4 +142,5 @@ export async function loader({ request, params, context, url}: LoaderFunctionArg
     },
     { headers },
   );
-}
+  },
+});

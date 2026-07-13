@@ -4,45 +4,53 @@ import {
   getConversationMessagesApi,
 } from "@/lib/platform-data.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  const contactNumber = params.contactNumber;
-  if (!workspaceId || !contactNumber) {
-    return jsonError("workspaceId and contactNumber are required", 400);
-  }
-  getDataPlaneRouteContext(context, workspaceId);
-
-  const decodedContactNumber = decodeURIComponent(contactNumber);
-
-  if (url.searchParams.get("latest") === "1") {
-    try {
-      const latestMessage = await fetchLatestMessageForPhone(
-        workspaceId,
-        decodedContactNumber,
-      );
-      return jsonResponse({ latest_message: latestMessage }, 200);
-    } catch (error) {
-      return jsonError(
-        error instanceof Error ? error.message : "Failed to load latest message",
-        500,
-      );
+export const loader = defineLoader({
+  auth: ({ params, context }: Pick<LoaderFunctionArgs, "params" | "context">) => {
+    const workspaceId = params.workspaceId;
+    const contactNumber = params.contactNumber;
+    if (!workspaceId || !contactNumber) {
+      return jsonError("workspaceId and contactNumber are required", 400);
     }
-  }
+    getDataPlaneRouteContext(context, workspaceId);
 
-  const result = await getConversationMessagesApi(
-    workspaceId,
-    decodedContactNumber,
-    url.searchParams,
-  );
+    return { workspaceId, contactNumber };
+  },
+  sideEffects: ["db-read"],
+  handler: async ({ auth, url }) => {
+    const { workspaceId, contactNumber } = auth;
+    const decodedContactNumber = decodeURIComponent(contactNumber);
 
-  return jsonResponse(
-    {
-      contact_number: result.contact_number,
-      messages: result.messages,
-      has_more: result.has_more,
-    },
-    200,
-  );
-}
+    if (url.searchParams.get("latest") === "1") {
+      try {
+        const latestMessage = await fetchLatestMessageForPhone(
+          workspaceId,
+          decodedContactNumber,
+        );
+        return jsonResponse({ latest_message: latestMessage }, 200);
+      } catch (error) {
+        return jsonError(
+          error instanceof Error ? error.message : "Failed to load latest message",
+          500,
+        );
+      }
+    }
+
+    const result = await getConversationMessagesApi(
+      workspaceId,
+      decodedContactNumber,
+      url.searchParams,
+    );
+
+    return jsonResponse(
+      {
+        contact_number: result.contact_number,
+        messages: result.messages,
+        has_more: result.has_more,
+      },
+      200,
+    );
+  },
+});

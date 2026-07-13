@@ -2,10 +2,10 @@ import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
 import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200;
@@ -32,19 +32,14 @@ const getCallWithRetry = async (
   return data;
 };
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrPage(request, [params.campaignId, params.pageId]),
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
   const twiml = new Twilio.twiml.VoiceResponse();
   const { pageId, campaignId } = params as { pageId: string; campaignId: string };
-  const formData = await request.formData();
-  const paramsObj = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const callSid = paramsObj.CallSid ?? null;
-
-  if (!callSid || !campaignId || !pageId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const forbidden = await requireTwilioSignature(request, { callSid });
-  if (forbidden) return forbidden;
+  const { callSid } = auth;
 
   try {
     const callData = await getCallWithRetry(callSid);
@@ -82,4 +77,5 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "application/xml" },
   });
-};
+  },
+});

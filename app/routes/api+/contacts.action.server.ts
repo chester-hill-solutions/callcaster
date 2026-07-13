@@ -11,16 +11,20 @@ import { data as routeData } from "react-router";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { getSession } from "@/lib/auth.server";
 import { AppError } from "@/lib/errors.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 
-import type { ActionFunctionArgs } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs , LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => searchContactsLoader(request);
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: ({ request }: LoaderFunctionArgs) => searchContactsLoader(request),
+});
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request }: ActionFunctionArgs) => requireDualAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
 
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
   const { headers } = await getSession(request);
   const user = getDualAuthUser(auth);
   if (!user) {
@@ -78,4 +82,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     return handleError(err instanceof Error ? err : new Error(String(err)), 'An unexpected error occurred');
   }
-}
+  },
+});

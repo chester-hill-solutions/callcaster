@@ -6,13 +6,13 @@ import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { defineAction } from "@/lib/handler.server";
 
-
-export const action = async ({ request }: { request: Request }) => {
-
-    const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
-  const { headers } = await getSession(request);
+export const action = defineAction({
+  auth: ({ request }) => requireDualAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+    const { headers } = await getSession(request);
     const user = getDualAuthUser(auth);
     if (!user) {
       return routeData({ error: "Unauthorized" }, { status: 401, headers });
@@ -41,4 +41,5 @@ export const action = async ({ request }: { request: Request }) => {
         }
     }
     return routeData(response, {headers});
-}
+  },
+});

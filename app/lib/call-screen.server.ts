@@ -1,5 +1,8 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { workspace } from "@/db/schema";
+import { workspace ,
+  call as callTable,
+  outreach_attempt as outreachAttemptTable,
+} from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import {
   countCampaignQueueRows,
@@ -14,10 +17,6 @@ import type { OutreachAttempt, QueueItem } from "@/lib/types";
 import { rpcGetAudiencesByCampaign } from "@/lib/db-rpc.server";
 import { logger } from "@/lib/logger.server";
 import { fetchCampaignWithScriptForWorkspace } from "@/lib/campaign-ivr.server";
-import {
-  call as callTable,
-  outreach_attempt as outreachAttemptTable,
-} from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { getUserById } from "@/lib/workspace-members-db.server";
 

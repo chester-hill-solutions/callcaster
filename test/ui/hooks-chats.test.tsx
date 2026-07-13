@@ -34,6 +34,10 @@ vi.mock("@/hooks/utils", async (importOriginal) => {
         if (fetcher.state === "idle") {
           onIdle(fetcher.data);
         }
+        // onIdle omitted intentionally: this test double mirrors the real
+        // useFetcherOnIdle, which fires on the fetcher busy→idle edge, not on
+        // callback identity changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [fetcher.state, fetcher.data]);
     },
   };

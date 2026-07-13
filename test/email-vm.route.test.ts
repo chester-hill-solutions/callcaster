@@ -143,8 +143,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         status: 403,
       }));
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeReq({
           RecordingUrl: "https://tw/rec",
           CallSid: "CA1",
@@ -178,7 +177,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -220,7 +219,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -254,7 +253,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -284,29 +283,29 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any);
 
     // RecordingUrl missing
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any));
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any));
     expect(res.status).toBe(500);
 
     // CallSid missing
-    res = await asRouteResponse(await mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any));
     expect(res.status).toBe(500);
 
     // AccountSid missing
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", RecordingSid: "RE1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
     // RecordingSid missing
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
     // non-string RecordingUrl (File)
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: new File(["x"], "f.txt"),
         CallSid: "CA1",
@@ -330,7 +329,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -365,7 +364,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/new-rec",
         CallSid: "CA1",
@@ -383,7 +382,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     const mod = await import("../app/routes/api+/email-vm");
 
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
@@ -391,7 +390,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
 
     setupEmailVmMocks();
     inboundDbMocks.findWorkspaceNumberVoicemailContextByPhone.mockResolvedValueOnce(null);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
@@ -399,7 +398,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
 
     setupEmailVmMocks();
     credentialsMocks.readTwilioWorkspaceCredentials.mockReturnValueOnce(null);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
@@ -407,7 +406,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
 
     setupEmailVmMocks();
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
@@ -420,7 +419,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
@@ -433,7 +432,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));

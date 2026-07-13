@@ -1,10 +1,10 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
-import { getUserRole, listMedia } from "@/lib/database/workspace.server";
+import { listMedia } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { getScriptDetailApi } from "@/lib/platform-data.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 import type { Script } from "@/lib/types";
 
 export type ScriptIdLoaderData = {
@@ -16,35 +16,39 @@ export type ScriptIdLoaderData = {
   userRole: MemberRole;
 };
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
-  const { id: workspace_id, scriptId: selected_id } = params;
-  if (!workspace_id || !selected_id) {
-    throw redirect("/workspaces");
-  }
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
+    const { id: workspace_id, scriptId: selected_id } = params;
+    if (!workspace_id || !selected_id) {
+      throw redirect("/workspaces");
+    }
 
-  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context)
+    const { userRole } = auth;
 
-  const workspaceData = await getWorkspaceById(workspace_id);
-  if (!workspaceData) {
-    throw redirect("/workspaces");
-  }
-  if (!userRole) {
-    throw redirect(`/workspaces/${workspace_id}`);
-  }
+    const workspaceData = await getWorkspaceById(workspace_id);
+    if (!workspaceData) {
+      throw redirect("/workspaces");
+    }
+    if (!userRole) {
+      throw redirect(`/workspaces/${workspace_id}`);
+    }
 
-  const scriptResult = await getScriptDetailApi(
-    selected_id,
-    workspace_id,
-  );
-  const script = scriptResult.ok ? (scriptResult.script as Script) : null;
+    const scriptResult = await getScriptDetailApi(
+      selected_id,
+      workspace_id,
+    );
+    const script = scriptResult.ok ? (scriptResult.script as Script) : null;
 
-  const mediaNames = await listMedia(workspace_id);
-  return routeData({
-    workspace: workspaceData,
-    workspace_id,
-    selected_id,
-    script,
-    mediaNames,
-    userRole: userRole as MemberRole,
-  } satisfies ScriptIdLoaderData);
-};
+    const mediaNames = await listMedia(workspace_id);
+    return routeData({
+      workspace: workspaceData,
+      workspace_id,
+      selected_id,
+      script,
+      mediaNames,
+      userRole: userRole as MemberRole,
+    } satisfies ScriptIdLoaderData);
+  },
+});

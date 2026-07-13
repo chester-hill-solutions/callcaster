@@ -13,7 +13,14 @@ const TREES = [
   {
     name: "workspace",
     prefix: "workspaces+/$id/",
-    required: [/getWorkspaceRouteContext/, /requireWorkspaceLoaderContext/],
+    // workspaceRouteAuth/workspaceLoaderAuth are the shared handler-factory
+    // strategies wrapping the same context getters.
+    required: [
+      /getWorkspaceRouteContext/,
+      /requireWorkspaceLoaderContext/,
+      /workspaceRouteAuth/,
+      /workspaceLoaderAuth/,
+    ],
     forbidden: [
       { pattern: /from\s+["']@\/lib\/auth\.server["']/, label: "auth.server import" },
       { pattern: /\bverifyAuth\s*\(/, label: "verifyAuth()" },
@@ -42,7 +49,8 @@ const TREES = [
   {
     name: "admin",
     prefix: "admin+/",
-    required: [/getAdminRouteContext/],
+    // adminRouteAuth is the shared handler-factory strategy wrapping the getter.
+    required: [/getAdminRouteContext/, /adminRouteAuth/],
     forbidden: [
       { pattern: /\bverifyAuth\s*\(/, label: "verifyAuth()" },
       { pattern: /\brequireSudoAdmin\s*\(/, label: "requireSudoAdmin()" },

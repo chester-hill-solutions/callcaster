@@ -8,11 +8,13 @@ import {
   updateScriptForWorkspace,
 } from "@/lib/script-api-db.server";
 import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = defineAction({
+  auth: ({ request }: { request: Request }) => requireDualAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
 
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
   const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -76,4 +78,5 @@ export const action = async ({ request }: { request: Request }) => {
     }
     return routeData({ error: message }, { status: 500 });
   }
-}
+  },
+});

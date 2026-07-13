@@ -57,13 +57,13 @@ describe("app/routes/api+/acd-router", () => {
       new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }),
     );
     const mod = await import("../app/routes/api+/acd-router.route");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
     expect(res.status).toBe(403);
   });
 
   test("delegates to handleAcdRouterRequest on the happy path", async () => {
     const mod = await import("../app/routes/api+/acd-router.route");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toContain("waiting");
   });
@@ -71,7 +71,7 @@ describe("app/routes/api+/acd-router", () => {
   test("returns fallback TwiML (not an HTML error page) when signature validation throws unexpectedly", async () => {
     mocks.requireTwilioSignature.mockRejectedValueOnce(new Error("signature check exploded"));
     const mod = await import("../app/routes/api+/acd-router.route");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();

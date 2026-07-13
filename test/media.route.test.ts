@@ -49,7 +49,7 @@ describe("app/routes/api+/media/route.tsx", () => {
     fd.set("live_campaign_id", "1");
     fd.set("workspace_id", "w1");
     fd.set("campaign_name", "Camp");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toBe("https://public");
   });
@@ -61,7 +61,7 @@ describe("app/routes/api+/media/route.tsx", () => {
     const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
 
@@ -73,7 +73,7 @@ describe("app/routes/api+/media/route.tsx", () => {
     fd2.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
     fd2.set("live_campaign_id", "1");
     fd2.set("workspace_id", "w1");
-    const res2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
+    const res2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(res2.status).toBe(500);
   });
 });

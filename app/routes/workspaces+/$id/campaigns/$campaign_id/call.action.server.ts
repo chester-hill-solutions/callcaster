@@ -1,4 +1,4 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import {
   handleCall,
@@ -26,26 +26,29 @@ import type {
   ActiveCall,
   CampaignDetails
 } from "@/lib/types";
-import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request, params, context }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ params, auth }) => {
+    const { campaign_id } = params;
 
-  const { campaign_id } = params;
+    const { headers, user, workspaceId, userRole } = auth;
+    if (!user || !campaign_id) {
+      throw redirect("/signin");
+    }
+    const result = await releaseAssignedQueueForUser(
+      user.id,
+      campaign_id,
+    );
 
-  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
-  if (!user || !campaign_id) {
-    throw redirect("/signin");
-  }
-  const result = await releaseAssignedQueueForUser(
-    user.id,
-    campaign_id,
-  );
+    if (!result.ok) {
+      logger.error("Error releasing assigned campaign queue rows:", result.error);
+      throw new Error(result.error);
+    }
 
-  if (!result.ok) {
-    logger.error("Error releasing assigned campaign queue rows:", result.error);
-    throw new Error(result.error);
-  }
-
-  return redirect("/workspaces", { headers });
-}
+    return redirect("/workspaces", { headers });
+  },
+});

@@ -22,6 +22,7 @@ import { findActiveHandsetSessionClientIdentity } from "@/lib/handset/handset-se
 import { getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
 import Twilio from "twilio";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
+import { defineAction } from "@/lib/handler.server";
 import type { TwilioInboundCallWebhook } from "@/lib/twilio.types";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -73,16 +74,39 @@ function inboundUnavailableTwiml(): Response {
   });
 }
 
-export const action = async ({ request, url }: ActionFunctionArgs) => {
-  try {
-    return await handleInboundAction(request, url);
-  } catch (error) {
-    logger.error("Unhandled error in api.inbound", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return inboundUnavailableTwiml();
-  }
-};
+export const action = defineAction({
+  auth: async ({ request }) => {
+    try {
+      const formData = await request.clone().formData();
+      const data = Object.fromEntries(
+        formData,
+      ) as Partial<TwilioInboundCallWebhook>;
+
+      if (!data.Called) {
+        return twilioWebhookBadRequest("Missing Called parameter");
+      }
+
+      const forbidden = await requireTwilioSignature(request, { phoneNumber: data.Called });
+      return forbidden ?? null;
+    } catch (error) {
+      logger.error("Unhandled error in api.inbound", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return inboundUnavailableTwiml();
+    }
+  },
+  sideEffects: ["db-write", "twilio", "external"],
+  handler: async ({ request, url }) => {
+    try {
+      return await handleInboundAction(request, url);
+    } catch (error) {
+      logger.error("Unhandled error in api.inbound", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return inboundUnavailableTwiml();
+    }
+  },
+});
 
 async function handleInboundAction(
   request: ActionFunctionArgs["request"],
@@ -97,9 +121,6 @@ async function handleInboundAction(
   if (!data.Called) {
     return twilioWebhookBadRequest("Missing Called parameter");
   }
-
-  const forbidden = await requireTwilioSignature(request, { phoneNumber: data.Called });
-  if (forbidden) return forbidden;
 
   const number = await findWorkspaceNumberByPhoneNumber(data.Called);
   if (!number) {

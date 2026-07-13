@@ -124,7 +124,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     queueDualAuthSession(authSession());
     const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
-    const res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    const res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(res.headers.get("X")).toBe("1");
   });
@@ -137,7 +137,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("fileName", "a.png");
     queueDualAuthSession(authSession());
     mocks.requireWorkspaceAccess.mockRejectedValueOnce(new Error("boom"));
-    const res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    const res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     expect(res.status).toBe(500);
     expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({ user: { id: "u1" }, workspaceId: "w1" });
   });
@@ -151,7 +151,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("campaignId", "1");
     queueDualAuthSession(authSession());
     makeDbClient({ campaign: { id: 1, message_media: [] } });
-    const res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    const res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: false, error: "Invalid file extension" });
     expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
@@ -165,7 +165,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("fileName", "big.png");
     queueDualAuthSession(authSession());
     makeDbClient();
-    const res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    const res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: false, error: "File exceeds 10MB limit" });
     expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
@@ -179,7 +179,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("fileName", "../../../etc/passwd.png");
     queueDualAuthSession(authSession());
     makeDbClient();
-    const res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    const res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true });
     expect(vi.mocked(uploadObject)).toHaveBeenCalledWith(
@@ -200,14 +200,14 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient({ uploadError: { statusCode: "500" } });
-    let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    let res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(mocks.logger.error).toHaveBeenCalled();
 
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient({ uploadError: { statusCode: "409" } });
-    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true, url: "https://signed" });
   });
 
@@ -222,18 +222,18 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient({ campaignError: new Error("c") });
-    let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    let res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient({ updateError: new Error("u") });
-    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     queueDualAuthSession(authSession());
     makeDbClient({ campaign: { id: 1, message_media: [] } });
-    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
 
@@ -247,13 +247,13 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient({ signedUrlError: new Error("s") });
-    let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    let res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient();
-    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
+    res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true, url: "https://signed" });
   });
 
@@ -267,18 +267,18 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient({ campaignError: new Error("c") });
-    let res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
+    let res = await asRouteResponse(mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
     makeDbClient({ updateError: new Error("u") });
-    res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
+    res = await asRouteResponse(mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     queueDualAuthSession(authSession());
     makeDbClient({ campaign: { id: 1, message_media: ["x.png", "y.png"] } });
-    res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
+    res = await asRouteResponse(mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
     expect(vi.mocked(deleteObject)).toHaveBeenCalledWith("messageMedia", "w1/x.png");
   });
@@ -290,7 +290,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");
-    const res = await asRouteResponse(await mod.action({ request: req("PUT", fd) } as any));
+    const res = await asRouteResponse(mod.action({ request: req("PUT", fd) } as any));
     expect(res.status).toBe(405);
   });
 });

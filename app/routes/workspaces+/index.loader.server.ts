@@ -4,7 +4,7 @@ import {
   createAuthLayoutLoader,
 } from "@/lib/auth-layout.server";
 import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
 interface Workspace {
   id: string;
@@ -33,37 +33,36 @@ const authLayoutLoader = createAuthLayoutLoader({
   },
 });
 
-export const loader = async (args: LoaderFunctionArgs) => {
-  const layout = await authLayoutLoader(args);
-  if (layout instanceof Response) {
-    return layout;
-  }
+export const loader = defineLoader({
+  auth: (args) => authLayoutLoader(args),
+  sideEffects: ["db-read"],
+  handler: async ({ auth: layout }) => {
+    const { user, userId } = layout.data;
+    const headers =
+      layout.init?.headers instanceof Headers
+        ? layout.init.headers
+        : new Headers();
 
-  const { user, userId } = layout.data;
-  const headers =
-    layout.init?.headers instanceof Headers
-      ? layout.init.headers
-      : new Headers();
+    const result = await listUserWorkspaces(user.id);
 
-  const result = await listUserWorkspaces(user.id);
+    if (!result.ok) {
+      return routeData(
+        {
+          workspaces: null,
+          userId,
+          error: result.error,
+        } satisfies LoaderData,
+        { headers },
+      );
+    }
 
-  if (!result.ok) {
     return routeData(
       {
-        workspaces: null,
+        workspaces: result.workspaces as WorkspaceUser[],
         userId,
-        error: result.error,
+        error: null,
       } satisfies LoaderData,
       { headers },
     );
-  }
-
-  return routeData(
-    {
-      workspaces: result.workspaces as WorkspaceUser[],
-      userId,
-      error: null,
-    } satisfies LoaderData,
-    { headers },
-  );
-};
+  },
+});

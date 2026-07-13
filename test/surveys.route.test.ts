@@ -149,7 +149,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   test("method not allowed returns createErrorResponse", async () => {
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.createErrorResponse).toHaveBeenCalled();
   });
@@ -159,11 +159,11 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     mocks.getUserRole.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/surveys");
 
-    const r0 = await asRouteResponse(await mod.action({ request: reqForm("POST", {}) } as any));
+    const r0 = await asRouteResponse(mod.action({ request: reqForm("POST", {}) } as any));
     expect(r0.status).toBe(400);
 
     mocks.getUserRole.mockResolvedValueOnce({ role: "viewer" });
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ title: "T", pages: [] }),
@@ -176,12 +176,12 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     setDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
 
-    const r0 = await asRouteResponse(await mod.action({
+    const r0 = await asRouteResponse(mod.action({
       request: reqForm("POST", { workspaceId: "w1", surveyData: "not-json" }),
     } as any));
     expect(r0.status).toBe(400);
 
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: reqForm("POST", { surveyData: JSON.stringify({ title: "T" }) }),
     } as any));
     expect(r1.status).toBe(400);
@@ -191,7 +191,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     surveyDbMocks.findUserById.mockResolvedValueOnce(null);
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ title: "T", pages: [] }),
@@ -206,7 +206,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     surveyDbMocks.createSurveyWithStructure.mockRejectedValueOnce({ message: "bad" });
 
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ title: "T", pages: [] }),
@@ -222,7 +222,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -261,7 +261,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     mocks.getUserRole.mockResolvedValueOnce({ role: "member" });
 
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -298,7 +298,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ survey_id: "S1", title: "T" }),
@@ -311,7 +311,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -328,7 +328,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "member" });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -361,24 +361,24 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     const mod = await import("../app/routes/api+/surveys");
 
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
-    let r0 = await asRouteResponse(await mod.action({ request: reqForm("PATCH", {}) } as any));
+    let r0 = await asRouteResponse(mod.action({ request: reqForm("PATCH", {}) } as any));
     expect(r0.status).toBe(400);
 
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
-    r0 = await asRouteResponse(await mod.action({
+    r0 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: "not-json" }),
     } as any));
     expect(r0.status).toBe(400);
 
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
-    r0 = await asRouteResponse(await mod.action({
+    r0 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r0.status).toBe(400);
 
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     surveyDbMocks.getSurveyWorkspaceByPublicId.mockResolvedValueOnce(null);
-    r0 = await asRouteResponse(await mod.action({
+    r0 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X", is_active: true }) }),
     } as any));
     expect(r0.status).toBe(404);
@@ -389,7 +389,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "viewer" });
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r1.status).toBe(403);
@@ -400,7 +400,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
     surveyDbMocks.updateSurveyMetadata.mockResolvedValueOnce(null);
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r2.status).toBe(500);
@@ -414,7 +414,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
     surveyDbMocks.updateSurveyMetadata.mockResolvedValueOnce({ id: 1, title: "X" });
-    const r3 = await asRouteResponse(await mod.action({
+    const r3 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r3.status).toBe(200);
@@ -423,7 +423,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   test("PATCH catch logs and returns 500 when formData throws", async () => {
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: {
         method: "PATCH",
         formData: async () => {
@@ -439,7 +439,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     const mod = await import("../app/routes/api+/surveys");
 
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
-    const r0 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", {}) } as any));
+    const r0 = await asRouteResponse(mod.action({ request: reqForm("DELETE", {}) } as any));
     expect(r0.status).toBe(400);
 
     queueDualAuthSession({
@@ -447,7 +447,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "viewer" });
-    const r1 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r1.status).toBe(403);
 
     queueDualAuthSession({
@@ -456,7 +456,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
     surveyDbMocks.deleteSurveyByPublicId.mockRejectedValueOnce(new Error("no"));
-    const r2 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r2.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error in handleDeleteSurvey:", expect.anything());
 
@@ -465,7 +465,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
-    const r3 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    const r3 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r3.status).toBe(200);
   });
 
@@ -477,11 +477,11 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       user: { id: "u1" },
     });
     surveyDbMocks.getSurveyWorkspaceByPublicId.mockResolvedValueOnce(null);
-    const r0 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    const r0 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r0.status).toBe(404);
 
     queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: {
         method: "DELETE",
         formData: async () => {

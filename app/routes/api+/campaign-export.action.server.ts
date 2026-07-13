@@ -8,17 +8,26 @@ import {
   processCallCampaignExport,
   processMessageCampaignExport,
 } from "@/lib/campaign-export.server";
+import { defineAction } from "@/lib/handler.server";
 
-import type { ActionFunctionArgs } from "react-router";
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: "Unauthorized" }), {
+    status: 401,
+    headers: { "content-type": "application/json" },
+  });
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
-  const user = getDualAuthUser(auth);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const action = defineAction({
+  auth: async ({ request }) => {
+    const auth = await requireDualAuth(request);
+    if (auth instanceof Response) return auth;
+    const user = getDualAuthUser(auth);
+    if (!user) {
+      return unauthorized();
+    }
+    return user;
+  },
+  sideEffects: ["db-write", "external"],
+  handler: async ({ request, auth: user }) => {
   try {
     const formData = await request.formData();
     const campaignId = formData.get("campaignId");
@@ -75,4 +84,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { status: 500 },
     );
   }
-};
+  },
+});

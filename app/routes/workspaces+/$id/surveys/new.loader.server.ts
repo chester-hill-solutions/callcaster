@@ -1,22 +1,25 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { User } from "@/lib/types";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ params, context }: LoaderFunctionArgs) {
-  const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context);
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["none"],
+  handler: ({ auth }) => {
+    const { user, workspaceId, userRole, headers } = auth;
 
-  if (!workspaceId) {
-    throw new Response("Workspace ID is required", { status: 400 });
-  }
+    if (!workspaceId) {
+      throw new Response("Workspace ID is required", { status: 400 });
+    }
 
-  if (!userRole || !["owner", "admin", "member"].includes(userRole)) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
+    if (!userRole || !["owner", "admin", "member"].includes(userRole)) {
+      throw new Response("Unauthorized", { status: 403 });
+    }
 
-  return routeData({
-    workspaceId,
-    user,
-    userRole,
-  }, { headers });
-}
+    return routeData({
+      workspaceId,
+      user,
+      userRole,
+    }, { headers });
+  },
+});

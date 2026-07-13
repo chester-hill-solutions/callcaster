@@ -24,3 +24,12 @@ export function getAdminRouteContext(
     headers: admin.headers,
   };
 }
+
+/** Shared handler-factory auth strategy: admin context from layout middleware. */
+export function adminRouteAuth({
+  context,
+}: {
+  context: Readonly<RouterContextProvider>;
+}): AdminRouteContext {
+  return getAdminRouteContext(context);
+}

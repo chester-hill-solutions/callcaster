@@ -97,7 +97,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
         status: 403,
       }));
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any));
     expect(res.status).toBe(403);
@@ -106,16 +106,20 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   test("throws when call upsert fails", async () => {
     setUpsertRow(null);
     const mod = await import("../app/routes/api+/call-status");
-    await expect(
-      mod.action({
-        request: makeReq({ CallSid: "CA1", CallStatus: "completed", Workspace: "w1", OutreachAttemptId: "10" }),
-      } as any),
-    ).rejects.toThrow("Failed to upsert call CA1");
+    // The handler factory maps thrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "completed", Workspace: "w1", OutreachAttemptId: "10" }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining("Failed to upsert call CA1"),
+    });
   });
 
   test("uses workspace authToken when present", async () => {
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any));
     expect(res.status).toBe(200);
@@ -132,11 +136,15 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     telephonyDbMocks.findOutreachAttemptWithCampaignType.mockRejectedValue(new Error("Failed to fetch current attempt"));
 
     const mod = await import("../app/routes/api+/call-status");
-    await expect(
-      mod.action({
-        request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed", ParentCallSid: "CA_PARENT", Workspace: "w1" }),
-      } as any),
-    ).rejects.toThrow("Failed to fetch current attempt");
+    // The handler factory maps thrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed", ParentCallSid: "CA_PARENT", Workspace: "w1" }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining("Failed to fetch current attempt"),
+    });
   });
 
   test("skips realtime.send when no currentAttempt and still bills with workspaceId", async () => {
@@ -149,7 +157,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Duration: "61", CallDuration: "61" }),
     } as any));
     expect(res.status).toBe(200);
@@ -166,7 +174,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       new Response("Failed to update attempt", { status: 500 }),
     );
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy", Workspace: "w1", OutreachAttemptId: "10" }),
     } as any));
     expect(res.status).toBe(500);
@@ -178,7 +186,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     setUpsertRow({ sid: "CA1", outreach_attempt_id: 10, workspace: undefined, parent_call_sid: null });
 
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         call_sid: "CA1",
         call_status: "completed",
@@ -194,7 +202,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
   test("covers existingCall workspace missing (uses env authToken)", async () => {
     setUpsertRow({ workspace: null, outreach_attempt_id: 10, parent_call_sid: null });
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing" }),
     } as any));
     expect(res.status).toBe(200);
@@ -202,7 +210,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
 
   test("covers workspace twilio token missing + calledVia split userId", async () => {
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -220,7 +228,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     fd.set("CallDuration", "61");
     fd.set("called_via", "client:u2");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call-status", {
         method: "POST",
         headers: { "x-twilio-signature": "sig" },
@@ -240,7 +248,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     setCurrentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
 
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u3", Workspace: "w1", OutreachAttemptId: "10" }),
     } as any));
     expect(res.status).toBe(200);
@@ -261,7 +269,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce({ workspace: null, outreach_attempt_id: null });
     setCurrentAttempt(null);
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
     } as any));
     expect(res.status).toBe(200);
@@ -276,7 +284,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     });
     setCurrentAttempt(null);
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
     } as any));
     expect(res.status).toBe(200);
@@ -291,7 +299,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       parent_call_sid: null,
     });
     const mod = await import("../app/routes/api+/call-status");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
     } as any));
     expect(res.status).toBe(200);

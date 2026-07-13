@@ -393,11 +393,14 @@ export async function countQueuedCampaignQueueRows(campaignId: number): Promise<
 export async function searchCampaignQueueIds(args: {
   campaignId: number;
   filters: QueueSearchFilters;
+  workspaceId: string;
 }): Promise<number[]> {
   const rows = await db
     .select({ id: campaignQueueTable.id })
     .from(campaignQueueTable)
-    .where(buildCampaignQueueSearchWhere(args.campaignId, args.filters));
+    .where(
+      buildCampaignQueueSearchWhere(args.campaignId, args.filters, "", args.workspaceId),
+    );
   return rows.map((row) => row.id);
 }
 

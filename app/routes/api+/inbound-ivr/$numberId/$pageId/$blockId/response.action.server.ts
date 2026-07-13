@@ -2,14 +2,14 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import {
   appendInboundVoicemailTwiml,
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -123,38 +123,19 @@ const renderTerminalTarget = async (
   twiml.hangup();
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrResponse(request, [params.numberId, params.pageId, params.blockId]),
+  sideEffects: ["db-read", "external"],
+  handler: async ({ params, auth }) => {
   const baseUrl = env.BASE_URL();
   const twiml = new Twilio.twiml.VoiceResponse();
 
-  const pageId = params.pageId;
-  const blockId = params.blockId;
-  const numberId = params.numberId;
+  const pageId = params.pageId as string;
+  const blockId = params.blockId as string;
+  const numberId = params.numberId as string;
 
-  if (!numberId || !pageId || !blockId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const formData = await request.formData();
-  const formParams = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const digitsValue = formParams.Digits;
-  const speechResultValue = formParams.SpeechResult;
-  const callSidValue = formParams.CallSid;
-
-  const userInput =
-    typeof digitsValue === "string"
-      ? digitsValue
-      : typeof speechResultValue === "string"
-        ? speechResultValue
-        : null;
-  const callSid = typeof callSidValue === "string" ? callSidValue : null;
-
-  if (!callSid) {
-    return new Response("Missing CallSid parameter", { status: 400 });
-  }
-
-  const forbidden = await requireTwilioSignature(request, { callSid });
-  if (forbidden) return forbidden;
+  const { callSid, userInput } = auth;
 
   try {
     const call = await findCallBySid(callSid);
@@ -199,4 +180,5 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "application/xml" },
   });
-};
+  },
+});

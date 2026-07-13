@@ -133,7 +133,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       user: null,
     }));
 
-    const res401 = await asRouteResponse(await mod.action({
+    const res401 = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audience-upload", { method: "POST" }),
       deps: { verifyAuth },
     } as any));
@@ -145,28 +145,28 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       user: { id: "u1" },
     }));
 
-    const res405 = await asRouteResponse(await mod.action({
+    const res405 = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audience-upload", { method: "GET" }),
       deps: { verifyAuth: verifyAuthUser },
     } as any));
     expect(res405.status).toBe(405);
 
     const fd = new FormData();
-    const res400a = await asRouteResponse(await mod.action({
+    const res400a = await asRouteResponse(mod.action({
       request: makeReq(fd),
       deps: { verifyAuth: verifyAuthUser },
     } as any));
     expect(res400a.status).toBe(400);
 
     fd.set("workspace_id", "w1");
-    const res400b = await asRouteResponse(await mod.action({
+    const res400b = await asRouteResponse(mod.action({
       request: makeReq(fd),
       deps: { verifyAuth: verifyAuthUser },
     } as any));
     expect(res400b.status).toBe(400);
 
     fd.set("audience_name", "A");
-    const res400c = await asRouteResponse(await mod.action({
+    const res400c = await asRouteResponse(mod.action({
       request: makeReq(fd),
       deps: { verifyAuth: verifyAuthUser },
     } as any));
@@ -190,7 +190,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd.set("header_mapping", JSON.stringify({ Name: "name" }));
     fd.set("split_name_column", "Name");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq(fd),
       deps: { verifyAuth, processAudienceUpload },
     } as any));
@@ -216,7 +216,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
     fd.set("contacts", new File(["x"], "c.csv"));
-    const res = await asRouteResponse(await mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
+    const res = await asRouteResponse(mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
     expect(res.status).toBe(404);
   }, 30000);
 
@@ -234,7 +234,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd1.set("workspace_id", "w1");
     fd1.set("audience_name", "A");
     fd1.set("contacts", new File(["x"], "c.csv"));
-    const r1 = await asRouteResponse(await mod.action({ request: makeReq(fd1), deps: { verifyAuth } } as any));
+    const r1 = await asRouteResponse(mod.action({ request: makeReq(fd1), deps: { verifyAuth } } as any));
     expect(r1.status).toBe(500);
 
     dbMocks.createAudienceUploadRecord.mockResolvedValueOnce(null);
@@ -242,7 +242,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd2.set("workspace_id", "w1");
     fd2.set("audience_name", "A");
     fd2.set("contacts", new File(["x"], "c.csv"));
-    const r2 = await asRouteResponse(await mod.action({ request: makeReq(fd2), deps: { verifyAuth } } as any));
+    const r2 = await asRouteResponse(mod.action({ request: makeReq(fd2), deps: { verifyAuth } } as any));
     expect(r2.status).toBe(500);
 
     const fdBadJson = new FormData();
@@ -250,7 +250,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fdBadJson.set("audience_name", "A");
     fdBadJson.set("contacts", new File(["x"], "c.csv"));
     fdBadJson.set("header_mapping", "{");
-    const r3 = await asRouteResponse(await mod.action({ request: makeReq(fdBadJson), deps: { verifyAuth } } as any));
+    const r3 = await asRouteResponse(mod.action({ request: makeReq(fdBadJson), deps: { verifyAuth } } as any));
     expect(r3.status).toBe(500);
   }, 30000);
 
@@ -272,7 +272,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd.set("audience_name", "A");
     fd.set("contacts", new File(["x"], "c.csv"));
     // omit header_mapping and split_name_column to hit default {} / null branches
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq(fd),
       deps: { verifyAuth, processAudienceUpload },
     } as any));
@@ -298,7 +298,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd.set("workspace_id", "w1");
     fd.set("audience_name", "A");
     fd.set("contacts", new File(["x"], "c.csv"));
-    const res = await asRouteResponse(await mod.action({ request: makeReq(fd) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeReq(fd) } as any));
     expect(res.status).toBe(200);
   }, 30000);
 
@@ -315,7 +315,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
     fd.set("contacts", new File(["x"], "c.csv"));
-    const res = await asRouteResponse(await mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
+    const res = await asRouteResponse(mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Unknown error" });
   }, 30000);

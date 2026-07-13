@@ -273,7 +273,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "client:u1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -390,7 +390,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -486,7 +486,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -592,7 +592,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -636,7 +636,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -678,7 +678,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -706,7 +706,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -747,7 +747,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     // intentionally omit Called
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -811,7 +811,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -893,7 +893,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -919,7 +919,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -968,7 +968,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -1007,7 +1007,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1777");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -1043,7 +1043,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -1085,7 +1085,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -1129,7 +1129,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
@@ -1171,7 +1171,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "client:u1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));

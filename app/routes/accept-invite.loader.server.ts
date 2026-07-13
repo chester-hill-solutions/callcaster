@@ -1,17 +1,16 @@
 import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { getInvitesByUserId } from "@/lib/database/workspace.server";
-import { listUserInvitesWithWorkspace } from "@/lib/workspace-members-db.server";
+import { listUserInvitesWithWorkspace , getUserById } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
-import { getUserById } from "@/lib/workspace-members-db.server";
+import { defineLoader } from "@/lib/handler.server";
 import type {
   ExistingUserInvite,
   LoaderData,
   WorkspaceInviteRow,
 } from "./accept-invite.types";
-import type { LoaderFunctionArgs } from "react-router";
 
 async function fetchInvitesWithWorkspace(userId: string): Promise<ExistingUserInvite[]> {
   return listUserInvitesWithWorkspace(userId);
@@ -130,20 +129,24 @@ async function handleTokenVerification(
   }
 }
 
-export async function loader({ request, url}: LoaderFunctionArgs) {
-  const { user, headers } = await getSession(request);
-  const token_hash = url.searchParams.get("token_hash");
-  const type = url.searchParams.get("type");
-  const email = url.searchParams.get("email");
+export const loader = defineLoader({
+  auth: ({ request }) => getSession(request),
+  sideEffects: ["db-read", "db-write"],
+  handler: async ({ request, url, auth: session }) => {
+    const { user, headers } = session;
+    const token_hash = url.searchParams.get("token_hash");
+    const type = url.searchParams.get("type");
+    const email = url.searchParams.get("email");
 
-  if (user) {
-    return handleAuthenticatedUser(user.id, user.email ?? "", headers);
-  }
+    if (user) {
+      return handleAuthenticatedUser(user.id, user.email ?? "", headers);
+    }
 
-  if (token_hash && type) {
-    if (!email) throw new Error("No email address found.");
-    return handleTokenVerification(request, token_hash, email, headers);
-  }
+    if (token_hash && type) {
+      if (!email) throw new Error("No email address found.");
+      return handleTokenVerification(request, token_hash, email, headers);
+    }
 
-  return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
-}
+    return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
+  },
+});

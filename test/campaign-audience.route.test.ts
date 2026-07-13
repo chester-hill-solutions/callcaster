@@ -100,7 +100,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);
@@ -119,7 +119,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     audienceDbMocks.listContactIdsForAudience.mockResolvedValue([1, 2]);
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);
@@ -143,7 +143,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);
@@ -164,7 +164,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     audienceDbMocks.insertCampaignAudienceLink.mockRejectedValue(new Error("add boom"));
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(500);
@@ -181,7 +181,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     audienceDbMocks.listContactIdsForAudience.mockRejectedValue(new Error("contacts boom"));
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(500);
@@ -200,7 +200,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     audienceDbMocks.listContactIdsForAudiences.mockResolvedValue([]);
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
@@ -221,7 +221,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     audienceDbMocks.listContactIdsForAudience.mockResolvedValue([]);
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
@@ -237,7 +237,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     audienceDbMocks.deleteCampaignAudienceLink.mockRejectedValue(new Error("del boom"));
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(500);
@@ -256,7 +256,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     queueDbMocks.deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds.mockRejectedValue(new Error("remove boom"));
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(500);
@@ -266,7 +266,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   test("returns 405 on unsupported method", async () => {
     queueDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "PUT" }),
     } as any));
     expect(res.status).toBe(405);
@@ -281,7 +281,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     audienceDbMocks.campaignAndAudienceShareWorkspace.mockRejectedValue("boom");
 
     const mod = await import("../app/routes/api+/campaign_audience");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(500);

@@ -91,6 +91,13 @@ export const useQueue = ({
   // Use ref to avoid including nextRecipient in updateQueue dependencies
   const nextRecipientRef = useRef(effectiveNextRecipient);
 
+  /**
+   * @effect Keep nextRecipientRef current so updateQueue can read the latest recipient without depending on it.
+   * @effect-deps effectiveNextRecipient (re-syncs the ref whenever the computed recipient changes)
+   * @effect-side-effects none — mutates a ref only; no DOM/subscription/fetch
+   * @effect-why-not-loader Not data fetching — this is the standard "latest ref" pattern used to
+   *   avoid stale closures in updateQueue's useCallback without widening its dependency array.
+   */
   useEffect(() => {
     nextRecipientRef.current = effectiveNextRecipient;
   }, [effectiveNextRecipient]);

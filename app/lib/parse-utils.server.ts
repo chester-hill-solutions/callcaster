@@ -21,3 +21,13 @@ export function isUniqueViolation(error: unknown): boolean {
   const code = (error as { code?: unknown }).code;
   return typeof code === "string" && code === "23505";
 }
+
+/** Postgres invalid_text_representation — e.g. comparing uuid columns to non-uuid strings. */
+export function isInvalidTextRepresentation(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && code === "22P02";
+}

@@ -13,9 +13,13 @@ import {
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { defineAction, defineLoader } from "@/lib/handler.server";
+import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params, context }: LoaderFunctionArgs) {
+function requireWorkspaceUser({
+  params,
+  context,
+}: Pick<LoaderFunctionArgs, "params" | "context">) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
@@ -24,44 +28,17 @@ export async function loader({ request, params, context }: LoaderFunctionArgs) {
   if (!userId) {
     return jsonError("Unauthorized", 401);
   }
-
-
-  const result = await listWorkspaceMembers(    userId,
-    workspaceId,
-  );
-
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse(
-    {
-      members: result.members,
-      pending_invites: result.pending_invites,
-    },
-    200,
-  );
+  return { workspaceId, userId };
 }
 
-export async function action({ request, params, context }: ActionFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
+export const loader = defineLoader({
+  auth: requireWorkspaceUser,
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const { workspaceId, userId } = auth;
 
-  if (request.method === "POST") {
-    const parsed = await parseJsonBodyOrResponse(request, inviteMemberBodySchema);
-    if (parsed instanceof Response) return parsed;
-
-    const result = await inviteWorkspaceMember(
-      userId,
+    const result = await listWorkspaceMembers(    userId,
       workspaceId,
-      parsed.email,
-      parsed.role,
     );
 
     if (!result.ok) {
@@ -70,68 +47,100 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
 
     return jsonResponse(
       {
-        invite: "invite" in result ? result.invite : undefined,
-        warning: "warning" in result ? result.warning : undefined,
-        success: true,
+        members: result.members,
+        pending_invites: result.pending_invites,
       },
-      201,
+      200,
     );
-  }
+  },
+});
 
-  if (request.method === "PATCH") {
-    const parsed = await parseJsonBodyOrResponse(request, updateMemberBodySchema);
-    if (parsed instanceof Response) return parsed;
+export const action = defineAction({
+  auth: requireWorkspaceUser,
+  sideEffects: ["db-write", "email"],
+  handler: async ({ request, auth }) => {
+    const { workspaceId, userId } = auth;
 
-    const result = await updateWorkspaceMemberRole(
-      userId,
-      workspaceId,
-      parsed.user_id,
-      parsed.role,
-    );
+    if (request.method === "POST") {
+      const parsed = await parseJsonBodyOrResponse(request, inviteMemberBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      const result = await inviteWorkspaceMember(
+        userId,
+        workspaceId,
+        parsed.email,
+        parsed.role,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse(
+        {
+          invite: "invite" in result ? result.invite : undefined,
+          warning: "warning" in result ? result.warning : undefined,
+          success: true,
+        },
+        201,
+      );
     }
 
-    return jsonResponse({ member: result.member }, 200);
-  }
+    if (request.method === "PATCH") {
+      const parsed = await parseJsonBodyOrResponse(request, updateMemberBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-  if (request.method === "DELETE") {
-    const parsed = await parseJsonBodyOrResponse(request, deleteMemberBodySchema);
-    if (parsed instanceof Response) return parsed;
+      const result = await updateWorkspaceMemberRole(
+        userId,
+        workspaceId,
+        parsed.user_id,
+        parsed.role,
+      );
 
-    if (parsed.target === "invite") {
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ member: result.member }, 200);
+    }
+
+    if (request.method === "DELETE") {
+      const parsed = await parseJsonBodyOrResponse(request, deleteMemberBodySchema);
+      if (parsed instanceof Response) return parsed;
+
+      if (parsed.target === "invite") {
+        const inviteResult = await cancelWorkspaceInvite(
+          userId,
+          workspaceId,
+          parsed.user_id,
+        );
+        if (!inviteResult.ok) {
+          return jsonError(inviteResult.error, inviteResult.status);
+        }
+        return jsonResponse({ success: true, invites: inviteResult.invites }, 200);
+      }
+
+      const removeResult = await removeWorkspaceMember(
+        userId,
+        workspaceId,
+        parsed.user_id,
+      );
+      if (removeResult.ok) {
+        return jsonResponse({ success: true, member: removeResult.member }, 200);
+      }
+
       const inviteResult = await cancelWorkspaceInvite(
         userId,
         workspaceId,
         parsed.user_id,
       );
-      if (!inviteResult.ok) {
-        return jsonError(inviteResult.error, inviteResult.status);
+      if (inviteResult.ok && inviteResult.invites.length > 0) {
+        return jsonResponse({ success: true, invites: inviteResult.invites }, 200);
       }
-      return jsonResponse({ success: true, invites: inviteResult.invites }, 200);
+
+      return jsonError(removeResult.error, removeResult.status);
     }
 
-    const removeResult = await removeWorkspaceMember(
-      userId,
-      workspaceId,
-      parsed.user_id,
-    );
-    if (removeResult.ok) {
-      return jsonResponse({ success: true, member: removeResult.member }, 200);
-    }
-
-    const inviteResult = await cancelWorkspaceInvite(
-      userId,
-      workspaceId,
-      parsed.user_id,
-    );
-    if (inviteResult.ok && inviteResult.invites.length > 0) {
-      return jsonResponse({ success: true, invites: inviteResult.invites }, 200);
-    }
-
-    return jsonError(removeResult.error, removeResult.status);
-  }
-
-  return jsonError("Method not allowed", 405);
-}
+    return jsonError("Method not allowed", 405);
+  },
+});

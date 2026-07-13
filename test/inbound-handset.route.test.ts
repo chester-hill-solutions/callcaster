@@ -80,8 +80,7 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }));
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest() } as never),
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never),
     );
     expect(res.status).toBe(403);
   });
@@ -92,8 +91,7 @@ describe("app/routes/api+/inbound-handset", () => {
       }));
     const mod = await import("../app/routes/api+/inbound-handset");
     const fd = new FormData();
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/inbound-handset", {
           method: "POST",
           body: fd,
@@ -108,15 +106,14 @@ describe("app/routes/api+/inbound-handset", () => {
         status: 403,
       }));
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest("+19999999999") } as never),
+    const res = await asRouteResponse(mod.action({ request: makeRequest("+19999999999") } as never),
     );
     expect(res.status).toBe(403);
   });
 
   test("returns TwiML dialing client on happy path", async () => {
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
     expect(text).toContain("client:agent-1");
@@ -125,7 +122,7 @@ describe("app/routes/api+/inbound-handset", () => {
   test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
     mocks.findWorkspaceNumberByPhoneNumber.mockRejectedValueOnce(new Error("db down"));
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();

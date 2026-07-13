@@ -22,12 +22,11 @@ import {
 } from "@/lib/handset/handset-session.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import type { Database } from "@/lib/db-types";
-import { resolveContactWorkspaceIdFromQueue } from "@/lib/campaign-queue-db.server";
+import { resolveContactWorkspaceIdFromQueue , releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import { handset_session as handsetSessionTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { generateToken } from "@/lib/twilio-token.server";
-import { releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
 
 const EMPTY_LISTENING = {

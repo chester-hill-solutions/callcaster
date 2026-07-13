@@ -100,7 +100,7 @@ export default function ChatMessages({
   loadingOlder = false,
   workspaceId,
 }: ChatMessagesProps) {
-  const safeMessages = messages ?? [];
+  const safeMessages = useMemo(() => messages ?? [], [messages]);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const workspaceNumberLabelByKey = useMemo(() => {

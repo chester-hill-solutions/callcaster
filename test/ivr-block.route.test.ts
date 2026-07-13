@@ -127,8 +127,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   test("returns 403 when Twilio signature validation fails", async () => {
     mocks.requireTwilioSignature.mockResolvedValueOnce(new Response("Invalid", { status: 403 }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
         request: ivrBlockRequest(),
       } as any),
@@ -139,8 +138,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   test("returns 400 when CallSid missing", async () => {
     const fd = new FormData();
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
         request: new Request("http://x", {
           method: "POST",
@@ -154,7 +152,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
 
   test("returns 400 when required params missing", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
-    const res = await asRouteResponse(await mod.action({ params: {}, request: new Request("http://x") } as any));
+    const res = await asRouteResponse(mod.action({ params: {}, request: new Request("http://x") } as any));
     expect(res.status).toBe(400);
   });
 
@@ -168,7 +166,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     vi.mocked(createSignedObjectUrl).mockResolvedValueOnce("https://signed");
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
     } as any));
@@ -244,7 +242,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   test("covers getCampaignData error branch", async () => {
     vi.mocked(fetchCampaignWithScript).mockRejectedValueOnce(new Error("db"));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
     } as any));

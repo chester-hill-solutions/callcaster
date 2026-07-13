@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 
+import { defineAction } from "@/lib/handler.server";
 import { logger } from "@/lib/logger.server";
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { findWorkspaceIdByComplianceSid } from "@/lib/twilio-compliance-webhook.server";
@@ -48,45 +48,48 @@ function readSid(event: EventStreamEvent): string | null {
   return null;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  try {
-    let body: unknown;
+export const action = defineAction({
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request }) => {
     try {
-      body = await request.clone().json();
-    } catch {
-      return routeData({ error: "Expected JSON body" }, { status: 400 });
-    }
+      let body: unknown;
+      try {
+        body = await request.clone().json();
+      } catch {
+        return routeData({ error: "Expected JSON body" }, { status: 400 });
+      }
 
-    const events = toEventArray(body);
-    const resolved = new Set<string>();
+      const events = toEventArray(body);
+      const resolved = new Set<string>();
 
-    for (const event of events) {
-      const sid = readSid(event);
-      if (!sid) continue;
-      const workspaceId = await findWorkspaceIdByComplianceSid(sid);
-      if (!workspaceId) {
-        logger.warn("twilio.compliance.a2p.events.unresolved", {
+      for (const event of events) {
+        const sid = readSid(event);
+        if (!sid) continue;
+        const workspaceId = await findWorkspaceIdByComplianceSid(sid);
+        if (!workspaceId) {
+          logger.warn("twilio.compliance.a2p.events.unresolved", {
+            sid,
+            type: event.type ?? null,
+          });
+          continue;
+        }
+        if (resolved.has(workspaceId)) continue;
+        resolved.add(workspaceId);
+        // Poll fallback: reconcile authoritative brand/campaign status from Twilio.
+        await syncWorkspaceA2pStatus({ workspaceId, actorUserId: null });
+        logger.info("twilio.compliance.a2p.events", {
+          workspaceId,
           sid,
           type: event.type ?? null,
         });
-        continue;
       }
-      if (resolved.has(workspaceId)) continue;
-      resolved.add(workspaceId);
-      // Poll fallback: reconcile authoritative brand/campaign status from Twilio.
-      await syncWorkspaceA2pStatus({ workspaceId, actorUserId: null });
-      logger.info("twilio.compliance.a2p.events", {
-        workspaceId,
-        sid,
-        type: event.type ?? null,
-      });
-    }
 
-    return routeData({ ok: true, updated: resolved.size });
-  } catch (error) {
-    logger.error("twilio.compliance.a2p.events.error", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return routeData({ error: "An unexpected error occurred" }, { status: 500 });
-  }
-};
+      return routeData({ ok: true, updated: resolved.size });
+    } catch (error) {
+      logger.error("twilio.compliance.a2p.events.error", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return routeData({ error: "An unexpected error occurred" }, { status: 500 });
+    }
+  },
+});

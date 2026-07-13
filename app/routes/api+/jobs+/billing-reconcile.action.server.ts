@@ -5,70 +5,76 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { logger } from "@/lib/logger.server";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 /**
  * HTTP endpoint for the billing-reconcile daily sweep.
  * Called by pg_cron via `net.http_post`.
  */
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const cronSecret = process.env.CRON_SECRET;
-  const headerSecret = request.headers.get("x-cron-secret");
-  if (!cronSecret || headerSecret !== cronSecret) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json().catch(() => ({} as Record<string, unknown>));
-  const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
-
-  if (!workspaceId) {
-    return routeData({ error: "Missing workspaceId" }, { status: 400 });
-  }
-
-  try {
-    const twilioData = await loadWorkspaceTwilioData(workspaceId);
-    const creds = readTwilioWorkspaceCredentials(twilioData);
-    if (!creds?.sid) {
-      return routeData(
-        { error: "Workspace has no Twilio credentials" },
-        { status: 400 },
-      );
+export const action = defineAction({
+  // NOTE: the cron-secret guard lives in `handler` (not `auth`) because its
+  // 401 is a `data()` result, not a `Response`, so it cannot short-circuit
+  // from `auth` without changing the response shape.
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request }) => {
+    const cronSecret = process.env.CRON_SECRET;
+    const headerSecret = request.headers.get("x-cron-secret");
+    if (!cronSecret || headerSecret !== cronSecret) {
+      return routeData({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const twilio = await createWorkspaceTwilioInstance({
-      workspace_id: workspaceId,
-    });
-    const usageRecords = await twilio.usage.records.list();
-    const twilioUsage = usageRecords.map((record) => ({
-      category: record.category,
-      description: record.description,
-      usage: record.usage,
-      usageUnit: record.usageUnit,
-      price: record.price.toString(),
-      startDate: record.startDate?.toISOString(),
-      endDate: record.endDate?.toISOString(),
-    }));
+    const body = await request.json().catch(() => ({} as Record<string, unknown>));
+    const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 
-    const report = await loadBillingReconciliationReport({
-      workspaceId,
-      twilioUsage,
-    });
-    const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
-      workspaceId,
-      report,
-      source: "cron",
-    });
+    if (!workspaceId) {
+      return routeData({ error: "Missing workspaceId" }, { status: 400 });
+    }
 
-    return routeData({
-      ok: true,
-      materialVariance: snapshot.materialVariance,
-      message: snapshot.materialVariance
-        ? "Reconciliation complete — material variance detected."
-        : "Reconciliation complete — no material variance.",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error("Billing reconciliation job failed", { workspaceId, error: message });
-    return routeData({ error: message }, { status: 500 });
-  }
-};
+    try {
+      const twilioData = await loadWorkspaceTwilioData(workspaceId);
+      const creds = readTwilioWorkspaceCredentials(twilioData);
+      if (!creds?.sid) {
+        return routeData(
+          { error: "Workspace has no Twilio credentials" },
+          { status: 400 },
+        );
+      }
+
+      const twilio = await createWorkspaceTwilioInstance({
+        workspace_id: workspaceId,
+      });
+      const usageRecords = await twilio.usage.records.list();
+      const twilioUsage = usageRecords.map((record) => ({
+        category: record.category,
+        description: record.description,
+        usage: record.usage,
+        usageUnit: record.usageUnit,
+        price: record.price.toString(),
+        startDate: record.startDate?.toISOString(),
+        endDate: record.endDate?.toISOString(),
+      }));
+
+      const report = await loadBillingReconciliationReport({
+        workspaceId,
+        twilioUsage,
+      });
+      const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
+        workspaceId,
+        report,
+        source: "cron",
+      });
+
+      return routeData({
+        ok: true,
+        materialVariance: snapshot.materialVariance,
+        message: snapshot.materialVariance
+          ? "Reconciliation complete — material variance detected."
+          : "Reconciliation complete — no material variance.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error("Billing reconciliation job failed", { workspaceId, error: message });
+      return routeData({ error: message }, { status: 500 });
+    }
+  },
+});

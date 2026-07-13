@@ -7,12 +7,14 @@ import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 import { downloadObject } from "@/lib/object-storage.server";
+import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request, url}: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  auth: ({ request }: LoaderFunctionArgs) => requireDualAuth(request),
+  sideEffects: ["db-read", "db-write", "external"],
+  handler: async ({ request, url, auth }) => {
 
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
   const { headers } = await getSession(request);
   const user = getDualAuthUser(auth);
   if (!user) {
@@ -106,8 +108,9 @@ export const loader = async ({ request, url}: LoaderFunctionArgs) => {
     if (error instanceof AppError) {
       return routeData({ error: error.message }, { status: error.statusCode, headers });
     }
-    return routeData({ 
-      error: error instanceof Error ? error.message : "Unknown error" 
+    return routeData({
+      error: error instanceof Error ? error.message : "Unknown error"
     }, { status: 500, headers });
   }
-}
+  },
+});

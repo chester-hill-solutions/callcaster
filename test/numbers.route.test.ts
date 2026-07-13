@@ -170,8 +170,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
 
   test("loader returns 400 when search query is missing", async () => {
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request("http://localhost/api/numbers?searchMode=areaCode"),
       } as any)),
     );
@@ -196,8 +195,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     mocks.env.TWILIO_SID.mockReturnValueOnce("sid");
     mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("token");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=416",
         ),
@@ -229,8 +227,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       availablePhoneNumbers: () => ({ local: { list: listMock } }),
     });
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=613&workspace_id=w1",
         ),
@@ -248,8 +245,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     queueDualAuthSession({ user: { id: "u1" } });
     listMock.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=416",
         ),
@@ -278,7 +274,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -304,7 +300,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -328,7 +324,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -355,7 +351,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1666");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000002");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -379,7 +375,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000003");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -405,7 +401,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1777");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -432,7 +428,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1888");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -454,7 +450,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -481,7 +477,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
@@ -503,7 +499,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,

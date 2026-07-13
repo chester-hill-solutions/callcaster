@@ -60,7 +60,7 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?id=u1&workspace=w1"),
     } as any)));
     expect(res.status).toBe(404);
@@ -71,7 +71,7 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token"),
     } as any)));
     expect(res.status).toBe(400);
@@ -87,7 +87,7 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?id=other-user&workspace=w1"),
     } as any)));
     expect(res.status).toBe(200);
@@ -112,7 +112,7 @@ describe("app/routes/api+/token/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "me" },
     });
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?workspace=w1"),
     } as any)));
     expect(res.status).toBe(200);
@@ -134,7 +134,7 @@ describe("app/routes/api+/token/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockRejectedValueOnce(new Error("denied"));
     const mod = await import("../app/routes/api+/token");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/token?workspace=w1"),
     } as any)));
     expect(res.status).toBe(500);

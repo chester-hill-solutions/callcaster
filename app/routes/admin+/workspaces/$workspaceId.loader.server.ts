@@ -6,8 +6,8 @@ import { data as routeData, redirect } from "react-router";
 import { getAdminWorkspaceDetail } from "@/lib/platform-admin.server";
 import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { getAdminRouteContext } from "@/lib/admin-route.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineLoader } from "@/lib/handler.server";
 
 interface TwilioPhoneNumber {
   sid: string;
@@ -44,8 +44,11 @@ interface TwilioUsageRecord {
   endDate?: Date;
 }
 
-export const loader = async ({ context, params }: LoaderFunctionArgs) => {
-  const { userData } = getAdminRouteContext(context);
+export const loader = defineLoader({
+  auth: adminRouteAuth,
+  sideEffects: ["db-read", "twilio"],
+  handler: async ({ auth, params }) => {
+  const { userData } = auth;
   const workspaceId = params.workspaceId;
 
   if (!workspaceId) {
@@ -116,4 +119,5 @@ export const loader = async ({ context, params }: LoaderFunctionArgs) => {
     twilioUsage,
     twilioPortalSnapshot,
   });
-};
+  },
+});

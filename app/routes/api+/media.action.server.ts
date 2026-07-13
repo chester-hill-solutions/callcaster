@@ -3,11 +3,14 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
+import { defineAction } from "@/lib/handler.server";
 
-import type { ActionFunctionArgs } from "react-router";
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-
+export const action = defineAction({
+  // NOTE: the dual-auth guard stays in `handler` (not `auth`) because the
+  // original handler reads the form body BEFORE authenticating — moving the
+  // guard ahead of the body read would change observable ordering.
+  sideEffects: ["db-write", "external"],
+  handler: async ({ request }) => {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const live_campaign_id_raw = formData.get('live_campaign_id');
@@ -15,12 +18,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const workspace_id = formData.get('workspace_id');
     const campaignName = formData.get('campaign_name') as string || Date.now().toString();
     const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
-  const user = getDualAuthUser(auth);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-    const arrayBuffer = await file.arrayBuffer();   
+    if (auth instanceof Response) return auth;
+    const user = getDualAuthUser(auth);
+    if (!user) {
+      return routeData({ error: "Unauthorized" }, { status: 401 });
+    }
+    const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const fileName = `${user.id}.${campaignName}`;
     try {
@@ -45,4 +48,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         logger.error("Error uploading media:", error);
         return routeData({ error }, { status: 500 });
     }
-}
+  },
+});

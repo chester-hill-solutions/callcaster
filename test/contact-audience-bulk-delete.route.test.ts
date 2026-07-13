@@ -46,7 +46,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
       user: null,
     });
     const mod = await import("../app/routes/api+/contact-audience/bulk-delete.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(401);
@@ -57,7 +57,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/contact-audience/bulk-delete.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "POST" }),
     } as any));
     expect(res.status).toBe(405);
@@ -68,14 +68,14 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
 
     queueJsonAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: null, "contact_ids[]": ["1"] });
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any));
     expect(r1.status).toBe(400);
 
     queueJsonAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: "1", "contact_ids[]": null });
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any));
     expect(r2.status).toBe(400);
@@ -99,7 +99,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/contact-audience/bulk-delete.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
@@ -119,7 +119,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
     queueJsonAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: "1", "contact_ids[]": "2" });
     mocks.removeContactsFromAudience.mockRejectedValueOnce(new Error("boom"));
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any));
     expect(r1.status).toBe(500);
@@ -127,7 +127,7 @@ describe("app/routes/api+/contact-audience/route.bulk-delete.tsx", () => {
     queueJsonAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: "1", "contact_ids[]": "2" });
     mocks.removeContactsFromAudience.mockRejectedValueOnce("nope");
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any));
     expect(r2.status).toBe(500);

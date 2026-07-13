@@ -1,10 +1,9 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
   getUserRole,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { data as routeData, redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import {
   isOnboardingActionName,
   type OnboardingActionData,
@@ -14,6 +13,7 @@ import {
   mapOnboardingHandlerResult,
   runOnboardingAction,
 } from "@/lib/platform-onboarding.server";
+import { defineAction } from "@/lib/handler.server";
 
 export type { OnboardingActionData } from "@/lib/onboarding-actions.server";
 
@@ -66,51 +66,55 @@ async function runUiOnboardingAction(
   });
 }
 
-export const action = async ({ request, params, context }: ActionFunctionArgs) => {
-  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
-  const wsId = params.id;
-  if (!wsId) {
-    return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });
-  }
-
-  await requireWorkspaceAccess({
-    user,
-    workspaceId: wsId,
-  });
-
-  const role = (await getUserRole({ user, workspaceId: wsId }))?.role;
-
-  if (role !== "owner" && role !== "admin") {
-    return routeData<OnboardingActionData>(
-      { error: "Only workspace admins can change onboarding state." },
-      { status: 403 },
-    );
-  }
-
-  const formData = await request.formData();
-  const actionName = String(formData.get("_action") ?? "");
-
-  if (!isOnboardingActionName(actionName)) {
-    return routeData<OnboardingActionData>({ error: "Unknown onboarding action." }, { status: 400 });
-  }
-
-  try {
-    return await runUiOnboardingAction(
-      wsId,
-      headers,
-      user.id, 
-      actionName,
-      formData,
-    );
-  } catch (error) {
-    if (error instanceof Response) {
-      throw error;
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, params, auth }) => {
+    const { headers, user } = auth;
+    const wsId = params.id;
+    if (!wsId) {
+      return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });
     }
-    return routeData<OnboardingActionData>(
-      {
-        error: error instanceof Error ? error.message : "Onboarding update failed.",
-      },
-      { status: 500 },
-    );
-  }
-};
+
+    await requireWorkspaceAccess({
+      user,
+      workspaceId: wsId,
+    });
+
+    const role = (await getUserRole({ user, workspaceId: wsId }))?.role;
+
+    if (role !== "owner" && role !== "admin") {
+      return routeData<OnboardingActionData>(
+        { error: "Only workspace admins can change onboarding state." },
+        { status: 403 },
+      );
+    }
+
+    const formData = await request.formData();
+    const actionName = String(formData.get("_action") ?? "");
+
+    if (!isOnboardingActionName(actionName)) {
+      return routeData<OnboardingActionData>({ error: "Unknown onboarding action." }, { status: 400 });
+    }
+
+    try {
+      return await runUiOnboardingAction(
+        wsId,
+        headers,
+        user.id,
+        actionName,
+        formData,
+      );
+    } catch (error) {
+      if (error instanceof Response) {
+        throw error;
+      }
+      return routeData<OnboardingActionData>(
+        {
+          error: error instanceof Error ? error.message : "Onboarding update failed.",
+        },
+        { status: 500 },
+      );
+    }
+  },
+});

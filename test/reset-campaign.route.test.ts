@@ -35,14 +35,14 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     setJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/reset_campaign");
 
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: new FormData() }),
     } as any));
     await expect(r1.json()).resolves.toEqual({ error: "Missing campaign_id" });
 
     const fd2 = new FormData();
     fd2.set("campaign_id", new File(["x"], "x.txt") as any);
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd2 }),
     } as any));
     await expect(r2.json()).resolves.toEqual({ error: "Missing campaign_id" });
@@ -53,21 +53,25 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     const fd = new FormData();
     fd.set("campaign_id", "nope");
     const mod = await import("../app/routes/api+/reset_campaign");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     await expect(res.json()).resolves.toEqual({ error: "Invalid campaign_id" });
   }, 30000);
 
-  test("throws when rpc errors", async () => {
+  test("returns a mapped 500 when rpc errors", async () => {
     mocks.rpcResetCampaign.mockRejectedValueOnce({ message: "bad" });
     queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
-    await expect(
-      mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any),
-    ).rejects.toEqual({ message: "bad" });
+    // The handler factory maps rethrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://x", { method: "POST", body: fd }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "bad" });
     expect(mocks.logger.error).toHaveBeenCalledWith("Error resetting campaign:", { message: "bad" });
   }, 30000);
 
@@ -77,7 +81,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });

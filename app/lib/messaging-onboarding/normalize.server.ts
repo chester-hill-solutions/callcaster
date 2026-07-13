@@ -1,10 +1,9 @@
-import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
+import type { WorkspaceMessagingOnboardingState , WorkspaceOperatingCountry , WorkspaceOnboardingChannel } from "@/lib/types";
 import {
   WORKSPACE_ONBOARDING_CHANNEL_VALUES,
   WORKSPACE_ONBOARDING_STATUS_VALUES,
   WORKSPACE_OPERATING_COUNTRY_VALUES,
 } from "@/lib/types";
-import type { WorkspaceOperatingCountry } from "@/lib/types";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import {
@@ -12,7 +11,6 @@ import {
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "@/lib/messaging-onboarding/defaults.server";
 import { buildOnboardingStepsForState } from "@/lib/messaging-onboarding/readiness.server";
-import type { WorkspaceOnboardingChannel } from "@/lib/types";
 import {
   mergeStoredOnboardingSteps,
   normalizeA2p10dlcSection,

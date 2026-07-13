@@ -1,9 +1,10 @@
 import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-import { resolveDualAuthSession } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth , resolveDualAuthSession } from "@/lib/api-auth.server";
 import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
 import {
   deleteAudienceById,
   findAudienceWorkspaceById,
@@ -30,13 +31,12 @@ type AudiencesDeps = {
   }) => Promise<void>;
 };
 
-export const action = async ({
-  request,
-  deps,
-}: {
-  request: Request;
-  deps?: Partial<AudiencesDeps>;
-}) => {
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({
+    request,
+    deps,
+  }: ActionFunctionArgs & { deps?: Partial<AudiencesDeps> }) => {
   const d = {
     verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
     parseActionRequest: deps?.parseActionRequest ?? parseActionRequest,
@@ -114,4 +114,5 @@ export const action = async ({
   }
 
   return routeData(response, { headers });
-};
+  },
+});

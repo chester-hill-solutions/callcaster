@@ -10,6 +10,8 @@ import {
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { AppError } from "@/lib/errors.server";
+import { defineLoader } from "@/lib/handler.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 interface AuthSessionResponse {
     headers: Headers;
@@ -57,7 +59,12 @@ function flattenAudienceExportRows(rawData: Array<Record<string, unknown>>) {
   });
 }
 
-export const loader = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: async ({
+    request,
+    deps,
+  }: LoaderFunctionArgs & { deps?: Partial<AudiencesDeps> }) => {
 
     const d = {
       verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
@@ -159,4 +166,5 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
       }
       throw error;
     }
-  }
+  },
+});
