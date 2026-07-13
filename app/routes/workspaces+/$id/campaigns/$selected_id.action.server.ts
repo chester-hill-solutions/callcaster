@@ -6,12 +6,15 @@ import {
 import { getWorkspaceUsers } from "@/lib/database/workspace.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { logger as loggerServer } from "@/lib/logger.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
+  auth: workspaceRouteAuth,
   sideEffects: ["db-read"],
-  handler: async ({ params }) => {
-    const { id: workspace_id, selected_id: campaign_id } = params;
+  handler: async ({ params, auth }) => {
+    const { workspaceId: workspace_id } = auth;
+    const campaign_id = params.selected_id;
     if (!workspace_id || !campaign_id) {
       return redirect(`/workspaces/${workspace_id}/campaigns`);
     }
