@@ -587,7 +587,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     docsGuide: GUIDE.telephony,
     workspaceScoped: true,
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-    notes: "Workspace-scoped call disconnect using workspace Twilio credentials.",
+    notes: "Workspace-scoped call disconnect using workspace Twilio credentials. Capability: calls.control.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start",
@@ -599,7 +599,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     docsGuide: GUIDE.telephony,
     workspaceScoped: true,
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-    notes: "Start predictive/manual auto-dial conference for authenticated caller+ agent.",
+    notes: "Start predictive/manual auto-dial conference for authenticated caller+ agent. Capability: calls.start.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/handset/session",

@@ -10314,7 +10314,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_calls_callSid_disconnect",
         "summary": "POST /api/workspaces/:workspaceId/calls/:callSid/disconnect",
-        "description": "Workspace-scoped call disconnect using workspace Twilio credentials.",
+        "description": "Workspace-scoped call disconnect using workspace Twilio credentials. Capability: calls.control.",
         "tags": [
           "Integrator API",
           "telephony"
@@ -10382,7 +10382,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_campaigns_campaignId_dialer_start",
         "summary": "POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start",
-        "description": "Start predictive/manual auto-dial conference for authenticated caller+ agent.",
+        "description": "Start predictive/manual auto-dial conference for authenticated caller+ agent. Capability: calls.start.",
         "tags": [
           "Integrator API",
           "dialer"

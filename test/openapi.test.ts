@@ -167,4 +167,23 @@ describe("openapi spec", () => {
     const op = openApiSpec.paths["/api/sms"].post;
     expect(op?.description).toMatch(/queue|batch|dequeue/i);
   });
+
+  test("cutover telephony routes have stable operationIds and dual auth", () => {
+    const dialer =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start"]
+        .post;
+    const disconnect =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/calls/{callSid}/disconnect"].post;
+
+    expect(dialer?.operationId).toBe("startCampaignDialer");
+    expect(disconnect?.operationId).toBe("disconnectWorkspaceCall");
+    expect(dialer?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(disconnect?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(dialer?.["x-callcaster-capability"]).toBe("calls.start");
+    expect(disconnect?.["x-callcaster-capability"]).toBe("calls.control");
+    expect(dialer?.requestBody?.required).toBe(true);
+    expect(
+      dialer?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("DialerStartResponse");
+  });
 });

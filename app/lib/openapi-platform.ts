@@ -139,6 +139,8 @@ export const platformOpenApiComponents = {
   },
 };
 
+const cutoverTelephonySecurity = [{ sessionCookie: [] }, { apiKey: [] }];
+
 export const platformPathOverrides: Record<string, Record<string, unknown>> = {
   "/api/auth/register": {
     post: {
@@ -280,8 +282,11 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
   },
   "/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start": {
     post: {
+      operationId: "startCampaignDialer",
       summary: "Start auto-dial conference for a campaign",
       tags: ["Platform API", "Dialer", "Telephony"],
+      "x-callcaster-capability": "calls.start",
+      security: cutoverTelephonySecurity,
       description:
         "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace.",
       requestBody: {
@@ -310,8 +315,11 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
   },
   "/api/workspaces/{workspaceId}/calls/{callSid}/disconnect": {
     post: {
+      operationId: "disconnectWorkspaceCall",
       summary: "Disconnect an active workspace call",
       tags: ["Platform API", "Telephony"],
+      "x-callcaster-capability": "calls.control",
+      security: cutoverTelephonySecurity,
       description:
         "Pause/hang up a live call using workspace Twilio credentials. Requires session or API key scoped to the call workspace.",
       responses: {
