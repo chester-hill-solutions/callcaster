@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger.server";
 import { adminDb } from "@/server/admin-db";
 import { hasMinRole } from "@/lib/workspace-route.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
+import { timestampToIsoString } from "@/lib/parse-utils.server";
 import { isTwoFactorEnabled } from "@/lib/two-factor.server";
 
 export async function listUserWorkspaces(
@@ -44,10 +45,7 @@ export async function listUserWorkspaces(
       ok: true as const,
       workspaces: rows.map((row) => ({
         ...row,
-        last_accessed:
-          row.last_accessed instanceof Date
-            ? row.last_accessed.toISOString()
-            : String(row.last_accessed ?? ""),
+        last_accessed: timestampToIsoString(row.last_accessed),
       })),
     };
   } catch (error) {

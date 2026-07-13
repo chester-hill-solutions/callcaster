@@ -17,6 +17,10 @@ import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { mergeWorkspaceTwilioData as mergeWorkspaceTwilioDataCore } from "@/lib/merge-workspace-twilio-data.server";
 import {
+  timestampToIsoString,
+  timestampToIsoStringOrNull,
+} from "@/lib/parse-utils.server";
+import {
   memberRoleToRoleId,
   workspaceMemberId,
 } from "@/lib/workspace-membership.server";
@@ -347,10 +351,7 @@ export async function listAllWorkspaceUsers() {
     workspace_id: row.workspace_id,
     user_id: row.user_id,
     role: row.role_id,
-    created_at:
-      row.created_at instanceof Date
-        ? row.created_at.toISOString()
-        : String(row.created_at),
+    created_at: timestampToIsoString(row.created_at),
     last_accessed: null as string | null,
   }));
 }
@@ -672,8 +673,7 @@ export async function listAdminWorkspaceUsersWithUser(workspaceId: string) {
 
   return rows.map(({ user, created_at, ...membership }) => ({
     ...membership,
-    created_at:
-      created_at instanceof Date ? created_at.toISOString() : String(created_at),
+    created_at: timestampToIsoString(created_at),
     last_accessed: null as string | null,
     user,
   }));
@@ -753,12 +753,7 @@ export async function listUserWorkspaceMembershipsForProfile(userId: string) {
 
   return rows.map((row) => ({
     ...row,
-    last_accessed:
-      row.last_accessed instanceof Date
-        ? row.last_accessed.toISOString()
-        : row.last_accessed
-          ? String(row.last_accessed)
-          : null,
+    last_accessed: timestampToIsoStringOrNull(row.last_accessed),
   }));
 }
 
