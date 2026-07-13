@@ -81,7 +81,6 @@ const useStartConferenceAndDial = ({ userId, campaignId, workspaceId, callerId, 
 
         try {
             const startConferenceData = await startConferenceAndDial({
-                user_id: userId,
                 caller_id: callerId,
                 workspace_id: workspaceId,
                 campaign_id: campaignId,

@@ -52,7 +52,7 @@ describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
     );
 
     const mod = await import("../app/routes/api+/outreach_attempts/$id.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/outreach_attempts/1", { method: "POST" }),
       params: { id: "1" },
     } as any));
@@ -67,7 +67,7 @@ describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
     mocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce({ id: 1 });
 
     const mod = await import("../app/routes/api+/outreach_attempts/$id.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/outreach_attempts/2", { method: "POST" }),
       params: { id: "2" },
     } as any));

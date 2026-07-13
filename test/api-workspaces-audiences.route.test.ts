@@ -31,8 +31,7 @@ describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/audiences.route"
     );
-    const response = await asRouteResponse(
-      await mod.loader(
+    const response = await asRouteResponse(mod.loader(
         await withDataPlaneRouteArgs({
           request: new Request("http://localhost/api/workspaces/w1/audiences"),
           params: { workspaceId: "w1" },
@@ -55,8 +54,7 @@ describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/audiences.route"
     );
-    const response = await asRouteResponse(
-      await mod.loader(
+    const response = await asRouteResponse(mod.loader(
         await withDataPlaneRouteArgs(
           {
             request: new Request("http://localhost/api/workspaces/w1/audiences"),

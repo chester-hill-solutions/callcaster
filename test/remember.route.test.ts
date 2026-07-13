@@ -17,8 +17,7 @@ vi.mock("@/server/auth-instance", () => ({
 describe("app/routes/remember.action.server.ts", () => {
   test("requires email", async () => {
     const mod = await import("../app/routes/remember");
-    const response = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const response = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://localhost/remember", {
           method: "POST",
           body: new FormData(),
@@ -40,8 +39,7 @@ describe("app/routes/remember.action.server.ts", () => {
     form.set("email", "user@example.com");
 
     const mod = await import("../app/routes/remember");
-    const response = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const response = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://localhost/remember", {
           method: "POST",
           body: form,
@@ -70,8 +68,7 @@ describe("app/routes/remember.action.server.ts", () => {
     form.set("email", "user@example.com");
 
     const mod = await import("../app/routes/remember");
-    const response = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const response = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://localhost/remember", {
           method: "POST",
           body: form,

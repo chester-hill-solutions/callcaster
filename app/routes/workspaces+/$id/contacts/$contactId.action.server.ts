@@ -4,7 +4,7 @@ import { updateContact } from "@/lib/database/contact.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { createTenantDb } from "@/server/tenant-db";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 export type ContactFormData = {
   id?: number;
@@ -21,9 +21,9 @@ export type ContactFormData = {
   workspace: string;
 };
 
-export const action = async ({
-  request, params, context,
-}: ActionFunctionArgs) => {
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({ request, params, context }) => {
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id || !selected_id) {
@@ -79,4 +79,5 @@ export const action = async ({
     logger.error("Error in contact action:", error);
     return routeData({ error: "Failed to save contact" }, { status: 500 });
   }
-};
+  },
+});

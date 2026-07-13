@@ -26,7 +26,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
   test("loader 400s when workspace_id missing", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/workspace-api-keys");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({ request: new Request("http://x/api/workspace-api-keys") } as any)));
+    const res = await asRouteResponse(mod.loader(withRouteUrl({ request: new Request("http://x/api/workspace-api-keys") } as any)));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id is required" });
   });
@@ -40,7 +40,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
       error: "bad",
       status: 500,
     });
-    const r1 = await asRouteResponse(await mod.loader(withRouteUrl({
+    const r1 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://x/api/workspace-api-keys?workspace_id=w1"),
     } as any)));
     expect(r1.status).toBe(500);
@@ -48,7 +48,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
 
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.listWorkspaceApiKeys.mockResolvedValueOnce({ ok: true, keys: [] });
-    const r2 = await asRouteResponse(await mod.loader(withRouteUrl({
+    const r2 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://x/api/workspace-api-keys?workspace_id=w1"),
     } as any)));
     expect(r2.status).toBe(200);
@@ -60,11 +60,11 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
 
     queueJsonAuthSession({ user: { id: "u1" } });
     const badJson = new Request("http://x", { method: "POST", body: "nope", headers: { "Content-Type": "application/json" } });
-    const r0 = await asRouteResponse(await mod.action(withRouteUrl({ request: badJson } as any)));
+    const r0 = await asRouteResponse(mod.action(withRouteUrl({ request: badJson } as any)));
     expect(r0.status).toBe(400);
 
     queueJsonAuthSession({ user: { id: "u1" } });
-    const r1 = await asRouteResponse(await mod.action(withRouteUrl({
+    const r1 = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "00000000-0000-4000-8000-000000000001", name: "" }) }),
     } as any)));
     expect(r1.status).toBe(400);
@@ -75,7 +75,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
       key: "cc_live_secret",
       api_key: { id: "id1", name: "Name", key_prefix: "cc_live_", created_at: "t" },
     });
-    const r2 = await asRouteResponse(await mod.action(withRouteUrl({
+    const r2 = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "00000000-0000-4000-8000-000000000001", name: " Name " }) }),
     } as any)));
     expect(r2.status).toBe(201);
@@ -89,7 +89,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
       error: "ins",
       status: 500,
     });
-    const r3 = await asRouteResponse(await mod.action(withRouteUrl({
+    const r3 = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "00000000-0000-4000-8000-000000000001", name: "Name" }) }),
     } as any)));
     expect(r3.status).toBe(500);
@@ -100,7 +100,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
     const mod = await import("../app/routes/api+/workspace-api-keys");
 
     queueJsonAuthSession({ user: { id: "u1" } });
-    const r0 = await asRouteResponse(await mod.action(withRouteUrl({
+    const r0 = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "DELETE", body: JSON.stringify({}) }),
     } as any)));
     expect(r0.status).toBe(400);
@@ -111,7 +111,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
       body: "nope",
       headers: { "Content-Type": "application/json" },
     });
-    const r0b = await asRouteResponse(await mod.action(withRouteUrl({ request: badJson } as any)));
+    const r0b = await asRouteResponse(mod.action(withRouteUrl({ request: badJson } as any)));
     expect(r0b.status).toBe(400);
 
     queueJsonAuthSession({ user: { id: "u1" } });
@@ -120,7 +120,7 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
       error: "del",
       status: 500,
     });
-    const r1 = await asRouteResponse(await mod.action(withRouteUrl({
+    const r1 = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "DELETE", body: JSON.stringify({ id: "00000000-0000-4000-8000-000000000002", workspace_id: "00000000-0000-4000-8000-000000000001" }) }),
     } as any)));
     expect(r1.status).toBe(500);
@@ -128,14 +128,14 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
 
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.deleteWorkspaceApiKey.mockResolvedValueOnce({ ok: true });
-    const r2 = await asRouteResponse(await mod.action(withRouteUrl({
+    const r2 = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "DELETE", body: JSON.stringify({ id: "00000000-0000-4000-8000-000000000002", workspace_id: "00000000-0000-4000-8000-000000000001" }) }),
     } as any)));
     expect(r2.status).toBe(200);
     await expect(r2.json()).resolves.toEqual({ success: true });
 
     queueJsonAuthSession({ user: { id: "u1" } });
-    const r3 = await asRouteResponse(await mod.action(withRouteUrl({ request: new Request("http://x", { method: "PUT" }) } as any)));
+    const r3 = await asRouteResponse(mod.action(withRouteUrl({ request: new Request("http://x", { method: "PUT" }) } as any)));
     expect(r3.status).toBe(405);
   });
 });

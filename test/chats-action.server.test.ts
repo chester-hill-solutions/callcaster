@@ -44,8 +44,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     formData.set("intent", "link_contact");
     formData.set("contact_id", "42");
 
-    const res = await asRouteResponse(
-      await action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(action(await withWorkspaceRouteArgs({
         request: new Request("http://x/workspaces/w1/chats/+15555550100", {
           method: "POST",
           body: formData,
@@ -72,8 +71,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const formData = new FormData();
     formData.set("intent", "link_contact");
 
-    const res = await asRouteResponse(
-      await action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(action(await withWorkspaceRouteArgs({
         request: new Request("http://x/workspaces/w1/chats/+15555550100", {
           method: "POST",
           body: formData,
@@ -97,8 +95,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     formData.set("body", "hi");
     formData.set("from", "+15550000000");
 
-    const res = await asRouteResponse(
-      await action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(action(await withWorkspaceRouteArgs({
         request: new Request("http://x/workspaces/w1/chats/+15555550100", {
           method: "POST",
           body: formData,

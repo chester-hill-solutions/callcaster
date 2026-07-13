@@ -1,10 +1,10 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { loadCallLogPage } from "@/lib/call-log.server";
 import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 import type { User } from "@/lib/types";
 import { and, eq, gt } from "drizzle-orm";
 import { handset_session as handsetSessionTable, workspace as workspaceTable } from "@/db/schema";
@@ -70,144 +70,147 @@ export type CallLogLoaderData = Awaited<ReturnType<typeof loadCallLogPage>> & {
   };
 };
 
-export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
-  const { headers, user, workspaceId, userRole } =
-    getWorkspaceRouteContext(context);
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ auth, url }) => {
+    const { headers, user, workspaceId, userRole } = auth;
 
-  if (!workspaceId) {
-    return routeData(
-      {
-        rows: [],
-        filters: {
-          callcasterNumber: "",
-          otherNumber: "",
-          direction: "all",
-          disposition: "",
-          agentUserId: "",
-          sortKey: "date_created",
-          sortDirection: "desc",
-          page: 1,
-          pageSize: 25,
-        },
-        workspaceNumbers: [],
-        agents: [],
-        pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
-        workspace: null,
-        userRole: null,
-        campaigns: [],
-        error: "Workspace ID is required",
-        handsetNumber: null,
-        listening: { ...EMPTY_LISTENING },
-      } satisfies CallLogLoaderData,
-      { headers, status: 400 },
-    );
-  }
+    if (!workspaceId) {
+      return routeData(
+        {
+          rows: [],
+          filters: {
+            callcasterNumber: "",
+            otherNumber: "",
+            direction: "all",
+            disposition: "",
+            agentUserId: "",
+            sortKey: "date_created",
+            sortDirection: "desc",
+            page: 1,
+            pageSize: 25,
+          },
+          workspaceNumbers: [],
+          agents: [],
+          pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
+          workspace: null,
+          userRole: null,
+          campaigns: [],
+          error: "Workspace ID is required",
+          handsetNumber: null,
+          listening: { ...EMPTY_LISTENING },
+        } satisfies CallLogLoaderData,
+        { headers, status: 400 },
+      );
+    }
 
-  const tdb = createTenantDb(workspaceId);
-  const [workspaceRow, campaigns] = await Promise.all([
-    adminDb
-      .select({
-        id: workspaceTable.id,
-        name: workspaceTable.name,
-        credits: workspaceTable.credits,
-      })
-      .from(workspaceTable)
-      .where(eq(workspaceTable.id, workspaceId))
-      .limit(1)
-      .then((rows) => rows[0] ?? null),
-    tdb.campaign.findMany({
-      columns: { id: true, title: true, status: true },
-      orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
-    }),
-  ]);
-
-  const workspace = workspaceRow;
-
-  if (!workspace) {
-    return routeData(
-      {
-        rows: [],
-        filters: {
-          callcasterNumber: "",
-          otherNumber: "",
-          direction: "all",
-          disposition: "",
-          agentUserId: "",
-          sortKey: "date_created",
-          sortDirection: "desc",
-          page: 1,
-          pageSize: 25,
-        },
-        workspaceNumbers: [],
-        agents: [],
-        pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
-        workspace: null,
-        userRole,
-        campaigns: campaigns ?? [],
-        error: "Workspace not found",
-        handsetNumber: null,
-        listening: { ...EMPTY_LISTENING },
-      } satisfies CallLogLoaderData,
-      { headers, status: 404 },
-    );
-  }
-
-  try {
-    const [callLog, incomingState] = await Promise.all([
-      loadCallLogPage({
-        workspaceId,
-        requestUrl: url.href,
+    const tdb = createTenantDb(workspaceId);
+    const [workspaceRow, campaigns] = await Promise.all([
+      adminDb
+        .select({
+          id: workspaceTable.id,
+          name: workspaceTable.name,
+          credits: workspaceTable.credits,
+        })
+        .from(workspaceTable)
+        .where(eq(workspaceTable.id, workspaceId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+      tdb.campaign.findMany({
+        columns: { id: true, title: true, status: true },
+        orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
       }),
-      user
-        ? loadIncomingListeningState({
-            workspaceId,
-            userId: user.id,
-          })
-        : Promise.resolve({
-            handsetNumber: null,
-            listening: { ...EMPTY_LISTENING },
-          }),
     ]);
 
-    return routeData(
-      {
-        ...callLog,
-        workspace,
-        userRole,
-        campaigns: campaigns ?? [],
-        error: null,
-        handsetNumber: incomingState.handsetNumber,
-        listening: incomingState.listening,
-      } satisfies CallLogLoaderData,
-      { headers },
-    );
-  } catch (error) {
-    logger.error("Failed to load call log:", error);
-    return routeData(
-      {
-        rows: [],
-        filters: {
-          callcasterNumber: "",
-          otherNumber: "",
-          direction: "all",
-          disposition: "",
-          agentUserId: "",
-          sortKey: "date_created",
-          sortDirection: "desc",
-          page: 1,
-          pageSize: 25,
-        },
-        workspaceNumbers: [],
-        agents: [],
-        pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
-        workspace,
-        userRole,
-        campaigns: campaigns ?? [],
-        error: "Failed to load call log. Please try again.",
-        handsetNumber: null,
-        listening: { ...EMPTY_LISTENING },
-      } satisfies CallLogLoaderData,
-      { headers, status: 500 },
-    );
-  }
-};
+    const workspace = workspaceRow;
+
+    if (!workspace) {
+      return routeData(
+        {
+          rows: [],
+          filters: {
+            callcasterNumber: "",
+            otherNumber: "",
+            direction: "all",
+            disposition: "",
+            agentUserId: "",
+            sortKey: "date_created",
+            sortDirection: "desc",
+            page: 1,
+            pageSize: 25,
+          },
+          workspaceNumbers: [],
+          agents: [],
+          pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
+          workspace: null,
+          userRole,
+          campaigns: campaigns ?? [],
+          error: "Workspace not found",
+          handsetNumber: null,
+          listening: { ...EMPTY_LISTENING },
+        } satisfies CallLogLoaderData,
+        { headers, status: 404 },
+      );
+    }
+
+    try {
+      const [callLog, incomingState] = await Promise.all([
+        loadCallLogPage({
+          workspaceId,
+          requestUrl: url.href,
+        }),
+        user
+          ? loadIncomingListeningState({
+              workspaceId,
+              userId: user.id,
+            })
+          : Promise.resolve({
+              handsetNumber: null,
+              listening: { ...EMPTY_LISTENING },
+            }),
+      ]);
+
+      return routeData(
+        {
+          ...callLog,
+          workspace,
+          userRole,
+          campaigns: campaigns ?? [],
+          error: null,
+          handsetNumber: incomingState.handsetNumber,
+          listening: incomingState.listening,
+        } satisfies CallLogLoaderData,
+        { headers },
+      );
+    } catch (error) {
+      logger.error("Failed to load call log:", error);
+      return routeData(
+        {
+          rows: [],
+          filters: {
+            callcasterNumber: "",
+            otherNumber: "",
+            direction: "all",
+            disposition: "",
+            agentUserId: "",
+            sortKey: "date_created",
+            sortDirection: "desc",
+            page: 1,
+            pageSize: 25,
+          },
+          workspaceNumbers: [],
+          agents: [],
+          pagination: { currentPage: 1, totalPages: 0, totalCount: 0, pageSize: 25 },
+          workspace,
+          userRole,
+          campaigns: campaigns ?? [],
+          error: "Failed to load call log. Please try again.",
+          handsetNumber: null,
+          listening: { ...EMPTY_LISTENING },
+        } satisfies CallLogLoaderData,
+        { headers, status: 500 },
+      );
+    }
+  },
+});

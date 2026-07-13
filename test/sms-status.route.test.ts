@@ -107,8 +107,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       }));
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
       } as never),
     );
@@ -139,8 +138,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     formData.set("ErrorCode", "30006");
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: formData }),
       } as never),
     );
@@ -180,8 +178,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     formData.set("ErrorCode", "30007");
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: formData }),
       } as never),
     );
@@ -191,8 +188,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
 
   test("returns 400 when SmsSid or status missing", async () => {
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeSmsStatusRequest({ SmsSid: "SM1" }),
       } as never),
     );
@@ -222,8 +218,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     formData.set("MessageStatus", "delivered");
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: formData }),
       } as never),
     );
@@ -235,8 +230,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     mocks.requireTwilioSignature.mockResolvedValueOnce(null);
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
       } as never),
     );
@@ -262,8 +256,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "delivered" }),
       } as never),
     );
@@ -295,8 +288,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeSmsStatusRequest({ SmsSid: "SM2", SmsStatus: "delivered" }),
       } as never),
     );
@@ -319,8 +311,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     mocks.requireTwilioSignature.mockResolvedValueOnce(null);
 
     const mod = await import("../app/routes/api+/sms/status.route");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
       } as never),
     );

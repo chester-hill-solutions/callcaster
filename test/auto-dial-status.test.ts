@@ -338,7 +338,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "61");
     fd.set("CallDuration", "61");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "bad" },
@@ -365,9 +365,9 @@ describe("api.auto-dial.status", () => {
       });
     };
 
-    const r1 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    const r1 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r1.status).toBe(200);
-    const r2 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    const r2 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(200);
 
     expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
@@ -387,7 +387,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "61");
     fd.set("CallDuration", "61");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -412,7 +412,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "10");
     fd.set("CallDuration", "10");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -439,7 +439,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -466,7 +466,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -496,7 +496,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
     fd.set("FriendlyName", "in-progress");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -523,7 +523,7 @@ describe("api.auto-dial.status", () => {
     fd.set("CallDuration", "2");
     fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -543,7 +543,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -571,7 +571,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -595,7 +595,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -635,7 +635,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -656,7 +656,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -684,7 +684,7 @@ describe("api.auto-dial.status", () => {
     fd.set("CallDuration", "2");
     fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -707,7 +707,7 @@ describe("api.auto-dial.status", () => {
     fd.set("CallDuration", "2");
     fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -740,7 +740,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
     fd.set("FriendlyName", "in-progress");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -759,7 +759,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -777,7 +777,7 @@ describe("api.auto-dial.status", () => {
     fd.set("StatusCallbackEvent", "other");
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -799,7 +799,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -821,7 +821,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
     fd.set("FriendlyName", "in-progress");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },

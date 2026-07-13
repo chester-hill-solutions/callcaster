@@ -31,8 +31,7 @@ describe("app/routes/admin+.tsx action", () => {
     formData.set("_action", "sync_workspace_twilio");
     formData.set("workspaceId", "w1");
 
-    const res = await asRouteResponse(
-      await mod.action(
+    const res = await asRouteResponse(mod.action(
         await withAdminRouteArgs({
           request: new Request("http://x", { method: "POST", body: formData }),
         }),
@@ -52,8 +51,7 @@ describe("app/routes/admin+.tsx action", () => {
     formData.set("workspaceId", "w2");
     formData.set("currentStatus", "false");
 
-    const res = await asRouteResponse(
-      await mod.action(
+    const res = await asRouteResponse(mod.action(
         await withAdminRouteArgs({
           request: new Request("http://x", { method: "POST", body: formData }),
         }),

@@ -51,7 +51,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
 
   test("loader returns retired 410 response", async () => {
     const mod = await import("../app/routes/api+/verify-audio-session");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
     } as any));
     expect(res.status).toBe(410);
@@ -62,7 +62,7 @@ describe("app/routes/api+/verify-audio-session/route.tsx", () => {
 
   test("action returns TwiML xml", async () => {
     const mod = await import("../app/routes/api+/verify-audio-session");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toBe("<Response />");
     expect(mocks.gather).toHaveBeenCalledWith(

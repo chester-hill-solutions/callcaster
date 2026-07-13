@@ -42,7 +42,7 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
     mocks.rpcCreateOutreachAttempt.mockRejectedValueOnce(new Error("nope"));
 
     const mod = await import("../app/routes/api+/outreach-attempts");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/outreach-attempts", { method: "POST" }),
     } as any));
 
@@ -66,7 +66,7 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
     mocks.rpcCreateOutreachAttempt.mockResolvedValueOnce(123);
 
     const mod = await import("../app/routes/api+/outreach-attempts");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/outreach-attempts", { method: "POST" }),
     } as any));
 

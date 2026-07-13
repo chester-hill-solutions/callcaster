@@ -27,7 +27,7 @@ describe("openapi spec", () => {
 
   test("includes user-facing workspace and campaign routes", () => {
     expect(openApiSpec.paths).toHaveProperty("/api/campaigns");
-    expect(openApiSpec.paths).toHaveProperty("/api/workspace");
+    expect(openApiSpec.paths).toHaveProperty("/api/workspaces/{workspaceId}");
     expect(openApiSpec.paths).toHaveProperty("/api/contacts");
     expect(Object.keys(openApiSpec.paths).length).toBeGreaterThan(40);
   });
@@ -166,5 +166,86 @@ describe("openapi spec", () => {
   test("dispatchCampaignSms description mentions queue/batch caveat", () => {
     const op = openApiSpec.paths["/api/sms"].post;
     expect(op?.description).toMatch(/queue|batch|dequeue/i);
+  });
+
+  test("cutover telephony routes have stable operationIds and dual auth", () => {
+    const dialer =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start"]
+        .post;
+    const disconnect =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/calls/{callSid}/disconnect"].post;
+
+    expect(dialer?.operationId).toBe("startCampaignDialer");
+    expect(disconnect?.operationId).toBe("disconnectWorkspaceCall");
+    expect(dialer?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(disconnect?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(dialer?.["x-callcaster-capability"]).toBe("calls.start");
+    expect(disconnect?.["x-callcaster-capability"]).toBe("calls.control");
+    expect(dialer?.requestBody?.required).toBe(true);
+    expect(
+      dialer?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("DialerStartResponse");
+  });
+
+  test("audit events route is owner-session documented with audit.read capability", () => {
+    const audit =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/audit-events"].get;
+
+    expect(audit?.operationId).toBe("listWorkspaceAuditEvents");
+    expect(audit?.security).toEqual([{ sessionCookie: [] }]);
+    expect(audit?.["x-callcaster-capability"]).toBe("audit.read");
+    expect(
+      audit?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("WorkspaceAuditEventListResponse");
+  });
+
+  test("workspace scoped routes have stable operationIds and mixed auth", () => {
+    const workspace = openApiSpec.paths["/api/workspaces/{workspaceId}"];
+
+    expect(workspace.get?.operationId).toBe("getWorkspace");
+    expect(workspace.patch?.operationId).toBe("updateWorkspace");
+    expect(workspace.delete?.operationId).toBe("deleteWorkspace");
+    expect(workspace.get?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(workspace.patch?.security).toEqual([{ sessionCookie: [] }]);
+    expect(workspace.delete?.security).toEqual([{ sessionCookie: [] }]);
+    expect(
+      workspace.patch?.requestBody?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("UpdateWorkspaceRequest");
+    expect(
+      workspace.get?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("WorkspaceDetailResponse");
+  });
+
+  test("workspace admin routes have stable operationIds and session auth", () => {
+    const apiKeys = openApiSpec.paths["/api/workspaces/{workspaceId}/api-keys"];
+    const members = openApiSpec.paths["/api/workspaces/{workspaceId}/members"];
+    const webhook = openApiSpec.paths["/api/workspaces/{workspaceId}/webhook"];
+    const numbers = openApiSpec.paths["/api/workspaces/{workspaceId}/numbers"];
+    const transfer =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/transfer-ownership"].post;
+
+    expect(apiKeys.get?.operationId).toBe("listWorkspaceApiKeys");
+    expect(apiKeys.post?.operationId).toBe("createWorkspaceApiKey");
+    expect(apiKeys.delete?.operationId).toBe("deleteWorkspaceApiKey");
+    expect(members.post?.operationId).toBe("inviteWorkspaceMember");
+    expect(members.post?.["x-callcaster-capability"]).toBe("members.invite");
+    expect(webhook.put?.operationId).toBe("upsertWorkspaceWebhook");
+    expect(webhook.post?.operationId).toBe("testWorkspaceWebhook");
+    expect(transfer?.operationId).toBe("transferWorkspaceOwnership");
+    expect(numbers.get?.operationId).toBe("listWorkspaceNumbers");
+    expect(numbers.post?.operationId).toBe("purchaseWorkspaceNumber");
+    expect(
+      openApiSpec.paths["/api/workspaces/{workspaceId}/numbers/{numberId}"].patch
+        ?.operationId,
+    ).toBe("patchWorkspaceNumber");
+
+    for (const pathItem of [apiKeys, members, webhook, numbers]) {
+      for (const op of Object.values(pathItem)) {
+        if (op && typeof op === "object" && "security" in op) {
+          expect(op.security).toEqual([{ sessionCookie: [] }]);
+        }
+      }
+    }
+    expect(transfer?.security).toEqual([{ sessionCookie: [] }]);
   });
 });

@@ -65,8 +65,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     mocks.insertScriptForWorkspace.mockResolvedValueOnce({ id: 1, name: "N (Copy)" });
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 1, name: "N (Copy)" } });
@@ -91,8 +90,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     mocks.updateScriptForWorkspace.mockResolvedValueOnce({ id: 2, name: "N" });
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 2, name: "N" } });
@@ -120,8 +118,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     );
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -142,8 +139,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     mocks.insertScriptForWorkspace.mockRejectedValueOnce(new Error("nope"));
 
     const mod = await import("../app/routes/api+/scripts");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
     );
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "nope" });

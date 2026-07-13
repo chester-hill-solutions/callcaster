@@ -53,8 +53,7 @@ describe("app/routes/signup/route.tsx", () => {
     form.set("password", "secret123");
 
     const mod = await import("../app/routes/signup");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/signup", {
           method: "POST",
           body: form,
@@ -81,8 +80,7 @@ describe("app/routes/signup/route.tsx", () => {
     form.set("password", "secret123");
 
     const mod = await import("../app/routes/signup");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/signup", {
           method: "POST",
           body: form,

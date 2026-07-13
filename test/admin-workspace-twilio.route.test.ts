@@ -284,7 +284,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     formData.set("voiceConcurrentCallLimit", "75");
     formData.set("parallelDispatchEnabled", "on");
 
-    const res = await asRouteResponse(await mod.action(await withAdminRouteArgs({
+    const res = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
     }, {
@@ -335,7 +335,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const formData = new FormData();
     formData.set("_action", "sync_twilio_workspace");
 
-    const res = await asRouteResponse(await mod.action(await withAdminRouteArgs({
+    const res = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
     }, {
@@ -371,7 +371,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const formData = new FormData();
     formData.set("_action", "bootstrap_workspace_messaging");
 
-    const res = await asRouteResponse(await mod.action(await withAdminRouteArgs({
+    const res = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
     }, {
@@ -400,7 +400,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const provisionData = new FormData();
     provisionData.set("_action", "provision_workspace_a2p");
-    const provisionRes = await asRouteResponse(await mod.action(await withAdminRouteArgs({
+    const provisionRes = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: provisionData }),
       params: { workspaceId: "w1" },
     }, {
@@ -439,7 +439,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     rcsData.set("rcsRegions", "US, CA");
     rcsData.set("rcsNotes", "beta");
     rcsData.set("rcsStatus", "in_review");
-    const rcsRes = await asRouteResponse(await mod.action(await withAdminRouteArgs({
+    const rcsRes = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: rcsData }),
       params: { workspaceId: "w1" },
     }, {

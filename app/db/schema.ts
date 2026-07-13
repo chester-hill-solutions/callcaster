@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import {
-  pgTable, text, integer, bigint, numeric, boolean, timestamp, jsonb, uuid, serial, smallint, pgEnum,
+  pgTable, text, integer, bigint, numeric, boolean, timestamp, jsonb, uuid, serial, bigserial, smallint, pgEnum,
   uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -409,6 +409,21 @@ export const workspace_events = pgTable("workspace_events", {
   event_type: text().notNull(),
   payload: jsonb().notNull(),
   created_at: text().notNull(),
+});
+
+export const workspace_audit_event = pgTable("workspace_audit_event", {
+  id: bigserial({ mode: "number" }).notNull().primaryKey(),
+  workspace_id: text().notNull(),
+  created_at: text().notNull(),
+  actor_type: text().notNull(),
+  actor_id: text(),
+  api_key_id: bigint({ mode: "number" }),
+  action: text().notNull(),
+  target_type: text(),
+  target_id: text(),
+  outcome: text().notNull(),
+  request_id: text(),
+  metadata: jsonb().notNull(),
 });
 
 export const handset_session = pgTable("handset_session", {

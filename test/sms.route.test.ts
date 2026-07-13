@@ -283,7 +283,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentClient = makeDbClient({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ error: "Unauthorized", status: 401 });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
@@ -297,7 +297,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       user_id: "u1",
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id does not match API key" });
   });
@@ -312,7 +312,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       user_id: "u1",
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
     await expect(res.json()).resolves.toEqual({
       creditsError: true,
@@ -333,7 +333,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       user_id: "u1",
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
     await expect(res.json()).resolves.toMatchObject({ creditsError: true });
   });
@@ -385,7 +385,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("responses");
@@ -422,7 +422,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(mocks.processTemplateTags).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledWith(expect.not.objectContaining({ mediaUrl: expect.anything() }));
@@ -447,7 +447,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]).toHaveProperty("3");
@@ -473,7 +473,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["12"]).toMatchObject({
@@ -502,7 +502,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledTimes(1);
   });
@@ -526,7 +526,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["4"].success).toBe(false);
@@ -552,7 +552,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["5"].success).toBe(false);
@@ -578,7 +578,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("https://example.com") }));
   });
@@ -613,7 +613,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -643,7 +643,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(tenantDbStubState.messageInsertCalls[0]?.sid).toBe("failed-+15551234567-123");
     (Date.now as any).mockRestore?.();
@@ -695,7 +695,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -753,7 +753,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ messagingServiceSid: "MG123" }),
@@ -782,7 +782,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.getCampaignQueueById.mockResolvedValueOnce([]);
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "caller_id is required for this campaign",
@@ -802,7 +802,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.getCampaignQueueById.mockResolvedValueOnce([]);
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toContain("Campaign fetch failed:");
@@ -826,7 +826,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 
@@ -848,7 +848,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 
@@ -864,8 +864,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       workspace_id: "550e8400-e29b-41d4-a716-446655440000",
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -887,8 +886,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       return actual.parseJsonBodyOrResponse(request, schema);
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -906,7 +904,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentClient = makeDbClient({});
     mocks.parseJsonBodyOrResponse.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });

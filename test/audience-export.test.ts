@@ -71,7 +71,7 @@ describe("api.audiences CSV export contract", () => {
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123&q=doe&sortKey=firstname&sortDirection=desc",
     );
-    const res = await asRouteResponse(await mod.loader({ request } as any));
+    const res = await asRouteResponse(mod.loader({ request } as any));
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
@@ -96,7 +96,7 @@ describe("api.audiences CSV export contract", () => {
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123&q=doe&sortKey=firstname&sortDirection=desc",
     );
-    const res = await asRouteResponse(await mod.loader({ request } as any));
+    const res = await asRouteResponse(mod.loader({ request } as any));
     expect(res.status).toBe(200);
 
     const bytes = new Uint8Array(await res.arrayBuffer());

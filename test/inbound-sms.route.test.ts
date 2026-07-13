@@ -288,8 +288,7 @@ describe("app/routes/api+/inbound-sms", () => {
         makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
       );
       const mod = await import("../app/routes/api+/inbound-sms");
-      const res = await asRouteResponse(
-        await mod.action({
+      const res = await asRouteResponse(mod.action({
           request: makeInboundSmsRequest({ Body: "quit", NumMedia: "0" }),
         } as any),
       );
@@ -308,8 +307,7 @@ describe("app/routes/api+/inbound-sms", () => {
         makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
       );
       const mod = await import("../app/routes/api+/inbound-sms");
-      const res = await asRouteResponse(
-        await mod.action({
+      const res = await asRouteResponse(mod.action({
           request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
         } as any),
       );
@@ -326,8 +324,7 @@ describe("app/routes/api+/inbound-sms", () => {
         makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
       );
       const mod = await import("../app/routes/api+/inbound-sms");
-      const res = await asRouteResponse(
-        await mod.action({
+      const res = await asRouteResponse(mod.action({
           request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
         } as any),
       );
@@ -350,8 +347,7 @@ describe("app/routes/api+/inbound-sms", () => {
         makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
       );
       const mod = await import("../app/routes/api+/inbound-sms");
-      const res = await asRouteResponse(
-        await mod.action({
+      const res = await asRouteResponse(mod.action({
           request: makeInboundSmsRequest({ Body: "start", NumMedia: "0" }),
         } as any),
       );
@@ -371,8 +367,7 @@ describe("app/routes/api+/inbound-sms", () => {
     };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeInboundSmsRequest(),
       } as any),
     );
@@ -396,8 +391,7 @@ describe("app/routes/api+/inbound-sms", () => {
     for (const [key, value] of Object.entries(makeParams())) {
       body.append(key, String(value));
     }
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x/inbound-sms", { method: "POST", body }),
       } as never),
     );
@@ -407,7 +401,7 @@ describe("app/routes/api+/inbound-sms", () => {
   test("returns 404 when number not found", async () => {
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number: null }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(404);
   });
 
@@ -425,8 +419,7 @@ describe("app/routes/api+/inbound-sms", () => {
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeInboundSmsRequest({
           To: "+19998887777",
           MessagingServiceSid: "MG1234567890abcdef",
@@ -452,8 +445,7 @@ describe("app/routes/api+/inbound-sms", () => {
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeInboundSmsRequest({
           To: "+19998887777",
           MessagingServiceSid: "MGdup",
@@ -469,8 +461,7 @@ describe("app/routes/api+/inbound-sms", () => {
     const number = { workspace: "w1", twilio_data: null, webhook: [] };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeInboundSmsRequest({ NumMedia: "1" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest({ NumMedia: "1" }) } as any),
     );
     expect(res.status).toBe(500);
   });
@@ -480,7 +471,7 @@ describe("app/routes/api+/inbound-sms", () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [{ id: 9 }], smsWebhook: true }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    let res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    let res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(tenantDbStubState.messageInsertCalls[0]?.contact_id).toBe(9);
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
@@ -488,7 +479,7 @@ describe("app/routes/api+/inbound-sms", () => {
     // start branch with quoted start + upload error path
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number, uploadError: { message: "up" }, contacts: [{ id: 9 }] }));
-    res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -498,7 +489,7 @@ describe("app/routes/api+/inbound-sms", () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "other" }] }] };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contactError: new Error("c") }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalledWith("Contact lookup error:", expect.any(Error));
     expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
@@ -509,11 +500,11 @@ describe("app/routes/api+/inbound-sms", () => {
     const mod = await import("../app/routes/api+/inbound-sms");
 
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [], contactError: new Error("c") }));
-    let res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    let res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
 
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [], contactError: new Error("c") }));
-    res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -523,7 +514,7 @@ describe("app/routes/api+/inbound-sms", () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -543,7 +534,7 @@ describe("app/routes/api+/inbound-sms", () => {
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
 
     expect(res.status).toBe(201);
     expect(tenantDbStubState.messageInsertCalls[0]).not.toHaveProperty("contact_id");
@@ -555,7 +546,7 @@ describe("app/routes/api+/inbound-sms", () => {
     configureTenantDbStub({ messageInsertError: new Error("msg") });
     mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(400);
   });
 });

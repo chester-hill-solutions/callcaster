@@ -195,7 +195,7 @@ describe("api.campaign-export CSV contract checks", () => {
       body: fd,
     });
 
-    const res = await asRouteResponse(await mod.action({ request: req } as any));
+    const res = await asRouteResponse(mod.action({ request: req } as any));
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
 

@@ -1,4 +1,4 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -9,13 +9,16 @@ import {
 import { normalizePhoneNumber } from "@/lib/utils";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { createTenantDb } from "@/server/tenant-db";
-import type { LoaderFunctionArgs } from "react-router";
 import type { Message } from "@/lib/types";
 import { fetchMessagePage } from "./$contact_number.messages.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params, context, url}: LoaderFunctionArgs) {
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ params, url, auth }) => {
   const { id, contact_number } = params;
-  const { headers, user, workspaceId } = getWorkspaceRouteContext(context);
+  const { headers, user, workspaceId } = auth;
   const before = url.searchParams.get("before");
   let messages: Message[] = [];
   let hasMore = false;
@@ -94,4 +97,5 @@ export async function loader({ request, params, context, url}: LoaderFunctionArg
     },
     { headers },
   );
-}
+  },
+});

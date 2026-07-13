@@ -151,7 +151,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId",
     routeModule: "app/routes/api+/workspaces+/$workspaceId.route.tsx",
-    authClass: "session",
+    authClass: "apiKeyOrSession",
     ownerArea: "workspace",
     exposure: "sessionOnly",
     docsGuide: GUIDE.platform,
@@ -161,6 +161,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+    notes: "GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId",
@@ -311,6 +312,17 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "POST", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+  }),
+  platformSeed({
+    path: "/api/workspaces/:workspaceId/audit-events",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId/audit-events.route.tsx",
+    authClass: "workspaceAdmin",
+    ownerArea: "workspace",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.workspace,
+    workspaceScoped: true,
+    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    notes: "Owner-only session access until SEC-07 audit.read scopes land for API keys.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/campaigns",
@@ -576,6 +588,30 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "POST", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+  }),
+  platformSeed({
+    path: "/api/workspaces/:workspaceId/calls/:callSid/disconnect",
+    routeModule:
+      "app/routes/api+/workspaces+/$workspaceId/calls/$callSid/disconnect.route.tsx",
+    authClass: "apiKeyOrSession",
+    ownerArea: "telephony",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.telephony,
+    workspaceScoped: true,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    notes: "Workspace-scoped call disconnect using workspace Twilio credentials. Capability: calls.control.",
+  }),
+  platformSeed({
+    path: "/api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start",
+    routeModule:
+      "app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route.tsx",
+    authClass: "apiKeyOrSession",
+    ownerArea: "dialer",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.telephony,
+    workspaceScoped: true,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    notes: "Start predictive/manual auto-dial conference for authenticated caller+ agent. Capability: calls.start.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/handset/session",

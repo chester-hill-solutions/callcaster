@@ -77,6 +77,52 @@ describe("userIsTwoFactorProtected", () => {
   });
 });
 
+describe("blockUnenrolledPrivilegedSessionUser", () => {
+  beforeEach(() => {
+    adminDbState.enrolled = false;
+    adminDbState.roles = ["admin"];
+    delete process.env.E2E_DISABLE_2FA_ENFORCEMENT;
+  });
+
+  test("returns 403 JSON for unenrolled privileged session users", async () => {
+    const { blockUnenrolledPrivilegedSessionUser } = await import(
+      "../app/lib/two-factor.server"
+    );
+    const result = await blockUnenrolledPrivilegedSessionUser({
+      userId: "u1",
+      request: new Request("http://x/api/workspaces/w1/campaigns"),
+    });
+    expect(result).toBeInstanceOf(Response);
+    expect(result?.status).toBe(403);
+    await expect(result?.json()).resolves.toMatchObject({
+      code: "mfa_enrollment_required",
+    });
+  });
+
+  test("allows API-key callers without a user id", async () => {
+    const { blockUnenrolledPrivilegedSessionUser } = await import(
+      "../app/lib/two-factor.server"
+    );
+    const result = await blockUnenrolledPrivilegedSessionUser({
+      userId: null,
+      request: new Request("http://x/api/workspaces/w1/campaigns"),
+    });
+    expect(result).toBeNull();
+  });
+
+  test("allows enrolled privileged session users", async () => {
+    adminDbState.enrolled = true;
+    const { blockUnenrolledPrivilegedSessionUser } = await import(
+      "../app/lib/two-factor.server"
+    );
+    const result = await blockUnenrolledPrivilegedSessionUser({
+      userId: "u1",
+      request: new Request("http://x/api/workspaces/w1/campaigns"),
+    });
+    expect(result).toBeNull();
+  });
+});
+
 describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
   beforeEach(() => {
     adminDbState.enrolled = false;

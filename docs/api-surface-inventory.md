@@ -16,9 +16,7 @@ Interactive specs:
 | `/api/audiences` | GET, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/audiences.tsx` | `docs/api-data-management.md` |  |
 | `/api/audiodrop` | POST | User API | sessionOnly | yes | `routes/api+/audiodrop.tsx` | `docs/api-telephony-control.md` | Voicemail drop during live call. |
 | `/api/auth/callback` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/callback.route.tsx` | `docs/api-auth-matrix.md` | Postgres auth callback; sets session cookies and redirects. |
-| `/api/auto-dial` | POST | User API | sessionOnly | yes | `routes/api+/auto-dial.tsx` | `docs/api-telephony-control.md` | Start auto-dial session for workspace. |
 | `/api/auto-dial/:roomId` | POST | Provider Webhook | providerOnly | no | `routes/api+/auto-dial/$roomId.route.tsx` | `docs/api-webhooks.md` | Twilio conference/AMD TwiML callback. |
-| `/api/auto-dial/dialer` | POST | Internal Trusted | internalOnly | no | `routes/api+/auto-dial/dialer.route.tsx` | `docs/api-internal-unsupported.md` | No user/API-key auth; trusts workspace_id/user_id in JSON body via service role. |
 | `/api/auto-dial/end` | POST | User API | sessionOnly | yes | `routes/api+/auto-dial/end.route.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/auto-dial/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/auto-dial/status.route.tsx` | `docs/api-webhooks.md` |  |
 | `/api/call-status-poll` | GET | User API | sessionOnly | yes | `routes/api+/call-status-poll.tsx` | `docs/api-analytics-export.md` | Poll Twilio call status for call-screen UI. |
@@ -44,7 +42,6 @@ Interactive specs:
 | `/api/dial/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/dial/status.route.tsx` | `docs/api-webhooks.md` |  |
 | `/api/docs/openapi` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/docs/openapi.route.tsx` | `docs/api-overview.md` | Public user-facing OpenAPI JSON (session + workspace + integrator routes). |
 | `/api/docs/openapi/all` | GET | Public Form | publicUnauthenticated | no | `routes/api+/docs/openapi/all.route.tsx` | `docs/api-overview.md` | Complete classified API surface OpenAPI JSON. |
-| `/api/disconnect` | POST | Security Gap | internalOnly | no | `routes/api.disconnect.ts` | `docs/api-internal-unsupported.md` | Twilio Device disconnect using account credentials; no session or signature check. |
 | `/api/email-vm` | POST | Provider Webhook | providerOnly | no | `routes/api+/email-vm.tsx` | `docs/api-webhooks.md` |  |
 | `/api/error-report` | POST | User API | sessionOnly | yes | `routes/api+/error-report.tsx` | `docs/api-internal-unsupported.md` |  |
 | `/api/handset-token` | GET | User API | sessionOnly | yes | `routes/api+/handset-token.tsx` | `docs/api-telephony-control.md` |  |
@@ -56,7 +53,7 @@ Interactive specs:
 | `/api/inbound-ivr/:numberId/:pageId/:blockId/response` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route.tsx` | `docs/api-webhooks.md` |  |
 | `/api/inbound-queue` | GET, POST, PUT, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/inbound-queue.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/inbound-sms` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound-sms.tsx` | `docs/api-webhooks.md` |  |
-| `/api/inbound-verification` | POST | Internal Trusted | internalOnly | no | `routes/api+/inbound-verification.tsx` | `docs/api-internal-unsupported.md` | Call-in verification TwiML; service role, no Twilio signature. |
+| `/api/inbound-verification` | POST | Internal Trusted | internalOnly | no | `routes/api+/inbound-verification.tsx` | `docs/api-internal-unsupported.md` | Call-in verification TwiML; validated with main-account Twilio signature. |
 | `/api/inbound` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound.tsx` | `docs/api-webhooks.md` | Returns TwiML. |
 | `/api/jobs/low-credit-notify` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/low-credit-notify.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered low-credit email sweep; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
 | `/api/jobs/number-rental-billing` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/number-rental-billing.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered monthly number-rental billing; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
@@ -92,7 +89,6 @@ Interactive specs:
 | `/api/verify-call-in-session` | GET | User API | sessionOnly | yes | `routes/api+/verify-call-in-session.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/verify-pin-input` | POST | Internal Trusted | internalOnly | no | `routes/api+/verify-pin-input.tsx` | `docs/api-internal-unsupported.md` | Twilio gather callback; service role, no Twilio signature. |
 | `/api/workspace-api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspace-api-keys.tsx` | `docs/api-workspace-admin.md` |  |
-| `/api/workspace` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspace.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/twilio/trusthub/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/twilio/trusthub/status.route.tsx` | `docs/api-webhooks.md` | Trust Hub status_callback receiver; resolves workspace by customer-profile bundle SID and reconciles compliance status. |
 | `/api/twilio/a2p/events` | POST | Internal Trusted | internalOnly | no | `routes/api+/twilio/a2p/events.route.tsx` | `docs/api-internal-unsupported.md` | A2P Event Streams sink receiver (JSON body); sink-secret validation lands in Phase D. |
 | `/api/auth/register` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/register.route.tsx` | `docs/api-agent-quickstart.md` |  |
@@ -105,7 +101,7 @@ Interactive specs:
 | `/api/auth/invites` | GET, POST | User API | sessionOnly | yes | `routes/api+/auth/invites.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/me` | GET, PATCH | User API | sessionOnly | yes | `routes/api+/me.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces` | GET, POST | User API | sessionOnly | yes | `routes/api+/workspaces.route.tsx` | `docs/api-agent-quickstart.md` |  |
-| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.route.tsx` | `docs/api-agent-quickstart.md` | GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session. |
 | `/api/workspaces/:workspaceId` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.tsx` | `docs/api-agent-quickstart.md` | duplicate route; Middleware layout for nested workspace API routes; no direct handler. |
 | `/api/workspaces/:workspaceId/transfer-ownership` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/transfer-ownership.route.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspaces/:workspaceId/billing` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing.route.tsx` | `docs/api-agent-quickstart.md` |  |
@@ -118,6 +114,7 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/webhook` | GET, PUT, POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 | `/api/workspaces/:workspaceId/members` | GET, POST, PATCH, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/members.route.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspaces/:workspaceId/api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/api-keys.route.tsx` | `docs/api-workspace-admin.md` |  |
+| `/api/workspaces/:workspaceId/audit-events` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audit-events.route.tsx` | `docs/api-workspace-admin.md` | Owner-only session access until SEC-07 audit.read scopes land for API keys. |
 | `/api/workspaces/:workspaceId/campaigns` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/campaigns.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/campaigns/:campaignId` | GET, POST | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/campaigns/:campaignId/queue` | GET, PATCH | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId/queue.route.tsx` | `docs/api-data-plane.md` |  |
@@ -143,6 +140,8 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/exports` | GET, POST | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/exports.route.tsx` | `docs/api-analytics-export.md` |  |
 | `/api/workspaces/:workspaceId/calls` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls.route.tsx` | `docs/api-live-operations.md` |  |
 | `/api/workspaces/:workspaceId/calls/listening` | POST, DELETE | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls/listening.route.tsx` | `docs/api-live-operations.md` |  |
+| `/api/workspaces/:workspaceId/calls/:callSid/disconnect` | POST | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls/$callSid/disconnect.route.tsx` | `docs/api-telephony-provisioning.md` | Workspace-scoped call disconnect using workspace Twilio credentials. Capability: calls.control. |
+| `/api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` | POST | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route.tsx` | `docs/api-telephony-provisioning.md` | Start predictive/manual auto-dial conference for authenticated caller+ agent. Capability: calls.start. |
 | `/api/workspaces/:workspaceId/handset/session` | GET, DELETE | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/handset/session.route.tsx` | `docs/api-live-operations.md` |  |
 | `/api/admin/dashboard` | GET, POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/dashboard.route.tsx` | `docs/api-admin.md` | Sudo-only admin dashboard and actions. |
 | `/api/admin/users/:userId` | GET, PATCH | Internal Trusted | internalOnly | yes | `routes/api+/admin+/users+/$userId.route.tsx` | `docs/api-admin.md` |  |
@@ -156,5 +155,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/audiences/:audienceId/uploads` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/workspaces/:workspaceId/events` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/events.route.tsx` | `docs/api-live-operations.md` | SSE stream for workspace events (activity log). |
 
-Total entries: **145**
+Total entries: **144**
 

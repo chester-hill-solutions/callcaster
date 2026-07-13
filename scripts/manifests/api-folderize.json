@@ -6,11 +6,9 @@
       "api.audiences",
       "api.audiodrop",
       "api.auth.callback",
-      "api.auto-dial",
       "api.auto-dial.$roomId"
     ],
     [
-      "api.auto-dial.dialer",
       "api.auto-dial.end",
       "api.auto-dial.status",
       "api.call",
@@ -40,7 +38,6 @@
       "api.dial",
       "api.dial.$number",
       "api.dial.status",
-      "api.disconnect",
       "api.docs.openapi",
       "api.email-vm",
       "api.error-report"

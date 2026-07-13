@@ -31,6 +31,35 @@ const tenantDbMock = vi.hoisted(() => ({
   createTenantDb: vi.fn(() => txDb),
 }));
 
+const twoFactorMocks = vi.hoisted(() => ({
+  isTwoFactorEnabled: vi.fn(async () => true),
+}));
+
+vi.mock("@/lib/two-factor.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/two-factor.server")>();
+  return {
+    ...actual,
+    requireTwoFactorForPrivilegedRoleAssignment: async (
+      targetUserId: string,
+      role: string,
+    ) => {
+      if (!actual.isPrivilegedWorkspaceRole(role)) {
+        return { ok: true as const };
+      }
+      const enrolled = await twoFactorMocks.isTwoFactorEnabled(targetUserId);
+      if (!enrolled) {
+        return {
+          ok: false as const,
+          error:
+            "The user must enroll in two-factor authentication before receiving an owner or admin role.",
+          status: 403,
+        };
+      }
+      return { ok: true as const };
+    },
+  };
+});
+
 vi.mock("@/lib/database/workspace.server", () => ({ ...accessMocks }));
 vi.mock("@/lib/workspace-members-db.server", () => ({ ...membersDbMocks }));
 vi.mock("@/server/db", () => ({ db: dbMock }));
@@ -47,6 +76,9 @@ function resetAll() {
   txDb.workspace_users.findFirst.mockReset();
   txDb.workspace_users.update.mockReset();
   dbMock.transaction.mockReset();
+
+  twoFactorMocks.isTwoFactorEnabled.mockReset();
+  twoFactorMocks.isTwoFactorEnabled.mockResolvedValue(true);
 
   accessMocks.requireWorkspaceAccess.mockResolvedValue(undefined);
   accessMocks.getUserRole.mockResolvedValue({ role: "member" });
@@ -131,6 +163,19 @@ describe("workspace member RBAC", () => {
       const mod = await import("../app/lib/platform-members.server");
       const result = await mod.updateWorkspaceMemberRole("u1", "w1", "u2", "member");
       expect(result).toEqual({ ok: true, member: { id: "u2" } });
+    });
+
+    test("blocks promoting to admin when target has not enrolled in 2FA", async () => {
+      accessMocks.getUserRole.mockResolvedValue({ role: "owner" });
+      twoFactorMocks.isTwoFactorEnabled.mockResolvedValueOnce(false);
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.updateWorkspaceMemberRole("u1", "w1", "u2", "admin");
+      expect(result).toMatchObject({
+        ok: false,
+        status: 403,
+        error: expect.stringContaining("two-factor"),
+      });
+      expect(membersDbMocks.updateWorkspaceMemberRole).not.toHaveBeenCalled();
     });
   });
 

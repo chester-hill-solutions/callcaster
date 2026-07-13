@@ -1,6 +1,7 @@
 
 import type { Database, Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
+import { safeOutboundFetch } from "@/lib/safe-outbound-url.server";
 import { getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
 
 type WebhookWithEvents = Tables<"webhook"> & {
@@ -60,7 +61,7 @@ export async function sendWorkspaceWebhookNotification({
         ? (webhook.custom_headers as Record<string, string>)
         : {};
 
-    const result = await fetch(webhook.destination_url, {
+    const result = await safeOutboundFetch(webhook.destination_url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -73,6 +74,7 @@ export async function sendWorkspaceWebhookNotification({
         timestamp: new Date().toISOString(),
         payload,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!result.ok) {

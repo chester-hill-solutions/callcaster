@@ -49,8 +49,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
 
   test("returns 503 when webhook secret is not configured", async () => {
     const mod = await import("../app/routes/api+/stripe-webhook");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/stripe-webhook", {
           method: "POST",
           body: "{}",
@@ -78,8 +77,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/stripe-webhook");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/stripe-webhook", {
           method: "POST",
           headers: { "Stripe-Signature": "sig" },
@@ -115,8 +113,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/stripe-webhook");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/stripe-webhook", {
           method: "POST",
           headers: { "Stripe-Signature": "sig" },
@@ -145,8 +142,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/stripe-webhook");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/stripe-webhook", {
           method: "POST",
           headers: { "Stripe-Signature": "sig" },

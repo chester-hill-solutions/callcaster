@@ -71,7 +71,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     mockCall();
 
     const mod = await import("../app/routes/api+/hangup");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(rpcDequeueContact).toHaveBeenCalled();
     expect(updateOutreachDispositionByContactId).toHaveBeenCalledWith("w1", 2, "completed");
@@ -91,7 +91,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     });
     mockCall();
     const mod = await import("../app/routes/api+/hangup");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(rpcDequeueContact).toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     });
     mockCall();
     const mod = await import("../app/routes/api+/hangup");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -123,7 +123,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
       conference_id: "u1~00000000-0000-0000-0000-000000000000",
     } as any);
     const mod = await import("../app/routes/api+/hangup");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toEqual({ success: false, message: "Call not found" });
   });
@@ -136,7 +136,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     });
     mockCall({ contact_id: null });
     const mod = await import("../app/routes/api+/hangup");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(rpcDequeueContact).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     mockCall();
     vi.mocked(updateOutreachDispositionByContactId).mockRejectedValueOnce(new Error("outreach"));
     const mod = await import("../app/routes/api+/hangup");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 });

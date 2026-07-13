@@ -124,7 +124,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeCallerIdRequest(fd),
     } as any));
     expect(await res.json()).toMatchObject({
@@ -142,7 +142,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     const fd = new FormData();
     fd.set("VerificationStatus", "success");
     fd.set("To", "+15555550100");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeCallerIdRequest(fd),
     } as any));
     expect(await res.json()).toEqual({ id: 1, workspace: "w1" });
@@ -180,15 +180,15 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       return makeCallerIdRequest(fd);
     };
 
-    const r1 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    const r1 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r1.status).toBe(500);
 
     mode = "empty";
-    const r2 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    const r2 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(500);
 
     mode = "ok";
-    const r3 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    const r3 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r3.status).toBe(200);
     expect(inboundMocks.updateWorkspaceNumberCapabilitiesByPhone).toHaveBeenCalledWith(
       "+15555550100",
@@ -210,7 +210,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeCallerIdRequest(fd),
     } as any));
 

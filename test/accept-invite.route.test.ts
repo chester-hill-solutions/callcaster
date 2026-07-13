@@ -60,8 +60,7 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     form.set("lastName", "Last");
 
     const mod = await import("../app/routes/accept-invite.action.server");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/accept-invite", {
           method: "POST",
           body: form,
@@ -97,8 +96,7 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     form.set("lastName", "Last");
 
     const mod = await import("../app/routes/accept-invite.action.server");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/accept-invite", {
           method: "POST",
           body: form,

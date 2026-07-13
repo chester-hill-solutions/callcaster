@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from "twilio";
 import {
@@ -10,6 +11,11 @@ import {
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
+  auth: async ({ request }) => {
+    const forbidden = await requireTwilioSignature(request);
+    if (forbidden) return forbidden;
+    return {};
+  },
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request }) => {
     const twiml = new Twilio.twiml.VoiceResponse();

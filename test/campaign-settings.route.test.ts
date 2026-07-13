@@ -157,7 +157,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 0, fullCount: 0 });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
     })));
@@ -184,7 +184,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 2, fullCount: 2 });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
     })));
@@ -205,7 +205,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
     })));
@@ -230,7 +230,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
     })));

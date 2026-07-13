@@ -10,7 +10,7 @@ import { parseRequestData } from "@/lib/request-utils.server";
 import { safeNumber } from "@/lib/type-safety-utils";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";
-import { campaign_queue as campaignQueueTable, contact as contactTable } from "@/db/schema";
+import { contact as contactTable } from "@/db/schema";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 // campaign_queue is a join table without a workspace column; tdb cannot scope it.
@@ -87,16 +87,7 @@ export const action = defineAction({
                 .map((id: string | number) => (typeof id === "string" ? parseInt(id, 10) : id))
                 .filter((id: number) => Number.isFinite(id));
 
-              const deleted = await db
-                .delete(campaignQueueTable)
-                .where(
-                  and(
-                    eq(campaignQueueTable.campaign_id, campaignIdNum),
-                    inArray(campaignQueueTable.id, batch),
-                  ),
-                )
-                .returning();
-
+              const deleted = await deleteCampaignQueueByIds(batch, workspaceId);
               results.push(...(deleted as CampaignQueue[]));
             }
             return routeData({ data: results });
@@ -105,6 +96,7 @@ export const action = defineAction({
           const deleteIds = await searchCampaignQueueIds({
             campaignId: campaignIdNum,
             filters: (filters ?? {}) as QueueSearchFilters,
+            workspaceId,
           });
 
           const validDeleteIds = deleteIds
@@ -114,7 +106,7 @@ export const action = defineAction({
           const results: CampaignQueue[] = [];
           for (let i = 0; i < validDeleteIds.length; i += BATCH_SIZE) {
             const batch = validDeleteIds.slice(i, i + BATCH_SIZE);
-            const deleted = await deleteCampaignQueueByIds(batch);
+            const deleted = await deleteCampaignQueueByIds(batch, workspaceId);
             results.push(...(deleted as CampaignQueue[]));
           }
 

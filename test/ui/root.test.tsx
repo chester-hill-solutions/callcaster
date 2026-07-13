@@ -100,7 +100,7 @@ describe("root.tsx", () => {
   test("loader redirects when q decodes to contactId:surveyId", async () => {
     const mod = await import("../../app/root");
     const q = btoa("10:20");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request(`http://x/?q=${encodeURIComponent(q)}`),
       params: {},
     } as any));
@@ -119,7 +119,7 @@ describe("root.tsx", () => {
 
     const mod = await import("../../app/root");
     const q = btoa("10:");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request(`http://x/?q=${encodeURIComponent(q)}`),
       params: {},
     } as any));
@@ -136,7 +136,7 @@ describe("root.tsx", () => {
     mocks.getSession.mockReturnValueOnce({ session: null, user: null, headers: new Headers({ "Set-Cookie": "a=1" }) });
 
     const mod = await import("../../app/root");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://x/?q=not-base64"),
       params: { id: "x" },
     } as any));
@@ -185,7 +185,7 @@ describe("root.tsx", () => {
     mocks.getSession.mockReturnValueOnce({ session: { token: "t" }, user: { id: "u1" }, headers: new Headers() });
 
     const mod = await import("../../app/root");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://x/"),
       params: {},
     } as any));
@@ -232,7 +232,7 @@ describe("root.tsx", () => {
     mocks.getSession.mockReturnValueOnce({ session: { token: "t" }, user: { id: "u1" }, headers: new Headers() });
 
     const mod = await import("../../app/root");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://x/"),
       params: {},
     } as any));

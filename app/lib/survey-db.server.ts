@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { formatDateUtc, safeFilenamePart, toCsvString } from "@/lib/csv";
 import { logger } from "@/lib/logger.server";
-import { isUniqueViolation } from "@/lib/parse-utils.server";
+import { isInvalidTextRepresentation, isUniqueViolation } from "@/lib/parse-utils.server";
 import type { SurveyFormData } from "@/lib/types";
 import {
   contact as contactTable,
@@ -56,22 +56,29 @@ export async function loadSurveyDetailByPublicId(
 ) {
   let survey: SurveyRow | null | undefined;
 
-  if (loadOptions?.workspaceId) {
-    const tdb = createTenantDb(loadOptions.workspaceId);
-    survey = (await tdb.survey.findFirst({
-      where: eq(surveyTable.survey_id, surveyPublicId),
-    })) as SurveyRow | undefined;
-  } else {
-    const conditions = [eq(surveyTable.survey_id, surveyPublicId)];
-    if (loadOptions?.activeOnly) {
-      conditions.push(eq(surveyTable.is_active, true));
+  try {
+    if (loadOptions?.workspaceId) {
+      const tdb = createTenantDb(loadOptions.workspaceId);
+      survey = (await tdb.survey.findFirst({
+        where: eq(surveyTable.survey_id, surveyPublicId),
+      })) as SurveyRow | undefined;
+    } else {
+      const conditions = [eq(surveyTable.survey_id, surveyPublicId)];
+      if (loadOptions?.activeOnly) {
+        conditions.push(eq(surveyTable.is_active, true));
+      }
+      const [row] = await db
+        .select()
+        .from(surveyTable)
+        .where(and(...conditions))
+        .limit(1);
+      survey = row ?? null;
     }
-    const [row] = await db
-      .select()
-      .from(surveyTable)
-      .where(and(...conditions))
-      .limit(1);
-    survey = row ?? null;
+  } catch (error) {
+    if (isInvalidTextRepresentation(error)) {
+      return null;
+    }
+    throw error;
   }
 
   if (!survey) {

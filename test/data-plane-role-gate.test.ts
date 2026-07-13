@@ -197,8 +197,7 @@ describe("data-plane mutation routes reject the caller role end-to-end", () => {
       "../app/routes/api+/contacts/$contactId.action.server"
     );
 
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x/api/contacts/5", { method: "DELETE" }),
         params: { contactId: "5" },
       } as never),
@@ -216,8 +215,7 @@ describe("data-plane mutation routes reject the caller role end-to-end", () => {
       "../app/routes/api+/contacts/$contactId.action.server"
     );
 
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x/api/contacts/5", { method: "DELETE" }),
         params: { contactId: "5" },
       } as never),
@@ -234,8 +232,7 @@ describe("data-plane mutation routes reject the caller role end-to-end", () => {
       "../app/routes/api+/campaigns/$campaignId/queue.action.server"
     );
 
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x/api/campaigns/9/queue", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

@@ -14,6 +14,17 @@ export function withRouteUrl<T extends { request: Request; url?: URL }>(
 }
 
 /** Normalize RR7 loader/action return values in route unit tests. */
+export async function resolveRouteResult(result: Promise<unknown> | unknown): Promise<unknown> {
+  try {
+    return await result;
+  } catch (error) {
+    if (error instanceof Response) {
+      return error;
+    }
+    throw error;
+  }
+}
+
 function statusFromInit(init: number | { status?: number; headers?: Headers } | null | undefined): number {
   if (typeof init === "number") return init;
   if (init && typeof init === "object" && "status" in init) {
@@ -93,9 +104,9 @@ type RouteResponseShape = {
 
 /** Response-shaped wrapper so existing route tests can keep `res.status` / `res.json()`. */
 export async function asRouteResponse(
-  result: unknown,
+  result: Promise<unknown> | unknown,
 ): Promise<RouteResponseShape & Record<string, unknown>> {
-  const { status, body, headers } = await normalizeRouteResult(result);
+  const { status, body, headers } = await normalizeRouteResult(await resolveRouteResult(result));
   const response: RouteResponseShape = {
     status,
     headers,

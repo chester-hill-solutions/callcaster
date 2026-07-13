@@ -48,7 +48,7 @@ describe("api.audiodrop action", () => {
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
@@ -67,7 +67,7 @@ describe("api.audiodrop action", () => {
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
@@ -87,7 +87,7 @@ describe("api.audiodrop action", () => {
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
@@ -114,14 +114,14 @@ describe("api.audiodrop action", () => {
     const makeReq = () => new Request("http://localhost/api/audiodrop", { method: "POST", body: fd });
 
     createSignedObjectUrl.mockRejectedValueOnce(new Error("vm"));
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: makeReq(),
       deps: baseDeps,
     } as any));
     expect(r1).toMatchObject({ success: false, error: { voicemail: expect.any(Error) } });
 
     createSignedObjectUrl.mockResolvedValueOnce("");
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: makeReq(),
       deps: baseDeps,
     } as any));
@@ -129,7 +129,7 @@ describe("api.audiodrop action", () => {
     expect(update).toHaveBeenCalledWith({ status: "completed" });
 
     createSignedObjectUrl.mockResolvedValueOnce("https://s");
-    const r3 = await asRouteResponse(await mod.action({
+    const r3 = await asRouteResponse(mod.action({
       request: makeReq(),
       deps: baseDeps,
     } as any));
@@ -162,7 +162,7 @@ describe("api.audiodrop action", () => {
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
     } as any));
     expect(res).toMatchObject({ success: true });

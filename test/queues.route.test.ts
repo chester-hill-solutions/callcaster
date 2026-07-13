@@ -60,7 +60,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   test("loader returns [] when limit is 0", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=0"),
     } as any)));
     await expect(res.json()).resolves.toEqual([]);
@@ -70,7 +70,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.rpcSelectAndUpdateCampaignContacts.mockResolvedValueOnce([]);
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=7"),
     } as any)));
     await expect(res.json()).resolves.toEqual([]);
@@ -84,7 +84,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.rpcSelectAndUpdateCampaignContacts.mockResolvedValueOnce([]);
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=10"),
     } as any)));
     await expect(res.json()).resolves.toEqual([]);
@@ -96,7 +96,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/queues?campaign_id=99&limit=2"),
     } as any)));
 
@@ -114,7 +114,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
     } as any)));
 
@@ -129,7 +129,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
     } as any)));
 
@@ -143,7 +143,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
     } as any)));
 
@@ -157,7 +157,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
     } as any)));
 
@@ -172,7 +172,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   test("action returns 405 for unsupported method", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/queues");
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/queues", { method: "PUT" }),
     } as any)));
     expect(res.status).toBe(405);

@@ -43,7 +43,7 @@ describe("app/routes/api+/error-report/route.tsx", () => {
     });
     mocks.send.mockResolvedValueOnce({ id: "em" });
     const mod = await import("../app/routes/api+/error-report");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "1" },
     } as any));
@@ -59,7 +59,7 @@ describe("app/routes/api+/error-report/route.tsx", () => {
     mocks.safeParseJson.mockRejectedValueOnce(new Error("boom"));
     queueJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/error-report");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "1" },
     } as any));

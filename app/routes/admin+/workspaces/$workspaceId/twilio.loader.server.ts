@@ -1,17 +1,19 @@
 import { data as routeData, redirect } from "react-router";
 import { loadTwilioData } from "./loadTwilioData.server";
-import { getAdminRouteContext } from "@/lib/admin-route.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ context, params }: LoaderFunctionArgs) => {
-    getAdminRouteContext(context);
-
+export const loader = defineLoader({
+  auth: adminRouteAuth,
+  sideEffects: ["db-read", "twilio"],
+  handler: ({ params }) => {
     const workspaceId = params.workspaceId;
     if (!workspaceId) {
-        throw redirect("/admin?tab=workspaces");
+      throw redirect("/admin?tab=workspaces");
     }
 
     return routeData({
-        twilioData: loadTwilioData(workspaceId),
+      twilioData: loadTwilioData(workspaceId),
     });
-};
+  },
+});

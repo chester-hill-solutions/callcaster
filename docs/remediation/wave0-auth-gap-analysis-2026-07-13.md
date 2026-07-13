@@ -54,8 +54,8 @@
 
 ## Publish / adoption sequence
 
-1. Implement extensions in CHS monorepo; package-level tests.
-2. Publish all three packages to GitHub Packages.
+1. Implement extensions in CHS monorepo; package-level tests. — **done:** [PR #22](https://github.com/chester-hill-solutions/chester-hill-solutions/pull/22) (`feat/auth-capability-invite`: auth 0.2.0, auth-postgres 0.3.0, auth-react-router 0.2.0).
+2. Publish all three packages to GitHub Packages. — **blocked:** need merge + `v*` tag (CI uses `packages: write`) **or** a local PAT with `write:packages` / `read:packages`.
 3. CallCaster: install packages; replace local auth-layout shim.
 4. Drizzle forward migration: atomic replace `workspace_users` → CHS membership tables.
 5. Update Supabase→Postgres transform to write canonical structures.

@@ -36,8 +36,7 @@ describe("app/routes/workspaces+/index.action.server.ts", () => {
     form.set("userId", "attacker-user-2");
 
     const mod = await import("../app/routes/workspaces+/index.action.server");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/workspaces", {
           method: "POST",
           body: form,
@@ -63,8 +62,7 @@ describe("app/routes/workspaces+/index.action.server.ts", () => {
     form.set("userId", "auth-user-1");
 
     const mod = await import("../app/routes/workspaces+/index.action.server");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/workspaces", {
           method: "POST",
           body: form,

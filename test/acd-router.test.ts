@@ -112,8 +112,7 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
       { queue_id: "1" },
       { CallSid: "CA1", From: "+15551234567", QueueTime: "0" },
     );
-    const res = await asRouteResponse(
-      await mod.handleAcdRouterRequest(request, "wait"),
+    const res = await asRouteResponse(mod.handleAcdRouterRequest(request, "wait"),
     );
     expect(await res.text()).toContain("queue");
     expect(mocks.rpcClaimInboundQueueEntry).not.toHaveBeenCalled();
@@ -127,8 +126,7 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
       { queue_id: "1" },
       { CallSid: "CA1", From: "+15551234567", QueueTime: String(mod.MAX_QUEUE_TIME_SECONDS + 1) },
     );
-    const res = await asRouteResponse(
-      await mod.handleAcdRouterRequest(request, "wait"),
+    const res = await asRouteResponse(mod.handleAcdRouterRequest(request, "wait"),
     );
     expect(await res.text()).toContain("Hangup");
     expect(mocks.rpcClaimInboundQueueEntry).not.toHaveBeenCalled();
@@ -145,8 +143,7 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
       { queue_id: "1" },
       { CallSid: "CA1", From: "+15551234567", QueueTime: "0" },
     );
-    const res = await asRouteResponse(
-      await mod.handleAcdRouterRequest(request, "wait"),
+    const res = await asRouteResponse(mod.handleAcdRouterRequest(request, "wait"),
     );
     expect(await res.text()).toContain("Hangup");
     expect(mocks.rpcClaimInboundQueueEntry).not.toHaveBeenCalled();
@@ -167,8 +164,7 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
       { queue_id: "1" },
       { CallSid: "CA1", From: "+15551234567", QueueTime: "0" },
     );
-    const res = await asRouteResponse(
-      await mod.handleAcdRouterRequest(request, "wait"),
+    const res = await asRouteResponse(mod.handleAcdRouterRequest(request, "wait"),
     );
     expect(await res.text()).toContain("queue");
     expect(mocks.rpcClaimInboundQueueEntry).toHaveBeenCalledOnce();

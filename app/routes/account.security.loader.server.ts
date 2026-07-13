@@ -1,4 +1,4 @@
-import { data as routeData } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { verifyAuth } from "@/lib/auth.server";
 import {
   isTwoFactorEnabled,
@@ -6,6 +6,7 @@ import {
   userHasPrivilegedWorkspaceRole,
   userIsTwoFactorProtected,
 } from "@/lib/two-factor.server";
+import { enforceTwoFactorSetupRateLimit } from "@/lib/two-factor-rate-limit.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
@@ -48,6 +49,11 @@ export const action = defineAction({
     };
 
     if (intent === "enable") {
+      const rateLimited = enforceTwoFactorSetupRateLimit(user.id, "2fa:enable");
+      if (rateLimited) {
+        return rateLimited;
+      }
+
       const password = String(formData.get("password") ?? "");
       if (!password) {
         return routeData({ error: "Password is required" }, { headers });
@@ -84,10 +90,17 @@ export const action = defineAction({
     }
 
     if (intent === "verify") {
+      const rateLimited = enforceTwoFactorSetupRateLimit(user.id, "2fa:verify");
+      if (rateLimited) {
+        return rateLimited;
+      }
+
       const code = String(formData.get("code") ?? "").trim();
       if (!code) {
         return routeData({ error: "Enter the code from your authenticator app" }, { headers });
       }
+
+      const next = String(formData.get("next") ?? "").trim();
 
       try {
         await authApi.verifyTOTP({
@@ -95,8 +108,16 @@ export const action = defineAction({
           headers: request.headers,
           returnHeaders: true,
         });
+
+        if (next && next.startsWith("/") && !next.startsWith("//")) {
+          throw redirect(next, { headers });
+        }
+
         return routeData({ success: "Two-factor authentication is enabled.", enabled: true }, { headers });
       } catch (error) {
+        if (error instanceof Response) {
+          throw error;
+        }
         return routeData(
           { error: error instanceof Error ? error.message : "Invalid code" },
           { headers },

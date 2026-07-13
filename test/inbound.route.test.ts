@@ -214,8 +214,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const client = makeDbClient();
     mocks.createClient.mockReturnValueOnce(client);
     const mod = await import("../app/routes/api+/inbound");
-    const res = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", {
           method: "POST",
           body: new FormData(),
@@ -231,8 +230,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const mod = await import("../app/routes/api+/inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
-    const res = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any)),
     );
@@ -255,8 +253,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
-    const res = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any)),
     );
@@ -286,7 +283,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
     const mod = await import("../app/routes/api+/inbound");
-    let res = await asRouteResponse(await mod.action(withRouteUrl({
+    let res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
@@ -304,7 +301,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       }),
     );
     vi.mocked(resolveInboundVoicemailAudio).mockResolvedValueOnce({ signedUrl: "https://signed" });
-    res = await asRouteResponse(await mod.action(withRouteUrl({
+    res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     const xml = await res.text();
@@ -322,7 +319,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       }),
     );
     vi.mocked(resolveInboundVoicemailAudio).mockResolvedValueOnce(null);
-    res = await asRouteResponse(await mod.action(withRouteUrl({
+    res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     expect(await res.text()).toContain("leave us a message");
@@ -335,7 +332,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     );
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
     mocks.createClient.mockReturnValueOnce(makeDbClient());
-    res = await asRouteResponse(await mod.action(withRouteUrl({
+    res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     expect(await res.text()).toContain("unable to answer");
@@ -355,8 +352,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const fd = new FormData();
     fd.set("Called", "+1");
     const mod = await import("../app/routes/api+/inbound");
-    let res = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    let res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any)),
     );
@@ -364,8 +360,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
 
     mocks.upsertInboundCallRecord.mockResolvedValueOnce(null);
     fd.set("CallSid", "CA1");
-    res = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any)),
     );
@@ -388,8 +383,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.isEmail.mockReturnValue(false);
     mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(null);
     mocks.createClient.mockReturnValueOnce(makeDbClient());
-    const res = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any)),
     );
@@ -407,7 +401,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     );
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
     mocks.createClient.mockReturnValueOnce(makeDbClient());
-    const response = await asRouteResponse(await mod.action(withRouteUrl({
+    const response = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     expect(await response.text()).toContain("say:");
@@ -453,7 +447,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
     mocks.createClient.mockReturnValueOnce(makeDbClient());
 
-    const response = await asRouteResponse(await mod.action(withRouteUrl({
+    const response = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     expect(response.headers.get("Content-Type")).toBe("text/xml");
@@ -474,8 +468,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const mod = await import("../app/routes/api+/inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
-    const res = await asRouteResponse(
-      await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any)),
     );

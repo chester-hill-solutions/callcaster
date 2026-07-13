@@ -16,6 +16,9 @@ import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { adminDb } from "@/server/admin-db";
+import { hasMinRole } from "@/lib/workspace-route.server";
+import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
+import { isTwoFactorEnabled } from "@/lib/two-factor.server";
 
 export async function listUserWorkspaces(
   userId: string,
@@ -65,6 +68,25 @@ export async function getWorkspaceDetail(
   return { ok: true as const, workspace: info.data };
 }
 
+export async function getWorkspaceDetailForDataPlane(
+  userId: string | null,
+  workspaceId: string,
+) {
+  if (userId) {
+    return getWorkspaceDetail(userId, workspaceId);
+  }
+
+  const info = await getWorkspaceInfo({ workspaceId });
+  if (info.error) {
+    return { ok: false as const, error: String(info.error), status: 404 };
+  }
+  if (!info.data) {
+    return { ok: false as const, error: "Workspace not found", status: 404 };
+  }
+
+  return { ok: true as const, workspace: info.data };
+}
+
 export async function updateWorkspaceName(
   userId: string,
   workspaceId: string,
@@ -75,7 +97,7 @@ export async function updateWorkspaceName(
     workspaceId,
   });
 
-  if (!role || role.role === MemberRole.Caller) {
+  if (!role || !hasMinRole(role.role, MemberRole.Admin)) {
     return { ok: false as const, error: "Not authorized", status: 403 };
   }
 
@@ -93,6 +115,17 @@ export async function updateWorkspaceName(
   if (!data) {
     return { ok: false as const, error: "Workspace not found", status: 404 };
   }
+
+  await safeRecordWorkspaceAuditEvent({
+    workspaceId,
+    actorType: "session",
+    actorId: userId,
+    action: "workspace.update",
+    targetType: "workspace",
+    targetId: workspaceId,
+    outcome: "success",
+    metadata: { name },
+  });
 
   return { ok: true as const, workspace: data };
 }
@@ -120,6 +153,16 @@ export async function deleteWorkspaceApi(
     return { ok: false as const, error: String(result.error), status: 400 };
   }
 
+  await safeRecordWorkspaceAuditEvent({
+    workspaceId,
+    actorType: "session",
+    actorId: userId,
+    action: "workspace.delete",
+    targetType: "workspace",
+    targetId: workspaceId,
+    outcome: "success",
+  });
+
   return { ok: true as const };
 }
 
@@ -138,6 +181,16 @@ export async function transferWorkspaceOwnershipApi(
     return { ok: false as const, error: "Only workspace owners can transfer", status: 403 };
   }
 
+  const newOwnerEnrolled = await isTwoFactorEnabled(newOwnerUserId);
+  if (!newOwnerEnrolled) {
+    return {
+      ok: false as const,
+      error:
+        "The new owner must enroll in two-factor authentication before ownership can be transferred.",
+      status: 403,
+    };
+  }
+
   const formData = new FormData();
   formData.set("workspace_owner_id", userId);
   formData.set("user_id", newOwnerUserId);
@@ -152,6 +205,17 @@ export async function transferWorkspaceOwnershipApi(
   if (result && typeof result === "object" && "error" in result && result.error) {
     return { ok: false as const, error: String(result.error), status: 400 };
   }
+
+  await safeRecordWorkspaceAuditEvent({
+    workspaceId,
+    actorType: "session",
+    actorId: userId,
+    action: "workspace.transfer_ownership",
+    targetType: "workspace",
+    targetId: workspaceId,
+    outcome: "success",
+    metadata: { new_owner_user_id: newOwnerUserId },
+  });
 
   return { ok: true as const, new_owner_user_id: newOwnerUserId };
 }

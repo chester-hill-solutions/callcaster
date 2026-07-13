@@ -72,8 +72,7 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
     const mod = await import(
       "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
     );
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader({
         request: new Request(
           "https://base.example/api/connect-campaign-conference/w1/c1?CallSid=CA1",
           {
@@ -97,8 +96,7 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
     const mod = await import(
       "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
     );
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader({
         request: new Request(
           "https://base.example/api/connect-campaign-conference/w1/c1",
         ),
@@ -114,8 +112,7 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
     const mod = await import(
       "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
     );
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader({
         request: new Request(
           "https://base.example/api/connect-campaign-conference/w1/c1",
         ),

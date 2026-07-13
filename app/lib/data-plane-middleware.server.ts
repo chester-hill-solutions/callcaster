@@ -3,6 +3,7 @@ import type { MiddlewareFunction } from "react-router";
 import { resolveDataPlaneAuth } from "@/lib/platform-data.server";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
+import { blockUnenrolledPrivilegedSessionUser } from "@/lib/two-factor.server";
 import { dataPlaneAuthContext } from "@/lib/route-context.server";
 
 /**
@@ -20,6 +21,14 @@ export const dataPlaneMiddleware: MiddlewareFunction = async (
   const auth = await resolveDataPlaneAuth(request, workspaceId);
   if (auth instanceof Response) {
     return auth;
+  }
+
+  const mfaBlock = await blockUnenrolledPrivilegedSessionUser({
+    userId: auth.userId,
+    request,
+  });
+  if (mfaBlock) {
+    return mfaBlock;
   }
 
   context.set(dataPlaneAuthContext, { ...auth, workspaceId });
