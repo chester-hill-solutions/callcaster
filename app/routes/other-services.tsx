@@ -1,7 +1,4 @@
-import { redirect } from "react-router";
-
-export const loader = async () => redirect("/services");
-export const action = async () => redirect("/services");
+export { loader, action } from "./other-services.loader.server";
 
 export default function OtherServicesRedirect() {
   return null;
