@@ -1230,7 +1230,10 @@ A finding is complete only when:
 
 Record these decisions in the PR or an ADR before dependent work proceeds:
 
-- **Deferred by decision (2026-07-13):** encrypted per-workspace credential vault work is outside this remediation. Do not adopt `@chester-hill-solutions/vault` as currently implemented: its key derivation imports but does not incorporate the master secret, and its Postgres upsert target lacks a declared unique constraint. SEC-01 must still remove credentials from API responses/logs and preserve least-privilege database/backup access, but provider credentials remaining under the current at-rest model are an explicit residual risk and require a separate security-reviewed project.
+- **Deferred by decision (2026-07-13):** encrypted per-workspace credential vault work is outside this remediation.
+- **Approved (2026-07-13):** CHS auth three-package extension API and publish/adopt sequence per [`wave0-auth-gap-analysis-2026-07-13.md`](./wave0-auth-gap-analysis-2026-07-13.md).
+- **Approved (2026-07-13):** CHS jobqueue extension API and publish/adopt sequence per [`wave0-worker-matrix-2026-07-13.md`](./wave0-worker-matrix-2026-07-13.md).
+- **Approved (2026-07-13):** remediation branch workflow — `chore/improvements` off `chore/effects-strictness`, squash-merge back.
 - **Adjusted:** predictive dialer start is `POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` at cutover, with a post-cutover `/api/v1` alias. Sessions require `caller+` and act as themselves; API keys provide a verified `caller+` workspace member as `agentUserId`. Both legacy auto-dial endpoints are deleted, while next-turn remains internal-only.
 - **Adjusted:** replace `/api/disconnect` with workspace-scoped dual-auth call control at `POST /api/workspaces/:workspaceId/calls/:callSid/disconnect`; a `/api/v1` alias follows post-cutover. Any `caller+` session or API key with the call-control capability may control any call in that workspace.
 - **Adjusted:** hard-delete `/api/workspace`; finish the existing secret-free `GET/PATCH /api/workspaces/:workspaceId` route and its data-plane dual-auth boundary. Session mutation requires `admin` or `owner`; API-key authority follows the cross-cutting API-key policy.
