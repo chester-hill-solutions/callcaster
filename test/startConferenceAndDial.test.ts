@@ -1,7 +1,6 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
 
 const params = {
-  user_id: "u1",
   caller_id: "c1",
   workspace_id: "w1",
   campaign_id: "camp1",
@@ -18,7 +17,7 @@ describe("startConferenceAndDial", () => {
     vi.resetModules();
   });
 
-  test("happy path: posts to auto-dial and returns conference data", async () => {
+  test("happy path: posts to dialer/start and returns conference data", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       new Response(
         JSON.stringify({ success: true, conferenceName: "c1" }),
@@ -33,11 +32,14 @@ describe("startConferenceAndDial", () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/auto-dial",
+      "/api/workspaces/w1/campaigns/camp1/dialer/start",
       expect.objectContaining({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
+        body: JSON.stringify({
+          caller_id: params.caller_id,
+          selected_device: params.selected_device,
+        }),
       }),
     );
   });
@@ -70,7 +72,7 @@ describe("startConferenceAndDial", () => {
   test("throws when required params are missing", async () => {
     const mod = await import("../app/lib/services/hooks-api");
     await expect(
-      mod.startConferenceAndDial({ ...params, user_id: "" }),
+      mod.startConferenceAndDial({ ...params, caller_id: "" }),
     ).rejects.toThrow(/Missing required parameters/);
   });
 

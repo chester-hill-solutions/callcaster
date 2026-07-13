@@ -16,6 +16,7 @@ import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { adminDb } from "@/server/admin-db";
+import { hasMinRole } from "@/lib/workspace-route.server";
 
 export async function listUserWorkspaces(
   userId: string,
@@ -65,6 +66,25 @@ export async function getWorkspaceDetail(
   return { ok: true as const, workspace: info.data };
 }
 
+export async function getWorkspaceDetailForDataPlane(
+  userId: string | null,
+  workspaceId: string,
+) {
+  if (userId) {
+    return getWorkspaceDetail(userId, workspaceId);
+  }
+
+  const info = await getWorkspaceInfo({ workspaceId });
+  if (info.error) {
+    return { ok: false as const, error: String(info.error), status: 404 };
+  }
+  if (!info.data) {
+    return { ok: false as const, error: "Workspace not found", status: 404 };
+  }
+
+  return { ok: true as const, workspace: info.data };
+}
+
 export async function updateWorkspaceName(
   userId: string,
   workspaceId: string,
@@ -75,7 +95,7 @@ export async function updateWorkspaceName(
     workspaceId,
   });
 
-  if (!role || role.role === MemberRole.Caller) {
+  if (!role || !hasMinRole(role.role, MemberRole.Admin)) {
     return { ok: false as const, error: "Not authorized", status: 403 };
   }
 

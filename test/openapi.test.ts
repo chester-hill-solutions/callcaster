@@ -27,7 +27,7 @@ describe("openapi spec", () => {
 
   test("includes user-facing workspace and campaign routes", () => {
     expect(openApiSpec.paths).toHaveProperty("/api/campaigns");
-    expect(openApiSpec.paths).toHaveProperty("/api/workspace");
+    expect(openApiSpec.paths).toHaveProperty("/api/workspaces/{workspaceId}");
     expect(openApiSpec.paths).toHaveProperty("/api/contacts");
     expect(Object.keys(openApiSpec.paths).length).toBeGreaterThan(40);
   });

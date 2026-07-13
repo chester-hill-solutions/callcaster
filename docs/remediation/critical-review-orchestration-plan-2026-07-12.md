@@ -1326,12 +1326,12 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [ ] SEC-07 shared capability authorization
 - [ ] API-01 existing OpenAPI/Hey API cutover foundation
 - [ ] AUDIT-01 immutable workspace audit foundation
-- [ ] SEC-01 workspace secret boundary
-- [ ] SEC-02 predictive dialer auth
+- [x] SEC-01 workspace secret boundary — deleted `POST /api/workspace`; scoped `GET/PATCH/DELETE` uses data-plane auth; PATCH requires admin+
+- [x] SEC-02 predictive dialer auth — deleted `/api/auto-dial` and `/api/auto-dial/dialer`; added workspace dialer/start; hardened auto-dial/end
 - [ ] SEC-03 invite binding
 - [ ] DATA-01 queue tenancy
 - [ ] SEC-04a safe/disabled stored webhook boundary
-- [ ] SEC-05 disconnect auth/removal
+- [x] SEC-05 disconnect auth/removal — deleted `/api/disconnect`; added workspace-scoped disconnect
 - [ ] SEC-06 inbound verification signature
 - [ ] SEC-08 auth cutover and MFA re-enrollment
 

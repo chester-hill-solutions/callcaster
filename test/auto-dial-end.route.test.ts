@@ -21,6 +21,11 @@ vi.mock("@/lib/telephony-db.server", async () => {
   };
 });
 
+vi.mock("@/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: async () => ({}) as any,
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
+
 describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   beforeEach(() => {
     configureTelephonyStub();
@@ -174,6 +179,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     setJsonAuthSession({ user: { id: "u1" } });
     vi.doMock("../app/lib/database/workspace.server", () => ({
       createWorkspaceTwilioInstance: async () => ({}) as any,
+      requireWorkspaceAccess: async () => undefined,
     }));
     vi.doMock("../app/lib/request-utils.server", () => ({
       safeParseJson: async () => ({ workspaceId: "w1" }),

@@ -187,17 +187,6 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     notes: "Postgres auth callback; sets session cookies and redirects.",
   }),
   seed({
-    path: "/api/auto-dial",
-    routeModule: "app/routes/api+/auto-dial.tsx",
-    authClass: "session",
-    ownerArea: "dialer",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.telephony,
-    workspaceScoped: true,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-    notes: "Start auto-dial session for workspace.",
-  }),
-  seed({
     path: "/api/auto-dial/:roomId",
     routeModule: "app/routes/api+/auto-dial/$roomId.route.tsx",
     authClass: "twilioSignature",
@@ -206,18 +195,6 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     docsGuide: GUIDE.webhooks,
     operations: [{ method: "POST", handler: "action", bodyType: "form" }],
     notes: "Twilio conference/AMD TwiML callback.",
-  }),
-  seed({
-    path: "/api/auto-dial/dialer",
-    routeModule: "app/routes/api+/auto-dial/dialer.route.tsx",
-    authClass: "internalTrusted",
-    ownerArea: "dialer",
-    exposure: "internalOnly",
-    docsGuide: GUIDE.internal,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-    securityWarning:
-      "No user/API-key auth; trusts workspace_id/user_id in JSON body via service role.",
-    notes: "Predictive/auto-dial worker endpoint.",
   }),
   seed({
     path: "/api/auto-dial/end",
@@ -481,17 +458,6 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     docsGuide: GUIDE.overview,
     operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
     notes: "Complete classified API surface OpenAPI JSON.",
-  }),
-  seed({
-    path: "/api/disconnect",
-    routeModule: "app/routes/api.disconnect.ts",
-    authClass: "weakUnknown",
-    ownerArea: "telephony",
-    exposure: "internalOnly",
-    docsGuide: GUIDE.internal,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-    securityWarning:
-      "Twilio Device disconnect using account credentials; no session or signature check.",
   }),
   seed({
     path: "/api/email-vm",
@@ -981,16 +947,6 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "POST", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
-  }),
-  seed({
-    path: "/api/workspace",
-    routeModule: "app/routes/api+/workspace.tsx",
-    authClass: "workspaceAdmin",
-    ownerArea: "workspace",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.workspace,
-    workspaceScoped: true,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
   }),
   seed({
     path: "/api/twilio/trusthub/status",

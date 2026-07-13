@@ -1,4 +1,7 @@
-import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { safeParseJson } from "@/lib/request-utils.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
@@ -45,6 +48,13 @@ export const action = defineAction({
   if (typeof workspace_id !== "string") {
     return routeData({ error: "Missing workspaceId" }, { status: 400 });
   }
+
+  try {
+    await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+  } catch {
+    return routeData({ error: "Forbidden" }, { status: 403 });
+  }
+
   const twilio = await d.createWorkspaceTwilioInstance({ workspace_id });
 
   const updateOutreachAttempt = async (

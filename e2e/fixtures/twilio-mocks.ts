@@ -71,8 +71,9 @@ export class TwilioMocks {
         path.includes("/api/dial") ||
         path.includes("/api/call") ||
         path.includes("/api/auto-dial") ||
+        path.includes("/dialer/start") ||
+        path.includes("/calls/") && path.includes("/disconnect") ||
         path.includes("/api/hangup") ||
-        path.includes("/api/disconnect") ||
         path.includes("/api/connect-campaign-conference")
       ) {
         const body = route.request().postDataJSON?.() ?? {};
