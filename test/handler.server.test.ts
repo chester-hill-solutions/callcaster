@@ -51,6 +51,33 @@ describe("defineAction", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  test("returns a thrown Response as-is (React Router semantics), not a mapped 500", async () => {
+    const action = defineAction({
+      sideEffects: ["none"],
+      handler: () => {
+        // e.g. resolveDualAuthSession throws a 401 Response on auth failure
+        throw new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+      },
+    });
+    const res = await action(args(post({})));
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(401);
+  });
+
+  test("returns a Response thrown from the auth strategy as-is", async () => {
+    const handler = vi.fn();
+    const action = defineAction({
+      auth: () => {
+        throw new Response("nope", { status: 403 });
+      },
+      sideEffects: ["none"],
+      handler,
+    });
+    const res = await action(args(post({})));
+    expect((res as Response).status).toBe(403);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   test("maps a thrown error through createErrorResponse", async () => {
     const action = defineAction({
       sideEffects: ["none"],

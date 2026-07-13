@@ -56,6 +56,9 @@ async function withGuards<Args extends { request: Request }, A, R>(
     }
     return await run(auth);
   } catch (error) {
+    // Thrown Responses keep React Router semantics: they ARE the response
+    // (e.g. resolveDualAuthSession throws a 401), never a mapped 500.
+    if (error instanceof Response) return error;
     return createErrorResponse(error);
   }
 }
