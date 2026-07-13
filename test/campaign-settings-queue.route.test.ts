@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => {
     countCampaignQueueRows: vi.fn(),
     countQueuedCampaignQueueRows: vi.fn(),
     requireWorkspaceLoaderContext: vi.fn(),
+    workspaceAuth: {
+      headers: new Headers(),
+      user: { id: "u1" },
+      workspaceId: "w1",
+      userRole: "admin",
+    },
   };
 });
 
@@ -63,12 +69,8 @@ vi.mock("@/lib/campaign-queue-search.server", () => ({
 }));
 
 vi.mock("@/lib/workspace-route.server", () => ({
-  getWorkspaceRouteContext: vi.fn(() => ({
-    headers: new Headers(),
-    user: { id: "u1" },
-    workspaceId: "w1",
-    userRole: "admin",
-  })),
+  getWorkspaceRouteContext: vi.fn(() => mocks.workspaceAuth),
+  workspaceRouteAuth: () => mocks.workspaceAuth,
   requireWorkspaceLoaderContext: (...args: any[]) =>
     mocks.requireWorkspaceLoaderContext(...args),
 }));
@@ -117,7 +119,12 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     mocks.countQueuedCampaignQueueRows.mockResolvedValue(0);
     mocks.requireWorkspaceLoaderContext.mockResolvedValue({
       ok: true,
-      context: { user: { id: "u1" }, workspace: { id: "w1" } },
+      ctx: {
+        headers: new Headers(),
+        user: { id: "u1" },
+        workspaceId: "w1",
+        userRole: "admin",
+      },
     });
     dbMocks.selectChain.mockResolvedValue([]);
   });
