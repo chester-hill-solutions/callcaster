@@ -20,7 +20,10 @@
 | 05 | [`05-drop-rcs-onboarding.sql`](./05-drop-rcs-onboarding.sql) | RCS no-op at DDL |
 | 08 | [`08-household-key.sql`](./08-household-key.sql) | Create/repair `households` table |
 | 08b | [`08b-household-backfill.sql`](./08b-household-backfill.sql) | Backfill 117k households from address |
-| 10 | [`10-verify.sql`](./10-verify.sql) | Read-only validation |
+| 11 | [`11-chs-membership-backfill.sql`](./11-chs-membership-backfill.sql) | Backfill `workspace_member` + feature matrix (`field_director`→`admin`) |
+| 10 | [`10-verify.sql`](./10-verify.sql) | Read-only validation (includes CHS membership parity) |
+
+**Prerequisite for step 11:** apply client migrations `20260713150000` (API-key scopes) and `20260713180000` (CHS membership DDL) first — see [`docs/remediation/wave1-membership-migration-2026-07-13.md`](../../docs/remediation/wave1-membership-migration-2026-07-13.md).
 
 ## Sketches (manual / later phases)
 
@@ -28,7 +31,7 @@
 |------|------|------|
 | 06 | [`06-adr-0015-call-message.sql`](./06-adr-0015-call-message.sql) | After billing key migration |
 | 07 | [`07-split-workspace-twilio-data.sql`](./07-split-workspace-twilio-data.sql) | After app reads typed twilio tables |
-| 09 | [`09-drop-legacy-presence.sql`](./09-drop-legacy-presence.sql) | After Phase 3B SSE |
+| 09 | [`09-drop-legacy-presence.sql`](./09-drop-legacy-presence.sql) | After Phase 3B SSE / membership reader switch |
 
 ## Run
 

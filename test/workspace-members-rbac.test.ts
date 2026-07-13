@@ -17,7 +17,7 @@ const membersDbMocks = vi.hoisted(() => ({
 }));
 
 const txDb = vi.hoisted(() => ({
-  workspace_users: {
+  workspace_member: {
     findFirst: vi.fn(async () => null as any),
     update: vi.fn(async () => [{ id: "u2" }] as any[]),
   },
@@ -73,8 +73,8 @@ function resetAll() {
   membersDbMocks.listWorkspaceMembersEnriched.mockReset();
   membersDbMocks.updateWorkspaceMemberRole.mockReset();
   membersDbMocks.removeWorkspaceMember.mockReset();
-  txDb.workspace_users.findFirst.mockReset();
-  txDb.workspace_users.update.mockReset();
+  txDb.workspace_member.findFirst.mockReset();
+  txDb.workspace_member.update.mockReset();
   dbMock.transaction.mockReset();
 
   twoFactorMocks.isTwoFactorEnabled.mockReset();
@@ -90,8 +90,8 @@ function resetAll() {
   membersDbMocks.listWorkspaceMembersEnriched.mockResolvedValue([]);
   membersDbMocks.updateWorkspaceMemberRole.mockResolvedValue({ id: "u2" });
   membersDbMocks.removeWorkspaceMember.mockResolvedValue({ id: "u2" });
-  txDb.workspace_users.findFirst.mockResolvedValue({ id: "u2" });
-  txDb.workspace_users.update.mockResolvedValue([{ id: "u2" }]);
+  txDb.workspace_member.findFirst.mockResolvedValue({ id: "u2" });
+  txDb.workspace_member.update.mockResolvedValue([{ id: "u2" }]);
   dbMock.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(txDb));
 }
 
@@ -229,7 +229,7 @@ describe("workspace member RBAC", () => {
 
   describe("transferWorkspaceOwnership", () => {
     test("verifies the new owner is an existing member", async () => {
-      txDb.workspace_users.findFirst.mockResolvedValue(null);
+      txDb.workspace_member.findFirst.mockResolvedValue(null);
       const actual = await vi.importActual<typeof import("../app/lib/workspace-members-db.server")>(
         "../app/lib/workspace-members-db.server",
       );
@@ -240,12 +240,12 @@ describe("workspace member RBAC", () => {
           newOwnerUserId: "u2",
         }),
       ).rejects.toThrow("existing workspace member");
-      expect(txDb.workspace_users.update).not.toHaveBeenCalled();
+      expect(txDb.workspace_member.update).not.toHaveBeenCalled();
     });
 
     test("rolls back when the new owner update affects zero rows", async () => {
-      txDb.workspace_users.findFirst.mockResolvedValue({ id: "u2" });
-      txDb.workspace_users.update.mockResolvedValue([]);
+      txDb.workspace_member.findFirst.mockResolvedValue({ id: "u2", role_id: "member" });
+      txDb.workspace_member.update.mockResolvedValue([]);
       const actual = await vi.importActual<typeof import("../app/lib/workspace-members-db.server")>(
         "../app/lib/workspace-members-db.server",
       );
@@ -259,8 +259,8 @@ describe("workspace member RBAC", () => {
     });
 
     test("promotes the new owner and demotes the previous owner in a transaction", async () => {
-      txDb.workspace_users.findFirst.mockResolvedValue({ id: "u2" });
-      txDb.workspace_users.update.mockResolvedValue([{ id: "updated" }]);
+      txDb.workspace_member.findFirst.mockResolvedValue({ id: "u2", role_id: "member" });
+      txDb.workspace_member.update.mockResolvedValue([{ id: "updated", role_id: "owner" }]);
       const actual = await vi.importActual<typeof import("../app/lib/workspace-members-db.server")>(
         "../app/lib/workspace-members-db.server",
       );
@@ -269,9 +269,12 @@ describe("workspace member RBAC", () => {
         currentOwnerUserId: "u1",
         newOwnerUserId: "u2",
       });
-      expect(result).toMatchObject({ newOwner: { id: "updated" }, previousOwner: { id: "updated" } });
+      expect(result).toMatchObject({
+        newOwner: { id: "updated" },
+        previousOwner: { id: "updated" },
+      });
       expect(dbMock.transaction).toHaveBeenCalled();
-      expect(txDb.workspace_users.update).toHaveBeenCalledTimes(2);
+      expect(txDb.workspace_member.update).toHaveBeenCalledTimes(2);
     });
   });
 });

@@ -31,6 +31,7 @@ STEPS=(
   08-household-key.sql
   08b-household-backfill.sql
   09-drop-legacy-presence.sql
+  11-chs-membership-backfill.sql
   10-verify.sql
 )
 
@@ -43,5 +44,5 @@ for step in "${STEPS[@]}"; do
 done
 
 echo ""
-echo "Applied steps 00–10 including optional sketches 06, 07, 09 (guarded/idempotent portions)."
+echo "Applied steps 00–11 including optional sketches 06, 07, 09 and CHS membership backfill (guarded/idempotent portions)."
 echo "Baseline: bash scripts/schema-transform/dump-baseline.sh"

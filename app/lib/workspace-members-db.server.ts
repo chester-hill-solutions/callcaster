@@ -7,8 +7,8 @@ import {
   workspace as workspaceTable,
   workspace_api_key as workspaceApiKeyTable,
   workspace_invite as workspaceInviteTable,
+  workspace_member as workspaceMemberTable,
   workspace_number as workspaceNumberTable,
-  workspace_users as workspaceUsersTable,
 } from "@/db/schema";
 import { authUser } from "@/db/auth-schema";
 import type { Database } from "@/lib/db-types";
@@ -16,6 +16,10 @@ import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { mergeWorkspaceTwilioData as mergeWorkspaceTwilioDataCore } from "@/lib/merge-workspace-twilio-data.server";
+import {
+  memberRoleToRoleId,
+  workspaceMemberId,
+} from "@/lib/workspace-membership.server";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -44,15 +48,15 @@ export async function findWorkspaceInviteForUser(
 export async function listWorkspaceMembersEnriched(workspaceId: string) {
   const rows = await adminDb
     .select({
-      role: workspaceUsersTable.role,
+      role: workspaceMemberTable.role_id,
       user_id: userTable.id,
       username: userTable.username,
       first_name: userTable.first_name,
       last_name: userTable.last_name,
     })
-    .from(workspaceUsersTable)
-    .innerJoin(userTable, eq(workspaceUsersTable.user_id, userTable.id))
-    .where(eq(workspaceUsersTable.workspace_id, workspaceId));
+    .from(workspaceMemberTable)
+    .innerJoin(userTable, eq(workspaceMemberTable.user_id, userTable.id))
+    .where(eq(workspaceMemberTable.workspace_id, workspaceId));
 
   return rows.map((row) => ({
     user_id: row.user_id,
@@ -100,13 +104,14 @@ export async function updateWorkspaceMemberRole(args: {
   tdb?: TenantDb;
 }) {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const rows = await tdb.workspace_users.update({
-    set: { role: args.role },
-    where: and(
-      eq(workspaceUsersTable.user_id, args.userId),
-    ),
+  const roleId = memberRoleToRoleId(args.role);
+  const rows = await tdb.workspace_member.update({
+    set: { role_id: roleId },
+    where: and(eq(workspaceMemberTable.user_id, args.userId)),
   });
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  return { ...row, role: row.role_id };
 }
 
 export async function removeWorkspaceMember(args: {
@@ -115,17 +120,17 @@ export async function removeWorkspaceMember(args: {
   tdb?: TenantDb;
 }) {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const rows = await tdb.workspace_users.findMany({
-    where: eq(workspaceUsersTable.user_id, args.userId),
+  const rows = await tdb.workspace_member.findMany({
+    where: eq(workspaceMemberTable.user_id, args.userId),
   });
   const member = rows[0] ?? null;
   if (!member) {
     return null;
   }
-  await tdb.workspace_users.delete({
-    where: eq(workspaceUsersTable.user_id, args.userId),
+  await tdb.workspace_member.delete({
+    where: eq(workspaceMemberTable.user_id, args.userId),
   });
-  return member;
+  return { ...member, role: member.role_id };
 }
 
 export async function removeWorkspaceInviteForUser(args: {
@@ -160,23 +165,26 @@ export async function transferWorkspaceOwnership(args: {
       throw new Error("New owner must be an existing workspace member");
     }
 
-    const [newOwner] = await tdb.workspace_users.update({
-      set: { role: "owner" },
-      where: eq(workspaceUsersTable.user_id, args.newOwnerUserId),
+    const [newOwner] = await tdb.workspace_member.update({
+      set: { role_id: "owner" },
+      where: eq(workspaceMemberTable.user_id, args.newOwnerUserId),
     });
     if (!newOwner) {
       throw new Error("Failed to promote the new owner");
     }
 
-    const [previousOwner] = await tdb.workspace_users.update({
-      set: { role: "admin" },
-      where: eq(workspaceUsersTable.user_id, args.currentOwnerUserId),
+    const [previousOwner] = await tdb.workspace_member.update({
+      set: { role_id: "admin" },
+      where: eq(workspaceMemberTable.user_id, args.currentOwnerUserId),
     });
     if (!previousOwner) {
       throw new Error("Failed to demote the previous owner");
     }
 
-    return { newOwner, previousOwner };
+    return {
+      newOwner: { ...newOwner, role: newOwner.role_id },
+      previousOwner: { ...previousOwner, role: previousOwner.role_id },
+    };
   });
 }
 
@@ -288,9 +296,11 @@ export async function findWorkspaceMembership(
   tdbIn?: TenantDb,
 ) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
-  return tdb.workspace_users.findFirst({
-    where: eq(workspaceUsersTable.user_id, userId),
+  const row = await tdb.workspace_member.findFirst({
+    where: eq(workspaceMemberTable.user_id, userId),
   });
+  if (!row) return null;
+  return { ...row, role: row.role_id };
 }
 
 export async function insertWorkspaceMembership(args: {
@@ -300,12 +310,15 @@ export async function insertWorkspaceMembership(args: {
   tdb?: TenantDb;
 }) {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const rows = await tdb.workspace_users.insert({
+  const roleId = memberRoleToRoleId(args.role);
+  const rows = await tdb.workspace_member.insert({
+    id: workspaceMemberId(args.workspaceId, args.userId),
     user_id: args.userId,
-    role: args.role,
-    created_at: new Date().toISOString(),
+    role_id: roleId,
   });
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  return { ...row, role: row.role_id };
 }
 
 export async function deleteWorkspaceById(workspaceId: string) {
@@ -328,7 +341,11 @@ export async function listAllUsersOrdered() {
 }
 
 export async function listAllWorkspaceUsers() {
-  return adminDb.select().from(workspaceUsersTable);
+  const rows = await adminDb.select().from(workspaceMemberTable);
+  return rows.map((row) => ({
+    ...row,
+    role: row.role_id,
+  }));
 }
 
 export async function listAllWorkspaceNumbers() {
@@ -410,10 +427,15 @@ export async function setWorkspaceDisabled(workspaceId: string, disabled: boolea
 }
 
 export async function listUserWorkspaceMemberships(userId: string) {
-  return adminDb
+  const rows = await adminDb
     .select()
-    .from(workspaceUsersTable)
-    .where(eq(workspaceUsersTable.user_id, userId));
+    .from(workspaceMemberTable)
+    .where(eq(workspaceMemberTable.user_id, userId));
+  return rows.map((row) => ({
+    ...row,
+    role: row.role_id,
+    workspace_id: row.workspace_id,
+  }));
 }
 
 export async function listPendingInvitesForUsername(username: string) {
@@ -440,17 +462,20 @@ export async function updateAdminWorkspaceMemberRole(args: {
   userId: string;
   role: WorkspaceRole;
 }) {
+  const roleId = memberRoleToRoleId(args.role);
   const rows = await adminDb
-    .update(workspaceUsersTable)
-    .set({ role: args.role })
+    .update(workspaceMemberTable)
+    .set({ role_id: roleId })
     .where(
       and(
-        eq(workspaceUsersTable.user_id, args.userId),
-        eq(workspaceUsersTable.workspace_id, args.workspaceId),
+        eq(workspaceMemberTable.user_id, args.userId),
+        eq(workspaceMemberTable.workspace_id, args.workspaceId),
       ),
     )
     .returning();
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  return { ...row, role: row.role_id };
 }
 
 export async function deleteAdminWorkspaceMember(args: {
@@ -458,11 +483,11 @@ export async function deleteAdminWorkspaceMember(args: {
   userId: string;
 }) {
   await adminDb
-    .delete(workspaceUsersTable)
+    .delete(workspaceMemberTable)
     .where(
       and(
-        eq(workspaceUsersTable.user_id, args.userId),
-        eq(workspaceUsersTable.workspace_id, args.workspaceId),
+        eq(workspaceMemberTable.user_id, args.userId),
+        eq(workspaceMemberTable.workspace_id, args.workspaceId),
       ),
     );
 }
@@ -472,16 +497,19 @@ export async function insertAdminWorkspaceMember(args: {
   userId: string;
   role: WorkspaceRole;
 }) {
+  const roleId = memberRoleToRoleId(args.role);
   const rows = await adminDb
-    .insert(workspaceUsersTable)
+    .insert(workspaceMemberTable)
     .values({
+      id: workspaceMemberId(args.workspaceId, args.userId),
       user_id: args.userId,
       workspace_id: args.workspaceId,
-      role: args.role,
-      created_at: new Date().toISOString(),
+      role_id: roleId,
     })
     .returning();
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  return { ...row, role: row.role_id };
 }
 
 export async function findAdminWorkspaceMembership(args: {
@@ -490,15 +518,16 @@ export async function findAdminWorkspaceMembership(args: {
 }) {
   const [row] = await adminDb
     .select()
-    .from(workspaceUsersTable)
+    .from(workspaceMemberTable)
     .where(
       and(
-        eq(workspaceUsersTable.user_id, args.userId),
-        eq(workspaceUsersTable.workspace_id, args.workspaceId),
+        eq(workspaceMemberTable.user_id, args.userId),
+        eq(workspaceMemberTable.workspace_id, args.workspaceId),
       ),
     )
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+  return { ...row, role: row.role_id };
 }
 
 export async function listUserInvitesWithWorkspace(userId: string) {
@@ -529,10 +558,10 @@ export async function listUserWorkspaceSummaries(userId: string) {
       id: workspaceTable.id,
       name: workspaceTable.name,
     })
-    .from(workspaceUsersTable)
-    .innerJoin(workspaceTable, eq(workspaceUsersTable.workspace_id, workspaceTable.id))
-    .where(eq(workspaceUsersTable.user_id, userId))
-    .orderBy(desc(workspaceUsersTable.last_accessed));
+    .from(workspaceMemberTable)
+    .innerJoin(workspaceTable, eq(workspaceMemberTable.workspace_id, workspaceTable.id))
+    .where(eq(workspaceMemberTable.user_id, userId))
+    .orderBy(desc(workspaceMemberTable.created_at));
 
   return rows;
 }
@@ -623,20 +652,20 @@ export async function listWorkspaceNumbersForWorkspace(workspaceId: string) {
 export async function listAdminWorkspaceUsersWithUser(workspaceId: string) {
   const rows = await adminDb
     .select({
-      id: workspaceUsersTable.id,
-      created_at: workspaceUsersTable.created_at,
-      last_accessed: workspaceUsersTable.last_accessed,
-      role: workspaceUsersTable.role,
-      user_id: workspaceUsersTable.user_id,
-      workspace_id: workspaceUsersTable.workspace_id,
+      id: workspaceMemberTable.id,
+      created_at: workspaceMemberTable.created_at,
+      role: workspaceMemberTable.role_id,
+      user_id: workspaceMemberTable.user_id,
+      workspace_id: workspaceMemberTable.workspace_id,
       user: userTable,
     })
-    .from(workspaceUsersTable)
-    .innerJoin(userTable, eq(workspaceUsersTable.user_id, userTable.id))
-    .where(eq(workspaceUsersTable.workspace_id, workspaceId));
+    .from(workspaceMemberTable)
+    .innerJoin(userTable, eq(workspaceMemberTable.user_id, userTable.id))
+    .where(eq(workspaceMemberTable.workspace_id, workspaceId));
 
   return rows.map(({ user, ...membership }) => ({
     ...membership,
+    last_accessed: null as string | null,
     user,
   }));
 }
@@ -667,21 +696,19 @@ export async function touchWorkspaceApiKeyLastUsed(keyId: string) {
  * Real email addresses (from the better-auth identity table) for a
  * workspace's owners and admins. Used for billing/credit notifications.
  *
- * `workspace_users.user_id` and `auth_user.id` live in differently-typed
- * columns (uuid vs text), so this resolves membership first and joins to
- * `auth_user` by id in a second query rather than a single cross-type SQL
- * join.
+ * Membership is CHS `workspace_member` (`user_id` text); resolved then joined
+ * to `auth_user` by id.
  */
 export async function listWorkspaceOwnerAdminEmails(
   workspaceId: string,
 ): Promise<string[]> {
   const members = await adminDb
-    .select({ user_id: workspaceUsersTable.user_id })
-    .from(workspaceUsersTable)
+    .select({ user_id: workspaceMemberTable.user_id })
+    .from(workspaceMemberTable)
     .where(
       and(
-        eq(workspaceUsersTable.workspace_id, workspaceId),
-        inArray(workspaceUsersTable.role, ["owner", "admin"]),
+        eq(workspaceMemberTable.workspace_id, workspaceId),
+        inArray(workspaceMemberTable.role_id, ["owner", "admin"]),
       ),
     );
 
@@ -703,17 +730,17 @@ export async function listWorkspaceOwnerAdminEmails(
 export async function listUserWorkspaceMembershipsForProfile(userId: string) {
   return adminDb
     .select({
-      last_accessed: workspaceUsersTable.last_accessed,
-      role: workspaceUsersTable.role,
+      last_accessed: workspaceMemberTable.created_at,
+      role: workspaceMemberTable.role_id,
       workspace: {
         id: workspaceTable.id,
         name: workspaceTable.name,
       },
     })
-    .from(workspaceUsersTable)
-    .innerJoin(workspaceTable, eq(workspaceUsersTable.workspace_id, workspaceTable.id))
-    .where(eq(workspaceUsersTable.user_id, userId))
-    .orderBy(desc(workspaceUsersTable.last_accessed));
+    .from(workspaceMemberTable)
+    .innerJoin(workspaceTable, eq(workspaceMemberTable.workspace_id, workspaceTable.id))
+    .where(eq(workspaceMemberTable.user_id, userId))
+    .orderBy(desc(workspaceMemberTable.created_at));
 }
 
 export async function listUserWorkspaceMembershipsWithWorkspace(userId: string) {

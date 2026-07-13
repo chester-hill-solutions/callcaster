@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import {
   workspace as workspaceTable,
-  workspace_users as workspaceUsersTable,
+  workspace_member as workspaceMemberTable,
 } from "@/db/schema";
 import {
   getUserRole,
@@ -26,8 +26,8 @@ export async function listUserWorkspaces(
   try {
     const rows = await adminDb
       .select({
-        last_accessed: workspaceUsersTable.last_accessed,
-        role: workspaceUsersTable.role,
+        last_accessed: workspaceMemberTable.created_at,
+        role: workspaceMemberTable.role_id,
         workspace: {
           id: workspaceTable.id,
           name: workspaceTable.name,
@@ -35,10 +35,10 @@ export async function listUserWorkspaces(
           created_at: workspaceTable.created_at,
         },
       })
-      .from(workspaceUsersTable)
-      .innerJoin(workspaceTable, eq(workspaceUsersTable.workspace_id, workspaceTable.id))
-      .where(eq(workspaceUsersTable.user_id, userId))
-      .orderBy(desc(workspaceUsersTable.last_accessed));
+      .from(workspaceMemberTable)
+      .innerJoin(workspaceTable, eq(workspaceMemberTable.workspace_id, workspaceTable.id))
+      .where(eq(workspaceMemberTable.user_id, userId))
+      .orderBy(desc(workspaceMemberTable.created_at));
 
     return { ok: true as const, workspaces: rows };
   } catch (error) {

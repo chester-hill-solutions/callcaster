@@ -61,7 +61,7 @@ export const workspace_users = pgTable("workspace_users", {
   workspace_id: uuid().notNull(),
 });
 
-/** CHS canonical membership (Wave 1 scaffold). Readers still use workspace_users. */
+/** CHS canonical membership (Wave 1 Phase C — app reads/writes this table). */
 export const workspace_member = pgTable(
   "workspace_member",
   {

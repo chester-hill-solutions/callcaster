@@ -3,10 +3,10 @@ import { eq } from "drizzle-orm";
 import { jsonError } from "@/lib/platform-api.server";
 import { adminDb } from "@/server/admin-db";
 import { authUser } from "@/db/auth-schema";
-import { user as platformUser, workspace_users } from "@/db/schema";
+import { user as platformUser, workspace_member } from "@/db/schema";
 
-/** Workspace roles that must enroll in TOTP 2FA (owner/admin/field_director per security baseline). */
-export const PRIVILEGED_WORKSPACE_ROLES = ["owner", "admin", "field_director"] as const;
+/** Workspace roles that must enroll in TOTP 2FA (owner/admin; field_director mapped to admin in Phase B). */
+export const PRIVILEGED_WORKSPACE_ROLES = ["owner", "admin"] as const;
 
 export type PrivilegedWorkspaceRole = (typeof PRIVILEGED_WORKSPACE_ROLES)[number];
 
@@ -40,9 +40,9 @@ async function privilegedUserNeedsTwoFactorEnrollment(
 
 export async function userHasPrivilegedWorkspaceRole(userId: string): Promise<boolean> {
   const memberships = await adminDb
-    .select({ role: workspace_users.role })
-    .from(workspace_users)
-    .where(eq(workspace_users.user_id, userId));
+    .select({ role: workspace_member.role_id })
+    .from(workspace_member)
+    .where(eq(workspace_member.user_id, userId));
 
   return memberships.some((m) =>
     PRIVILEGED_WORKSPACE_ROLES.includes(m.role as PrivilegedWorkspaceRole),

@@ -23,6 +23,7 @@ import {
   workspace_events,
   workspace_audit_event,
   workspace_invite,
+  workspace_member,
   workspace_number,
   workspace_users,
 } from "./schema";
@@ -32,7 +33,7 @@ import {
  *
  * `createTenantDb(workspaceId)` auto-scopes each of these tables on every
  * read/update/delete and auto-injects the tenancy column on every insert (ADR-0004).
- * Count: 25 tables after Phase 1 schema transform (vestigial/subtype tables removed).
+ * Count: 26 tables (Phase C adds CHS `workspace_member`; tenancy col is text).
  */
 export const WORKSPACE_SCOPED_TABLES = {
   campaign: { table: campaign, workspaceColumn: campaign.workspace },
@@ -69,6 +70,11 @@ export const WORKSPACE_SCOPED_TABLES = {
   },
   handset_session: { table: handset_session, workspaceColumn: handset_session.workspace_id },
   workspace_users: { table: workspace_users, workspaceColumn: workspace_users.workspace_id },
+  /** CHS membership; `workspace_id` is text (CallCaster workspace ids stored as text). */
+  workspace_member: {
+    table: workspace_member,
+    workspaceColumn: workspace_member.workspace_id,
+  },
   workspace_api_key: {
     table: workspace_api_key,
     workspaceColumn: workspace_api_key.workspace_id,
