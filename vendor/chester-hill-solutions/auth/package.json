@@ -1,0 +1,77 @@
+{
+  "name": "@chester-hill-solutions/auth",
+  "version": "0.2.0",
+  "description": "Framework- and provider-agnostic auth utilities (redirects, cookies, session types, capability actors, tokens)",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chester-hill-solutions/chester-hill-solutions.git",
+    "directory": "packages/auth"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./cookies": {
+      "types": "./dist/cookies.d.ts",
+      "import": "./dist/cookies.js",
+      "default": "./dist/cookies.js"
+    },
+    "./redirect": {
+      "types": "./dist/redirect.d.ts",
+      "import": "./dist/redirect.js",
+      "default": "./dist/redirect.js"
+    },
+    "./resource": {
+      "types": "./dist/resource.d.ts",
+      "import": "./dist/resource.js",
+      "default": "./dist/resource.js"
+    },
+    "./origin": {
+      "types": "./dist/origin.d.ts",
+      "import": "./dist/origin.js",
+      "default": "./dist/origin.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres.d.ts",
+      "import": "./dist/postgres.js",
+      "default": "./dist/postgres.js"
+    },
+    "./capability": {
+      "types": "./dist/capability.d.ts",
+      "import": "./dist/capability.js",
+      "default": "./dist/capability.js"
+    },
+    "./email": {
+      "types": "./dist/email.d.ts",
+      "import": "./dist/email.js",
+      "default": "./dist/email.js"
+    },
+    "./token": {
+      "types": "./dist/token.d.ts",
+      "import": "./dist/token.js",
+      "default": "./dist/token.js"
+    }
+  },
+  "peerDependencies": {
+    "cookie": "^1.0.0",
+    "postgres": "^3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "cookie": {
+      "optional": false
+    },
+    "postgres": {
+      "optional": true
+    }
+  }
+}
