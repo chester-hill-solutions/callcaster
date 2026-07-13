@@ -313,7 +313,7 @@ describe("WorkspaceSettingUtils", () => {
   test("sendWebhookNotification handles missing webhook, disabled events, delivery failure, success, and catch", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
 
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const safeFetch = safeOutboundMocks.safeOutboundFetch;
 
     membersDbMocks.getWorkspaceWebhookRow.mockRejectedValueOnce(new Error("none"));
     const r0 = await mod.sendWebhookNotification({
@@ -351,7 +351,7 @@ describe("WorkspaceSettingUtils", () => {
       custom_headers: "not-an-object",
       events: [{ category: "a", type: "INSERT" }],
     });
-    fetchMock.mockResolvedValueOnce(new Response("fail", { status: 500, statusText: "Nope" }));
+    safeFetch.mockResolvedValueOnce(new Response("fail", { status: 500, statusText: "Nope" }));
     const r2 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
@@ -365,7 +365,7 @@ describe("WorkspaceSettingUtils", () => {
       custom_headers: null,
       events: [{ category: "a", type: "INSERT" }],
     });
-    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200, statusText: "OK" }));
+    safeFetch.mockResolvedValueOnce(new Response("ok", { status: 200, statusText: "OK" }));
     const r2b = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
@@ -379,7 +379,7 @@ describe("WorkspaceSettingUtils", () => {
       custom_headers: { X: "1" },
       events: [{ category: "a", type: "UPDATE" }],
     });
-    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200, statusText: "OK" }));
+    safeFetch.mockResolvedValueOnce(new Response("ok", { status: 200, statusText: "OK" }));
     const r3 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "UPDATE",
