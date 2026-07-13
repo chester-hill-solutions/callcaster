@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { inspect } from "node:util";
 import { asRouteResponse } from "./helpers/route-result";
 
 const objectStorageMocks = vi.hoisted(() => ({
@@ -29,6 +30,7 @@ vi.mock("@/lib/messaging-onboarding.server", async () => {
 const adminDbMocks = vi.hoisted(() => ({
   workspaceFindFirst: vi.fn(),
   selectChain: vi.fn(),
+  selectWhere: vi.fn(),
   updateWhere: vi.fn(),
 }));
 
@@ -40,6 +42,10 @@ const tdbMocks = vi.hoisted(() => ({
     delete: vi.fn(),
   },
   workspace_users: {
+    findFirst: vi.fn(),
+    insert: vi.fn(),
+  },
+  workspace_member: {
     findFirst: vi.fn(),
     insert: vi.fn(),
   },
@@ -128,6 +134,7 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     adminDbMocks.workspaceFindFirst.mockReset();
     adminDbMocks.selectChain.mockReset();
+    adminDbMocks.selectWhere.mockReset();
     adminDbMocks.updateWhere.mockReset();
     authApiMocks.verifyEmail.mockReset();
     for (const fn of Object.values(rpcMocks)) {
@@ -147,6 +154,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     // unaffected. Individual tests override these to exercise the warning path.
     tdbMocks.script.insert.mockResolvedValue([{ id: 1 }]);
     tdbMocks.campaign.insert.mockResolvedValue([{ id: 1 }]);
+    tdbMocks.workspace_member.insert.mockResolvedValue([
+      { id: "wm:w:u", role_id: "owner" },
+    ]);
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue({
       inserted: true,
@@ -160,11 +170,17 @@ describe("app/lib/database/workspace.server.ts", () => {
         select: () => ({
           from: () => ({
             innerJoin: () => ({
-              where: () => ({
-                orderBy: () => adminDbMocks.selectChain(),
-              }),
+              where: (...args: unknown[]) => {
+                adminDbMocks.selectWhere(...args);
+                return {
+                  orderBy: () => adminDbMocks.selectChain(),
+                };
+              },
             }),
-            where: () => adminDbMocks.selectChain(),
+            where: (...args: unknown[]) => {
+              adminDbMocks.selectWhere(...args);
+              return adminDbMocks.selectChain();
+            },
           }),
         }),
         update: () => ({
@@ -488,9 +504,9 @@ describe("app/lib/database/workspace.server.ts", () => {
       name: "W",
       credits: 0,
     });
-    tdbMocks.workspace_users.findFirst.mockResolvedValueOnce({
-      id: 1,
-      role: "admin",
+    tdbMocks.workspace_member.findFirst.mockResolvedValueOnce({
+      id: "wm:w1:u1",
+      role_id: "admin",
     });
     tdbMocks.campaign.findMany.mockResolvedValueOnce([{ id: 1 }]);
     tdbMocks.workspace_number.findMany.mockResolvedValueOnce([{ id: 1 }]);
@@ -560,7 +576,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    tdbMocks.workspace_users.insert.mockRejectedValueOnce(new Error("x"));
+    tdbMocks.workspace_member.insert.mockRejectedValueOnce(new Error("x"));
     const r1 = await mod.addUserToWorkspace({
       workspaceId: "w1",
       userId: "u1",
@@ -570,13 +586,18 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(r1.error).toBeTruthy();
     expect(logger.error).toHaveBeenCalled();
 
-    tdbMocks.workspace_users.insert.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.workspace_member.insert.mockResolvedValueOnce([
+      { id: "wm:w1:u1", role_id: "member" },
+    ]);
     const r2 = await mod.addUserToWorkspace({
       workspaceId: "w1",
       userId: "u1",
       role: "member",
     });
-    expect(r2).toEqual({ data: { id: 1 }, error: null });
+    expect(r2).toEqual({
+      data: { id: "wm:w1:u1", role_id: "member" },
+      error: null,
+    });
   });
 
   test("getUserRole handles missing user and logs on query error", async () => {
@@ -590,7 +611,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     ).resolves.toBeNull();
 
-    tdbMocks.workspace_users.findFirst.mockRejectedValueOnce(new Error("x"));
+    tdbMocks.workspace_member.findFirst.mockRejectedValueOnce(new Error("x"));
     const role = await mod.getUserRole({
       user: { id: "u1" } as any,
       workspaceId: "w1",
@@ -602,7 +623,9 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("requireWorkspaceAccess throws AppError when role missing/forbidden, passes for allowed", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
-    tdbMocks.workspace_users.findFirst.mockResolvedValueOnce({ role: "invited" });
+    tdbMocks.workspace_member.findFirst.mockResolvedValueOnce({
+      role_id: "invited",
+    });
     await expect(
       mod.requireWorkspaceAccess({
         user: { id: "u1" },
@@ -610,7 +633,9 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
 
-    tdbMocks.workspace_users.findFirst.mockResolvedValueOnce({ role: "admin" });
+    tdbMocks.workspace_member.findFirst.mockResolvedValueOnce({
+      role_id: "admin",
+    });
     await expect(
       mod.requireWorkspaceAccess({
         user: { id: "u1" },
@@ -901,7 +926,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       { id: "i1", workspace: "w1", role: "member" },
       { id: "i2", workspace: "w2", role: "member" },
     ]);
-    tdbMocks.workspace_users.insert.mockRejectedValue(new Error("join"));
+    tdbMocks.workspace_member.insert.mockRejectedValue(new Error("join"));
     tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
 
     const out = await mod.acceptWorkspaceInvitations(["i1", "i2"], "u1");
@@ -918,7 +943,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     adminDbMocks.selectChain.mockResolvedValueOnce([
       { id: "i1", workspace: "w1", role: "member" },
     ]);
-    tdbMocks.workspace_users.insert.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.workspace_member.insert.mockResolvedValueOnce([
+      { id: "wm:w1:u1", role_id: "member" },
+    ]);
     tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
 
     const out = await mod.acceptWorkspaceInvitations(["i1"], "u1");
@@ -930,7 +957,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     adminDbMocks.selectChain.mockResolvedValueOnce([
       { id: "i1", workspace: "w1", role: "member" },
     ]);
-    tdbMocks.workspace_users.insert.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.workspace_member.insert.mockResolvedValueOnce([
+      { id: "wm:w1:u1", role_id: "member" },
+    ]);
     tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
 
     const out = await mod.acceptWorkspaceInvitations(["i1", "missing"], "u1");
@@ -938,6 +967,52 @@ describe("app/lib/database/workspace.server.ts", () => {
       invitationId: "missing",
       type: "invite",
     });
+  });
+
+  test("acceptWorkspaceInvitations rejects foreign invite ids without membership insert", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+    // DB filter: id IN list AND user_id = authenticated user → foreign invite omitted
+    adminDbMocks.selectChain.mockResolvedValueOnce([]);
+
+    const out = await mod.acceptWorkspaceInvitations(
+      ["foreign-invite"],
+      "attacker",
+    );
+
+    expect(adminDbMocks.selectWhere).toHaveBeenCalled();
+    const whereDump = inspect(adminDbMocks.selectWhere.mock.calls[0]?.[0], {
+      depth: 10,
+    });
+    expect(whereDump).toMatch(/user_id/);
+    expect(whereDump).toMatch(/attacker/);
+
+    expect(out.errors).toEqual([
+      { invitationId: "foreign-invite", type: "invite" },
+    ]);
+    expect(tdbMocks.workspace_member.insert).not.toHaveBeenCalled();
+    expect(tdbMocks.workspace_invite.delete).not.toHaveBeenCalled();
+  });
+
+  test("acceptWorkspaceInvitations accepts own invite and skips foreign ids in same request", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+    // Only the invite owned by u1 is returned; foreign id is filtered out by user_id
+    adminDbMocks.selectChain.mockResolvedValueOnce([
+      { id: "own-invite", workspace: "w1", role: "member" },
+    ]);
+    tdbMocks.workspace_member.insert.mockResolvedValueOnce([
+      { id: "wm:w1:u1", role_id: "member" },
+    ]);
+    tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
+
+    const out = await mod.acceptWorkspaceInvitations(
+      ["own-invite", "foreign-invite"],
+      "u1",
+    );
+
+    expect(tdbMocks.workspace_member.insert).toHaveBeenCalledTimes(1);
+    expect(out.errors).toEqual([
+      { invitationId: "foreign-invite", type: "invite" },
+    ]);
   });
 
   test("getInvitesByUserId throws on error and returns data on success", async () => {

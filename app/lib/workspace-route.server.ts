@@ -2,7 +2,13 @@ import { data as routeData } from "react-router";
 import type { RouterContextProvider } from "react-router";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { verifyAuth } from "@/lib/auth.server";
+import {
+  hasMinRole,
+  WORKSPACE_ROLE_RANK,
+} from "@/lib/member-role";
 import { workspaceContext } from "@/lib/route-context.server";
+
+export { hasMinRole, WORKSPACE_ROLE_RANK };
 
 export type WorkspaceRouteContext = {
   headers: Headers;
@@ -37,22 +43,6 @@ export type WorkspaceLoaderContext = {
 export type WorkspaceLoaderResult =
   | { ok: true; ctx: WorkspaceLoaderContext }
   | { ok: false; response: ReturnType<typeof routeData<{ error: string }>> };
-
-export const WORKSPACE_ROLE_RANK: Record<string, number> = {
-  owner: 4,
-  admin: 3,
-  member: 2,
-  caller: 1,
-};
-
-export function hasMinRole(
-  role: string | undefined,
-  minRole: string | undefined,
-): boolean {
-  if (!minRole) return true;
-  if (!role) return false;
-  return (WORKSPACE_ROLE_RANK[role] ?? 0) >= (WORKSPACE_ROLE_RANK[minRole] ?? 0);
-}
 
 /**
  * Read workspace context set by layout middleware, or fall back to full auth check.

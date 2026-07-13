@@ -1,8 +1,5 @@
-import { desc, eq } from "drizzle-orm";
-import {
-  workspace as workspaceTable,
-  workspace_users as workspaceUsersTable,
-} from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { workspace as workspaceTable } from "@/db/schema";
 import {
   getUserRole,
   getWorkspaceInfo,
@@ -18,29 +15,23 @@ import { logger } from "@/lib/logger.server";
 import { adminDb } from "@/server/admin-db";
 import { hasMinRole } from "@/lib/workspace-route.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
+import { timestampToIsoString } from "@/lib/parse-utils.server";
 import { isTwoFactorEnabled } from "@/lib/two-factor.server";
+import { listUserWorkspaceMembershipsForProfile } from "@/lib/workspace-members-db.server";
 
 export async function listUserWorkspaces(
   userId: string,
 ) {
   try {
-    const rows = await adminDb
-      .select({
-        last_accessed: workspaceUsersTable.last_accessed,
-        role: workspaceUsersTable.role,
-        workspace: {
-          id: workspaceTable.id,
-          name: workspaceTable.name,
-          credits: workspaceTable.credits,
-          created_at: workspaceTable.created_at,
-        },
-      })
-      .from(workspaceUsersTable)
-      .innerJoin(workspaceTable, eq(workspaceUsersTable.workspace_id, workspaceTable.id))
-      .where(eq(workspaceUsersTable.user_id, userId))
-      .orderBy(desc(workspaceUsersTable.last_accessed));
+    const rows = await listUserWorkspaceMembershipsForProfile(userId);
 
-    return { ok: true as const, workspaces: rows };
+    return {
+      ok: true as const,
+      workspaces: rows.map((row) => ({
+        ...row,
+        last_accessed: timestampToIsoString(row.last_accessed),
+      })),
+    };
   } catch (error) {
     logger.error("listUserWorkspaces error", error);
     return {

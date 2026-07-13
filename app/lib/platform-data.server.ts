@@ -89,8 +89,15 @@ function audienceContactSortColumn(sortKey: string) {
   return contactTable.id;
 }
 
+export type DataPlaneApiKeyAuth = {
+  keyId: string;
+  scopes: readonly string[];
+};
+
 export type DataPlaneAuthContext = {
   userId: string | null;
+  /** Present when authenticated via workspace API key. */
+  apiKey?: DataPlaneApiKeyAuth;
 };
 
 export type PlatformResult<T> =
@@ -135,7 +142,10 @@ export async function resolveDataPlaneAuth(
     if (workspaceId && auth.workspaceId !== workspaceId) {
       return jsonError("workspaceId does not match API key", 403);
     }
-    return { userId: null };
+    return {
+      userId: null,
+      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
+    };
   }
 
   if (workspaceId) {
@@ -235,8 +245,12 @@ export async function authForCampaign(
       return jsonError("Campaign not found", 404);
     }
     // Workspace-scoped API keys retain full data-plane access; role gating
-    // applies to session (member) auth only.
-    return { userId: null, workspaceId };
+    // applies to session (member) auth only. Capability gates are opt-in per route.
+    return {
+      userId: null,
+      workspaceId,
+      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
+    };
   }
 
   const denied = await enforceWorkspaceRole(auth.user, workspaceId, minRole);
@@ -262,8 +276,12 @@ export async function authForContact(
       return jsonError("Contact not found", 404);
     }
     // Workspace-scoped API keys retain full data-plane access; role gating
-    // applies to session (member) auth only.
-    return { userId: null, workspaceId };
+    // applies to session (member) auth only. Capability gates are opt-in per route.
+    return {
+      userId: null,
+      workspaceId,
+      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
+    };
   }
 
   const denied = await enforceWorkspaceRole(auth.user, workspaceId, minRole);
@@ -287,7 +305,11 @@ export async function authForScript(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Script not found", 404);
     }
-    return { userId: null, workspaceId };
+    return {
+      userId: null,
+      workspaceId,
+      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
+    };
   }
 
   await requireWorkspaceAccess({
@@ -313,7 +335,11 @@ export async function authForSurvey(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Survey not found", 404);
     }
-    return { userId: null, workspaceId };
+    return {
+      userId: null,
+      workspaceId,
+      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
+    };
   }
 
   await requireWorkspaceAccess({

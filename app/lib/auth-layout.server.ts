@@ -1,4 +1,8 @@
 import { data, redirect, type LoaderFunctionArgs } from "react-router";
+import {
+  createRequireCapability,
+  createInviteCompletionLoader,
+} from "@chester-hill-solutions/auth-react-router";
 import { getSession, type AuthUser } from "@/lib/auth.server";
 
 export type AuthLayoutLoaderData = {
@@ -16,8 +20,10 @@ export type CreateAuthLayoutLoaderOptions = {
 };
 
 /**
- * CHS `@chester-hill-solutions/auth-react-router` compatible layout loader factory.
- * Thin adapter over Better Auth until the package is installed from GitHub Packages.
+ * CallCaster auth layout loader. Package `createAuthLayoutLoader` expects a
+ * different SessionReader / continue-URL shape and omits `userId` in the
+ * payload, so we keep this thin Better Auth shim and re-export capability
+ * helpers from `@chester-hill-solutions/auth-react-router` below.
  */
 export function createAuthLayoutLoader(
   options: CreateAuthLayoutLoaderOptions = {},
@@ -45,7 +51,8 @@ export function createAuthLayoutLoader(
 }
 
 /**
- * CHS `@chester-hill-solutions/auth-react-router` compatible session user guard.
+ * CallCaster session user guard. Package export takes a SessionReader options
+ * object; this shim matches existing CallCaster call sites.
  */
 export function createRequireSessionUserId(signInPath = "/signin") {
   return async function requireSessionUserId(request: Request): Promise<string> {
@@ -56,3 +63,5 @@ export function createRequireSessionUserId(signInPath = "/signin") {
     return user.id;
   };
 }
+
+export { createRequireCapability, createInviteCompletionLoader };

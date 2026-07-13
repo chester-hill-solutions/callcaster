@@ -3,7 +3,7 @@
  */
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
-import { user, workspace, workspace_users } from "@/db/schema";
+import { user, workspace, workspace_member } from "@/db/schema";
 import { env } from "../env.server";
 import { logger } from "../logger.server";
 import { adminDb } from "@/server/admin-db";
@@ -33,8 +33,8 @@ export async function createStripeContact({
     throw new Error("No owner found for the workspace");
   }
 
-  const ownerRecord = await tdb.workspace_users.findFirst({
-    where: eq(workspace_users.role, "owner"),
+  const ownerRecord = await tdb.workspace_member.findFirst({
+    where: eq(workspace_member.role_id, "owner"),
     columns: { user_id: true },
   });
 

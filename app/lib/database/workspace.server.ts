@@ -2,15 +2,16 @@
  * Workspace-related database functions
  */
 import Twilio from "twilio";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   audience,
   campaign,
   workspace,
   workspace_invite,
+  workspace_member,
   workspace_number,
-  workspace_users,
 } from "@/db/schema";
+import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -27,7 +28,6 @@ import {
   rpcUpdateUserWorkspaceLastAccessTime,
 } from "@/lib/db-rpc.server";
 import { createStripeContact } from "./stripe.server";
-import { AppError, ErrorCode } from "@/lib/errors.server";
 import {
   buildOnboardingStepsForState,
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
@@ -43,6 +43,21 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { data as routeData } from "react-router";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
+import {
+  addUserToWorkspace,
+  getUserRole,
+  memberRoleToRoleId,
+  requireWorkspaceAccess,
+  workspaceMemberId,
+} from "@/lib/workspace-membership.server";
+
+export {
+  addUserToWorkspace,
+  getUserRole,
+  memberRoleToRoleId,
+  requireWorkspaceAccess,
+  workspaceMemberId,
+};
 
 type DbQueryError = { message: string; code?: string; details?: string };
 
@@ -92,9 +107,12 @@ export async function getUserWorkspaces({ userId }: { userId: string }) {
   try {
     const rows = await adminDb
       .select({ workspace })
-      .from(workspace_users)
-      .innerJoin(workspace, eq(workspace_users.workspace_id, workspace.id))
-      .where(eq(workspace_users.user_id, userId))
+      .from(workspace_member)
+      .innerJoin(
+        workspace,
+        eqChsTextToUuid(workspace_member.workspace_id, workspace.id),
+      )
+      .where(eq(workspace_member.user_id, userId))
       .orderBy(desc(workspace.created_at));
 
     const data = rows.map((row) => row.workspace) as WorkspaceData;
@@ -197,6 +215,22 @@ export async function createNewWorkspace({
     const insertWorkspaceData = await rpcCreateNewWorkspace(workspaceName, user_id);
     const createdWorkspaceId = insertWorkspaceData;
     workspaceId = createdWorkspaceId;
+
+    // Phase C: RPC still seeds legacy workspace_users; also create CHS membership
+    // so getUserRole / requireWorkspaceAccess see the owner (no dual-write of
+    // membership mutations elsewhere — this only fills the CHS gap left by RPC).
+    const { error: ownerMembershipError } = await addUserToWorkspace({
+      workspaceId: createdWorkspaceId,
+      userId: user_id,
+      role: "owner",
+    });
+    if (ownerMembershipError) {
+      logger.error(
+        "CHS owner membership insert failed after workspace create:",
+        ownerMembershipError,
+      );
+      provisioningWarnings.push("Owner membership was not created");
+    }
 
     let account: Awaited<ReturnType<typeof createSubaccount>> | null = null;
     try {
@@ -411,9 +445,9 @@ export async function getWorkspaceInfoWithDetails({
     throw notFoundError();
   }
 
-  const membership = await tdb.workspace_users.findFirst({
-    where: eq(workspace_users.user_id, userId),
-    columns: { id: true, role: true },
+  const membership = await tdb.workspace_member.findFirst({
+    where: eq(workspace_member.user_id, userId),
+    columns: { id: true, role_id: true },
   });
   if (!membership) {
     throw notFoundError();
@@ -429,7 +463,7 @@ export async function getWorkspaceInfoWithDetails({
     }),
   ]);
 
-  const workspace_users_list = [{ role: membership.role as MemberRole }];
+  const workspace_users_list = [{ role: membership.role_id as MemberRole }];
 
   return {
     workspace: {
@@ -528,120 +562,6 @@ export async function updateWorkspacePhoneNumber({
     return { data, error: data ? null : toDbError(new Error("Not found")) };
   } catch (error) {
     return { data: null, error: toDbError(error) };
-  }
-}
-
-export async function addUserToWorkspace({
-  workspaceId,
-  userId,
-  role,
-  tdb: tdbIn,
-}: {
-  workspaceId: string;
-  userId: string;
-  role: "owner" | "admin" | "caller" | "member";
-  tdb?: TenantDb;
-  null?: never;
-}) {
-  const tdb = tdbIn ?? createTenantDb(workspaceId);
-  try {
-    const rows = await tdb.workspace_users.insert({
-      user_id: userId,
-      role,
-      created_at: new Date().toISOString(),
-    });
-    const data = rows[0] ?? null;
-    if (!data) {
-      return { data: null, error: toDbError(new Error("Insert returned no row")) };
-    }
-    return { data, error: null };
-  } catch (error) {
-    logger.error("Failed to join workspace", error);
-    return { data: null, error: toDbError(error) };
-  }
-}
-
-export async function getUserRole({
-  user,
-  workspaceId,
-  tdb: tdbIn,
-}: {
-  user: { id: string } | null;
-  workspaceId: string;
-  tdb?: TenantDb;
-  null?: never;
-}) {
-  if (!user) {
-    return null;
-  }
-
-  const tdb = tdbIn ?? createTenantDb(workspaceId);
-  try {
-    const userRole = await tdb.workspace_users.findFirst({
-      where: eq(workspace_users.user_id, user.id),
-      columns: { role: true },
-    });
-    return userRole ?? null;
-  } catch (error) {
-    logger.error("Failed to load user role for workspace", {
-      workspaceId,
-      userId: user.id,
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
-}
-
-const WORKSPACE_ROLE_RANK: Record<string, number> = {
-  owner: 4,
-  admin: 3,
-  member: 2,
-  caller: 1,
-};
-
-function hasMinRole(
-  role: string | undefined,
-  minRole: string | undefined,
-): boolean {
-  if (!minRole) return true;
-  if (!role) return false;
-  return (WORKSPACE_ROLE_RANK[role] ?? 0) >= (WORKSPACE_ROLE_RANK[minRole] ?? 0);
-}
-
-/**
- * Verify that the user is a member of the workspace. Non-members get a uniform
- * 404 (not 403) so a caller cannot infer whether a workspace id exists
- * (ADR-0004). Use as defense-in-depth when workspace_id comes from a request
- * body. Use `requireWorkspaceLoaderContext` / `withWorkspaceApi*` for
- * role-gated access.
- *
- * Pass `{ minRole: "admin" }` to require the user be an owner or admin.
- */
-export async function requireWorkspaceAccess({
-  user,
-  workspaceId,
-  tdb,
-  minRole,
-}: {
-  user: { id: string };
-  workspaceId: string;
-  tdb?: TenantDb;
-  minRole?: "owner" | "admin" | "member" | "caller" | string;
-  null?: never;
-}): Promise<void> {
-  const role = await getUserRole({
-    user,
-    workspaceId,
-    tdb,
-  });
-  if (!role) {
-    throw new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND);
-  }
-  if (!["owner", "admin", "member", "caller"].includes(role.role)) {
-    throw new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN);
-  }
-  if (!hasMinRole(role.role, minRole)) {
-    throw new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN);
   }
 }
 
@@ -1002,6 +922,9 @@ export async function acceptWorkspaceInvitations(
 
   let inviteRows: { id: string; workspace: string; role: string }[];
   try {
+    // SEC-03 stopgap: only invites addressed to this user are selectable.
+    // Foreign/missing IDs are omitted from processing (no membership insert);
+    // callers see them as invite errors without distinguishing ownership.
     inviteRows = await adminDb
       .select({
         id: workspace_invite.id,
@@ -1009,7 +932,12 @@ export async function acceptWorkspaceInvitations(
         role: workspace_invite.role,
       })
       .from(workspace_invite)
-      .where(inArray(workspace_invite.id, invitationIds));
+      .where(
+        and(
+          inArray(workspace_invite.id, invitationIds),
+          eq(workspace_invite.user_id, userId),
+        ),
+      );
   } catch {
     return {
       errors: invitationIds.map((invitationId) => ({
@@ -1027,6 +955,7 @@ export async function acceptWorkspaceInvitations(
     .map((invitationId) => {
       const invite = invitesById.get(invitationId);
       if (!invite) {
+        // Missing and foreign invite IDs share this path (no existence leak).
         errors.push({ invitationId, type: "invite" });
         return null;
       }
@@ -1063,7 +992,10 @@ export async function acceptWorkspaceInvitations(
 
       try {
         await tdb.workspace_invite.delete({
-          where: eq(workspace_invite.id, invitationId),
+          where: and(
+            eq(workspace_invite.id, invitationId),
+            eq(workspace_invite.user_id, userId),
+          ),
         });
       } catch {
         invitationErrors.push({ invitationId, type: "deletion" });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
+import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { defineAction } from "@/lib/handler.server";
@@ -19,7 +20,7 @@ const dialerStartBodySchema = z.object({
   agentUserId: z.string().min(1).optional(),
 });
 
-function resolveDialerAuth({ params, context, request }: ActionFunctionArgs) {
+async function resolveDialerAuth({ params, context, request }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   const campaignIdParam = params.campaignId;
   if (!workspaceId) {
@@ -35,6 +36,11 @@ function resolveDialerAuth({ params, context, request }: ActionFunctionArgs) {
   }
 
   const auth = getDataPlaneRouteContext(context, workspaceId);
+  const capability = await requireDataPlaneCapability(auth, "calls.start");
+  if (capability instanceof Response) {
+    return capability;
+  }
+
   return {
     workspaceId,
     campaignId,

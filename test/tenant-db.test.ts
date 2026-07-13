@@ -18,6 +18,7 @@ const SCOPED_TABLE_NAMES = [
   "workspace_invite", "transaction_history",
   "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
   "agent_status", "agent_status_event", "handset_session", "workspace_users",
+  "workspace_member",
   "workspace_api_key", "workspace_events", "workspace_audit_event",
 ] as const;
 
@@ -49,6 +50,7 @@ const hoisted = vi.hoisted(() => {
     "workspace_invite", "transaction_history",
     "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
     "agent_status", "agent_status_event", "handset_session", "workspace_users",
+    "workspace_member",
     "workspace_api_key",
   ];
   const query: Record<string, { findMany: (c?: unknown) => Promise<unknown[]>; findFirst: (c?: unknown) => Promise<unknown> }> = {};
@@ -189,8 +191,8 @@ describe("createTenantDb — registry completeness", () => {
     }
   });
 
-  test("registry covers exactly the 25 workspace-scoped tables", () => {
-    expect(Object.keys(WORKSPACE_SCOPED_TABLES)).toHaveLength(25);
+  test("registry covers exactly the 26 workspace-scoped tables", () => {
+    expect(Object.keys(WORKSPACE_SCOPED_TABLES)).toHaveLength(26);
     const registryNames = Object.keys(WORKSPACE_SCOPED_TABLES).sort();
     const inlineNames = [...SCOPED_TABLE_NAMES].sort();
     expect(registryNames).toEqual(inlineNames);

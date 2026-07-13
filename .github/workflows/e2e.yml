@@ -14,6 +14,9 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +30,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        env:
+          # Vendored CHS auth packages do not need this; keep for future registry deps.
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
 
       # The compose bootstrap applies drizzle/ + client/migrations via psql.
       - name: Install psql client

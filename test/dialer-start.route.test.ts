@@ -32,8 +32,8 @@ describe("dialer/start route", () => {
     });
   });
 
-  test("returns 403 when session user lacks caller role", async () => {
-    mocks.getUserRole.mockResolvedValueOnce(null);
+  test("returns 403 when session role lacks calls.start", async () => {
+    mocks.getUserRole.mockResolvedValue({ role: "invited" });
 
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route"
@@ -57,6 +57,78 @@ describe("dialer/start route", () => {
     );
 
     expect(res.status).toBe(403);
+  });
+
+  test("returns 403 when API key lacks calls.start scope", async () => {
+    const mod = await import(
+      "../app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route"
+    );
+    const res = await asRouteResponse(
+      mod.action(
+        await withDataPlaneRouteArgs(
+          {
+            request: new Request(
+              "http://localhost/api/workspaces/w1/campaigns/1/dialer/start",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  caller_id: "+1555",
+                  selected_device: "computer",
+                  agentUserId: "agent-1",
+                }),
+              },
+            ),
+            params: { workspaceId: "w1", campaignId: "1" },
+          },
+          {
+            userId: null,
+            apiKey: { keyId: "k1", scopes: ["messages.send"] },
+          },
+        ),
+      ),
+    );
+
+    expect(res.status).toBe(403);
+    expect(mocks.startAutoDialConference).not.toHaveBeenCalled();
+  });
+
+  test("starts conference for API key with calls.start", async () => {
+    mocks.getUserRole.mockResolvedValue({ role: "caller" });
+
+    const mod = await import(
+      "../app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route"
+    );
+    const res = await asRouteResponse(
+      mod.action(
+        await withDataPlaneRouteArgs(
+          {
+            request: new Request(
+              "http://localhost/api/workspaces/w1/campaigns/1/dialer/start",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  caller_id: "+1555",
+                  selected_device: "computer",
+                  agentUserId: "agent-1",
+                }),
+              },
+            ),
+            params: { workspaceId: "w1", campaignId: "1" },
+          },
+          {
+            userId: null,
+            apiKey: { keyId: "k1", scopes: ["calls.start"] },
+          },
+        ),
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.startAutoDialConference).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "agent-1", workspaceId: "w1" }),
+    );
   });
 
   test("starts conference for authorized caller", async () => {

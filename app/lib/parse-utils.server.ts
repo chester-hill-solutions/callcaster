@@ -2,6 +2,24 @@ export function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+/** Normalize Date/string timestamps for JSON API / UI string fields. */
+export function timestampToIsoString(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value ?? "");
+}
+
+export function timestampToIsoStringOrNull(value: unknown): string | null {
+  if (value == null || value === "") {
+    return null;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value);
+}
+
 export function parseJsonField<T>(value: unknown): T {
   if (typeof value === "string") {
     try {

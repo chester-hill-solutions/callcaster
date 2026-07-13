@@ -35,6 +35,9 @@ const steps = [
   "client/migrations/20260710020000_fix_apply_ledger_entry_enum_cast.sql",
   "client/migrations/20260711000000_money_columns_integer_and_ledger_hardening.sql",
   "client/migrations/20260711130000_call_and_workspace_users_perf_indexes.sql",
+  "client/migrations/20260713120000_workspace_audit_event.sql",
+  "drizzle/0007_workspace_api_key_scopes.sql",
+  "drizzle/0008_chs_workspace_membership.sql",
 ];
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);

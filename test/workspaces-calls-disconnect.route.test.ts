@@ -8,12 +8,15 @@ import { asRouteResponse } from "./helpers/route-result";
 import { withDataPlaneRouteArgs } from "./helpers/route-context-mock";
 
 const mocks = vi.hoisted(() => ({
+  getUserRole: vi.fn(),
   createWorkspaceTwilioInstance: vi.fn(),
   callUpdate: vi.fn(),
+  safeRecordWorkspaceAuditEvent: vi.fn(),
   logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock("@/lib/database/workspace.server", () => ({
+  getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
   createWorkspaceTwilioInstance: (...args: unknown[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
 }));
@@ -28,11 +31,19 @@ vi.mock("@/lib/telephony-db.server", () => ({
   findCallBySid: vi.fn(),
 }));
 
+vi.mock("@/lib/audit-event.server", () => ({
+  safeRecordWorkspaceAuditEvent: (...args: unknown[]) =>
+    mocks.safeRecordWorkspaceAuditEvent(...args),
+}));
+
 import { findCallBySid } from "@/lib/telephony-db.server";
 
 describe("workspaces calls disconnect route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // caller role includes calls.control
+    mocks.getUserRole.mockResolvedValue({ role: "caller" });
+    mocks.safeRecordWorkspaceAuditEvent.mockResolvedValue(undefined);
     mocks.callUpdate.mockResolvedValue({});
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({
       calls: (_sid: string) => ({ update: mocks.callUpdate }),

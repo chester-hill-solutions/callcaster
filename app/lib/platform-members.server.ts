@@ -4,6 +4,12 @@ import {
   hashApiKeyForStorage,
 } from "@/lib/api-auth.server";
 import {
+  API_KEY_DEFAULT_TTL_DAYS,
+  API_KEY_MAX_TTL_DAYS,
+  isProductCapabilityId,
+  type ProductCapabilityId,
+} from "@/lib/capabilities";
+import {
   getUserRole,
   getWorkspaceUsers,
   requireWorkspaceAccess,
@@ -472,11 +478,46 @@ export async function createWorkspaceApiKey(
   userId: string,
   workspaceId: string,
   name: string,
+  scopes: readonly string[],
+  expiresInDays: number = API_KEY_DEFAULT_TTL_DAYS,
 ) {
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
+  const normalizedScopes = [
+    ...new Set(scopes.map((s) => s.trim()).filter(Boolean)),
+  ];
+  if (normalizedScopes.length === 0) {
+    return {
+      ok: false as const,
+      error: "At least one capability scope is required",
+      status: 400,
+    };
+  }
+  const invalid = normalizedScopes.filter((s) => !isProductCapabilityId(s));
+  if (invalid.length > 0) {
+    return {
+      ok: false as const,
+      error: `Unknown capability scopes: ${invalid.join(", ")}`,
+      status: 400,
+    };
+  }
+
+  const ttlDays = Number.isFinite(expiresInDays)
+    ? Math.trunc(expiresInDays)
+    : API_KEY_DEFAULT_TTL_DAYS;
+  if (ttlDays < 1 || ttlDays > API_KEY_MAX_TTL_DAYS) {
+    return {
+      ok: false as const,
+      error: `expires_in_days must be between 1 and ${API_KEY_MAX_TTL_DAYS}`,
+      status: 400,
+    };
+  }
+
   const { key, keyPrefix, keyHash } = generateApiKey();
+  const expiresAt = new Date(
+    Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   try {
     const row = await insertWorkspaceApiKeyRow({
@@ -485,6 +526,8 @@ export async function createWorkspaceApiKey(
       name,
       keyPrefix,
       keyHash,
+      scopes: normalizedScopes as ProductCapabilityId[],
+      expiresAt,
     });
     if (!row) {
       return { ok: false as const, error: "Failed to create API key", status: 500 };
@@ -498,7 +541,12 @@ export async function createWorkspaceApiKey(
       targetType: "api_key",
       targetId: String(row.id),
       outcome: "success",
-      metadata: { name: row.name, key_prefix: row.key_prefix },
+      metadata: {
+        name: row.name,
+        key_prefix: row.key_prefix,
+        scopes: normalizedScopes,
+        expires_at: expiresAt,
+      },
     });
 
     return {
@@ -509,6 +557,8 @@ export async function createWorkspaceApiKey(
         name: row.name,
         key_prefix: row.key_prefix,
         created_at: row.created_at,
+        scopes: row.scopes ?? normalizedScopes,
+        expires_at: row.expires_at ?? expiresAt,
       },
     };
   } catch (error) {

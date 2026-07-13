@@ -1,5 +1,6 @@
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
 import { defineAction } from "@/lib/handler.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -8,7 +9,7 @@ import { pauseTwiml } from "@/lib/twilio-twiml.server";
 import { logger } from "@/lib/logger.server";
 import type { ActionFunctionArgs } from "react-router";
 
-function resolveDisconnectAuth({ params, context, request }: ActionFunctionArgs) {
+async function resolveDisconnectAuth({ params, context, request }: ActionFunctionArgs) {
   const workspaceId = params.workspaceId;
   const callSid = params.callSid;
   if (!workspaceId) {
@@ -19,6 +20,11 @@ function resolveDisconnectAuth({ params, context, request }: ActionFunctionArgs)
   }
 
   const dataPlane = getDataPlaneRouteContext(context, workspaceId);
+  const capability = await requireDataPlaneCapability(dataPlane, "calls.control");
+  if (capability instanceof Response) {
+    return capability;
+  }
+
   return {
     workspaceId,
     callSid,

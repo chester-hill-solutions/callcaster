@@ -20,8 +20,8 @@ describe("two-factor.server", () => {
     expect(isTwoFactorRedirectResponse(null)).toBe(false);
   });
 
-  test("privileged roles include owner, admin, field_director", () => {
-    expect(PRIVILEGED_WORKSPACE_ROLES).toEqual(["owner", "admin", "field_director"]);
+  test("privileged roles include owner and admin", () => {
+    expect(PRIVILEGED_WORKSPACE_ROLES).toEqual(["owner", "admin"]);
   });
 });
 

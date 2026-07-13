@@ -54,6 +54,8 @@ export const action = defineAction({
         auth.user.id,
         parsed.workspace_id,
         parsed.name,
+        parsed.scopes,
+        parsed.expires_in_days,
       );
 
       if (!result.ok) {
@@ -67,6 +69,8 @@ export const action = defineAction({
           name: result.api_key.name,
           key_prefix: result.api_key.key_prefix,
           created_at: result.api_key.created_at,
+          scopes: result.api_key.scopes,
+          expires_at: result.api_key.expires_at,
         },
         201,
       );

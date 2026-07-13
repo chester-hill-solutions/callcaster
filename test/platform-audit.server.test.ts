@@ -1,14 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  getUserRole: vi.fn(),
   listWorkspaceAuditEvents: vi.fn(),
   decodeAuditEventCursor: vi.fn(),
   parseAuditEventPageSize: vi.fn(),
-}));
-
-vi.mock("@/lib/database/workspace.server", () => ({
-  getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
 }));
 
 vi.mock("@/lib/audit-event.server", async (importOriginal) => {
@@ -34,7 +29,7 @@ describe("listWorkspaceAuditEventsApi", () => {
     mocks.listWorkspaceAuditEvents.mockResolvedValue({ events: [], nextCursor: null });
   });
 
-  test("rejects API key auth without a session user", async () => {
+  test("lists events without enforcing membership (capability gate is on the route)", async () => {
     const result = await listWorkspaceAuditEventsApi(
       null,
       "ws-1",
@@ -42,31 +37,18 @@ describe("listWorkspaceAuditEventsApi", () => {
     );
 
     expect(result).toEqual({
-      ok: false,
-      error: "Audit log access requires a signed-in owner session",
-      status: 403,
+      ok: true,
+      events: [],
+      next_cursor: null,
     });
-    expect(mocks.getUserRole).not.toHaveBeenCalled();
-  });
-
-  test("rejects non-owner workspace members", async () => {
-    mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
-
-    const result = await listWorkspaceAuditEventsApi(
-      "user-1",
-      "ws-1",
-      new URLSearchParams(),
-    );
-
-    expect(result).toEqual({
-      ok: false,
-      error: "Only workspace owners can view the audit log",
-      status: 403,
+    expect(mocks.listWorkspaceAuditEvents).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      limit: 50,
+      cursor: null,
     });
   });
 
-  test("returns paginated events for owners", async () => {
-    mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
+  test("returns paginated events", async () => {
     mocks.decodeAuditEventCursor.mockReturnValueOnce({
       createdAt: "2026-07-13T11:00:00.000Z",
       id: 1,
@@ -116,7 +98,6 @@ describe("listWorkspaceAuditEventsApi", () => {
   });
 
   test("returns 400 for invalid cursor", async () => {
-    mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
     mocks.decodeAuditEventCursor.mockReturnValueOnce(null);
 
     const result = await listWorkspaceAuditEventsApi(

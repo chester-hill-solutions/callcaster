@@ -11,7 +11,12 @@ type WorkspaceRecord = Omit<Tables<"workspace">, "twilio_data"> & {
 };
 
 type UserRecord = Tables<"user">;
-type WorkspaceUserRecord = Tables<"workspace_users">;
+/** CHS membership projection used by admin rows (legacy workspace_users shape subset). */
+type WorkspaceUserRecord = {
+  workspace_id: string;
+  user_id: string;
+  role: string;
+};
 type WorkspaceNumberRecord = Tables<"workspace_number">;
 
 import { parseOptionalString } from "@/lib/parse-utils.server";

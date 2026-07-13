@@ -13,9 +13,9 @@ vi.mock("@/lib/env.server", () => {
 let membershipRole: string | null = null;
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => ({
-    workspace_users: {
+    workspace_member: {
       findFirst: async () =>
-        membershipRole ? { role: membershipRole } : null,
+        membershipRole ? { role_id: membershipRole } : null,
     },
   }),
 }));

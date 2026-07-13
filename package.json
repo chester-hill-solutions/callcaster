@@ -72,6 +72,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1077.0",
     "@aws-sdk/s3-request-presigner": "^3.1077.0",
+    "@chester-hill-solutions/auth": "file:vendor/chester-hill-solutions/auth",
+    "@chester-hill-solutions/auth-postgres": "file:vendor/chester-hill-solutions/auth-postgres",
+    "@chester-hill-solutions/auth-react-router": "file:vendor/chester-hill-solutions/auth-react-router",
     "@chester-hill-solutions/scriptkit-call-script-core": "file:vendor/scriptkit/scriptkit-call-script-core",
     "@chester-hill-solutions/scriptkit-call-script-react": "file:vendor/scriptkit/scriptkit-call-script-react",
     "@radix-ui/react-accordion": "^1.2.0",

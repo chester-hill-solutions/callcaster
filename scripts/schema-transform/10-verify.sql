@@ -61,3 +61,50 @@ WHERE table_schema = 'public'
   AND table_name IN ('call', 'message')
   AND column_name = 'twilio_sid'
 ORDER BY 1;
+
+\echo '=== CHS membership tables (after Wave 1 DDL 0008) ==='
+SELECT tablename
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN (
+    'workspace_member',
+    'workspace_role',
+    'workspace_feature',
+    'workspace_feature_permission',
+    'workspace_invitation'
+  )
+ORDER BY 1;
+
+\echo '=== CHS product roles (expect owner/admin/member/caller) ==='
+SELECT id, rank
+FROM public.workspace_role
+WHERE workspace_id IS NULL
+ORDER BY rank;
+
+\echo '=== Membership parity (legacy vs CHS; after step 11) ==='
+SELECT
+  (SELECT count(*)::bigint FROM public.workspace_users) AS legacy_workspace_users,
+  (SELECT count(*)::bigint FROM public.workspace_member) AS chs_workspace_member;
+
+\echo '=== Role histogram (workspace_member) ==='
+SELECT role_id, count(*)::bigint
+FROM public.workspace_member
+GROUP BY 1
+ORDER BY 1;
+
+\echo '=== Workspaces missing an owner member (should be 0 after backfill) ==='
+SELECT w.id::text AS workspace_id
+FROM public.workspace w
+LEFT JOIN public.workspace_member m
+  ON m.workspace_id = w.id::text AND m.role_id = 'owner'
+WHERE m.id IS NULL
+  AND EXISTS (
+    SELECT 1 FROM public.workspace_users wu
+    WHERE wu.workspace_id::text = w.id::text
+  )
+LIMIT 50;
+
+\echo '=== Unknown role_id rows (should be 0) ==='
+SELECT count(*)::bigint AS unknown_role_members
+FROM public.workspace_member
+WHERE role_id NOT IN ('owner', 'admin', 'member', 'caller');
