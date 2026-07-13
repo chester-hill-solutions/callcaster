@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   campaign as campaignTable,
   job as jobTable,
@@ -11,6 +11,7 @@ import {
   workspace_number as workspaceNumberTable,
 } from "@/db/schema";
 import { authUser } from "@/db/auth-schema";
+import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
@@ -59,7 +60,10 @@ export async function listWorkspaceMembersEnriched(workspaceId: string) {
       last_name: userTable.last_name,
     })
     .from(workspaceMemberTable)
-    .innerJoin(userTable, eq(workspaceMemberTable.user_id, userTable.id))
+    .innerJoin(
+      userTable,
+      eqChsTextToUuid(workspaceMemberTable.user_id, userTable.id),
+    )
     .where(eq(workspaceMemberTable.workspace_id, workspaceId));
 
   return rows.map((row) => ({
@@ -567,7 +571,10 @@ export async function listUserWorkspaceSummaries(userId: string) {
       name: workspaceTable.name,
     })
     .from(workspaceMemberTable)
-    .innerJoin(workspaceTable, eq(workspaceMemberTable.workspace_id, workspaceTable.id))
+    .innerJoin(
+      workspaceTable,
+      eqChsTextToUuid(workspaceMemberTable.workspace_id, workspaceTable.id),
+    )
     .where(eq(workspaceMemberTable.user_id, userId))
     .orderBy(desc(workspaceMemberTable.created_at));
 
@@ -668,7 +675,10 @@ export async function listAdminWorkspaceUsersWithUser(workspaceId: string) {
       user: userTable,
     })
     .from(workspaceMemberTable)
-    .innerJoin(userTable, eq(workspaceMemberTable.user_id, userTable.id))
+    .innerJoin(
+      userTable,
+      eqChsTextToUuid(workspaceMemberTable.user_id, userTable.id),
+    )
     .where(eq(workspaceMemberTable.workspace_id, workspaceId));
 
   return rows.map(({ user, created_at, ...membership }) => ({
@@ -749,7 +759,10 @@ export async function listUserWorkspaceMembershipsForProfile(userId: string) {
       },
     })
     .from(workspaceMemberTable)
-    .innerJoin(workspaceTable, eq(workspaceMemberTable.workspace_id, workspaceTable.id))
+    .innerJoin(
+      workspaceTable,
+      eqChsTextToUuid(workspaceMemberTable.workspace_id, workspaceTable.id),
+    )
     .where(eq(workspaceMemberTable.user_id, userId))
     .orderBy(desc(workspaceMemberTable.created_at));
 
@@ -766,10 +779,16 @@ export async function listUserWorkspaceMembershipsWithWorkspace(userId: string) 
   }
 
   const workspaceIds = [...new Set(memberships.map((row) => row.workspace_id))];
-  const workspaces = await adminDb
-    .select()
-    .from(workspaceTable)
-    .where(inArray(workspaceTable.id, workspaceIds));
+  const workspaces =
+    workspaceIds.length === 0
+      ? []
+      : await adminDb
+          .select()
+          .from(workspaceTable)
+          .where(
+            // CHS stores workspace_id as text; workspace.id is uuid in Postgres.
+            inArray(sql`(${workspaceTable.id})::text`, workspaceIds),
+          );
   const workspaceById = new Map(workspaces.map((row) => [row.id, row]));
 
   return memberships.map((membership) => ({

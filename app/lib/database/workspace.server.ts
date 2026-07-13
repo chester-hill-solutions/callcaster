@@ -11,6 +11,7 @@ import {
   workspace_member,
   workspace_number,
 } from "@/db/schema";
+import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -107,7 +108,10 @@ export async function getUserWorkspaces({ userId }: { userId: string }) {
     const rows = await adminDb
       .select({ workspace })
       .from(workspace_member)
-      .innerJoin(workspace, eq(workspace_member.workspace_id, workspace.id))
+      .innerJoin(
+        workspace,
+        eqChsTextToUuid(workspace_member.workspace_id, workspace.id),
+      )
       .where(eq(workspace_member.user_id, userId))
       .orderBy(desc(workspace.created_at));
 
