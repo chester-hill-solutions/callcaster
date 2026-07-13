@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger.client";
@@ -60,19 +60,34 @@ export function usePhoneVerification({
     [],
   );
 
-  return {
-    selectedDevice,
-    setSelectedDevice,
-    phoneConnectionStatus,
-    setPhoneConnectionStatus,
-    phoneCallSid,
-    setPhoneCallSid,
-    isAddingNumber,
-    setIsAddingNumber,
-    newPhoneNumber,
-    setNewPhoneNumber,
-    handleVerifyNewNumber,
-    pin,
-    handlePhoneDeviceSelection,
-  };
+  // Memoized so consumers (e.g. useCallScreen) can safely depend on the whole
+  // object without it changing identity on every unrelated render — it only
+  // changes when one of the underlying state values or callbacks actually does.
+  return useMemo(
+    () => ({
+      selectedDevice,
+      setSelectedDevice,
+      phoneConnectionStatus,
+      setPhoneConnectionStatus,
+      phoneCallSid,
+      setPhoneCallSid,
+      isAddingNumber,
+      setIsAddingNumber,
+      newPhoneNumber,
+      setNewPhoneNumber,
+      handleVerifyNewNumber,
+      pin,
+      handlePhoneDeviceSelection,
+    }),
+    [
+      selectedDevice,
+      phoneConnectionStatus,
+      phoneCallSid,
+      isAddingNumber,
+      newPhoneNumber,
+      handleVerifyNewNumber,
+      pin,
+      handlePhoneDeviceSelection,
+    ],
+  );
 }

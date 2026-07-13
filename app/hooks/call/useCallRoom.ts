@@ -64,10 +64,33 @@ const useCallRoom = ({
     [workspace, campaign, userId],
   );
 
+  /**
+   * @effect Mirror the latest connection `status` into a ref so the presence
+   * heartbeat interval (set up once per SSE connection) can read the current
+   * value without needing to be recreated on every status change.
+   * @effect-deps status (re-syncs the ref whenever the SSE-driven status changes)
+   * @effect-side-effects none (plain ref assignment, no timer/subscription/DOM)
+   * @effect-why-not-loader Not data fetching; this is the "latest ref" pattern for
+   * reading current state inside a longer-lived closure (the heartbeat interval below).
+   */
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
 
+  /**
+   * @effect Open a workspace SSE connection for this call room: track presence
+   * online/offline, relay predictive-dialer broadcasts and presence_sync events
+   * into local state, and send a periodic presence heartbeat while online.
+   * @effect-deps campaign, updatePresence, userId, workspace (all identify which
+   * workspace/campaign room to connect to and are needed to (re)open the stream
+   * and to report presence for the right agent/campaign)
+   * @effect-side-effects subscription (EventSource + "workspace_event" listener) +
+   * timer (setInterval heartbeat, PRESENCE_UPDATE_INTERVAL) + fetch (updatePresence
+   * POSTs on open/heartbeat/unmount); all torn down in the cleanup function.
+   * @effect-why-not-loader Requires a persistent live connection (SSE) and a
+   * recurring heartbeat for the lifetime of the mounted call room; this is a
+   * subscription to a push stream, not a one-shot request/response.
+   */
   useEffect(() => {
     if (!userId || !workspace) return;
 

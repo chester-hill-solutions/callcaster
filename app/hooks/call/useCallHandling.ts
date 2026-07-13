@@ -102,18 +102,59 @@ export function useCallHandling({
   const isOnLocalHoldRef = useRef(false);
   const incomingListenerCleanupsRef = useRef<Map<Call, () => void>>(new Map());
 
+  /**
+   * @effect Mirror `heldCalls` state into a ref so callbacks/other effects
+   * (e.g. hangUp, the active-call listener effect) can read the current held
+   * calls without needing to be recreated/resubscribed on every change.
+   * @effect-deps heldCalls (re-syncs the ref whenever the held-calls list changes)
+   * @effect-side-effects none (plain ref assignment)
+   * @effect-why-not-loader Not data fetching; "latest ref" pattern for use in
+   * imperative SDK callbacks below.
+   */
   useEffect(() => {
     heldCallsRef.current = heldCalls;
   }, [heldCalls]);
+  /**
+   * @effect Mirror `activeCall` state into a ref for the same reason as
+   * heldCallsRef above — callbacks like hangUp/answer/switchTo read the
+   * current active call synchronously without depending on (and thus
+   * recreating on) every activeCall change.
+   * @effect-deps activeCall (re-syncs the ref whenever the active call changes)
+   * @effect-side-effects none (plain ref assignment)
+   * @effect-why-not-loader Not data fetching; "latest ref" pattern.
+   */
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+  /**
+   * @effect Mirror `incomingCall` state into a ref so callbacks (answer,
+   * clearIncomingCall) can read the current incoming call synchronously.
+   * @effect-deps incomingCall (re-syncs the ref whenever the incoming call changes)
+   * @effect-side-effects none (plain ref assignment)
+   * @effect-why-not-loader Not data fetching; "latest ref" pattern.
+   */
   useEffect(() => {
     incomingCallRef.current = incomingCall;
   }, [incomingCall]);
+  /**
+   * @effect Mirror `isMicMuted` state into a ref so syncAgentLegMute/setMicMuted
+   * can read the current mute flag without depending on it directly.
+   * @effect-deps isMicMuted (re-syncs the ref whenever the mute flag changes)
+   * @effect-side-effects none (plain ref assignment)
+   * @effect-why-not-loader Not data fetching; "latest ref" pattern.
+   */
   useEffect(() => {
     isMicMutedRef.current = isMicMuted;
   }, [isMicMuted]);
+  /**
+   * @effect Mirror `isActiveCallOnLocalHold` state into a ref so
+   * syncAgentLegMute/resumeActiveCall can read the current local-hold flag
+   * without depending on it directly.
+   * @effect-deps isActiveCallOnLocalHold (re-syncs the ref whenever the local
+   * hold flag changes)
+   * @effect-side-effects none (plain ref assignment)
+   * @effect-why-not-loader Not data fetching; "latest ref" pattern.
+   */
   useEffect(() => {
     isOnLocalHoldRef.current = isActiveCallOnLocalHold;
   }, [isActiveCallOnLocalHold]);
@@ -274,7 +315,21 @@ export function useCallHandling({
     ],
   );
 
-  // Sync optional external incoming call prop (tests / legacy bridges).
+  /**
+   * @effect Sync an optional externally-supplied `incomingCall` prop (used by
+   * tests / legacy bridges that don't go through the device's own "incoming"
+   * event) into this hook's own incoming-call state and SDK listeners.
+   * @effect-deps externalIncomingCall, receiveIncoming, updateIncomingCall,
+   * clearIncomingListeners (reacts whenever the caller passes a new/cleared
+   * external Call object; the other three are needed to attach/detach
+   * listeners and update state for it)
+   * @effect-side-effects subscription (attaches Twilio Call listeners via
+   * receiveIncoming/setupIncomingCallListeners, detaches the previous call's
+   * via clearIncomingListeners)
+   * @effect-why-not-loader Bridges an imperative external SDK Call object
+   * (test/legacy prop) into internal state and attaches its event listeners;
+   * not request/response data.
+   */
   useEffect(() => {
     const prev = previousExternalIncomingRef.current;
     if (externalIncomingCall !== prev) {
@@ -449,7 +504,18 @@ export function useCallHandling({
     applyAgentLegMute(currentActive, isMicMutedRef.current);
   }, []);
 
-  // Active call event listeners.
+  /**
+   * @effect Attach Twilio Call SDK event listeners (accept/audio/disconnect/
+   * error) to the current active call and drive local call-state and
+   * held-call transitions when it accepts, ends, or errors.
+   * @effect-deps activeCall, updateCallState, updateActiveCall, onStatusChange,
+   * onError, onDeviceBusyChange (re-subscribes whenever the active call
+   * instance changes; the callbacks are invoked from the listeners)
+   * @effect-side-effects subscription (Twilio Call event listeners), cleaned
+   * up whenever activeCall changes or on unmount.
+   * @effect-why-not-loader Subscribes to imperative SDK call-object events;
+   * not request/response data.
+   */
   useEffect(() => {
     if (!activeCall) return;
 
@@ -509,7 +575,17 @@ export function useCallHandling({
     onDeviceBusyChange,
   ]);
 
-  // Held call disconnect cleanup.
+  /**
+   * @effect Attach a disconnect listener to each currently held call so a held
+   * call that ends remotely (e.g. the other party hangs up while on hold) is
+   * removed from local `heldCalls` state instead of lingering.
+   * @effect-deps heldCalls (re-subscribes whenever the held-calls list changes,
+   * to attach listeners to newly-held calls and drop stale ones)
+   * @effect-side-effects subscription (Twilio Call "disconnect" listener per
+   * held call), cleaned up whenever the list changes or on unmount.
+   * @effect-why-not-loader SDK event subscription on live call objects; not
+   * request/response data.
+   */
   useEffect(() => {
     const cleanups: (() => void)[] = [];
     heldCalls.forEach((call) => {
@@ -521,10 +597,23 @@ export function useCallHandling({
     return () => cleanups.forEach((fn) => fn());
   }, [heldCalls]);
 
+  /**
+   * @effect On unmount, run any incoming-call SDK listener cleanups still
+   * pending in `incomingListenerCleanupsRef` so no Twilio Call listeners leak
+   * past the hook's lifetime.
+   * @effect-deps [] — intentionally mount-once, cleanup-only; the ref's Map
+   * object identity never changes (created once via useRef), so capturing it
+   * once here and reading it in the cleanup is safe.
+   * @effect-side-effects subscription cleanup (invokes stored SDK
+   * listener-removal functions); runs only on unmount.
+   * @effect-why-not-loader Teardown of imperative SDK listeners on unmount;
+   * not request/response data.
+   */
   useEffect(() => {
+    const incomingListenerCleanups = incomingListenerCleanupsRef.current;
     return () => {
-      incomingListenerCleanupsRef.current.forEach((cleanup) => cleanup());
-      incomingListenerCleanupsRef.current.clear();
+      incomingListenerCleanups.forEach((cleanup) => cleanup());
+      incomingListenerCleanups.clear();
     };
   }, []);
 

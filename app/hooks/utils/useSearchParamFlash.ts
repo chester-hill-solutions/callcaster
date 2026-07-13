@@ -17,6 +17,15 @@ export function useSearchParamFlash(
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
 
+  /**
+   * @effect Run one-shot flash-param handlers (e.g. post-redirect toasts) then strip those params from the URL.
+   * @effect-deps searchParams, setSearchParams (handlers themselves come from handlersRef, not deps,
+   *   so passing a fresh inline handlers object each render doesn't re-trigger already-handled params)
+   * @effect-side-effects navigation (replace-navigation via setSearchParams to strip the params) +
+   *   whatever the caller's handlers do (toast, etc.)
+   * @effect-why-not-loader Per the existing docstring above: handlers fire toasts/navigation, which
+   *   cannot run during render, and stripping the param requires a replace navigation.
+   */
   useEffect(() => {
     const presentKeys = Object.keys(handlersRef.current).filter(
       (key) => searchParams.get(key) != null,

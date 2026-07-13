@@ -37,10 +37,25 @@ export function useOptimisticMutation<TData = unknown>({
   const rollbackRef = useRef(onRollback);
   const lastDataRef = useRef<TData | undefined>(undefined);
 
+  /**
+   * @effect Keep rollbackRef current so the fetcher-watching effect below can call the latest onRollback.
+   * @effect-deps onRollback (re-syncs the ref whenever a new callback identity is passed in)
+   * @effect-side-effects none — mutates a ref only
+   * @effect-why-not-loader Not data fetching — "latest ref" pattern avoiding onRollback in the next effect's deps.
+   */
   useEffect(() => {
     rollbackRef.current = onRollback;
   }, [onRollback]);
 
+  /**
+   * @effect CANDIDATE-REMOVE Detect a failed mutation (fetcher settled with an error) and roll back + toast.
+   * @effect-deps fetcher.state, fetcher.data (identity-guarded via lastDataRef so it only reacts once
+   *   per new response), isError, errorMessage, toastApi
+   * @effect-side-effects none directly — reads fetcher state; calls rollbackRef.current() and toast.error
+   * @effect-why-not-loader Same pattern app/hooks/utils/useFetcherOnIdle.ts exists to replace: hand-rolled
+   *   fetcher.state/fetcher.data watching duplicates that hook's busy->idle edge detection. Could migrate
+   *   to `useFetcherOnIdle(fetcher, (data) => { if (isError(data)) { rollback(); toast... } })`.
+   */
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data) return;
 

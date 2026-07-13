@@ -115,9 +115,18 @@ const useDebouncedSave = ({
         }
     }, [fetcher, update, recentAttempt?.id, workspaceId, nextRecipient, campaign?.id, disposition, toast]);
   
+    /**
+     * @effect Debounce saveData() by 2s after `update`/`disposition` change, skipping no-op edits.
+     * @effect-deps update, disposition, nextRecipient (only schedules a save when a recipient exists
+     *   and the value actually changed vs. the previous* refs), saveData
+     * @effect-side-effects timer (setTimeout; cleared on re-schedule/unmount) — saveData() itself
+     *   submits via fetcher.submit (fetch), but that call happens inside the timer callback, not here
+     * @effect-why-not-loader Debounced auto-save on local edits needs a client timer; it's a mutation
+     *   (fetcher.submit) triggered by user input, not something a loader can express.
+     */
     useEffect(() => {
-        const shouldUpdate = nextRecipient && 
-            (!deepEqual(update, previousUpdateRef.current) || 
+        const shouldUpdate = nextRecipient &&
+            (!deepEqual(update, previousUpdateRef.current) ||
              !deepEqual(disposition, previousDispositionRef.current));
     
         if (shouldUpdate) {
@@ -140,6 +149,15 @@ const useDebouncedSave = ({
         };
     }, [update, disposition, nextRecipient, saveData]);
   
+    /**
+     * @effect CANDIDATE-REMOVE Toast success/failure once the save fetcher settles.
+     * @effect-deps fetcher.state, fetcher.data, toast (watches for idle+data to report the result)
+     * @effect-side-effects none directly — reads fetcher state; calls toast.success/error
+     * @effect-why-not-loader This is the exact pattern app/hooks/utils/useFetcherOnIdle.ts was built
+     *   to replace: watching raw fetcher.state/fetcher.data can re-fire on stale/identical data across
+     *   renders, whereas useFetcherOnIdle fires exactly once per busy->idle transition. Could migrate
+     *   to `useFetcherOnIdle(fetcher, (data) => { ... })` instead of this hand-rolled watcher.
+     */
     useEffect(() => {
         if (fetcher.state === 'idle' && fetcher.data) {
             if (fetcher.data.id) {

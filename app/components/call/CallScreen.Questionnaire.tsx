@@ -56,6 +56,12 @@ const CallQuestionnaire = ({
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
 
+  /**
+   * @effect Resync the local edit buffer (localUpdate) whenever the parent's authoritative `update` object changes (e.g. new recipient, external answer sync).
+   * @effect-deps update — the parent-owned response state this component mirrors and edits locally before calling handleResponse.
+   * @effect-side-effects none (local setState only; no DOM/timer/subscription/fetch)
+   * @effect-why-not-loader `update` is live in-memory call-session state passed down as a prop, not request data — there's no route transition to hang a loader off.
+   */
   useEffect(() => {
     setLocalUpdate(update || {});
   }, [update]);

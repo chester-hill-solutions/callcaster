@@ -41,11 +41,15 @@ belong in an effect in this app.
   lower the baseline (never raise it).
 - `check:effects` regenerates [`docs/effects-inventory.md`](./effects-inventory.md);
   `ci:local`'s final `git diff --exit-code` catches an un-regenerated inventory.
-- `react-hooks/exhaustive-deps` is `warn` (surfaces dep bugs); it graduates to `error`
-  once the baseline reaches zero.
+- `react-hooks/exhaustive-deps` is **`error`** (promoted from `warn` once the baseline
+  hit 0 and all dep warnings were resolved). Intentional omissions need an inline
+  `eslint-disable-next-line` with a reason, mirrored in the `@effect-deps` tag.
 
-## Goal
+## Status
 
-Drive the baseline to **0**. Every effect ends up in the inventory with a written
-justification, and effects that were really disguised data-fetching or derived state
-get removed.
+Baseline is **0** — every `useEffect`/`useLayoutEffect` is documented in the
+[inventory](./effects-inventory.md). Any new un-annotated effect hard-fails
+`check:effects`. Remaining work is the **`CANDIDATE-REMOVE`** effects (annotations
+starting with that marker): effects that were really disguised data-fetching or
+derived state and should migrate to loaders / `useFetcher` / derived values. Grep
+`CANDIDATE-REMOVE` in the inventory for the current list.

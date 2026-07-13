@@ -86,13 +86,24 @@ export const useChatRealTime = ({
   const messageIdsRef = useRef(new Set(initial.map(msg => msg?.sid)));
   const contactNumberRef = useRef(contact_number);
 
-  // Update refs when props change
+  /**
+   * @effect Reset local message state and the SID-dedupe set whenever the caller supplies a new initial message list (e.g. switching conversations).
+   * @effect-deps initial (loader-provided message list; a new reference means the conversation/context changed)
+   * @effect-side-effects none — synchronizes initialRef/messageIdsRef and calls setMessages
+   * @effect-why-not-loader `initial` already comes from a loader; this effect only re-derives local realtime bookkeeping (the dedupe set) each time that loader data changes, which isn't itself a fetch.
+   */
   useEffect(() => {
     initialRef.current = initial;
     messageIdsRef.current = new Set(initial.map(msg => msg?.sid));
     setMessages(initial);
   }, [initial]);
 
+  /**
+   * @effect Keep a ref to the active contact_number filter so the realtime message handler always reads the current value.
+   * @effect-deps contact_number (filter prop, changes when the user switches contacts)
+   * @effect-side-effects none — updates contactNumberRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleMessageChange; not data fetching.
+   */
   useEffect(() => {
     contactNumberRef.current = contact_number;
   }, [contact_number]);
@@ -235,7 +246,12 @@ export const useConversationSummaryRealTime = ({
   const lastUpdateTimeRef = useRef<number>(Date.now());
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Update active contact ref when it changes
+  /**
+   * @effect Keep a ref to the active contact number so the realtime message handler always reads the currently-open conversation without a stale closure.
+   * @effect-deps activeContactNumber (which conversation is open; changes as the user navigates between chats)
+   * @effect-side-effects none — updates activeContactRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid stale closures in handleMessageChange; not data fetching.
+   */
   useEffect(() => {
     activeContactRef.current = activeContactNumber;
   }, [activeContactNumber]);
@@ -278,20 +294,35 @@ export const useConversationSummaryRealTime = ({
     }
   }, [workspace]);
 
-  // Update conversations when initial data changes
+  /**
+   * @effect Resync `conversations` from the caller-supplied `initial` list when the loader gives us a materially different set (new/removed contacts or a changed count).
+   * @effect-deps initial (loader data — always reacted to via reference change); conversations.length (used only as a coarse "did the set size change" check, intentionally NOT the full `conversations` object — see tradeoff below)
+   * @effect-side-effects none — recomputes and calls setConversations when the phone-number set or length diverges from `initial`
+   * @effect-why-not-loader `initial` is already loader data; this effect exists purely to reconcile it against realtime-mutated local state, which a loader can't do on its own.
+   *
+   * Known tradeoff (assessed, not changed): depending on the full `conversations` object instead of `conversations.length`
+   * would make this effect re-fire on every realtime-driven `setConversations` call (unread bumps, new conversations from
+   * handleMessageChange), and it would then be free to overwrite those local-only changes with stale `initial` data whenever
+   * the phone-number-set/length heuristic happened not to catch the difference — a strictly worse regression (losing live
+   * updates) than the one it fixes. Because a live realtime subscription + a 60s poll fallback (see
+   * `fetchConversationSummary` effect below) already keep `conversations` fresh, the bounded miss here (an `initial` change
+   * that alters existing-conversation content, e.g. message_count/timestamps, without changing the phone-number set or
+   * count) self-heals within one poll cycle. Kept as `[initial, conversations.length]` with a justified
+   * eslint-disable rather than widening the dependency.
+   */
   useEffect(() => {
     const newPhoneNumbers = new Set(initial.map(conv => conv.contact_phone));
     // Only update if phone numbers changed or length changed
     if (!setsAreEqual(phoneNumbersRef.current, newPhoneNumbers) || initial.length !== conversations.length) {
       phoneNumbersRef.current = newPhoneNumbers;
       initialRef.current = initial;
-      
+
       // Sort by most recent first
       const sortedConversations = [...initial].sort(compareByRecentActivity);
-      
+
       setConversations(sortedConversations);
     }
-  }, [initial, conversations.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initial, conversations.length]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally excludes full `conversations` object; see @effect-why-not-loader tradeoff note above
 
   // Handle new messages and message status changes
   const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
@@ -418,11 +449,16 @@ export const useConversationSummaryRealTime = ({
     onChange: handleMessageChange,
   });
 
-  // Periodically refresh conversations to ensure they're up to date
+  /**
+   * @effect Fetch conversation summaries immediately on mount, then poll every 60s as a fallback in case realtime events are missed/coalesced.
+   * @effect-deps fetchConversationSummary (useCallback memoized on [workspace] — resubscribes the timer if the workspace changes)
+   * @effect-side-effects timer (setInterval, 60s) + fetch (fetchConversationSummary network call); interval cleared and any pending debounce timeout cleared on cleanup
+   * @effect-why-not-loader The interval itself needs a live component-lifetime timer, which loaders/fetchers can't express; only the underlying network call is "fetching," and it exists here as a polling fallback alongside the realtime subscription and debounced on-event fetch (handleMessageChange), not as the primary data source. The immediate on-mount call is somewhat redundant with the loader-seeded `initial` prop but is left as-is (low cost, keeps summaries fresh if `initial` was stale by the time this hook mounts).
+   */
   useEffect(() => {
     // Initial fetch
     fetchConversationSummary(true);
-    
+
     // Set up periodic refresh (every 60 seconds)
     const intervalId = setInterval(() => {
       fetchConversationSummary(true);

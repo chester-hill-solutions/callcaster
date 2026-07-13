@@ -26,6 +26,23 @@ export function usePredictiveCallSync({
   setNextRecipient,
   setUpdate,
 }: UsePredictiveCallSyncOptions) {
+  /**
+   * @effect Bridge predictive-dialer room state (pushed via the workspace SSE
+   * stream, see useCallRoom) into the local call state machine: advance the
+   * next recipient and dispatch the matching FSM transition for each dialer
+   * status, and clear the pending questionnaire update when the dialer starts
+   * dialing a different (or no) contact.
+   * @effect-deps predictiveState, queue, nextRecipient?.contact_id, send,
+   * setNextRecipient, setUpdate (reacts to every server-pushed predictive
+   * status/contact change and needs the current queue to resolve the contact
+   * and the current nextRecipient to detect a contact swap)
+   * @effect-side-effects none (dispatches to state setters/reducer passed in;
+   * no direct timer/subscription/DOM/fetch of its own)
+   * @effect-why-not-loader predictiveState already arrives via a realtime SSE
+   * push (not a request this hook makes); this effect is the single point that
+   * reacts to that pushed value regardless of who else observes it, mirroring
+   * it into local FSM/UI state is exactly what an effect is for.
+   */
   useEffect(() => {
     if (predictiveState.contact_id && predictiveState.status) {
       const contact = queue.find(

@@ -76,6 +76,12 @@ export function useIntersectionObserver(
     [root, rootMargin, threshold, freezeOnceVisible, disconnect]
   );
 
+  /**
+   * @effect Disconnect the IntersectionObserver when the hook/component unmounts.
+   * @effect-deps disconnect (stable callback; re-subscribes cleanup if identity ever changes)
+   * @effect-side-effects dom (IntersectionObserver#disconnect on unmount)
+   * @effect-why-not-loader Not data fetching — this is teardown of a browser observer instance.
+   */
   useEffect(() => {
     return () => {
       disconnect();
@@ -182,6 +188,12 @@ export function useIntersectionObserverMulti(
     [entries]
   );
 
+  /**
+   * @effect Disconnect the shared IntersectionObserver when the hook/component unmounts.
+   * @effect-deps disconnect (stable callback; re-subscribes cleanup if identity ever changes)
+   * @effect-side-effects dom (IntersectionObserver#disconnect on unmount)
+   * @effect-why-not-loader Not data fetching — this is teardown of a browser observer instance.
+   */
   useEffect(() => {
     return () => {
       disconnect();
@@ -210,6 +222,12 @@ export function useInfiniteScroll(
     threshold: 0.1,
   });
 
+  /**
+   * @effect Trigger the caller's onLoadMore callback once the sentinel scrolls into view.
+   * @effect-deps entry?.isIntersecting, hasMore, loading (guards against firing while a page is already loading or none remain)
+   * @effect-side-effects none — delegates to caller-supplied onLoadMore (typically a fetcher.load/submit)
+   * @effect-why-not-loader Reacts to a DOM intersection event, not route data; the load itself belongs to the caller.
+   */
   useEffect(() => {
     if (entry?.isIntersecting && hasMore && !loading) {
       onLoadMore();
@@ -239,6 +257,12 @@ export function useLazyImage(
   const [error, setError] = useState<Error | null>(null);
   const [ref, entry] = useIntersectionObserver(observerOptions);
 
+  /**
+   * @effect Lazily load the target image's src once its placeholder scrolls into view.
+   * @effect-deps entry?.isIntersecting, src, currentSrc (avoids reloading an already-loaded src)
+   * @effect-side-effects dom (constructs an Image() element to preload; fires onLoad/onError callbacks)
+   * @effect-why-not-loader Preloading a browser Image element is a DOM/asset concern, not route data.
+   */
   useEffect(() => {
     if (entry?.isIntersecting && currentSrc !== src) {
       setLoading(true);

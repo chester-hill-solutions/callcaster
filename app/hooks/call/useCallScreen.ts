@@ -292,6 +292,16 @@ export function useCallScreen() {
   const handleDTMFRef = useRef(audioControls.handleDTMF);
   handleDTMFRef.current = audioControls.handleDTMF;
 
+  /**
+   * @effect Let the physical/OS keyboard send DTMF digits during an active
+   * call by listening for global keypress events matching the keypad keys.
+   * @effect-deps [] — intentionally mount-once; the handler always calls
+   * through handleDTMFRef (kept fresh every render just above), so it doesn't
+   * need audioControls.handleDTMF in the deps to stay current.
+   * @effect-side-effects dom (window "keypress" event listener), removed on
+   * unmount.
+   * @effect-why-not-loader DOM event subscription, not request/response data.
+   */
   useEffect(() => {
     const handleKeypress = (e: KeyboardEvent) => {
       if (KEYPAD_KEYS.includes(e.key)) {
@@ -330,11 +340,7 @@ export function useCallScreen() {
         );
       }
     },
-    [
-      phoneVerification.setSelectedDevice,
-      phoneVerification.handlePhoneDeviceSelection,
-      audioControls.requestMicrophoneAccess,
-    ],
+    [phoneVerification, audioControls.requestMicrophoneAccess],
   );
 
   const currentState = {

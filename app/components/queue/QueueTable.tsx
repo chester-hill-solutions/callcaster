@@ -597,7 +597,21 @@ export function QueueTable({
                 );
             },
         }
-    ], [isAllFilteredSelected, onSelectAllFiltered, rowSelection, optimisticDisposition, optimisticQueueStatus]);
+    ], [
+        isAllFilteredSelected,
+        onSelectAllFiltered,
+        rowSelection,
+        optimisticDisposition,
+        optimisticQueueStatus,
+        audiences,
+        defaultFilters.address,
+        handleFilterChange,
+        handleStatusChangeOptimistic,
+        optimisticAudience,
+        optimisticInputs.email,
+        optimisticInputs.name,
+        optimisticInputs.phone,
+    ]);
 
     const table = useReactTable({
         data: optimisticQueue || [],

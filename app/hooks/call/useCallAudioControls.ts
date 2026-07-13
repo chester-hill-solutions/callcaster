@@ -133,6 +133,16 @@ export function useCallAudioControls({
     [activeCall],
   );
 
+  /**
+   * @effect Create a Web Audio API AudioContext on mount for DTMF tone
+   * playback (handleDTMF), and close it on unmount to release the audio
+   * hardware resource.
+   * @effect-deps [] — intentionally mount-once; the AudioContext should be
+   * created exactly once per hook lifetime, not recreated per render.
+   * @effect-side-effects dom (Web Audio API AudioContext construction/close)
+   * @effect-why-not-loader Browser audio API object construction, not
+   * request/response data.
+   */
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext ||
       (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
@@ -143,6 +153,18 @@ export function useCallAudioControls({
     };
   }, []);
 
+  /**
+   * @effect Auto-request microphone access whenever there's no live stream
+   * and no prior permission error, so audio controls have a mic stream ready
+   * by default (on mount, and again if the stream/error state is reset).
+   * @effect-deps stream, permissionError, requestMicrophoneAccess (re-runs
+   * whenever these change; the internal guard prevents repeated prompts once
+   * a stream exists or permission was denied)
+   * @effect-side-effects dom (navigator.mediaDevices.getUserMedia browser
+   * permission prompt + enumerateDevices), no timer/subscription/analytics
+   * @effect-why-not-loader Browser media-permission/hardware access is a
+   * client-only side effect gated on user consent, not app request data.
+   */
   useEffect(() => {
     if (!stream && !permissionError) {
       requestMicrophoneAccess();

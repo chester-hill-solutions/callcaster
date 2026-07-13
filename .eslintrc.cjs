@@ -237,11 +237,12 @@ module.exports = {
     {
       files: ["**/*.{js,jsx,ts,tsx}"],
       rules: {
-        // Ratchet: surfaces missing/incorrect effect deps without failing CI.
-        // Pairs with `check:effects` (docs/effects-strictness.md). Tighten to
-        // "error" once the grandfathered effects in effects-baseline.json are
-        // annotated and their deps verified.
-        "react-hooks/exhaustive-deps": "warn",
+        // Strengthened to "error" once every effect was annotated (baseline 0
+        // in effects-baseline.json) and every dep warning resolved. New
+        // violations now hard-fail; intentional omissions need an inline
+        // eslint-disable with a reason (captured in the @effect-deps tag).
+        // See docs/effects-strictness.md.
+        "react-hooks/exhaustive-deps": "error",
       },
     },
 

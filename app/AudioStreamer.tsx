@@ -13,6 +13,12 @@ const AudioStreamer = ({ id, token, host }: AudioStreamerProps) => {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [socket, setSocket] = useState<WebSocket | null>(null);
 
+  /**
+   * @effect Open a WebSocket connection to the media-stream host for this call/id and expose it as `socket`.
+   * @effect-deps id, token, host — reconnects whenever the target stream (or auth token) changes.
+   * @effect-side-effects subscription (opens a live WebSocket; closes it on cleanup/re-run)
+   * @effect-why-not-loader A persistent bidirectional audio-streaming socket is live client state, not request/response data a loader can express.
+   */
   useEffect(() => {
     const wsUrl =
       process.env.NODE_ENV === 'production'

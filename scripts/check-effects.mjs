@@ -46,12 +46,19 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** Grab the comment block (if any) immediately preceding a given char offset. */
+/**
+ * Grab the JSDoc block (if any) immediately preceding a given char offset.
+ * Only whitespace and full-line `//` comments may sit between the block and
+ * the effect, and the NEAREST preceding block is used (never a distant one).
+ */
 function precedingBlock(src, offset) {
   const before = src.slice(0, offset);
-  // last */ that closes right before the effect (allow whitespace/`const x =`)
-  const m = before.match(/\/\*\*?([\s\S]*?)\*\/\s*(?:const\s+\w+\s*=\s*)?$/);
-  return m ? m[1] : "";
+  // strip trailing whitespace + line comments between the block and the effect
+  const gap = before.match(/(?:[ \t]*\/\/[^\n]*\n|\s)*$/);
+  const trimmed = before.slice(0, before.length - (gap ? gap[0].length : 0));
+  if (!trimmed.endsWith("*/")) return "";
+  const start = trimmed.lastIndexOf("/*");
+  return start < 0 ? "" : trimmed.slice(start + 2, trimmed.length - 2);
 }
 
 function parseTags(block) {

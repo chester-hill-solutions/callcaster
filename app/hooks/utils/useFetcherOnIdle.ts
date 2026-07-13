@@ -21,6 +21,17 @@ export function useFetcherOnIdle<T>(
   const onIdleRef = useRef(onIdle);
   onIdleRef.current = onIdle;
 
+  /**
+   * @effect Fire onIdle(fetcher.data) exactly once per busy->idle transition of the given fetcher.
+   * @effect-deps busy (derived from fetcher.state), fetcher.data (the payload to hand to onIdle);
+   *   onIdle itself is intentionally excluded — it's read from onIdleRef so inline closures don't
+   *   cause spurious re-fires or need memoizing at call sites
+   * @effect-side-effects none directly — invokes the caller's onIdle callback, whose own side effects
+   *   (toast, rollback, etc.) are the caller's responsibility
+   * @effect-why-not-loader This hook exists specifically to replace ad-hoc effects watching
+   *   fetcher.state/fetcher.data (which re-fire on stale/identical data); the edge-detection itself
+   *   still requires an effect since it can't run during render.
+   */
   useEffect(() => {
     const wasBusy = wasBusyRef.current;
     wasBusyRef.current = busy;
