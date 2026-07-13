@@ -237,7 +237,11 @@ module.exports = {
     {
       files: ["**/*.{js,jsx,ts,tsx}"],
       rules: {
-        "react-hooks/exhaustive-deps": "off",
+        // Ratchet: surfaces missing/incorrect effect deps without failing CI.
+        // Pairs with `check:effects` (docs/effects-strictness.md). Tighten to
+        // "error" once the grandfathered effects in effects-baseline.json are
+        // annotated and their deps verified.
+        "react-hooks/exhaustive-deps": "warn",
       },
     },
 
