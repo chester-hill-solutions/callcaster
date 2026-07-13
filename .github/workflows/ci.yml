@@ -33,6 +33,10 @@ jobs:
       - run: npm run check:twilio-webhooks
       - run: npm run check:middleware
       - run: npm run check:credit-writes
+      - run: npm run check:effects
+      - run: npm run check:type-safety
+      - run: npm run check:dry
+      - run: npm run check:handlers
       - run: npm run tools:api:codegen
       - run: git diff --exit-code
 
