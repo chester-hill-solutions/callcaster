@@ -53,7 +53,7 @@ Interactive specs:
 | `/api/inbound-ivr/:numberId/:pageId/:blockId/response` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route.tsx` | `docs/api-webhooks.md` |  |
 | `/api/inbound-queue` | GET, POST, PUT, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/inbound-queue.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/inbound-sms` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound-sms.tsx` | `docs/api-webhooks.md` |  |
-| `/api/inbound-verification` | POST | Internal Trusted | internalOnly | no | `routes/api+/inbound-verification.tsx` | `docs/api-internal-unsupported.md` | Call-in verification TwiML; service role, no Twilio signature. |
+| `/api/inbound-verification` | POST | Internal Trusted | internalOnly | no | `routes/api+/inbound-verification.tsx` | `docs/api-internal-unsupported.md` | Call-in verification TwiML; validated with main-account Twilio signature. |
 | `/api/inbound` | POST | Provider Webhook | providerOnly | no | `routes/api+/inbound.tsx` | `docs/api-webhooks.md` | Returns TwiML. |
 | `/api/jobs/low-credit-notify` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/low-credit-notify.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered low-credit email sweep; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
 | `/api/jobs/number-rental-billing` | POST | Internal Trusted | internalOnly | no | `routes/api+/jobs+/number-rental-billing.tsx` | `docs/api-internal-unsupported.md` | Cron-triggered monthly number-rental billing; authenticated via x-cron-secret header (process.env.CRON_SECRET). |
