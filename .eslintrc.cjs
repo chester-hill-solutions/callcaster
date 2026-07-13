@@ -60,7 +60,9 @@ module.exports = {
         "@typescript-eslint/no-require-imports": "off",
         "@typescript-eslint/no-unused-expressions": "off",
         "@typescript-eslint/no-unused-vars": "off",
-        "import/no-duplicates": "off",
+        // Strictness free-lock: 0 duplicate imports after the database.server
+        // barrel removal — keep it that way.
+        "import/no-duplicates": "error",
         "import/no-named-as-default": "off",
         "react/prop-types": "off",
         "react/no-unescaped-entities": "off",
@@ -97,7 +99,10 @@ module.exports = {
           "error",
           {
             "ts-expect-error": "allow-with-description",
-            "ts-ignore": "allow-with-description",
+            // Strengthened: @ts-ignore fully banned (the 2 stale AWS-SDK
+            // suppressions were removed and typecheck stayed clean). Use
+            // @ts-expect-error with a description so stale suppressions surface.
+            "ts-ignore": true,
             "ts-nocheck": false,
           },
         ],

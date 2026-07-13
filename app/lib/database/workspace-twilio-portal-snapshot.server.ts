@@ -8,7 +8,7 @@ import {
 import {
   type TwilioAccountData,
   type WorkspaceTwilioPortalMetrics,
-} from "../types";
+ WorkspaceTwilioPortalSnapshot } from "../types";
 import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingFromTwilioData,
@@ -35,7 +35,6 @@ import {
   DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
 } from "./workspace-twilio-sync.server";
-import type { WorkspaceTwilioPortalSnapshot } from "../types";
 import {
   buildTwilioPortalRecommendations,
   buildTwilioSupportRequestSummary,

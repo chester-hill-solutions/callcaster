@@ -17,8 +17,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Text } from "@/components/ui/typography";
-import { Heading } from "@/components/ui/typography";
+import { Text , Heading } from "@/components/ui/typography";
 
 export const meta: MetaFunction = () => [{ title: "Sign Up — CallCaster" }];
 

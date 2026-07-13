@@ -33,8 +33,7 @@ import { CampaignSetupGuide } from "./CampaignSetupGuide";
 import type { CampaignSetupStep } from "@/lib/campaign-setup-steps";
 import { CampaignCostPanel } from "./CampaignCostPanel";
 import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
-import { formatCredits, formatCurrency } from "@/lib/billing-format";
-import { CREDIT_PRICE_CAD } from "@/lib/billing-format";
+import { formatCredits, formatCurrency , CREDIT_PRICE_CAD } from "@/lib/billing-format";
 
 
 export type CampaignSettingsProps = {

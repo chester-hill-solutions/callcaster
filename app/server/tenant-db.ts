@@ -1,6 +1,5 @@
-import { and, eq, sql, type SQL } from "drizzle-orm";
+import { and, eq, sql, type SQL , InferInsertModel, InferSelectModel } from "drizzle-orm";
 import { count } from "drizzle-orm";
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { db, type Database } from "./db";
 import { WORKSPACE_SCOPED_TABLES, type WorkspaceScopedTableName } from "../db/workspace-scoped-tables";

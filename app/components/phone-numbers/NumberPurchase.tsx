@@ -1,7 +1,12 @@
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Text } from "@/components/ui/typography";
 import { hasCreditsForNumberRental } from "@/lib/number-rental";
-import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
+import {
+  emptyMessageForMode,
+  type AvailableNumber,
+  type NumbersSearchFetcherData,
+  type PurchaseFetcherData,
+} from "@/components/phone-numbers/NumberPurchase.constants";
 import { useFetcher, type FetcherWithComponents } from "react-router";
 import { useMemo, useState } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
@@ -10,11 +15,6 @@ import { buildNumberPurchaseColumns } from "./NumberPurchase.columns";
 import { NumberPurchaseConfirmDialog } from "./NumberPurchase.ConfirmDialog";
 import { NumberPurchaseSuccessDialog } from "./NumberPurchase.SuccessDialog";
 import { NumberRentalCreditsAlert } from "./NumberRentalCreditsAlert";
-import {
-  emptyMessageForMode,
-  type NumbersSearchFetcherData,
-  type PurchaseFetcherData,
-} from "./NumberPurchase.constants";
 import { NumberPurchaseSearchForm } from "./NumberPurchase.SearchForm";
 import type { NumberSearchMode } from "@/lib/numbers-search.server";
 

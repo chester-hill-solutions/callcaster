@@ -12,8 +12,7 @@ import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { getSession } from "@/lib/auth.server";
 import { AppError } from "@/lib/errors.server";
 
-import type { ActionFunctionArgs } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs , LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => searchContactsLoader(request);
 
