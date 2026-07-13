@@ -241,7 +241,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
     const mod = await import("../app/routes/api+/dial/status.route");
-    const res = await asRouteResponse(await mod.action({ request: makeReq({}) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeReq({}) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
@@ -251,7 +251,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human" }), // omit CallStatus => null
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "call" });
@@ -260,7 +260,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup2._set.campaignError(new Error("camp"));
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "camp" });
@@ -269,7 +269,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     dialStatusStorageState.error = new Error("vm");
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "vm" });
@@ -284,7 +284,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
     const mod = await import("../app/routes/api+/dial/status.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any));
     expect(res.status).toBe(403);
@@ -296,7 +296,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ error: "Call not found" });
@@ -309,7 +309,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
       expect(tok).toBe("test");
       return true;
     });
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any));
     expect(res.status).toBe(200);
@@ -323,7 +323,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     const mod = await import("../app/routes/api+/dial/status.route");
 
     // voicemail present
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -336,7 +336,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     dialStatusStorageState.signedUrl = null;
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -349,7 +349,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup3._set.outreachUpdateError(new Error("upd"));
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: upd" });
@@ -359,7 +359,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup4._set.outreachUpdateThrows("nope");
     mocks.createClient.mockReturnValueOnce(sup4);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw4 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: Unknown error" });
@@ -371,7 +371,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
 
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
     expect(res.status).toBe(200);
@@ -382,7 +382,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup2._set.callUpsertError(new Error("up"));
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "up" });
@@ -391,7 +391,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup3._set.attemptUpdateError(new Error("att"));
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: att" });
@@ -399,7 +399,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     // throw non-Error from createWorkspaceTwilioInstance triggers outer catch "An unexpected error occurred"
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce("nope");
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "An unexpected error occurred" });
@@ -414,7 +414,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     client._set.campaignRow(null);
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Campaign 1 not found" });
@@ -424,7 +424,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup2._set.campaignRow({ voicemail_file: null });
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -434,7 +434,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup3._set.outreachUpdateError(new Error("outreach"));
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: outreach" });
@@ -445,7 +445,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup4._set.outreachUpdateError(new Error("no-answer-update"));
     mocks.createClient.mockReturnValueOnce(sup4);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw4 as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: no-answer-update" });

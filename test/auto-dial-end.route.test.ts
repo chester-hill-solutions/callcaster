@@ -36,7 +36,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
 
     telephonyDbMocks.findActiveConferenceIdsForUser.mockRejectedValueOnce(new Error("list"));
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         verifyAuth: async () => ({ user: { id: "u1" } } as any),
@@ -70,7 +70,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
 
     const logger = { error: vi.fn(), debug: vi.fn() };
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         logger: logger as any,
@@ -96,7 +96,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   test("returns success when there are no in-progress conferences", async () => {
     configureTelephonyStub({ activeConferenceIds: [] });
     const mod = await import("../app/routes/api+/auto-dial/end.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         verifyAuth: async () => ({ user: { id: "u1" } } as any),
@@ -192,7 +192,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     vi.doMock("@/lib/logger.server", () => ({ logger }));
 
     const mod = await import("../app/routes/api+/auto-dial/end.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
     } as any));
     expect(res.status).toBe(500);

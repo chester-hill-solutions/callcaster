@@ -44,8 +44,8 @@ describe("confirm-payment route", () => {
       "http://localhost/confirm-payment?session_id=sess_123",
     );
 
-    const first = await asRouteResponse(await mod.loader(withRouteUrl({ request } as any)));
-    const second = await asRouteResponse(await mod.loader(withRouteUrl({ request } as any)));
+    const first = await asRouteResponse(mod.loader(withRouteUrl({ request } as any)));
+    const second = await asRouteResponse(mod.loader(withRouteUrl({ request } as any)));
 
     expect(first.status).toBe(302);
     expect(second.status).toBe(302);
@@ -63,7 +63,7 @@ describe("confirm-payment route", () => {
     });
 
     const mod = await import("../app/routes/confirm-payment");
-    const response = await asRouteResponse(await mod.loader(withRouteUrl({
+    const response = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/confirm-payment?session_id=sess_123"),
     } as any)));
 
@@ -75,7 +75,7 @@ describe("confirm-payment route", () => {
 
   test("redirects to workspaces when no session_id", async () => {
     const mod = await import("../app/routes/confirm-payment");
-    const response = await asRouteResponse(await mod.loader(withRouteUrl({
+    const response = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/confirm-payment"),
     } as any)));
 
@@ -91,7 +91,7 @@ describe("confirm-payment route", () => {
     });
 
     const mod = await import("../app/routes/confirm-payment");
-    const response = await asRouteResponse(await mod.loader(withRouteUrl({
+    const response = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/confirm-payment?session_id=sess_123"),
     } as any)));
 

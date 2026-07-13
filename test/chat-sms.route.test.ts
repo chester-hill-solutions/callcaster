@@ -509,7 +509,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   test("action returns auth error response", async () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ error: "no", status: 401 });
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "no" });
   });
@@ -525,7 +525,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       media: "[]",
     });
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(403);
   });
 
@@ -541,7 +541,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       media: "[]",
     });
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
     await expect(res.json()).resolves.toEqual({
       creditsError: true,
@@ -561,7 +561,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       media: "[]",
     });
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
     await expect(res.json()).resolves.toMatchObject({ creditsError: true });
   });
@@ -581,7 +581,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM1", body: " " })) },
     });
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
   });
 
@@ -598,7 +598,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(404);
     expect(mocks.logger.error).toHaveBeenCalledWith("Invalid phone number:", expect.anything());
   });
@@ -625,7 +625,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     expect(mocks.processTemplateTags).not.toHaveBeenCalled();
   });
@@ -655,7 +655,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.processTemplateTags.mockReturnValueOnce("Hello A");
 
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toEqual({ data: [{ id: 1 }], message: expect.anything() });
     expect(mocks.processTemplateTags).toHaveBeenCalled();
@@ -717,7 +717,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -743,7 +743,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce(new Error("twilio"));
 
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error in chat_sms action:", expect.anything());
   });
@@ -761,8 +761,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       return actual.parseJsonBodyOrResponse(request, schema);
     });
     const mod = await import("../app/routes/api+/chat_sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

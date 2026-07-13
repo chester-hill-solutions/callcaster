@@ -67,8 +67,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
   test("redirects to /signin when user missing", async () => {
     queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
     expect(res.status).toBe(401);
   });
@@ -80,7 +79,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.dbSelectWhere.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(10, [1, 2], {
@@ -95,7 +94,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.deleteCampaignQueueByIds.mockResolvedValueOnce([{ id: 1 }]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ data: [{ id: 1 }] });
     expect(mocks.deleteCampaignQueueByIds).toHaveBeenCalledWith([1, 2], "w1");
@@ -107,7 +106,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.deleteCampaignQueueByIds.mockRejectedValueOnce(new Error("bad"));
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "bad" });
   });
@@ -119,7 +118,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.deleteCampaignQueueByIds.mockResolvedValueOnce([{ id: 5 }]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ data: [{ id: 5 }] });
   });
@@ -130,7 +129,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.searchCampaignQueueIds.mockResolvedValueOnce([]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ data: [] });
   });
@@ -142,7 +141,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.deleteCampaignQueueByIds.mockRejectedValueOnce(new Error("del bad"));
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "del bad" });
   });
@@ -153,7 +152,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.searchCampaignQueueIds.mockRejectedValueOnce(new Error("lookup bad"));
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "lookup bad" });
   });
@@ -163,7 +162,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.parseRequestData.mockResolvedValueOnce({});
 
     const mod = await import("../app/routes/api+/campaign_queue");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
     expect(res.status).toBe(405);
   });
 });

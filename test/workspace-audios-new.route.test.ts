@@ -76,7 +76,7 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       new File(["source-audio"], "greeting.m4a", { type: "audio/mp4" }),
     );
 
-    const response = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
+    const response = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
@@ -105,7 +105,7 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     const formData = new FormData();
     formData.set("media-name", "Greeting");
 
-    const response = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
+    const response = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
@@ -138,7 +138,7 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       new File(["bogus"], "bad.ogg", { type: "audio/ogg" }),
     );
 
-    const response = await asRouteResponse(await mod.action(await withWorkspaceRouteArgs({
+    const response = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,

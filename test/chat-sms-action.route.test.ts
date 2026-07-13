@@ -92,8 +92,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(403);
@@ -110,8 +109,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(403);
@@ -123,8 +121,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(201);
@@ -137,8 +134,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(201);
@@ -154,8 +150,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(400);
@@ -176,8 +171,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
       mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
       const mod = await import("../app/routes/api+/chat_sms.action.server");
-      const res = await asRouteResponse(
-        await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+      const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
       );
 
       expect(res.status).toBe(201);
@@ -190,8 +184,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(201);
@@ -204,8 +197,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(201);
@@ -222,8 +214,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     );
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(201);

@@ -104,7 +104,7 @@ describe("api.call-status billing + idempotency", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "61");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call-status", {
         method: "POST",
         headers: { "x-twilio-signature": "bad" },

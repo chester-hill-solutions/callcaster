@@ -57,7 +57,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
   test("returns 400 when required params missing", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       params: {},
       request: new Request("http://x", { method: "POST", body: new FormData() }),
     } as never));
@@ -71,7 +71,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never));

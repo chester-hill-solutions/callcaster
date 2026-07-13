@@ -108,14 +108,14 @@ describe("WorkspaceSettingUtils", () => {
     const headers = new Headers();
 
     const fdMissing = new FormData();
-    const resMissing = await asRouteResponse(await mod.handleAddUser(fdMissing, "w1", headers));
+    const resMissing = await asRouteResponse(mod.handleAddUser(fdMissing, "w1", headers));
     expect(resMissing.status).toBe(400);
 
     getWorkspaceUsers.mockResolvedValueOnce({ data: [{ username: "a@b.com" }] });
     const fd = new FormData();
     fd.set("username", "A@B.COM ");
     fd.set("new_user_workspace_role", "caller");
-    const resDup = await asRouteResponse(await mod.handleAddUser(fd, "w1", headers));
+    const resDup = await asRouteResponse(mod.handleAddUser(fd, "w1", headers));
     expect(resDup.status).toBe(403);
   });
 
@@ -129,7 +129,7 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("new_user_workspace_role", "member");
 
     // findUserIdByUsername returns null by default → inviteUserByEmail returns user-not-found error
-    const resErr = await asRouteResponse(await mod.handleAddUser(fd, "w1", headers));
+    const resErr = await asRouteResponse(mod.handleAddUser(fd, "w1", headers));
     expect(await resErr.json()).toMatchObject({
       user: null,
       error: "User not found. They must sign up before being invited to a workspace.",
@@ -138,7 +138,7 @@ describe("WorkspaceSettingUtils", () => {
     // Success path: user exists, no pending invite
     membersDbMocks.findUserIdByUsername.mockResolvedValue("u1");
     membersDbMocks.findWorkspaceInviteForUser.mockResolvedValue(null);
-    const resOk = await asRouteResponse(await mod.handleAddUser(fd, "w1", headers));
+    const resOk = await asRouteResponse(mod.handleAddUser(fd, "w1", headers));
     expect(await resOk.json()).toMatchObject({ error: null, success: true });
   });
 
@@ -150,14 +150,14 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "u1");
     fd.set("updated_workspace_role", "admin");
 
-    const resUpdateOk = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", headers, "u1"));
+    const resUpdateOk = await asRouteResponse(mod.handleUpdateUser(fd, "w1", headers, "u1"));
     expect(await resUpdateOk.json()).toEqual({ data: { id: "u1" }, error: null });
 
     membersDbMocks.updateWorkspaceMemberRole.mockRejectedValueOnce(new Error("nope"));
-    const resUpdateErr = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", headers, "u1"));
+    const resUpdateErr = await asRouteResponse(mod.handleUpdateUser(fd, "w1", headers, "u1"));
     expect(await resUpdateErr.json()).toEqual({ data: null, error: "nope" });
 
-    const resDeleteOk = await asRouteResponse(await mod.handleDeleteUser(fd, "w1", headers, "u1"));
+    const resDeleteOk = await asRouteResponse(mod.handleDeleteUser(fd, "w1", headers, "u1"));
     expect(await resDeleteOk.json()).toEqual({ data: { id: "u1" }, error: null });
   });
 
@@ -166,7 +166,7 @@ describe("WorkspaceSettingUtils", () => {
     const headers = new Headers();
 
     const fdMissing = new FormData();
-    const resMissing = await asRouteResponse(await mod.handleDeleteSelf(fdMissing, "w1", headers, "u1"));
+    const resMissing = await asRouteResponse(mod.handleDeleteSelf(fdMissing, "w1", headers, "u1"));
     expect(resMissing.status).toBe(200);
 
     const fd = new FormData();
@@ -178,7 +178,7 @@ describe("WorkspaceSettingUtils", () => {
     expect(logger.error).toHaveBeenCalled();
 
     membersDbMocks.removeWorkspaceMember.mockResolvedValueOnce({ ok: 1 });
-    const res = await asRouteResponse(await mod.handleDeleteSelf(fd, "w1", headers, "u1"));
+    const res = await asRouteResponse(mod.handleDeleteSelf(fd, "w1", headers, "u1"));
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/workspaces");
   });
@@ -192,15 +192,15 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "new");
 
     membersDbMocks.transferWorkspaceOwnership.mockRejectedValueOnce(new Error("new owner failed"));
-    const res1 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
+    const res1 = await asRouteResponse(mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
     expect(await res1.json()).toEqual({ error: "new owner failed" });
 
     membersDbMocks.transferWorkspaceOwnership.mockRejectedValueOnce(new Error("current failed"));
-    const res2 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
+    const res2 = await asRouteResponse(mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
     expect(await res2.json()).toEqual({ error: "current failed" });
 
     membersDbMocks.transferWorkspaceOwnership.mockResolvedValueOnce({ previousOwner: { id: "owner" } });
-    const res3 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
+    const res3 = await asRouteResponse(mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
     expect(await res3.json()).toEqual({ data: { id: "owner" }, error: null });
   });
 
@@ -213,7 +213,7 @@ describe("WorkspaceSettingUtils", () => {
     expect(err).toEqual({ data: null, error: "del ws" });
 
     membersDbMocks.deleteWorkspaceById.mockResolvedValueOnce([{ id: "w1" }]);
-    const res = await asRouteResponse(await mod.handleDeleteWorkspace({ workspaceId: "w1", headers }));
+    const res = await asRouteResponse(mod.handleDeleteWorkspace({ workspaceId: "w1", headers }));
     expect(res.status).toBe(302);
   });
 
@@ -244,11 +244,11 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("events", JSON.stringify([{ category: "a", type: "INSERT" }]));
 
     membersDbMocks.upsertWorkspaceWebhookRow.mockRejectedValueOnce(new Error("bad"));
-    const resErr = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1", headers));
+    const resErr = await asRouteResponse(mod.handleUpdateWebhook(fd, "w1", headers));
     expect(await resErr.json()).toEqual({ data: null, error: "bad" });
 
     membersDbMocks.upsertWorkspaceWebhookRow.mockResolvedValueOnce({ id: 1 });
-    const resOk = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1", headers));
+    const resOk = await asRouteResponse(mod.handleUpdateWebhook(fd, "w1", headers));
     expect(await resOk.json()).toEqual({ data: [{ id: 1 }], error: null });
   });
 

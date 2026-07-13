@@ -46,7 +46,7 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
       custom_headers: JSON.stringify([]),
     });
     const mod = await import("../app/routes/api+/test-webhook");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "Invalid input" });
     expect(mocks.logger.warn).toHaveBeenCalledWith("Invalid input for webhook test");
@@ -62,7 +62,7 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
       new Error("Destination URL host is not allowed"),
     );
     const mod = await import("../app/routes/api+/test-webhook");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "Destination URL host is not allowed",
@@ -78,7 +78,7 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
     });
     mocks.testWebhook.mockResolvedValueOnce({ ok: true });
     const mod = await import("../app/routes/api+/test-webhook");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
     expect(mocks.testWebhook).toHaveBeenCalledWith({ category: "outbound_sms" }, "http://hook", { "X-Test": "1" });

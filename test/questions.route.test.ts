@@ -97,7 +97,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     tenantDbMocks.findFirst.mockResolvedValueOnce(null);
     mocks.rpcCreateOutreachAttempt.mockResolvedValueOnce("7");
     const mod = await import("../app/routes/api+/questions");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest(defaultBody) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ id: 7, disposition: "done", result: { a: 1 } });
     expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledWith(
@@ -117,7 +117,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     const rpcError = new Error("rpc bad");
     mocks.rpcCreateOutreachAttempt.mockRejectedValueOnce(rpcError);
     const mod = await import("../app/routes/api+/questions");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest(defaultBody) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: rpcError });
     expect(mocks.logger.error).toHaveBeenCalled();
@@ -137,7 +137,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
       queue_id: 3,
     });
     const mod = await import("../app/routes/api+/questions");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest({}) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeRequest({}) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ id: 1, disposition: "completed" });
   });
@@ -165,7 +165,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
       queue_id: 3,
     });
     const mod = await import("../app/routes/api+/questions");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest({}) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeRequest({}) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ id: null, disposition: "completed" });
   });
@@ -184,7 +184,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     tenantDbMocks.findFirst.mockResolvedValueOnce(null);
     mocks.rpcCreateOutreachAttempt.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/questions");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest(defaultBody) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Failed to create or update outreach attempt" });
   });

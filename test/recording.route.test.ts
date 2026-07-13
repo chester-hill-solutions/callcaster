@@ -42,8 +42,7 @@ describe("app/routes/api+/recording", () => {
     mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
     const mod = await import("../app/routes/api+/recording");
     const fd = new FormData();
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as never),
     );
@@ -58,8 +57,7 @@ describe("app/routes/api+/recording", () => {
     const mod = await import("../app/routes/api+/recording");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as never),
     );
@@ -72,8 +70,7 @@ describe("app/routes/api+/recording", () => {
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("RecordingUrl", "https://rec");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as never),
     );
@@ -91,8 +88,7 @@ describe("app/routes/api+/recording", () => {
     const mod = await import("../app/routes/api+/recording");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as never),
     );
@@ -107,8 +103,7 @@ describe("app/routes/api+/recording", () => {
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("RecordingUrl", "https://rec");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as never),
     );

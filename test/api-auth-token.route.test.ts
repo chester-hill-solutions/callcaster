@@ -33,8 +33,7 @@ describe("app/routes/api+/auth/token/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/auth/token.route");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/auth/token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -59,8 +58,7 @@ describe("app/routes/api+/auth/token/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/auth/token.route");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/auth/token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -77,8 +75,7 @@ describe("app/routes/api+/auth/token/route.tsx", () => {
 
   test("rejects non-POST methods", async () => {
     const mod = await import("../app/routes/api+/auth/token.route");
-    const response = await asRouteResponse(
-      await mod.action({
+    const response = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/auth/token", { method: "GET" }),
       } as never),
     );

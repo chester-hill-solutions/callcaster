@@ -38,8 +38,7 @@ describe("dialer/start route", () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route"
     );
-    const res = await asRouteResponse(
-      await mod.action(
+    const res = await asRouteResponse(mod.action(
         await withDataPlaneRouteArgs({
           request: new Request(
             "http://localhost/api/workspaces/w1/campaigns/1/dialer/start",
@@ -64,8 +63,7 @@ describe("dialer/start route", () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route"
     );
-    const res = await asRouteResponse(
-      await mod.action(
+    const res = await asRouteResponse(mod.action(
         await withDataPlaneRouteArgs({
           request: new Request(
             "http://localhost/api/workspaces/w1/campaigns/1/dialer/start",

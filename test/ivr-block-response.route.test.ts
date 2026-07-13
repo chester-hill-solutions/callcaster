@@ -179,7 +179,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     const campaignData = { script: { steps: script } };
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData, workspaceTwilioData: { authToken: "t" } }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any));

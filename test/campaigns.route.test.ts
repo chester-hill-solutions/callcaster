@@ -66,7 +66,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1 }, campaignDetails: { campaign_id: 1 } });
 
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ campaign: { id: 1 } });
@@ -84,7 +84,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1, script_id: 5 }, campaignDetails: { campaign_id: 1 } });
 
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
 
@@ -142,7 +142,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1 }, campaignDetails: {} });
 
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
 
@@ -165,7 +165,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     mocks.updateOrCopyScript.mockRejectedValueOnce(new Error("duplicate name"));
 
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
 
@@ -183,7 +183,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     authSession({ sb: 1 });
     mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: 123, workspaceId: "w1" });
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
@@ -205,7 +205,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     mocks.parseActionRequest.mockResolvedValueOnce({ campaignData: { title: "x", workspace: "w1" } });
     mocks.createCampaign.mockResolvedValueOnce({ campaign: { id: 2 }, campaignDetails: { campaign_id: 2 } });
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "POST" }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ campaign: { id: 2 } });
@@ -215,7 +215,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     authSession({});
     mocks.parseActionRequest.mockResolvedValueOnce({});
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "GET" }),
     } as any));
     expect(res.status).toBe(405);
@@ -225,7 +225,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     authSession({}, new Headers({ "X": "1" }));
     mocks.parseActionRequest.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH" }),
     } as any));
     expect(res.status).toBe(400);

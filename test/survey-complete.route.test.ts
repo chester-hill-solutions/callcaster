@@ -67,20 +67,20 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
     const fd = new FormData();
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(400);
   });
 
   test("rejects honeypot field", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         surveyId: "S1",
         resultId: "R1",
@@ -93,7 +93,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
 
   test("rejects invalid respondent token", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x?respondent_token=bad-token", {
         method: "POST",
         body: new FormData(),
@@ -104,7 +104,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
 
   test("generates a respondent token when none is provided", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         surveyId: "S1",
         completed: "true",
@@ -127,7 +127,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
     const fd = new FormData();
     fd.set("surveyId", "S1");
     fd.set("completed", "false");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request(`http://x?respondent_token=${encodeURIComponent(token)}`, {
         method: "POST",
         body: fd,
@@ -154,18 +154,18 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
     }
 
     for (let i = 0; i < 10; i++) {
-      const r = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
+      const r = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
       expect(r.status).toBe(200);
     }
 
-    const limited = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
+    const limited = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
     expect(limited.status).toBe(429);
   });
 
   test("rejects contact outside survey workspace", async () => {
     surveyDbMocks.loadContactById.mockResolvedValueOnce({ id: 100, workspace: "ws-other" });
     const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         surveyId: "S1",
         completed: "true",
@@ -179,7 +179,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
     const mod = await import("../app/routes/api+/survey-complete");
 
     surveyDbMocks.getActiveSurveyByPublicId.mockResolvedValueOnce(null);
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "S1", resultId: "R1" }),
     } as any));
     expect(r1.status).toBe(404);
@@ -189,7 +189,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
       is_active: false,
       workspace: "ws-1",
     });
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "S1", resultId: "R1" }),
     } as any));
     expect(r2.status).toBe(400);
@@ -202,7 +202,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
       status: 500,
     });
     const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "S1", resultId: "R1" }),
     } as any));
     expect(res.status).toBe(500);

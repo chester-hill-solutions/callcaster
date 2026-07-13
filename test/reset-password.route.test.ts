@@ -17,8 +17,7 @@ vi.mock("@/server/auth-instance", () => ({
 describe("app/routes/reset-password", () => {
   test("loader returns token from query string", async () => {
     const mod = await import("../app/routes/reset-password");
-    const response = await asRouteResponse(
-      await mod.loader(routeArgs(new Request("http://localhost/reset-password?token=abc123"))),
+    const response = await asRouteResponse(mod.loader(routeArgs(new Request("http://localhost/reset-password?token=abc123"))),
     );
 
     expect(response.status).toBe(200);
@@ -27,8 +26,7 @@ describe("app/routes/reset-password", () => {
 
   test("loader returns null token when missing", async () => {
     const mod = await import("../app/routes/reset-password");
-    const response = await asRouteResponse(
-      await mod.loader(routeArgs(new Request("http://localhost/reset-password"))),
+    const response = await asRouteResponse(mod.loader(routeArgs(new Request("http://localhost/reset-password"))),
     );
 
     expect(response.status).toBe(200);
@@ -43,8 +41,7 @@ describe("app/routes/reset-password", () => {
     form.set("confirmPassword", "newPassword123");
 
     const mod = await import("../app/routes/reset-password");
-    const response = await asRouteResponse(
-      await mod.action(
+    const response = await asRouteResponse(mod.action(
         routeArgs(
           new Request("http://localhost/reset-password?token=abc123", {
             method: "POST",
@@ -68,8 +65,7 @@ describe("app/routes/reset-password", () => {
     form.set("confirmPassword", "differentPassword");
 
     const mod = await import("../app/routes/reset-password");
-    const response = await asRouteResponse(
-      await mod.action(
+    const response = await asRouteResponse(mod.action(
         routeArgs(
           new Request("http://localhost/reset-password?token=abc123", {
             method: "POST",
@@ -95,8 +91,7 @@ describe("app/routes/reset-password", () => {
     form.set("confirm_password", "newPassword123");
 
     const mod = await import("../app/routes/reset-password");
-    const response = await asRouteResponse(
-      await mod.action(
+    const response = await asRouteResponse(mod.action(
         routeArgs(
           new Request("http://localhost/reset-password?token=abc123", {
             method: "POST",

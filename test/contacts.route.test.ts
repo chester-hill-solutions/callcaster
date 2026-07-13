@@ -87,7 +87,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     mocks.updateContact.mockResolvedValueOnce({ id: 1, ok: true });
 
     const mod = await import("../app/routes/api+/contacts");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contacts", { method: "PATCH" }),
     } as any));
     expect(res.status).toBe(200);
@@ -106,7 +106,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
       audience_id: 2,
     });
     mocks.bulkCreateContacts.mockResolvedValueOnce({ created: 1 });
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ created: 1 });
@@ -116,7 +116,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     queueDualAuthSession({ headers: new Headers(),
       user: { id: "u1" },
     });
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ id: 9 });
@@ -126,7 +126,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({});
     const mod = await import("../app/routes/api+/contacts");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contacts", { method: "PUT" }),
     } as any));
     expect(res.status).toBe(400);
@@ -136,7 +136,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("Unsupported content type"));
     const mod = await import("../app/routes/api+/contacts");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any));
     expect(res.status).toBe(415);
@@ -146,7 +146,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/contacts");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any));
     expect(res.status).toBe(500);
@@ -157,7 +157,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     queueDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/contacts");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any));
     expect(res.status).toBe(500);
@@ -167,7 +167,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
   test("loader returns [] when q missing", async () => {
     queueDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/contacts");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/contacts"),
     } as any));
     await expect(res.json()).resolves.toEqual({ data: [] });
@@ -185,7 +185,7 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     setDualAuthSession({ user: { id: "u1" } });
 
     const mod = await import("../app/routes/api+/contacts");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any));
     const body = await res.json();
@@ -193,21 +193,21 @@ describe("app/routes/api+/contacts/route.tsx", () => {
     expect(body.contacts.find((c: any) => c.id === 2).queued).toBe(true);
 
     contactSearchMocks.searchContactsForQueuePicker.mockResolvedValueOnce([]);
-    const rEmpty = await asRouteResponse(await mod.loader({
+    const rEmpty = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any));
     await expect(rEmpty.json()).resolves.toEqual({ contacts: [] });
 
     contactSearchMocks.searchContactsForQueuePicker.mockResolvedValueOnce([contactA] as any);
     contactSearchMocks.getQueuedContactIdsForCampaign.mockRejectedValueOnce(new Error("queued"));
-    const rQueuedErr = await asRouteResponse(await mod.loader({
+    const rQueuedErr = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any));
     expect(rQueuedErr.status).toBe(500);
     expect(mocks.handleError).toHaveBeenCalled();
 
     contactSearchMocks.searchContactsForQueuePicker.mockRejectedValueOnce(new Error("q"));
-    const resErr = await asRouteResponse(await mod.loader({
+    const resErr = await asRouteResponse(mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any));
     expect(resErr.status).toBe(500);

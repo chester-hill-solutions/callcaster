@@ -13,12 +13,12 @@ export const loader = defineLoader({
     const contactIdParam = url.searchParams.get("contact");
 
     if (!surveyId) {
-      return routeData({ error: "Survey ID is required" }, { status: 400 });
+      throw new Response("Survey ID is required", { status: 400 });
     }
 
     const survey = await loadSurveyDetailByPublicId(surveyId, { activeOnly: true });
     if (!survey) {
-      return routeData({ error: "Survey not found or inactive" }, { status: 404 });
+      throw new Response("Survey not found or inactive", { status: 404 });
     }
 
     let contact = null;

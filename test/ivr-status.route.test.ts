@@ -141,8 +141,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     const mod = await import("../app/routes/api+/ivr/status.route");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any),
     );
     expect(res.status).toBe(403);
   });
@@ -151,15 +150,15 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     const mod = await import("../app/routes/api+/ivr/status.route");
 
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }) } as any));
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "no-answer", Timestamp: new Date().toISOString() }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "no-answer", Timestamp: new Date().toISOString() }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
   });
 
@@ -172,7 +171,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
       script: { steps: { pages: { page_1: { title: "Other", blocks: [] } } } },
     }));
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -185,7 +184,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
       script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } },
     }));
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -198,7 +197,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
       script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
     }));
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -211,7 +210,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       voicemail_file: null,
       script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
     }));
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
@@ -222,17 +221,17 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
 
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ workspace: null }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ outreach_attempt_id: null }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
     // persistCallStatusFromParams accepts null outreachAttemptId; no updateResult call needed
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
@@ -245,7 +244,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     }));
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(new Response(JSON.stringify({ error: "x" }), { status: 500 }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
@@ -259,7 +258,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
 
     // dbCall null (callError null) => "Call not found"
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     // pagesObject undefined => findVoicemailPage early return null => hangup update
@@ -267,7 +266,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
       script: { steps: null },
     }));
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -280,7 +279,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
     }));
     objectStorageMocks.createSignedObjectUrl.mockRejectedValueOnce(new Error("sig"));
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
@@ -290,7 +289,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
     }));
     objectStorageMocks.createSignedObjectUrl.mockResolvedValueOnce(null as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
@@ -300,7 +299,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } },
     }));
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(new Response(JSON.stringify({ error: "x" }), { status: 500 }));
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
@@ -310,7 +309,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
 
     // completed branch success
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow());
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -318,7 +317,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     // upsertCallBySid error => catch
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     telephonyDbMocks.upsertCallBySid.mockRejectedValueOnce(new Error("call-update"));
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
@@ -326,7 +325,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     // ensure completed branch catches upsertCallBySid errors too
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     telephonyDbMocks.upsertCallBySid.mockRejectedValueOnce(new Error("completed-update"));
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
@@ -335,7 +334,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
   test("explicitly hits completed branch and debits credits once", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         CallSid: "CA1",
         CallStatus: "completed",
@@ -359,12 +358,12 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: async () => ({}) }) });
 
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "no-answer", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -375,7 +374,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
   test("covers switch default (non-terminal callStatus, non-machine)", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "human", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });

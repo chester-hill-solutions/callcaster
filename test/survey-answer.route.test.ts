@@ -63,7 +63,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     const mod = await import("../app/routes/api+/survey-answer");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
@@ -71,7 +71,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     const mod = await import("../app/routes/api+/survey-answer");
 
     const fd0 = new FormData();
-    const r0 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd0 }) } as any));
+    const r0 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd0 }) } as any));
     expect(r0.status).toBe(400);
 
     const fd1 = new FormData();
@@ -79,7 +79,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
-    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(400);
 
     const fd2 = new FormData();
@@ -88,13 +88,13 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
     fd2.set("contactId", "nope");
-    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(400);
   });
 
   test("rejects honeypot field", async () => {
     const mod = await import("../app/routes/api+/survey-answer");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         surveyId: "1",
         questionId: "Q1",
@@ -108,7 +108,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
 
   test("rejects invalid respondent token", async () => {
     const mod = await import("../app/routes/api+/survey-answer");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x?respondent_token=bad-token", { method: "POST", body: new FormData() }),
     } as any));
     expect(res.status).toBe(400);
@@ -116,7 +116,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
 
   test("generates a respondent token when none is provided", async () => {
     const mod = await import("../app/routes/api+/survey-answer");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         surveyId: "1",
         questionId: "Q1",
@@ -146,7 +146,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd.set("questionId", "Q1");
     fd.set("pageId", "p1");
     fd.set("answerValue", "yes");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request(`http://x?respondent_token=${encodeURIComponent(token)}`, {
         method: "POST",
         body: fd,
@@ -169,18 +169,18 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     }
 
     for (let i = 0; i < 10; i++) {
-      const r = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
+      const r = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
       expect(r.status).toBe(200);
     }
 
-    const limited = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
+    const limited = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
     expect(limited.status).toBe(429);
   });
 
   test("rejects contact outside survey workspace", async () => {
     surveyDbMocks.loadContactById.mockResolvedValueOnce({ id: 100, workspace: "ws-other" });
     const mod = await import("../app/routes/api+/survey-answer");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         surveyId: "1",
         questionId: "Q1",
@@ -204,7 +204,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
-    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(404);
 
     surveyDbMocks.saveSurveyAnswer.mockResolvedValueOnce({
@@ -217,7 +217,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd2.set("questionId", "Q1");
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
-    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(500);
   });
 });

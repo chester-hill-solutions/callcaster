@@ -51,7 +51,7 @@ describe("defineAction", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  test("returns a thrown Response as-is (React Router semantics), not a mapped 500", async () => {
+  test("rethrows a thrown Response (React Router semantics), not a mapped 500", async () => {
     const action = defineAction({
       sideEffects: ["none"],
       handler: () => {
@@ -59,12 +59,10 @@ describe("defineAction", () => {
         throw new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
       },
     });
-    const res = await action(args(post({})));
-    expect(res).toBeInstanceOf(Response);
-    expect((res as Response).status).toBe(401);
+    await expect(action(args(post({})))).rejects.toMatchObject({ status: 401 });
   });
 
-  test("returns a Response thrown from the auth strategy as-is", async () => {
+  test("rethrows a Response thrown from the auth strategy", async () => {
     const handler = vi.fn();
     const action = defineAction({
       auth: () => {
@@ -73,8 +71,7 @@ describe("defineAction", () => {
       sideEffects: ["none"],
       handler,
     });
-    const res = await action(args(post({})));
-    expect((res as Response).status).toBe(403);
+    await expect(action(args(post({})))).rejects.toMatchObject({ status: 403 });
     expect(handler).not.toHaveBeenCalled();
   });
 

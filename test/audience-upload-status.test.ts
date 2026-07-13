@@ -138,7 +138,7 @@ describe("api.audience-upload-status loader", () => {
   test("returns 401 when no user", async () => {
     queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api.audience-upload-status"),
     } as any)));
     expect(res.status).toBe(401);
@@ -146,7 +146,7 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 400 when params missing", async () => {
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api.audience-upload-status"),
     } as any)));
     expect(res.status).toBe(400);
@@ -154,7 +154,7 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 400 when uploadId invalid", async () => {
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=not-a-number&workspaceId=w1",
       ),
@@ -169,7 +169,7 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
@@ -189,7 +189,7 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
@@ -218,7 +218,7 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=2&workspaceId=w1",
       ),
@@ -247,7 +247,7 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
@@ -267,7 +267,7 @@ describe("api.audience-upload-status loader", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
@@ -305,7 +305,7 @@ describe("api.audience-upload-status loader", () => {
         user: { id: "u1" },
       });
       const mod = await import("../app/routes/api+/audience-upload-status");
-      const res = await asRouteResponse(await mod.loader(withRouteUrl({
+      const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
         ),
@@ -342,7 +342,7 @@ describe("api.audience-upload-status loader", () => {
         user: { id: "u1" },
       });
       const mod = await import("../app/routes/api+/audience-upload-status");
-      const res = await asRouteResponse(await mod.loader(withRouteUrl({
+      const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
         ),
@@ -378,7 +378,7 @@ describe("api.audience-upload-status loader", () => {
         user: { id: "u1" },
       });
       const mod = await import("../app/routes/api+/audience-upload-status");
-      const res = await asRouteResponse(await mod.loader(withRouteUrl({
+      const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
         ),

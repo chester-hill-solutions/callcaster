@@ -73,8 +73,7 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
     );
-    const response = await asRouteResponse(
-      await mod.loader(
+    const response = await asRouteResponse(mod.loader(
         await withDataPlaneRouteArgs({
           request: new Request("http://localhost/api/workspaces/ws-1/events"),
           params: {},

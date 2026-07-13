@@ -136,7 +136,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
     } as any)));
@@ -168,7 +168,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "77" },
     } as any)));
@@ -193,7 +193,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
     } as any)));
@@ -270,7 +270,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action(withRouteUrl({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
     } as any)));

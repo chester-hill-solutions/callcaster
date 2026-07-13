@@ -62,7 +62,7 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
     const mod = await import("../app/routes/api+/dial/$number.route");
     const fd = new FormData();
     fd.set("From", "+1555");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/dial/+1555", { method: "POST", body: fd }),
       params: { number: "+15550001111" },
     } as any));
@@ -78,8 +78,7 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
     const mod = await import("../app/routes/api+/dial/$number.route");
     const fd = new FormData();
     fd.set("From", "+1555");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/dial/+1555", { method: "POST", body: fd }),
         params: { number: "+15550001111" },
       } as any),

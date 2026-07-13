@@ -91,7 +91,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: null,
     });
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({ request: new Request("http://localhost/api/call-status-poll") } as any)));
+    const res = await asRouteResponse(mod.loader(withRouteUrl({ request: new Request("http://localhost/api/call-status-poll") } as any)));
     expect(res.status).toBe(401);
   }, 30000);
 
@@ -103,7 +103,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({ request: new Request("http://localhost/api/call-status-poll?callSid=CA") } as any)));
+    const res = await asRouteResponse(mod.loader(withRouteUrl({ request: new Request("http://localhost/api/call-status-poll?callSid=CA") } as any)));
     expect(res.status).toBe(400);
   }, 30000);
 
@@ -118,7 +118,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     setCallRow(null);
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(404);
@@ -137,7 +137,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
 
     const mod = await import("../app/routes/api+/call-status-poll");
 
-    const resMismatch = await asRouteResponse(await mod.loader(withRouteUrl({
+    const resMismatch = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(resMismatch.status).toBe(403);
@@ -152,7 +152,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND),
     );
     setCallRow({ workspace: "w1", status: null });
-    const resNoMembership = await asRouteResponse(await mod.loader(withRouteUrl({
+    const resNoMembership = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(resNoMembership.status).toBe(404);
@@ -173,7 +173,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce(null);
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
@@ -195,7 +195,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
@@ -220,7 +220,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(500);
@@ -247,7 +247,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
@@ -271,7 +271,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
@@ -294,7 +294,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
     const mod = await import("../app/routes/api+/call-status-poll");
-    const res = await asRouteResponse(await mod.loader(withRouteUrl({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
@@ -312,7 +312,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/call-status-poll");
-    const r1 = await asRouteResponse(await mod.loader(withRouteUrl({
+    const r1 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(r1.status).toBe(500);
@@ -328,7 +328,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: { id: "u1" },
     });
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce(new Error("boom"));
-    const r2 = await asRouteResponse(await mod.loader(withRouteUrl({
+    const r2 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     await expect(r2.json()).resolves.toEqual({

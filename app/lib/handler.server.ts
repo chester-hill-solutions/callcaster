@@ -56,9 +56,10 @@ async function withGuards<Args extends { request: Request }, A, R>(
     }
     return await run(auth);
   } catch (error) {
-    // Thrown Responses keep React Router semantics: they ARE the response
-    // (e.g. resolveDualAuthSession throws a 401), never a mapped 500.
-    if (error instanceof Response) return error;
+    // Thrown Responses must stay thrown for React Router document loaders
+    // (returning them lets SSR render with empty data → 500). Auth strategies
+    // that *return* a Response are handled above.
+    if (error instanceof Response) throw error;
     return createErrorResponse(error);
   }
 }

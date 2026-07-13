@@ -567,7 +567,7 @@ describe("api.campaign-export", () => {
     authUser = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(401);
@@ -580,7 +580,7 @@ describe("api.campaign-export", () => {
     postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({ request: reqForm("http://x", {}) } as any));
+    const res = await asRouteResponse(mod.action({ request: reqForm("http://x", {}) } as any));
     expect(res.status).toBe(400);
   }, 60000);
 
@@ -592,7 +592,7 @@ describe("api.campaign-export", () => {
     postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(404);
@@ -605,7 +605,7 @@ describe("api.campaign-export", () => {
     postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(404);
@@ -619,7 +619,7 @@ describe("api.campaign-export", () => {
     postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(400);
@@ -633,7 +633,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: {
         formData: () => {
           throw new Error("bad form");
@@ -646,7 +646,7 @@ describe("api.campaign-export", () => {
     requireWorkspaceAccess.mockImplementationOnce(async () => {
       throw "nope";
     });
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(500);
@@ -707,7 +707,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -771,7 +771,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "81", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -807,7 +807,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "5", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -834,7 +834,7 @@ describe("api.campaign-export", () => {
       messages: [],
     });
     applyDualAuth();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "6", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -852,7 +852,7 @@ describe("api.campaign-export", () => {
       outreachAttempts: [],
     });
     applyDualAuth();
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "7", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(200);
@@ -896,7 +896,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "8", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -922,7 +922,7 @@ describe("api.campaign-export", () => {
     postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "9", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -951,7 +951,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "4", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -979,7 +979,7 @@ describe("api.campaign-export", () => {
     });
     postgresForAuth = null;
     applyDualAuth();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "10", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1002,7 +1002,7 @@ describe("api.campaign-export", () => {
       campaignExportMissing: true,
     });
     applyDualAuth();
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "11", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(200);
@@ -1125,7 +1125,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1171,7 +1171,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "50", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1357,7 +1357,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "2", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1395,7 +1395,7 @@ describe("api.campaign-export", () => {
     });
     postgresForAuth = null;
     applyDualAuth();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "40", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1418,7 +1418,7 @@ describe("api.campaign-export", () => {
       campaignExportMissing: true,
     });
     applyDualAuth();
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "41", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(200);
@@ -1448,7 +1448,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "42", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1478,7 +1478,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "3", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1629,7 +1629,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "70", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1807,7 +1807,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "78", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1836,7 +1836,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1874,7 +1874,7 @@ describe("api.campaign-export", () => {
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);

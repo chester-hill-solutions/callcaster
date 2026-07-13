@@ -75,8 +75,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -100,8 +99,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -122,8 +120,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -143,8 +140,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -168,8 +164,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -203,8 +198,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       const mod = await import(
         "../app/routes/workspaces+/$id/chats.action.server"
       );
-      const res = await asRouteResponse(
-        await mod.action(await withWorkspaceRouteArgs({
+      const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
           request: makeFormRequest({
             body: "hi",
             contact_number: "+15551234567",
@@ -224,8 +218,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -246,8 +239,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -267,8 +259,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       "../app/routes/workspaces+/$id/chats.action.server"
     );
     const sendAt = "2026-08-01T12:00:00.000Z";
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -291,8 +282,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
@@ -315,8 +305,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           intent: "cancel_scheduled_message",
           sid: "SM1",
@@ -336,8 +325,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({ intent: "cancel_scheduled_message" }),
         params: { id: "w1" },
       })),
@@ -353,8 +341,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           intent: "cancel_scheduled_message",
           sid: "SM1",
@@ -373,8 +360,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
-    const res = await asRouteResponse(
-      await mod.action(await withWorkspaceRouteArgs({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
         request: makeFormRequest({
           intent: "link_contact",
           contact_id: "9",

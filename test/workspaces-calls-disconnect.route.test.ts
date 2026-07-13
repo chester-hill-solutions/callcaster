@@ -48,8 +48,7 @@ describe("workspaces calls disconnect route", () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/calls/$callSid/disconnect.route"
     );
-    const res = await asRouteResponse(
-      await mod.action(
+    const res = await asRouteResponse(mod.action(
         await withDataPlaneRouteArgs({
           request: new Request(
             "http://localhost/api/workspaces/w1/calls/CA1/disconnect",
@@ -72,8 +71,7 @@ describe("workspaces calls disconnect route", () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/calls/$callSid/disconnect.route"
     );
-    const res = await asRouteResponse(
-      await mod.action(
+    const res = await asRouteResponse(mod.action(
         await withDataPlaneRouteArgs({
           request: new Request(
             "http://localhost/api/workspaces/w1/calls/CA1/disconnect",

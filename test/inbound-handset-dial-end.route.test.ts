@@ -83,7 +83,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
 
   test("returns 405 for non-POST", async () => {
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/inbound-handset-dial-end", {
         method: "GET",
       }),
@@ -96,8 +96,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
         status: 403,
       }));
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeRequest({ called: "+15551234567" }),
       } as never),
     );
@@ -109,8 +108,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
         status: 403,
       }));
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest({ called: "" }) } as never),
+    const res = await asRouteResponse(mod.action({ request: makeRequest({ called: "" }) } as never),
     );
     expect(res.status).toBe(403);
   });
@@ -120,8 +118,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
         status: 403,
       }));
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeRequest({ called: "+19999999999" }),
       } as never),
     );
@@ -130,7 +127,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
 
   test("returns TwiML with no-answer message on happy path", async () => {
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "no-answer" }),
     } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
@@ -146,7 +143,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
       workspaceId: "w1",
     });
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "no-answer" }),
     } as never));
     const text = await res.text();
@@ -157,7 +154,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
   test("returns TwiML hangup only when dial completed", async () => {
     mocks.requireTwilioSignature.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "completed" }),
     } as never));
     const text = await res.text();

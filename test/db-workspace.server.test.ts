@@ -649,7 +649,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     const serverSession: any = { user: { id: "u1" } };
 
     adminDbMocks.selectChain.mockRejectedValueOnce(new Error("x"));
-    const r1 = await asRouteResponse(await mod.handleExistingUserSession(
+    const r1 = await asRouteResponse(mod.handleExistingUserSession(
       serverSession,
       headers,
     ));
@@ -657,7 +657,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(await r1.json()).toMatchObject({ invites: [], newSession: null });
 
     adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
-    const r2 = await asRouteResponse(await mod.handleExistingUserSession(
+    const r2 = await asRouteResponse(mod.handleExistingUserSession(
       serverSession,
       headers,
     ));
@@ -674,21 +674,18 @@ describe("app/lib/database/workspace.server.ts", () => {
     const makeRequest = () =>
       new Request("http://localhost/verify", { headers: new Headers() });
 
-    const r0 = await asRouteResponse(
-      await mod.handleNewUserOTPVerification(makeRequest(), "", "signup", headers),
+    const r0 = await asRouteResponse(mod.handleNewUserOTPVerification(makeRequest(), "", "signup", headers),
     );
     expect(await r0.json()).toEqual({ error: "Invalid invitation link" });
     expect(authApiMocks.verifyEmail).not.toHaveBeenCalled();
 
     authApiMocks.verifyEmail.mockRejectedValueOnce(new Error("verify"));
-    const r1 = await asRouteResponse(
-      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    const r1 = await asRouteResponse(mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
     );
     expect(((await r1.json()) as any).error).toBeTruthy();
 
     authApiMocks.verifyEmail.mockResolvedValueOnce({ response: null });
-    const r2 = await asRouteResponse(
-      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    const r2 = await asRouteResponse(mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
     );
     expect(await r2.json()).toEqual({ error: "Failed to create session" });
 
@@ -696,8 +693,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       response: { user: { id: "u1" } },
     });
     adminDbMocks.selectChain.mockRejectedValueOnce(new Error("inv"));
-    const r3 = await asRouteResponse(
-      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    const r3 = await asRouteResponse(mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
     );
     expect(((await r3.json()) as any).error).toBeTruthy();
 
@@ -705,8 +701,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       response: { user: { id: "u1" } },
     });
     adminDbMocks.selectChain.mockResolvedValueOnce([{ id: 1 }]);
-    const r4 = await asRouteResponse(
-      await mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
+    const r4 = await asRouteResponse(mod.handleNewUserOTPVerification(makeRequest(), "th", "signup", headers),
     );
     expect(await r4.json()).toMatchObject({
       newSession: { user: { id: "u1" } },

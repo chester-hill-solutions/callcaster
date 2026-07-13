@@ -49,7 +49,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     const mod = await import("../app/routes/api+/survey-responses");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
@@ -57,15 +57,15 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
     setDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/survey-responses");
 
-    const r0 = await asRouteResponse(await mod.action({ request: makeReq({ surveyId: "S1" }) } as any));
+    const r0 = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "S1" }) } as any));
     expect(r0.status).toBe(400);
 
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "", responseData: JSON.stringify({}) }),
     } as any));
     expect(r1.status).toBe(400);
 
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "S1", responseData: "not-json" }),
     } as any));
     expect(r2.status).toBe(400);
@@ -76,7 +76,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
 
     queueDualAuthSession({ user: { id: "u1" } });
     surveyDbMocks.getSurveyWorkspaceByPublicId.mockResolvedValueOnce(null);
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
     } as any));
     expect(r1.status).toBe(404);
@@ -87,7 +87,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
       error: "Survey is not active",
       status: 400,
     });
-    const r2 = await asRouteResponse(await mod.action({
+    const r2 = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
     } as any));
     expect(r2.status).toBe(400);
@@ -101,7 +101,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
       status: 500,
     });
     const mod = await import("../app/routes/api+/survey-responses");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
     } as any));
     expect(res.status).toBe(500);
@@ -121,7 +121,7 @@ describe("app/routes/api+/survey-responses/route.tsx", () => {
       last_page_completed: "p1",
       answers: [{ question_id: "Q1", answer_value: "yes" }],
     };
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify(responseData),

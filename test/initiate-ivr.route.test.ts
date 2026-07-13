@@ -80,7 +80,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
       json: async () => ({ creditsError: true }),
     } as any);
     const mod = await import("../app/routes/api+/initiate-ivr");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
     expect(res).toMatchObject({ creditsError: true });
   });
@@ -104,7 +104,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     } as any);
 
     const mod = await import("../app/routes/api+/initiate-ivr");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
     expect(res).toMatchObject({ creditsError: true });
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
@@ -122,7 +122,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     mocks.fetch.mockRejectedValueOnce(new Error("net"));
 
     const mod = await import("../app/routes/api+/initiate-ivr");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual(queue);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error initiating IVR call:", expect.any(Error));
   });

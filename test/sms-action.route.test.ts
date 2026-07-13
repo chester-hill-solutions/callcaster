@@ -142,8 +142,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     });
 
     const mod = await import("../app/routes/api+/sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(200);
@@ -176,8 +175,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     });
 
     const mod = await import("../app/routes/api+/sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(200);
@@ -205,8 +203,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     mocks.getOrLookupLineType.mockResolvedValueOnce("landline");
 
     const mod = await import("../app/routes/api+/sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(200);
@@ -249,8 +246,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
       mocks.getOrLookupLineType.mockResolvedValueOnce(lineType);
 
       const mod = await import("../app/routes/api+/sms.action.server");
-      const res = await asRouteResponse(
-        await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+      const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
       );
 
       expect(res.status).toBe(200);
@@ -278,8 +274,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     });
 
     const mod = await import("../app/routes/api+/sms.action.server");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
     expect(res.status).toBe(200);
