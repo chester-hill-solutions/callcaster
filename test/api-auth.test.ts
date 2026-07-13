@@ -17,6 +17,8 @@ const workspaceMembersMocks = vi.hoisted(() => ({
     workspace_id: string;
     key_hash: string;
     key_prefix: string;
+    scopes?: string[] | null;
+    expires_at?: string | null;
   },
   touchWorkspaceApiKeyLastUsed: vi.fn(),
 }));
@@ -82,6 +84,8 @@ describe("verifyApiKeyOrSession", () => {
     expect(res).toMatchObject({
       authType: "api_key",
       workspaceId: "w1",
+      keyId: "key-1",
+      scopes: [],
     });
     expect(workspaceMembersMocks.apiKeyRow).toMatchObject({ key_hash: hashApiKeyForStorage(key) });
     expect(keyPrefix.length).toBe(API_KEY_PREFIX_LENGTH);

@@ -240,6 +240,8 @@ export async function listWorkspaceApiKeyRows(workspaceId: string, tdbIn?: Tenan
       key_prefix: true,
       created_at: true,
       last_used_at: true,
+      scopes: true,
+      expires_at: true,
     },
     orderBy: (key, { desc: descFn }) => [descFn(key.created_at)],
   });
@@ -251,6 +253,8 @@ export async function insertWorkspaceApiKeyRow(args: {
   name: string;
   keyPrefix: string;
   keyHash: string;
+  scopes: readonly string[];
+  expiresAt: string;
   tdb?: TenantDb;
 }) {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
@@ -261,6 +265,8 @@ export async function insertWorkspaceApiKeyRow(args: {
     key_hash: args.keyHash,
     created_by: args.userId,
     created_at: new Date().toISOString(),
+    scopes: [...args.scopes],
+    expires_at: args.expiresAt,
   });
   return rows[0] ?? null;
 }
@@ -641,6 +647,8 @@ export async function findWorkspaceApiKeyByPrefix(keyPrefix: string) {
       id: workspaceApiKeyTable.id,
       workspace_id: workspaceApiKeyTable.workspace_id,
       key_hash: workspaceApiKeyTable.key_hash,
+      scopes: workspaceApiKeyTable.scopes,
+      expires_at: workspaceApiKeyTable.expires_at,
     })
     .from(workspaceApiKeyTable)
     .where(eq(workspaceApiKeyTable.key_prefix, keyPrefix))

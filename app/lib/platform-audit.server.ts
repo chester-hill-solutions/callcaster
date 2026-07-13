@@ -3,35 +3,16 @@ import {
   listWorkspaceAuditEvents,
   parseAuditEventPageSize,
 } from "@/lib/audit-event.server";
-import { getUserRole } from "@/lib/database/workspace.server";
-import { MemberRole } from "@/lib/member-role";
 
+/**
+ * List workspace audit events. Capability `audit.read` is enforced by the
+ * route loader; this helper only validates cursor/limit and reads rows.
+ */
 export async function listWorkspaceAuditEventsApi(
-  userId: string | null,
+  _userId: string | null,
   workspaceId: string,
   searchParams: URLSearchParams,
 ) {
-  if (!userId) {
-    return {
-      ok: false as const,
-      error: "Audit log access requires a signed-in owner session",
-      status: 403,
-    };
-  }
-
-  const role = await getUserRole({
-    user: { id: userId },
-    workspaceId,
-  });
-
-  if (!role || role.role !== MemberRole.Owner) {
-    return {
-      ok: false as const,
-      error: "Only workspace owners can view the audit log",
-      status: 403,
-    };
-  }
-
   const cursorRaw = searchParams.get("cursor");
   const cursor = decodeAuditEventCursor(cursorRaw);
   if (cursorRaw && !cursor) {

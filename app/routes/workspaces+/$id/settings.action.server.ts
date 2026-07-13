@@ -115,7 +115,23 @@ export const action = defineAction({
           return routeData({ error: "API key name is required" }, { headers, status: 400 });
         }
 
-        const result = await createWorkspaceApiKey(user.id, workspaceId, name);
+        const scopes = formData
+          .getAll("scopes")
+          .map((value) => String(value).trim())
+          .filter(Boolean);
+        if (scopes.length === 0) {
+          return routeData(
+            { error: "Select at least one capability scope" },
+            { headers, status: 400 },
+          );
+        }
+
+        const result = await createWorkspaceApiKey(
+          user.id,
+          workspaceId,
+          name,
+          scopes,
+        );
         if (!result.ok) {
           return routeData({ error: result.error }, { headers, status: result.status });
         }

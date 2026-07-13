@@ -5,6 +5,13 @@ on:
     branches: [main, master]
   pull_request:
 
+# packages:read lets GITHUB_TOKEN fetch @chester-hill-solutions/* from GitHub
+# Packages when the workflow token is permitted. Prefer repository secret
+# NODE_AUTH_TOKEN (PAT with read:packages) if org package access fails.
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -18,6 +25,8 @@ jobs:
       # spawn `bun run services/media-stream/index.ts`.
       - uses: oven-sh/setup-bun@v2
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:node
@@ -50,6 +59,8 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - run: npm run build
       - run: npm run check:client-bundle
 
@@ -64,6 +75,8 @@ jobs:
       # The media-stream service tests spawn `bun run`.
       - uses: oven-sh/setup-bun@v2
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - run: npm run test:coverage
         env:
           COVERAGE_FULL: "0"

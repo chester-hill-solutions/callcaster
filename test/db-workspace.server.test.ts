@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { inspect } from "node:util";
 import { asRouteResponse } from "./helpers/route-result";
 
 const objectStorageMocks = vi.hoisted(() => ({
@@ -29,6 +30,7 @@ vi.mock("@/lib/messaging-onboarding.server", async () => {
 const adminDbMocks = vi.hoisted(() => ({
   workspaceFindFirst: vi.fn(),
   selectChain: vi.fn(),
+  selectWhere: vi.fn(),
   updateWhere: vi.fn(),
 }));
 
@@ -128,6 +130,7 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     adminDbMocks.workspaceFindFirst.mockReset();
     adminDbMocks.selectChain.mockReset();
+    adminDbMocks.selectWhere.mockReset();
     adminDbMocks.updateWhere.mockReset();
     authApiMocks.verifyEmail.mockReset();
     for (const fn of Object.values(rpcMocks)) {
@@ -160,11 +163,17 @@ describe("app/lib/database/workspace.server.ts", () => {
         select: () => ({
           from: () => ({
             innerJoin: () => ({
-              where: () => ({
-                orderBy: () => adminDbMocks.selectChain(),
-              }),
+              where: (...args: unknown[]) => {
+                adminDbMocks.selectWhere(...args);
+                return {
+                  orderBy: () => adminDbMocks.selectChain(),
+                };
+              },
             }),
-            where: () => adminDbMocks.selectChain(),
+            where: (...args: unknown[]) => {
+              adminDbMocks.selectWhere(...args);
+              return adminDbMocks.selectChain();
+            },
           }),
         }),
         update: () => ({
@@ -938,6 +947,50 @@ describe("app/lib/database/workspace.server.ts", () => {
       invitationId: "missing",
       type: "invite",
     });
+  });
+
+  test("acceptWorkspaceInvitations rejects foreign invite ids without membership insert", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+    // DB filter: id IN list AND user_id = authenticated user → foreign invite omitted
+    adminDbMocks.selectChain.mockResolvedValueOnce([]);
+
+    const out = await mod.acceptWorkspaceInvitations(
+      ["foreign-invite"],
+      "attacker",
+    );
+
+    expect(adminDbMocks.selectWhere).toHaveBeenCalled();
+    const whereDump = inspect(adminDbMocks.selectWhere.mock.calls[0]?.[0], {
+      depth: 10,
+    });
+    expect(whereDump).toMatch(/user_id/);
+    expect(whereDump).toMatch(/attacker/);
+
+    expect(out.errors).toEqual([
+      { invitationId: "foreign-invite", type: "invite" },
+    ]);
+    expect(tdbMocks.workspace_users.insert).not.toHaveBeenCalled();
+    expect(tdbMocks.workspace_invite.delete).not.toHaveBeenCalled();
+  });
+
+  test("acceptWorkspaceInvitations accepts own invite and skips foreign ids in same request", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+    // Only the invite owned by u1 is returned; foreign id is filtered out by user_id
+    adminDbMocks.selectChain.mockResolvedValueOnce([
+      { id: "own-invite", workspace: "w1", role: "member" },
+    ]);
+    tdbMocks.workspace_users.insert.mockResolvedValueOnce([{ id: 1 }]);
+    tdbMocks.workspace_invite.delete.mockResolvedValue(undefined);
+
+    const out = await mod.acceptWorkspaceInvitations(
+      ["own-invite", "foreign-invite"],
+      "u1",
+    );
+
+    expect(tdbMocks.workspace_users.insert).toHaveBeenCalledTimes(1);
+    expect(out.errors).toEqual([
+      { invitationId: "foreign-invite", type: "invite" },
+    ]);
   });
 
   test("getInvitesByUserId throws on error and returns data on success", async () => {

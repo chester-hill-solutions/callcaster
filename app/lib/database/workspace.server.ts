@@ -2,7 +2,7 @@
  * Workspace-related database functions
  */
 import Twilio from "twilio";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   audience,
   campaign,
@@ -1002,6 +1002,9 @@ export async function acceptWorkspaceInvitations(
 
   let inviteRows: { id: string; workspace: string; role: string }[];
   try {
+    // SEC-03 stopgap: only invites addressed to this user are selectable.
+    // Foreign/missing IDs are omitted from processing (no membership insert);
+    // callers see them as invite errors without distinguishing ownership.
     inviteRows = await adminDb
       .select({
         id: workspace_invite.id,
@@ -1009,7 +1012,12 @@ export async function acceptWorkspaceInvitations(
         role: workspace_invite.role,
       })
       .from(workspace_invite)
-      .where(inArray(workspace_invite.id, invitationIds));
+      .where(
+        and(
+          inArray(workspace_invite.id, invitationIds),
+          eq(workspace_invite.user_id, userId),
+        ),
+      );
   } catch {
     return {
       errors: invitationIds.map((invitationId) => ({
@@ -1027,6 +1035,7 @@ export async function acceptWorkspaceInvitations(
     .map((invitationId) => {
       const invite = invitesById.get(invitationId);
       if (!invite) {
+        // Missing and foreign invite IDs share this path (no existence leak).
         errors.push({ invitationId, type: "invite" });
         return null;
       }
@@ -1063,7 +1072,10 @@ export async function acceptWorkspaceInvitations(
 
       try {
         await tdb.workspace_invite.delete({
-          where: eq(workspace_invite.id, invitationId),
+          where: and(
+            eq(workspace_invite.id, invitationId),
+            eq(workspace_invite.user_id, userId),
+          ),
         });
       } catch {
         invitationErrors.push({ invitationId, type: "deletion" });

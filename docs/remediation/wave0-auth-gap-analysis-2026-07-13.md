@@ -55,17 +55,17 @@
 ## Publish / adoption sequence
 
 1. Implement extensions in CHS monorepo; package-level tests. — **done:** [PR #22](https://github.com/chester-hill-solutions/chester-hill-solutions/pull/22) (`feat/auth-capability-invite`: auth 0.2.0, auth-postgres 0.3.0, auth-react-router 0.2.0).
-2. Publish all three packages to GitHub Packages. — **blocked:** need merge + `v*` tag (CI uses `packages: write`) **or** a local PAT with `write:packages` / `read:packages`.
-3. CallCaster: install packages; replace local auth-layout shim.
+2. Publish all three packages to GitHub Packages. — **done** (2026-07-13 afternoon): PR #22 merged; tag **v0.1.8** published (auth 0.2.0, auth-postgres 0.3.0, auth-react-router 0.2.0).
+3. CallCaster: install packages; replace local auth-layout shim. — **next** (adopt pending).
 4. Drizzle forward migration: atomic replace `workspace_users` → CHS membership tables.
 5. Update Supabase→Postgres transform to write canonical structures.
-6. Implement SEC-07 capability guard; then SEC-03 invite flow.
+6. Implement SEC-07 capability guard; then SEC-03 invite flow. — SEC-03 IDOR stopgap landed; full SEC-07/SEC-03 adopt still pending.
 
 ## Cutover blockers
 
-1. CHS auth extensions unpublished
+1. ~~CHS auth extensions unpublished~~ — published v0.1.8; CallCaster adopt next
 2. Canonical membership schema absent from Drizzle baseline
 3. Import transform not writing CHS structures
 4. Auth table shape mismatch (`auth_*` vs CHS defaults)
-5. SEC-07 / SEC-03 not started
+5. SEC-07 / SEC-03 — IDOR stopgap landed; full capability guard + invite binding still pending
 6. `field_director` → `admin` mapping policy at data layer

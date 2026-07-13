@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { PRODUCT_CAPABILITIES } from "@/lib/capabilities";
 
 type ApiKeysSectionProps = {
   workspaceId: string;
@@ -17,6 +18,10 @@ type ApiKeysSectionProps = {
   defaultShowCreateForm?: boolean;
   variant?: "elevated" | "flat";
 };
+
+const SCOPE_OPTIONS = Object.entries(PRODUCT_CAPABILITIES) as Array<
+  [keyof typeof PRODUCT_CAPABILITIES, string]
+>;
 
 export default function ApiKeysSection({
   workspaceId,
@@ -101,7 +106,7 @@ export default function ApiKeysSection({
         branded={false}
         compact={variant === "flat"}
         title="API Keys"
-        description="Use API keys to send SMS programmatically (for example from scripts or Zapier)."
+        description="Use API keys to call workspace APIs programmatically. Each key needs explicit capability scopes."
       />
       <div className="space-y-4">
         {listError ? (
@@ -121,85 +126,130 @@ export default function ApiKeysSection({
                 key={key.id}
                 className="flex items-center justify-between gap-4 py-3"
               >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{key.name}</p>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {key.key_prefix}…
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{key.name}</p>
+                  <p className="truncate font-mono text-xs text-muted-foreground">
+                    {key.key_prefix}…
+                  </p>
+                  {key.scopes && key.scopes.length > 0 ? (
+                    <p className="truncate text-xs text-muted-foreground">
+                      Scopes: {key.scopes.join(", ")}
                     </p>
+                  ) : (
                     <p className="text-xs text-muted-foreground">
-                      Created {new Date(key.created_at).toLocaleDateString()}
-                      {key.last_used_at
-                        ? ` · Last used ${new Date(key.last_used_at).toLocaleDateString()}`
-                        : ""}
+                      Scopes: none (deny-all for capability-gated routes)
                     </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRevoke(key.id)}
-                    disabled={mutateFetcher.state === "submitting"}
-                  >
-                    Revoke
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Created {new Date(key.created_at).toLocaleDateString()}
+                    {key.expires_at
+                      ? ` · Expires ${new Date(key.expires_at).toLocaleDateString()}`
+                      : ""}
+                    {key.last_used_at
+                      ? ` · Last used ${new Date(key.last_used_at).toLocaleDateString()}`
+                      : ""}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleRevoke(key.id)}
+                  disabled={mutateFetcher.state === "submitting"}
+                >
+                  Revoke
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {revealedKey ? (
           <div
             className="rounded-md border border-warning/50 bg-warning/10 p-3"
             data-testid="api-key-reveal"
           >
-              <p className="mb-2 text-sm font-semibold text-warning">
-                Copy your key now. We won’t show it again.
-              </p>
+            <p className="mb-2 text-sm font-semibold text-warning">
+              Copy your key now. We won’t show it again.
+            </p>
             <div className="flex flex-wrap gap-2">
               <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-sm">
-                  {revealedKey}
-                </code>
-                <Button type="button" size="sm" onClick={copyKey}>
-                  Copy
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setNewKeyReveal(null)}
-                >
-                  Done
-                </Button>
+                {revealedKey}
+              </code>
+              <Button type="button" size="sm" onClick={copyKey}>
+                Copy
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setNewKeyReveal(null)}
+              >
+                Done
+              </Button>
             </div>
           </div>
         ) : null}
 
         {showCreateForm && !revealedKey ? (
-          <createFetcher.Form method="post" className="flex flex-col gap-2" data-testid="api-key-create-form">
-              <input type="hidden" name="formName" value="createApiKey" />
-              <FormField htmlFor="api-key-name" label="Key name">
-                <Input
-                  aria-label="Key name"
-                  id="api-key-name"
-                  name="name"
-                  type="text"
-                  required
-                  defaultValue=""
-                  placeholder="e.g. Production, Zapier"
+          <createFetcher.Form
+            method="post"
+            className="flex flex-col gap-3"
+            data-testid="api-key-create-form"
+          >
+            <input type="hidden" name="formName" value="createApiKey" />
+            <FormField htmlFor="api-key-name" label="Key name">
+              <Input
+                aria-label="Key name"
+                id="api-key-name"
+                name="name"
+                type="text"
+                required
+                defaultValue=""
+                placeholder="e.g. Production, Zapier"
               />
-              </FormField>
-              <div className="flex gap-2">
-                <Button type="submit" data-testid="api-key-submit">
-                  Create key
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowCreateForm(false)}
-                >
-                  Cancel
-                </Button>
+            </FormField>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Capability scopes</legend>
+              <p className="text-xs text-muted-foreground">
+                Required. Keys only access the scopes you select.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SCOPE_OPTIONS.map(([id, description]) => (
+                  <label
+                    key={id}
+                    className="flex items-start gap-2 text-sm"
+                    htmlFor={`api-key-scope-${id}`}
+                  >
+                    <input
+                      id={`api-key-scope-${id}`}
+                      type="checkbox"
+                      name="scopes"
+                      value={id}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-mono text-xs">{id}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
               </div>
+            </fieldset>
+            <div className="flex gap-2">
+              <Button type="submit" data-testid="api-key-submit">
+                Create key
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreateForm(false)}
+              >
+                Cancel
+              </Button>
+            </div>
           </createFetcher.Form>
         ) : (
           <Button

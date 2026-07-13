@@ -32,7 +32,8 @@ export const message_status = pgEnum("message_status", ["accepted","scheduled","
 export const queue_entry_state = pgEnum("queue_entry_state", ["queued","offered","accepted","declined","timed_out","abandoned","completed"]);
 export const queue_status = pgEnum("queue_status", ["queued","dequeued"]);
 export const voter_list_source = pgEnum("voter_list_source", ["liberalist","van","elections_canada","elections_ontario","manual","other"]);
-export const workspace_role = pgEnum("workspace_role", ["owner","member","caller","admin"]);
+/** Legacy enum renamed in 0008_chs_workspace_membership (CHS table claims workspace_role). */
+export const workspace_role = pgEnum("workspace_users_role", ["owner","member","caller","admin"]);
 
 // ─── Workspace ──────────────────────────────────────
 
@@ -60,6 +61,80 @@ export const workspace_users = pgTable("workspace_users", {
   workspace_id: uuid().notNull(),
 });
 
+/** CHS canonical membership (Wave 1 scaffold). Readers still use workspace_users. */
+export const workspace_member = pgTable(
+  "workspace_member",
+  {
+    id: text().notNull().primaryKey(),
+    workspace_id: text().notNull(),
+    user_id: text().notNull(),
+    role_id: text().notNull(),
+    invited_by: text(),
+    created_at: timestamp().notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("workspace_member_workspace_user_idx").on(table.workspace_id, table.user_id)],
+);
+
+/** CHS role templates; global when workspace_id is null. */
+export const workspace_role_row = pgTable(
+  "workspace_role",
+  {
+    id: text().notNull().primaryKey(),
+    name: text().notNull(),
+    workspace_id: text(),
+    rank: integer().notNull().default(0),
+    created_at: timestamp().notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("workspace_role_workspace_name_idx").on(table.workspace_id, table.name)],
+);
+
+export const workspace_feature = pgTable(
+  "workspace_feature",
+  {
+    id: text().notNull().primaryKey(),
+    name: text().notNull(),
+    description: text(),
+    workspace_id: text(),
+    created_at: timestamp().notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("workspace_feature_workspace_name_idx").on(table.workspace_id, table.name)],
+);
+
+export const workspace_feature_permission = pgTable(
+  "workspace_feature_permission",
+  {
+    id: text().notNull().primaryKey(),
+    workspace_id: text(),
+    role_id: text().notNull(),
+    feature_id: text().notNull(),
+    allowed: boolean().notNull().default(false),
+    created_at: timestamp().notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("workspace_feature_permission_scope_idx").on(
+      table.workspace_id,
+      table.role_id,
+      table.feature_id,
+    ),
+  ],
+);
+
+/** CHS email-first invitation (SEC-03 attach after DDL). */
+export const workspace_invitation = pgTable("workspace_invitation", {
+  id: text().notNull().primaryKey(),
+  workspace_id: text().notNull(),
+  email: text().notNull(),
+  role_id: text().notNull(),
+  invited_by_user_id: text().notNull(),
+  token_hash: text().notNull(),
+  status: text().notNull().default("pending"),
+  expires_at: timestamp().notNull(),
+  accepted_at: timestamp(),
+  accepted_by_user_id: text(),
+  created_at: timestamp().notNull().defaultNow(),
+  updated_at: timestamp().notNull().defaultNow(),
+});
+
 export const workspace_api_key = pgTable(
   "workspace_api_key",
   {
@@ -71,6 +146,10 @@ export const workspace_api_key = pgTable(
     created_by: uuid(),
     created_at: text().notNull(),
     last_used_at: text(),
+    /** ProductCapabilityId allowlist; empty = deny-all for capability-gated routes. */
+    scopes: text().array().notNull().default([]),
+    /** ISO-8601 expiry; null only for pre-SEC-07 legacy keys. */
+    expires_at: text(),
   },
   (table) => [uniqueIndex("workspace_api_key_key_prefix_unique").on(table.key_prefix)],
 );

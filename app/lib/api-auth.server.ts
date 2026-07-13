@@ -1,6 +1,8 @@
 import { createHash, timingSafeEqual } from "crypto";
 import { getSession, resolveBearerSessionUser } from "./auth.server";
 import { jsonError } from "./platform-api.server";
+import type { ProductCapabilityId } from "@/lib/capabilities";
+import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import {
   findWorkspaceApiKeyByPrefix,
   getUserById,
@@ -35,6 +37,9 @@ function extractBearerToken(request: Request): string | null {
 export type ApiKeyAuthResult = {
   authType: "api_key";
   workspaceId: string;
+  keyId: string;
+  /** ProductCapabilityId allowlist; empty denies newly gated routes. */
+  scopes: readonly string[];
 };
 
 export type BearerSessionAuthResult = {
@@ -118,6 +123,13 @@ export async function verifyApiKeyOrSession(
       return { error: "Invalid API key", status: 401 };
     }
 
+    if (row.expires_at) {
+      const expiresAtMs = Date.parse(row.expires_at);
+      if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+        return { error: "API key expired", status: 401 };
+      }
+    }
+
     const expectedHash = row.key_hash;
     const actualHash = hashApiKey(rawKey);
     if (!secureCompare(expectedHash, actualHash)) {
@@ -129,6 +141,8 @@ export async function verifyApiKeyOrSession(
     return {
       authType: "api_key",
       workspaceId: row.workspace_id,
+      keyId: row.id,
+      scopes: row.scopes ?? [],
     };
   }
 
@@ -152,6 +166,10 @@ export async function requireJsonAuth(
 
 export async function requireDualAuth(
   request: Request,
+  options?: {
+    capability?: ProductCapabilityId;
+    workspaceId?: string;
+  },
 ): Promise<
   ApiKeyAuthResult | BearerSessionAuthResult | SessionAuthResult | Response
 > {
@@ -159,6 +177,24 @@ export async function requireDualAuth(
   if ("error" in result) {
     return jsonError(result.error, result.status);
   }
+
+  if (options?.capability) {
+    const workspaceId =
+      options.workspaceId ??
+      (result.authType === "api_key" ? result.workspaceId : undefined);
+    if (!workspaceId) {
+      return jsonError("workspaceId is required for capability checks", 400);
+    }
+    const gated = await requireDualAuthCapability({
+      auth: result,
+      workspaceId,
+      capability: options.capability,
+    });
+    if (gated instanceof Response) {
+      return gated;
+    }
+  }
+
   return result;
 }
 

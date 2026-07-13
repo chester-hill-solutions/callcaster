@@ -73,15 +73,35 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
     mocks.createWorkspaceApiKey.mockResolvedValueOnce({
       ok: true,
       key: "cc_live_secret",
-      api_key: { id: "id1", name: "Name", key_prefix: "cc_live_", created_at: "t" },
+      api_key: {
+        id: "id1",
+        name: "Name",
+        key_prefix: "cc_live_",
+        created_at: "t",
+        scopes: ["messages.send"],
+        expires_at: "t",
+      },
     });
     const r2 = await asRouteResponse(mod.action(withRouteUrl({
-      request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "00000000-0000-4000-8000-000000000001", name: " Name " }) }),
+      request: new Request("http://x", {
+        method: "POST",
+        body: JSON.stringify({
+          workspace_id: "00000000-0000-4000-8000-000000000001",
+          name: " Name ",
+          scopes: ["messages.send"],
+        }),
+      }),
     } as any)));
     expect(r2.status).toBe(201);
     const b2 = await r2.json();
     expect(b2.key).toMatch(/^cc_live_/);
-    expect(b2).toMatchObject({ id: "id1", name: "Name", key_prefix: "cc_live_", created_at: "t" });
+    expect(b2).toMatchObject({
+      id: "id1",
+      name: "Name",
+      key_prefix: "cc_live_",
+      created_at: "t",
+      scopes: ["messages.send"],
+    });
 
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.createWorkspaceApiKey.mockResolvedValueOnce({
@@ -90,7 +110,14 @@ describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
       status: 500,
     });
     const r3 = await asRouteResponse(mod.action(withRouteUrl({
-      request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "00000000-0000-4000-8000-000000000001", name: "Name" }) }),
+      request: new Request("http://x", {
+        method: "POST",
+        body: JSON.stringify({
+          workspace_id: "00000000-0000-4000-8000-000000000001",
+          name: "Name",
+          scopes: ["messages.send"],
+        }),
+      }),
     } as any)));
     expect(r3.status).toBe(500);
     await expect(r3.json()).resolves.toEqual({ error: "ins" });
