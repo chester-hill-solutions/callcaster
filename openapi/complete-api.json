@@ -6985,18 +6985,21 @@
       "patch": {
         "operationId": "patchWorkspaces_workspaceId",
         "summary": "PATCH /api/workspaces/:workspaceId",
-        "description": "",
+        "description": "GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
         "tags": [
-          "User API",
+          "Integrator API",
           "workspace"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
         "requestBody": {
@@ -7048,18 +7051,21 @@
       "delete": {
         "operationId": "deleteWorkspaces_workspaceId",
         "summary": "DELETE /api/workspaces/:workspaceId",
-        "description": "",
+        "description": "GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
         "tags": [
-          "User API",
+          "Integrator API",
           "workspace"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
         "responses": {

@@ -151,7 +151,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId",
     routeModule: "app/routes/api+/workspaces+/$workspaceId.route.tsx",
-    authClass: "session",
+    authClass: "apiKeyOrSession",
     ownerArea: "workspace",
     exposure: "sessionOnly",
     docsGuide: GUIDE.platform,
@@ -161,6 +161,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+    notes: "GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId",

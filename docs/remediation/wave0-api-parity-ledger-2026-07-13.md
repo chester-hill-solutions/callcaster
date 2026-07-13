@@ -22,15 +22,15 @@
 | Meta | Full API-01 programmatic parity | **missing** | Post-cutover |
 | Meta | SEC-07 capability registry | **missing** | |
 | Workspace | List/create workspaces | **proved** | |
-| Workspace | Scoped GET/PATCH/DELETE | **partial** | Session-only; SEC-01 path |
-| Workspace | `POST /api/workspace` | **deprecated-hard-cut** | SEC-01 |
+| Workspace | Scoped GET/PATCH/DELETE | **partial** | OpenAPI documented; GET dual-auth, PATCH admin+, DELETE owner |
+| Workspace | `POST /api/workspace` | **deprecated-hard-cut** | SEC-01 — deleted |
 | Workspace | Members, API keys, numbers, billing | **partial** | Session trust-root |
 | Campaigns | create-with-script integrator | **proved** | 3 integrator paths |
 | Campaigns | Legacy CRUD + data-plane | **partial** | Weak schemas |
 | Campaigns | Queue/audience legacy | **partial** | DATA-01 tenancy gaps |
 | Dialer | Manual dial, auto-dial session | **partial** | Session UI paths |
 | Dialer | `POST /api/auto-dial/dialer` | **deprecated-hard-cut** | SEC-02 unauthenticated |
-| Dialer | Workspace dialer start (planned) | **missing** | SEC-02 cutover route |
+| Dialer | Workspace dialer start (planned) | **partial** | SEC-02 cutover route shipped; OpenAPI `startCampaignDialer` |
 | Dialer | Twilio callbacks | **proved** | Signature validated |
 | SMS | Campaign + chat SMS integrator | **proved** | |
 | SMS | Conversations read | **partial** | Read-only API key |
@@ -47,7 +47,7 @@
 |--------|------:|
 | proved | 11 |
 | partial | 28 |
-| missing | 3 |
+| missing | 2 |
 | deprecated-hard-cut | 2 |
 
 ## Board contradictions
@@ -55,7 +55,7 @@
 1. Branch mismatch: board on `feat/supabase-postgres-migration`; handoff on `chore/effects-strictness`.
 2. Board 4.5 = inventory sync, not API-01 full parity.
 3. Board 3C.6 dialer Done ≠ SEC-02 secure — HTTP surface is deprecated-hard-cut.
-4. `docs/api-workspace-admin.md` still centers legacy `POST /api/workspace`.
+4. `docs/api-workspace-admin.md` updated for scoped workspace routes (legacy `POST /api/workspace` removed).
 
 ## Explicit exclusions (API-01)
 

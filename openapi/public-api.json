@@ -5205,41 +5205,28 @@
     },
     "/api/workspaces/{workspaceId}": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId",
-        "summary": "GET /api/workspaces/:workspaceId",
-        "description": "Middleware layout for nested workspace API routes; no direct handler.\n\nDuplicate/legacy route registration.",
+        "operationId": "getWorkspace",
+        "summary": "Get workspace details",
         "tags": [
-          "Workspace",
-          "User API"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
-          }
-        ],
-        "parameters": [
+          },
           {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
+            "apiKey": []
           }
         ],
+        "description": "Returns workspace metadata for an authorized session member or workspace API key scoped to the route workspace.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Workspace details",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceDetailResponse"
                 }
               }
             }
@@ -5249,17 +5236,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "404": {
+            "description": "Workspace not found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5267,42 +5254,45 @@
         }
       },
       "patch": {
-        "operationId": "patchWorkspaces_workspaceId",
-        "summary": "PATCH /api/workspaces/:workspaceId",
-        "description": "",
+        "operationId": "updateWorkspace",
+        "summary": "Update workspace settings",
         "tags": [
-          "Workspace",
-          "User API"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Rename a workspace. Requires an admin-or-higher signed-in session.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/UpdateWorkspaceRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Workspace updated",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/UpdateWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5312,17 +5302,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Admin role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5330,30 +5330,35 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId",
-        "summary": "DELETE /api/workspaces/:workspaceId",
-        "description": "",
+        "operationId": "deleteWorkspace",
+        "summary": "Delete a workspace",
         "tags": [
-          "Workspace",
-          "User API"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Permanently delete a workspace. Owner session only.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Workspace deleted",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Deletion blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5363,17 +5368,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Owner role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -10336,6 +10341,91 @@
           "next_cursor": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "WorkspaceSummary": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "WorkspaceDetail": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "credits": {
+            "type": "number",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "WorkspaceDetailResponse": {
+        "type": "object",
+        "required": [
+          "workspace"
+        ],
+        "properties": {
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceSummary"
+          }
+        }
+      },
+      "UpdateWorkspaceRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "UpdateWorkspaceResponse": {
+        "type": "object",
+        "required": [
+          "workspace"
+        ],
+        "properties": {
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceDetail"
+          }
+        }
+      },
+      "DeleteWorkspaceResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
           }
         }
       }

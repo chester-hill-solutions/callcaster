@@ -8,7 +8,11 @@ Spec: [`/api/docs/openapi`](/api/docs/openapi) · Auth: [auth matrix](./api-auth
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/workspace` | Update workspace settings (JSON body) |
+| GET | `/api/workspaces/:workspaceId` | Read workspace metadata (session or workspace API key) |
+| PATCH | `/api/workspaces/:workspaceId` | Rename workspace (admin+ session) |
+| DELETE | `/api/workspaces/:workspaceId` | Delete workspace (owner session) |
+
+Legacy `POST /api/workspace` is removed (SEC-01). Use the scoped routes above.
 
 ## API keys
 

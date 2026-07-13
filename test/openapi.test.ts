@@ -198,4 +198,21 @@ describe("openapi spec", () => {
       audit?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
     ).toContain("WorkspaceAuditEventListResponse");
   });
+
+  test("workspace scoped routes have stable operationIds and mixed auth", () => {
+    const workspace = openApiSpec.paths["/api/workspaces/{workspaceId}"];
+
+    expect(workspace.get?.operationId).toBe("getWorkspace");
+    expect(workspace.patch?.operationId).toBe("updateWorkspace");
+    expect(workspace.delete?.operationId).toBe("deleteWorkspace");
+    expect(workspace.get?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(workspace.patch?.security).toEqual([{ sessionCookie: [] }]);
+    expect(workspace.delete?.security).toEqual([{ sessionCookie: [] }]);
+    expect(
+      workspace.patch?.requestBody?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("UpdateWorkspaceRequest");
+    expect(
+      workspace.get?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("WorkspaceDetailResponse");
+  });
 });

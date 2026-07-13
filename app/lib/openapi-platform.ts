@@ -181,10 +181,57 @@ export const platformOpenApiComponents = {
         next_cursor: { type: "string" as const, nullable: true },
       },
     },
+    WorkspaceSummary: {
+      type: "object" as const,
+      required: ["name"] as const,
+      properties: {
+        name: { type: "string" as const },
+      },
+    },
+    WorkspaceDetail: {
+      type: "object" as const,
+      required: ["id", "name"] as const,
+      properties: {
+        id: { type: "string" as const, format: "uuid" },
+        name: { type: "string" as const },
+        credits: { type: "number" as const, nullable: true },
+        created_at: { type: "string" as const, format: "date-time", nullable: true },
+      },
+    },
+    WorkspaceDetailResponse: {
+      type: "object" as const,
+      required: ["workspace"] as const,
+      properties: {
+        workspace: { $ref: "#/components/schemas/WorkspaceSummary" },
+      },
+    },
+    UpdateWorkspaceRequest: {
+      type: "object" as const,
+      required: ["name"] as const,
+      properties: {
+        name: { type: "string" as const, minLength: 1, maxLength: 200 },
+      },
+    },
+    UpdateWorkspaceResponse: {
+      type: "object" as const,
+      required: ["workspace"] as const,
+      properties: {
+        workspace: { $ref: "#/components/schemas/WorkspaceDetail" },
+      },
+    },
+    DeleteWorkspaceResponse: {
+      type: "object" as const,
+      required: ["success"] as const,
+      properties: {
+        success: { type: "boolean" as const, enum: [true] as const },
+      },
+    },
   },
 };
 
 const cutoverTelephonySecurity = [{ sessionCookie: [] }, { apiKey: [] }];
+const cutoverDataPlaneSecurity = [{ sessionCookie: [] }, { apiKey: [] }];
+const sessionOnlySecurity = [{ sessionCookie: [] }];
 
 export const platformPathOverrides: Record<string, Record<string, unknown>> = {
   "/api/auth/register": {
@@ -322,6 +369,77 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
           },
         },
         "401": errorResponse("Unauthorized"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}": {
+    get: {
+      operationId: "getWorkspace",
+      summary: "Get workspace details",
+      tags: ["Platform API", "Workspace"],
+      security: cutoverDataPlaneSecurity,
+      description:
+        "Returns workspace metadata for an authorized session member or workspace API key scoped to the route workspace.",
+      responses: {
+        "200": {
+          description: "Workspace details",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkspaceDetailResponse" },
+            },
+          },
+        },
+        "401": errorResponse("Unauthorized"),
+        "404": errorResponse("Workspace not found"),
+      },
+    },
+    patch: {
+      operationId: "updateWorkspace",
+      summary: "Update workspace settings",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description: "Rename a workspace. Requires an admin-or-higher signed-in session.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/UpdateWorkspaceRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Workspace updated",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateWorkspaceResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Admin role required"),
+        "404": errorResponse("Workspace not found"),
+      },
+    },
+    delete: {
+      operationId: "deleteWorkspace",
+      summary: "Delete a workspace",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description: "Permanently delete a workspace. Owner session only.",
+      responses: {
+        "200": {
+          description: "Workspace deleted",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DeleteWorkspaceResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Deletion blocked"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Owner role required"),
       },
     },
   },
