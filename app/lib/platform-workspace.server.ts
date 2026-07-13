@@ -206,5 +206,16 @@ export async function transferWorkspaceOwnershipApi(
     return { ok: false as const, error: String(result.error), status: 400 };
   }
 
+  await safeRecordWorkspaceAuditEvent({
+    workspaceId,
+    actorType: "session",
+    actorId: userId,
+    action: "workspace.transfer_ownership",
+    targetType: "workspace",
+    targetId: workspaceId,
+    outcome: "success",
+    metadata: { new_owner_user_id: newOwnerUserId },
+  });
+
   return { ok: true as const, new_owner_user_id: newOwnerUserId };
 }

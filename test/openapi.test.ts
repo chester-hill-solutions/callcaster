@@ -220,6 +220,9 @@ describe("openapi spec", () => {
     const apiKeys = openApiSpec.paths["/api/workspaces/{workspaceId}/api-keys"];
     const members = openApiSpec.paths["/api/workspaces/{workspaceId}/members"];
     const webhook = openApiSpec.paths["/api/workspaces/{workspaceId}/webhook"];
+    const numbers = openApiSpec.paths["/api/workspaces/{workspaceId}/numbers"];
+    const transfer =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/transfer-ownership"].post;
 
     expect(apiKeys.get?.operationId).toBe("listWorkspaceApiKeys");
     expect(apiKeys.post?.operationId).toBe("createWorkspaceApiKey");
@@ -228,13 +231,21 @@ describe("openapi spec", () => {
     expect(members.post?.["x-callcaster-capability"]).toBe("members.invite");
     expect(webhook.put?.operationId).toBe("upsertWorkspaceWebhook");
     expect(webhook.post?.operationId).toBe("testWorkspaceWebhook");
+    expect(transfer?.operationId).toBe("transferWorkspaceOwnership");
+    expect(numbers.get?.operationId).toBe("listWorkspaceNumbers");
+    expect(numbers.post?.operationId).toBe("purchaseWorkspaceNumber");
+    expect(
+      openApiSpec.paths["/api/workspaces/{workspaceId}/numbers/{numberId}"].patch
+        ?.operationId,
+    ).toBe("patchWorkspaceNumber");
 
-    for (const pathItem of [apiKeys, members, webhook]) {
+    for (const pathItem of [apiKeys, members, webhook, numbers]) {
       for (const op of Object.values(pathItem)) {
         if (op && typeof op === "object" && "security" in op) {
           expect(op.security).toEqual([{ sessionCookie: [] }]);
         }
       }
     }
+    expect(transfer?.security).toEqual([{ sessionCookie: [] }]);
   });
 });

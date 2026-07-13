@@ -424,6 +424,78 @@ export const platformOpenApiComponents = {
         statusText: { type: "string" as const },
       },
     },
+    TransferOwnershipRequest: {
+      type: "object" as const,
+      required: ["new_owner_user_id"] as const,
+      properties: {
+        new_owner_user_id: { type: "string" as const, format: "uuid" },
+      },
+    },
+    TransferOwnershipResponse: {
+      type: "object" as const,
+      required: ["success", "new_owner_user_id"] as const,
+      properties: {
+        success: { type: "boolean" as const, enum: [true] as const },
+        new_owner_user_id: { type: "string" as const, format: "uuid" },
+      },
+    },
+    WorkspacePhoneNumber: {
+      type: "object" as const,
+      properties: {
+        id: { type: "integer" as const },
+        phone_number: { type: "string" as const },
+        friendly_name: { type: "string" as const, nullable: true },
+        inbound_action: { type: "string" as const, nullable: true },
+        handset_enabled: { type: "boolean" as const, nullable: true },
+      },
+      additionalProperties: true,
+    },
+    WorkspaceNumbersListResponse: {
+      type: "object" as const,
+      required: ["numbers"] as const,
+      properties: {
+        numbers: {
+          type: "array" as const,
+          items: { $ref: "#/components/schemas/WorkspacePhoneNumber" },
+        },
+      },
+    },
+    PurchaseNumberRequest: {
+      type: "object" as const,
+      required: ["phone_number"] as const,
+      properties: {
+        phone_number: { type: "string" as const, minLength: 1 },
+      },
+    },
+    PurchaseNumberResponse: {
+      type: "object" as const,
+      required: ["number"] as const,
+      properties: {
+        number: { $ref: "#/components/schemas/WorkspacePhoneNumber" },
+        messagingServiceAttached: { type: "boolean" as const },
+        messagingServiceAttachError: { type: "string" as const },
+        partialSuccess: { type: "boolean" as const },
+      },
+    },
+    PatchNumberRequest: {
+      type: "object" as const,
+      properties: {
+        friendly_name: { type: "string" as const, minLength: 1 },
+        inbound_action: { type: "string" as const },
+        inbound_audio: { type: "string" as const, nullable: true },
+        inbound_ring_count: { type: "integer" as const, minimum: 1, maximum: 10 },
+        inbound_queue_id: { type: "integer" as const, nullable: true },
+        inbound_script_id: { type: "integer" as const, nullable: true },
+        handset_enabled: { type: "boolean" as const },
+      },
+    },
+    PatchNumberResponse: {
+      type: "object" as const,
+      required: ["number"] as const,
+      properties: {
+        number: { $ref: "#/components/schemas/WorkspacePhoneNumber" },
+      },
+    },
   },
 };
 
@@ -1002,6 +1074,134 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         "400": errorResponse("Validation error or blocked destination URL"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Member manager role required"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/transfer-ownership": {
+    post: {
+      operationId: "transferWorkspaceOwnership",
+      summary: "Transfer workspace ownership",
+      tags: ["Platform API", "Workspace"],
+      security: sessionOnlySecurity,
+      description:
+        "Owner session only. The incoming owner must have MFA enrolled (SEC-08).",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/TransferOwnershipRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Ownership transferred",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/TransferOwnershipResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Transfer blocked"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Owner session and new-owner MFA required"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/numbers": {
+    get: {
+      operationId: "listWorkspaceNumbers",
+      summary: "List workspace phone numbers",
+      tags: ["Platform API", "Workspace", "Telephony"],
+      security: sessionOnlySecurity,
+      responses: {
+        "200": {
+          description: "Phone numbers",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkspaceNumbersListResponse" },
+            },
+          },
+        },
+        "401": errorResponse("Unauthorized"),
+      },
+    },
+    post: {
+      operationId: "purchaseWorkspaceNumber",
+      summary: "Purchase and provision a phone number",
+      tags: ["Platform API", "Workspace", "Telephony"],
+      security: sessionOnlySecurity,
+      description: "Requires sufficient workspace credits and numbers-manager role.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/PurchaseNumberRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Number purchased",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PurchaseNumberResponse" },
+            },
+          },
+        },
+        "402": errorResponse("Insufficient credits"),
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Numbers manager role required"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/numbers/{numberId}": {
+    patch: {
+      operationId: "patchWorkspaceNumber",
+      summary: "Update phone number settings",
+      tags: ["Platform API", "Workspace", "Telephony"],
+      security: sessionOnlySecurity,
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/PatchNumberRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Number updated",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PatchNumberResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Numbers manager role required"),
+        "404": errorResponse("Number not found"),
+      },
+    },
+    delete: {
+      operationId: "deleteWorkspaceNumber",
+      summary: "Release a workspace phone number",
+      tags: ["Platform API", "Workspace", "Telephony"],
+      security: sessionOnlySecurity,
+      responses: {
+        "200": {
+          description: "Number released",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DeleteWorkspaceResponse" },
+            },
+          },
+        },
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Numbers manager role required"),
+        "404": errorResponse("Number not found"),
       },
     },
   },

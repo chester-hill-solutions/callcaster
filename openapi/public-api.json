@@ -5388,42 +5388,45 @@
     },
     "/api/workspaces/{workspaceId}/transfer-ownership": {
       "post": {
-        "operationId": "postWorkspaces_workspaceId_transfer_ownership",
-        "summary": "POST /api/workspaces/:workspaceId/transfer-ownership",
-        "description": "",
+        "operationId": "transferWorkspaceOwnership",
+        "summary": "Transfer workspace ownership",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Owner session only. The incoming owner must have MFA enrolled (SEC-08).",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/TransferOwnershipRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Ownership transferred",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/TransferOwnershipResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Transfer blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5433,17 +5436,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Owner session and new-owner MFA required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5838,41 +5841,25 @@
     },
     "/api/workspaces/{workspaceId}/numbers": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_numbers",
-        "summary": "GET /api/workspaces/:workspaceId/numbers",
-        "description": "",
+        "operationId": "listWorkspaceNumbers",
+        "summary": "List workspace phone numbers",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Phone numbers",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceNumbersListResponse"
                 }
               }
             }
@@ -5882,17 +5869,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5900,42 +5877,46 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_numbers",
-        "summary": "POST /api/workspaces/:workspaceId/numbers",
-        "description": "",
+        "operationId": "purchaseWorkspaceNumber",
+        "summary": "Purchase and provision a phone number",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Requires sufficient workspace credits and numbers-manager role.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/PurchaseNumberRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Number purchased",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/PurchaseNumberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5945,17 +5926,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Numbers manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5965,17 +5956,13 @@
     },
     "/api/workspaces/{workspaceId}/numbers/{numberId}": {
       "patch": {
-        "operationId": "patchWorkspaces_workspaceId_numbers_numberId",
-        "summary": "PATCH /api/workspaces/:workspaceId/numbers/:numberId",
-        "description": "",
+        "operationId": "patchWorkspaceNumber",
+        "summary": "Update phone number settings",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
@@ -5986,21 +5973,28 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/PatchNumberRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Number updated",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/PatchNumberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6010,17 +6004,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Numbers manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6028,17 +6032,13 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId_numbers_numberId",
-        "summary": "DELETE /api/workspaces/:workspaceId/numbers/:numberId",
-        "description": "",
+        "operationId": "deleteWorkspaceNumber",
+        "summary": "Release a workspace phone number",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
@@ -6046,12 +6046,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Number released",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
                 }
               }
             }
@@ -6061,17 +6060,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Numbers manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -10828,6 +10837,150 @@
           },
           "statusText": {
             "type": "string"
+          }
+        }
+      },
+      "TransferOwnershipRequest": {
+        "type": "object",
+        "required": [
+          "new_owner_user_id"
+        ],
+        "properties": {
+          "new_owner_user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "TransferOwnershipResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "new_owner_user_id"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "new_owner_user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "WorkspacePhoneNumber": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "phone_number": {
+            "type": "string"
+          },
+          "friendly_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "inbound_action": {
+            "type": "string",
+            "nullable": true
+          },
+          "handset_enabled": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "WorkspaceNumbersListResponse": {
+        "type": "object",
+        "required": [
+          "numbers"
+        ],
+        "properties": {
+          "numbers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspacePhoneNumber"
+            }
+          }
+        }
+      },
+      "PurchaseNumberRequest": {
+        "type": "object",
+        "required": [
+          "phone_number"
+        ],
+        "properties": {
+          "phone_number": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "PurchaseNumberResponse": {
+        "type": "object",
+        "required": [
+          "number"
+        ],
+        "properties": {
+          "number": {
+            "$ref": "#/components/schemas/WorkspacePhoneNumber"
+          },
+          "messagingServiceAttached": {
+            "type": "boolean"
+          },
+          "messagingServiceAttachError": {
+            "type": "string"
+          },
+          "partialSuccess": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PatchNumberRequest": {
+        "type": "object",
+        "properties": {
+          "friendly_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inbound_action": {
+            "type": "string"
+          },
+          "inbound_audio": {
+            "type": "string",
+            "nullable": true
+          },
+          "inbound_ring_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "inbound_queue_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "inbound_script_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "handset_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PatchNumberResponse": {
+        "type": "object",
+        "required": [
+          "number"
+        ],
+        "properties": {
+          "number": {
+            "$ref": "#/components/schemas/WorkspacePhoneNumber"
           }
         }
       }
