@@ -1,42 +1,46 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import {
   findCampaignMessageMedia,
   updateCampaignMessageMedia,
 } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request, params, context }: ActionFunctionArgs) => {
-  const campaignId = params.selected_id;
-  const { headers, workspaceId } = getWorkspaceRouteContext(context);
-  if (!campaignId || !workspaceId) {
-    throw new Response("Campaign ID is required", { status: 400 });
-  }
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ request, params, auth }) => {
+    const campaignId = params.selected_id;
+    const { headers, workspaceId } = auth;
+    if (!campaignId || !workspaceId) {
+      throw new Response("Campaign ID is required", { status: 400 });
+    }
 
-  const formData = await request.formData();
-  const mediaName = formData.get("fileName");
-  const encodedMediaName = mediaName ? encodeURI(mediaName.toString()) : null;
+    const formData = await request.formData();
+    const mediaName = formData.get("fileName");
+    const encodedMediaName = mediaName ? encodeURI(mediaName.toString()) : null;
 
-  if (!encodedMediaName) {
-    return routeData({ success: false, error: "File name is required" });
-  }
+    if (!encodedMediaName) {
+      return routeData({ success: false, error: "File name is required" });
+    }
 
-  const campaign = await findCampaignMessageMedia(workspaceId, parseInt(campaignId, 10));
+    const campaign = await findCampaignMessageMedia(workspaceId, parseInt(campaignId, 10));
 
-  if (!campaign) {
-    logger.error("Campaign Error", new Error("Campaign not found"));
-    return routeData({ success: false, error: "Campaign not found" }, { headers });
-  }
+    if (!campaign) {
+      logger.error("Campaign Error", new Error("Campaign not found"));
+      return routeData({ success: false, error: "Campaign not found" }, { headers });
+    }
 
-  const campaignUpdate = await updateCampaignMessageMedia(
-    workspaceId,
-    parseInt(campaignId, 10),
-    campaign.message_media?.filter((med) => med !== encodedMediaName) || [],
-  );
+    const campaignUpdate = await updateCampaignMessageMedia(
+      workspaceId,
+      parseInt(campaignId, 10),
+      campaign.message_media?.filter((med) => med !== encodedMediaName) || [],
+    );
 
-  if (!campaignUpdate) {
-    return routeData({ success: false, error: "Campaign update failed" }, { headers });
-  }
-  return routeData({ success: true, data: [campaignUpdate] }, { headers });
-};
+    if (!campaignUpdate) {
+      return routeData({ success: false, error: "Campaign update failed" }, { headers });
+    }
+    return routeData({ success: true, data: [campaignUpdate] }, { headers });
+  },
+});

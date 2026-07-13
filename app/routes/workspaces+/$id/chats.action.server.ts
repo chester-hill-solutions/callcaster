@@ -1,4 +1,4 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
   getConversationParticipantPhones,
   getChatSortOption,
@@ -23,12 +23,14 @@ import type {
   BaseUser,
   WorkspaceNumber,
 } from "@/lib/types";
-import type { ActionFunctionArgs } from "react-router";
 import type { Database, Tables } from "@/lib/db-types";
+import { defineAction } from "@/lib/handler.server";
 
-export async function action({ request, params, context }: ActionFunctionArgs) {
-
-  const { headers, user, workspaceId, userRole } = getWorkspaceRouteContext(context);
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, params, auth }) => {
+  const { headers, user, workspaceId, userRole } = auth;
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
 
@@ -166,4 +168,5 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
       { status: 400 },
     );
   }
-}
+  },
+});

@@ -16,7 +16,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 import { eq, inArray } from "drizzle-orm";
 import type { Audience, Contact } from "@/lib/types";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
 export type ContactIdLoaderData = {
   workspace: NonNullable<Awaited<ReturnType<typeof getWorkspaceById>>>;
@@ -27,7 +27,9 @@ export type ContactIdLoaderData = {
   audiences: Audience[];
 };
 
-export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: async ({ params, context }) => {
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id) {
@@ -109,4 +111,5 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
     logger.error("Error in contact loader:", error);
     return redirect(`/workspaces/${workspace_id}`);
   }
-};
+  },
+});

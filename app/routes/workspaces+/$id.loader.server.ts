@@ -10,7 +10,7 @@ import {
 } from "@/lib/database/workspace.server";
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { workspaceContext } from "@/lib/route-context.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 
 type LoaderData = {
@@ -19,54 +19,59 @@ type LoaderData = {
   onboardingReadiness: WorkspaceMessagingReadiness;
 };
 
-export const loader = async ({ request, params, context, url }: LoaderFunctionArgs) => {
-  const ws = context.get(workspaceContext);
-  if (!ws) {
-    throw new Error("Workspace context missing");
-  }
-
-  const { headers, userId, userRole, workspaceId } = ws;
-
-  try {
-    const pathname = url.pathname;
-    const [onboarding, phoneNumbersResult, recentOutboundCount, workspaceData] =
-      await Promise.all([
-        getWorkspaceMessagingOnboardingState({ workspaceId }),
-        getWorkspacePhoneNumbers({ workspaceId }),
-        getWorkspaceRecentOutboundMessageCount({ workspaceId }),
-        getWorkspaceInfoWithDetails({ workspaceId, userId }),
-      ]);
-    const readiness = deriveWorkspaceMessagingReadiness({
-      onboarding,
-      workspaceNumbers: (phoneNumbersResult.data ?? []).map((number) => ({
-        type: number?.type ?? null,
-        phone_number: number?.phone_number ?? null,
-        capabilities: number?.capabilities ?? null,
-      })),
-      recentOutboundCount,
-    });
-    if (
-      pathname === `/workspaces/${workspaceId}` &&
-      (userRole === "owner" || userRole === "admin") &&
-      readiness.shouldRedirectToOnboarding
-    ) {
-      throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
+export const loader = defineLoader({
+  auth: ({ context }) => {
+    const ws = context.get(workspaceContext);
+    if (!ws) {
+      throw new Error("Workspace context missing");
     }
+    return ws;
+  },
+  sideEffects: ["db-read"],
+  handler: async ({ auth: ws, url }) => {
+    const { headers, userId, userRole, workspaceId } = ws;
 
-    return routeData({
-      userRole,
-      workspaceData,
-      onboardingReadiness: readiness,
-    } satisfies LoaderData, { headers });
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "PGRST116"
-    ) {
-      throw redirect("/workspaces", { headers });
+    try {
+      const pathname = url.pathname;
+      const [onboarding, phoneNumbersResult, recentOutboundCount, workspaceData] =
+        await Promise.all([
+          getWorkspaceMessagingOnboardingState({ workspaceId }),
+          getWorkspacePhoneNumbers({ workspaceId }),
+          getWorkspaceRecentOutboundMessageCount({ workspaceId }),
+          getWorkspaceInfoWithDetails({ workspaceId, userId }),
+        ]);
+      const readiness = deriveWorkspaceMessagingReadiness({
+        onboarding,
+        workspaceNumbers: (phoneNumbersResult.data ?? []).map((number) => ({
+          type: number?.type ?? null,
+          phone_number: number?.phone_number ?? null,
+          capabilities: number?.capabilities ?? null,
+        })),
+        recentOutboundCount,
+      });
+      if (
+        pathname === `/workspaces/${workspaceId}` &&
+        (userRole === "owner" || userRole === "admin") &&
+        readiness.shouldRedirectToOnboarding
+      ) {
+        throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
+      }
+
+      return routeData({
+        userRole,
+        workspaceData,
+        onboardingReadiness: readiness,
+      } satisfies LoaderData, { headers });
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "PGRST116"
+      ) {
+        throw redirect("/workspaces", { headers });
+      }
+      throw error;
     }
-    throw error;
-  }
-};
+  },
+});

@@ -1,4 +1,4 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
   Audience,
   Campaign,
@@ -35,7 +35,7 @@ import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -94,10 +94,12 @@ async function handleCampaignDuplicate(
   return { success: true };
 }
 
-export async function action({ request, params, context }: ActionFunctionArgs) {
-
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ request, params, auth }) => {
   const { id: workspace_id, selected_id } = params;
-  const { user } = getWorkspaceRouteContext(context)
+  const { user } = auth;
 
   if (!selected_id || !workspace_id) return redirect("/");
 
@@ -280,4 +282,5 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
     default:
       return routeData({ success: false, error: "Invalid intent" }, { status: 400 });
   }
-}
+  },
+});

@@ -141,3 +141,25 @@ async function requireWorkspaceLoaderContextFromRequest(
     ctx: { headers, user, workspaceId, userRole },
   };
 }
+
+/** Shared handler-factory auth strategy: workspace context from layout middleware. */
+export function workspaceRouteAuth({
+  context,
+}: {
+  context: Readonly<RouterContextProvider>;
+}): WorkspaceRouteContext {
+  return getWorkspaceRouteContext(context);
+}
+
+/** Shared handler-factory auth strategy: middleware context with request fallback. */
+export function workspaceLoaderAuth({
+  request,
+  params,
+  context,
+}: {
+  request: Request;
+  params: { id?: string };
+  context: Readonly<RouterContextProvider>;
+}): Promise<WorkspaceLoaderResult> {
+  return requireWorkspaceLoaderContext(request, params.id, { context });
+}

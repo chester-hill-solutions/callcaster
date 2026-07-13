@@ -7,11 +7,13 @@ import {
   syncWorkspaceTwilio,
   toggleWorkspaceStatus,
 } from "@/lib/platform-admin.server";
-import { getAdminRouteContext } from "@/lib/admin-route.server";
-import type { ActionFunctionArgs } from "react-router";
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request, context }: ActionFunctionArgs) => {
-  getAdminRouteContext(context);
+export const action = defineAction({
+  auth: adminRouteAuth,
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request }) => {
   const formData = await request.formData();
   const actionType = formData.get("_action") as string;
 
@@ -87,4 +89,5 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   }
 
   return routeData({ error: "Invalid action" });
-};
+  },
+});

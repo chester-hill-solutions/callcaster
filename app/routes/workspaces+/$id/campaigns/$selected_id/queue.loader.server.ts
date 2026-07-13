@@ -11,10 +11,10 @@ import { campaign_audience as campaignAudienceTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AppError } from "@/lib/errors.server";
-import type { LoaderFunctionArgs } from "react-router";
 // campaign_audience is a join table without a workspace column; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
 import { db } from "@/server/db";
+import { defineLoader } from "@/lib/handler.server";
 
 interface QueueResponse {
   queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -27,82 +27,85 @@ interface QueueResponse {
   filters: QueueSearchFilters;
 }
 
-export const loader = async ({ request, params, context, url}: LoaderFunctionArgs) => {
-  const { selected_id, id: workspaceId } = params;
-  const searchParams = url.searchParams;
+export const loader = defineLoader({
+  auth: ({ request, params }) => requireWorkspaceLoaderContext(request, params.id),
+  sideEffects: ["db-read"],
+  handler: async ({ params, url, auth }) => {
+    const { selected_id } = params;
+    const searchParams = url.searchParams;
 
-  const page = Number(searchParams.get("page")) || 1;
-  const pageSize = 50;
-  const offset = (page - 1) * pageSize;
+    const page = Number(searchParams.get("page")) || 1;
+    const pageSize = 50;
+    const offset = (page - 1) * pageSize;
 
-  const result = await requireWorkspaceLoaderContext(request, workspaceId);
-  if (!result.ok) return result.response;
+    if (!auth.ok) return auth.response;
 
-  if (!selected_id) throw redirect("../../");
+    if (!selected_id) throw redirect("../../");
 
-  const campaignIdNum = Number(selected_id);
+    const campaignIdNum = Number(selected_id);
 
-  const filters: QueueSearchFilters = {
-    name: searchParams.get("name") || "",
-    phone: searchParams.get("phone") || "",
-    disposition: searchParams.get("disposition") || "",
-    queueStatus: searchParams.get("queueStatus") || "",
-    audiences: searchParams.get("audiences") || "",
-    email: searchParams.get("email") || "",
-    address: searchParams.get("address") || "",
-  };
-
-  try {
-    const [selectedAudiences, queueResult, unfilteredCount, queuedCount] = await Promise.all([
-      db
-        .select({ audience_id: campaignAudienceTable.audience_id })
-        .from(campaignAudienceTable)
-        .where(eq(campaignAudienceTable.campaign_id, campaignIdNum)),
-      fetchCampaignQueuePage({
-        campaignId: campaignIdNum,
-        filters,
-        offset,
-        limit: pageSize,
-      }),
-      countCampaignQueueRows(campaignIdNum),
-      countQueuedCampaignQueueRows(campaignIdNum),
-    ]);
-
-    const selectedAudienceIds = selectedAudiences.map((row) => row.audience_id);
-    const queueResponse: QueueResponse = {
-      queueData: queueResult.items.map(
-        (item) => mapCampaignQueueItemForUi(item) as unknown as QueueItem & { contact: Contact; audiences: Audience[] },
-      ),
-      queueError: null,
-      totalCount: queueResult.totalCount,
-      queuedCount,
-      unfilteredCount,
-      currentPage: page,
-      pageSize,
-      filters: { ...filters },
+    const filters: QueueSearchFilters = {
+      name: searchParams.get("name") || "",
+      phone: searchParams.get("phone") || "",
+      disposition: searchParams.get("disposition") || "",
+      queueStatus: searchParams.get("queueStatus") || "",
+      audiences: searchParams.get("audiences") || "",
+      email: searchParams.get("email") || "",
+      address: searchParams.get("address") || "",
     };
 
-    return routeData({
-      selectedAudienceIds,
-      queuePromise: queueResponse,
-      campaignId: selected_id,
-    });
-  } catch (error) {
-    const queueResponse: QueueResponse = {
-      queueData: null,
-      queueError: error instanceof Error ? error : new Error("Failed to load queue"),
-      totalCount: null,
-      queuedCount: null,
-      unfilteredCount: null,
-      currentPage: page,
-      pageSize,
-      filters: { ...filters },
-    };
+    try {
+      const [selectedAudiences, queueResult, unfilteredCount, queuedCount] = await Promise.all([
+        db
+          .select({ audience_id: campaignAudienceTable.audience_id })
+          .from(campaignAudienceTable)
+          .where(eq(campaignAudienceTable.campaign_id, campaignIdNum)),
+        fetchCampaignQueuePage({
+          campaignId: campaignIdNum,
+          filters,
+          offset,
+          limit: pageSize,
+        }),
+        countCampaignQueueRows(campaignIdNum),
+        countQueuedCampaignQueueRows(campaignIdNum),
+      ]);
 
-    return routeData({
-      selectedAudienceIds: [],
-      queuePromise: queueResponse,
-      campaignId: selected_id,
-    });
-  }
-};
+      const selectedAudienceIds = selectedAudiences.map((row) => row.audience_id);
+      const queueResponse: QueueResponse = {
+        queueData: queueResult.items.map(
+          (item) => mapCampaignQueueItemForUi(item) as unknown as QueueItem & { contact: Contact; audiences: Audience[] },
+        ),
+        queueError: null,
+        totalCount: queueResult.totalCount,
+        queuedCount,
+        unfilteredCount,
+        currentPage: page,
+        pageSize,
+        filters: { ...filters },
+      };
+
+      return routeData({
+        selectedAudienceIds,
+        queuePromise: queueResponse,
+        campaignId: selected_id,
+      });
+    } catch (error) {
+      const queueResponse: QueueResponse = {
+        queueData: null,
+        queueError: error instanceof Error ? error : new Error("Failed to load queue"),
+        totalCount: null,
+        queuedCount: null,
+        unfilteredCount: null,
+        currentPage: page,
+        pageSize,
+        filters: { ...filters },
+      };
+
+      return routeData({
+        selectedAudienceIds: [],
+        queuePromise: queueResponse,
+        campaignId: selected_id,
+      });
+    }
+  },
+});
