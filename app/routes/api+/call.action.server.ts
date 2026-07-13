@@ -5,6 +5,7 @@ import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -12,20 +13,34 @@ function isAValidPhoneNumber(number: string): boolean {
   return /^[\d+\-() ]+$/.test(number);
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const formData = await request.clone().formData();
-  const toNumber = (formData.get("To") as string) ?? "";
-  const workspaceId = formData.get("workspace_id") as string | null;
-  const clientIdentity = formData.get("client_identity") as string | null;
-  const callSid = String(formData.get("CallSid") ?? "");
-  const baseUrl = env.BASE_URL();
+type CallAuth = {
+  toNumber: string;
+  workspaceId: string | null;
+  clientIdentity: string | null;
+  callSid: string;
+};
 
-  const forbidden = await requireTwilioSignature(
-    request,
-    workspaceId ? { workspaceId } : {},
-  );
-  if (forbidden) return forbidden;
-  const twiml = new Twilio.twiml.VoiceResponse();
+export const action = defineAction({
+  auth: async ({ request }: ActionFunctionArgs): Promise<CallAuth | Response> => {
+    const formData = await request.clone().formData();
+    const toNumber = (formData.get("To") as string) ?? "";
+    const workspaceId = formData.get("workspace_id") as string | null;
+    const clientIdentity = formData.get("client_identity") as string | null;
+    const callSid = String(formData.get("CallSid") ?? "");
+
+    const forbidden = await requireTwilioSignature(
+      request,
+      workspaceId ? { workspaceId } : {},
+    );
+    if (forbidden) return forbidden;
+
+    return { toNumber, workspaceId, clientIdentity, callSid };
+  },
+  sideEffects: ["twilio", "db-write"],
+  handler: async ({ auth }) => {
+    const { toNumber, workspaceId, clientIdentity, callSid } = auth;
+    const baseUrl = env.BASE_URL();
+    const twiml = new Twilio.twiml.VoiceResponse();
 
   // Handset outbound: validate session and use workspace handset number as callerId
   if (workspaceId && clientIdentity && toNumber && isPhoneNumber(toNumber)) {
@@ -107,4 +122,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" },
   });
-};
+  },
+});

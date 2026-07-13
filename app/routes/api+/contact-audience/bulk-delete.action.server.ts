@@ -7,22 +7,26 @@ import { parseActionRequest } from "@/lib/request-utils.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
 
-import type { ActionFunctionArgs } from "react-router";
+export const action = defineAction({
+  auth: async ({ request }) => {
+    const auth = await requireJsonAuth(request);
+    if (auth instanceof Response) return auth;
 
-export async function action({ request }: ActionFunctionArgs) {
+    if (request.method !== "DELETE") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { "content-type": "application/json" },
+      });
+    }
 
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const { headers } = await getSession(request);  const user = auth.user;
-
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401, headers });
-  }
-
-  if (request.method !== "DELETE") {
-    return routeData({ error: "Method not allowed" }, { status: 405, headers });
-  }
+    return auth;
+  },
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+  const { headers } = await getSession(request);
+  const user = auth.user;
 
   const data = await parseActionRequest(request);
   const audienceIdStr = String(data.audience_id ?? "");
@@ -73,4 +77,5 @@ export async function action({ request }: ActionFunctionArgs) {
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
     return routeData({ error: errorMessage }, { status: 500, headers });
   }
-}
+  },
+});

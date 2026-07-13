@@ -12,13 +12,23 @@ import { safeParseJson } from "@/lib/request-utils.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { defineAction } from "@/lib/handler.server";
+import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: { request: Request }) => {
-
+export const action = defineAction({
+  auth: async ({ request }: ActionFunctionArgs) => {
     const { headers, user } = await getSession(request);
     if (!user) {
-        return routeData({ error: "Unauthorized" }, { status: 401 });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
     }
+    return { headers, user };
+  },
+  sideEffects: ["twilio", "db-read"],
+  handler: async ({ request, auth }) => {
+    const { headers, user } = auth;
 
     const { phoneNumber, workspaceId, campaignId } = await safeParseJson<{
         phoneNumber: string;
@@ -95,4 +105,5 @@ export const action = async ({ request }: { request: Request }) => {
         logger.error('Error connecting phone device:', error);
         return routeData({ error: error.message }, { status: 500 });
     }
-}
+  },
+});

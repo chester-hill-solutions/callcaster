@@ -10,25 +10,41 @@ import {
   updateCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const formData = await request.formData();
-  const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const callSidValue = formData.get("CallSid");
-  const answeredByValue = formData.get("AnsweredBy");
-  const callStatusValue = formData.get("CallStatus");
+type DialStatusAuth = {
+  callSid: string | null;
+  answeredBy: string | null;
+  callStatus: string | null;
+};
 
-  if (!callSidValue || typeof callSidValue !== "string") {
-    return routeData({ success: false, error: "CallSid is required and must be a string" });
-  }
+export const action = defineAction({
+  auth: async ({ request }: ActionFunctionArgs): Promise<DialStatusAuth | Response> => {
+    const formData = await request.formData();
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const callSidValue = formData.get("CallSid");
+    const answeredByValue = formData.get("AnsweredBy");
+    const callStatusValue = formData.get("CallStatus");
 
-  const callSid = callSidValue;
-  const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
-  const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
+    const callSid = typeof callSidValue === "string" && callSidValue ? callSidValue : null;
+    const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
+    const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
 
-  const forbidden = await requireTwilioSignature(request, { callSid });
-  if (forbidden) return forbidden;
+    if (callSid) {
+      const forbidden = await requireTwilioSignature(request, { callSid });
+      if (forbidden) return forbidden;
+    }
+
+    return { callSid, answeredBy, callStatus };
+  },
+  sideEffects: ["twilio", "db-write"],
+  handler: async ({ auth }) => {
+    const { callSid, answeredBy, callStatus } = auth;
+
+    if (!callSid) {
+      return routeData({ success: false, error: "CallSid is required and must be a string" });
+    }
 
   try {
     const dbCall = await findCallBySid(callSid);
@@ -125,4 +141,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       error instanceof Error ? error.message : "An unexpected error occurred";
     return routeData({ success: false, error: errorMessage });
   }
-};
+  },
+});
