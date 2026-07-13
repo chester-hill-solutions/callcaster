@@ -79,6 +79,17 @@ async function upsertMembership(sql, workspaceId, userId, role) {
       role = EXCLUDED.role,
       last_accessed = EXCLUDED.last_accessed
   `;
+
+  const memberId = `wm:${workspaceId}:${userId}`;
+  const roleId = role === "field_director" ? "admin" : role;
+  await sql`
+    INSERT INTO workspace_member (id, workspace_id, user_id, role_id, invited_by, created_at)
+    VALUES (${memberId}, ${workspaceId}, ${userId}, ${roleId}, NULL, now())
+    ON CONFLICT (id) DO UPDATE SET
+      role_id = EXCLUDED.role_id,
+      workspace_id = EXCLUDED.workspace_id,
+      user_id = EXCLUDED.user_id
+  `;
 }
 
 async function seed() {
@@ -600,21 +611,36 @@ async function seed() {
   }
 
   await sql`
-    INSERT INTO workspace_api_key (id, workspace_id, name, key_prefix, key_hash, created_by)
+    INSERT INTO workspace_api_key (
+      id, workspace_id, name, key_prefix, key_hash, created_by, scopes, expires_at
+    )
     VALUES (
       ${API_KEY.id},
       ${readyId},
       'E2E Existing Key',
       ${API_KEY.prefix},
       ${hashApiKey(API_KEY.plaintext)},
-      ${USERS.owner.id}
+      ${USERS.owner.id},
+      ${[
+        "campaigns.read",
+        "campaigns.write",
+        "campaigns.dispatch",
+        "calls.start",
+        "calls.control",
+        "messages.send",
+        "members.invite",
+        "audit.read",
+      ]},
+      ${null}
     )
     ON CONFLICT (id) DO UPDATE SET
       workspace_id = EXCLUDED.workspace_id,
       name = EXCLUDED.name,
       key_prefix = EXCLUDED.key_prefix,
       key_hash = EXCLUDED.key_hash,
-      created_by = EXCLUDED.created_by
+      created_by = EXCLUDED.created_by,
+      scopes = EXCLUDED.scopes,
+      expires_at = EXCLUDED.expires_at
   `;
 
   await sql.end();
