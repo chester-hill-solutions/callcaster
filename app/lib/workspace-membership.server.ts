@@ -10,6 +10,7 @@ import {
   type ProductRoleId,
 } from "@/lib/capabilities";
 import { AppError, ErrorCode } from "@/lib/errors.server";
+import { hasMinRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
@@ -67,22 +68,6 @@ export const WORKSPACE_MEMBERSHIP_ROLES = [
 ] as const;
 
 export type WorkspaceMembershipRole = (typeof WORKSPACE_MEMBERSHIP_ROLES)[number];
-
-const WORKSPACE_ROLE_RANK: Record<string, number> = {
-  owner: 4,
-  admin: 3,
-  member: 2,
-  caller: 1,
-};
-
-function hasMinRole(
-  role: string | undefined,
-  minRole: string | undefined,
-): boolean {
-  if (!minRole) return true;
-  if (!role) return false;
-  return (WORKSPACE_ROLE_RANK[role] ?? 0) >= (WORKSPACE_ROLE_RANK[minRole] ?? 0);
-}
 
 function toDbError(error: unknown): { message: string; code?: string; details?: string } {
   if (error instanceof Error) {

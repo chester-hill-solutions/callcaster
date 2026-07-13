@@ -1,8 +1,5 @@
-import { desc, eq } from "drizzle-orm";
-import {
-  workspace as workspaceTable,
-  workspace_member as workspaceMemberTable,
-} from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { workspace as workspaceTable } from "@/db/schema";
 import {
   getUserRole,
   getWorkspaceInfo,
@@ -20,26 +17,13 @@ import { hasMinRole } from "@/lib/workspace-route.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
 import { timestampToIsoString } from "@/lib/parse-utils.server";
 import { isTwoFactorEnabled } from "@/lib/two-factor.server";
+import { listUserWorkspaceMembershipsForProfile } from "@/lib/workspace-members-db.server";
 
 export async function listUserWorkspaces(
   userId: string,
 ) {
   try {
-    const rows = await adminDb
-      .select({
-        last_accessed: workspaceMemberTable.created_at,
-        role: workspaceMemberTable.role_id,
-        workspace: {
-          id: workspaceTable.id,
-          name: workspaceTable.name,
-          credits: workspaceTable.credits,
-          created_at: workspaceTable.created_at,
-        },
-      })
-      .from(workspaceMemberTable)
-      .innerJoin(workspaceTable, eq(workspaceMemberTable.workspace_id, workspaceTable.id))
-      .where(eq(workspaceMemberTable.user_id, userId))
-      .orderBy(desc(workspaceMemberTable.created_at));
+    const rows = await listUserWorkspaceMembershipsForProfile(userId);
 
     return {
       ok: true as const,

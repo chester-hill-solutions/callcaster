@@ -744,6 +744,8 @@ export async function listUserWorkspaceMembershipsForProfile(userId: string) {
       workspace: {
         id: workspaceTable.id,
         name: workspaceTable.name,
+        credits: workspaceTable.credits,
+        created_at: workspaceTable.created_at,
       },
     })
     .from(workspaceMemberTable)
