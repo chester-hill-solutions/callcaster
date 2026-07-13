@@ -659,71 +659,6 @@
         }
       }
     },
-    "/api/auto-dial": {
-      "post": {
-        "operationId": "postAuto_dial",
-        "summary": "POST /api/auto-dial",
-        "description": "Start auto-dial session for workspace.",
-        "tags": [
-          "User API",
-          "dialer"
-        ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/auto-dial/{roomId}": {
       "post": {
         "operationId": "postAuto_dial_roomId",
@@ -763,67 +698,6 @@
           },
           "401": {
             "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auto-dial/dialer": {
-      "post": {
-        "operationId": "postAuto_dial_dialer",
-        "summary": "POST /api/auto-dial/dialer",
-        "description": "Predictive/auto-dial worker endpoint.\n\n**Security:** No user/API-key auth; trusts workspace_id/user_id in JSON body via service role.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
-        "tags": [
-          "Internal Trusted",
-          "dialer"
-        ],
-        "x-callcaster-supported": false,
-        "x-callcaster-exposure": "internalOnly",
-        "x-callcaster-auth-class": "internalTrusted",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -2603,67 +2477,6 @@
         }
       }
     },
-    "/api/disconnect": {
-      "post": {
-        "operationId": "postDisconnect",
-        "summary": "POST /api/disconnect",
-        "description": "**Security:** Twilio Device disconnect using account credentials; no session or signature check.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
-        "tags": [
-          "Security Gap",
-          "telephony"
-        ],
-        "x-callcaster-supported": false,
-        "x-callcaster-exposure": "internalOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/email-vm": {
       "post": {
         "operationId": "postEmail_vm",
@@ -3552,7 +3365,7 @@
       "post": {
         "operationId": "postInbound_verification",
         "summary": "POST /api/inbound-verification",
-        "description": "Returns TwiML.\n\n**Security:** Call-in verification TwiML; service role, no Twilio signature.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Returns TwiML.\n\n**Security:** Call-in verification TwiML; validated with main-account Twilio signature.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
           "Internal Trusted",
           "inbound"
@@ -6171,71 +5984,6 @@
             "sessionCookie": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspace": {
-      "post": {
-        "operationId": "postWorkspace",
-        "summary": "POST /api/workspace",
-        "description": "",
-        "tags": [
-          "Workspace Admin",
-          "workspace"
-        ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -10527,6 +10275,142 @@
             "sessionCookie": []
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/calls/{callSid}/disconnect": {
+      "post": {
+        "operationId": "postWorkspaces_workspaceId_calls_callSid_disconnect",
+        "summary": "POST /api/workspaces/:workspaceId/calls/:callSid/disconnect",
+        "description": "Workspace-scoped call disconnect using workspace Twilio credentials.",
+        "tags": [
+          "Integrator API",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start": {
+      "post": {
+        "operationId": "postWorkspaces_workspaceId_campaigns_campaignId_dialer_start",
+        "summary": "POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start",
+        "description": "Start predictive/manual auto-dial conference for authenticated caller+ agent.",
+        "tags": [
+          "Integrator API",
+          "dialer"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success",

@@ -102,6 +102,40 @@ export const platformOpenApiComponents = {
         provisioning_warning: { type: "string" as const, nullable: true },
       },
     },
+    DialerStartRequest: {
+      type: "object" as const,
+      required: ["caller_id", "selected_device"] as const,
+      properties: {
+        caller_id: {
+          type: "string" as const,
+          description: "E.164 caller ID to present on outbound dials.",
+        },
+        selected_device: {
+          type: "string" as const,
+          description: "Twilio client device identifier for the agent leg.",
+        },
+        agentUserId: {
+          type: "string" as const,
+          format: "uuid",
+          description: "Required when authenticating with a workspace API key.",
+        },
+      },
+    },
+    DialerStartResponse: {
+      type: "object" as const,
+      required: ["success", "conferenceName"] as const,
+      properties: {
+        success: { type: "boolean" as const, enum: [true] as const },
+        conferenceName: { type: "string" as const },
+      },
+    },
+    CallDisconnectResponse: {
+      type: "object" as const,
+      required: ["success"] as const,
+      properties: {
+        success: { type: "boolean" as const, enum: [true] as const },
+      },
+    },
   },
 };
 
@@ -241,6 +275,58 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
           },
         },
         "401": errorResponse("Unauthorized"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start": {
+    post: {
+      summary: "Start auto-dial conference for a campaign",
+      tags: ["Platform API", "Dialer", "Telephony"],
+      description:
+        "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/DialerStartRequest" },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Conference started",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DialerStartResponse" },
+            },
+          },
+        },
+        "400": errorResponse("Validation error"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Insufficient role or MFA enrollment required"),
+        "404": errorResponse("Campaign not found"),
+      },
+    },
+  },
+  "/api/workspaces/{workspaceId}/calls/{callSid}/disconnect": {
+    post: {
+      summary: "Disconnect an active workspace call",
+      tags: ["Platform API", "Telephony"],
+      description:
+        "Pause/hang up a live call using workspace Twilio credentials. Requires session or API key scoped to the call workspace.",
+      responses: {
+        "200": {
+          description: "Disconnect initiated",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CallDisconnectResponse" },
+            },
+          },
+        },
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Forbidden"),
+        "404": errorResponse("Call not found"),
+        "500": errorResponse("Twilio disconnect failed"),
       },
     },
   },

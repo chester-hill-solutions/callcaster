@@ -651,71 +651,6 @@
         }
       }
     },
-    "/api/auto-dial": {
-      "post": {
-        "operationId": "postAuto_dial",
-        "summary": "POST /api/auto-dial",
-        "description": "Start auto-dial session for workspace.",
-        "tags": [
-          "Dialer",
-          "User API"
-        ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/auto-dial/end": {
       "post": {
         "operationId": "postAuto_dial_end",
@@ -4476,71 +4411,6 @@
             "sessionCookie": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspace": {
-      "post": {
-        "operationId": "postWorkspace",
-        "summary": "POST /api/workspace",
-        "description": "",
-        "tags": [
-          "Workspace",
-          "Workspace Admin"
-        ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -8724,6 +8594,141 @@
         }
       }
     },
+    "/api/workspaces/{workspaceId}/calls/{callSid}/disconnect": {
+      "post": {
+        "summary": "Disconnect an active workspace call",
+        "tags": [
+          "Platform API",
+          "Telephony"
+        ],
+        "description": "Pause/hang up a live call using workspace Twilio credentials. Requires session or API key scoped to the call workspace.",
+        "responses": {
+          "200": {
+            "description": "Disconnect initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallDisconnectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Call not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Twilio disconnect failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start": {
+      "post": {
+        "summary": "Start auto-dial conference for a campaign",
+        "tags": [
+          "Platform API",
+          "Dialer",
+          "Telephony"
+        ],
+        "description": "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DialerStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conference started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DialerStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or MFA enrollment required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Campaign not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{workspaceId}/handset/session": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_handset_session",
@@ -10090,6 +10095,60 @@
           "provisioning_warning": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "DialerStartRequest": {
+        "type": "object",
+        "required": [
+          "caller_id",
+          "selected_device"
+        ],
+        "properties": {
+          "caller_id": {
+            "type": "string",
+            "description": "E.164 caller ID to present on outbound dials."
+          },
+          "selected_device": {
+            "type": "string",
+            "description": "Twilio client device identifier for the agent leg."
+          },
+          "agentUserId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required when authenticating with a workspace API key."
+          }
+        }
+      },
+      "DialerStartResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "conferenceName"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "conferenceName": {
+            "type": "string"
+          }
+        }
+      },
+      "CallDisconnectResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
           }
         }
       }

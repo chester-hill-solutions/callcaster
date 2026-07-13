@@ -1324,7 +1324,7 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 
 - [ ] Publish/adopt CHS auth package extensions
 - [ ] SEC-07 shared capability authorization
-- [ ] API-01 existing OpenAPI/Hey API cutover foundation
+- [ ] API-01 existing OpenAPI/Hey API cutover foundation — telephony cutover routes documented in platform OpenAPI overrides
 - [ ] AUDIT-01 immutable workspace audit foundation
 - [x] SEC-01 workspace secret boundary — deleted `POST /api/workspace`; scoped `GET/PATCH/DELETE` uses data-plane auth; PATCH requires admin+
 - [x] SEC-02 predictive dialer auth — deleted `/api/auto-dial` and `/api/auto-dial/dialer`; added workspace dialer/start; hardened auto-dial/end
@@ -1333,7 +1333,7 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [x] SEC-04a safe/disabled stored webhook boundary — production fanout uses `safeOutboundFetch`
 - [x] SEC-05 disconnect auth/removal — deleted `/api/disconnect`; added workspace-scoped disconnect
 - [x] SEC-06 inbound verification signature — main-account Twilio signature on `/api/inbound-verification`
-- [ ] SEC-08 auth cutover and MFA re-enrollment
+- [x] SEC-08 auth cutover and MFA re-enrollment — data-plane MFA gate, role-elevation/ownership 2FA checks, enrollment rate limits (cutover session invalidation remains pre-launch)
 
 ### Wave 2
 

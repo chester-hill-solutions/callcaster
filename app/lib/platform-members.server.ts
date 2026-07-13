@@ -12,6 +12,7 @@ import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { WORKSPACE_ROLE_RANK } from "@/lib/workspace-route.server";
+import { requireTwoFactorForPrivilegedRoleAssignment } from "@/lib/two-factor.server";
 import { assertSafeOutboundUrl, safeOutboundFetch } from "@/lib/safe-outbound-url.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
@@ -259,6 +260,9 @@ export async function updateWorkspaceMemberRole(
 
   const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
   if (!soleOwnerCheck.ok) return soleOwnerCheck;
+
+  const mfaCheck = await requireTwoFactorForPrivilegedRoleAssignment(targetUserId, role);
+  if (!mfaCheck.ok) return mfaCheck;
 
   try {
     const data = await updateWorkspaceMemberRoleRow({

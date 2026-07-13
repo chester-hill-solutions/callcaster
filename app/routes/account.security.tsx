@@ -71,6 +71,7 @@ export default function AccountSecurity() {
             ) : null}
             <Form method="POST" className="flex flex-col gap-4">
               <input type="hidden" name="intent" value="verify" />
+              {data.next ? <input type="hidden" name="next" value={data.next} /> : null}
               <FormField htmlFor="code" label="Verification code">
                 <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" />
               </FormField>

@@ -17,6 +17,7 @@ import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { adminDb } from "@/server/admin-db";
 import { hasMinRole } from "@/lib/workspace-route.server";
+import { isTwoFactorEnabled } from "@/lib/two-factor.server";
 
 export async function listUserWorkspaces(
   userId: string,
@@ -156,6 +157,16 @@ export async function transferWorkspaceOwnershipApi(
 
   if (!role || role.role !== MemberRole.Owner) {
     return { ok: false as const, error: "Only workspace owners can transfer", status: 403 };
+  }
+
+  const newOwnerEnrolled = await isTwoFactorEnabled(newOwnerUserId);
+  if (!newOwnerEnrolled) {
+    return {
+      ok: false as const,
+      error:
+        "The new owner must enroll in two-factor authentication before ownership can be transferred.",
+      status: 403,
+    };
   }
 
   const formData = new FormData();
