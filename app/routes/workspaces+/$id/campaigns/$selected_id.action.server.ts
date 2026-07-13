@@ -1,85 +1,12 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
-import {
-  IVRCampaign,
-  LiveCampaign,
-  MessageCampaign,
-} from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
 import {
   rpcGetCampaignAttemptsCsv,
   rpcGetCampaignMessagesCsv,
 } from "@/lib/db-rpc.server";
-import {
-  fetchBasicResults,
-  fetchCampaignDetails,
-  fetchQueueCounts,
-} from "@/lib/database/campaign.server";
-import {
-  getUserRole,
-  getWorkspaceUsers,
-} from "@/lib/database/workspace.server";
+import { getWorkspaceUsers } from "@/lib/database/workspace.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { logger as loggerServer } from "@/lib/logger.server";
-import { MemberRole } from "@/lib/member-role";
-import { defineAction, defineLoader } from "@/lib/handler.server";
-
-const VALID_CAMPAIGN_TYPES = new Set([
-  "live_call",
-  "message",
-  "robocall",
-  "simple_ivr",
-  "complex_ivr",
-]);
-
-export const loader = defineLoader({
-  auth: ({ params, context }) => {
-    const { id: workspace_id, selected_id } = params;
-    if (!workspace_id || !selected_id) {
-      return redirect(`/workspaces/${workspace_id}/campaigns`);
-    }
-    return { ...getWorkspaceRouteContext(context), workspace_id, selected_id };
-  },
-  sideEffects: ["db-read"],
-  handler: async ({ auth }) => {
-    const { user, workspace_id, selected_id } = auth;
-
-    const [campaignRow, queueCounts, userRole] = await Promise.all([
-      findCampaignInWorkspace(workspace_id, selected_id),
-      fetchQueueCounts({ workspaceId: workspace_id, campaignId: selected_id}),
-      getUserRole({ user, workspaceId: workspace_id }),
-    ]);
-    if (!campaignRow?.type || !VALID_CAMPAIGN_TYPES.has(campaignRow.type)) {
-      return redirect(`/workspaces/${workspace_id}/campaigns`);
-    }
-
-    const campaignDetails = await fetchCampaignDetails({
-      workspaceId: workspace_id,
-      campaignId: selected_id,
-    });
-
-    const resultsPromise = fetchBasicResults({
-      workspaceId: workspace_id,
-      campaignId: selected_id,
-    }) as unknown as {
-      disposition: string;
-      count: number;
-      average_call_duration: string;
-      average_wait_time: string;
-      expected_total: number;
-    }[];
-
-    return routeData({
-      selected_id,
-      hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(
-        userRole?.role as MemberRole,
-      ),
-      campaignDetails,
-      user: user,
-      results: resultsPromise || [], // Deferred loading
-      queueCounts,
-    });
-  },
-});
+import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
   sideEffects: ["db-read"],
