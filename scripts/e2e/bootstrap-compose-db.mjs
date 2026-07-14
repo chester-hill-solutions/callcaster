@@ -40,6 +40,7 @@ const steps = [
   "client/migrations/20260714130000_retire_pg_cron_http_job_routes.sql",
   "drizzle/0007_workspace_api_key_scopes.sql",
   "drizzle/0008_chs_workspace_membership.sql",
+  "client/migrations/20260714140000_fix_create_new_workspace_role_cast.sql",
 ];
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
