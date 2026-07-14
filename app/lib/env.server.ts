@@ -5,11 +5,17 @@
  * and validates required variables at application startup.
  */
 
+import {
+  resolveObjectStorageEnv,
+  resolveObjectStorageEnvRequired,
+} from "./object-storage-config.server";
+
 type EnvConfig = {
   DATABASE_URL: string;
   DATABASE_DIRECT_URL?: string;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL?: string;
+  /** S3-compatible endpoint (S3_ENDPOINT locally, ENDPOINT on Railway Buckets). */
   S3_ENDPOINT: string;
   S3_REGION: string;
   S3_ACCESS_KEY_ID: string;
@@ -117,11 +123,11 @@ export const env = {
   DATABASE_DIRECT_URL: () => getEnv('DATABASE_DIRECT_URL'),
   BETTER_AUTH_SECRET: () => getEnv('BETTER_AUTH_SECRET'),
   BETTER_AUTH_URL: () => getEnv('BETTER_AUTH_URL') ?? getEnv('BASE_URL'),
-  S3_ENDPOINT: () => getEnv('S3_ENDPOINT'),
-  S3_REGION: () => getEnv('S3_REGION'),
-  S3_ACCESS_KEY_ID: () => getEnv('S3_ACCESS_KEY_ID'),
-  S3_SECRET_ACCESS_KEY: () => getEnv('S3_SECRET_ACCESS_KEY'),
-  S3_BUCKET: () => getEnv('S3_BUCKET'),
+  S3_ENDPOINT: () => resolveObjectStorageEnvRequired('endpoint'),
+  S3_REGION: () => resolveObjectStorageEnvRequired('region'),
+  S3_ACCESS_KEY_ID: () => resolveObjectStorageEnvRequired('accessKeyId'),
+  S3_SECRET_ACCESS_KEY: () => resolveObjectStorageEnvRequired('secretAccessKey'),
+  S3_BUCKET: () => resolveObjectStorageEnvRequired('bucket'),
   S3_BUCKET_AUDIO: () => getEnv('S3_BUCKET_AUDIO'),
   S3_BUCKET_MEDIA: () => getEnv('S3_BUCKET_MEDIA'),
   S3_BUCKET_EXPORTS: () => getEnv('S3_BUCKET_EXPORTS'),

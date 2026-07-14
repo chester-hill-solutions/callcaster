@@ -20,6 +20,7 @@ const FORBIDDEN_RUNTIME = [
   "STRIPE_WEBHOOK_SECRET",
   "TWILIO_AUTH_TOKEN",
   "S3_SECRET_ACCESS_KEY",
+  "SECRET_ACCESS_KEY",
   // app/server/db.ts boot error — fires when the server db graph leaks into
   // a client chunk (e.g. a shared lib re-exporting from a *.server module).
   "DATABASE_URL is required",

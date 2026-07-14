@@ -1,6 +1,7 @@
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env.server";
+import { objectStorageUsesPathStyle } from "@/lib/object-storage-config.server";
 
 /** Postgres-compatible logical bucket names. */
 export type ObjectStorageBucket =
@@ -37,14 +38,15 @@ let s3Client: S3Client | undefined;
  */
 export function getS3Client(): S3Client {
   if (!s3Client) {
+    const endpoint = env.S3_ENDPOINT();
     s3Client = new S3Client({
-      endpoint: env.S3_ENDPOINT(),
+      endpoint,
       region: env.S3_REGION(),
       credentials: {
         accessKeyId: env.S3_ACCESS_KEY_ID(),
         secretAccessKey: env.S3_SECRET_ACCESS_KEY(),
       },
-      forcePathStyle: true,
+      forcePathStyle: objectStorageUsesPathStyle(endpoint),
     });
   }
   return s3Client;
