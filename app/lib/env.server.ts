@@ -28,7 +28,7 @@ type EnvConfig = {
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET?: string;
   RESEND_API_KEY: string;
-  /** Ops-alert recipient for Twilio compliance jobs needing docs / failing terminally. Optional — alerts are skipped when unset. */
+  /** Ops-alert recipient for Twilio compliance jobs needing docs / failing terminally. Defaults to the platform compliance inbox when unset. */
   TWILIO_COMPLIANCE_NOTIFY_EMAIL?: string;
   /** Trust Hub secondary customer-profile policy SID (override; optional). */
   TWILIO_TRUSTHUB_SECONDARY_POLICY_SID?: string;
@@ -135,8 +135,9 @@ export const env = {
   STRIPE_SECRET_KEY: () => getEnv('STRIPE_SECRET_KEY'),
   STRIPE_WEBHOOK_SECRET: () => getEnv('STRIPE_WEBHOOK_SECRET'),
   RESEND_API_KEY: () => getEnv('RESEND_API_KEY'),
-  /** Ops-alert recipient for Twilio compliance jobs needing docs / failing terminally. */
-  TWILIO_COMPLIANCE_NOTIFY_EMAIL: () => getEnv('TWILIO_COMPLIANCE_NOTIFY_EMAIL'),
+  /** Ops-alert recipient for Twilio compliance jobs needing docs / failing terminally. Falls back to the platform compliance inbox. */
+  TWILIO_COMPLIANCE_NOTIFY_EMAIL: () =>
+    getEnv('TWILIO_COMPLIANCE_NOTIFY_EMAIL') || 'info@callcaster.ca',
   /** Trust Hub secondary customer-profile policy SID override (optional). */
   TWILIO_TRUSTHUB_SECONDARY_POLICY_SID: () =>
     getEnv('TWILIO_TRUSTHUB_SECONDARY_POLICY_SID'),

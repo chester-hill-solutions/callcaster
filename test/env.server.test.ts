@@ -41,6 +41,20 @@ describe("env.server", () => {
     expect(mod.env.STRIPE_WEBHOOK_SECRET()).toBeUndefined();
   });
 
+  test("compliance notify email falls back to the platform inbox when unset", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+    delete process.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL;
+
+    const mod = await import("../app/lib/env.server");
+    expect(mod.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL()).toBe("info@callcaster.ca");
+
+    process.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL = "override@callcaster.ca";
+    expect(mod.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL()).toBe(
+      "override@callcaster.ca",
+    );
+  });
+
   test("server import logs validation errors instead of throwing", async () => {
     vi.resetModules();
     process.env.NODE_ENV = "development";

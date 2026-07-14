@@ -14,6 +14,7 @@
 import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
 import { runWorkerPollLoop, resetStaleClaims, claimNextJob, completeJob, failJob } from "../app/lib/worker/poll-jobs.server.ts";
 import { jobHandlers } from "../app/lib/worker/handlers.server.ts";
+import { ensureSelfSchedulingJobsSeeded } from "../app/lib/worker/ensure-scheduled-jobs.server.ts";
 
 try {
   validateRequiredEnv(process.env);
@@ -46,6 +47,11 @@ function shutdown(signal: string) {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// Seed the first row for self-re-enqueuing job types (low-credit notify,
+// webhook audit) so a fresh database never needs the manual insert from the
+// ops runbook. Idempotent: no-ops when a live row already exists.
+await ensureSelfSchedulingJobsSeeded();
 
 if (mode === "drain") {
   // Recover any claims stranded by a prior crash/redeploy before attempting

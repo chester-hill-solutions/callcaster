@@ -49,47 +49,44 @@ one-time, parent-account-level Console step:
    Twilio's own review queue indefinitely, and CallCaster's `reviewState` has no way
    to distinguish that from ordinary review latency.
 
-## 3. `TWILIO_COMPLIANCE_NOTIFY_EMAIL` (optional)
+## 3. `TWILIO_COMPLIANCE_NOTIFY_EMAIL` (optional — defaults to `info@callcaster.ca`)
 
 `app/lib/twilio-compliance-notify.server.ts` sends an internal ops-alert email
 (via Resend) when a Trust Hub bundle needs documents/manual action, or when the
-`workspace_twilio_compliance` job terminally fails. As of Phase H this env var is
-**optional**:
+`workspace_twilio_compliance` job terminally fails. As of 2026-07-14 the env
+accessor falls back to the platform compliance inbox `info@callcaster.ca` when
+the var is unset, so alerts are proactive by default:
 
-- If unset, `sendComplianceOpsAlert()` logs
-  `twilio.compliance.notify.skipped_no_recipient` and returns `{ sent: false }`
-  without throwing — no alert email is sent, but nothing breaks.
-- Because alerting is silent-by-default when unset, ops must instead rely on the
-  admin Compliance panel (`AdminTwilioPortal.CompliancePanel.tsx`, wired into the
-  per-workspace Twilio admin page) to spot workspaces with a "Documents / manual
-  action needed" flag, or on log search for `twilio.compliance.notify.skipped_no_recipient`
-  / `worker.handler.twilio_webhook_audit.drift_detected` to confirm the sweep is
-  actually running.
-- **Recommendation**: set `TWILIO_COMPLIANCE_NOTIFY_EMAIL` in production so
-  action-needed alerts are proactive rather than requiring someone to open the
-  admin panel per workspace.
+- Set `TWILIO_COMPLIANCE_NOTIFY_EMAIL` only to route alerts somewhere other
+  than `info@callcaster.ca`.
+- The same fallback feeds the Trust Hub / toll-free / A2P provisioning contact
+  email when a workspace's business-profile `supportEmail` is blank.
+- The admin Compliance panel (`AdminTwilioPortal.CompliancePanel.tsx`) and log
+  search for `worker.handler.twilio_webhook_audit.drift_detected` remain the
+  backstop for confirming the sweep is running.
 
-## 4. `TWILIO_TRUSTHUB_SECONDARY_POLICY_SID` — placeholder, MUST confirm before go-live
+## 4. `TWILIO_TRUSTHUB_SECONDARY_POLICY_SID` — confirm against Console before first submission
 
-`app/lib/twilio-trusthub.server.ts` hardcodes a **placeholder** default Trust Hub
-policy SID for Secondary Customer Profiles:
+As of 2026-07-14 `app/lib/twilio-trusthub.server.ts` defaults to the Secondary
+Customer Profile policy SID published in Twilio's own Trust Hub / ISV onboarding
+API examples:
 
 ```
-DEFAULT_SECONDARY_CUSTOMER_PROFILE_POLICY_SID = "RNdfbf3fXXXXXXXXXXXXXXXXXXXXXXXXXX"
+DEFAULT_SECONDARY_CUSTOMER_PROFILE_POLICY_SID = "RNdfbf3fae0e1107f8aded0e7cead80bf5"
 ```
 
-This is not a real SID — it is a stand-in until confirmed against Twilio Console.
-**Before any workspace's Trust Hub bundle is submitted for review in production**:
+Twilio's canonical guidance is still to confirm the policy SID per account.
+**Before the first workspace's Trust Hub bundle is submitted for review in
+production**:
 
-1. In Twilio Console → *Trust Hub* → *Policies*, find the actual "Secondary
-   Customer Profile" policy SID for the account (this can vary by Twilio account
-   region/type).
-2. Set `TWILIO_TRUSTHUB_SECONDARY_POLICY_SID` in the environment to that real SID —
-   `resolvePolicySid()` prefers the env var over the placeholder default.
-3. If this is left unset with the placeholder in place, bundle creation will
-   either fail outright or (worse) silently attach the wrong policy, which only
-   surfaces once Twilio's own review rejects the submission (Phase C/D territory,
-   not something the webhook audit or compliance job can detect ahead of time).
+1. Confirm via Console → *Trust Hub* → *Policies*, or
+   `twilio api:trusthub:v1:policies:list`, that the account's Secondary Customer
+   Profile policy SID matches the default above.
+2. If it differs, set `TWILIO_TRUSTHUB_SECONDARY_POLICY_SID` —
+   `resolvePolicySid()` prefers the env var over the default.
+3. Every bundle creation that used the built-in default logs
+   `twilio.trusthub.policy_sid.default_used`, so log search shows whether the
+   default was in play for any given submission.
 
 ## 5. Admin Compliance panel and retry action (Phase H)
 
@@ -125,18 +122,16 @@ A new self-re-enqueuing job type, `twilio_webhook_audit`, runs in the Bun worker
   with a future `retry_at`, which `claimNextJob`'s `retry_at IS NULL OR retry_at <=
   now()` filter treats as "not due yet."
 
-### Seeding the first `twilio_webhook_audit` row
+### Seeding the first `twilio_webhook_audit` row — automatic since 2026-07-14
 
-Like `low_credit_notify`, this job type has **no pg_cron entry and nothing in the
-codebase inserts its first row automatically** — the self-re-enqueue logic only
-takes over once a row exists. **Ops step**: seed the first row once, manually, e.g.:
-
-```sql
-insert into job (type, status, params)
-values ('twilio_webhook_audit', 'queued', '{}'::jsonb);
-```
-
-Run this once against the production database (or via an admin one-off script) after
-deploying Phase H. After that, the worker's self-re-enqueue keeps the sweep running
-indefinitely without further ops intervention, as long as the Bun worker process
-(`worker/index.ts`, long-running mode) stays up.
+The worker seeds the chain itself at boot: `worker/index.ts` calls
+`ensureSelfSchedulingJobsSeeded()` (`app/lib/worker/ensure-scheduled-jobs.server.ts`),
+which inserts one `queued` row for each self-scheduling job type
+(`low_credit_notify`, `twilio_webhook_audit`) **only when no queued/running row
+for that type exists** (single-statement `INSERT … WHERE NOT EXISTS`, so a
+duplicate self-perpetuating chain cannot be seeded). No manual SQL is needed —
+just deploy the worker. Seed inserts log `worker.schedule_seed.inserted`; a
+failed seed logs `worker.schedule_seed.failed` and does not block worker boot
+(the next boot retries). After seeding, the self-re-enqueue keeps the sweep
+running indefinitely as long as the Bun worker process (`worker/index.ts`,
+long-running mode) stays up.

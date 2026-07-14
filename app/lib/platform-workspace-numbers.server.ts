@@ -33,6 +33,13 @@ import { debitAmountFromCredits } from "@/lib/pricing";
 import { numberRentalPurchaseKey } from "@/lib/billing-keys";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
+import {
+  isNanpTollFreeNumber,
+  normalizeAddressRequirement,
+  resolveAddressForRequirement,
+  type AddressRequirement,
+  type CandidateAddress,
+} from "@/lib/number-address-requirements";
 import { deriveAndPersistWorkspaceThroughput } from "@/lib/database/workspace-twilio-config.server";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace-twilio-sync.server";
 import type { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";

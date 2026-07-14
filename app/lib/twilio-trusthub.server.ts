@@ -28,20 +28,24 @@ import { presentTwilioError } from "@/lib/twilio-errors";
 import type { TwilioAccountData } from "@/lib/types";
 
 /**
- * Twilio's global "secondary customer profile" Trust Hub policy SID. Overridable
- * via `TWILIO_TRUSTHUB_SECONDARY_POLICY_SID` for account/region differences.
- *
- * NOTE: confirm this default against the Twilio Console before go-live — Phases
- * C/D submit the bundle for review, at which point a wrong policy SID surfaces.
+ * Twilio's "secondary customer profile" Trust Hub policy SID as published in
+ * Twilio's Trust Hub / ISV onboarding API examples. Twilio's canonical guidance
+ * is to confirm the policy SID against the account (Console → Trust Hub →
+ * Policies, or `twilio api:trusthub:v1:policies:list`); override via
+ * `TWILIO_TRUSTHUB_SECONDARY_POLICY_SID` if the account differs.
  */
 const DEFAULT_SECONDARY_CUSTOMER_PROFILE_POLICY_SID =
-  "RNdfbf3fXXXXXXXXXXXXXXXXXXXXXXXXXX";
+  "RNdfbf3fae0e1107f8aded0e7cead80bf5";
 
 function resolvePolicySid(): string {
-  return (
-    env.TWILIO_TRUSTHUB_SECONDARY_POLICY_SID() ||
-    DEFAULT_SECONDARY_CUSTOMER_PROFILE_POLICY_SID
-  );
+  const override = env.TWILIO_TRUSTHUB_SECONDARY_POLICY_SID();
+  if (override) {
+    return override;
+  }
+  logger.info("twilio.trusthub.policy_sid.default_used", {
+    policySid: DEFAULT_SECONDARY_CUSTOMER_PROFILE_POLICY_SID,
+  });
+  return DEFAULT_SECONDARY_CUSTOMER_PROFILE_POLICY_SID;
 }
 
 export async function ensureTrustHubCustomerProfile(args: {

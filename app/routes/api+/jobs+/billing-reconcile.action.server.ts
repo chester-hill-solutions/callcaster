@@ -4,12 +4,43 @@ import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-rec
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { runCronWorkspaceFanout } from "@/lib/cron-workspace-fanout.server";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+
+/** Full per-workspace reconcile: pull Twilio usage, build + persist snapshot. */
+async function reconcileWorkspace(workspaceId: string) {
+  const twilio = await createWorkspaceTwilioInstance({
+    workspace_id: workspaceId,
+  });
+  const usageRecords = await twilio.usage.records.list();
+  const twilioUsage = usageRecords.map((record) => ({
+    category: record.category,
+    description: record.description,
+    usage: record.usage,
+    usageUnit: record.usageUnit,
+    price: record.price.toString(),
+    startDate: record.startDate?.toISOString(),
+    endDate: record.endDate?.toISOString(),
+  }));
+
+  const report = await loadBillingReconciliationReport({
+    workspaceId,
+    twilioUsage,
+  });
+  return persistWorkspaceBillingReconciliationSnapshot({
+    workspaceId,
+    report,
+    source: "cron",
+  });
+}
 
 /**
  * HTTP endpoint for the billing-reconcile daily sweep.
  * Called by pg_cron via `net.http_post`.
+ *
+ * pg_cron posts `workspaceId: null`; a null/absent workspaceId fans out across
+ * all workspaces with Twilio credentials (BILL-01 interim coordinator).
  */
 export const action = defineAction({
   // NOTE: the cron-secret guard lives in `handler` (not `auth`) because its
@@ -27,7 +58,20 @@ export const action = defineAction({
     const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 
     if (!workspaceId) {
-      return routeData({ error: "Missing workspaceId" }, { status: 400 });
+      // Fan out across all eligible workspaces; per-workspace failures are
+      // reported in the body, not as a 500.
+      try {
+        const summary = await runCronWorkspaceFanout({
+          job: "billing_reconcile",
+          requireTwilioCredentials: true,
+          run: reconcileWorkspace,
+        });
+        return routeData(summary);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error("Billing reconciliation sweep failed", { error: message });
+        return routeData({ error: message }, { status: 500 });
+      }
     }
 
     try {
@@ -40,29 +84,7 @@ export const action = defineAction({
         );
       }
 
-      const twilio = await createWorkspaceTwilioInstance({
-        workspace_id: workspaceId,
-      });
-      const usageRecords = await twilio.usage.records.list();
-      const twilioUsage = usageRecords.map((record) => ({
-        category: record.category,
-        description: record.description,
-        usage: record.usage,
-        usageUnit: record.usageUnit,
-        price: record.price.toString(),
-        startDate: record.startDate?.toISOString(),
-        endDate: record.endDate?.toISOString(),
-      }));
-
-      const report = await loadBillingReconciliationReport({
-        workspaceId,
-        twilioUsage,
-      });
-      const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
-        workspaceId,
-        report,
-        source: "cron",
-      });
+      const snapshot = await reconcileWorkspace(workspaceId);
 
       return routeData({
         ok: true,

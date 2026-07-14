@@ -1,4 +1,8 @@
 import type Twilio from "twilio";
+import {
+  normalizeAddressRequirement,
+  type AddressRequirement,
+} from "@/lib/number-address-requirements";
 
 export const TOLL_FREE_VERIFICATION_STATUSES = [
   "not_submitted",
@@ -79,6 +83,10 @@ export type AvailableTollFreeNumber = {
   friendlyName: string;
   region: string | null;
   locality: string | null;
+  /** ISO country of the available number (e.g. "CA"). */
+  isoCountry: string | null;
+  /** Q43: Twilio regulatory address requirement (none|any|local|foreign). */
+  addressRequirements: AddressRequirement;
   capabilities: { sms: boolean; mms: boolean; voice: boolean };
 };
 
@@ -112,6 +120,8 @@ export async function searchAvailableTollFreeNumbers(args: {
     friendlyName: n.friendlyName ?? n.phoneNumber ?? "",
     region: typeof n.region === "string" ? n.region : null,
     locality: typeof n.locality === "string" ? n.locality : null,
+    isoCountry: typeof n.isoCountry === "string" ? n.isoCountry : null,
+    addressRequirements: normalizeAddressRequirement(n.addressRequirements),
     capabilities: {
       sms: Boolean(n.capabilities?.sms),
       mms: Boolean(n.capabilities?.mms),
