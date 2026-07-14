@@ -45,3 +45,26 @@ The infrastructure/admin/background-jobs slice has conflicting `job` table schem
 - The worker, cron, and media-stream decisions are tightly coupled; finishing the worker unlocks reliable cron execution and webhook delivery.
 - The Bun server should not be used in production until it is aligned with the Node/Express entry.
 - Admin audit logging intersects with the auth slice.
+
+## Railway Environment Topology (audited 2026-07-14)
+
+Findings from diagnosing the crashed PR environment for PR #1042 (`callcaster-pr-1042`):
+
+| Environment | Services | State |
+|---|---|---|
+| `production` | `callcaster`, `Postgres` | Active, healthy |
+| `dev` | `CallCaster`, `callcaster-worker`, `PostgreSQL 18` | Active, current config (`DATABASE_URL`, `BETTER_AUTH_*`, `S3_*`) |
+| `staging` | `hearty-expression` only | **Stale** — last successful deploy 2026-06-24, pre Supabase→Postgres/Better Auth cutover; still carries `SUPABASE_*` variables, lacks `DATABASE_URL`/`BETTER_AUTH_SECRET` |
+| PR envs (ephemeral) | fork of base env | Crash at boot on env validation |
+
+Root cause of PR-env crashes: project settings have `prDeploys: true` with `baseEnvironmentId` = **staging**. Every ephemeral PR environment forks staging's single stale service and Supabase-era variable set, so current code fails `validateRequiredEnv` (`DATABASE_URL`, `BETTER_AUTH_SECRET` missing) and the container crash-loops. PR-env failures are therefore infrastructure noise, not a signal about the PR (CI + E2E remain the gates).
+
+Resolution (2026-07-14, operator): `baseEnvironmentId` re-pointed to `dev`; `prDeploys` left enabled. Future PR environments fork dev's three services. Caveat: the forked `PostgreSQL 18` starts empty, so PR envs need a migrate/seed step before they are usable (until then their crashes remain non-signal).
+
+Post-merge finding (2026-07-14, PR #1042 deploy to dev): dev `CallCaster` crash-loops on boot env validation because several required third-party provider secrets are unset in that environment (details tracked internally, not in this public doc). This predates the PR — dev had no successful `CallCaster` deploy earlier the same day either — and matches the outstanding "Railway env" go-live TODO. Also note: `callcaster-worker` in dev has no repo source configured — it does not auto-deploy on merges to `dev`; its deploy path needs defining.
+
+Follow-ups:
+- Fill the unset dev provider secrets (operator), then redeploy `CallCaster` and verify boot.
+- Add a migrate/seed step for forked PR-env Postgres, or disable `prDeploys` until one exists.
+- Define an auto-deploy path for `callcaster-worker` (currently source-less in dev).
+- `hearty-expression` (auto-named service) and the `staging` environment are retirement candidates: either delete them or rebuild staging from dev's service/variable topology.
