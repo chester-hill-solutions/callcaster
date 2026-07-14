@@ -1345,7 +1345,7 @@ Record these decisions in the PR or an ADR before dependent work proceeds:
 - [ ] TEL-03 ACD lifecycle recovery
 - [ ] TEL-04 open-sync recovery
 - [ ] TEL-05 monotonic message state
-- [ ] BILL-01 scheduler architecture
+- [ ] BILL-01 scheduler architecture — partial (2026-07-14, PR #1042): pg_cron HTTP job routes retired (`retire_pg_cron` migration), worker cron handlers with workspace fanout resolve the `workspaceId: NULL` root cause, enqueue idempotency/advisory-lock dedupe + dead-letter revival landed. Remaining: migrate the interim inline all-workspace fanout to durable per-workspace child jobs on the published jobqueue (after ASYNC-02), and alert when a required recurring job has no future occurrence
 - [ ] BILL-02 rental catch-up
 - [ ] BILL-03 reconciliation units
 - [ ] BILL-04 reserve-first number purchase
