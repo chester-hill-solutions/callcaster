@@ -6,6 +6,7 @@
  */
 
 import { resolveObjectStorageEnvRequired } from "./object-storage-config";
+import { logger } from "./logger.server";
 
 type EnvConfig = {
   DATABASE_URL: string;
@@ -97,6 +98,57 @@ function getEnv<K extends keyof EnvConfig>(
   );
 }
 
+/** Stripe secret-key mode, derived from the key prefix (`sk_test_` / `sk_live_`). */
+export type StripeKeyMode = 'test' | 'live' | 'unknown';
+
+/** Detects the Stripe key mode from a secret (or restricted) key's prefix. */
+export function getStripeKeyMode(
+  secretKey: string | null | undefined,
+): StripeKeyMode {
+  if (!secretKey) return 'unknown';
+  if (secretKey.startsWith('sk_test_') || secretKey.startsWith('rk_test_')) {
+    return 'test';
+  }
+  if (secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_')) {
+    return 'live';
+  }
+  return 'unknown';
+}
+
+let stripeKeyModeMismatchLogged = false;
+
+/**
+ * Guard for issue #1027: production running with a Stripe TEST-mode key sends
+ * real users to a test-mode Checkout where every real card is declined
+ * ("Your request was in test mode, but used a non test card"). Make that
+ * misconfiguration loud at boot instead of a confusing decline at card entry.
+ *
+ * Logs a prominent structured error once per process. Never throws —
+ * production must not go down over this. Returns true when the mismatch is
+ * present (NODE_ENV === "production" with a test-mode STRIPE_SECRET_KEY).
+ */
+export function warnIfStripeKeyModeMismatch(): boolean {
+  const keyMode = getStripeKeyMode(process.env.STRIPE_SECRET_KEY);
+  const mismatch = process.env.NODE_ENV === 'production' && keyMode === 'test';
+
+  if (mismatch && !stripeKeyModeMismatchLogged) {
+    stripeKeyModeMismatchLogged = true;
+    logger.error(
+      'STRIPE MISCONFIGURATION: STRIPE_SECRET_KEY is a TEST-mode key while NODE_ENV is "production"',
+      {
+        guard: 'stripe-key-mode-mismatch',
+        keyMode,
+        nodeEnv: process.env.NODE_ENV,
+        impact:
+          'Stripe Checkout runs in test mode; real cards are declined and credit purchases fail.',
+        fix: 'Set STRIPE_SECRET_KEY (and matching STRIPE_WEBHOOK_SECRET) to live-mode values in the production environment.',
+      },
+    );
+  }
+
+  return mismatch;
+}
+
 // Validate environment variables on module load
 // This will throw an error immediately if required vars are missing
 if (typeof window === 'undefined') {
@@ -109,6 +161,8 @@ if (typeof window === 'undefined') {
       console.error('Environment validation error:', error);
     }
   }
+  // Boot-time guard: loud structured error if prod is on a Stripe test key.
+  warnIfStripeKeyModeMismatch();
 }
 
 /**
@@ -135,7 +189,12 @@ export const env = {
   // Trailing slash stripped centrally: 23 of 29 call sites string-template
   // Twilio callback URLs from this value, and `https://host//api/...` 404s.
   BASE_URL: () => getEnv('BASE_URL').replace(/\/+$/, ''),
-  STRIPE_SECRET_KEY: () => getEnv('STRIPE_SECRET_KEY'),
+  STRIPE_SECRET_KEY: () => {
+    // Re-check at every Stripe-client init (once-logged) in case env vars
+    // were injected after module load.
+    warnIfStripeKeyModeMismatch();
+    return getEnv('STRIPE_SECRET_KEY');
+  },
   STRIPE_WEBHOOK_SECRET: () => getEnv('STRIPE_WEBHOOK_SECRET'),
   RESEND_API_KEY: () => getEnv('RESEND_API_KEY'),
   /** Ops-alert recipient for Twilio compliance jobs needing docs / failing terminally. Falls back to the platform compliance inbox. */
