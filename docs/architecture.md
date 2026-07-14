@@ -12,7 +12,7 @@ This document is the durable onboarding map for functional layers, deployable se
 | **Worker** | `worker/index.ts` | Polls Postgres `job` table (`FOR UPDATE SKIP LOCKED`), runs handlers |
 | **Media stream** | `services/media-stream/` | Live Twilio media streams / transcription (ADR-0030) |
 
-Legacy dual path: Railway function cron services may still POST to `/api/jobs/*`, which now **enqueue** job rows only. Bun worker owns execution. pg_cron HTTP schedules are retired via `client/migrations/20260714120000_retire_pg_cron_http_job_routes.sql`.
+Legacy dual path: Railway function cron services may still POST to `/api/jobs/*`, which now **enqueue** job rows only. Bun worker owns execution. pg_cron HTTP schedules are retired via `client/migrations/20260714130000_retire_pg_cron_http_job_routes.sql`.
 
 ## Functional layers
 
