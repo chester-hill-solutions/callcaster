@@ -38,7 +38,7 @@ export function createCronEnqueueAction(args: {
   ) => Record<string, unknown>;
 }): {
   sideEffects: SideEffect[];
-  handler: (ctx: { request: Request }) => Promise<ReturnType<typeof toEnqueueResponse>>;
+  handler: (ctx: { request: Request }) => Promise<unknown>;
 } {
   return {
     sideEffects: ["db-write"],
