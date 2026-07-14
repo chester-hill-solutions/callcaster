@@ -11,11 +11,11 @@ import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import {
-  createSignedObjectUrl,
-  createSignedObjectUrls,
-  listObjects,
-  uploadObject,
-} from "@/lib/object-storage.server";
+  getSignedMediaUrl,
+  listMediaObjects,
+  putMediaObject,
+} from "@/lib/adapters/media-library.adapter.server";
+import { createSignedObjectUrls } from "@/lib/object-storage.server";
 
 const SIGNED_URL_TTL_SECONDS = 3600;
 
@@ -35,7 +35,7 @@ async function listWorkspaceMediaWithUrls(
   filter: (name: string) => boolean,
 ) {
   try {
-    const mediaData = await listObjects("workspaceAudio", workspaceId, {
+    const mediaData = await listMediaObjects("workspaceAudio", workspaceId, {
       sortBy: { column: "created_at", order: "desc" },
     });
 
@@ -120,13 +120,13 @@ export async function uploadWorkspaceAudioApi(
     const normalizedAudio = await normalizeUploadedAudio(file);
     const objectPath = `${workspaceId}/${safeMediaName}.${normalizedAudio.extension}`;
 
-    await uploadObject("workspaceAudio", objectPath, normalizedAudio.buffer, {
+    await putMediaObject("workspaceAudio", objectPath, normalizedAudio.buffer, {
       cacheControl: "60",
       upsert: false,
       contentType: normalizedAudio.contentType,
     });
 
-    const signedUrl = await createSignedObjectUrl(
+    const signedUrl = await getSignedMediaUrl(
       "workspaceAudio",
       objectPath,
       SIGNED_URL_TTL_SECONDS,

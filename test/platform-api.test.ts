@@ -69,16 +69,16 @@ describe("platform auth rate limits", () => {
     resetRateLimitsForTests();
   });
 
-  test("returns 429 after limit exceeded", () => {
+  test("returns 429 after limit exceeded", async () => {
     const request = new Request("http://localhost/api/auth/token", {
       headers: { "x-forwarded-for": "203.0.113.1" },
     });
 
     for (let i = 0; i < 30; i += 1) {
-      expect(enforceAuthRateLimit(request, "auth:token")).toBeNull();
+      expect(await enforceAuthRateLimit(request, "auth:token")).toBeNull();
     }
 
-    const limited = enforceAuthRateLimit(request, "auth:token");
+    const limited = await enforceAuthRateLimit(request, "auth:token");
     expect(limited?.status).toBe(429);
     expect(limited?.headers.get("Retry-After")).toBeTruthy();
   });

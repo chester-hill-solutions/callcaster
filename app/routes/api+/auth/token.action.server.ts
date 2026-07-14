@@ -7,11 +7,11 @@ import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = defineAction({
-  auth: ({ request }: ActionFunctionArgs) => {
+  auth: async ({ request }: ActionFunctionArgs) => {
     if (request.method !== "POST") {
       return jsonError("Method not allowed", 405);
     }
-    return enforceAuthRateLimit(request, "auth:token") ?? undefined;
+    return (await enforceAuthRateLimit(request, "auth:token")) ?? undefined;
   },
   sideEffects: ["external"],
   handler: async ({ request }) => {

@@ -49,7 +49,7 @@ export const action = defineAction({
     };
 
     if (intent === "enable") {
-      const rateLimited = enforceTwoFactorSetupRateLimit(user.id, "2fa:enable");
+      const rateLimited = await enforceTwoFactorSetupRateLimit(user.id, "2fa:enable");
       if (rateLimited) {
         return rateLimited;
       }
@@ -90,7 +90,7 @@ export const action = defineAction({
     }
 
     if (intent === "verify") {
-      const rateLimited = enforceTwoFactorSetupRateLimit(user.id, "2fa:verify");
+      const rateLimited = await enforceTwoFactorSetupRateLimit(user.id, "2fa:verify");
       if (rateLimited) {
         return rateLimited;
       }

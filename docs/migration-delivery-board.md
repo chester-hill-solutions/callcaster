@@ -138,7 +138,8 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 3B.2 | SSE route + pg-realtime package | **Done** | WS-C |
 | 3B.3 | Replace Realtime hooks | **Done** | WS-C |
 | 3C.1 | `job` table schema | **Done** | `drizzle/0003_job.sql` + `client/migrations/20260704000003_extend_job_table.sql` |
-| 3C.2 | Bun worker service | **Partial** | Code done (`worker/index.ts`); image now builds/boots locally (2026-07-08 Dockerfile.worker fixes); **not deployed** on Railway review yet |
+| 3C.2 | Bun worker service | **Done** | Deployed `callcaster-worker` (`9cba9fa7-…`) on review; `job` table text status + `workspace_id`; HTTP `/api/jobs/*` enqueue-only; Railway cron functions scaled to 0 |
+
 | 3C.3 | Port twilio_open_sync handler | **Done** | Remix route `/api/jobs/twilio-open-sync` |
 | 3C.4 | Port number_rental_billing handler | **Done** | Remix route `/api/jobs/number-rental-billing` |
 | 3C.5 | Port billing_reconcile handler | **Done** | Remix route `/api/jobs/billing-reconcile` |
@@ -167,7 +168,8 @@ Gap analysis: [`phase-3-stack-gap-analysis.md`](./phase-3-stack-gap-analysis.md)
 | 4.3 | Scriptkit call + survey paths | **Done** | Survey routes pass 40/40 tests; Scriptkit components typecheck clean |
 | 4.4 | Manual Twilio smoke checklist (plan) | **Done** | `docs/manual-test-plan-zero-supabase.md` exists with 150+ test steps across 14 categories |
 | 4.5 | `tools:api:surface:check` green | **Done** |
-| 4.6 | Railway review deploy smoke | **Partial** | App online at review URL; health probes pass; **manual Twilio + auth flows not yet executed** |
+| 4.6 | Railway review deploy smoke | **Partial** | Worker live and claiming jobs; **app CRASHED** — Twilio/Stripe/Resend secrets empty on `CallCaster`. Manual Twilio smoke blocked — see `docs/twilio-smoke-review-results.md` |
+
 
 ---
 

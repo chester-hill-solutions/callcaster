@@ -8,6 +8,12 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
+import { runWithRequestContext } from "../app/lib/request-context.server.ts";
+import {
+  captureException,
+  initializeSentry,
+} from "../app/lib/sentry.server.ts";
+import type { DatabaseReadiness } from "../app/server/db-health.server.ts";
 import { isTwilioWebhookPath } from "./twilio-webhook-paths.ts";
 import { runBootSmokeChecks } from "../app/server/boot-checks.server.ts";
 type TwilioWebhookModule = typeof import("./twilio-webhook.ts");
@@ -214,28 +220,29 @@ async function serveStaticFile(
 
 const DB_PING_CACHE_MS = 10_000;
 
-type DbReadinessChecker = () => Promise<boolean>;
+type DbReadinessChecker = () => Promise<DatabaseReadiness>;
 
 function createDbReadinessChecker(): DbReadinessChecker {
-  let cache: { at: number; ok: boolean } | null = null;
-  let inflight: Promise<boolean> | null = null;
+  let cache: { at: number; readiness: DatabaseReadiness } | null = null;
+  let inflight: Promise<DatabaseReadiness> | null = null;
 
   return () => {
     if (cache && Date.now() - cache.at < DB_PING_CACHE_MS) {
-      return Promise.resolve(cache.ok);
+      return Promise.resolve(cache.readiness);
     }
 
     inflight ??= (async () => {
       try {
-        const { pingDatabase } = await import(
+        const { probeDatabaseReadiness } = await import(
           "../app/server/db-health.server.ts"
         );
-        const ok = await pingDatabase();
-        cache = { at: Date.now(), ok };
-        return ok;
+        const readiness = await probeDatabaseReadiness();
+        cache = { at: Date.now(), readiness };
+        return readiness;
       } catch {
-        cache = { at: Date.now(), ok: false };
-        return false;
+        const readiness = { queryReady: false, listenReady: false };
+        cache = { at: Date.now(), readiness };
+        return readiness;
       } finally {
         inflight = null;
       }
@@ -257,7 +264,10 @@ async function probeResponse(
     });
   }
 
-  const dbReady = checkDb ? await checkDb() : true;
+  const database = checkDb
+    ? await checkDb()
+    : { queryReady: true, listenReady: true };
+  const dbReady = database.queryReady && database.listenReady;
 
   if (!readyState.buildReady || !readyState.acceptingTraffic || !dbReady) {
     return new Response(
@@ -265,7 +275,8 @@ async function probeResponse(
         ok: false,
         buildReady: Boolean(readyState.buildReady),
         acceptingTraffic: Boolean(readyState.acceptingTraffic),
-        databaseReady: dbReady,
+        databaseReady: database.queryReady,
+        databaseListenReady: database.listenReady,
       }),
       {
         status: 503,
@@ -334,7 +345,8 @@ export async function createServer(options: CreateServerOptions = {}) {
       const url = new URL(request.url);
       const pathname = url.pathname;
 
-      try {
+      return runWithRequestContext({ requestId: logger.requestId }, async () => {
+        try {
         if (pathname === "/healthz" || pathname === "/readyz") {
           const response = finalizeResponse(
             await probeResponse(pathname, readyState, dbReadinessChecker),
@@ -405,27 +417,35 @@ export async function createServer(options: CreateServerOptions = {}) {
         const response = finalizeResponse(rrResponse, logger.requestId);
         logger.finish(response);
         return response;
-      } catch (error) {
-        log("error", "Unhandled request error", {
-          error: error instanceof Error ? error.message : String(error),
-          path: pathname,
-        });
+        } catch (error) {
+          log("error", "Unhandled request error", {
+            error: error instanceof Error ? error.message : String(error),
+            path: pathname,
+            requestId: logger.requestId,
+          });
+          captureException(error, {
+            path: pathname,
+            method: request.method,
+            requestId: logger.requestId,
+          });
 
-        const response = finalizeResponse(
-          new Response(JSON.stringify({ error: "Internal Server Error" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          }),
-          logger.requestId,
-        );
-        logger.finish(response);
-        return response;
-      }
+          const response = finalizeResponse(
+            new Response(JSON.stringify({ error: "Internal Server Error" }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            }),
+            logger.requestId,
+          );
+          logger.finish(response);
+          return response;
+        }
+      });
     },
     error: (error) => {
       log("error", "Bun server error", {
         error: error instanceof Error ? error.message : String(error),
       });
+      captureException(error, { source: "bun.server.error" });
       return new Response("Internal Server Error", { status: 500 });
     },
   });
@@ -470,12 +490,14 @@ function gracefulShutdown(server: ReturnType<typeof Bun.serve>, readyState: Read
     log("error", "uncaught exception", {
       message: error instanceof Error ? error.message : String(error),
     });
+    captureException(error, { source: "uncaughtException" });
     void shutdown("uncaughtException", 1);
   });
   process.on("unhandledRejection", (reason) => {
     log("error", "unhandled rejection", {
       message: reason instanceof Error ? reason.message : String(reason),
     });
+    captureException(reason, { source: "unhandledRejection" });
     if (FATAL_ON_REJECTION) {
       void shutdown("unhandledRejection", 1);
     }
@@ -493,6 +515,7 @@ export async function startServer({
   env?: NodeJS.ProcessEnv;
   buildPath?: string;
 } = {}) {
+  initializeSentry("callcaster-web", env);
   validateEnvironment(env);
 
   const readyState: ReadyState = {
@@ -529,6 +552,7 @@ async function main() {
     log("error", "server boot failed", {
       message: error instanceof Error ? error.message : String(error),
     });
+    captureException(error, { source: "server.boot" });
     process.exit(1);
   }
 }

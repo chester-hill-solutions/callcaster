@@ -27,6 +27,11 @@ vi.mock("@/lib/telephony-db.server", () => ({
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
+const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+}));
+
 describe("app/routes/api+/recording", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -34,8 +39,10 @@ describe("app/routes/api+/recording", () => {
     mocks.requireTwilioSignature.mockReset();
     mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.updateCallRecordingUrlBySid.mockReset();
-    mocks.updateCallRecordingUrlBySid.mockResolvedValue({ sid: "CA1" });
+    mocks.updateCallRecordingUrlBySid.mockResolvedValue({ sid: "CA1", workspace: "w1" });
     mocks.logger.error.mockReset();
+    enqueueJobMock.mockReset();
+    enqueueJobMock.mockResolvedValue({ enqueued: true, jobId: 1 });
   });
 
   test("returns 400 when CallSid missing", async () => {
@@ -81,6 +88,9 @@ describe("app/routes/api+/recording", () => {
     // app/routes/api+/call.action.server.ts (recordingStatusCallback wiring)
     // and app/lib/telephony-db.server.ts:updateCallRecordingUrlBySid.
     expect(mocks.updateCallRecordingUrlBySid).toHaveBeenCalledWith("CA1", "https://rec");
+    expect(enqueueJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "recording_side_effects" }),
+    );
   });
 
   test("does not attempt to persist when RecordingUrl is missing", async () => {

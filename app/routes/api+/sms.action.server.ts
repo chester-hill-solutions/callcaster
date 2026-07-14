@@ -37,6 +37,7 @@ import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup
 import { createTenantDb } from "@/server/tenant-db";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { defineAction } from "@/lib/handler.server";
 
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
@@ -268,7 +269,7 @@ export const action = defineAction({
     // rather than per contact, so a mid-campaign depletion doesn't burn
     // through the audience one Twilio failure at a time.
     const creditsBalance = await getWorkspaceCreditsBalance(workspace_id);
-    if (creditsBalance === null || creditsBalance <= 0) {
+    if (hasInsufficientCreditsForOutbound(creditsBalance)) {
       return new Response(
         JSON.stringify({ creditsError: true, error: "Insufficient credits" }),
         {

@@ -44,6 +44,16 @@ vi.mock("@/lib/telephony-db.server", () => ({
     telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
 }));
 
+vi.mock("@/lib/workspace-events.server", () => ({
+  emitPredictiveBroadcast: vi.fn(async () => ({})),
+}));
+
+const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
+
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+}));
+
 const transactionRowsState = vi.hoisted(() => ({ rows: [] as TransactionRow[] }));
 
 vi.mock("@/lib/transaction-history.server", () => ({
@@ -80,6 +90,8 @@ describe("api.call-status billing + idempotency", () => {
     resetTransactionRows();
     twilioWebhookMocks.requireTwilioSignature.mockReset();
     twilioWebhookMocks.requireTwilioSignature.mockResolvedValue(null);
+    enqueueJobMock.mockReset();
+    enqueueJobMock.mockResolvedValue({ enqueued: true, jobId: 1 });
     telephonyDbMocks.findCallBySid.mockReset();
     telephonyDbMocks.upsertCallBySid.mockReset();
     telephonyDbMocks.findOutreachAttemptWithCampaignType.mockReset();
@@ -90,6 +102,18 @@ describe("api.call-status billing + idempotency", () => {
       parent_call_sid: null,
       campaign_id: null,
       sid: values.sid,
+      status: values.status,
+      duration: values.duration,
+      call_duration: values.call_duration,
+    }));
+    telephonyDbMocks.findCallBySid.mockImplementation(async (sid: string) => ({
+      workspace: "w1",
+      sid,
+      status: "completed",
+      duration: sid === "CA61" ? "61" : sid.startsWith("CA6") ? "60" : "1",
+      call_duration: sid === "CA61" ? "61" : sid.startsWith("CA6") ? "60" : "1",
+      outreach_attempt_id: null,
+      campaign_id: null,
     }));
   });
 
@@ -115,74 +139,104 @@ describe("api.call-status billing + idempotency", () => {
     expect(res.status).toBe(403);
   });
 
-  test("bills staffed rates: 4 credits for 1-60s, 9 credits for 61s", async () => {
+  test("route enqueues side-effects job instead of inline billing", async () => {
     const mod = await import("../app/routes/api+/call-status");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "61");
 
-    const makeReq = (sid: string, duration: string) => {
-      const fd = new FormData();
-      fd.set("CallSid", sid);
-      fd.set("CallStatus", "completed");
-      fd.set("Timestamp", new Date().toISOString());
-      fd.set("Duration", duration);
-      fd.set("CallDuration", duration);
-      fd.set("CalledVia", "client:u1");
-      return new Request("http://localhost/api/call-status", {
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/call-status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
         body: fd,
-      });
-    };
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(enqueueJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "call_status_side_effects" }),
+    );
+    expect(transactionRowsState.rows).toHaveLength(0);
+  });
 
-    await mod.action({ request: makeReq("CA1", "1") } as any);
-    await mod.action({ request: makeReq("CA60", "60") } as any);
-    await mod.action({ request: makeReq("CA61", "61") } as any);
+  test("bills staffed rates via side-effects handler: 4 credits for 1-60s, 9 credits for 61s", async () => {
+    const { runCallStatusSideEffects } = await import(
+      "../app/lib/worker/webhook-side-effects.server"
+    );
+
+    await runCallStatusSideEffects({
+      callSid: "CA1",
+      twilioParams: { CallSid: "CA1", CallStatus: "completed", Duration: "1" },
+    });
+    await runCallStatusSideEffects({
+      callSid: "CA60",
+      twilioParams: { CallSid: "CA60", CallStatus: "completed", Duration: "60" },
+    });
+    await runCallStatusSideEffects({
+      callSid: "CA61",
+      twilioParams: { CallSid: "CA61", CallStatus: "completed", Duration: "61" },
+    });
 
     const amounts = transactionRowsState.rows.map((r) => r.amount);
     expect(amounts).toEqual([-4, -4, -9]);
   });
 
   test("does not bill zero-duration terminal staffed calls (failed/busy/no-answer)", async () => {
-    const mod = await import("../app/routes/api+/call-status");
+    telephonyDbMocks.findCallBySid.mockImplementation(async (sid: string) => ({
+      workspace: "w1",
+      sid,
+      status: sid.replace("CA_", "").toLowerCase(),
+      duration: "0",
+      call_duration: "0",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    }));
 
-    const makeReq = (sid: string, status: string) => {
-      const fd = new FormData();
-      fd.set("CallSid", sid);
-      fd.set("CallStatus", status);
-      fd.set("Timestamp", new Date().toISOString());
-      fd.set("Duration", "0");
-      fd.set("CallDuration", "0");
-      return new Request("http://localhost/api/call-status", {
-        method: "POST",
-        headers: { "x-twilio-signature": "good" },
-        body: fd,
-      });
-    };
+    const { runCallStatusSideEffects } = await import(
+      "../app/lib/worker/webhook-side-effects.server"
+    );
 
-    await mod.action({ request: makeReq("CA_FAILED", "failed") } as any);
-    await mod.action({ request: makeReq("CA_BUSY", "busy") } as any);
-    await mod.action({ request: makeReq("CA_NOANSWER", "no-answer") } as any);
+    await runCallStatusSideEffects({
+      callSid: "CA_FAILED",
+      twilioParams: { CallSid: "CA_FAILED", CallStatus: "failed", Duration: "0" },
+    });
+    await runCallStatusSideEffects({
+      callSid: "CA_BUSY",
+      twilioParams: { CallSid: "CA_BUSY", CallStatus: "busy", Duration: "0" },
+    });
+    await runCallStatusSideEffects({
+      callSid: "CA_NOANSWER",
+      twilioParams: { CallSid: "CA_NOANSWER", CallStatus: "no-answer", Duration: "0" },
+    });
 
     expect(transactionRowsState.rows).toHaveLength(0);
   });
 
-  test("is idempotent across duplicate webhook deliveries (same CallSid)", async () => {
-    const mod = await import("../app/routes/api+/call-status");
-
-    const fd = new FormData();
-    fd.set("CallSid", "CA_DUP");
-    fd.set("CallStatus", "completed");
-    fd.set("Timestamp", new Date().toISOString());
-    fd.set("Duration", "61");
-    fd.set("CallDuration", "61");
-
-    const req = new Request("http://localhost/api/call-status", {
-      method: "POST",
-      headers: { "x-twilio-signature": "good" },
-      body: fd,
+  test("is idempotent across duplicate side-effect runs (same CallSid)", async () => {
+    telephonyDbMocks.findCallBySid.mockResolvedValue({
+      workspace: "w1",
+      sid: "CA_DUP",
+      status: "completed",
+      duration: "61",
+      call_duration: "61",
+      outreach_attempt_id: null,
+      campaign_id: null,
     });
 
-    await mod.action({ request: req.clone() } as any);
-    await mod.action({ request: req.clone() } as any);
+    const { runCallStatusSideEffects } = await import(
+      "../app/lib/worker/webhook-side-effects.server"
+    );
+
+    await runCallStatusSideEffects({
+      callSid: "CA_DUP",
+      twilioParams: { CallSid: "CA_DUP", CallStatus: "completed", Duration: "61" },
+    });
+    await runCallStatusSideEffects({
+      callSid: "CA_DUP",
+      twilioParams: { CallSid: "CA_DUP", CallStatus: "completed", Duration: "61" },
+    });
 
     const matching = transactionRowsState.rows.filter(
       (r) => r.idempotency_key === "call:CA_DUP",
@@ -194,6 +248,16 @@ describe("api.call-status billing + idempotency", () => {
 describe("processCallStatusWebhook single source of truth", () => {
   beforeEach(() => {
     resetTransactionRows();
+    telephonyDbMocks.upsertCallBySid.mockImplementation(async (values: any) => ({
+      workspace: "w1",
+      outreach_attempt_id: null,
+      parent_call_sid: null,
+      campaign_id: null,
+      sid: values.sid,
+      status: values.status,
+      duration: values.duration,
+      call_duration: values.call_duration,
+    }));
   });
 
   function makeParams(status: string, duration: string, sid: string) {

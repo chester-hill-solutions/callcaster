@@ -11,14 +11,27 @@
  *   bun run ./worker/index.ts drain
  *   bun run ./worker/index.ts --mode=drain
  */
-import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
-import { runWorkerPollLoop, resetStaleClaims, claimNextJob, completeJob, failJob } from "../app/lib/worker/poll-jobs.server.ts";
+import { validateWorkerEnv } from "../app/lib/worker/validate-worker-env.ts";
+import {
+  runWorkerPollLoop,
+  resetStaleClaims,
+  claimJob,
+  completeJob,
+  failJob,
+} from "../app/lib/adapters/jobqueue.adapter.server.ts";
 import { jobHandlers } from "../app/lib/worker/handlers.server.ts";
 import { ensureSelfSchedulingJobsSeeded } from "../app/lib/worker/ensure-scheduled-jobs.server.ts";
+import {
+  captureException,
+  initializeSentry,
+} from "../app/lib/sentry.server.ts";
+
+initializeSentry("callcaster-worker");
 
 try {
-  validateRequiredEnv(process.env);
+  validateWorkerEnv(process.env);
 } catch (error) {
+  captureException(error, { source: "worker.boot" });
   console.error("worker.boot_failed", {
     error: error instanceof Error ? error.message : String(error),
   });
@@ -47,6 +60,12 @@ function shutdown(signal: string) {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("uncaughtException", (error) => {
+  captureException(error, { source: "worker.uncaughtException" });
+});
+process.on("unhandledRejection", (reason) => {
+  captureException(reason, { source: "worker.unhandledRejection" });
+});
 
 // Seed the first row for self-re-enqueuing job types (low-credit notify,
 // webhook audit) so a fresh database never needs the manual insert from the
@@ -58,7 +77,7 @@ if (mode === "drain") {
   // to claim a job, matching the long-running poll loop's per-iteration reset.
   await resetStaleClaims();
 
-  const job = await claimNextJob(workerId);
+  const job = await claimJob(workerId);
   if (!job) {
     console.info("worker.drain", { message: "idle" });
     process.exit(0);
@@ -82,6 +101,11 @@ if (mode === "drain") {
     process.exit(0);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    captureException(error, {
+      source: "worker.drain",
+      jobId: job.id,
+      jobType: job.type,
+    });
     console.error("worker.drain", { jobId: job.id, error: message });
     await failJob(job.id, job.attempt_count, job.max_attempts, message, job.type);
     process.exit(1);

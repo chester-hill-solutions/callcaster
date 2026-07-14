@@ -1,47 +1,39 @@
 import { jsonError } from "./platform-api.server";
+import { checkRateLimitPostgres } from "@/lib/platform-rate-limit-db.server";
+import {
+  checkRateLimitInMemory,
+  type RateLimitBucketState,
+  type RateLimitConfig,
+  type RateLimitResult,
+} from "@/lib/platform-rate-limit-window";
 
-type RateLimitBucket = {
-  count: number;
-  resetAt: number;
-};
+export type { RateLimitConfig, RateLimitResult };
 
-const buckets = new Map<string, RateLimitBucket>();
+let testMemoryBuckets: Map<string, RateLimitBucketState> | null = null;
+let vitestMemoryBuckets: Map<string, RateLimitBucketState> | null = null;
 
-export type RateLimitConfig = {
-  key: string;
-  limit: number;
-  windowMs: number;
-};
-
-export type RateLimitResult =
-  | { ok: true; remaining: number; resetAt: number }
-  | { ok: false; retryAfterSeconds: number; resetAt: number };
-
-export function checkRateLimit(config: RateLimitConfig): RateLimitResult {
-  const now = Date.now();
-  const existing = buckets.get(config.key);
-
-  if (!existing || existing.resetAt <= now) {
-    const resetAt = now + config.windowMs;
-    buckets.set(config.key, { count: 1, resetAt });
-    return { ok: true, remaining: config.limit - 1, resetAt };
+function memoryBuckets(): Map<string, RateLimitBucketState> {
+  if (testMemoryBuckets) {
+    return testMemoryBuckets;
   }
-
-  if (existing.count >= config.limit) {
-    return {
-      ok: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
-      resetAt: existing.resetAt,
-    };
+  if (process.env.VITEST === "true") {
+    if (!vitestMemoryBuckets) {
+      vitestMemoryBuckets = new Map();
+    }
+    return vitestMemoryBuckets;
   }
+  throw new Error("memoryBuckets called without an active in-memory backend");
+}
 
-  existing.count += 1;
-  buckets.set(config.key, existing);
-  return {
-    ok: true,
-    remaining: config.limit - existing.count,
-    resetAt: existing.resetAt,
-  };
+function usesMemoryBackend(): boolean {
+  return testMemoryBuckets !== null || process.env.VITEST === "true";
+}
+
+export async function checkRateLimit(config: RateLimitConfig): Promise<RateLimitResult> {
+  if (usesMemoryBackend()) {
+    return checkRateLimitInMemory(config, memoryBuckets());
+  }
+  return checkRateLimitPostgres(config);
 }
 
 export function rateLimitResponse(retryAfterSeconds: number): Response {
@@ -58,5 +50,13 @@ export function clientRateLimitKey(request: Request, scope: string): string {
 
 /** Test helper — clears in-memory buckets between tests. */
 export function resetRateLimitsForTests(): void {
-  buckets.clear();
+  if (process.env.VITEST === "true") {
+    vitestMemoryBuckets?.clear();
+    return;
+  }
+  if (!testMemoryBuckets) {
+    testMemoryBuckets = new Map();
+  } else {
+    testMemoryBuckets.clear();
+  }
 }

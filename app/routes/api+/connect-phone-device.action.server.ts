@@ -12,6 +12,7 @@ import { safeParseJson } from "@/lib/request-utils.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -75,7 +76,7 @@ export const action = defineAction({
         if (credits === null) {
             throw new Error(`Workspace ${workspaceId} not found`);
         }
-        if (credits <= 0) {
+        if (hasInsufficientCreditsForOutbound(credits)) {
             return routeData({ error: "Insufficient credits" }, { status: 402, headers });
         }
 

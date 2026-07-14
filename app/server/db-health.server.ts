@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
-import { db } from "./db";
+import { db, directPool } from "./db";
 
 const REQUIRED_FUNCTION = "apply_ledger_entry_and_sync_credits";
+const LISTEN_PROBE_CHANNEL = "callcaster_readiness_probe";
+const LISTEN_PROBE_TIMEOUT_MS = 2_000;
 
 const BANNED_TRIGGERS = [
   "add_contact_to_queues_trigger",
@@ -33,6 +35,46 @@ export async function pingDatabase(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export type DatabaseReadiness = {
+  queryReady: boolean;
+  listenReady: boolean;
+};
+
+async function probeListenConnection(): Promise<boolean> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const listener = await Promise.race([
+      directPool.listen(LISTEN_PROBE_CHANNEL, () => undefined),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error("Postgres LISTEN probe timed out")),
+          LISTEN_PROBE_TIMEOUT_MS,
+        );
+      }),
+    ]);
+    await listener.unlisten();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+/**
+ * Readiness probe for both ordinary queries and the direct LISTEN/NOTIFY
+ * connection used by realtime streams.
+ */
+export async function probeDatabaseReadiness(): Promise<DatabaseReadiness> {
+  const [queryReady, listenReady] = await Promise.all([
+    pingDatabase(),
+    probeListenConnection(),
+  ]);
+  return { queryReady, listenReady };
 }
 
 /**

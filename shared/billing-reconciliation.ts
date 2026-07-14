@@ -219,16 +219,49 @@ export function buildBillingReconciliationReport(args: {
   };
 }
 
+/** Twilio-vs-ledger unit/event gaps above this count trigger material-variance alerts. */
+export const BILLING_RECONCILIATION_VARIANCE_THRESHOLD = 2;
+
+export function exceedsBillingVarianceThreshold(value: number): boolean {
+  return Math.abs(value) > BILLING_RECONCILIATION_VARIANCE_THRESHOLD;
+}
+
 export function hasMaterialBillingVariance(
   report: BillingReconciliationReport,
 ): boolean {
   return (
-    Math.abs(report.categories.sms.variance) > 2 ||
-    Math.abs(report.categories.voice.variance) > 2 ||
-    Math.abs(report.entityAudit.messageGap) > 2 ||
-    Math.abs(report.entityAudit.callGap) > 2 ||
+    exceedsBillingVarianceThreshold(report.categories.sms.variance) ||
+    exceedsBillingVarianceThreshold(report.categories.voice.variance) ||
+    exceedsBillingVarianceThreshold(report.entityAudit.messageGap) ||
+    exceedsBillingVarianceThreshold(report.entityAudit.callGap) ||
     report.unrecognizedDebitEvents > 0
   );
+}
+
+export type BillingReconciliationAlertDetails = {
+  period: BillingReconciliationPeriod;
+  smsVariance: number;
+  voiceVariance: number;
+  messageGap: number;
+  callGap: number;
+  unrecognizedDebitEvents: number;
+  twilioTotalCostUsd: number;
+  ledgerDebitCredits: number;
+};
+
+export function buildBillingReconciliationAlertDetails(
+  report: BillingReconciliationReport,
+): BillingReconciliationAlertDetails {
+  return {
+    period: report.period,
+    smsVariance: report.categories.sms.variance,
+    voiceVariance: report.categories.voice.variance,
+    messageGap: report.entityAudit.messageGap,
+    callGap: report.entityAudit.callGap,
+    unrecognizedDebitEvents: report.unrecognizedDebitEvents,
+    twilioTotalCostUsd: report.twilioTotalCostUsd,
+    ledgerDebitCredits: report.ledgerDebitCredits,
+  };
 }
 
 export type BillingReconciliationSnapshot = {

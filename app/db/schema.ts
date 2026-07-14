@@ -505,6 +505,12 @@ export const workspace_audit_event = pgTable("workspace_audit_event", {
   metadata: jsonb().notNull(),
 });
 
+export const rate_limit_bucket = pgTable("rate_limit_bucket", {
+  key: text().notNull().primaryKey(),
+  count: integer().notNull(),
+  reset_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
+});
+
 export const handset_session = pgTable("handset_session", {
   id: text().notNull().primaryKey(),
   user_id: uuid().notNull(),

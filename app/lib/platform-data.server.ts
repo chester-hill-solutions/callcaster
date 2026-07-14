@@ -140,7 +140,7 @@ export async function resolveDataPlaneAuth(
   }
   if (auth.authType === "api_key") {
     if (workspaceId && auth.workspaceId !== workspaceId) {
-      return jsonError("workspaceId does not match API key", 403);
+      return jsonError("Workspace not found", 404);
     }
     return {
       userId: null,
@@ -149,10 +149,17 @@ export async function resolveDataPlaneAuth(
   }
 
   if (workspaceId) {
-    await requireWorkspaceAccess({
-      user: auth.user,
-      workspaceId,
-    });
+    try {
+      await requireWorkspaceAccess({
+        user: auth.user,
+        workspaceId,
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return jsonError(error.message, error.statusCode);
+      }
+      throw error;
+    }
   }
 
   return { userId: auth.user.id };

@@ -61,6 +61,65 @@ export async function emitPostgresChangeEvent(
   });
 }
 
+type RealtimeRow = Record<string, unknown>;
+
+function serializeRealtimeRow(row: RealtimeRow): RealtimeRow {
+  const out: RealtimeRow = {};
+  for (const [key, value] of Object.entries(row)) {
+    out[key] = value instanceof Date ? value.toISOString() : value;
+  }
+  return out;
+}
+
+function toRealtimeRow(row: RealtimeRow | null | undefined): RealtimeRow | null {
+  if (!row) return null;
+  return serializeRealtimeRow(row);
+}
+
+export async function emitChatMessageEvent(
+  workspaceId: string,
+  eventType: "INSERT" | "UPDATE" | "DELETE",
+  newRow: RealtimeRow | null,
+  oldRow?: RealtimeRow | null,
+): Promise<WorkspaceEventRow> {
+  return emitPostgresChangeEvent(workspaceId, {
+    eventType,
+    table: "message",
+    schema: "public",
+    new: toRealtimeRow(newRow),
+    old: toRealtimeRow(oldRow ?? null),
+  });
+}
+
+export async function emitQueueEvent(
+  workspaceId: string,
+  eventType: "INSERT" | "UPDATE" | "DELETE",
+  newRow: RealtimeRow | null,
+  oldRow?: RealtimeRow | null,
+): Promise<WorkspaceEventRow> {
+  return emitPostgresChangeEvent(workspaceId, {
+    eventType,
+    table: "campaign_queue",
+    schema: "public",
+    new: toRealtimeRow(newRow),
+    old: toRealtimeRow(oldRow ?? null),
+  });
+}
+
+export async function emitCampaignStatusEvent(
+  workspaceId: string,
+  newRow: RealtimeRow,
+  oldRow?: RealtimeRow | null,
+): Promise<WorkspaceEventRow> {
+  return emitPostgresChangeEvent(workspaceId, {
+    eventType: "UPDATE",
+    table: "campaign",
+    schema: "public",
+    new: toRealtimeRow(newRow),
+    old: toRealtimeRow(oldRow ?? null),
+  });
+}
+
 export async function emitPredictiveBroadcast(
   workspaceId: string,
   payload: { contact_id: number | null; status: string },

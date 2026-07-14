@@ -8,8 +8,8 @@ const tdbMocks = vi.hoisted(() => ({
   },
 }));
 
-const messageDbMocks = vi.hoisted(() => ({
-  fetchMessagePageForContact: vi.fn(),
+const workspaceEventsMocks = vi.hoisted(() => ({
+  emitChatMessageEvent: vi.fn(),
 }));
 
 describe("app/lib/message-db.server.ts", () => {
@@ -17,10 +17,12 @@ describe("app/lib/message-db.server.ts", () => {
     vi.resetModules();
     tdbMocks.message.findMany.mockReset();
     tdbMocks.message.update.mockReset();
+    workspaceEventsMocks.emitChatMessageEvent.mockReset();
 
     vi.doMock("@/server/tenant-db", () => ({
       createTenantDb: vi.fn(() => tdbMocks),
     }));
+    vi.doMock("@/lib/workspace-events.server", () => workspaceEventsMocks);
     vi.doMock("@/server/db", () => ({
       db: {
         select: () => ({
@@ -125,7 +127,31 @@ describe("app/lib/message-db.server.ts", () => {
       }),
     );
   });
+
+  test("updateMessageBySid emits chat realtime event after update", async () => {
+    tdbMocks.message.findMany.mockResolvedValueOnce([
+      { sid: "SM1", status: "received", workspace: "w1" },
+    ]);
+    tdbMocks.message.update.mockResolvedValueOnce([
+      { sid: "SM1", status: "delivered", workspace: "w1" },
+    ]);
+
+    const mod = await import("../app/lib/message-db.server");
+    const result = await mod.updateMessageBySid("w1", "SM1", { status: "delivered" });
+
+    expect(result?.status).toBe("delivered");
+    expect(workspaceEventsMocks.emitChatMessageEvent).toHaveBeenCalledWith(
+      "w1",
+      "UPDATE",
+      expect.objectContaining({ sid: "SM1", status: "delivered" }),
+      expect.objectContaining({ sid: "SM1", status: "received" }),
+    );
+  });
 });
+
+const messageDbMocks = vi.hoisted(() => ({
+  fetchMessagePageForContact: vi.fn(),
+}));
 
 describe("app/lib/chats/fetch-message-page.server.ts", () => {
   beforeEach(() => {

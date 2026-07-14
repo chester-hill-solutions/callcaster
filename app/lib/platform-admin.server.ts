@@ -3,6 +3,7 @@ import {
   repointWorkspaceTwilioWebhooks,
 } from "@/lib/twilio-webhook-audit.server";
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
+import { listRecentDeadLetteredJobs } from "@/lib/admin-jobs.server";
 import type { Database } from "@/lib/db-types";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
@@ -17,7 +18,6 @@ import {
   listAllWorkspaceNumbers,
   listAllWorkspacesOrdered,
   listAllWorkspaceUsers,
-  listRecentDeadLetteredJobs,
   listPendingInvitesForUsername,
   listUserWorkspaceMembershipsWithWorkspace,
   listWorkspaceInvitesEnriched,

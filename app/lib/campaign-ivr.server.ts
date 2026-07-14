@@ -9,6 +9,7 @@ import {
 import { db } from "@/server/db";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
+import { emitCampaignStatusEvent } from "@/lib/workspace-events.server";
 
 /** PostgREST select for unified campaign + joined script row. */
 export const CAMPAIGN_WITH_SCRIPT_SELECT = "*, script:script(*)";
@@ -148,6 +149,11 @@ export async function updateCampaignStatusInWorkspace(
   update: { status: string; is_active?: boolean },
 ) {
   const tdb = createTenantDb(workspaceId);
+  const existingRows = await tdb.campaign.findMany({
+    where: eq(campaignTable.id, campaignId),
+    limit: 1,
+  });
+  const existing = existingRows[0] ?? null;
   const [row] = await tdb.campaign.update({
     set: update,
     where: eq(campaignTable.id, campaignId),
@@ -155,6 +161,11 @@ export async function updateCampaignStatusInWorkspace(
   if (!row) {
     throw new Error("Campaign not found");
   }
+  await emitCampaignStatusEvent(
+    workspaceId,
+    row as Record<string, unknown>,
+    (existing ?? null) as Record<string, unknown> | null,
+  );
   return row;
 }
 

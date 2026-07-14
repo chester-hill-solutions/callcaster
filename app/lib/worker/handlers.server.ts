@@ -1,8 +1,7 @@
 import { triggerTwilioOpenSync } from "@/lib/twilio-open-sync.server";
 import { runNumberRentalBilling } from "@/lib/number-rental-billing.server";
-import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
-import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import { reconcileWorkspaceBilling } from "@/lib/billing-reconcile-workspace.server";
+import { runCronWorkspaceFanout } from "@/lib/cron-workspace-fanout.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { processAudienceUpload } from "@/lib/audience-upload-process.server";
@@ -13,7 +12,27 @@ import {
   repointWorkspaceTwilioWebhooks,
 } from "@/lib/twilio-webhook-audit.server";
 import { listAllWorkspacesOrdered } from "@/lib/workspace-members-db.server";
+import {
+  processCallCampaignExport,
+  processMessageCampaignExport,
+} from "@/lib/campaign-export.server";
+import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
+import { scheduleNextDispatch } from "@/lib/worker/campaign-dispatch";
+import {
+  runCallStatusSideEffects,
+  runRecordingSideEffects,
+  runSmsStatusSideEffects,
+} from "@/lib/worker/webhook-side-effects.server";
+import {
+  CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
+  CAMPAIGN_DISPATCH_JOB_TYPE,
+  CAMPAIGN_EXPORT_JOB_TYPE,
+  RECORDING_SIDE_EFFECTS_JOB_TYPE,
+  SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
+  WEBHOOK_DELIVERY_JOB_TYPE,
+} from "@/lib/worker/job-types.server";
 import { logger } from "@/lib/logger.server";
+import { addRequestIdToJobParams } from "@/lib/request-context.server";
 import { db } from "@/server/db";
 import { job as jobTable } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
@@ -22,6 +41,9 @@ import type { ClaimedJobRow, JobHandlers } from "./poll-jobs.server";
 const WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE = "workspace_twilio_compliance";
 
 const LOW_CREDIT_NOTIFY_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
+const TWILIO_OPEN_SYNC_RESCHEDULE_MS = 5 * 60 * 1000;
+const BILLING_RECONCILE_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
+const NUMBER_RENTAL_BILLING_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 
 const TWILIO_WEBHOOK_AUDIT_JOB_TYPE = "twilio_webhook_audit";
 
@@ -30,6 +52,28 @@ const TWILIO_WEBHOOK_AUDIT_JOB_TYPE = "twilio_webhook_audit";
 // specifically to catch stragglers during the Edge -> Remix `/api/*` cutover
 // (Phase E), so it runs more often than the once-daily low-credit sweep.
 const TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS = 6 * 60 * 60 * 1000;
+
+async function rescheduleJob(
+  type: string,
+  delayMs: number,
+  params: Record<string, unknown>,
+  completedJobId: number,
+): Promise<void> {
+  const nextRunAt = new Date(Date.now() + delayMs).toISOString();
+  try {
+    await db.insert(jobTable).values({
+      type,
+      status: "queued",
+      retry_at: nextRunAt,
+      params: addRequestIdToJobParams(params),
+    });
+  } catch (error) {
+    logger.error(`worker.handler.${type}.reschedule_failed`, {
+      jobId: completedJobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 async function twilioOpenSyncHandler(job: ClaimedJobRow): Promise<unknown> {
   const params = (job.params ?? {}) as Record<string, unknown>;
@@ -42,15 +86,42 @@ async function twilioOpenSyncHandler(job: ClaimedJobRow): Promise<unknown> {
   const maxAgeMinutes =
     typeof params.maxAgeMinutes === "number" ? params.maxAgeMinutes : 120;
 
-  const result = await triggerTwilioOpenSync({
-    workspaceId,
-    callLimit,
-    messageLimit,
-    maxAgeMinutes,
-  });
-  if (!result.ok) {
-    throw new Error(result.error);
+  let result: unknown;
+  if (!workspaceId) {
+    result = await runCronWorkspaceFanout({
+      job: "twilio_open_sync",
+      requireTwilioCredentials: true,
+      run: async (id) => {
+        const sync = await triggerTwilioOpenSync({
+          workspaceId: id,
+          callLimit,
+          messageLimit,
+          maxAgeMinutes,
+        });
+        if (!sync.ok) {
+          throw new Error(sync.error);
+        }
+      },
+    });
+  } else {
+    const sync = await triggerTwilioOpenSync({
+      workspaceId,
+      callLimit,
+      messageLimit,
+      maxAgeMinutes,
+    });
+    if (!sync.ok) {
+      throw new Error(sync.error);
+    }
+    result = sync;
   }
+
+  await rescheduleJob(
+    "twilio_open_sync",
+    TWILIO_OPEN_SYNC_RESCHEDULE_MS,
+    { callLimit, messageLimit, maxAgeMinutes },
+    job.id,
+  );
   return result;
 }
 
@@ -60,45 +131,47 @@ async function billingReconcileHandler(job: ClaimedJobRow): Promise<unknown> {
     job.workspace_id ??
     (typeof params.workspaceId === "string" ? params.workspaceId : undefined);
 
+  let result: unknown;
   if (!workspaceId) {
-    throw new Error("Missing workspaceId");
+    result = await runCronWorkspaceFanout({
+      job: "billing_reconcile",
+      requireTwilioCredentials: true,
+      run: async (id) => {
+        const { snapshot } = await reconcileWorkspaceBilling({
+          workspaceId: id,
+          source: "cron",
+        });
+        return snapshot;
+      },
+    });
+  } else {
+    const twilioData = await loadWorkspaceTwilioData(workspaceId);
+    const creds = readTwilioWorkspaceCredentials(twilioData);
+    if (!creds?.sid) {
+      throw new Error("Workspace has no Twilio credentials");
+    }
+
+    const { snapshot } = await reconcileWorkspaceBilling({
+      workspaceId,
+      source: "cron",
+    });
+
+    result = {
+      ok: true,
+      materialVariance: snapshot.materialVariance,
+      message: snapshot.materialVariance
+        ? "Reconciliation complete — material variance detected."
+        : "Reconciliation complete — no material variance.",
+    };
   }
 
-  const twilioData = await loadWorkspaceTwilioData(workspaceId);
-  const creds = readTwilioWorkspaceCredentials(twilioData);
-  if (!creds?.sid) {
-    throw new Error("Workspace has no Twilio credentials");
-  }
-
-  const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId });
-  const usageRecords = await twilio.usage.records.list();
-  const twilioUsage = usageRecords.map((record) => ({
-    category: record.category,
-    description: record.description,
-    usage: record.usage,
-    usageUnit: record.usageUnit,
-    price: record.price.toString(),
-    startDate: record.startDate?.toISOString(),
-    endDate: record.endDate?.toISOString(),
-  }));
-
-  const report = await loadBillingReconciliationReport({
-    workspaceId,
-    twilioUsage,
-  });
-  const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
-    workspaceId,
-    report,
-    source: "cron",
-  });
-
-  return {
-    ok: true,
-    materialVariance: snapshot.materialVariance,
-    message: snapshot.materialVariance
-      ? "Reconciliation complete — material variance detected."
-      : "Reconciliation complete — no material variance.",
-  };
+  await rescheduleJob(
+    "billing_reconcile",
+    BILLING_RECONCILE_RESCHEDULE_MS,
+    {},
+    job.id,
+  );
+  return result;
 }
 
 async function numberRentalBillingHandler(
@@ -108,7 +181,25 @@ async function numberRentalBillingHandler(
   const workspaceId =
     job.workspace_id ??
     (typeof params.workspaceId === "string" ? params.workspaceId : undefined);
-  return runNumberRentalBilling({ workspaceId });
+
+  let result: unknown;
+  if (!workspaceId) {
+    result = await runCronWorkspaceFanout({
+      job: "number_rental_billing",
+      requireTwilioCredentials: false,
+      run: (id) => runNumberRentalBilling({ workspaceId: id }),
+    });
+  } else {
+    result = await runNumberRentalBilling({ workspaceId });
+  }
+
+  await rescheduleJob(
+    "number_rental_billing",
+    NUMBER_RENTAL_BILLING_RESCHEDULE_MS,
+    {},
+    job.id,
+  );
+  return result;
 }
 
 async function audienceUploadHandler(job: ClaimedJobRow): Promise<unknown> {
@@ -353,12 +444,178 @@ export async function enqueueWorkspaceComplianceJob(
     type: WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
     status: "queued",
     workspace_id: workspaceId,
-    params: { workspaceId, reason },
+    params: addRequestIdToJobParams({ workspaceId, reason }),
   });
   logger.info("worker.enqueue.workspace_twilio_compliance", {
     workspaceId,
     reason,
   });
+}
+
+async function callStatusSideEffectsHandler(
+  job: ClaimedJobRow,
+): Promise<unknown> {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  const callSid =
+    typeof params.callSid === "string" ? params.callSid : undefined;
+  const twilioParams =
+    typeof params.twilioParams === "object" && params.twilioParams !== null
+      ? (params.twilioParams as Record<string, string>)
+      : undefined;
+
+  if (!callSid || !twilioParams) {
+    throw new Error("call_status_side_effects: missing callSid or twilioParams");
+  }
+
+  return runCallStatusSideEffects({ callSid, twilioParams });
+}
+
+async function smsStatusSideEffectsHandler(
+  job: ClaimedJobRow,
+): Promise<unknown> {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  const messageSid =
+    typeof params.messageSid === "string" ? params.messageSid : undefined;
+  const twilioParams =
+    typeof params.twilioParams === "object" && params.twilioParams !== null
+      ? (params.twilioParams as Record<string, string>)
+      : undefined;
+
+  if (!messageSid || !twilioParams) {
+    throw new Error("sms_status_side_effects: missing messageSid or twilioParams");
+  }
+
+  return runSmsStatusSideEffects({ messageSid, twilioParams });
+}
+
+async function recordingSideEffectsHandler(
+  job: ClaimedJobRow,
+): Promise<unknown> {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  const callSid =
+    typeof params.callSid === "string" ? params.callSid : undefined;
+  const twilioParams =
+    typeof params.twilioParams === "object" && params.twilioParams !== null
+      ? (params.twilioParams as Record<string, string>)
+      : undefined;
+
+  if (!callSid || !twilioParams) {
+    throw new Error("recording_side_effects: missing callSid or twilioParams");
+  }
+
+  return runRecordingSideEffects({ callSid, twilioParams });
+}
+
+async function campaignExportHandler(job: ClaimedJobRow): Promise<unknown> {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  const campaignId =
+    typeof params.campaignId === "number" ? params.campaignId : undefined;
+  const exportId =
+    typeof params.exportId === "string" ? params.exportId : undefined;
+  const campaignName =
+    typeof params.campaignName === "string" ? params.campaignName : "";
+  const campaignType =
+    typeof params.campaignType === "string" ? params.campaignType : undefined;
+  const workspaceId =
+    job.workspace_id ??
+    (typeof params.workspaceId === "string" ? params.workspaceId : undefined);
+
+  if (!campaignId || !exportId || !workspaceId || !campaignType) {
+    throw new Error(
+      "campaign_export: missing campaignId, exportId, workspaceId, or campaignType",
+    );
+  }
+
+  if (campaignType === "message") {
+    await processMessageCampaignExport(
+      campaignId,
+      workspaceId,
+      exportId,
+      campaignName,
+    );
+  } else if (campaignType === "live_call" || campaignType === "robocall") {
+    await processCallCampaignExport(
+      campaignId,
+      workspaceId,
+      exportId,
+      campaignName,
+    );
+  } else {
+    throw new Error(`campaign_export: unsupported campaign type ${campaignType}`);
+  }
+
+  return { ok: true, exportId, campaignId };
+}
+
+async function campaignDispatchHandler(job: ClaimedJobRow): Promise<unknown> {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  const campaignId =
+    typeof params.campaignId === "number" ? params.campaignId : undefined;
+  const queueNextUrl =
+    typeof params.queueNextUrl === "string" ? params.queueNextUrl : undefined;
+  const owner =
+    typeof params.owner === "string" ? params.owner : null;
+  const headers =
+    typeof params.headers === "object" && params.headers !== null
+      ? (params.headers as Record<string, string>)
+      : { "Content-Type": "application/json" };
+  const delayMs =
+    typeof params.delayMs === "number" ? params.delayMs : undefined;
+
+  if (!campaignId || !queueNextUrl) {
+    throw new Error(
+      "campaign_dispatch: missing campaignId or queueNextUrl — enqueue only from a wired dispatch route",
+    );
+  }
+
+  await scheduleNextDispatch({
+    fetchImpl: fetch,
+    queueNextUrl,
+    headers,
+    campaignId,
+    owner,
+    delayMs,
+  });
+
+  return { ok: true, campaignId };
+}
+
+async function webhookDeliveryHandler(job: ClaimedJobRow): Promise<unknown> {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  const workspaceId =
+    job.workspace_id ??
+    (typeof params.workspaceId === "string" ? params.workspaceId : undefined);
+  const eventCategory =
+    typeof params.eventCategory === "string" ? params.eventCategory : undefined;
+  const eventType =
+    params.eventType === "INSERT" || params.eventType === "UPDATE"
+      ? params.eventType
+      : undefined;
+  const payload =
+    typeof params.payload === "object" && params.payload !== null
+      ? (params.payload as Record<string, unknown>)
+      : undefined;
+  const optional = params.optional === true;
+
+  if (!workspaceId || !eventCategory || !eventType || !payload) {
+    throw new Error(
+      "webhook_delivery: missing workspaceId, eventCategory, eventType, or payload",
+    );
+  }
+
+  const result = await sendWorkspaceWebhookNotification({
+    workspaceId,
+    eventCategory,
+    eventType,
+    payload,
+    optional,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error ?? "webhook_delivery failed");
+  }
+
+  return { ok: true };
 }
 
 export const jobHandlers: JobHandlers = {
@@ -369,15 +626,10 @@ export const jobHandlers: JobHandlers = {
   audience_upload: audienceUploadHandler,
   low_credit_notify: lowCreditNotifyHandler,
   twilio_webhook_audit: twilioWebhookAuditHandler,
-  // Unimplemented — throw so these jobs retry/dead-letter visibly instead of
-  // silently completing having done nothing.
-  campaign_export: async () => {
-    throw new Error("handler not implemented: campaign_export");
-  },
-  campaign_dispatch: async () => {
-    throw new Error("handler not implemented: campaign_dispatch");
-  },
-  webhook_delivery: async () => {
-    throw new Error("handler not implemented: webhook_delivery");
-  },
+  [CALL_STATUS_SIDE_EFFECTS_JOB_TYPE]: callStatusSideEffectsHandler,
+  [SMS_STATUS_SIDE_EFFECTS_JOB_TYPE]: smsStatusSideEffectsHandler,
+  [RECORDING_SIDE_EFFECTS_JOB_TYPE]: recordingSideEffectsHandler,
+  [CAMPAIGN_EXPORT_JOB_TYPE]: campaignExportHandler,
+  [CAMPAIGN_DISPATCH_JOB_TYPE]: campaignDispatchHandler,
+  [WEBHOOK_DELIVERY_JOB_TYPE]: webhookDeliveryHandler,
 };

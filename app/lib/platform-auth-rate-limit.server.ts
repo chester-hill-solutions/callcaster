@@ -20,12 +20,12 @@ const LIMITS: Record<
   "auth:forgot-password": { limit: 10, windowMs: 60_000 },
 };
 
-export function enforceAuthRateLimit(
+export async function enforceAuthRateLimit(
   request: Request,
   scope: AuthRateLimitScope,
-): Response | null {
+): Promise<Response | null> {
   const config = LIMITS[scope];
-  const result = checkRateLimit({
+  const result = await checkRateLimit({
     key: clientRateLimitKey(request, scope),
     limit: config.limit,
     windowMs: config.windowMs,

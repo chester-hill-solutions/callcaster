@@ -2,6 +2,7 @@ import { and, desc, eq, isNotNull, lt, or } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 
 type MessageRow = typeof messageTable.$inferSelect;
 
@@ -126,10 +127,23 @@ export async function updateMessageBySid(
   options?: { tdb?: TenantDb },
 ): Promise<MessageRow | null> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  const existingRows = (await tdb.message.findMany({
+    where: eq(messageTable.sid, sid),
+    limit: 1,
+  })) as MessageRow[];
+  const existing = existingRows[0] ?? null;
   const [row] = await tdb.message.update({
     set: update,
     where: eq(messageTable.sid, sid),
   });
+  if (row) {
+    await emitChatMessageEvent(
+      workspaceId,
+      "UPDATE",
+      row as Record<string, unknown>,
+      (existing ?? null) as Record<string, unknown> | null,
+    );
+  }
   return row ?? null;
 }
 

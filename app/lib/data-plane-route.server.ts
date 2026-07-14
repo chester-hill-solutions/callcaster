@@ -11,7 +11,7 @@ export function getDataPlaneRouteContext(
     throw new Error("Data plane auth context missing");
   }
   if (workspaceId && auth.workspaceId !== workspaceId) {
-    throw new Error("Workspace ID mismatch");
+    throw Response.json({ error: "Workspace not found" }, { status: 404 });
   }
   return auth;
 }

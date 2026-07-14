@@ -3,12 +3,21 @@ import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { updateCallRecordingUrlBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { RECORDING_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import type { ActionFunctionArgs } from "react-router";
 
 type RecordingAuth = {
   params: Record<string, string>;
   callSid: string | null;
 };
+
+function recordingSideEffectsIdempotencyKey(
+  callSid: string,
+  recordingUrl: string,
+): string {
+  return `recording_side_effects:${callSid}:${recordingUrl}`;
+}
 
 export const action = defineAction({
   auth: async ({ request }: ActionFunctionArgs): Promise<RecordingAuth | Response> => {
@@ -39,6 +48,16 @@ export const action = defineAction({
         const updated = await updateCallRecordingUrlBySid(callSid, recordingUrl);
         if (!updated) {
           logger.error("Recording webhook: call not found for CallSid", { callSid });
+        } else {
+          await enqueueJob({
+            type: RECORDING_SIDE_EFFECTS_JOB_TYPE,
+            workspaceId: updated.workspace ?? null,
+            idempotencyKey: recordingSideEffectsIdempotencyKey(callSid, recordingUrl),
+            params: {
+              callSid,
+              twilioParams: params,
+            },
+          });
         }
       } catch (error) {
         logger.error("Recording webhook: failed to persist recording URL", {

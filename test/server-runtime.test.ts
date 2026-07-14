@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createServer, validateEnvironment } from "../server/bun.ts";
+import { getRequestId } from "../app/lib/request-context.server.ts";
 
 const servers = new Set<ReturnType<typeof Bun.serve>>();
 
@@ -10,14 +11,18 @@ afterEach(async () => {
   }
 });
 
-async function startTestServer(acceptingTraffic = true) {
+async function startTestServer(
+  acceptingTraffic = true,
+  requestHandler: (request: Request) => Promise<Response> = async () =>
+    new Response(null, { status: 204 }),
+) {
   const readyState = { acceptingTraffic, buildReady: true };
   const server = await createServer({
     build: {},
     readyState,
     skipDbHealthCheck: true,
     port: 0,
-    requestHandler: async () => new Response(null, { status: 204 }),
+    requestHandler,
   });
 
   servers.add(server);
@@ -66,6 +71,7 @@ describe("server runtime", () => {
         buildReady: true,
         acceptingTraffic: false,
         databaseReady: true,
+        databaseListenReady: true,
       }),
     );
   });
@@ -92,5 +98,21 @@ describe("server runtime", () => {
 
     // Must fall through to the app handler (stubbed to 204), never serve the file.
     expect(escape.statusCode).toBe(204);
+  });
+
+  test("propagates inbound request ids through async request context", async () => {
+    let contextRequestId: string | undefined;
+    const { port } = await startTestServer(true, async () => {
+      await Promise.resolve();
+      contextRequestId = getRequestId();
+      return new Response(null, { status: 204 });
+    });
+
+    const response = await fetch(`http://127.0.0.1:${port}/context`, {
+      headers: { "x-request-id": "req-inbound" },
+    });
+
+    expect(contextRequestId).toBe("req-inbound");
+    expect(response.headers.get("x-request-id")).toBe("req-inbound");
   });
 });

@@ -1,22 +1,13 @@
 import { data as routeData } from "react-router";
-import { runNumberRentalBilling } from "@/lib/number-rental-billing.server";
-import { runCronWorkspaceFanout } from "@/lib/cron-workspace-fanout.server";
-import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import { enqueueCronJobRow } from "@/lib/worker/enqueue-cron-job.server";
 
 /**
- * HTTP endpoint for the number-rental-billing daily sweep.
- * Called by pg_cron via `net.http_post` (with x-cron-secret header).
- *
- * pg_cron posts `workspaceId: null`; a null/absent workspaceId fans out across
- * all workspaces (BILL-01 interim coordinator). Rental billing needs only the
- * tenant DB + Resend, so no Twilio-credential eligibility gate applies.
+ * Legacy HTTP cron entry for number-rental-billing.
+ * WS-A: enqueue only — Bun worker owns execution.
  */
 export const action = defineAction({
-  // NOTE: the cron-secret guard lives in `handler` (not `auth`) because its
-  // 401 is a `data()` result, not a `Response`, so it cannot short-circuit
-  // from `auth` without changing the response shape.
-  sideEffects: ["db-write", "credit", "email"],
+  sideEffects: ["db-write"],
   handler: async ({ request }) => {
     const cronSecret = process.env.CRON_SECRET;
     const headerSecret = request.headers.get("x-cron-secret");
@@ -25,31 +16,14 @@ export const action = defineAction({
     }
 
     const body = await request.json().catch(() => ({} as Record<string, unknown>));
-    const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
+    const workspaceId =
+      typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 
-    if (!workspaceId) {
-      // Fan out across all workspaces; per-workspace failures are reported in
-      // the body, not as a 500.
-      try {
-        const summary = await runCronWorkspaceFanout({
-          job: "number_rental_billing",
-          run: (id) => runNumberRentalBilling({ workspaceId: id }),
-        });
-        return routeData(summary);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.error("Number rental billing sweep failed", { error: message });
-        return routeData({ error: message }, { status: 500 });
-      }
-    }
-
-    try {
-      const result = await runNumberRentalBilling({ workspaceId });
-      return routeData(result);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error("Number rental billing sweep failed", { workspaceId, error: message });
-      return routeData({ error: message }, { status: 500 });
-    }
+    const result = await enqueueCronJobRow({
+      type: "number_rental_billing",
+      workspaceId,
+      params: { workspaceId },
+    });
+    return routeData(result);
   },
 });

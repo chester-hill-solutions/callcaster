@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TabsContent } from "@/components/ui/tabs";
+import { Link } from "react-router";
 import type { DeadLetteredJobRow } from "../admin.types";
 
 export function AdminSystemSettingsPanel({
@@ -17,10 +18,13 @@ export function AdminSystemSettingsPanel({
                     <CardHeader>
                         <CardTitle>Dead-Lettered Jobs</CardTitle>
                         <CardDescription>
-                            Background jobs that exhausted their retries (status = &quot;failed&quot;). Read-only — most recent {deadLetteredJobs.length} shown.
+                            Background jobs that exhausted their retries. Read-only — most recent {deadLetteredJobs.length} shown.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link to="/admin/dead-letters">View all dead-letter jobs</Link>
+                        </Button>
                         {deadLetteredJobs.length === 0 ? (
                             <p className="text-sm text-muted-foreground">No dead-lettered jobs.</p>
                         ) : (

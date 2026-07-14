@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   campaign as campaignTable,
-  job as jobTable,
   user as userTable,
   webhook as webhookTable,
   workspace as workspaceTable,
@@ -369,26 +368,6 @@ export async function listAllCampaignsOrdered() {
     .select()
     .from(campaignTable)
     .orderBy(desc(campaignTable.created_at));
-}
-
-/** Read-only diagnostics: most-recently dead-lettered background jobs (status='failed'). */
-export async function listRecentDeadLetteredJobs(limit = 25) {
-  return adminDb
-    .select({
-      id: jobTable.id,
-      type: jobTable.type,
-      workspace_id: jobTable.workspace_id,
-      attempt_count: jobTable.attempt_count,
-      max_attempts: jobTable.max_attempts,
-      dead_letter_reason: jobTable.dead_letter_reason,
-      error_message: jobTable.error_message,
-      failed_at: jobTable.failed_at,
-      created_at: jobTable.created_at,
-    })
-    .from(jobTable)
-    .where(eq(jobTable.status, "failed"))
-    .orderBy(desc(jobTable.failed_at))
-    .limit(limit);
 }
 
 export async function updateUserAccessLevel(userId: string, accessLevel: string) {

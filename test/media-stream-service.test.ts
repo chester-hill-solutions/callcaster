@@ -81,7 +81,9 @@ describe("media-stream-service", () => {
   test("/healthz returns ok", async () => {
     const res = await getHealth(port);
     expect(res.status).toBe(200);
-    expect(res.body).toBe(JSON.stringify({ status: "ok" }));
+    const body = JSON.parse(res.body) as { status: string; maxPerWorkspace: number };
+    expect(body.status).toBe("ok");
+    expect(body.maxPerWorkspace).toBe(10);
   });
 
   test("rejects WebSocket upgrade without token", async () => {
@@ -189,6 +191,49 @@ describe("media-stream-service", () => {
     await new Promise((r) => setTimeout(r, 200));
     expect(echoed).toBe(false);
     ws.close();
+  });
+
+  test("rejects WebSocket upgrade when workspace stream cap is exceeded", async () => {
+    if (service && !service.killed) {
+      service.kill("SIGTERM");
+      await new Promise((resolve) => service.once("exit", resolve));
+    }
+
+    const capPort = port + 1;
+    service = spawn("bun", ["run", "services/media-stream/index.ts"], {
+      env: {
+        ...process.env,
+        MEDIA_STREAM_PORT: String(capPort),
+        MEDIA_STREAM_MAX_PER_WORKSPACE: "1",
+        MEDIA_STREAM_SECRET: "test-media-stream-secret",
+        NODE_ENV: "test",
+      },
+      stdio: "pipe",
+    });
+    await waitForPort(capPort);
+
+    const ws1 = new WebSocket(
+      `ws://127.0.0.1:${capPort}/session-cap-1?token=${token("session-cap-1")}`,
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws1.on("open", resolve);
+      ws1.on("error", reject);
+    });
+
+    await expect(
+      new Promise<void>((resolve, reject) => {
+        const ws2 = new WebSocket(
+          `ws://127.0.0.1:${capPort}/session-cap-2?token=${token("session-cap-2")}`,
+        );
+        ws2.on("open", () => reject(new Error("Should not connect")));
+        ws2.on("error", () => resolve());
+        ws2.on("close", (code) => {
+          if (code === 1006) resolve();
+        });
+      }),
+    ).resolves.toBeUndefined();
+
+    ws1.close();
   });
 
   test("rejects expired token", async () => {

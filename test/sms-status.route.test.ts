@@ -67,6 +67,11 @@ vi.mock("@/lib/twilio-lookup.server", () => ({
   markContactLineType: (...args: unknown[]) => markContactLineTypeMock(...args),
 }));
 
+const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+}));
+
 function makeSmsStatusRequest(payload: { SmsSid?: string; SmsStatus?: string }) {
   const formData = new FormData();
   if (payload.SmsSid !== undefined) {
@@ -99,6 +104,8 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({});
     mocks.shouldUpdateOutreachDisposition.mockReset();
     mocks.logger.error.mockReset();
+    enqueueJobMock.mockReset();
+    enqueueJobMock.mockResolvedValue({ enqueued: true, jobId: 1 });
   });
 
   test("returns 403 when webhook validation fails", async () => {
@@ -114,7 +121,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     expect(res.status).toBe(403);
   });
 
-  test("stamps contact as landline on Twilio error 30006", async () => {
+  test("stamps contact as landline on Twilio error 30006 via async job path", async () => {
     mocks.findMessageBySid.mockResolvedValueOnce({
       workspace: "w1",
       direction: "outbound-api",
@@ -143,10 +150,10 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       } as never),
     );
     expect(res.status).toBe(200);
-    expect(markContactLineTypeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: "w1", contactId: 42, lineType: "landline" }),
+    expect(enqueueJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "sms_status_side_effects" }),
     );
-    // error_code persisted alongside status
+    expect(markContactLineTypeMock).not.toHaveBeenCalled();
     expect(mocks.updateMessageBySid).toHaveBeenCalledWith(
       "w1",
       "SM1",
@@ -237,7 +244,7 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
     expect(res.status).toBe(500);
   });
 
-  test("bills MMS flat at MMS_CREDITS when the message has media", async () => {
+  test("enqueues side-effects job instead of inline MMS billing", async () => {
     mocks.findMessageBySid.mockResolvedValueOnce({
       workspace: "w1",
       direction: "outbound-api",
@@ -261,15 +268,13 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       } as never),
     );
     expect(res.status).toBe(200);
-    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        amount: -2,
-        note: expect.stringContaining("MMS SM1 delivered"),
-      }),
+    expect(enqueueJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "sms_status_side_effects" }),
     );
+    expect(mocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
-  test("bills SMS per-segment at SMS_SEGMENT_CREDITS when the message has no media", async () => {
+  test("enqueues side-effects job instead of inline SMS billing", async () => {
     mocks.findMessageBySid.mockResolvedValueOnce({
       workspace: "w1",
       direction: "outbound-api",
@@ -293,12 +298,8 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       } as never),
     );
     expect(res.status).toBe(200);
-    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        amount: -3,
-        note: expect.stringContaining("SMS SM2 delivered (3 segments)"),
-      }),
-    );
+    expect(enqueueJobMock).toHaveBeenCalled();
+    expect(mocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
   test("returns 200 without updating DB when message is inbound", async () => {

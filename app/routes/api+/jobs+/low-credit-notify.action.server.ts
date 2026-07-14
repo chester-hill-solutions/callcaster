@@ -1,17 +1,13 @@
 import { data as routeData } from "react-router";
-import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
-import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import { enqueueCronJobRow } from "@/lib/worker/enqueue-cron-job.server";
 
 /**
- * HTTP endpoint for the low-credit notification sweep.
- * Called by pg_cron via `net.http_post` (with x-cron-secret header).
+ * Legacy HTTP cron entry for low-credit-notify.
+ * WS-A: enqueue only — Bun worker owns execution.
  */
 export const action = defineAction({
-  // NOTE: the cron-secret guard lives in `handler` (not `auth`) because its
-  // 401 is a `data()` result, not a `Response`, so it cannot short-circuit
-  // from `auth` without changing the response shape.
-  sideEffects: ["db-read", "email"],
+  sideEffects: ["db-write"],
   handler: async ({ request }) => {
     const cronSecret = process.env.CRON_SECRET;
     const headerSecret = request.headers.get("x-cron-secret");
@@ -20,15 +16,14 @@ export const action = defineAction({
     }
 
     const body = await request.json().catch(() => ({} as Record<string, unknown>));
-    const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
+    const workspaceId =
+      typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 
-    try {
-      const result = await runLowCreditNotify({ workspaceId });
-      return routeData(result);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error("Low credit notify sweep failed", { workspaceId, error: message });
-      return routeData({ error: message }, { status: 500 });
-    }
+    const result = await enqueueCronJobRow({
+      type: "low_credit_notify",
+      workspaceId,
+      params: { workspaceId },
+    });
+    return routeData(result);
   },
 });

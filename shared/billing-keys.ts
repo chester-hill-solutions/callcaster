@@ -15,6 +15,7 @@ const NUMBER_RENT_PREFIX = "number_rent:";
 const NUMBER_RENT_PURCHASE_PREFIX = "number_rent_purchase:";
 const STRIPE_EVT_PREFIX = "stripe_evt:";
 const STRIPE_SESSION_PREFIX = "stripe_session:";
+const WELCOME_CREDITS_PREFIX = "welcome-credits:";
 
 export function smsKey(sid: string): string {
   return `${SMS_PREFIX}${sid}`;
@@ -55,6 +56,11 @@ export function stripeSessionKey(sessionId: string): string {
 
 export function stripeEventKey(eventId: string): string {
   return `${STRIPE_EVT_PREFIX}${eventId}`;
+}
+
+/** One-time welcome grant on workspace creation (CREDIT, not a purchase). */
+export function welcomeCreditsKey(workspaceId: string): string {
+  return `${WELCOME_CREDITS_PREFIX}${workspaceId}`;
 }
 
 /**

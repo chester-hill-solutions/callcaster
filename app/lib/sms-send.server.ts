@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/db-types";
 import { createTenantDb } from "@/server/tenant-db";
 import { withTwilioRetry, type TwilioClientCallOptions } from "@/lib/twilio-client.server";
+import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 
 type MessageInsert = Database["public"]["Tables"]["message"]["Insert"];
 
@@ -194,6 +195,10 @@ export async function persistMessageRecord(
   try {
     const tdb = createTenantDb(workspaceId);
     const rows = await tdb.message.insert(buildMessageInsert(fields));
+    const inserted = rows[0];
+    if (inserted) {
+      await emitChatMessageEvent(workspaceId, "INSERT", inserted as Record<string, unknown>, null);
+    }
     return { data: rows, error: null };
   } catch (error) {
     return {

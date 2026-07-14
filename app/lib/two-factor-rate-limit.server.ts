@@ -13,12 +13,12 @@ const LIMITS: Record<
   "2fa:verify": { limit: 10, windowMs: 15 * 60_000 },
 };
 
-export function enforceTwoFactorSetupRateLimit(
+export async function enforceTwoFactorSetupRateLimit(
   userId: string,
   scope: TwoFactorSetupRateLimitScope,
-): Response | null {
+): Promise<Response | null> {
   const config = LIMITS[scope];
-  const result = checkRateLimit({
+  const result = await checkRateLimit({
     key: `${scope}:${userId}`,
     limit: config.limit,
     windowMs: config.windowMs,

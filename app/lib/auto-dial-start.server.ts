@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { call as callTable } from "@/db/schema";
 import { insertCallForWorkspace, updateCallBySid } from "@/lib/telephony-db.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../shared/credit-floor";
 import { createTenantDb } from "@/server/tenant-db";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -45,7 +46,7 @@ export async function startAutoDialConference(
   if (credits === null) {
     throw new Error(`Workspace ${workspaceId} not found`);
   }
-  if (credits <= 0) {
+  if (hasInsufficientCreditsForOutbound(credits)) {
     return {
       ok: false,
       status: 402,

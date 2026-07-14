@@ -6,6 +6,7 @@ import {
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { createTenantDb } from "@/server/tenant-db";
 import { and, eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
@@ -64,7 +65,7 @@ export const action = defineAction({
     if (credits === null) {
         throw new Response("Workspace not found", { status: 404 });
     }
-    if (credits <= 0) {
+    if (hasInsufficientCreditsForOutbound(credits)) {
         return routeData({ creditsError: true }, { status: 402 });
     }
     const tdb = createTenantDb(workspace_id);

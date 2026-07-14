@@ -177,12 +177,12 @@ const mockState = vi.hoisted(() => {
     // Update failed
     if (
       queryString.includes("UPDATE job") &&
-      queryString.includes("SET status = 'failed'")
+      queryString.includes("SET status = 'dead_letter'")
     ) {
       const id = findParam(query, (s) => s.includes("WHERE id = ")) as number;
       const job = state.jobs.find((j) => j.id === id);
       if (job) {
-        job.status = "failed";
+        job.status = "dead_letter";
         job.failed_at = currentNow;
         job.dead_letter_reason = findParam(query, (s) =>
           s.includes("dead_letter_reason = "),
@@ -298,7 +298,7 @@ describe("worker poll-jobs lifecycle", () => {
     await failJob(42, 3, 3, "Permanent error");
 
     const stored = mockState.state.jobs.find((j) => j.id === 42);
-    expect(stored?.status).toBe("failed");
+    expect(stored?.status).toBe("dead_letter");
     expect(stored?.failed_at).toBe(mockState.baseTime.toISOString());
     expect(stored?.dead_letter_reason).toBe("Permanent error");
     expect(stored?.error_message).toBe("Permanent error");

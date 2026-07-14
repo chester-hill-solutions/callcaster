@@ -41,7 +41,7 @@ async function resolveRespondentToken(
 }
 
 async function handleSaveAnswer(request: Request) {
-  const rateLimit = checkRateLimit({
+  const rateLimit = await checkRateLimit({
     key: clientRateLimitKey(request, "survey:answer"),
     ...SURVEY_RATE_LIMIT,
   });

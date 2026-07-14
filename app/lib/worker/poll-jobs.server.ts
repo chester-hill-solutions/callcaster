@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { logger } from "@/lib/logger.server";
+import { runWithRequestContext } from "@/lib/request-context.server";
+import { captureException } from "@/lib/sentry.server";
 
 export type ClaimedJobRow = {
   id: number;
@@ -20,6 +22,18 @@ export type WorkerOptions = {
   heartbeatIntervalMs?: number;
   claimTtlMinutes?: number;
 };
+
+function getJobRequestId(job: ClaimedJobRow): string {
+  if (
+    job.params &&
+    typeof job.params === "object" &&
+    "requestId" in job.params &&
+    typeof job.params.requestId === "string"
+  ) {
+    return job.params.requestId;
+  }
+  return `job-${job.id}`;
+}
 
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
@@ -129,15 +143,14 @@ export async function failJob(
   } else {
     await db.execute(sql`
       UPDATE job
-      SET status = 'failed',
+      SET status = 'dead_letter',
           failed_at = now(),
           dead_letter_reason = ${error},
           error_message = ${error},
           updated_at = now()
       WHERE id = ${jobId}
     `);
-    // Dead-letter visibility: nothing else surfaces status='failed' rows in
-    // near-real-time, so log at error level for ops alerting/log search.
+    // Surface terminal rows immediately for ops alerting and log search.
     logger.error("worker.job.dead_letter", {
       jobId,
       type: jobType ?? "unknown",
@@ -174,48 +187,59 @@ export async function runWorkerPollLoop(
         continue;
       }
 
-      logger.info("worker.job.claimed", {
-        jobId: job.id,
-        type: job.type,
-        workspaceId: job.workspace_id,
-      });
-
-      const heartbeat = setInterval(async () => {
-        try {
-          await db.execute(sql`
-            UPDATE job
-            SET claimed_until = now() + interval '1 minute' * ${claimTtlMinutes},
-                updated_at = now()
-            WHERE id = ${job.id}
-          `);
-        } catch (err) {
-          logger.error("worker.heartbeat_failed", {
+      await runWithRequestContext(
+        { requestId: getJobRequestId(job) },
+        async () => {
+          logger.info("worker.job.claimed", {
             jobId: job.id,
-            error: err instanceof Error ? err.message : String(err),
+            type: job.type,
+            workspaceId: job.workspace_id,
           });
-        }
-      }, heartbeatIntervalMs);
 
-      try {
-        const handler = handlers[job.type];
-        if (!handler) {
-          throw new Error(`No handler registered for job type: ${job.type}`);
-        }
-        const result = await handler(job);
-        await completeJob(job.id, result);
-        logger.info("worker.job.completed", { jobId: job.id });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
-        logger.error("worker.job.failed", { jobId: job.id, error: message });
-        await failJob(job.id, job.attempt_count, job.max_attempts, message, job.type);
-      } finally {
-        clearInterval(heartbeat);
-      }
+          const heartbeat = setInterval(async () => {
+            try {
+              await db.execute(sql`
+                UPDATE job
+                SET claimed_until = now() + interval '1 minute' * ${claimTtlMinutes},
+                    updated_at = now()
+                WHERE id = ${job.id}
+              `);
+            } catch (err) {
+              logger.error("worker.heartbeat_failed", {
+                jobId: job.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }, heartbeatIntervalMs);
+
+          try {
+            const handler = handlers[job.type];
+            if (!handler) {
+              throw new Error(`No handler registered for job type: ${job.type}`);
+            }
+            const result = await handler(job);
+            await completeJob(job.id, result);
+            logger.info("worker.job.completed", { jobId: job.id });
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            captureException(error, {
+              source: "worker.job",
+              jobId: job.id,
+              jobType: job.type,
+            });
+            logger.error("worker.job.failed", { jobId: job.id, error: message });
+            await failJob(job.id, job.attempt_count, job.max_attempts, message, job.type);
+          } finally {
+            clearInterval(heartbeat);
+          }
+        },
+      );
 
       if (signal.aborted) break;
       await sleep(pollIntervalMs, signal);
     } catch (error) {
+      captureException(error, { source: "worker.poll" });
       logger.error(
         "worker.poll_error",
         error instanceof Error ? error : new Error(String(error)),

@@ -7,11 +7,11 @@ import { withIdempotency } from "@/lib/platform-idempotency.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
-  auth: ({ request }) => {
+  auth: async ({ request }) => {
     if (request.method !== "POST") {
       return jsonError("Method not allowed", 405);
     }
-    return enforceAuthRateLimit(request, "auth:register") ?? undefined;
+    return (await enforceAuthRateLimit(request, "auth:register")) ?? undefined;
   },
   sideEffects: ["db-write", "email"],
   handler: async ({ request }) => {

@@ -5,7 +5,7 @@ WORKDIR /app
 # vendor/ must be present before install — package.json has file:vendor deps
 COPY package.json bun.lock ./
 COPY vendor ./vendor
-RUN bun install --frozen-lockfile --production
+RUN bun install --production
 
 COPY --chown=bun:bun app ./app
 COPY --chown=bun:bun shared ./shared

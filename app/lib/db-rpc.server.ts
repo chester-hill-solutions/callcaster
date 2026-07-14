@@ -1,5 +1,8 @@
-import { sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { rowsToCsv } from "@/lib/rpc-csv.server";
+import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+import { emitQueueEvent } from "@/lib/workspace-events.server";
+import { campaign_queue as campaignQueueTable, contact as contactTable } from "@/db/schema";
 import { db, type Database as DbInstance } from "@/server/db";
 import { withAppCurrentUser } from "@/server/tenant-db";
 
@@ -117,6 +120,38 @@ export async function rpcDequeueContact(
     dequeuedReasonText?: string | null;
   },
 ): Promise<void> {
+  const contactIds = new Set<number>([args.contactId]);
+  if (args.groupOnHousehold) {
+    const [sourceContact] = await db
+      .select({ household_id: contactTable.household_id })
+      .from(contactTable)
+      .where(eq(contactTable.id, args.contactId))
+      .limit(1);
+    if (sourceContact?.household_id != null) {
+      const householdContacts = await db
+        .select({ id: contactTable.id })
+        .from(contactTable)
+        .where(eq(contactTable.household_id, sourceContact.household_id));
+      for (const row of householdContacts) {
+        contactIds.add(row.id);
+      }
+    }
+  }
+
+  const oldRows = await db
+    .select()
+    .from(campaignQueueTable)
+    .where(
+      and(
+        inArray(campaignQueueTable.contact_id, [...contactIds]),
+        isNull(campaignQueueTable.dequeued_at),
+        or(
+          isNull(campaignQueueTable.queue_state),
+          eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
+        ),
+      ),
+    );
+
   await execVoid(
     executor,
     sql`select dequeue_contact(
@@ -125,6 +160,29 @@ export async function rpcDequeueContact(
       ${args.dequeuedById ?? null}::uuid,
       ${args.dequeuedReasonText ?? null}
     )`,
+  );
+
+  if (oldRows.length === 0) {
+    return;
+  }
+
+  const newRows = await db
+    .select()
+    .from(campaignQueueTable)
+    .where(inArray(campaignQueueTable.id, oldRows.map((row) => row.id)));
+
+  const oldById = new Map(oldRows.map((row) => [row.id, row]));
+  await Promise.all(
+    newRows
+      .filter((row) => row.dequeued_at != null)
+      .map((newRow) =>
+        emitQueueEvent(
+          newRow.workspace,
+          "UPDATE",
+          newRow as Record<string, unknown>,
+          (oldById.get(newRow.id) ?? null) as Record<string, unknown> | null,
+        ),
+      ),
   );
 }
 

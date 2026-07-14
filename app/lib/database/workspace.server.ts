@@ -37,6 +37,7 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { welcomeCreditsKey } from "@/lib/billing-keys";
 import { seedWorkspaceSampleData } from "@/lib/seed/seed-workspace-sample-data.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -349,7 +350,7 @@ export async function createNewWorkspace({
         type: "CREDIT",
         amount: NEW_WORKSPACE_WELCOME_CREDITS,
         note: `Welcome bonus: ${NEW_WORKSPACE_WELCOME_CREDITS} free credits to get started`,
-        idempotencyKey: `welcome-credits:${createdWorkspaceId}`,
+        idempotencyKey: welcomeCreditsKey(createdWorkspaceId),
       });
     } catch (welcomeCreditError) {
       logger.error(

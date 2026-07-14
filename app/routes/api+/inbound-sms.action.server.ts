@@ -15,6 +15,7 @@ import { uploadObject } from "@/lib/object-storage.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { defineAction } from "@/lib/handler.server";
+import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 
 export const action = defineAction({
   auth: async ({ request }) => {
@@ -189,6 +190,16 @@ export const action = defineAction({
     if (messageError) {
       logger.error("Message insert error:", messageError);
       return routeData({ messageError }, 400);
+    }
+
+    const insertedMessage = Array.isArray(message) ? message[0] : null;
+    if (insertedMessage) {
+      await emitChatMessageEvent(
+        workspaceNumber.workspace,
+        "INSERT",
+        insertedMessage as Record<string, unknown>,
+        null,
+      );
     }
 
     const smsWebhook = workspaceNumber.webhook

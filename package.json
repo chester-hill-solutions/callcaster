@@ -91,6 +91,7 @@
     "@radix-ui/react-tooltip": "^1.1.2",
     "@react-router/node": "^8.2.0",
     "@scalar/api-reference-react": "^0.9.48",
+    "@sentry/bun": "^10.65.0",
     "@stripe/stripe-js": "^4.1.0",
     "@tanstack/react-table": "^8.17.3",
     "@twilio/voice-sdk": "^2.10.2",

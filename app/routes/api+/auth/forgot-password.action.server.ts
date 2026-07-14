@@ -5,11 +5,11 @@ import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
-  auth: ({ request }) => {
+  auth: async ({ request }) => {
     if (request.method !== "POST") {
       return jsonError("Method not allowed", 405);
     }
-    return enforceAuthRateLimit(request, "auth:forgot-password") ?? undefined;
+    return (await enforceAuthRateLimit(request, "auth:forgot-password")) ?? undefined;
   },
   input: forgotPasswordBodySchema,
   sideEffects: ["email"],

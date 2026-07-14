@@ -135,7 +135,65 @@ type ProcessCallStatusOptions = {
   outreachAttemptId?: number | null;
   userId?: string | null;
   note?: string;
+  /** When true, only persist the call row — billing runs async via worker job. */
+  skipBilling?: boolean;
 };
+
+export type CallStatusBillingResult = {
+  inserted: boolean;
+  existingId?: number;
+} | null;
+
+/** Debit credits for a terminal call with non-zero duration (idempotent). */
+export async function billTerminalCallStatus(
+  call: Tables<"call">,
+  options: Pick<
+    ProcessCallStatusOptions,
+    "campaignType" | "note"
+  > = {},
+): Promise<CallStatusBillingResult> {
+  const status = String(call.status ?? "").toLowerCase();
+  const duration = Math.max(
+    Number(call.duration) || 0,
+    Number(call.call_duration) || 0,
+  );
+  const isTerminal = TERMINAL_BILLABLE_CALL_STATUSES.includes(
+    status as (typeof TERMINAL_BILLABLE_CALL_STATUSES)[number],
+  );
+
+  if (!call.workspace || !isTerminal || duration <= 0) {
+    return null;
+  }
+
+  let campaignType = options.campaignType ?? null;
+  if (campaignType == null && call.campaign_id != null) {
+    try {
+      campaignType = await findCampaignTypeByCampaignId(
+        call.campaign_id,
+        call.workspace,
+      );
+    } catch (e) {
+      logger.error("Failed to resolve campaign type for billing", e);
+    }
+  }
+  const billingKind = voiceBillingKindFromCampaignType(campaignType);
+  const credits = billingUnitsFromCallDurationSeconds(duration, billingKind);
+  const note =
+    options.note ??
+    (call.contact_id
+      ? `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
+      : `Call ${call.sid} (API/staffed dial)`);
+
+  return insertTransactionHistoryIdempotent({
+    workspaceId: call.workspace,
+    type: "DEBIT",
+    amount: debitAmountFromCredits(credits),
+    note,
+    idempotencyKey: callKey(call.sid),
+    callSid: call.sid,
+    campaignId: call.campaign_id ?? null,
+  });
+}
 
 /**
  * Single source of truth for call status persistence and billing.
@@ -153,7 +211,7 @@ export async function processCallStatusWebhook(
   options: ProcessCallStatusOptions = {},
 ): Promise<{
   call: Tables<"call">;
-  billingResult: { inserted: boolean; existingId?: number } | null;
+  billingResult: CallStatusBillingResult;
 }> {
   if (!updateData.sid) {
     throw new Error("Missing CallSid in processCallStatusWebhook");
@@ -201,51 +259,14 @@ export async function processCallStatusWebhook(
     }
   }
 
-  const newStatus = update.status ? String(update.status).toLowerCase() : null;
-
   const call = await upsertCallBySid(update as Partial<Tables<"call">> & { sid: string });
   if (!call) {
     throw new Error(`Failed to upsert call ${updateData.sid}`);
   }
 
-  const status = String(update.status ?? "").toLowerCase();
-  const duration = Math.max(
-    Number(update.duration) || 0,
-    Number(update.call_duration) || 0,
-  );
-  const isTerminal = TERMINAL_BILLABLE_CALL_STATUSES.includes(
-    status as (typeof TERMINAL_BILLABLE_CALL_STATUSES)[number],
-  );
-
-  let billingResult: { inserted: boolean; existingId?: number } | null = null;
-
-  if (call.workspace && isTerminal && duration > 0) {
-    let campaignType = options.campaignType ?? null;
-    if (campaignType == null && call.campaign_id != null) {
-      try {
-        campaignType = await findCampaignTypeByCampaignId(call.campaign_id, call.workspace);
-      } catch (e) {
-        logger.error("Failed to resolve campaign type for billing", e);
-      }
-    }
-    const billingKind = voiceBillingKindFromCampaignType(campaignType);
-    const credits = billingUnitsFromCallDurationSeconds(duration, billingKind);
-    const note =
-      options.note ??
-      (call.contact_id
-        ? `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
-        : `Call ${call.sid} (API/staffed dial)`);
-
-    billingResult = await insertTransactionHistoryIdempotent({
-      workspaceId: call.workspace,
-      type: "DEBIT",
-      amount: debitAmountFromCredits(credits),
-      note,
-      idempotencyKey: callKey(call.sid),
-      callSid: call.sid,
-      campaignId: call.campaign_id ?? null,
-    });
-  }
+  const billingResult = options.skipBilling
+    ? null
+    : await billTerminalCallStatus(call, options);
 
   return { call, billingResult };
 }

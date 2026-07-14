@@ -16,6 +16,7 @@ import { contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { findMatchingContactIds } from "@/lib/inbound-sms-context.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { defineAction } from "@/lib/handler.server";
 
@@ -146,7 +147,7 @@ export const action = defineAction({
   // Fail-closed credit gate: reject sends when the balance is unknown or
   // depleted rather than letting Twilio billing failures surface later.
   const creditsBalance = await getWorkspaceCreditsBalance(workspace_id);
-  if (creditsBalance === null || creditsBalance <= 0) {
+  if (hasInsufficientCreditsForOutbound(creditsBalance)) {
     return new Response(
       JSON.stringify({ creditsError: true, error: "Insufficient credits" }),
       {

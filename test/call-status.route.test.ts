@@ -31,6 +31,12 @@ vi.mock("@/lib/workspace-events.server", () => ({
   emitPredictiveBroadcast: vi.fn(async () => ({})),
 }));
 
+const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
+
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+}));
+
 const mocks = vi.hoisted(() => {
   return {
     validateTwilioWebhookParams: vi.fn(() => true),
@@ -79,6 +85,8 @@ function setCurrentAttempt(attempt: Record<string, unknown> | null) {
 describe("app/routes/api+/call/route-status.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
+    enqueueJobMock.mockReset();
+    enqueueJobMock.mockResolvedValue({ enqueued: true, jobId: 1 });
     twilioWebhookMocks.requireTwilioSignature.mockReset();
     twilioWebhookMocks.requireTwilioSignature.mockResolvedValue(null);
     telephonyDbMocks.findCallBySid.mockReset();
@@ -125,35 +133,32 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     expect(res.status).toBe(200);
   });
 
-  test("falls back to parent call workspace/outreach attempt and handles fetch error", async () => {
+  test("falls back to parent call workspace/outreach attempt on persist", async () => {
     setUpsertRow({
       sid: "CA_CHILD",
       outreach_attempt_id: null,
       workspace: "w1",
       parent_call_sid: "CA_PARENT",
+      status: "completed",
     });
     telephonyDbMocks.findCallBySid.mockResolvedValue({ workspace: "w_parent", outreach_attempt_id: 77 });
-    telephonyDbMocks.findOutreachAttemptWithCampaignType.mockRejectedValue(new Error("Failed to fetch current attempt"));
 
     const mod = await import("../app/routes/api+/call-status");
-    // The handler factory maps thrown errors through createErrorResponse
-    // instead of letting them propagate to the framework.
     const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed", ParentCallSid: "CA_PARENT", Workspace: "w1" }),
     } as any));
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({
-      error: expect.stringContaining("Failed to fetch current attempt"),
-    });
+    expect(res.status).toBe(200);
+    expect(enqueueJobMock).toHaveBeenCalled();
   });
 
-  test("skips realtime.send when no currentAttempt and still bills with workspaceId", async () => {
+  test("enqueues side-effects job and skips inline billing", async () => {
     setCurrentAttempt(null);
     setUpsertRow({
       sid: "CA1",
       outreach_attempt_id: null,
       workspace: "w1",
       parent_call_sid: null,
+      status: "completed",
     });
 
     const mod = await import("../app/routes/api+/call-status");
@@ -161,15 +166,17 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Duration: "61", CallDuration: "61" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+    expect(enqueueJobMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        type: "call_status_side_effects",
         workspaceId: "w1",
-        type: "DEBIT",
+        idempotencyKey: "call_status_side_effects:CA1:completed",
       }),
     );
+    expect(mocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
-  test("updates disposition when transition allowed; returns 500 on updateError", async () => {
+  test("returns 200 after persist and job enqueue (disposition runs async)", async () => {
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(
       new Response("Failed to update attempt", { status: 500 }),
     );
@@ -177,8 +184,8 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy", Workspace: "w1", OutreachAttemptId: "10" }),
     } as any));
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "Failed to update attempt" });
+    expect(res.status).toBe(200);
+    expect(enqueueJobMock).toHaveBeenCalled();
   });
 
   test("does not bill when billingWorkspace missing; covers called_via default channel id", async () => {
@@ -238,12 +245,13 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     expect(res.status).toBe(200);
   });
 
-  test("covers disposition transition denied (logs debug)", async () => {
+  test("returns 200 and enqueues side-effects when disposition would be denied async", async () => {
     setUpsertRow({
       sid: "CA1",
       outreach_attempt_id: 10,
       workspace: "w1",
       parent_call_sid: null,
+      status: "ringing",
     });
     setCurrentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
 
@@ -252,10 +260,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u3", Workspace: "w1", OutreachAttemptId: "10" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.logger.debug).toHaveBeenCalledWith(
-      "Skipping outreach disposition transition",
-      expect.any(Object),
-    );
+    expect(enqueueJobMock).toHaveBeenCalled();
     expect(mocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
