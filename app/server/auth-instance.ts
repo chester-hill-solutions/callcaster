@@ -4,6 +4,7 @@ import { twoFactor } from "better-auth/plugins";
 import { db } from "./db";
 import * as authSchema from "../db/auth-schema";
 import { env } from "@/lib/env.server";
+import { ensureProfileForUser } from "@/lib/ensure-user-profile.server";
 
 let authInstance: ReturnType<typeof createAuth> | null = null;
 
@@ -25,6 +26,16 @@ function createAuth() {
         auth_two_factor: authSchema.authTwoFactor,
       },
     }),
+    databaseHooks: {
+      user: {
+        create: {
+          // Mirror auth_user → public.user so domain FKs (workspace_users, etc.) succeed.
+          after: async (user) => {
+            await ensureProfileForUser(user);
+          },
+        },
+      },
+    },
     advanced: {
       database: {
         // Domain tables key users by uuid (e.g. create_new_workspace casts
