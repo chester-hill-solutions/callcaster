@@ -37,6 +37,7 @@ const steps = [
   "client/migrations/20260711130000_call_and_workspace_users_perf_indexes.sql",
   "client/migrations/20260713120000_workspace_audit_event.sql",
   "client/migrations/20260714120000_rate_limit_bucket.sql",
+  "client/migrations/20260714120000_retire_pg_cron_http_job_routes.sql",
   "drizzle/0007_workspace_api_key_scopes.sql",
   "drizzle/0008_chs_workspace_membership.sql",
 ];

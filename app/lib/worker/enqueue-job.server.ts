@@ -47,6 +47,30 @@ function resolveDedupe(args: EnqueueJobArgs): EnqueueDedupe {
   return { kind: "none" };
 }
 
+function normalizeJobRunAt(runAt?: Date | string | null): string | null {
+  if (runAt instanceof Date) {
+    return runAt.toISOString();
+  }
+  return runAt ?? null;
+}
+
+function queuedJobValues(args: {
+  type: string;
+  params: Record<string, unknown>;
+  workspaceId?: string | null;
+  userId?: string | null;
+  runAt?: Date | string | null;
+}) {
+  return {
+    type: args.type,
+    status: "queued" as const,
+    params: args.params,
+    workspace_id: args.workspaceId ?? null,
+    user_id: args.userId ?? null,
+    retry_at: normalizeJobRunAt(args.runAt),
+  };
+}
+
 /**
  * Revive a dead-lettered job with the same idempotency key so Twilio
  * redelivery can re-run billing/side effects after a prior terminal failure.
@@ -75,11 +99,7 @@ async function reviveDeadLetterJob(args: {
         claimed_until = NULL,
         started_at = NULL,
         completed_at = NULL,
-        retry_at = ${
-          args.runAt instanceof Date
-            ? args.runAt.toISOString()
-            : (args.runAt ?? null)
-        },
+        retry_at = ${normalizeJobRunAt(args.runAt)},
         updated_at = now()
     WHERE type = ${args.type}
       AND idempotency_key = ${args.idempotencyKey}
@@ -118,7 +138,7 @@ async function enqueueWithIdempotency(args: {
       ${JSON.stringify(args.params)}::jsonb,
       ${args.workspaceId ?? null},
       ${args.userId ?? null},
-      ${args.runAt instanceof Date ? args.runAt.toISOString() : (args.runAt ?? null)},
+      ${normalizeJobRunAt(args.runAt)},
       ${args.idempotencyKey}
     )
     ON CONFLICT (type, idempotency_key)
@@ -197,17 +217,7 @@ async function enqueueWithLiveDedupe(args: {
 
     const [row] = await tx
       .insert(jobTable)
-      .values({
-        type: args.type,
-        status: "queued",
-        params: args.params,
-        workspace_id: workspaceId,
-        user_id: args.userId ?? null,
-        retry_at:
-          args.runAt instanceof Date
-            ? args.runAt.toISOString()
-            : (args.runAt ?? null),
-      })
+      .values(queuedJobValues({ ...args, workspaceId }))
       .returning({ id: jobTable.id });
 
     if (!row) {
@@ -269,17 +279,7 @@ export async function enqueueJob(
 
   const [row] = await db
     .insert(jobTable)
-    .values({
-      type: args.type,
-      status: "queued",
-      params,
-      workspace_id: args.workspaceId ?? null,
-      user_id: args.userId ?? null,
-      retry_at:
-        args.runAt instanceof Date
-          ? args.runAt.toISOString()
-          : (args.runAt ?? null),
-    })
+    .values(queuedJobValues({ ...args, params }))
     .returning({ id: jobTable.id });
 
   if (!row) {
