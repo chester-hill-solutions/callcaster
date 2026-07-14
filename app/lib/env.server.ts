@@ -5,10 +5,7 @@
  * and validates required variables at application startup.
  */
 
-import {
-  resolveObjectStorageEnv,
-  resolveObjectStorageEnvRequired,
-} from "./object-storage-config.server";
+import { resolveObjectStorageEnvRequired } from "./object-storage-config";
 
 type EnvConfig = {
   DATABASE_URL: string;

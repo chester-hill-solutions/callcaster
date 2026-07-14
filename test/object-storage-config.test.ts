@@ -5,9 +5,9 @@ import {
   resolveObjectStorageEnv,
   resolveObjectStorageEnvRequired,
   validateObjectStorageEnv,
-} from "../app/lib/object-storage-config.server";
+} from "../app/lib/object-storage-config";
 
-describe("object-storage-config.server", () => {
+describe("object-storage-config", () => {
   test("resolveObjectStorageEnv prefers S3_* then Railway bucket vars", () => {
     expect(
       resolveObjectStorageEnv("endpoint", {
