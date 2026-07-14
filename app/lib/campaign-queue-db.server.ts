@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import {
   buildAssignedQueueUpdate,
   buildDequeuedQueueUpdate,
@@ -49,6 +49,45 @@ async function emitQueueRowDeletes(workspaceId: string, deletedRows: CampaignQue
       emitQueueEvent(workspaceId, "DELETE", null, oldRow as Record<string, unknown>),
     ),
   );
+}
+
+/**
+ * Update campaign_queue rows and emit SSE postgres_change events.
+ * Loads old rows once, mutates, then emits UPDATE events.
+ */
+async function updateCampaignQueueAndEmit(args: {
+  conditions: SQL[];
+  set: Record<string, unknown>;
+  workspaceId?: string;
+}): Promise<CampaignQueueRow[]> {
+  const where = and(...args.conditions);
+  const oldRows = await db.select().from(campaignQueueTable).where(where);
+  const updated = await db
+    .update(campaignQueueTable)
+    .set(args.set)
+    .where(where)
+    .returning();
+
+  const resolvedWorkspaceId = args.workspaceId ?? updated[0]?.workspace;
+  if (resolvedWorkspaceId) {
+    await emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
+  }
+  return updated;
+}
+
+/**
+ * Delete campaign_queue rows and emit SSE DELETE events when a workspace is known.
+ */
+async function deleteCampaignQueueAndEmit(args: {
+  conditions: SQL[];
+  workspaceId?: string;
+}): Promise<CampaignQueueRow[]> {
+  const where = and(...args.conditions);
+  const deleted = await db.delete(campaignQueueTable).where(where).returning();
+  if (args.workspaceId) {
+    await emitQueueRowDeletes(args.workspaceId, deleted);
+  }
+  return deleted;
 }
 
 /**
@@ -110,22 +149,14 @@ export async function updateCampaignQueueStatusByIds(
     return;
   }
 
-  const oldRows = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(
-      and(inArray(campaignQueueTable.id, ids), eq(campaignQueueTable.workspace, workspaceId)),
-    );
-
-  const newRows = await db
-    .update(campaignQueueTable)
-    .set(buildQueueStatusUpdatePayload(status))
-    .where(
-      and(inArray(campaignQueueTable.id, ids), eq(campaignQueueTable.workspace, workspaceId)),
-    )
-    .returning();
-
-  await emitQueueRowUpdates(workspaceId, oldRows, newRows);
+  await updateCampaignQueueAndEmit({
+    conditions: [
+      inArray(campaignQueueTable.id, ids),
+      eq(campaignQueueTable.workspace, workspaceId),
+    ],
+    set: buildQueueStatusUpdatePayload(status),
+    workspaceId,
+  });
 }
 
 export async function deleteCampaignQueueByIds(ids: number[], workspaceId: string) {
@@ -133,30 +164,23 @@ export async function deleteCampaignQueueByIds(ids: number[], workspaceId: strin
     return [];
   }
 
-  const deleted = await db
-    .delete(campaignQueueTable)
-    .where(
-      and(inArray(campaignQueueTable.id, ids), eq(campaignQueueTable.workspace, workspaceId)),
-    )
-    .returning();
-
-  await emitQueueRowDeletes(workspaceId, deleted);
-  return deleted;
+  return deleteCampaignQueueAndEmit({
+    conditions: [
+      inArray(campaignQueueTable.id, ids),
+      eq(campaignQueueTable.workspace, workspaceId),
+    ],
+    workspaceId,
+  });
 }
 
 export async function deleteAllCampaignQueueForCampaign(campaignId: number, workspaceId: string) {
-  const deleted = await db
-    .delete(campaignQueueTable)
-    .where(
-      and(
-        eq(campaignQueueTable.campaign_id, campaignId),
-        eq(campaignQueueTable.workspace, workspaceId),
-      ),
-    )
-    .returning();
-
-  await emitQueueRowDeletes(workspaceId, deleted);
-  return deleted;
+  return deleteCampaignQueueAndEmit({
+    conditions: [
+      eq(campaignQueueTable.campaign_id, campaignId),
+      eq(campaignQueueTable.workspace, workspaceId),
+    ],
+    workspaceId,
+  });
 }
 
 export async function deleteCampaignQueueByCampaignAndContactIds(args: {
@@ -168,7 +192,7 @@ export async function deleteCampaignQueueByCampaignAndContactIds(args: {
     return [];
   }
 
-  const conditions = [
+  const conditions: SQL[] = [
     eq(campaignQueueTable.campaign_id, args.campaignId),
     inArray(campaignQueueTable.contact_id, args.contactIds),
   ];
@@ -176,11 +200,10 @@ export async function deleteCampaignQueueByCampaignAndContactIds(args: {
     conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
   }
 
-  const deleted = await db.delete(campaignQueueTable).where(and(...conditions)).returning();
-  if (args.workspaceId) {
-    await emitQueueRowDeletes(args.workspaceId, deleted);
-  }
-  return deleted;
+  return deleteCampaignQueueAndEmit({
+    conditions,
+    workspaceId: args.workspaceId,
+  });
 }
 
 export async function deleteQueuedUnattemptedCampaignQueueByCampaignAndContactIds(args: {
@@ -192,7 +215,7 @@ export async function deleteQueuedUnattemptedCampaignQueueByCampaignAndContactId
     return [];
   }
 
-  const conditions = [
+  const conditions: SQL[] = [
     eq(campaignQueueTable.campaign_id, args.campaignId),
     inArray(campaignQueueTable.contact_id, args.contactIds),
     eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
@@ -202,11 +225,10 @@ export async function deleteQueuedUnattemptedCampaignQueueByCampaignAndContactId
     conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
   }
 
-  const deleted = await db.delete(campaignQueueTable).where(and(...conditions)).returning();
-  if (args.workspaceId) {
-    await emitQueueRowDeletes(args.workspaceId, deleted);
-  }
-  return deleted;
+  return deleteCampaignQueueAndEmit({
+    conditions,
+    workspaceId: args.workspaceId,
+  });
 }
 
 export async function getCampaignQueueContactIds(
@@ -257,28 +279,16 @@ export async function getQueuedContactIdsForCampaign(args: {
  * and the predictive dialer can never retry it.
  */
 export async function requeueCampaignQueueById(queueId: number, workspaceId?: string) {
-  const update = buildQueuedQueueUpdate();
-  const conditions = [eq(campaignQueueTable.id, queueId)];
+  const conditions: SQL[] = [eq(campaignQueueTable.id, queueId)];
   if (workspaceId) {
     conditions.push(eq(campaignQueueTable.workspace, workspaceId));
   }
 
-  const oldRows = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(and(...conditions));
-
-  const updated = await db
-    .update(campaignQueueTable)
-    .set(update)
-    .where(and(...conditions))
-    .returning();
-
-  const resolvedWorkspaceId = workspaceId ?? updated[0]?.workspace;
-  if (resolvedWorkspaceId) {
-    await emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
-  }
-  return updated;
+  return updateCampaignQueueAndEmit({
+    conditions,
+    set: buildQueuedQueueUpdate(),
+    workspaceId,
+  });
 }
 
 export async function dequeueCampaignQueueById(args: {
@@ -287,28 +297,16 @@ export async function dequeueCampaignQueueById(args: {
   reason: string;
   workspaceId?: string;
 }) {
-  const update = buildDequeuedQueueUpdate(args.userId, args.reason);
-  const conditions = [eq(campaignQueueTable.id, args.queueId)];
+  const conditions: SQL[] = [eq(campaignQueueTable.id, args.queueId)];
   if (args.workspaceId) {
     conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
   }
 
-  const oldRows = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(and(...conditions));
-
-  const updated = await db
-    .update(campaignQueueTable)
-    .set(update)
-    .where(and(...conditions))
-    .returning();
-
-  const resolvedWorkspaceId = args.workspaceId ?? updated[0]?.workspace;
-  if (resolvedWorkspaceId) {
-    await emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
-  }
-  return updated;
+  return updateCampaignQueueAndEmit({
+    conditions,
+    set: buildDequeuedQueueUpdate(args.userId, args.reason),
+    workspaceId: args.workspaceId,
+  });
 }
 
 export async function updateCampaignQueueByContactAndCampaign(args: {
@@ -317,7 +315,7 @@ export async function updateCampaignQueueByContactAndCampaign(args: {
   update: Record<string, unknown>;
   workspaceId?: string;
 }) {
-  const conditions = [
+  const conditions: SQL[] = [
     eq(campaignQueueTable.contact_id, args.contactId),
     eq(campaignQueueTable.campaign_id, args.campaignId),
   ];
@@ -325,47 +323,24 @@ export async function updateCampaignQueueByContactAndCampaign(args: {
     conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
   }
 
-  const oldRows = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(and(...conditions));
-
-  const updated = await db
-    .update(campaignQueueTable)
-    .set(args.update)
-    .where(and(...conditions))
-    .returning();
-
-  const resolvedWorkspaceId = args.workspaceId ?? updated[0]?.workspace;
-  if (resolvedWorkspaceId) {
-    await emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
-  }
-  return updated;
+  return updateCampaignQueueAndEmit({
+    conditions,
+    set: args.update,
+    workspaceId: args.workspaceId,
+  });
 }
 
 export async function requeueAllCampaignQueueForCampaign(campaignId: number, workspaceId?: string) {
-  const update = buildQueuedQueueUpdate();
-  const conditions = [eq(campaignQueueTable.campaign_id, campaignId)];
+  const conditions: SQL[] = [eq(campaignQueueTable.campaign_id, campaignId)];
   if (workspaceId) {
     conditions.push(eq(campaignQueueTable.workspace, workspaceId));
   }
 
-  const oldRows = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(and(...conditions));
-
-  const updated = await db
-    .update(campaignQueueTable)
-    .set(update)
-    .where(and(...conditions))
-    .returning();
-
-  const resolvedWorkspaceId = workspaceId ?? updated[0]?.workspace;
-  if (resolvedWorkspaceId) {
-    await emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
-  }
-  return updated;
+  return updateCampaignQueueAndEmit({
+    conditions,
+    set: buildQueuedQueueUpdate(),
+    workspaceId,
+  });
 }
 
 export async function fetchCampaignQueueRowsByIds(queueIds: number[], workspaceId?: string) {
@@ -454,8 +429,7 @@ export async function dequeueCampaignQueueByContact(args: {
   reason: string;
   workspaceId?: string;
 }) {
-  const update = buildDequeuedQueueUpdate(args.userId, args.reason);
-  const conditions = [eq(campaignQueueTable.contact_id, args.contactId)];
+  const conditions: SQL[] = [eq(campaignQueueTable.contact_id, args.contactId)];
   if (args.campaignId != null) {
     conditions.push(eq(campaignQueueTable.campaign_id, args.campaignId));
   }
@@ -463,22 +437,11 @@ export async function dequeueCampaignQueueByContact(args: {
     conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
   }
 
-  const oldRows = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(and(...conditions));
-
-  const updated = await db
-    .update(campaignQueueTable)
-    .set(update)
-    .where(and(...conditions))
-    .returning();
-
-  const resolvedWorkspaceId = args.workspaceId ?? updated[0]?.workspace;
-  if (resolvedWorkspaceId) {
-    await emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
-  }
-  return updated;
+  return updateCampaignQueueAndEmit({
+    conditions,
+    set: buildDequeuedQueueUpdate(args.userId, args.reason),
+    workspaceId: args.workspaceId,
+  });
 }
 
 export async function releaseAssignedQueueForUser(
@@ -487,7 +450,7 @@ export async function releaseAssignedQueueForUser(
   workspaceId?: string,
 ): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
   try {
-    const conditions = [
+    const conditions: SQL[] = [
       eq(campaignQueueTable.campaign_id, Number(campaignId)),
       isNull(campaignQueueTable.dequeued_at),
       eq(campaignQueueTable.assigned_to_user_id, userId),
@@ -507,38 +470,16 @@ export async function releaseAssignedQueueForUser(
       return { ok: true, released: 0 };
     }
 
-    const update = buildQueuedQueueUpdate();
-    const oldRows = await db
-      .select()
-      .from(campaignQueueTable)
-      .where(
-        workspaceId
-          ? and(
-              inArray(campaignQueueTable.id, assignedIds),
-              eq(campaignQueueTable.workspace, workspaceId),
-            )
-          : inArray(campaignQueueTable.id, assignedIds),
-      );
-
-    const released = await db
-      .update(campaignQueueTable)
-      .set(update)
-      .where(
-        workspaceId
-          ? and(
-              inArray(campaignQueueTable.id, assignedIds),
-              eq(campaignQueueTable.workspace, workspaceId),
-            )
-          : inArray(campaignQueueTable.id, assignedIds),
-      )
-      .returning();
-
-    const resolvedWorkspaceId = workspaceId ?? released[0]?.workspace;
-    if (resolvedWorkspaceId) {
-      const releasedIds = new Set(released.map((row) => row.id));
-      const oldReleasedRows = oldRows.filter((row) => releasedIds.has(row.id));
-      await emitQueueRowUpdates(resolvedWorkspaceId, oldReleasedRows, released);
+    const updateConditions: SQL[] = [inArray(campaignQueueTable.id, assignedIds)];
+    if (workspaceId) {
+      updateConditions.push(eq(campaignQueueTable.workspace, workspaceId));
     }
+
+    const released = await updateCampaignQueueAndEmit({
+      conditions: updateConditions,
+      set: buildQueuedQueueUpdate(),
+      workspaceId,
+    });
 
     return { ok: true, released: released.length };
   } catch (error) {

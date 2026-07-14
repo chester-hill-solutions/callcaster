@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { defineAction } from "@/lib/handler.server";
-import { enqueueCronJobRow } from "@/lib/worker/enqueue-cron-job.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
 
 /**
  * Legacy HTTP cron entry for low-credit-notify.
@@ -19,11 +19,17 @@ export const action = defineAction({
     const workspaceId =
       typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 
-    const result = await enqueueCronJobRow({
+    const result = await enqueueJob({
       type: "low_credit_notify",
       workspaceId,
       params: { workspaceId },
+      dedupe: { kind: "live", workspaceId },
     });
-    return routeData(result);
+    return routeData({
+      ok: true as const,
+      enqueued: result.enqueued,
+      deduped: result.deduped ?? !result.enqueued,
+      jobId: result.jobId,
+    });
   },
 });

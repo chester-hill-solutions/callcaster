@@ -28,6 +28,12 @@ function smsStatusSideEffectsIdempotencyKey(
 /**
  * Canonical Twilio outbound SMS status webhook (`POST /api/sms/status`).
  * Merged from Edge `sms-status`; new sends use `${BASE_URL}/api/sms/status`.
+ *
+ * Fast-ack cutover: persists message status, then enqueues billing / outreach
+ * disposition / webhook delivery as a worker job. The JSON response always
+ * includes `outreach: null` — Twilio ignores the body, and no in-app consumer
+ * reads synchronous outreach from this webhook. Disposition updates run in
+ * `runSmsStatusSideEffects` on the worker.
  */
 export const action = defineAction({
   auth: async ({ request }: ActionFunctionArgs): Promise<SmsStatusAuth | Response> => {

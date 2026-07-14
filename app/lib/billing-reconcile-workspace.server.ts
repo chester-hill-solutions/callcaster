@@ -44,20 +44,12 @@ export async function reconcileWorkspaceBilling(args: {
     source: args.source,
   });
 
-  if (snapshot.materialVariance) {
-    await handleBillingReconciliationDrift({
-      workspaceId: args.workspaceId,
-      report,
-      snapshot,
-    });
-  } else {
-    await handleBillingReconciliationDrift({
-      workspaceId: args.workspaceId,
-      report,
-      snapshot,
-      cleared: true,
-    });
-  }
+  await handleBillingReconciliationDrift({
+    workspaceId: args.workspaceId,
+    report,
+    snapshot,
+    cleared: !snapshot.materialVariance,
+  });
 
   return { report, snapshot };
 }

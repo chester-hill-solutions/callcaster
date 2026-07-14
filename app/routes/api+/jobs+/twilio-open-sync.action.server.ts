@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { defineAction } from "@/lib/handler.server";
-import { enqueueCronJobRow } from "@/lib/worker/enqueue-cron-job.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
 
 /**
  * Legacy HTTP cron entry for twilio-open-sync.
@@ -24,11 +24,17 @@ export const action = defineAction({
     const maxAgeMinutes =
       typeof body.maxAgeMinutes === "number" ? body.maxAgeMinutes : 120;
 
-    const result = await enqueueCronJobRow({
+    const result = await enqueueJob({
       type: "twilio_open_sync",
       workspaceId,
       params: { workspaceId, callLimit, messageLimit, maxAgeMinutes },
+      dedupe: { kind: "live", workspaceId },
     });
-    return routeData(result);
+    return routeData({
+      ok: true as const,
+      enqueued: result.enqueued,
+      deduped: result.deduped ?? !result.enqueued,
+      jobId: result.jobId,
+    });
   },
 });

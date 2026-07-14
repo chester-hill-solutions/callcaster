@@ -127,7 +127,10 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     objectStorageMocks.createSignedObjectUrl.mockReset();
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
     telephonyDbMocks.findCallBySid.mockResolvedValue(makeCallRow());
-    telephonyDbMocks.upsertCallBySid.mockResolvedValue(makeCallRow());
+    telephonyDbMocks.upsertCallBySid.mockImplementation(async (update: Record<string, unknown>) => ({
+      ...makeCallRow(),
+      ...update,
+    }));
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValue(makeCampaign({ type: "robocall" }));
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValue({});
     callStatusMocks.persistCallStatusFromParams.mockResolvedValue(undefined);

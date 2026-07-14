@@ -54,13 +54,13 @@ Phase 3 packages are **not available** in this repo or as installable dependenci
 
 **Mitigation:** New and migrated media call sites should import `putMediaObject` / `getSignedMediaUrl` from the adapter. `uploadWorkspaceAudioApi` is wired as the first call site.
 
-### `contact-import` — **defer; use adapter**
+### `contact-import` — **defer; no premature adapter**
 
 **Recommendation:** Keep `audience-upload-process.server.ts` and the `audience_upload` table. The CHS package will share parse/map/chunk logic, not table shape (see [archive/opencode-plans/package-extraction.md](../archive/opencode-plans/package-extraction.md)).
 
 **Risk:** Voter-list source aliases and CallCaster-specific column mapping stay product-local even after package adoption.
 
-**Mitigation:** `app/lib/adapters/contact-import.adapter.server.ts` exposes `processContactImport` and `markImportInterruptedIfStale`. Route handlers should migrate imports to the adapter before the package ships.
+**Mitigation:** Routes continue importing `audience-upload-process.server` directly. Add an adapter only when the package publishes and call sites migrate.
 
 ## Adapter map (swap boundary)
 
@@ -68,7 +68,6 @@ Phase 3 packages are **not available** in this repo or as installable dependenci
 |---------|----------------|-------------------|
 | `app/lib/adapters/jobqueue.adapter.server.ts` | `@chester-hill-solutions/jobqueue` | `worker/index.ts` |
 | `app/lib/adapters/media-library.adapter.server.ts` | `@chester-hill-solutions/media-library` | `app/lib/platform-media.server.ts` (`uploadWorkspaceAudioApi`) |
-| `app/lib/adapters/contact-import.adapter.server.ts` | `@chester-hill-solutions/contact-import` | *(ready; routes still import process module directly)* |
 
 ## Adoption sequence (when packages publish)
 
