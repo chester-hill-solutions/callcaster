@@ -25,6 +25,13 @@ function createAuth() {
         auth_two_factor: authSchema.authTwoFactor,
       },
     }),
+    advanced: {
+      database: {
+        // Domain tables key users by uuid (e.g. create_new_workspace casts
+        // $2::uuid), so auth ids must be uuids, not Better Auth's nanoids.
+        generateId: () => crypto.randomUUID(),
+      },
+    },
     plugins: [
       twoFactor({
         twoFactorTable: "auth_two_factor",
