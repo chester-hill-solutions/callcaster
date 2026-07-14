@@ -211,6 +211,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
           region: "ON",
           locality: "Toronto",
           capabilities: { voice: true, sms: true },
+          addressRequirements: "none",
         },
       ],
     });

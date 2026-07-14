@@ -43,6 +43,9 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/object-storage.server", () => ({
   uploadObject: vi.fn(async () => undefined),
 }));
+vi.mock("@/lib/workspace-events.server", () => ({
+  emitChatMessageEvent: vi.fn(async () => undefined),
+}));
 
 const onboardingMocks = vi.hoisted(() => ({
   getWorkspaceMessagingOnboardingState: vi.fn(),

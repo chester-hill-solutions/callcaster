@@ -19,6 +19,8 @@ describe("numbers-search.server", () => {
         region: undefined,
         locality: undefined,
         capabilities: {},
+        addressRequirements: "none",
+        isoCountry: undefined,
       },
     ]);
   });

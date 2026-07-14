@@ -42,6 +42,10 @@ vi.mock("@/lib/workspace-events.server", () => ({
   emitPredictiveBroadcast: vi.fn(async () => ({})),
 }));
 
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 1 })),
+}));
+
 describe("outreach disposition transitions", () => {
   beforeEach(() => {
     vi.resetModules();

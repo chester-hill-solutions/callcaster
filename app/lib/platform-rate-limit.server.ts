@@ -9,29 +9,23 @@ import {
 
 export type { RateLimitConfig, RateLimitResult };
 
-let testMemoryBuckets: Map<string, RateLimitBucketState> | null = null;
-let vitestMemoryBuckets: Map<string, RateLimitBucketState> | null = null;
+/** Single in-memory Map used when `VITEST=true` or after `resetRateLimitsForTests`. */
+let memoryBackend: Map<string, RateLimitBucketState> | null = null;
 
-function memoryBuckets(): Map<string, RateLimitBucketState> {
-  if (testMemoryBuckets) {
-    return testMemoryBuckets;
+function getMemoryBackend(): Map<string, RateLimitBucketState> {
+  if (!memoryBackend) {
+    memoryBackend = new Map();
   }
-  if (process.env.VITEST === "true") {
-    if (!vitestMemoryBuckets) {
-      vitestMemoryBuckets = new Map();
-    }
-    return vitestMemoryBuckets;
-  }
-  throw new Error("memoryBuckets called without an active in-memory backend");
+  return memoryBackend;
 }
 
 function usesMemoryBackend(): boolean {
-  return testMemoryBuckets !== null || process.env.VITEST === "true";
+  return memoryBackend !== null || process.env.VITEST === "true";
 }
 
 export async function checkRateLimit(config: RateLimitConfig): Promise<RateLimitResult> {
   if (usesMemoryBackend()) {
-    return checkRateLimitInMemory(config, memoryBuckets());
+    return checkRateLimitInMemory(config, getMemoryBackend());
   }
   return checkRateLimitPostgres(config);
 }
@@ -50,13 +44,5 @@ export function clientRateLimitKey(request: Request, scope: string): string {
 
 /** Test helper — clears in-memory buckets between tests. */
 export function resetRateLimitsForTests(): void {
-  if (process.env.VITEST === "true") {
-    vitestMemoryBuckets?.clear();
-    return;
-  }
-  if (!testMemoryBuckets) {
-    testMemoryBuckets = new Map();
-  } else {
-    testMemoryBuckets.clear();
-  }
+  getMemoryBackend().clear();
 }

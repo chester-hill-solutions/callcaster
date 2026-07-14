@@ -20,6 +20,10 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+const webhookMocks = vi.hoisted(() => ({
+  sendWorkspaceWebhookNotification: vi.fn(async () => ({ success: true })),
+}));
+
 const tenantDbMocks = vi.hoisted(() => ({
   message: {
     insert: vi.fn(async () => [{ id: 1 }]),
@@ -73,6 +77,13 @@ vi.mock("@/lib/twilio-client.server", () => ({
 }));
 vi.mock("@/lib/workspace-credits.server", () => ({
   getWorkspaceCreditsBalance: (...args: any[]) => mocks.getWorkspaceCreditsBalance(...args),
+}));
+vi.mock("@/lib/workspace-events.server", () => ({
+  emitChatMessageEvent: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/workspace-webhooks.server", () => ({
+  sendWorkspaceWebhookNotification: (...args: unknown[]) =>
+    webhookMocks.sendWorkspaceWebhookNotification(...args),
 }));
 
 vi.mock("@/server/tenant-db", () => ({
@@ -149,6 +160,8 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     mocks.env.BETTER_AUTH_URL.mockClear();
     mocks.logger.error.mockReset();
+    webhookMocks.sendWorkspaceWebhookNotification.mockReset();
+    webhookMocks.sendWorkspaceWebhookNotification.mockResolvedValue({ success: true });
     tenantDbMocks.message.insert.mockReset();
     tenantDbMocks.message.insert.mockResolvedValue([{ id: 1 }]);
     tenantDbMocks.contact.findFirst.mockReset();
@@ -400,9 +413,11 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("sendMessage logs webhook failures but still returns when webhook delivery fails", async () => {
-    // webhook query error
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
-    const postgres1 = makeDbClientStub({ webhookError: { message: "wh" } });
+    webhookMocks.sendWorkspaceWebhookNotification.mockResolvedValueOnce({
+      success: false,
+      error: "wh",
+    });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
@@ -413,7 +428,6 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         to: "+15551234567",
         from: "+15550000000",
         media: "[]",
-        client: postgres1 as any,
         workspace: "w1",
         contact_id: "",
         user: null,
@@ -421,21 +435,14 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     ).resolves.toMatchObject({ message: { sid: "SM1" } });
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Outbound SMS webhook delivery failed",
-      expect.any(String),
+      "wh",
     );
 
     mocks.logger.error.mockClear();
 
-    // webhook post not ok
-    const fetchMock = vi.fn(async () => ({ ok: false, status: 500, statusText: "NO" } as any));
-    vi.stubGlobal("fetch", fetchMock);
-    const postgres2 = makeDbClientStub({
-      webhookRows: [
-        {
-          destination_url: "http://hook",
-          events: [{ category: "outbound_sms", type: "INSERT" }],
-        },
-      ],
+    webhookMocks.sendWorkspaceWebhookNotification.mockResolvedValueOnce({
+      success: false,
+      error: "delivery failed",
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1", body: "x" })) },
@@ -446,7 +453,6 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         to: "+15551234567",
         from: "+15550000000",
         media: "[]",
-        client: postgres2 as any,
         workspace: "w1",
         contact_id: "",
         user: null,
@@ -454,7 +460,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     ).resolves.toMatchObject({ message: { sid: "SM1" } });
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Outbound SMS webhook delivery failed",
-      expect.any(String),
+      "delivery failed",
     );
   });
 

@@ -80,6 +80,7 @@ export async function resetStaleClaims(): Promise<void> {
 
 export async function claimNextJob(
   workerId: string,
+  claimTtlMinutes: number = DEFAULT_CLAIM_TTL_MINUTES,
 ): Promise<ClaimedJobRow | null> {
   return db.transaction(async (tx) => {
     const rows = (await tx.execute(sql`
@@ -98,7 +99,7 @@ export async function claimNextJob(
     await tx.execute(sql`
       UPDATE job
       SET status = 'running',
-          claimed_until = now() + interval '5 minutes',
+          claimed_until = now() + interval '1 minute' * ${claimTtlMinutes},
           claimed_by = ${workerId},
           started_at = now(),
           attempt_count = attempt_count + 1,
@@ -181,7 +182,7 @@ export async function runWorkerPollLoop(
       // without waiting for the next process restart.
       await resetStaleClaims();
 
-      const job = await claimNextJob(workerId);
+      const job = await claimNextJob(workerId, claimTtlMinutes);
       if (!job) {
         await sleep(pollIntervalMs, signal);
         continue;
