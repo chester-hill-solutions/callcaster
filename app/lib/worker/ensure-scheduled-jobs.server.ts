@@ -6,15 +6,13 @@
  * occurrence on complete (via `retry_at`); this seed starts the chain if no
  * live (queued/running) row exists.
  *
- * The INSERT … WHERE NOT EXISTS keeps check-and-insert atomic so concurrent
- * boots cannot each seed a row. A duplicated chain re-enqueues itself forever,
- * so this guard stays until durable schedule definitions land with CHS
- * jobqueue adoption (BILL-01).
+ * The unified enqueue path serializes live-dedupe by type/workspace with a
+ * transaction-scoped advisory lock, so concurrent boots cannot each seed a
+ * self-perpetuating chain.
  */
 
-import { sql } from "drizzle-orm";
-import { db } from "@/server/db";
 import { logger } from "@/lib/logger.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
 
 /** Job types that re-enqueue themselves and therefore need a first row. */
 export const SELF_SCHEDULING_JOB_TYPES = [
@@ -44,23 +42,16 @@ export async function ensureSelfSchedulingJobsSeeded(): Promise<{
   for (const type of SELF_SCHEDULING_JOB_TYPES) {
     try {
       const params = SELF_SCHEDULING_SEED_PARAMS[type] ?? {};
-      const paramsJson = JSON.stringify(params);
-      const rows = (await db.execute(sql`
-        INSERT INTO job (type, status, params)
-        SELECT ${type}, 'queued', ${paramsJson}::jsonb
-        WHERE NOT EXISTS (
-          SELECT 1 FROM job
-          WHERE type = ${type}
-            AND status IN ('queued', 'running')
-        )
-        RETURNING id
-      `)) as Array<{ id: number }>;
-      const inserted = rows[0];
-      if (inserted) {
+      const result = await enqueueJob({
+        type,
+        params,
+        dedupe: { kind: "live" },
+      });
+      if (result.enqueued) {
         seeded.push(type);
         logger.info("worker.schedule_seed.inserted", {
           type,
-          jobId: inserted.id,
+          jobId: result.jobId,
         });
       }
     } catch (error) {

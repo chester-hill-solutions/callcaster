@@ -1,7 +1,5 @@
 import { logger } from "@/lib/logger.server";
-import { addRequestIdToJobParams } from "@/lib/request-context.server";
-import { db } from "@/server/db";
-import { job as jobTable } from "@/db/schema";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
 
 /**
  * Enqueue the next run of a self-scheduling cron/coordinator job.
@@ -14,11 +12,14 @@ export async function rescheduleJob(
 ): Promise<void> {
   const nextRunAt = new Date(Date.now() + delayMs).toISOString();
   try {
-    await db.insert(jobTable).values({
+    await enqueueJob({
       type,
-      status: "queued",
-      retry_at: nextRunAt,
-      params: addRequestIdToJobParams(params),
+      params,
+      runAt: nextRunAt,
+      dedupe: {
+        kind: "live",
+        excludeJobId: completedJobId,
+      },
     });
   } catch (error) {
     logger.error(`worker.handler.${type}.reschedule_failed`, {

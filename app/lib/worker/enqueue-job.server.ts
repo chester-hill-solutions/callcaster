@@ -2,11 +2,16 @@ import { job as jobTable } from "@/db/schema";
 import { logger } from "@/lib/logger.server";
 import { addRequestIdToJobParams } from "@/lib/request-context.server";
 import { db } from "@/server/db";
-import { and, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 export type EnqueueDedupe =
   | { kind: "idempotency"; key: string }
-  | { kind: "live"; workspaceId?: string | null }
+  | {
+      kind: "live";
+      workspaceId?: string | null;
+      /** Ignore the currently-running job when scheduling its successor. */
+      excludeJobId?: number;
+    }
   | { kind: "none" };
 
 export type EnqueueJobArgs = {
@@ -14,6 +19,7 @@ export type EnqueueJobArgs = {
   params?: Record<string, unknown>;
   workspaceId?: string | null;
   userId?: string | null;
+  runAt?: Date | string | null;
   /**
    * Preferred dedupe strategy. When omitted, falls back to
    * `idempotencyKey` for backwards compatibility with webhook callers.
@@ -52,6 +58,7 @@ async function reviveDeadLetterJob(args: {
   params: Record<string, unknown>;
   workspaceId?: string | null;
   userId?: string | null;
+  runAt?: Date | string | null;
 }): Promise<number | null> {
   const rows = (await db.execute(sql`
     UPDATE job
@@ -68,9 +75,14 @@ async function reviveDeadLetterJob(args: {
         claimed_until = NULL,
         started_at = NULL,
         completed_at = NULL,
-        retry_at = NULL,
+        retry_at = ${
+          args.runAt instanceof Date
+            ? args.runAt.toISOString()
+            : (args.runAt ?? null)
+        },
         updated_at = now()
-    WHERE idempotency_key = ${args.idempotencyKey}
+    WHERE type = ${args.type}
+      AND idempotency_key = ${args.idempotencyKey}
       AND status = 'dead_letter'
     RETURNING id
   `)) as Array<{ id: number }>;
@@ -93,19 +105,25 @@ async function enqueueWithIdempotency(args: {
   params: Record<string, unknown>;
   workspaceId?: string | null;
   userId?: string | null;
+  runAt?: Date | string | null;
   idempotencyKey: string;
 }): Promise<EnqueueJobResult> {
   const rows = (await db.execute(sql`
-    INSERT INTO job (type, status, params, workspace_id, user_id, idempotency_key)
+    INSERT INTO job (
+      type, status, params, workspace_id, user_id, retry_at, idempotency_key
+    )
     VALUES (
       ${args.type},
       'queued',
       ${JSON.stringify(args.params)}::jsonb,
       ${args.workspaceId ?? null},
       ${args.userId ?? null},
+      ${args.runAt instanceof Date ? args.runAt.toISOString() : (args.runAt ?? null)},
       ${args.idempotencyKey}
     )
-    ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+    ON CONFLICT (type, idempotency_key)
+      WHERE idempotency_key IS NOT NULL
+      DO NOTHING
     RETURNING id
   `)) as Array<{ id: number }>;
 
@@ -139,55 +157,69 @@ async function enqueueWithLiveDedupe(args: {
   params: Record<string, unknown>;
   workspaceId?: string | null;
   userId?: string | null;
+  runAt?: Date | string | null;
+  excludeJobId?: number;
 }): Promise<EnqueueJobResult> {
-  const workspaceClause: SQL | undefined =
-    args.workspaceId != null && args.workspaceId !== ""
-      ? eq(jobTable.workspace_id, args.workspaceId)
-      : isNull(jobTable.workspace_id);
+  const workspaceId = args.workspaceId ?? null;
+  const lockKey = `${args.type}:${workspaceId ?? "global"}`;
 
-  const existing = await db
-    .select({ id: jobTable.id })
-    .from(jobTable)
-    .where(
-      and(
-        eq(jobTable.type, args.type),
-        inArray(jobTable.status, ["queued", "running"]),
-        workspaceClause,
-      ),
-    )
-    .limit(1);
+  return db.transaction(async (tx) => {
+    // Serialize check + insert for this type/workspace pair. Unlike a unique
+    // index, this can ignore the currently-running coordinator while it
+    // schedules its successor.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+    );
 
-  if (existing.length > 0) {
-    logger.info(`jobs.${args.type}.enqueue_deduped`, {
-      workspaceId: args.workspaceId,
+    const existing = (await tx.execute(sql`
+      SELECT id
+      FROM job
+      WHERE type = ${args.type}
+        AND status IN ('queued', 'running')
+        AND workspace_id IS NOT DISTINCT FROM ${workspaceId}
+        AND (${args.excludeJobId ?? null}::integer IS NULL
+          OR id <> ${args.excludeJobId ?? null})
+      ORDER BY created_at ASC
+      LIMIT 1
+    `)) as Array<{ id: number }>;
+
+    const existingId = existing[0]?.id;
+    if (existingId != null) {
+      logger.info(`jobs.${args.type}.enqueue_deduped`, {
+        workspaceId,
+      });
+      return {
+        enqueued: false,
+        deduped: true,
+        jobId: existingId,
+      };
+    }
+
+    const [row] = await tx
+      .insert(jobTable)
+      .values({
+        type: args.type,
+        status: "queued",
+        params: args.params,
+        workspace_id: workspaceId,
+        user_id: args.userId ?? null,
+        retry_at:
+          args.runAt instanceof Date
+            ? args.runAt.toISOString()
+            : (args.runAt ?? null),
+      })
+      .returning({ id: jobTable.id });
+
+    if (!row) {
+      throw new Error(`Failed to enqueue job type ${args.type}`);
+    }
+
+    logger.info(`jobs.${args.type}.enqueued`, {
+      jobId: row.id,
+      workspaceId,
     });
-    return {
-      enqueued: false,
-      deduped: true,
-      jobId: existing[0]?.id,
-    };
-  }
-
-  const [row] = await db
-    .insert(jobTable)
-    .values({
-      type: args.type,
-      status: "queued",
-      params: args.params,
-      workspace_id: args.workspaceId ?? null,
-      user_id: args.userId ?? null,
-    })
-    .returning({ id: jobTable.id });
-
-  if (!row) {
-    throw new Error(`Failed to enqueue job type ${args.type}`);
-  }
-
-  logger.info(`jobs.${args.type}.enqueued`, {
-    jobId: row.id,
-    workspaceId: args.workspaceId,
+    return { enqueued: true, jobId: row.id };
   });
-  return { enqueued: true, jobId: row.id };
 }
 
 /**
@@ -213,6 +245,7 @@ export async function enqueueJob(
         params,
         workspaceId: args.workspaceId,
         userId: args.userId,
+        runAt: args.runAt,
         idempotencyKey: key,
       });
     }
@@ -222,6 +255,8 @@ export async function enqueueJob(
         params,
         workspaceId: dedupe.workspaceId ?? args.workspaceId,
         userId: args.userId,
+        runAt: args.runAt,
+        excludeJobId: dedupe.excludeJobId,
       });
     case "none":
       break;
@@ -240,6 +275,10 @@ export async function enqueueJob(
       params,
       workspace_id: args.workspaceId ?? null,
       user_id: args.userId ?? null,
+      retry_at:
+        args.runAt instanceof Date
+          ? args.runAt.toISOString()
+          : (args.runAt ?? null),
     })
     .returning({ id: jobTable.id });
 

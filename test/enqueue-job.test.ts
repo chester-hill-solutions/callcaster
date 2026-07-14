@@ -15,6 +15,7 @@ type JobRow = {
   params: unknown;
   workspace_id: string | null;
   idempotency_key: string | null;
+  retry_at?: string | null;
   attempt_count?: number;
   dead_letter_reason?: string | null;
 };
@@ -25,7 +26,26 @@ const mockState = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/db", () => ({
-  db: {
+  db: (() => {
+    const insert = vi.fn(() => ({
+      values: vi.fn((values: Partial<JobRow>) => ({
+        returning: vi.fn(async () => {
+          const row: JobRow = {
+            id: mockState.nextId++,
+            type: values.type ?? "unknown",
+            status: values.status ?? "queued",
+            params: values.params ?? {},
+            workspace_id: values.workspace_id ?? null,
+            idempotency_key: values.idempotency_key ?? null,
+            retry_at: values.retry_at ?? null,
+          };
+          mockState.jobs.push(row);
+          return [{ id: row.id }];
+        }),
+      })),
+    }));
+
+    return {
     execute: vi.fn(async (query: unknown) => {
       const text = String(query ?? "");
       if (text.includes("INSERT INTO job")) {
@@ -43,35 +63,40 @@ vi.mock("@/server/db", () => ({
       }
       return [];
     }),
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(async () => {
-            const live = mockState.jobs.filter((j) =>
-              ["queued", "running"].includes(j.status),
+      insert,
+      transaction: vi.fn(async (callback: (tx: unknown) => unknown) => {
+        let executeCount = 0;
+        const tx = {
+          execute: vi.fn(async (query: unknown) => {
+            executeCount += 1;
+            if (executeCount === 1) return [];
+            const chunks =
+              (query as { queryChunks?: unknown[] }).queryChunks ?? [];
+            const excludedId = chunks
+              .filter(
+                (chunk) =>
+                  chunk != null &&
+                  (typeof chunk !== "object" ||
+                    chunk.constructor.name !== "StringChunk"),
+              )
+              .map((chunk) =>
+                typeof chunk === "object" && chunk !== null
+                  ? chunk.valueOf()
+                  : chunk,
+              )
+              .find((value): value is number => typeof value === "number");
+            const live = mockState.jobs.filter((job) =>
+              ["queued", "running"].includes(job.status) &&
+              job.id !== excludedId,
             );
-            return live.slice(0, 1).map((j) => ({ id: j.id }));
+            return live.slice(0, 1).map((job) => ({ id: job.id }));
           }),
-        })),
-      })),
-    })),
-    insert: vi.fn(() => ({
-      values: vi.fn((values: Partial<JobRow>) => ({
-        returning: vi.fn(async () => {
-          const row: JobRow = {
-            id: mockState.nextId++,
-            type: values.type ?? "unknown",
-            status: values.status ?? "queued",
-            params: values.params ?? {},
-            workspace_id: values.workspace_id ?? null,
-            idempotency_key: values.idempotency_key ?? null,
-          };
-          mockState.jobs.push(row);
-          return [{ id: row.id }];
-        }),
-      })),
-    })),
-  },
+          insert,
+        };
+        return callback(tx);
+      }),
+    };
+  })(),
 }));
 
 vi.mock("@/lib/logger.server", () => ({
@@ -172,6 +197,28 @@ describe("enqueueJob", () => {
     expect(result.enqueued).toBe(false);
     expect(result.deduped).toBe(true);
     expect(result.jobId).toBe(7);
+  });
+
+  test("live dedupe inserts a scheduled successor while excluding current job", async () => {
+    mockState.jobs.push({
+      id: 8,
+      type: "billing_reconcile",
+      status: "running",
+      params: {},
+      workspace_id: null,
+      idempotency_key: null,
+    });
+
+    const runAt = "2026-07-15T00:00:00.000Z";
+    const result = await enqueueJob({
+      type: "billing_reconcile",
+      params: {},
+      runAt,
+      dedupe: { kind: "live", excludeJobId: 8 },
+    });
+
+    expect(result.enqueued).toBe(true);
+    expect(mockState.jobs.at(-1)?.retry_at).toBe(runAt);
   });
 
   test("copies the active request id into job params", async () => {

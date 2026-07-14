@@ -2,7 +2,10 @@ import { Campaign, OutreachAttempt } from "@/lib/types";
 import { cancelQueuedMessagesForCampaign } from "@/lib/database/call-actions.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
+import {
+  canTransitionOutreachDisposition,
+  shouldUpdateOutreachDisposition,
+} from "@/lib/outreach-disposition";
 import { markContactLineType } from "@/lib/twilio-lookup.server";
 import {
   isTerminalSmsStatus,
@@ -27,7 +30,6 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
-import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import {
   billTerminalCallStatus,
   resolveCallOutreachContext,
