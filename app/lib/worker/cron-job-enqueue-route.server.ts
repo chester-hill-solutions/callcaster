@@ -1,9 +1,9 @@
 import { data as routeData } from "react-router";
-import { defineAction } from "@/lib/handler.server";
 import {
   enqueueJob,
   type EnqueueJobResult,
 } from "@/lib/worker/enqueue-job.server";
+import type { SideEffect } from "@/lib/handler.server";
 
 function toEnqueueResponse(result: EnqueueJobResult) {
   return routeData({
@@ -30,14 +30,17 @@ export function parseCronWorkspaceId(
  * Legacy HTTP cron entry points enqueue coordinator/workspace jobs only.
  * WS-A: Bun worker owns execution after enqueue.
  */
-export function defineCronEnqueueAction(args: {
+export function createCronEnqueueAction(args: {
   type: string;
   buildParams: (
     body: Record<string, unknown>,
     workspaceId?: string,
   ) => Record<string, unknown>;
-}) {
-  return defineAction({
+}): {
+  sideEffects: SideEffect[];
+  handler: (ctx: { request: Request }) => Promise<ReturnType<typeof toEnqueueResponse>>;
+} {
+  return {
     sideEffects: ["db-write"],
     handler: async ({ request }) => {
       if (!verifyCronSecret(request)) {
@@ -56,5 +59,5 @@ export function defineCronEnqueueAction(args: {
       });
       return toEnqueueResponse(result);
     },
-  });
+  };
 }
