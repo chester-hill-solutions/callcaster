@@ -24,6 +24,8 @@ describe("audio device lifecycle", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setInputDevice.mockResolvedValue(undefined);
+    setSpeakerDevice.mockResolvedValue(undefined);
     deviceChange = undefined;
     devices = [
       audioDevice("audioinput", "default", "Default microphone"),
