@@ -74,6 +74,8 @@ const SCHEDULE_READINESS_CODES = new Set<CampaignReadinessCode>([
 
 export const CAMPAIGN_CONTENT_READINESS_CODES = [
   "script_required",
+  "script_unavailable",
+  "audio_unavailable",
   "message_content_required",
 ] as const satisfies readonly CampaignReadinessCode[];
 
