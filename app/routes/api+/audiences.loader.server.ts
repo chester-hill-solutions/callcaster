@@ -25,7 +25,10 @@ type AudiencesDeps = {
     headers: Headers;
   }>;
   parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
-  requireWorkspaceAccess: (args: unknown) => Promise<void>;
+  requireWorkspaceAccess: (args: {
+    user: { id: string };
+    workspaceId: string;
+  }) => Promise<void>;
 };
 
 const AUDIENCE_CONTACT_SORT_KEYS = new Set([
