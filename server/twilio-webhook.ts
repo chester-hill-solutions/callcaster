@@ -1,4 +1,5 @@
 import { requireTwilioSignature } from "../app/lib/twilio-webhook.server.ts";
+import { logger } from "../app/lib/logger.server.ts";
 import { isTwilioWebhookPath } from "./twilio-webhook-paths.ts";
 
 const MAX_RAW_BODY_BYTES = 1 * 1024 * 1024;
@@ -143,7 +144,11 @@ export async function handleTwilioWebhookRequest(
     }
 
     return { kind: "validated", request: validatedRequest };
-  } catch {
+  } catch (error) {
+    logger.error("twilio.webhook.prehandler_error", {
+      error: error instanceof Error ? error.message : String(error),
+      path: new URL(request.url).pathname,
+    });
     return { kind: "response", response: twilioWebhookErrorResponse() };
   }
 }

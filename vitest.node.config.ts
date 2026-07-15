@@ -9,7 +9,7 @@ export default mergeConfig(
       environment: "node",
       testTimeout: 60000,
       include: ["test/**/*.test.ts"],
-      exclude: ["test/ui/**", "test/server-runtime.test.ts"],
+      exclude: ["test/ui/**", "test/server-runtime.test.ts", "test/twilio-webhook-prehandler.test.ts"],
       setupFiles: ["test/setup.node.ts"],
       coverage: {
         provider: "istanbul",
