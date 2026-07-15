@@ -5,6 +5,7 @@ import ChatImages from "./ChatImages";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { getConversationPhoneKey } from "@/lib/chat-conversation-sort";
+import { MESSAGING_SERVICE_SENDER_VALUE } from "@/lib/sms-campaign-send-mode";
 import type { Contact } from "@/lib/types";
 import type { useFetcher } from "react-router";
 
@@ -27,7 +28,8 @@ interface ChatInputProps {
   workspace: NonNullable<Workspace>;
   workspaceNumbers: WorkspaceNumber[];
   senderSelection: {
-    mode: "from_number" | "messaging_service";
+    /** The composer's initial sender selection, not a lock. */
+    defaultMode: "from_number" | "messaging_service";
     messagingServiceReady: boolean;
   };
   initialFrom: string;
@@ -81,8 +83,13 @@ export default function ChatInput({
   phoneNumber,
   isValid,
 }: ChatInputProps) {
+  const messagingServiceReady = senderSelection.messagingServiceReady;
   const [bodyValue, setBodyValue] = useState("");
-  const [selectedFrom, setSelectedFrom] = useState(initialFrom);
+  const [selectedFrom, setSelectedFrom] = useState(() =>
+    senderSelection.defaultMode === "messaging_service" && messagingServiceReady
+      ? MESSAGING_SERVICE_SENDER_VALUE
+      : initialFrom,
+  );
   const [sendLater, setSendLater] = useState(false);
   const [sendAtLocal, setSendAtLocal] = useState("");
   const submittedScheduleRef = useRef(false);
@@ -96,8 +103,9 @@ export default function ChatInput({
   const optedOut = Boolean(selectedContact?.opt_out);
   const minScheduleValue = useMemo(() => minScheduleLocalValue(), []);
   const maxScheduleValue = useMemo(() => maxScheduleLocalValue(), []);
-  const hasSenderOptions = (workspaceNumbers?.length ?? 0) > 0;
-  const usesMessagingService = senderSelection.mode === "messaging_service";
+  const hasNumberOptions = (workspaceNumbers?.length ?? 0) > 0;
+  const hasSenderOptions = hasNumberOptions || messagingServiceReady;
+  const usesMessagingService = selectedFrom === MESSAGING_SERVICE_SENDER_VALUE;
 
   /**
    * @effect KEEP: align the controlled From selection with available sender
@@ -113,13 +121,19 @@ export default function ChatInput({
     const optionValues = new Set(
       (workspaceNumbers ?? []).map((num) => num.phone_number),
     );
+    if (messagingServiceReady) {
+      optionValues.add(MESSAGING_SERVICE_SENDER_VALUE);
+    }
     if (selectedFrom && optionValues.has(selectedFrom)) return;
     if (initialFrom && optionValues.has(initialFrom)) {
       setSelectedFrom(initialFrom);
       return;
     }
-    setSelectedFrom(workspaceNumbers?.[0]?.phone_number || "");
-  }, [initialFrom, workspaceNumbers, selectedFrom]);
+    setSelectedFrom(
+      workspaceNumbers?.[0]?.phone_number ||
+        (messagingServiceReady ? MESSAGING_SERVICE_SENDER_VALUE : ""),
+    );
+  }, [initialFrom, workspaceNumbers, selectedFrom, messagingServiceReady]);
 
   const establishedLabel = useMemo(() => {
     if (!establishedFromNumber) return "";
@@ -144,7 +158,7 @@ export default function ChatInput({
   const isSendDisabled =
     messageFetcher.state !== "idle" ||
     optedOut ||
-    (!usesMessagingService && (!selectedFrom || !hasSenderOptions)) ||
+    (!usesMessagingService && (!selectedFrom || !hasNumberOptions)) ||
     !(selectedContact || (phoneNumber && isValid)) ||
     (sendLater && !sendAtLocal);
 
@@ -185,37 +199,45 @@ export default function ChatInput({
         className="flex flex-col space-y-2"
         onSubmit={handleFormSubmit}
       >
-        {usesMessagingService ? (
-          <div className="rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-            Messaging Service — sender selected automatically
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label htmlFor="from" className="text-sm font-medium sm:w-[50px]">
-              From:
-            </label>
-            <select
-              name="from"
-              id="from"
-              value={selectedFrom}
-              onChange={(e) => setSelectedFrom(e.target.value)}
-              disabled={!hasSenderOptions}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {!hasSenderOptions && (
-                <option value="" disabled>
-                  No sending numbers available
-                </option>
-              )}
-              {workspaceNumbers?.map((num) => (
-                <option key={num.id} value={num.phone_number}>
-                  {num.friendly_name || num.phone_number}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {!usesMessagingService && !hasSenderOptions && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label htmlFor="from" className="text-sm font-medium sm:w-[50px]">
+            From:
+          </label>
+          <select
+            name="from"
+            id="from"
+            value={selectedFrom}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSelectedFrom(next);
+              // Scheduling is only valid via a Messaging Service; picking a
+              // number would otherwise submit a send the server must reject.
+              if (next !== MESSAGING_SERVICE_SENDER_VALUE) {
+                setSendLater(false);
+                setSendAtLocal("");
+              }
+            }}
+            disabled={!hasSenderOptions}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {!hasSenderOptions && (
+              <option value="" disabled>
+                No sending numbers available
+              </option>
+            )}
+            {messagingServiceReady && (
+              <option value={MESSAGING_SERVICE_SENDER_VALUE}>
+                Messaging Service (automatic sender)
+              </option>
+            )}
+            {workspaceNumbers?.map((num) => (
+              <option key={num.id} value={num.phone_number}>
+                {num.friendly_name || num.phone_number}
+              </option>
+            ))}
+          </select>
+        </div>
+        {!hasSenderOptions && (
           <div
             role="status"
             className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
@@ -253,7 +275,9 @@ export default function ChatInput({
             <input
               type="checkbox"
               checked={sendLater}
-              disabled={!senderSelection.messagingServiceReady}
+              // Twilio only schedules sends through a Messaging Service, so this
+              // follows the current selection rather than the workspace default.
+              disabled={!usesMessagingService}
               onChange={(e) => {
                 setSendLater(e.target.checked);
                 if (!e.target.checked) setSendAtLocal("");
@@ -262,8 +286,12 @@ export default function ChatInput({
             />
             Send later
           </label>
-          {!senderSelection.messagingServiceReady && (
-            <span>Scheduling requires Messaging Service</span>
+          {!usesMessagingService && (
+            <span>
+              {messagingServiceReady
+                ? "Select Messaging Service to schedule"
+                : "Scheduling requires Messaging Service"}
+            </span>
           )}
           {sendLater && (
             <input

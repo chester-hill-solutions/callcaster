@@ -106,7 +106,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
-  test("sends through a resolved Messaging Service without from and ignores a supplied from", async () => {
+  test("sends through the Messaging Service when the composer selects it", async () => {
     mocks.getEffectivePortalConfig.mockResolvedValueOnce({
       sendMode: "messaging_service",
       messagingServiceSid: " MG123 ",
@@ -119,8 +119,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
         request: makeFormRequest({
           body: "hi",
           contact_number: "+15551234567",
-          from: "+15559999999",
-          mode: "from_number",
+          from: "__messaging_service__",
         }),
         params: { id: "w1", contact_number: "+15551234567" },
       })),
@@ -132,9 +131,40 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       expect.objectContaining({
         from: "",
         messagingServiceSid: "MG123",
-        portalConfig: expect.objectContaining({
-          sendMode: "messaging_service",
+        sendMode: "messaging_service",
+      }),
+    );
+  });
+
+  test("honours an explicitly picked number over the workspace Messaging Service", async () => {
+    // Regression: the workspace default used to override the chosen number, so
+    // a picked sender was silently replaced by the Messaging Service.
+    mocks.getEffectivePortalConfig.mockResolvedValueOnce({
+      sendMode: "messaging_service",
+      messagingServiceSid: " MG123 ",
+    });
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
         }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+
+    expect(res.status).toBe(200);
+    // A chosen number must still be proven to belong to the workspace.
+    expect(tenantDbMocks.workspace_number.findMany).toHaveBeenCalled();
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "+15550000000",
+        messagingServiceSid: null,
+        sendMode: "from_number",
       }),
     );
   });

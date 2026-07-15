@@ -39,7 +39,7 @@ Inventory: accordion, alert, badge, button, calendar, card, checkbox, command, d
 - **Card / CardHeader / CardTitle / CardContent** — CardTitle is for card-scale headings; don't nest a level-1/2 Heading inside a card.
 - **Badge + StatusBadge** — `Badge` for generic labels; for any entity status string, use `StatusBadge` (`ui/status-badge`) so colors stay consistent app-wide. Extend `statusToVariant` there rather than mapping locally.
 - **PageShell** (`ui/page-shell`) vs **WorkspaceResourceListShell** (`components/workspace/`) — list pages that need an empty state and error alert use `WorkspaceResourceListShell`; every other page uses `PageShell` (title, optional description, actions slot, `maxWidth="content" | "narrow" | "full"`). Do not hand-roll `container mx-auto py-8` wrappers.
-- **table / DataTable** — use `ui/table` primitives for simple tables; `components/workspace/tables/DataTable` for TanStack-powered tables (sticky headers built in).
+- **table / DataTable** — use `ui/table` primitives for simple tables; `components/workspace/tables/DataTable` for TanStack-powered tables (sticky headers built in). Cells and headers never wrap (`whitespace-nowrap` is baked into `TableCell`/`TableHead`); the `Table` wrapper scrolls horizontally instead.
 - **Dialog / Sheet** — Dialog for confirmations and focused forms; Sheet for side panels.
 - **Spinner / Skeleton / Progress** — Spinner for indeterminate inline waits, Skeleton for loading layouts, Progress for known progress.
 
@@ -51,6 +51,7 @@ Inventory: accordion, alert, badge, button, calendar, card, checkbox, command, d
 - **Empty states** get the icon-chip treatment (round `bg-brand-tertiary/40 text-brand-primary` chip + heading + muted description + action), as in `WorkspaceResourceListShell`.
 - **Destructive confirmations** use a `Dialog` with a `variant="destructive"` confirm button that names the action ("Delete campaign", not "OK").
 - **Statuses** always render via `StatusBadge`; never invent per-page color maps.
+- **Table values never wrap.** One row is one line, so rows stay scannable and column alignment holds. Never re-enable wrapping on a cell. For a column that can hold long free text, cap it and clip — `max-w-xs truncate` plus a `title` for the full value — and let the table's own container scroll horizontally when columns don't fit.
 
 ## Do / Don't
 

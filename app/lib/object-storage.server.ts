@@ -148,6 +148,14 @@ function basenameFromKey(key: string, prefix: string): string {
   return key.slice(prefix.length);
 }
 
+/** Thrown when `upsert: false` was requested and the key already exists. */
+export class ObjectExistsError extends Error {
+  constructor(objectPath: string) {
+    super(`An object already exists at ${objectPath}.`);
+    this.name = "ObjectExistsError";
+  }
+}
+
 export async function uploadObject(
   logicalBucket: ObjectStorageBucket,
   objectPath: string,
@@ -165,12 +173,34 @@ export async function uploadObject(
         Body: payload,
         ContentType: options.contentType,
         CacheControl: options.cacheControl,
+        // `upsert` predates the S3 migration (it was a Supabase storage flag)
+        // and was silently dropped here, so callers asking not to overwrite
+        // were overwriting anyway. For audio that is not just a lost file: a
+        // filename is how campaigns and IVR steps point at a recording, so a
+        // clobbered key changes what live callers hear. A conditional write
+        // makes the flag mean what it says.
+        ...(options.upsert === false ? { IfNoneMatch: "*" } : {}),
       }),
     );
   } catch (error) {
+    if (options.upsert === false && isPreconditionFailed(error)) {
+      throw new ObjectExistsError(objectPath);
+    }
     const message = error instanceof Error ? error.message : "Upload failed";
     throw new Error(message);
   }
+}
+
+/** S3 and MinIO both answer a failed `IfNoneMatch: "*"` with HTTP 412. */
+function isPreconditionFailed(error: unknown): boolean {
+  const candidate = error as {
+    name?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  return (
+    candidate?.$metadata?.httpStatusCode === 412 ||
+    candidate?.name === "PreconditionFailed"
+  );
 }
 
 export async function downloadObject(

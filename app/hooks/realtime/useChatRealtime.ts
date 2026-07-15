@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Message } from "@/lib/types";
 import type { Database, Tables } from "@/lib/db-types";
-import { compareByRecentActivity } from "@/lib/chat-conversation-sort";
+import {
+  compareByRecentActivity,
+  isInboundMessageDirection,
+} from "@/lib/chat-conversation-sort";
 import {
   fetchConversationSummaries,
   markConversationRead,
@@ -330,9 +333,12 @@ export const useConversationSummaryRealTime = ({
   const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
     const typedPayload = payload as RealtimeChangePayload<Tables<"message">>;
     const newRow = typedPayload.new;
-    if (typedPayload.eventType === 'INSERT' && newRow?.workspace === workspace) {
-      if (!newRow) return;
+    if (!newRow || newRow.workspace !== workspace) return;
+    if (typedPayload.eventType !== 'INSERT' && typedPayload.eventType !== 'UPDATE') {
+      return;
+    }
 
+    if (typedPayload.eventType === 'INSERT') {
       // For new messages, we need to update unread counts
       if (newRow.status === "received") {
         // Check if this is for the active contact

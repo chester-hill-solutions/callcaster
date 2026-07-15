@@ -142,6 +142,14 @@ What the script updates:
 - Twilio incoming phone number webhooks for the selected workspace(s)
 - stored onboarding callback metadata in the workspace `twilio_data`
 
+> **Use your own TwiML App for local dev.** A TwiML App holds exactly one voice
+> URL, so pointing a shared app at your tunnel breaks browser calling for every
+> environment using it — and keeps it broken after your tunnel closes, with
+> Twilio only ever saying "an unexpected error has occurred" (error 11200).
+> Create a personal TwiML App in the
+> [Twilio console](https://console.twilio.com/us1/develop/voice/manage/twiml-apps)
+> and point your `.env` `TWILIO_APP_SID` at it before running this script.
+
 The script reads the public URL in this order:
 - `--base-url`
 - `BASE_URL` from the environment
@@ -157,6 +165,31 @@ Twilio webhook validation uses the exact incoming request URL. If your Localtunn
 Relevant runtime wiring:
 - incoming numbers point to `${BASE_URL}/api/inbound`, `${BASE_URL}/api/inbound-sms`, and `${BASE_URL}/api/caller-id/status`
 - browser/device calls rely on `TWILIO_APP_SID`, which should point at `${BASE_URL}/api/call`
+
+## TwiML Apps In Deployed Environments
+
+Production sets `TWILIO_APP_SID` explicitly and owns the `calldiv` app.
+
+Every other Railway environment (PR previews, `dev`, `staging`) provisions its own
+TwiML App at boot via `app/server/environment-twiml-app.server.ts`, named
+`env:<railway-environment-name>` and pointed at that environment's own
+`${BASE_URL}/api/call`. This runs before the required-env check, and deliberately
+overrides any inherited `TWILIO_APP_SID`: Railway clones variables from the base
+environment, and only production owns an app, so without the override a
+non-production deployment would mint Voice SDK tokens against production's app and
+place its calls through production's code, database, and caller ID.
+
+Closed PRs leave their apps behind. Reconcile Twilio against the environments
+Railway still reports (dry-run by default):
+
+```bash
+bun ./scripts/local/prune-environment-twiml-apps.mjs
+bun ./scripts/local/prune-environment-twiml-apps.mjs --apply
+```
+
+Run these with `bun`, not `node`: the `twilio` package pulls in
+`buffer-equal-constant-time`, which reads `SlowBuffer` and throws on import under
+Node 24+.
 
 ## Build, Typegen, And Production Server
 

@@ -68,6 +68,7 @@ export function createEmptyDocument(options: {
   return {
     version: 1,
     startPageId: pageId,
+    pageOrder: [pageId],
     pages: {
       [pageId]: {
         id: pageId,

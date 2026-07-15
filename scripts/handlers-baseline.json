@@ -31,7 +31,6 @@
   "app/routes/workspaces+/$id/audios.loader.server.ts": 1,
   "app/routes/workspaces+/$id/billing.action.server.ts": 1,
   "app/routes/workspaces+/$id/billing.loader.server.ts": 1,
-  "app/routes/workspaces+/$id/calls.action.server.ts": 1,
   "app/routes/workspaces+/$id/calls.loader.server.ts": 1,
   "app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.action.server.ts": 1,
   "app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.loader.server.ts": 1,

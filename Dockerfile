@@ -30,6 +30,13 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
+# ffmpeg is a runtime dependency, not a build tool: app/lib/audio.server.ts
+# spawns it to normalize and trim uploaded audio. Without it every upload
+# fails with "Audio transcoding is unavailable".
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+
 # Copy built assets and runtime source from builder
 COPY --from=builder --chown=bun:bun /app/build ./build
 COPY --from=builder --chown=bun:bun /app/public ./public

@@ -9,6 +9,7 @@ import {
   useSearchParams,
 } from "react-router";
 import { isOptOutMessage } from "@/lib/chat-opt-out";
+import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import { useContactSearch } from "@/hooks/contact/useContactSearch";
@@ -332,12 +333,17 @@ export function useChatsPage() {
       const formData = new FormData(target);
       formData.append("media", JSON.stringify(selectedImages));
       const body = (formData.get("body") as string) || "";
+      // Resolve the sender the same way the action does, so the optimistic
+      // bubble shows the number the message will actually be sent from. A
+      // Messaging Service send has no specific number, hence `undefined`.
+      const selection = parseChatSenderSelection({
+        rawFrom: formData.get("from") as string | null,
+        messagingServiceAvailable: senderSelection.messagingServiceReady,
+      });
       const from =
-        senderSelection.mode === "messaging_service"
+        selection.mode === "messaging_service"
           ? undefined
-          : (formData.get("from") as string) ||
-            workspaceNumbers?.[0]?.phone_number ||
-            "";
+          : selection.fromNumber || workspaceNumbers?.[0]?.phone_number || "";
       const media = formData.get("media") as string | undefined;
       const pendingSid = `pending-${Date.now()}`;
       pendingOptimisticMessageRef.current = { sid: pendingSid, body };
@@ -363,7 +369,7 @@ export function useChatsPage() {
       messageFetcher,
       selectedImages,
       setSelectedImages,
-      senderSelection.mode,
+      senderSelection.messagingServiceReady,
       workspaceNumbers,
     ],
   );

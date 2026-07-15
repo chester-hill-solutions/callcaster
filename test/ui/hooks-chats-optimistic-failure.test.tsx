@@ -24,7 +24,7 @@ const stableLoaderData = {
   campaigns: [] as unknown[],
   workspaceNumbers: [{ id: "n1", phone_number: "+15550000000" }],
   senderSelection: {
-    mode: "messaging_service" as const,
+    defaultMode: "messaging_service" as const,
     messagingServiceReady: true,
   },
   optOutKeywords: ["stop"],

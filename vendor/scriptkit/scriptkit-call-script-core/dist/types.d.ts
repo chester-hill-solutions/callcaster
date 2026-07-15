@@ -22,6 +22,8 @@ declare const scriptOptionSchema: z.ZodObject<{
     label: z.ZodString;
     next: z.ZodOptional<z.ZodString>;
     content: z.ZodOptional<z.ZodString>;
+    id: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export type ScriptOption = z.infer<typeof scriptOptionSchema>;
 export declare const instructionBlockSchema: z.ZodObject<{
@@ -41,6 +43,7 @@ export declare const instructionBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const yesNoBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"yes_no">;
@@ -58,6 +61,7 @@ export declare const yesNoBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const choiceBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"choice">;
@@ -67,6 +71,8 @@ export declare const choiceBlockSchema: z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -81,6 +87,7 @@ export declare const choiceBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const textBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"text">;
@@ -99,6 +106,7 @@ export declare const textBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const supportBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"support">;
@@ -116,6 +124,7 @@ export declare const supportBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const textareaBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"textarea">;
@@ -125,6 +134,8 @@ export declare const textareaBlockSchema: z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -139,6 +150,7 @@ export declare const textareaBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const selectBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"select">;
@@ -148,6 +160,8 @@ export declare const selectBlockSchema: z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -162,6 +176,7 @@ export declare const selectBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const radioBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"radio">;
@@ -171,6 +186,8 @@ export declare const radioBlockSchema: z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -185,6 +202,7 @@ export declare const radioBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const checkboxBlockSchema: z.ZodObject<{
     type: z.ZodLiteral<"checkbox">;
@@ -194,6 +212,8 @@ export declare const checkboxBlockSchema: z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -208,6 +228,7 @@ export declare const checkboxBlockSchema: z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     type: z.ZodLiteral<"instruction">;
@@ -226,6 +247,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"yes_no">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -242,6 +264,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"choice">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -250,6 +273,8 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -264,6 +289,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"text">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -281,6 +307,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"support">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -297,6 +324,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"textarea">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -305,6 +333,8 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -319,6 +349,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"select">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -327,6 +358,8 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -341,6 +374,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"radio">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -349,6 +383,8 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -363,6 +399,7 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"checkbox">;
     prompt: z.ZodDefault<z.ZodString>;
@@ -371,6 +408,8 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         label: z.ZodString;
         next: z.ZodOptional<z.ZodString>;
         content: z.ZodOptional<z.ZodString>;
+        id: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     id: z.ZodString;
     label: z.ZodOptional<z.ZodString>;
@@ -385,21 +424,25 @@ export declare const scriptBlockSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     audioFile: z.ZodOptional<z.ZodString>;
     callcasterType: z.ZodOptional<z.ZodString>;
     speechType: z.ZodOptional<z.ZodString>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>], "type">;
 export type ScriptBlock = z.infer<typeof scriptBlockSchema>;
 export declare const scriptPageSchema: z.ZodObject<{
     id: z.ZodString;
     title: z.ZodDefault<z.ZodString>;
     blockIds: z.ZodDefault<z.ZodArray<z.ZodString>>;
+    wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export type ScriptPage = z.infer<typeof scriptPageSchema>;
 export declare const scriptDocumentSchema: z.ZodObject<{
     version: z.ZodLiteral<1>;
     startPageId: z.ZodString;
+    pageOrder: z.ZodDefault<z.ZodArray<z.ZodString>>;
     pages: z.ZodRecord<z.ZodString, z.ZodObject<{
         id: z.ZodString;
         title: z.ZodDefault<z.ZodString>;
         blockIds: z.ZodDefault<z.ZodArray<z.ZodString>>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>;
     blocks: z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
         type: z.ZodLiteral<"instruction">;
@@ -418,6 +461,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"yes_no">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -434,6 +478,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"choice">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -442,6 +487,8 @@ export declare const scriptDocumentSchema: z.ZodObject<{
             label: z.ZodString;
             next: z.ZodOptional<z.ZodString>;
             content: z.ZodOptional<z.ZodString>;
+            id: z.ZodOptional<z.ZodString>;
+            wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
         }, z.core.$strip>>>;
         id: z.ZodString;
         label: z.ZodOptional<z.ZodString>;
@@ -456,6 +503,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"text">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -473,6 +521,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"support">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -489,6 +538,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"textarea">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -497,6 +547,8 @@ export declare const scriptDocumentSchema: z.ZodObject<{
             label: z.ZodString;
             next: z.ZodOptional<z.ZodString>;
             content: z.ZodOptional<z.ZodString>;
+            id: z.ZodOptional<z.ZodString>;
+            wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
         }, z.core.$strip>>>;
         id: z.ZodString;
         label: z.ZodOptional<z.ZodString>;
@@ -511,6 +563,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"select">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -519,6 +572,8 @@ export declare const scriptDocumentSchema: z.ZodObject<{
             label: z.ZodString;
             next: z.ZodOptional<z.ZodString>;
             content: z.ZodOptional<z.ZodString>;
+            id: z.ZodOptional<z.ZodString>;
+            wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
         }, z.core.$strip>>>;
         id: z.ZodString;
         label: z.ZodOptional<z.ZodString>;
@@ -533,6 +588,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"radio">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -541,6 +597,8 @@ export declare const scriptDocumentSchema: z.ZodObject<{
             label: z.ZodString;
             next: z.ZodOptional<z.ZodString>;
             content: z.ZodOptional<z.ZodString>;
+            id: z.ZodOptional<z.ZodString>;
+            wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
         }, z.core.$strip>>>;
         id: z.ZodString;
         label: z.ZodOptional<z.ZodString>;
@@ -555,6 +613,7 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         type: z.ZodLiteral<"checkbox">;
         prompt: z.ZodDefault<z.ZodString>;
@@ -563,6 +622,8 @@ export declare const scriptDocumentSchema: z.ZodObject<{
             label: z.ZodString;
             next: z.ZodOptional<z.ZodString>;
             content: z.ZodOptional<z.ZodString>;
+            id: z.ZodOptional<z.ZodString>;
+            wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
         }, z.core.$strip>>>;
         id: z.ZodString;
         label: z.ZodOptional<z.ZodString>;
@@ -577,15 +638,18 @@ export declare const scriptDocumentSchema: z.ZodObject<{
         audioFile: z.ZodOptional<z.ZodString>;
         callcasterType: z.ZodOptional<z.ZodString>;
         speechType: z.ZodOptional<z.ZodString>;
+        wireExtras: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>], "type">>;
 }, z.core.$strip>;
 export type ScriptDocument = z.infer<typeof scriptDocumentSchema>;
 export declare const callcasterFlowSchema: z.ZodObject<{
+    startPageId: z.ZodOptional<z.ZodString>;
+    pageOrder: z.ZodOptional<z.ZodArray<z.ZodString>>;
     pages: z.ZodRecord<z.ZodString, z.ZodObject<{
         id: z.ZodOptional<z.ZodString>;
         title: z.ZodOptional<z.ZodString>;
         blocks: z.ZodOptional<z.ZodArray<z.ZodString>>;
-    }, z.core.$strip>>;
+    }, z.core.$loose>>;
     blocks: z.ZodRecord<z.ZodString, z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, z.core.$strip>;
 export type CallcasterFlow = z.infer<typeof callcasterFlowSchema>;
@@ -610,6 +674,16 @@ export declare const quickCanvassBlockSchema: z.ZodObject<{
 export type QuickCanvassBlock = z.infer<typeof quickCanvassBlockSchema>;
 export declare const CANVASS_BLOCK_TYPES: readonly ["instruction", "yes_no", "choice", "text", "support"];
 export declare const CALLCASTER_BLOCK_TYPES: readonly ["instruction", "textarea", "select", "radio", "checkbox"];
+/**
+ * Callcaster IVR playback modes.
+ *
+ * On the wire these occupy the same `type` field as the input types above,
+ * so a block is either an input (radio/dropdown/...) or a playback step
+ * (recorded/synthetic/say) — never both. Anything that rewrites a block's
+ * type must leave these alone, or the IVR routes stop playing audio.
+ */
+export declare const IVR_PLAYBACK_TYPES: readonly ["recorded", "synthetic", "say"];
+export declare function isIvrPlaybackType(type: string | undefined): boolean;
 export type ParseMode = "strict" | "permissive";
 export type ParseDocumentOptions = {
     mode?: ParseMode;

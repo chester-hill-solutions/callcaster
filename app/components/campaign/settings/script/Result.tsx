@@ -25,6 +25,17 @@ interface ResultProps {
   disabled: boolean;
 }
 
+/**
+ * An option's stored answer value.
+ *
+ * The documented upload format (docs/script-json-format.md) keys options by
+ * `{ content, next }` with no `value`, so a script uploaded exactly as
+ * documented would otherwise render `value="undefined"` here. Fall back to the
+ * option text, which is what the builder derives `value` from anyway.
+ */
+const optionValue = (option: BlockOption | IVROption): string =>
+  String(option.value ?? (option as BlockOption).content ?? "");
+
 const Result = ({
   action,
   initResult = null,
@@ -38,7 +49,10 @@ const Result = ({
   const [prevInitResult, setPrevInitResult] = useState(initResult);
   if (prevInitResult !== initResult) {
     setPrevInitResult(initResult);
-    setResult(initResult || (questions.type === "multi" ? [] : ""));
+    setResult(
+      initResult ||
+        (questions.type === "multi" || questions.type === "checkbox" ? [] : ""),
+    );
   }
 
   const handleChange = (id: string, value: string | boolean) => {
@@ -60,9 +74,9 @@ const Result = ({
     if (option.Icon === "SupportButton") {
       return (
         <SupportButton
-          key={option.value}
-          option={{ value: option.value || "", content: option.content || "" }}
-          handleChange={() => handleChange(questions.id, option.value || "")}
+          key={optionValue(option)}
+          option={{ value: optionValue(option), content: option.content || "" }}
+          handleChange={() => handleChange(questions.id, optionValue(option))}
           current={typeof result === 'string' ? result : ''}
         />
       );
@@ -73,9 +87,9 @@ const Result = ({
     if (!IconComponent) {
       return (
         <SupportButton
-          key={option.value}
-          option={{ value: option.value || "", content: option.content || "" }}
-          handleChange={() => handleChange(questions.id, option.value || "")}
+          key={optionValue(option)}
+          option={{ value: optionValue(option), content: option.content || "" }}
+          handleChange={() => handleChange(questions.id, optionValue(option))}
           current={typeof result === 'string' ? result : ''}
         />
       );
@@ -91,7 +105,7 @@ const Result = ({
           alignItems: "center",
           minWidth: "40px",
         }}
-        onClick={() => handleChange(questions.id, option.value || "")}
+        onClick={() => handleChange(questions.id, optionValue(option))}
         type="button"
       >
         <IconComponent
@@ -124,9 +138,9 @@ const Result = ({
           return opt.Icon === "SupportButton"
             ? (
                 <SupportButton
-                  key={String(opt.value)}
-                  option={{ value: String(opt.value), content: opt.content || "" }}
-                  handleChange={() => handleChange(questions.id, String(opt.value))}
+                  key={optionValue(opt)}
+                  option={{ value: optionValue(opt), content: opt.content || "" }}
+                  handleChange={() => handleChange(questions.id, optionValue(opt))}
                   current={typeof result === 'string' ? result : ''}
                 />
               )
@@ -148,7 +162,11 @@ const Result = ({
             />
           </div>
         );
+      // "dropdown" is the legacy wire type; "select" is the documented one
+      // (docs/script-json-format.md) and what the builder writes for new
+      // blocks. Both mean the same thing — render them the same way.
       case "dropdown":
+      case "select":
         return (
           <select
           disabled={disabled}
@@ -160,17 +178,19 @@ const Result = ({
             <option value="">---</option>
             {questions.options.map((option: BlockOption | IVROption) => (
               <option
-                key={`question-${questionId}-select-${String(option.value)}`}
-                value={String(option.value)}
+                key={`question-${questionId}-select-${optionValue(option)}`}
+                value={optionValue(option)}
               >
                 {option.content}
               </option>
             ))}
           </select>
         );
+      // "multi" is the legacy wire type; "checkbox" is the documented one.
       case "multi":
+      case "checkbox":
         return questions.options.map((option: BlockOption | IVROption) => {
-          const inputId = `${questionId}-select-${String(option.value)}`;
+          const inputId = `${questionId}-select-${optionValue(option)}`;
           return (
             <div
               key={inputId}
@@ -182,9 +202,9 @@ const Result = ({
                 name={inputId}
                 type="checkbox"
                 onChange={(e) =>
-                  handleMultiChange(questions.id, String(option.value), e.target.checked)
+                  handleMultiChange(questions.id, optionValue(option), e.target.checked)
                 }
-                checked={Array.isArray(result) ? result.includes(String(option.value)) : false}
+                checked={Array.isArray(result) ? result.includes(optionValue(option)) : false}
               />
               <label htmlFor={inputId} className="ml-2">
                 {option.content}

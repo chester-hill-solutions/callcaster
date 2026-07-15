@@ -15,7 +15,10 @@ import {
   listMediaObjects,
   putMediaObject,
 } from "@/lib/adapters/media-library.adapter.server";
-import { createSignedObjectUrls } from "@/lib/object-storage.server";
+import {
+  createSignedObjectUrls,
+  ObjectExistsError,
+} from "@/lib/object-storage.server";
 
 const SIGNED_URL_TTL_SECONDS = 3600;
 
@@ -142,6 +145,15 @@ export async function uploadWorkspaceAudioApi(
     };
   } catch (error) {
     logger.error("uploadWorkspaceAudioApi failed", error);
+    // ObjectExistsError's message embeds the workspace id and storage key, so
+    // it must never reach a user. A name collision is a normal thing to hit.
+    if (error instanceof ObjectExistsError) {
+      return {
+        ok: false as const,
+        error: "An audio file with that name already exists. Choose a different name.",
+        status: 409,
+      };
+    }
     const message =
       error instanceof Error ? error.message : "Failed to upload audio.";
     const status = error instanceof AudioUploadError ? error.status : 500;

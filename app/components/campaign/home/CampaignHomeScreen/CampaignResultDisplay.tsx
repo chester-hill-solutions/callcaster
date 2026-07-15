@@ -2,6 +2,10 @@ import { useNavigation } from "react-router";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
 import type { CampaignState } from "@/lib/campaign-home.types";
+import {
+  campaignTypeCollectsIvrResponses,
+  type IvrQuestionResults,
+} from "@/lib/ivr-results";
 import { Campaign } from "@/lib/types";
 
 type CampaignResult = {
@@ -57,12 +61,13 @@ const aggregateDispositionResults = (results: CampaignResult[]) => {
   return Array.from(aggregated.values());
 };
 
-export const ResultsDisplay = ({ 
-  results, 
-  campaign, 
+export const ResultsDisplay = ({
+  results,
+  campaign,
   hasAccess,
-  queueCounts
-}: { 
+  queueCounts,
+  ivrResponses,
+}: {
   results: CampaignResult[];
   campaign: NonNullable<Campaign>;
   hasAccess: boolean;
@@ -70,6 +75,7 @@ export const ResultsDisplay = ({
     fullCount: number;
     queuedCount: number;
   };
+  ivrResponses?: IvrQuestionResults[] | null;
 }) => {
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
@@ -107,6 +113,13 @@ export const ResultsDisplay = ({
       results={visibleResults}
       hasAccess={hasAccess}
       queueCounts={queueCounts}
+      // Only IVR-style campaigns record responses; for anything else there is no
+      // response section to show, empty or otherwise.
+      ivrResponses={
+        campaignTypeCollectsIvrResponses(campaign?.type)
+          ? (ivrResponses ?? [])
+          : null
+      }
     />
   );
 };
