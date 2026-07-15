@@ -150,7 +150,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId.tsx",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId/route.tsx",
     authClass: "apiKeyOrSession",
     ownerArea: "workspace",
     exposure: "sessionOnly",
@@ -162,7 +162,19 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
     notes:
-      "Layout + handlers (middleware on same module). GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
+      "Child index under data-plane layout middleware. GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
+  }),
+  platformSeed({
+    path: "/api/workspaces/:workspaceId",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId.tsx",
+    authClass: "session",
+    ownerArea: "workspace",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.platform,
+    workspaceScoped: true,
+    duplicate: true,
+    notes: "Middleware layout for nested workspace API routes; no direct handler.",
+    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/transfer-ownership",
