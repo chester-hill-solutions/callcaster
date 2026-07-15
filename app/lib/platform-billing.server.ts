@@ -299,13 +299,17 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
+    // Capture the workspace before any throw below: it is what lets the caller
+    // redirect the user back to their own billing page instead of dumping them
+    // on the workspace list with a context-free error.
+    const workspaceId = session.metadata?.workspaceId ?? null;
+    fallbackWorkspaceId = workspaceId;
+
     if (session.status !== "complete") {
       throw new Error("Payment not completed");
     }
 
-    const workspaceId = session.metadata?.workspaceId ?? null;
     const creditAmount = Number(session.metadata?.creditAmount);
-    fallbackWorkspaceId = workspaceId;
 
     if (!workspaceId || !creditAmount) {
       throw new Error("Invalid session metadata");

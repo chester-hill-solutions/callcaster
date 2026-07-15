@@ -3,9 +3,19 @@
  * Compare in-repo client/migrations/*.sql versions against
  * AUTH_migrations.schema_migrations when DATABASE_URL is set.
  *
+ * Without DATABASE_URL this can only print the repo inventory — it compares
+ * nothing. That is fine for `ci:local` (no database to reach) but useless as a
+ * deploy gate, so the no-database path is loud rather than a silent success:
+ * a green line here has previously been mistaken for "the ledger is in sync".
+ *
+ * Pass --require-db (or set LEDGER_CHECK_REQUIRE_DB=1) in any pipeline that is
+ * meant to actually gate a deploy; it makes a missing DATABASE_URL a failure
+ * instead of a no-op.
+ *
  * Usage:
  *   node scripts/db/check-migration-ledger.mjs
  *   DATABASE_URL=postgresql://... node scripts/db/check-migration-ledger.mjs
+ *   DATABASE_URL=postgresql://... node scripts/db/check-migration-ledger.mjs --require-db
  */
 
 import { readdirSync } from "node:fs";
@@ -114,14 +124,29 @@ async function main() {
   const { files, byVersion: repoVersions } = loadRepoVersions();
   console.log(`Found ${files.length} migration files in client/migrations/`);
 
+  const requireDb =
+    process.argv.includes("--require-db") ||
+    process.env.LEDGER_CHECK_REQUIRE_DB === "1";
+
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.log(
-      "\nDATABASE_URL not set — repo inventory only. Set DATABASE_URL to compare against a database ledger.",
-    );
     for (const file of files) {
       console.log(`  ${versionFromFilename(file)}  ${file}`);
     }
+
+    if (requireDb) {
+      console.error(
+        "\nFAIL: --require-db was set but DATABASE_URL is not. This run gated nothing.",
+      );
+      process.exit(1);
+    }
+
+    console.warn(
+      "\nWARNING: DATABASE_URL not set — NOTHING WAS COMPARED.\n" +
+        "This is a repo inventory, not a ledger check. A deployed database can\n" +
+        "be missing any of the migrations listed above and this run still passes.\n" +
+        "To actually gate a deploy, run with DATABASE_URL set and --require-db.",
+    );
     process.exit(0);
   }
 
