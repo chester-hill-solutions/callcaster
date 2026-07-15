@@ -1,7 +1,20 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+const mockLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+// env.server imports ./logger.server (relative), not the @/ alias mocked in setup.node.ts.
+vi.mock("../app/lib/logger.server", () => ({
+  logger: mockLogger,
+}));
+
 function seedRequiredEnv() {
   process.env.NODE_ENV = "test";
+  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
   process.env.BASE_URL = "http://localhost";
   process.env.BETTER_AUTH_SECRET = "test-better-auth-secret";
   process.env.TWILIO_SID = "d";
@@ -11,11 +24,17 @@ function seedRequiredEnv() {
   process.env.STRIPE_SECRET_KEY = "sk";
   process.env.RESEND_API_KEY = "re";
   process.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL = "compliance@callcaster.ca";
+  process.env.S3_ENDPOINT = "http://localhost:9000";
+  process.env.S3_REGION = "us-east-1";
+  process.env.S3_ACCESS_KEY_ID = "test-access-key";
+  process.env.S3_SECRET_ACCESS_KEY = "test-secret-key";
+  process.env.S3_BUCKET = "callcaster-test";
 }
 
 describe("env.server", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    mockLogger.error.mockClear();
     seedRequiredEnv();
   });
 
@@ -153,12 +172,10 @@ describe("env.server", () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_abc123";
 
     try {
-      // Module load runs the boot-time guard (logger.server is mocked in setup.node.ts).
+      // Module load runs the boot-time guard.
       const mod = await import("../app/lib/env.server");
-      const { logger } = await import("../app/lib/logger.server");
-      const errorMock = vi.mocked(logger.error);
 
-      const guardCalls = errorMock.mock.calls.filter(
+      const guardCalls = mockLogger.error.mock.calls.filter(
         ([message]) =>
           typeof message === "string" &&
           message.includes("STRIPE MISCONFIGURATION"),
@@ -174,7 +191,7 @@ describe("env.server", () => {
       expect(mod.warnIfStripeKeyModeMismatch()).toBe(true);
       expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk_test_abc123");
       expect(
-        errorMock.mock.calls.filter(
+        mockLogger.error.mock.calls.filter(
           ([message]) =>
             typeof message === "string" &&
             message.includes("STRIPE MISCONFIGURATION"),
@@ -193,10 +210,9 @@ describe("env.server", () => {
 
     try {
       const mod = await import("../app/lib/env.server");
-      const { logger } = await import("../app/lib/logger.server");
       expect(mod.warnIfStripeKeyModeMismatch()).toBe(false);
       expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk_live_abc123");
-      expect(vi.mocked(logger.error)).not.toHaveBeenCalled();
+      expect(mockLogger.error).not.toHaveBeenCalled();
     } finally {
       process.env.NODE_ENV = "test";
     }
@@ -208,10 +224,9 @@ describe("env.server", () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_abc123";
 
     const mod = await import("../app/lib/env.server");
-    const { logger } = await import("../app/lib/logger.server");
     expect(mod.warnIfStripeKeyModeMismatch()).toBe(false);
     expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk_test_abc123");
-    expect(vi.mocked(logger.error)).not.toHaveBeenCalled();
+    expect(mockLogger.error).not.toHaveBeenCalled();
   });
 
   test("isSignupOpen is true only when SIGNUP_OPEN is true or 1", async () => {
