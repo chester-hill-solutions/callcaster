@@ -90,6 +90,11 @@ export default function WorkspaceSettings() {
     (user) => user?.role === "owner"
   ) as UserWithRole | undefined;
   users?.sort((a, b) => compareMembersByRole(a, b));
+  // Mirrors what the list below actually renders: non-owner members plus any
+  // pending invites. The owner has its own row above this list.
+  const hasOtherMembers =
+    (users ?? []).some((member) => member?.role && member.role !== "owner") ||
+    (pendingInvites ?? []).some(Boolean);
   const formRef = useRef<HTMLFormElement | null>(null);
   useActionFeedback(actionData, {
     getError: (data) => data?.error,
@@ -216,6 +221,13 @@ export default function WorkspaceSettings() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Members
             </p>
+            {!hasOtherMembers ? (
+              <Text variant="muted" className="py-2">
+                {hasAccess
+                  ? "No other members yet. Invite a teammate below to share this workspace."
+                  : "No other members yet."}
+              </Text>
+            ) : null}
             <ul className="divide-y divide-border">
               {users?.map((member) => {
                 if (!member?.role || member.role === "owner") return null;

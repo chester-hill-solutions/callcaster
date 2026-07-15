@@ -286,6 +286,16 @@ export default function Credits() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {credits.history.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center">
+                    <Text variant="muted">
+                      No credit usage yet. Purchases and campaign spend will
+                      appear here.
+                    </Text>
+                  </TableCell>
+                </TableRow>
+              ) : null}
               {credits.history.map((transaction: TransactionRow) => {
                 const source = getBillingEventSource({
                   type: transaction.type as TransactionType,
