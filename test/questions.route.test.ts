@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
 const tenantDbMocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   update: vi.fn(),
+  contactUpdate: vi.fn(),
 }));
 
 vi.mock("@/lib/auth.server", () => ({
@@ -40,6 +41,9 @@ vi.mock("@/server/tenant-db", () => ({
     outreach_attempt: {
       findFirst: (...args: any[]) => tenantDbMocks.findFirst(...args),
       update: (...args: any[]) => tenantDbMocks.update(...args),
+    },
+    contact: {
+      update: (...args: any[]) => tenantDbMocks.contactUpdate(...args),
     },
   }),
 }));
@@ -74,6 +78,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     mocks.logger.error.mockReset();
     tenantDbMocks.findFirst.mockReset();
     tenantDbMocks.update.mockReset();
+    tenantDbMocks.contactUpdate.mockReset();
 
     mocks.getSession.mockResolvedValue({ headers, user: { id: "u1" } });
     mocks.requireJsonAuth.mockResolvedValue({ user: { id: "u1" } });
@@ -178,6 +183,35 @@ describe("app/routes/api+/questions/route.tsx", () => {
     tenantDbMocks.update.mockRejectedValueOnce(new Error("final bad"));
     const mod = await import("../app/routes/api+/questions");
     await expect(mod.action({ request: makeRequest(defaultBody) } as any)).rejects.toThrow("final bad");
+  });
+
+  test("writes typed outreach columns and syncs contact.support_level cache", async () => {
+    tenantDbMocks.findFirst.mockResolvedValueOnce(null);
+    mocks.rpcCreateOutreachAttempt.mockResolvedValueOnce(7);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      ...defaultBody,
+      update: {
+        support_level: 2,
+        volunteer_interest: "yes",
+        lawn_sign: true,
+      },
+    });
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
+    expect(res.status).toBe(200);
+    expect(tenantDbMocks.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({
+          support_level: 2,
+          volunteer_interest: "yes",
+          lawn_sign: true,
+        }),
+      }),
+    );
+    expect(tenantDbMocks.contactUpdate).toHaveBeenCalledWith({
+      set: { support_level: 2 },
+      where: expect.anything(),
+    });
   });
 
   test("returns 500 when outreach attempt id is null after creation", async () => {
