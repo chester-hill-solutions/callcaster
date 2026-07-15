@@ -39,7 +39,7 @@ export const SaveBar = ({
   if (!isChanged && !isSaving) return null;
 
   return (
-    <div className="sticky top-0 z-50 bg-white border-b px-4 py-2 flex items-center justify-between">
+    <div className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b bg-background px-4 py-2">
       <span className="text-sm">{message}</span>
       <div className="flex gap-2">
         {onReset && (
@@ -52,12 +52,7 @@ export const SaveBar = ({
             Reset
           </Button>
         )}
-        <Button
-          onClick={onSave}
-          size="sm"
-          className="bg-red-600 hover:bg-red-700 text-white"
-          disabled={isSaving}
-        >
+        <Button onClick={onSave} size="sm" disabled={isSaving}>
           {isSaving ? "Saving..." : "Save Changes"}
         </Button>
       </div>

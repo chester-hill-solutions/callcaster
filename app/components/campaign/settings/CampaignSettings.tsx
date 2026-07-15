@@ -263,7 +263,7 @@ export const CampaignSettings = ({
 
       <div
         id="campaignSettingsContainer"
-        className="flex h-full flex-col gap-8 p-6"
+        className="flex h-full min-w-0 flex-col gap-8 p-4 sm:p-6"
         role="region"
         aria-label="Campaign Settings"
       >
