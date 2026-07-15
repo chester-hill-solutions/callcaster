@@ -160,6 +160,7 @@ scripts
 services
 sessions/:sessionId
 settings
+setup
 signin
 signup
 status
