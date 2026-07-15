@@ -145,6 +145,10 @@ function ErrorShell({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title}</title>
         <Meta />
+        {/* Error pages bootstrap the same route graph, so they need the
+            Buffer polyfill installed before <Scripts /> too — see the
+            comment in App's <head>. */}
+        <script src="/buffer-polyfill.mjs" />
         <Links />
       </head>
       <body className="min-h-screen bg-background">

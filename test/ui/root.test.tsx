@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => {
   return {
     loaderData: null as any,
     navbarProps: null as any,
+    routeError: null as any,
+    isRouteErrorResponse: vi.fn(() => false),
     navigate: vi.fn(),
     unsubscribe: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
@@ -65,8 +67,8 @@ vi.mock("react-router", async () => {
     useLoaderData: () => mocks.loaderData,
     useNavigate: () => mocks.navigate,
     useNavigation: () => ({ state: "idle" }),
-    useRouteError: () => null,
-    isRouteErrorResponse: () => false,
+    useRouteError: () => mocks.routeError,
+    isRouteErrorResponse: (error: unknown) => mocks.isRouteErrorResponse(error),
   };
 });
 
@@ -74,6 +76,9 @@ describe("root.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.navbarProps = null;
+    mocks.routeError = null;
+    mocks.isRouteErrorResponse.mockReset();
+    mocks.isRouteErrorResponse.mockReturnValue(false);
     mocks.navigate.mockReset();
     mocks.unsubscribe.mockReset();
     mocks.logger.error.mockReset();
@@ -253,6 +258,35 @@ describe("root.tsx", () => {
     const r = await mocks.navbarProps.handleSignOut();
     expect(r).toEqual({ success: "Sign off successful", error: null });
     expect(mocks.navigate).toHaveBeenCalledWith("/");
+  });
+
+  async function renderErrorBoundary() {
+    const mod = await import("../../app/root");
+    document.documentElement.innerHTML = "";
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<mod.ErrorBoundary />, { container: document.documentElement });
+    consoleError.mockRestore();
+    const head = document.documentElement.querySelector("head");
+    expect(head).not.toBeNull();
+    return head as HTMLHeadElement;
+  }
+
+  // The error document bootstraps the same client route graph as App, and
+  // csv-parse reads Buffer at module scope — without the polyfill every 404
+  // dies with "Buffer is not defined".
+  test("404 error document loads the Buffer polyfill", async () => {
+    mocks.routeError = { status: 404, statusText: "Not Found", data: null };
+    mocks.isRouteErrorResponse.mockReturnValue(true);
+
+    const head = await renderErrorBoundary();
+    expect(head.querySelector('script[src="/buffer-polyfill.mjs"]')).not.toBeNull();
+  });
+
+  test("unexpected-error document loads the Buffer polyfill", async () => {
+    mocks.routeError = new Error("boom");
+
+    const head = await renderErrorBoundary();
+    expect(head.querySelector('script[src="/buffer-polyfill.mjs"]')).not.toBeNull();
   });
 });
 
