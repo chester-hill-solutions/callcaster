@@ -377,7 +377,41 @@ describe("app/routes/api+/inbound-sms", () => {
     expect(res.status).toBe(403);
     expect(mocks.requireTwilioSignature).toHaveBeenCalledWith(
       expect.objectContaining({ url: "http://x/inbound-sms" }),
-      { workspaceId: "w1" },
+      expect.objectContaining({
+        workspaceId: "w1",
+        params: expect.objectContaining({
+          MessageSid: "SM1",
+          To: "+1555",
+          From: "+1666",
+          Body: "hello",
+        }),
+      }),
+    );
+  });
+
+  test("passes parsed webhook params into signature validation (avoids Bun empty re-read)", async () => {
+    const number = {
+      workspace: "w1",
+      twilio_data: { sid: "sid", authToken: "workspace-tok" },
+      webhook: [],
+    };
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, mediaOk: true }));
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(mod.action({
+        request: makeInboundSmsRequest({ NumMedia: "0" }),
+      } as any),
+    );
+    expect(res.status).toBe(201);
+    expect(mocks.requireTwilioSignature).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.objectContaining({
+        workspaceId: "w1",
+        params: expect.objectContaining({
+          MessageSid: "SM1",
+          AccountSid: "AC1",
+          Body: "hello",
+        }),
+      }),
     );
   });
 

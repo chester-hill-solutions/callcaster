@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     sendMessage: vi.fn(),
     cancelScheduledMessage: vi.fn(),
     linkContactToConversation: vi.fn(),
+    getEffectivePortalConfig: vi.fn(),
     getOrLookupLineType: vi.fn(async () => null as string | null),
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   };
@@ -33,6 +34,10 @@ vi.mock("@/lib/chat-sms.server", () => ({
 vi.mock("@/lib/database/chat-contact-link.server", () => ({
   linkContactToConversation: (...args: unknown[]) =>
     mocks.linkContactToConversation(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace: (...args: unknown[]) =>
+    mocks.getEffectivePortalConfig(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/server/tenant-db", () => ({
@@ -66,6 +71,11 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     mocks.sendMessage.mockReset();
     mocks.cancelScheduledMessage.mockReset();
     mocks.linkContactToConversation.mockReset();
+    mocks.getEffectivePortalConfig.mockReset();
+    mocks.getEffectivePortalConfig.mockResolvedValue({
+      sendMode: "from_number",
+      messagingServiceSid: null,
+    });
     mocks.logger.error.mockReset();
     mocks.getOrLookupLineType.mockReset();
     mocks.getOrLookupLineType.mockResolvedValue(null);
@@ -94,6 +104,39 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       error: "A workspace sending number is required.",
     });
     expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("sends through a resolved Messaging Service without from and ignores a supplied from", async () => {
+    mocks.getEffectivePortalConfig.mockResolvedValueOnce({
+      sendMode: "messaging_service",
+      messagingServiceSid: " MG123 ",
+    });
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15559999999",
+          mode: "from_number",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+
+    expect(res.status).toBe(200);
+    expect(tenantDbMocks.workspace_number.findMany).not.toHaveBeenCalled();
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "",
+        messagingServiceSid: "MG123",
+        portalConfig: expect.objectContaining({
+          sendMode: "messaging_service",
+        }),
+      }),
+    );
   });
 
   test("rejects an unowned from number with a 400 before calling sendMessage", async () => {

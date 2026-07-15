@@ -164,6 +164,12 @@ async function parseTwilioWebhookParams(request: Request): Promise<Record<string
  *
  * Returns a 403 hangup TwiML Response on failure, or `null` on success.
  *
+ * Callers that need to inspect the body before validating MUST either:
+ * - `await request.clone().formData()` (leave the original unread), or
+ * - pass the already-parsed `params` here.
+ * On Bun, consuming `request.formData()` then cloning yields empty params and
+ * causes false `invalid_signature` failures (Twilio Error 11200).
+ *
  * - If a workspace option is provided (`workspaceId`, `callSid`, `messageSid`, or
  *   `phoneNumber`), the request is validated against that workspace's subaccount auth
  *   token. If the workspace or its credentials cannot be resolved, validation fails.

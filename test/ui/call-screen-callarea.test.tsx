@@ -407,6 +407,30 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     expect(saveNext2).not.toBeDisabled();
     fireEvent.click(saveNext2);
     expect(handleDequeueNext).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CallArea
+        isBusy={false}
+        nextRecipient={makeRecipient()}
+        activeCall={null}
+        recentCall={null}
+        hangUp={vi.fn()}
+        handleVoiceDrop={vi.fn()}
+        handleDialNext={vi.fn()}
+        handleDequeueNext={handleDequeueNext}
+        disposition="completed"
+        dispositionOptions={dispositionOptions as any}
+        setDisposition={setDisposition}
+        recentAttempt={null}
+        predictive={false}
+        conference={null}
+        voiceDrop={false}
+        displayState="completed"
+        callState="completed"
+        callDuration={0}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Save and Next" })).toBeDisabled();
   });
 });
 

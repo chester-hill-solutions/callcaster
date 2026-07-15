@@ -19,7 +19,10 @@ import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 
 export const action = defineAction({
   auth: async ({ request }) => {
-    const formData = await request.formData();
+    // Clone before reading: Bun returns an empty body from clone()/re-read after
+    // the original is consumed, which makes Twilio signature validation fail
+    // (403 → Twilio Error 11200) and drops inbound messages from chats.
+    const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const toNumber = parseTrimmedString(params.To);
     const messagingServiceSid = parseTrimmedString(params.MessagingServiceSid);
@@ -46,6 +49,7 @@ export const action = defineAction({
 
     const forbidden = await requireTwilioSignature(request, {
       workspaceId: workspaceNumber.workspace,
+      params,
     });
     if (forbidden) {
       if (forbidden.status === 500) {

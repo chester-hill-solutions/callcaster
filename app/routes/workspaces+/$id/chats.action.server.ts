@@ -4,6 +4,7 @@ import { data as routeData, redirect } from "react-router";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { cancelScheduledMessage, sendMessage } from "@/lib/chat-sms.server";
 import { linkContactToConversation } from "@/lib/database/chat-contact-link.server";
+import { getEffectiveWorkspaceTwilioPortalConfigForWorkspace } from "@/lib/database/workspace.server";
 import { eq } from "drizzle-orm";
 import {
   contact as contactTable,
@@ -12,7 +13,7 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
-import type { BaseUser } from "@/lib/types";
+import type { BaseUser, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
@@ -93,43 +94,66 @@ export const action = defineAction({
     params["contact_number"] || (data["contact_number"] as string),
   );
 
-  const fromNumber = String(data["from"] || "").trim();
   if (!workspaceId) {
     return routeData({ error: "Workspace is required" }, { status: 400 });
   }
-  if (!fromNumber) {
+
+  let portalConfig: WorkspaceTwilioOpsConfig;
+  try {
+    portalConfig = await getEffectiveWorkspaceTwilioPortalConfigForWorkspace({
+      workspaceId,
+    });
+  } catch (error) {
+    logger.error("Error resolving chat sender configuration:", error);
     return routeData(
-      { error: "A workspace sending number is required." },
+      { error: "Unable to resolve the workspace sending configuration." },
       { status: 400 },
     );
   }
 
-  try {
-    const tdb = createTenantDb(workspaceId);
-    const workspaceNumbers = await tdb.workspace_number.findMany({
-      where: eq(workspaceNumberTable.type, "rented"),
-      columns: { phone_number: true },
-    });
-    const fromKey = getConversationPhoneKey(fromNumber);
-    const isOwnedSender = workspaceNumbers.some((row) => {
-      if (!row.phone_number) return false;
-      return getConversationPhoneKey(row.phone_number) === fromKey;
-    });
-    if (!isOwnedSender) {
+  const messagingServiceSid =
+    portalConfig.sendMode === "messaging_service"
+      ? portalConfig.messagingServiceSid?.trim() || null
+      : null;
+  const fromNumber = messagingServiceSid
+    ? ""
+    : String(data["from"] || "").trim();
+
+  if (!messagingServiceSid) {
+    if (!fromNumber) {
       return routeData(
-        {
-          error:
-            "from must be a rented phone number that belongs to this workspace",
-        },
+        { error: "A workspace sending number is required." },
         { status: 400 },
       );
     }
-  } catch (error) {
-    logger.error("Error validating chat sender number:", error);
-    return routeData(
-      { error: "Unable to validate the selected sending number." },
-      { status: 400 },
-    );
+
+    try {
+      const tdb = createTenantDb(workspaceId);
+      const workspaceNumbers = await tdb.workspace_number.findMany({
+        where: eq(workspaceNumberTable.type, "rented"),
+        columns: { phone_number: true },
+      });
+      const fromKey = getConversationPhoneKey(fromNumber);
+      const isOwnedSender = workspaceNumbers.some((row) => {
+        if (!row.phone_number) return false;
+        return getConversationPhoneKey(row.phone_number) === fromKey;
+      });
+      if (!isOwnedSender) {
+        return routeData(
+          {
+            error:
+              "from must be a rented phone number that belongs to this workspace",
+          },
+          { status: 400 },
+        );
+      }
+    } catch (error) {
+      logger.error("Error validating chat sender number:", error);
+      return routeData(
+        { error: "Unable to validate the selected sending number." },
+        { status: 400 },
+      );
+    }
   }
 
   const contactId = data.contact_id as string;
@@ -182,6 +206,8 @@ export const action = defineAction({
       workspace: workspaceId as string,
       contact_id: data.contact_id as string,
       user: user as unknown as BaseUser,
+      portalConfig,
+      messagingServiceSid,
       sendAt: sendAt || null,
     });
     if (!params.contact_number) return redirect(contact_number);

@@ -11,7 +11,7 @@ interface UseAgentStatusOptions {
 
 interface UseAgentStatusReturn {
   agentStatus: Tables<"agent_status"> | null;
-  setStatus: (to: AgentState, reason?: string) => Promise<void>;
+  setStatus: (to: AgentState, reason?: string) => Promise<boolean>;
   refreshStatus: () => Promise<void>;
   loading: boolean;
   error: string | null;
@@ -53,7 +53,7 @@ export function useAgentStatus({
   }, [workspaceId]);
 
   const setStatus = useCallback(
-    async (to: AgentState, reason?: string) => {
+    async (to: AgentState, reason?: string): Promise<boolean> => {
       try {
         const res = await fetch("/api/agent-status", {
           method: "POST",
@@ -63,14 +63,17 @@ export function useAgentStatus({
         if (!res.ok) {
           const body = await res.json();
           setError(body.error ?? "Failed to update status");
-          return;
+          return false;
         }
         const result = await res.json();
         setAgentStatus(result.status);
         currentStatusRef.current = result.status?.status ?? "offline";
+        setError(null);
+        return true;
       } catch (e) {
         logger.error("Failed to update agent status:", e);
         setError("Failed to update agent status");
+        return false;
       }
     },
     [workspaceId],
@@ -98,7 +101,7 @@ export function useAgentStatus({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workspace_id: workspaceId,
-            status: currentStatusRef.current,
+            intent: "heartbeat",
           }),
         });
       } catch {

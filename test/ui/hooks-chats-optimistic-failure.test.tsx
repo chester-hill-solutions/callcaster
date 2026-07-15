@@ -23,6 +23,10 @@ const stableLoaderData = {
   contact: null,
   campaigns: [] as unknown[],
   workspaceNumbers: [{ id: "n1", phone_number: "+15550000000" }],
+  senderSelection: {
+    mode: "messaging_service" as const,
+    messagingServiceReady: true,
+  },
   optOutKeywords: ["stop"],
 };
 
@@ -106,7 +110,11 @@ describe("useChatsPage optimistic failure handling", () => {
 
     expect(fakeEvent.preventDefault).toHaveBeenCalled();
     expect(addOptimisticMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ body: "hello there", sid: expect.any(String) }),
+      expect.objectContaining({
+        body: "hello there",
+        from: undefined,
+        sid: expect.any(String),
+      }),
     );
     // Composer is cleared immediately on submit.
     expect(textarea.value).toBe("");

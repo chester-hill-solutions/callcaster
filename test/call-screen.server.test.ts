@@ -136,20 +136,35 @@ describe("call-screen.server", () => {
     ).toEqual([{ sid: "CA1" }, { sid: "CA2" }, { sid: "CA3" }]);
   });
 
-  test("getInitialRecentCall sorts attempts by created_at desc", () => {
+  test("getInitialRecentCall returns the latest call row for the current recipient", () => {
+    const nextRecipient = { contact_id: 2 } as never;
     const attempts = [
-      { created_at: "2026-01-01T00:00:00.000Z", call: [] },
-      { created_at: "2026-03-01T00:00:00.000Z", call: [] },
+      {
+        contact_id: 1,
+        created_at: "2026-04-01T00:00:00.000Z",
+        call: [{ sid: "CA-WRONG", date_created: "2026-04-01T00:00:00.000Z" }],
+      },
+      {
+        contact_id: 2,
+        created_at: "2026-03-01T00:00:00.000Z",
+        call: [
+          { sid: "CA-OLD", date_created: "2026-03-01T00:00:00.000Z" },
+          { sid: "CA-NEW", date_created: "2026-03-02T00:00:00.000Z" },
+        ],
+      },
     ] as never;
-    expect(getInitialRecentCall(attempts)?.created_at).toBe("2026-03-01T00:00:00.000Z");
+    expect(getInitialRecentCall(attempts, nextRecipient)?.sid).toBe("CA-NEW");
   });
 
-  test("getInitialRecentAttempt sorts attempts by created_at desc", () => {
+  test("getInitialRecentAttempt is scoped to the current recipient", () => {
+    const nextRecipient = { contact_id: 2 } as never;
     const attempts = [
-      { created_at: "2026-02-01T00:00:00.000Z" },
-      { created_at: "2026-01-01T00:00:00.000Z" },
+      { id: 1, contact_id: 1, created_at: "2026-03-01T00:00:00.000Z" },
+      { id: 2, contact_id: 2, created_at: "2026-02-01T00:00:00.000Z" },
+      { id: 3, contact_id: 2, created_at: "2026-01-01T00:00:00.000Z" },
     ] as never;
-    expect(getInitialRecentAttempt(attempts)?.created_at).toBe("2026-02-01T00:00:00.000Z");
+    expect(getInitialRecentAttempt(attempts, nextRecipient)?.id).toBe(2);
+    expect(getInitialRecentAttempt(attempts, null)).toBeNull();
   });
 
   test("getVerifiedNumbers returns verified numbers", async () => {

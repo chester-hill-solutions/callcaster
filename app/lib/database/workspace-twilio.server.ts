@@ -5,6 +5,7 @@ export {
   normalizeWorkspaceTwilioOpsConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
   getEffectiveWorkspaceTwilioPortalConfig,
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace,
   getWorkspaceTwilioPortalConfig,
   updateWorkspaceTwilioPortalConfig,
 } from "./workspace-twilio-config.server";

@@ -16,6 +16,10 @@ function baseProps(overrides: Record<string, unknown> = {}) {
   return {
     workspace: { id: "w1", name: "W", owner: null, users: null, created_at: "" },
     workspaceNumbers: [{ id: "1", phone_number: "+15550000000" }],
+    senderSelection: {
+      mode: "from_number",
+      messagingServiceReady: false,
+    },
     initialFrom: "+15550000000",
     handleSubmit: vi.fn((e: React.FormEvent) => e.preventDefault()),
     handleImageSelect: vi.fn(),
@@ -30,6 +34,29 @@ function baseProps(overrides: Record<string, unknown> = {}) {
 }
 
 describe("ChatInput From sender selection", () => {
+  test("uses a sender-neutral Messaging Service display and omits From", () => {
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+          establishedFromNumber: "+15559999999",
+          senderSelection: {
+            mode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText(/messaging service — sender selected automatically/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/starts a new thread/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send message/i })).toBeEnabled();
+  });
+
   test("disables Send and explains when no sending numbers are available", () => {
     render(
       <ChatInput
@@ -98,16 +125,66 @@ describe("ChatInput opt-out and send-later", () => {
     expect(screen.getByText(/this contact has opted out/i)).toBeInTheDocument();
   });
 
-  test("reveals a datetime picker when Send later is toggled and keeps Send disabled until a time is set", async () => {
-    const user = userEvent.setup();
+  test("disables Send later with an explanation without Messaging Service", () => {
     render(<ChatInput {...baseProps()} />);
+
+    expect(screen.getByRole("checkbox", { name: /send later/i })).toBeDisabled();
+    expect(
+      screen.getByText(/scheduling requires messaging service/i),
+    ).toBeInTheDocument();
+  });
+
+  test("reveals a bounded datetime picker when Messaging Service scheduling is enabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+          senderSelection: {
+            mode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
     expect(screen.queryByLabelText(/send at/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("checkbox", { name: /send later/i }));
 
     const sendAtInput = screen.getByLabelText(/send at/i);
     expect(sendAtInput).toBeInTheDocument();
+    expect(sendAtInput).toHaveAttribute("min");
+    expect(sendAtInput).toHaveAttribute("max");
     expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
+  });
+
+  test("keeps schedule controls after submit until success is observed", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+          senderSelection: {
+            mode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: /send later/i }));
+    fireEvent.change(screen.getByLabelText(/send at/i), {
+      target: { value: "2026-08-01T12:00" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/type your message/i), {
+      target: { value: "scheduled" },
+    });
+    await user.click(screen.getByRole("button", { name: /send message/i }));
+
+    expect(screen.getByRole("checkbox", { name: /send later/i })).toBeChecked();
+    expect(screen.getByLabelText(/send at/i)).toHaveValue("2026-08-01T12:00");
   });
 });
 

@@ -26,7 +26,12 @@ export default function SelectNumber({
   phoneNumbers,
   callerIdOptional = false,
 }: SelectNumberProps) {
-  if (!phoneNumbers.length) {
+  const configuredCallerId = campaignData.caller_id?.trim() || null;
+  const callerIdAvailable = configuredCallerId
+    ? phoneNumbers.some((number) => number?.phone_number === configuredCallerId)
+    : true;
+
+  if (!phoneNumbers.length && !configuredCallerId) {
     return (
       <Button variant="outline" asChild>
         <NavLink to="../../../settings/numbers/purchase">Get a Number</NavLink>
@@ -52,17 +57,21 @@ export default function SelectNumber({
         <SelectValue placeholder="Select a number" />
       </SelectTrigger>
       <SelectContent>
+        {configuredCallerId && !callerIdAvailable ? (
+          <SelectItem value={configuredCallerId} disabled>
+            {configuredCallerId} — unavailable
+          </SelectItem>
+        ) : null}
         {callerIdOptional ? (
           <SelectItem value={NONE_VALUE}>None (Messaging Service only)</SelectItem>
         ) : null}
-        {phoneNumbers.map((number) => number?.phone_number && (
-          <SelectItem 
-            key={number.phone_number} 
-            value={number.phone_number}
-          >
-            {number.friendly_name || number.phone_number}
-          </SelectItem>
-        ))}
+        {phoneNumbers.map((number) =>
+          number?.phone_number ? (
+            <SelectItem key={number.phone_number} value={number.phone_number}>
+              {number.friendly_name || number.phone_number}
+            </SelectItem>
+          ) : null,
+        )}
       </SelectContent>
     </Select>
   );

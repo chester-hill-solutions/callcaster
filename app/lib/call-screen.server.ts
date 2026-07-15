@@ -13,7 +13,7 @@ import {
   isAssignedToUser,
   isQueued,
 } from "@/lib/queue-status";
-import type { OutreachAttempt, QueueItem } from "@/lib/types";
+import type { Call, OutreachAttempt, QueueItem } from "@/lib/types";
 import { rpcGetAudiencesByCampaign } from "@/lib/db-rpc.server";
 import { logger } from "@/lib/logger.server";
 import { fetchCampaignWithScriptForWorkspace } from "@/lib/campaign-ivr.server";
@@ -129,19 +129,42 @@ export function getNextRecipient(queue: QueueItem[], dialType: string, userId: s
 }
 
 export function getInitialCallsList(attempts: OutreachAttempt[]) {
-  return attempts.flatMap((attempt) => attempt.call);
+  return attempts.flatMap((attempt) =>
+    Array.isArray(attempt.call) ? attempt.call : [attempt.call]
+  );
 }
 
-function getMostRecentAttempt(attempts: OutreachAttempt[]) {
+function getMostRecentAttempt(
+  attempts: OutreachAttempt[],
+  nextRecipient: QueueItem | null,
+): OutreachAttempt | null {
+  if (!nextRecipient) return null;
+
   return [...attempts].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  )[0];
+  ).find((attempt) => attempt.contact_id === nextRecipient.contact_id) ?? null;
 }
 
-export function getInitialRecentCall(attempts: OutreachAttempt[]) {
-  return getMostRecentAttempt(attempts);
+export function getInitialRecentCall(
+  attempts: OutreachAttempt[],
+  nextRecipient: QueueItem | null,
+): Call | null {
+  const recentAttempt = getMostRecentAttempt(attempts, nextRecipient);
+  if (!recentAttempt) return null;
+
+  const calls = Array.isArray(recentAttempt.call)
+    ? recentAttempt.call
+    : [recentAttempt.call];
+  return [...calls].sort((a, b) => {
+    const aDate = a.date_created ?? a.start_time ?? a.date_updated ?? "";
+    const bDate = b.date_created ?? b.start_time ?? b.date_updated ?? "";
+    return new Date(bDate).getTime() - new Date(aDate).getTime();
+  })[0] ?? null;
 }
 
-export function getInitialRecentAttempt(attempts: OutreachAttempt[]) {
-  return getMostRecentAttempt(attempts);
+export function getInitialRecentAttempt(
+  attempts: OutreachAttempt[],
+  nextRecipient: QueueItem | null,
+): OutreachAttempt | null {
+  return getMostRecentAttempt(attempts, nextRecipient);
 }

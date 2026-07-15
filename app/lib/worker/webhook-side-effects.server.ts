@@ -2,10 +2,7 @@ import { Campaign, OutreachAttempt } from "@/lib/types";
 import { cancelQueuedMessagesForCampaign } from "@/lib/database/call-actions.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import {
-  canTransitionOutreachDisposition,
-  shouldUpdateOutreachDisposition,
-} from "@/lib/outreach-disposition";
+import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { markContactLineType } from "@/lib/twilio-lookup.server";
 import {
   isTerminalSmsStatus,
@@ -61,27 +58,6 @@ export async function runCallStatusSideEffects(args: {
       contact_id: currentAttempt.contact_id,
       status: String(underCaseData.call_status ?? ""),
     });
-  }
-
-  const nextDisposition = String(underCaseData.call_status || "").toLowerCase();
-  if (outreachAttemptId != null && workspaceId && nextDisposition) {
-    const currentDisposition = currentAttempt?.disposition ?? null;
-    if (canTransitionOutreachDisposition(currentDisposition, nextDisposition)) {
-      const result = await updateOutreachAttemptForWorkspace(
-        workspaceId,
-        outreachAttemptId,
-        { disposition: nextDisposition },
-      );
-
-      if (result instanceof Response) {
-        throw new Error("Failed to update outreach attempt disposition");
-      }
-    } else {
-      logger.debug("Skipping outreach disposition transition", {
-        currentDisposition,
-        nextDisposition,
-      });
-    }
   }
 
   return { ok: true };

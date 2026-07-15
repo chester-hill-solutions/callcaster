@@ -92,6 +92,7 @@ export {
   normalizeWorkspaceTwilioOpsConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
   getEffectiveWorkspaceTwilioPortalConfig,
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace,
   normalizeWorkspaceTwilioSyncSnapshot,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
   getWorkspaceTwilioPortalConfig,

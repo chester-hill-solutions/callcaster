@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MdImage, MdSend } from "react-icons/md";
 import { AlertTriangle } from "lucide-react";
 import ChatImages from "./ChatImages";
@@ -26,6 +26,10 @@ type Workspace = {
 interface ChatInputProps {
   workspace: NonNullable<Workspace>;
   workspaceNumbers: WorkspaceNumber[];
+  senderSelection: {
+    mode: "from_number" | "messaging_service";
+    messagingServiceReady: boolean;
+  };
   initialFrom: string;
   /** The workspace number this contact has most recently been texting, if any. */
   establishedFromNumber?: string;
@@ -41,20 +45,33 @@ interface ChatInputProps {
 
 /** Twilio requires scheduled sends at least 15 minutes out — mirrors sms-send-resolve.ts. */
 const MIN_SCHEDULE_LEAD_MINUTES = 15;
+const MAX_SCHEDULE_LEAD_DAYS = 35;
+
+function scheduleLocalValue(date: Date): string {
+  date.setSeconds(0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+}
 
 function minScheduleLocalValue(): string {
-  const min = new Date(Date.now() + MIN_SCHEDULE_LEAD_MINUTES * 60 * 1000);
-  min.setSeconds(0, 0);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${min.getFullYear()}-${pad(min.getMonth() + 1)}-${pad(min.getDate())}T${pad(
-    min.getHours(),
-  )}:${pad(min.getMinutes())}`;
+  return scheduleLocalValue(
+    new Date(Date.now() + MIN_SCHEDULE_LEAD_MINUTES * 60 * 1000),
+  );
+}
+
+function maxScheduleLocalValue(): string {
+  return scheduleLocalValue(
+    new Date(Date.now() + MAX_SCHEDULE_LEAD_DAYS * 24 * 60 * 60 * 1000),
+  );
 }
 
 export default function ChatInput({
   initialFrom,
   establishedFromNumber,
   workspaceNumbers,
+  senderSelection,
   handleSubmit,
   handleImageSelect,
   handleImageRemove,
@@ -68,6 +85,8 @@ export default function ChatInput({
   const [selectedFrom, setSelectedFrom] = useState(initialFrom);
   const [sendLater, setSendLater] = useState(false);
   const [sendAtLocal, setSendAtLocal] = useState("");
+  const submittedScheduleRef = useRef(false);
+  const observedSubmissionRef = useRef(false);
   const segmentInfo = useMemo(() => getSmsSegmentInfo(bodyValue), [bodyValue]);
   const hasMedia = selectedImages.filter(Boolean).length > 0;
   const creditEstimate = useMemo(
@@ -76,7 +95,9 @@ export default function ChatInput({
   );
   const optedOut = Boolean(selectedContact?.opt_out);
   const minScheduleValue = useMemo(() => minScheduleLocalValue(), []);
+  const maxScheduleValue = useMemo(() => maxScheduleLocalValue(), []);
   const hasSenderOptions = (workspaceNumbers?.length ?? 0) > 0;
+  const usesMessagingService = senderSelection.mode === "messaging_service";
 
   /**
    * @effect KEEP: align the controlled From selection with available sender
@@ -112,26 +133,42 @@ export default function ChatInput({
   }, [establishedFromNumber, workspaceNumbers]);
 
   const isFromMismatched = useMemo(() => {
+    if (usesMessagingService) return false;
     if (!establishedFromNumber || !selectedFrom) return false;
     return (
       getConversationPhoneKey(selectedFrom) !==
       getConversationPhoneKey(establishedFromNumber)
     );
-  }, [establishedFromNumber, selectedFrom]);
+  }, [establishedFromNumber, selectedFrom, usesMessagingService]);
 
   const isSendDisabled =
     messageFetcher.state !== "idle" ||
     optedOut ||
-    !selectedFrom ||
-    !hasSenderOptions ||
+    (!usesMessagingService && (!selectedFrom || !hasSenderOptions)) ||
     !(selectedContact || (phoneNumber && isValid)) ||
     (sendLater && !sendAtLocal);
 
+  useEffect(() => {
+    if (!submittedScheduleRef.current) return;
+    if (messageFetcher.state !== "idle") {
+      observedSubmissionRef.current = true;
+      return;
+    }
+    if (!observedSubmissionRef.current) return;
+
+    const data = messageFetcher.data as { error?: string } | undefined;
+    if (!data?.error) {
+      setSendLater(false);
+      setSendAtLocal("");
+    }
+    submittedScheduleRef.current = false;
+    observedSubmissionRef.current = false;
+  }, [messageFetcher.data, messageFetcher.state]);
+
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    submittedScheduleRef.current = sendLater;
     handleSubmit(e);
     setBodyValue("");
-    setSendLater(false);
-    setSendAtLocal("");
   };
 
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -148,31 +185,37 @@ export default function ChatInput({
         className="flex flex-col space-y-2"
         onSubmit={handleFormSubmit}
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label htmlFor="from" className="text-sm font-medium sm:w-[50px]">
-            From:
-          </label>
-          <select
-            name="from"
-            id="from"
-            value={selectedFrom}
-            onChange={(e) => setSelectedFrom(e.target.value)}
-            disabled={!hasSenderOptions}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {!hasSenderOptions && (
-              <option value="" disabled>
-                No sending numbers available
-              </option>
-            )}
-            {workspaceNumbers?.map((num) => (
-              <option key={num.id} value={num.phone_number}>
-                {num.friendly_name || num.phone_number}
-              </option>
-            ))}
-          </select>
-        </div>
-        {!hasSenderOptions && (
+        {usesMessagingService ? (
+          <div className="rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            Messaging Service — sender selected automatically
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label htmlFor="from" className="text-sm font-medium sm:w-[50px]">
+              From:
+            </label>
+            <select
+              name="from"
+              id="from"
+              value={selectedFrom}
+              onChange={(e) => setSelectedFrom(e.target.value)}
+              disabled={!hasSenderOptions}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {!hasSenderOptions && (
+                <option value="" disabled>
+                  No sending numbers available
+                </option>
+              )}
+              {workspaceNumbers?.map((num) => (
+                <option key={num.id} value={num.phone_number}>
+                  {num.friendly_name || num.phone_number}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {!usesMessagingService && !hasSenderOptions && (
           <div
             role="status"
             className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
@@ -210,6 +253,7 @@ export default function ChatInput({
             <input
               type="checkbox"
               checked={sendLater}
+              disabled={!senderSelection.messagingServiceReady}
               onChange={(e) => {
                 setSendLater(e.target.checked);
                 if (!e.target.checked) setSendAtLocal("");
@@ -218,11 +262,15 @@ export default function ChatInput({
             />
             Send later
           </label>
+          {!senderSelection.messagingServiceReady && (
+            <span>Scheduling requires Messaging Service</span>
+          )}
           {sendLater && (
             <input
               type="datetime-local"
               value={sendAtLocal}
               min={minScheduleValue}
+              max={maxScheduleValue}
               required
               onChange={(e) => setSendAtLocal(e.target.value)}
               className="rounded border border-input bg-background px-2 py-1 text-xs text-foreground"

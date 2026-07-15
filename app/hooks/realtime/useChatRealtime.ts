@@ -126,12 +126,14 @@ export const useChatRealTime = ({
           return curr;
         }
         messageIdsRef.current.add(newMessage.sid);
-        // Replace pending message with same body/from/to if present
+        // Messaging Service optimistic messages have no fabricated From value,
+        // so reconcile those by body/to while retaining From matching for
+        // phone-number sends.
         const withoutMatchingPending = curr.filter((m) => {
           if (!m?.sid?.startsWith?.("pending-")) return true;
           return !(
             m.body === newMessage.body &&
-            phoneNumbersMatch(m.from, newMessage.from) &&
+            (!m.from || phoneNumbersMatch(m.from, newMessage.from)) &&
             phoneNumbersMatch(m.to, newMessage.to)
           );
         });
@@ -149,7 +151,7 @@ export const useChatRealTime = ({
   const addOptimisticMessage = useCallback(
     (params: {
       body: string;
-      from: string;
+      from?: string;
       to: string;
       media?: string;
       sid?: string;
@@ -158,7 +160,7 @@ export const useChatRealTime = ({
       const pending = {
         sid: params.sid ?? `pending-${Date.now()}`,
         body: params.body,
-        from: params.from,
+        from: params.from ?? null,
         to: params.to,
         workspace,
         direction: "outbound",

@@ -23,14 +23,18 @@ function callStatusSideEffectsIdempotencyKey(
 
 export const action = defineAction({
   auth: async ({ request }: ActionFunctionArgs): Promise<CallStatusAuth | Response> => {
-    const formData = await request.formData();
+    // Clone before reading — Bun yields empty params on re-read after consume.
+    const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const callSidRaw = params.CallSid ?? params.call_sid;
     if (!callSidRaw) {
       return { params, callSid: null };
     }
 
-    const forbidden = await requireTwilioSignature(request, { callSid: callSidRaw });
+    const forbidden = await requireTwilioSignature(request, {
+      callSid: callSidRaw,
+      params,
+    });
     if (forbidden) return forbidden;
 
     return { params, callSid: callSidRaw };

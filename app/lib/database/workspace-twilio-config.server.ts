@@ -310,6 +310,18 @@ export async function getWorkspaceTwilioPortalConfig({
   );
 }
 
+export async function getEffectiveWorkspaceTwilioPortalConfigForWorkspace({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) {
+  const twilioData = await loadWorkspaceTwilioData(workspaceId);
+
+  return getEffectiveWorkspaceTwilioPortalConfig(
+    twilioData as TwilioAccountData,
+  );
+}
+
 export async function updateWorkspaceTwilioPortalConfig({
   workspaceId,
   updates,

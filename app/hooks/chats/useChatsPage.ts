@@ -50,6 +50,7 @@ export function useChatsPage() {
     campaigns,
     workspaceNumbers,
     optOutKeywords,
+    senderSelection,
   } = useLoaderData<ChatsLoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
   const hideStopConversations = searchParams.get("hide_stop") === "1";
@@ -67,7 +68,7 @@ export function useChatsPage() {
   const chatActionsRef = useRef<{
     addOptimisticMessage?: (p: {
       body: string;
-      from: string;
+      from?: string;
       to: string;
       media?: string;
       sid?: string;
@@ -332,9 +333,11 @@ export function useChatsPage() {
       formData.append("media", JSON.stringify(selectedImages));
       const body = (formData.get("body") as string) || "";
       const from =
-        (formData.get("from") as string) ||
-        workspaceNumbers?.[0]?.phone_number ||
-        "";
+        senderSelection.mode === "messaging_service"
+          ? undefined
+          : (formData.get("from") as string) ||
+            workspaceNumbers?.[0]?.phone_number ||
+            "";
       const media = formData.get("media") as string | undefined;
       const pendingSid = `pending-${Date.now()}`;
       pendingOptimisticMessageRef.current = { sid: pendingSid, body };
@@ -360,6 +363,7 @@ export function useChatsPage() {
       messageFetcher,
       selectedImages,
       setSelectedImages,
+      senderSelection.mode,
       workspaceNumbers,
     ],
   );
@@ -521,6 +525,7 @@ export function useChatsPage() {
   return {
     workspace,
     workspaceNumbers,
+    senderSelection,
     registerChatActions,
     outlet,
     contact,
