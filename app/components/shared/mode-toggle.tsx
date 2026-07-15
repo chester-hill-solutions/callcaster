@@ -38,6 +38,15 @@ export function ModeToggle() {
   const { resolvedTheme, setTheme, theme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  /**
+   * @effect Flag that we are past hydration so the resolved-theme icon can render.
+   * @effect-deps none (mount only)
+   * @effect-side-effects none (local setState)
+   * @effect-why-not-loader The theme comes from localStorage/`prefers-color-scheme`,
+   *   which the server cannot know. Rendering the resolved icon on the first pass
+   *   would mismatch the server HTML, so the neutral SunMoon icon renders until
+   *   mount. This is client-only state, not request data.
+   */
   useEffect(() => {
     setMounted(true);
   }, []);
