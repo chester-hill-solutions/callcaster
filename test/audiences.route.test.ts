@@ -53,6 +53,10 @@ const loggerMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/logger.server", () => ({ logger: loggerMock }));
 
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
+
 function makeQuery(result: any) {
   const q: any = {
     or: vi.fn(() => q),
@@ -75,7 +79,7 @@ describe("api.audiences route", () => {
       ...values,
     }));
     const parseActionRequest = vi.fn();
-    const verifyAuth = vi.fn(async () => ({ headers: new Headers() }));
+    const verifyAuth = vi.fn(async () => ({ headers: new Headers(), user: { id: "u1" } }));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
     parseActionRequest.mockResolvedValueOnce({ name: "x" });
@@ -119,7 +123,7 @@ describe("api.audiences route", () => {
     contactAudienceMocks.deleteAudienceById.mockReset();
     const mod = await import("../app/routes/api+/audiences");
     const parseActionRequest = vi.fn();
-    const verifyAuth = vi.fn(async () => ({ headers: new Headers() }));
+    const verifyAuth = vi.fn(async () => ({ headers: new Headers(), user: { id: "u1" } }));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
     parseActionRequest.mockResolvedValueOnce({});
@@ -304,5 +308,29 @@ describe("api.audiences route", () => {
     expect(resErr.status).toBe(500);
     await expect(resErr.json()).resolves.toMatchObject({ error: "q" });
   }, 30000);
+
+  test("API keys cannot access audiences outside their workspace", async () => {
+    contactAudienceMocks.findAudienceWorkspaceById.mockResolvedValue("w1");
+    const mod = await import("../app/routes/api+/audiences");
+    const verifyAuth = vi.fn(async () => ({
+      auth: { authType: "api_key", workspaceId: "w2" },
+      headers: new Headers(),
+    }));
+    const parseActionRequest = vi.fn(async () => ({ id: "1" }));
+    const requireWorkspaceAccess = vi.fn(async () => undefined);
+
+    const loaderRes = await asRouteResponse(mod.loader({
+      request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
+      deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
+    } as any));
+    expect(loaderRes.status).toBe(403);
+
+    const actionRes = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
+      deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
+    } as any));
+    expect(actionRes.status).toBe(403);
+    expect(requireWorkspaceAccess).not.toHaveBeenCalled();
+  });
 });
 

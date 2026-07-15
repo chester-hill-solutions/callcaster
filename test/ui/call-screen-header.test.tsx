@@ -213,7 +213,7 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
     expect(screen.getByText("Unmute Microphone")).toBeInTheDocument();
   });
 
-  test("add-number dialog and PIN overlay wiring", async () => {
+  test("add-number dialog and call-in instructions wiring", async () => {
     const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
     const onAddNumberCancel = vi.fn();
     const onVerifyNewNumber = vi.fn();

@@ -12,6 +12,7 @@ export declare const callcasterWireBlockSchema: z.ZodObject<{
     required: z.ZodOptional<z.ZodBoolean>;
     options: z.ZodOptional<z.ZodArray<z.ZodUnknown>>;
     routingRules: z.ZodOptional<z.ZodArray<z.ZodUnknown>>;
+    speechType: z.ZodOptional<z.ZodString>;
     audioFile: z.ZodOptional<z.ZodString>;
 }, z.core.$loose>;
 export declare function migrateFromCallcasterFlow(flow: unknown): ScriptDocument;

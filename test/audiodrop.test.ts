@@ -24,10 +24,16 @@ vi.mock("@/lib/sms-campaign-db.server", () => ({
     telephonyMocks.loadCampaignVoicedropAudio(...args),
 }));
 
-vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/database/workspace.server")>();
-  return { ...actual, createWorkspaceTwilioInstance: vi.fn() };
+vi.mock("@/lib/twilio-twiml.server", () => ({
+  playTwiml: (url: string) =>
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Play>${url}</Play></Response>`,
+}));
+
+vi.mock("@/lib/database/workspace.server", () => {
+  return {
+    createWorkspaceTwilioInstance: vi.fn(),
+    requireWorkspaceAccess: vi.fn(async () => undefined),
+  };
 });
 
 describe("api.audiodrop action", () => {
@@ -155,6 +161,7 @@ describe("api.audiodrop action", () => {
     setJsonAuthSession({ user: { id: "u1" } });
     vi.doMock("@/lib/database/workspace.server", () => ({
       createWorkspaceTwilioInstance,
+      requireWorkspaceAccess: vi.fn(async () => undefined),
     }));
 
     const mod = await import("../app/routes/api+/audiodrop");

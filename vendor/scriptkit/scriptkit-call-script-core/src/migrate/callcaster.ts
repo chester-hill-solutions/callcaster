@@ -29,6 +29,7 @@ export const callcasterWireBlockSchema = z
     required: z.boolean().optional(),
     options: z.array(z.unknown()).optional(),
     routingRules: z.array(z.unknown()).optional(),
+    speechType: z.string().optional(),
     /** Recorded-audio reference. Must survive a migrate -> serialize round-trip. */
     audioFile: z.string().optional(),
   })
@@ -42,7 +43,9 @@ function resolveCallcasterBlockType(raw: z.infer<typeof callcasterWireBlockSchem
 function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): ScriptBlock {
   const parsed = callcasterWireBlockSchema.parse(raw);
   const mapped = resolveCallcasterBlockType(parsed);
-  const prompt = String(parsed.prompt ?? parsed.label ?? parsed.title ?? "");
+  const prompt = String(
+    parsed.prompt ?? parsed.content ?? parsed.label ?? parsed.title ?? "",
+  );
   const options = Array.isArray(parsed.options)
     ? parsed.options.map((opt) => {
         if (typeof opt === "string") {
@@ -72,9 +75,19 @@ function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): Scr
   const base = {
     id,
     label: typeof parsed.label === "string" ? parsed.label : undefined,
+    title: typeof parsed.title === "string" ? parsed.title : undefined,
+    content: typeof parsed.content === "string" ? parsed.content : undefined,
     prompt,
     required: Boolean(parsed.required),
     audioFile: typeof parsed.audioFile === "string" ? parsed.audioFile : undefined,
+    callcasterType:
+      typeof parsed.type === "string"
+        ? parsed.type
+        : typeof parsed.blockType === "string"
+          ? parsed.blockType
+          : undefined,
+    speechType:
+      typeof parsed.speechType === "string" ? parsed.speechType : undefined,
     routingRules: Array.isArray(parsed.routingRules)
       ? parsed.routingRules.map((rule) => {
           const r = rule as Record<string, unknown>;
@@ -102,7 +115,12 @@ function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): Scr
       return { ...base, type: "checkbox", options, prompt };
     case "textarea":
     default:
-      return { ...base, type: "textarea", prompt };
+      return {
+        ...base,
+        type: "textarea",
+        prompt,
+        ...(options.length > 0 ? { options } : {}),
+      };
   }
 }
 
@@ -147,12 +165,17 @@ export function serializeToCallcasterFlow(doc: ScriptDocument): CallcasterFlow {
   for (const block of Object.values(doc.blocks)) {
     const wire: Record<string, unknown> = {
       id: block.id,
-      type: block.type === "instruction" ? "instruction" : block.type,
+      type:
+        block.callcasterType ??
+        (block.type === "instruction" ? "instruction" : block.type),
       prompt: "prompt" in block ? block.prompt : undefined,
       label: block.label,
+      title: block.title,
+      content: block.content,
       required: block.required,
       routingRules: block.routingRules,
       audioFile: block.audioFile,
+      speechType: block.speechType,
     };
 
     if (block.type === "instruction") {

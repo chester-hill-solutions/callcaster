@@ -8,15 +8,15 @@ const routeAuthMocks = vi.hoisted(() => ({
   resolveJsonAuthSession: vi.fn(),
 }));
 
-vi.mock("@/lib/api-auth.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api-auth.server")>();
+vi.mock("@/lib/api-auth.server", () => {
   return {
-    ...actual,
     requireDualAuth: routeAuthMocks.requireDualAuth,
     requireJsonAuth: routeAuthMocks.requireJsonAuth,
     requireSudo: routeAuthMocks.requireSudo,
     resolveDualAuthSession: routeAuthMocks.resolveDualAuthSession,
     resolveJsonAuthSession: routeAuthMocks.resolveJsonAuthSession,
+    getDualAuthUser: (auth: { authType?: string; user?: { id: string; email?: string } }) =>
+      auth?.authType === "api_key" ? null : auth?.user ?? null,
   };
 });
 

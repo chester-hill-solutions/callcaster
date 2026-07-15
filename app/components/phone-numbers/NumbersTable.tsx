@@ -455,44 +455,62 @@ const IncomingActivitySelect = ({
   verifiedNumbers: WorkspaceNumbers[];
   onChange: (id: number, value: string) => void;
 }) => {
+  const forwardingDisabledReasonId = `forwarding-disabled-reason-${number?.id ?? "unknown"}`;
+  const forwardingUnavailable =
+    Boolean(number) && number?.type !== "caller_id" && verifiedNumbers.length === 0;
+
   return (
     number && (
-      <select
-        className="w-full rounded border p-2"
-        disabled={number.type === "caller_id"}
-        defaultValue={number.inbound_action || ""}
-        onChange={(e) => onChange(number.id, e.target.value)}
-      >
-        {number.type === "caller_id" ? (
-          <option>Outbound Only</option>
-        ) : (
-          <>
-            <option value="">Select how to handle incoming calls</option>
-            <option value="webhook_only">Webhook Only</option>
-            {members.map(
-              (member: MemberOption) =>
-                member && (
-                  <option key={member.id} value={member.username}>
-                    Email to Workspace Member{" "}
-                    {member.username && `- ${member.username}`}
+      <div className="space-y-1">
+        <select
+          className="w-full rounded border p-2"
+          disabled={number.type === "caller_id"}
+          defaultValue={number.inbound_action || ""}
+          onChange={(e) => onChange(number.id, e.target.value)}
+          aria-describedby={
+            forwardingUnavailable ? forwardingDisabledReasonId : undefined
+          }
+        >
+          {number.type === "caller_id" ? (
+            <option>Outbound Only</option>
+          ) : (
+            <>
+              <option value="">Select how to handle incoming calls</option>
+              <option value="webhook_only">Webhook Only</option>
+              {members.map(
+                (member: MemberOption) =>
+                  member && (
+                    <option key={member.id} value={member.username}>
+                      Email to Workspace Member{" "}
+                      {member.username && `- ${member.username}`}
+                    </option>
+                  ),
+              )}
+              {!verifiedNumbers.length && (
+                <option disabled>Forward to your verified number</option>
+              )}
+              {verifiedNumbers.length > 0 &&
+                verifiedNumbers.map((verifiedNumber) => (
+                  <option
+                    key={verifiedNumber?.id}
+                    value={`${verifiedNumber?.phone_number}`}
+                  >
+                    Forward to {verifiedNumber?.friendly_name}
                   </option>
-                ),
-            )}
-            {!verifiedNumbers.length && (
-              <option disabled>Forward to your verified number</option>
-            )}
-            {verifiedNumbers.length > 0 &&
-              verifiedNumbers.map((verifiedNumber) => (
-                <option
-                  key={verifiedNumber?.id}
-                  value={`${verifiedNumber?.phone_number}`}
-                >
-                  Forward to {verifiedNumber?.friendly_name}
-                </option>
-              ))}
-          </>
-        )}
-      </select>
+                ))}
+            </>
+          )}
+        </select>
+        {forwardingUnavailable ? (
+          <p
+            id={forwardingDisabledReasonId}
+            className="text-xs text-muted-foreground"
+            role="status"
+          >
+            Verify a caller ID before enabling call forwarding.
+          </p>
+        ) : null}
+      </div>
     )
   );
 };

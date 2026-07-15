@@ -291,6 +291,11 @@ export default function WebhookEditor({
           onTestEvent={handleTestOption}
           testBusy={isBusy}
           canTest={Boolean(destinationUrl)}
+          testDisabledReason={
+            destinationUrl
+              ? undefined
+              : "Enter a destination URL to test this webhook."
+          }
         />
         {eventsError ? (
           <p className="text-sm text-destructive" role="alert">

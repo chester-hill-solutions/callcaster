@@ -1,12 +1,18 @@
 export { loader } from "./$id.loader.server";
 export { middleware } from "./$id.middleware.server";
 
-import { useLoaderData, Outlet, useOutlet, useOutletContext } from "react-router";
+import {
+  useLoaderData,
+  Outlet,
+  useOutlet,
+  useOutletContext,
+  useRevalidator,
+} from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
-import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
 import {
   Campaign,
@@ -60,45 +66,22 @@ function WorkspaceResolvedView({
   const phoneNumbers = (
     (resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>
   ).filter(Boolean);
-  const { data: workspaceData } = useRealtimeData(
-    null,
-    workspace.id,
-    "workspace",
-    workspace ? [workspace] : [],
-  );
-  const { data: campaignsData } = useRealtimeData(
-    null,
-    workspace.id,
-    "campaign",
-    campaigns,
-  );
-  const { data: phoneNumbersData } = useRealtimeData(
-    null,
-    workspace.id,
-    "workspace_numbers",
-    phoneNumbers,
-  );
-  const { data: audiencesData } = useRealtimeData(
-    null,
-    workspace.id,
-    "audience",
-    audiences,
-  );
+  const revalidator = useRevalidator();
 
-  const liveCredits = workspaceData?.[0]?.credits ?? workspace.credits;
+  useWorkspaceEventSubscription({
+    workspaceId: workspace.id,
+    table: "campaign",
+    onChange: () => revalidator.revalidate(),
+  });
+
+  const liveCredits = workspace.credits;
   const canManageBilling = userRole === "admin" || userRole === "owner";
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
       <WorkspaceNav
-        workspace={
-          workspaceData?.[0] ?? {
-            id: workspace.id,
-            name: workspace.name,
-            credits: workspace.credits,
-          }
-        }
-        campaigns={(campaignsData as Campaign[] | undefined) ?? []}
+        workspace={workspace}
+        campaigns={campaigns as Campaign[]}
         userRole={
           (userRole as MemberRole | null | undefined) ?? MemberRole.Member
         }
@@ -155,16 +138,16 @@ function WorkspaceResolvedView({
               ) : null}
               <CampaignEmptyState
                 hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
-                type={(phoneNumbersData?.length ?? 0) > 0 ? "campaign" : "number"}
+                type={phoneNumbers.length > 0 ? "campaign" : "number"}
               />
             </div>
           ) : (
             <Outlet
               context={{
-                workspace: workspaceData?.[0],
-                audiences: audiencesData,
-                campaigns: campaignsData,
-                phoneNumbers: phoneNumbersData,
+                workspace,
+                audiences,
+                campaigns,
+                phoneNumbers,
                 userRole,
                 ...context,
               }}

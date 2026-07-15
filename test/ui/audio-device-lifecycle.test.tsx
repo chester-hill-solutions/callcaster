@@ -2,6 +2,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
 import { useSoftphoneAudioDevices } from "@/hooks/call/useSoftphoneAudioDevices";
+import {
+  getUsableAudioDevices,
+  reconcileAudioDeviceId,
+} from "@/hooks/call/audio-device-selection";
 
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -51,6 +55,16 @@ describe("audio device lifecycle", () => {
       close = vi.fn();
     }
     vi.stubGlobal("AudioContext", MockAudioContext);
+  });
+
+  test("does not turn an anonymous device into a synthetic default", () => {
+    const usable = getUsableAudioDevices(
+      [audioDevice("audioinput", "", "")],
+      "audioinput",
+    );
+
+    expect(usable).toEqual([]);
+    expect(reconcileAudioDeviceId(usable, null)).toBeNull();
   });
 
   test("softphone falls back after unplug and preserves microphone mute", async () => {

@@ -40,6 +40,7 @@ jobs:
       - run: npm run tools:api:surface:check
       - run: npm run check:route-server-leaks
       - run: npm run check:twilio-webhooks
+      - run: npm run check:request-body-consumption
       - run: npm run check:middleware
       - run: npm run check:credit-writes
       - run: npm run check:effects

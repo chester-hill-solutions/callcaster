@@ -13,6 +13,7 @@ export {
 export type {
   ScriptDocument,
   ScriptBlock,
+  ScriptOption,
   ScriptPage,
   CallcasterFlow,
   QuickCanvassBlock,

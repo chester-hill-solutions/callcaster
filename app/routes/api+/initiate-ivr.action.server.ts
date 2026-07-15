@@ -13,16 +13,19 @@ import { normalizePhoneNumber } from "@/lib/utils";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const auth = await requireJsonAuth(request);
+  if (auth instanceof Response) return auth;
+  const user = auth.user;
+
   const parsed = initiateIvrBodySchema.safeParse(await safeParseJson(request));
   if (!parsed.success) {
     return { error: "Invalid initiate IVR payload" };
   }
 
   const { campaign_id, user_id, workspace_id } = parsed.data;
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;  const user = auth.user;
 
-  await requireWorkspaceAccess({ user,
+  await requireWorkspaceAccess({
+    user,
     workspaceId: workspace_id,
   });
 
