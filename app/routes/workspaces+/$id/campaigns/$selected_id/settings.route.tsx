@@ -421,8 +421,8 @@ export default function CampaignSettingsRoute() {
           <DialogHeader>
             <DialogTitle>Change campaign type?</DialogTitle>
             <DialogDescription>
-              Changing the campaign type updates which setup fields are required and may clear
-              channel-specific content that does not apply to the new flow.
+              Changing the campaign type updates which setup fields are required. Existing
+              channel-specific content is preserved if you switch back.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">

@@ -31,14 +31,14 @@ export interface CampaignData {
   workspace: string;
   title: string;
   type: CampaignType;
-  script_id?: number;
+  script_id?: number | null;
   audiences?: Array<{ audience_id: string; campaign_id: string }>;
   [key: string]: unknown;
 }
 
 export interface CampaignDetails {
   campaign_id: string;
-  script_id?: string;
+  script_id?: string | null;
   [key: string]: unknown;
 }
 
@@ -88,8 +88,18 @@ function buildUnifiedCampaignFields(
   campaignData: CampaignData,
   campaignDetails: CampaignDetails,
 ): Record<string, unknown> {
+  const scriptId =
+    campaignData.script_id !== undefined
+      ? campaignData.script_id
+      : campaignDetails.script_id;
+
   return cleanObject({
-    script_id: campaignData.script_id ? Number(campaignData.script_id) : undefined,
+    script_id:
+      scriptId === null || scriptId === ""
+        ? null
+        : scriptId === undefined
+          ? undefined
+          : Number(scriptId),
     body_text: campaignData.body_text ?? campaignDetails.body_text ?? "",
     message_media: campaignData.message_media ?? campaignDetails.message_media ?? [],
     voicedrop_audio: campaignData.voicedrop_audio ?? campaignDetails.voicedrop_audio ?? null,
@@ -162,7 +172,10 @@ export async function updateCampaign({
   if (!id) throw new Error("Campaign ID is required");
   if (!workspace) throw new Error("Workspace is required");
 
-  campaignDetails.script_id = campaignData.script_id?.toString() || undefined;
+  campaignDetails.script_id =
+    campaignData.script_id === null
+      ? null
+      : campaignData.script_id?.toString() ?? campaignDetails.script_id;
   campaignDetails.body_text = campaignData.body_text || "";
   campaignDetails.message_media = campaignData.message_media || [];
   campaignDetails.voicedrop_audio = campaignData.voicedrop_audio || null;

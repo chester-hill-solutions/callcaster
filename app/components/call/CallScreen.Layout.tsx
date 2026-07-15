@@ -97,6 +97,8 @@ export function CallScreenLayout({
     stream,
     availableMicrophones,
     availableSpeakers,
+    selectedMicrophone,
+    selectedSpeaker,
     handleMicrophoneChange,
     handleSpeakerChange,
     handleMuteMicrophone,
@@ -113,7 +115,7 @@ export function CallScreenLayout({
     newPhoneNumber,
     setNewPhoneNumber,
     handleVerifyNewNumber,
-    pin,
+    verificationPhoneNumber,
   } = phoneVerification;
 
   return (
@@ -157,6 +159,8 @@ export function CallScreenLayout({
           mediaStream={stream}
           availableMicrophones={availableMicrophones}
           availableSpeakers={availableSpeakers}
+          selectedMicrophone={selectedMicrophone}
+          selectedSpeaker={selectedSpeaker}
           handleMicrophoneChange={handleMicrophoneChange}
           handleSpeakerChange={handleSpeakerChange}
           handleMuteMicrophone={handleMuteMicrophone}
@@ -174,7 +178,7 @@ export function CallScreenLayout({
           newPhoneNumber={newPhoneNumber}
           onNewPhoneNumberChange={setNewPhoneNumber}
           onVerifyNewNumber={handleVerifyNewNumber}
-          pin={pin || ""}
+          verificationPhoneNumber={verificationPhoneNumber}
         />
         <div className="shrink-0 self-center lg:self-start">
           <PhoneKeypad

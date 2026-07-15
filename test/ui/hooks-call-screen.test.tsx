@@ -40,7 +40,14 @@ vi.mock("@/lib/services/hooks-api", () => ({
 
 const fetcher = createMockFetcher({ submit: vi.fn() });
 const queueFetcher = createMockFetcher({ submit: vi.fn() });
-const verifyFetcher = createMockFetcher({ load: vi.fn(), data: { pin: "1234" } });
+const verifyFetcher = createMockFetcher({
+  load: vi.fn(),
+  data: {
+    success: true,
+    verificationId: "verification-1",
+    phoneNumber: "+15550009999",
+  },
+});
 const revalidate = vi.fn();
 
 const queueItem = {
@@ -117,7 +124,14 @@ describe("useCallScreen", () => {
 
     Object.assign(fetcher, { submit: vi.fn(), state: "idle", data: undefined });
     Object.assign(queueFetcher, { submit: vi.fn(), state: "idle" });
-    Object.assign(verifyFetcher, { load: vi.fn(), data: { pin: "1234" } });
+    Object.assign(verifyFetcher, {
+      load: vi.fn(),
+      data: {
+        success: true,
+        verificationId: "verification-1",
+        phoneNumber: "+15550009999",
+      },
+    });
 
     const stream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream;
     Object.defineProperty(navigator, "mediaDevices", {

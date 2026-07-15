@@ -124,9 +124,9 @@ export function useCallAudioControls({
 
   useEffect(() => {
     void refreshDevices();
-    navigator.mediaDevices?.addEventListener("devicechange", refreshDevices);
+    navigator.mediaDevices?.addEventListener?.("devicechange", refreshDevices);
     return () => {
-      navigator.mediaDevices?.removeEventListener("devicechange", refreshDevices);
+      navigator.mediaDevices?.removeEventListener?.("devicechange", refreshDevices);
     };
   }, [refreshDevices]);
 

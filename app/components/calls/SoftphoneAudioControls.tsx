@@ -4,8 +4,6 @@ import {
   Pause,
   PhoneOff,
   Play,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,20 +15,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Keypad } from "@/components/calls/Keypad";
+import { AUDIO_DEVICE_UNAVAILABLE_VALUE } from "@/hooks/call/audio-device-selection";
 
 type SoftphoneAudioControlsProps = {
   idPrefix: string;
   microphones: MediaDeviceInfo[];
   speakers: MediaDeviceInfo[];
-  selectedMicId: string;
-  selectedSpeakerId: string;
+  selectedMicId: string | null;
+  selectedSpeakerId: string | null;
   micMuted: boolean;
-  speakerMuted: boolean;
   callOnHold: boolean;
   onMicChange: (deviceId: string) => void;
   onSpeakerChange: (deviceId: string) => void;
   onMuteMic: () => void;
-  onMuteSpeaker: () => void;
   onHold: () => void;
   onResume: () => void;
   onHangUp: () => void;
@@ -44,12 +41,10 @@ export function SoftphoneAudioControls({
   selectedMicId,
   selectedSpeakerId,
   micMuted,
-  speakerMuted,
   callOnHold,
   onMicChange,
   onSpeakerChange,
   onMuteMic,
-  onMuteSpeaker,
   onHold,
   onResume,
   onHangUp,
@@ -70,7 +65,7 @@ export function SoftphoneAudioControls({
               Microphone
             </label>
             <Select
-              value={selectedMicId || undefined}
+              value={selectedMicId ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
               onValueChange={onMicChange}
             >
               <SelectTrigger id={`${idPrefix}-mic-select`} className="w-full">
@@ -78,16 +73,13 @@ export function SoftphoneAudioControls({
               </SelectTrigger>
               <SelectContent>
                 {microphones.map((d) => (
-                  <SelectItem
-                    key={d.deviceId}
-                    value={d.deviceId || "default"}
-                  >
+                  <SelectItem key={d.deviceId} value={d.deviceId}>
                     {d.label || `Microphone ${d.deviceId.slice(0, 8)}`}
                   </SelectItem>
                 ))}
                 {microphones.length === 0 && (
-                  <SelectItem value="none" disabled>
-                    No microphones
+                  <SelectItem value={AUDIO_DEVICE_UNAVAILABLE_VALUE} disabled>
+                    Microphone unavailable
                   </SelectItem>
                 )}
               </SelectContent>
@@ -111,7 +103,7 @@ export function SoftphoneAudioControls({
               Speaker
             </label>
             <Select
-              value={selectedSpeakerId || undefined}
+              value={selectedSpeakerId ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
               onValueChange={onSpeakerChange}
             >
               <SelectTrigger
@@ -122,30 +114,17 @@ export function SoftphoneAudioControls({
               </SelectTrigger>
               <SelectContent>
                 {speakers.map((d) => (
-                  <SelectItem
-                    key={d.deviceId}
-                    value={d.deviceId || "default"}
-                  >
+                  <SelectItem key={d.deviceId} value={d.deviceId}>
                     {d.label || `Speaker ${d.deviceId.slice(0, 8)}`}
                   </SelectItem>
                 ))}
                 {speakers.length === 0 && (
-                  <SelectItem value="none" disabled>
-                    No speakers
+                  <SelectItem value={AUDIO_DEVICE_UNAVAILABLE_VALUE} disabled>
+                    Speaker unavailable
                   </SelectItem>
                 )}
               </SelectContent>
             </Select>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className={`w-full gap-1 ${speakerMuted ? "bg-red-100 text-red-600 dark:bg-red-900/30" : ""}`}
-              onClick={onMuteSpeaker}
-            >
-              {speakerMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-              {speakerMuted ? "Unmute speaker" : "Mute speaker"}
-            </Button>
           </div>
         </div>
       </div>

@@ -750,7 +750,6 @@ export interface BaseCall {
 export interface ActiveCall extends Call {
   parameters: CallParameters;
   mute: (state: boolean) => void;
-  _setInputTracksFromStream: (stream: MediaStream) => Promise<void>;
   sendDigits: (digits: string) => void;
 }
 

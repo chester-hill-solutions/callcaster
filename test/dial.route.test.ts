@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceMessagingOnboardingState: vi.fn(),
+    getUserVerifiedAudioNumbers: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
     env: { BASE_URL: () => "https://base.example" },
   };
@@ -45,6 +46,10 @@ vi.mock("../app/lib/request-utils.server", () => ({
 }));
 vi.mock("../app/lib/messaging-onboarding.server", () => ({
   getWorkspaceMessagingOnboardingState: (...args: any[]) => mocks.getWorkspaceMessagingOnboardingState(...args),
+}));
+vi.mock("@/lib/user-audio.server", () => ({
+  getUserVerifiedAudioNumbers: (...args: unknown[]) =>
+    mocks.getUserVerifiedAudioNumbers(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -92,6 +97,8 @@ describe("app/routes/api+/dial/tsx.route", () => {
     mocks.requireWorkspaceAccess.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.getWorkspaceMessagingOnboardingState.mockReset();
+    mocks.getUserVerifiedAudioNumbers.mockReset();
+    mocks.getUserVerifiedAudioNumbers.mockResolvedValue(["+15550001111"]);
     mocks.logger.error.mockReset();
     autoDialState.createOutreachAttempt.mockReset();
     autoDialState.createOutreachAttempt.mockResolvedValue(77);
@@ -202,6 +209,31 @@ describe("app/routes/api+/dial/tsx.route", () => {
       "w1",
       "u1",
     );
+  });
+
+  test("rejects an unverified selected device before calling Twilio", async () => {
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      to_number: "+15555550100",
+      user_id: "u1",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      caller_id: "+1555",
+      selected_device: "+15559999999",
+    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.getUserVerifiedAudioNumbers.mockResolvedValueOnce(["+15550001111"]);
+
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(
+      mod.action({
+        request: new Request("http://localhost/api/dial", { method: "POST" }),
+      } as any),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
   });
 
   test("invalid phone number throws before calling Twilio", async () => {
