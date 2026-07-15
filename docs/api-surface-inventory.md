@@ -101,8 +101,7 @@ Interactive specs:
 | `/api/auth/invites` | GET, POST | User API | sessionOnly | yes | `routes/api+/auth/invites.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/me` | GET, PATCH | User API | sessionOnly | yes | `routes/api+/me.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces` | GET, POST | User API | sessionOnly | yes | `routes/api+/workspaces.route.tsx` | `docs/api-agent-quickstart.md` |  |
-| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.route.tsx` | `docs/api-agent-quickstart.md` | GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session. |
-| `/api/workspaces/:workspaceId` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.tsx` | `docs/api-agent-quickstart.md` | duplicate route; Middleware layout for nested workspace API routes; no direct handler. |
+| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.tsx` | `docs/api-agent-quickstart.md` | Layout + handlers (middleware on same module). GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session. |
 | `/api/workspaces/:workspaceId/transfer-ownership` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/transfer-ownership.route.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspaces/:workspaceId/billing` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces/:workspaceId/billing/checkout-session` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing/checkout-session.route.tsx` | `docs/api-agent-quickstart.md` |  |
@@ -155,5 +154,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/audiences/:audienceId/uploads` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/workspaces/:workspaceId/events` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/events.route.tsx` | `docs/api-live-operations.md` | SSE stream for workspace events (activity log). |
 
-Total entries: **144**
+Total entries: **143**
 
