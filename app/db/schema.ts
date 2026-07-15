@@ -505,6 +505,26 @@ export const workspace_audit_event = pgTable("workspace_audit_event", {
   metadata: jsonb().notNull(),
 });
 
+// Annotates objects in the workspaceAudio bucket. `file_name` (extension
+// included) is the join key because every existing consumer stores a bare
+// filename; a missing row means "unknown metadata", never a broken reference.
+// See client/migrations/20260715120000_workspace_audio_metadata.sql.
+export const workspace_audio = pgTable("workspace_audio", {
+  id: bigserial({ mode: "number" }).notNull().primaryKey(),
+  workspace_id: text().notNull(),
+  file_name: text().notNull(),
+  origin: text().notNull(),
+  duration_ms: integer(),
+  size_bytes: bigint({ mode: "number" }),
+  content_type: text(),
+  source_file_name: text(),
+  clip_start_ms: integer(),
+  clip_end_ms: integer(),
+  created_by: text(),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
+});
+
 export const rate_limit_bucket = pgTable("rate_limit_bucket", {
   key: text().notNull().primaryKey(),
   count: integer().notNull(),
