@@ -192,12 +192,16 @@ export default function Navbar({
           )}
           <ModeToggle />
         </div>
-        <button
-          className="rounded-md border border-border bg-background/80 p-2 text-2xl sm:hidden"
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <Menu className="h-6 w-6" />
-        </button>
+        <div className="flex items-center gap-2 sm:hidden">
+          <ModeToggle />
+          <button
+            className="rounded-md border border-border bg-background/80 p-2 text-2xl"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+        </div>
       </nav>
       {mobileMenuOpen && (
         <MobileMenu

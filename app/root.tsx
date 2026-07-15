@@ -105,7 +105,7 @@ export default function App() {
       </head>
       <body className="min-h-screen bg-background">
         <ThemeProvider
-          defaultTheme="light"
+          defaultTheme="system"
           storageKey="callcaster-theme"
           attribute="class"
         >
