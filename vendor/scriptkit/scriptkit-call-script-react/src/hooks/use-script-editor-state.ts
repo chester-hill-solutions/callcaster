@@ -20,17 +20,28 @@ export type UseScriptEditorStateOptions = {
 
 export function useScriptEditorState(options: UseScriptEditorStateOptions) {
   const [document, setDocument] = useState(options.initialDocument);
-  const [activePageId, setActivePageId] = useState(options.initialDocument.startPageId);
+  const [activePageId, setActivePageId] = useState(
+    options.initialDocument.startPageId,
+  );
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
   useEffect(() => {
     setDocument(options.initialDocument);
-    setActivePageId(options.initialDocument.startPageId);
-    setActiveBlockId(null);
+    setActivePageId((currentPageId) =>
+      options.initialDocument.pages[currentPageId]
+        ? currentPageId
+        : options.initialDocument.startPageId,
+    );
+    setActiveBlockId((currentBlockId) =>
+      currentBlockId && options.initialDocument.blocks[currentBlockId]
+        ? currentBlockId
+        : null,
+    );
   }, [options.initialDocument]);
 
   const palette = options.palette ?? "callcaster";
-  const blockTypes = palette === "canvass" ? CANVASS_BLOCK_TYPES : CALLCASTER_BLOCK_TYPES;
+  const blockTypes =
+    palette === "canvass" ? CANVASS_BLOCK_TYPES : CALLCASTER_BLOCK_TYPES;
 
   const updateDocument = (next: ScriptDocument) => {
     setDocument(next);
@@ -101,7 +112,10 @@ export function useScriptEditorState(options: UseScriptEditorStateOptions) {
     }
   };
 
-  const validation = useMemo(() => scripts.validateDocument(document), [document]);
+  const validation = useMemo(
+    () => scripts.validateDocument(document),
+    [document],
+  );
 
   return {
     document,
@@ -119,7 +133,10 @@ export function useScriptEditorState(options: UseScriptEditorStateOptions) {
   };
 }
 
-function patchBlock(existing: ScriptBlock, patch: Partial<ScriptBlock>): ScriptBlock {
+function patchBlock(
+  existing: ScriptBlock,
+  patch: Partial<ScriptBlock>,
+): ScriptBlock {
   switch (existing.type) {
     case "instruction":
       return { ...existing, ...patch, type: "instruction" };

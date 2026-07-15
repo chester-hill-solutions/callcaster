@@ -17,10 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  documentToScript,
-  scriptToDocument,
-} from "@/lib/call-script-service";
+import { documentToScript, scriptToDocument } from "@/lib/call-script-service";
 
 type PageData = {
   campaignDetails: {
@@ -60,7 +57,13 @@ export default function CampaignSettingsScript({
     <ScriptKitCallScriptUiProvider
       components={{
         Button: ({ onClick, disabled, children, type = "button" }) => (
-          <Button type={type} onClick={onClick} disabled={disabled} size="sm" variant="outline">
+          <Button
+            type={type}
+            onClick={onClick}
+            disabled={disabled}
+            size="sm"
+            variant="outline"
+          >
             {children as React.ReactNode}
           </Button>
         ),

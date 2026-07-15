@@ -187,8 +187,7 @@ export type ParseDocumentOptions = {
 };
 
 export type ValidateDocumentResult =
-  | { ok: true; document: ScriptDocument }
-  | { ok: false; errors: string[] };
+  { ok: true; document: ScriptDocument } | { ok: false; errors: string[] };
 
 export type RoutingAnswer = {
   blockId: string;
@@ -201,7 +200,10 @@ export type RoutingResult = {
   complete: boolean;
 };
 
-export type MergeTagContext = Record<string, string | number | boolean | null | undefined>;
+export type MergeTagContext = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
 
 export type CreateEmptyDocumentOptions = {
   palette?: ScriptPalette;
@@ -213,7 +215,10 @@ export type CallScriptServiceConfig = {
 };
 
 export type CallScriptService = {
-  parseDocument: (input: unknown, options?: ParseDocumentOptions) => ScriptDocument;
+  parseDocument: (
+    input: unknown,
+    options?: ParseDocumentOptions,
+  ) => ScriptDocument;
   validateDocument: (doc: unknown) => ValidateDocumentResult;
   migrateFromCallcasterFlow: (flow: unknown) => ScriptDocument;
   serializeToCallcasterFlow: (doc: ScriptDocument) => CallcasterFlow;

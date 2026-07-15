@@ -94,7 +94,6 @@ export default function ScriptEditor() {
           mediaNames={(mediaNames ?? []).map((media) =>
             typeof media === "string" ? media : media.name,
           )}
-          scripts={[]}
         />
       </div>
     </div>

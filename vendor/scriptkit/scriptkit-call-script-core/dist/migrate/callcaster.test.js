@@ -103,9 +103,7 @@ describe("callcaster migrate/serialize round-trip", () => {
                     title: "Welcome",
                     content: "Choose an option",
                     audioFile: "welcome.mp3",
-                    options: [
-                        { value: "1", content: "Sales", next: "sales_page" },
-                    ],
+                    options: [{ value: "1", content: "Sales", next: "sales_page" }],
                 },
             },
         };

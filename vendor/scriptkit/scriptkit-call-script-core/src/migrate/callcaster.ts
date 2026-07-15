@@ -35,12 +35,17 @@ export const callcasterWireBlockSchema = z
   })
   .passthrough();
 
-function resolveCallcasterBlockType(raw: z.infer<typeof callcasterWireBlockSchema>): ScriptBlock["type"] {
+function resolveCallcasterBlockType(
+  raw: z.infer<typeof callcasterWireBlockSchema>,
+): ScriptBlock["type"] {
   const typeRaw = String(raw.type ?? raw.blockType ?? "textarea");
   return CALLCASTER_TYPE_MAP[typeRaw] ?? "textarea";
 }
 
-function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): ScriptBlock {
+function normalizeCallcasterBlock(
+  id: string,
+  raw: Record<string, unknown>,
+): ScriptBlock {
   const parsed = callcasterWireBlockSchema.parse(raw);
   const mapped = resolveCallcasterBlockType(parsed);
   const prompt = String(
@@ -79,7 +84,8 @@ function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): Scr
     content: typeof parsed.content === "string" ? parsed.content : undefined,
     prompt,
     required: Boolean(parsed.required),
-    audioFile: typeof parsed.audioFile === "string" ? parsed.audioFile : undefined,
+    audioFile:
+      typeof parsed.audioFile === "string" ? parsed.audioFile : undefined,
     callcasterType:
       typeof parsed.type === "string"
         ? parsed.type
@@ -94,7 +100,9 @@ function normalizeCallcasterBlock(id: string, raw: Record<string, unknown>): Scr
           return {
             answerValue: String(r.answerValue ?? r.value ?? ""),
             targetPageId: r.targetPageId ? String(r.targetPageId) : undefined,
-            targetBlockId: r.targetBlockId ? String(r.targetBlockId) : undefined,
+            targetBlockId: r.targetBlockId
+              ? String(r.targetBlockId)
+              : undefined,
           };
         })
       : undefined,

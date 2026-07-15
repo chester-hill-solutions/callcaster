@@ -37,6 +37,8 @@ export const CampaignInstructions = ({ campaignData, totalCalls, expectedTotal, 
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
+                  {/* A disabled button cannot receive focus, so its tooltip needs a focusable wrapper. */}
+                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
                   <span className="inline-flex cursor-not-allowed" tabIndex={0}>
                     <Button type="button" disabled>
                       Join Campaign

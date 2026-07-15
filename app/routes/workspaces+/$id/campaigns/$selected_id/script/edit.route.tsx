@@ -1,7 +1,7 @@
 export { loader } from "./edit.loader.server";
 export { action } from "./edit.action.server";
 
-import { data as routeData, redirect , useLoaderData } from "react-router";
+import { data as routeData, redirect, useLoaderData } from "react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -28,8 +28,12 @@ type LoaderData = ScriptEditLoaderData;
 type PageData = LoaderData["data"];
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, mediaNames = [], data } =
-    useLoaderData<LoaderData>();
+  const {
+    workspace_id,
+    selected_id,
+    mediaNames = [],
+    data,
+  } = useLoaderData<LoaderData>();
   const [initData, setInitData] = useState<PageData>(data);
   const [pageData, setPageData] = useState<PageData>(data);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -45,13 +49,16 @@ export default function ScriptEditor() {
     setIsSaving(true);
     try {
       const formData = new FormData();
-      formData.append('campaignData', JSON.stringify(pageData));
-      formData.append('campaignDetails', JSON.stringify(pageData.campaignDetails));
+      formData.append("campaignData", JSON.stringify(pageData));
       formData.append(
-        'scriptData',
+        "campaignDetails",
+        JSON.stringify(pageData.campaignDetails),
+      );
+      formData.append(
+        "scriptData",
         JSON.stringify(pageData.campaignDetails.script ?? null),
       );
-      formData.append('saveScriptAsCopy', saveScriptAsCopy.toString());
+      formData.append("saveScriptAsCopy", saveScriptAsCopy.toString());
 
       // The HTTP method is always PATCH here: "save as copy" is a flag the
       // server uses to copy the script row, not a request to create a new
@@ -102,14 +109,14 @@ export default function ScriptEditor() {
 
   const renderCampaignSettingsScript = (mediaNames: string[] = []) => {
     if (!pageData.campaignDetails.script) return null;
-    
+
     const scriptPageData = {
       campaignDetails: {
         ...pageData.campaignDetails,
-        script: pageData.campaignDetails.script
-      }
+        script: pageData.campaignDetails.script,
+      },
     };
-    
+
     return (
       <CampaignSettingsScript
         pageData={scriptPageData}
@@ -119,7 +126,7 @@ export default function ScriptEditor() {
             campaignDetails: {
               ...pageData.campaignDetails,
               script: newData.campaignDetails.script,
-            }
+            },
           });
         }}
         mediaNames={mediaNames}
@@ -137,10 +144,11 @@ export default function ScriptEditor() {
           onReset={handleReset}
         />
         <div className="h-full flex-grow p-4">
-          {(pageData.type === "live_call") && renderCampaignSettingsScript([])}
+          {pageData.type === "live_call" && renderCampaignSettingsScript([])}
           {(pageData.type === "robocall" ||
             pageData.type === "simple_ivr" ||
-            pageData.type === "complex_ivr") && renderCampaignSettingsScript(mediaNames)}
+            pageData.type === "complex_ivr") &&
+            renderCampaignSettingsScript(mediaNames)}
           {pageData.type === "message" && (
             <MessageSettings
               mediaLinks={
