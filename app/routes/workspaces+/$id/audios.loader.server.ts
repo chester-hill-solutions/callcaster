@@ -1,4 +1,5 @@
 import { data as routeData } from "react-router";
+import { listAudioMetadata } from "@/lib/database/workspace-audio-metadata.server";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
@@ -57,13 +58,27 @@ export const loader = defineLoader({
       );
     }
 
-    const audioMedia = mediaResult.audios.map((audio) => ({
-      name: audio.name,
-      id: audio.id,
-      created_at: audio.created_at,
-      updated_at: audio.updated_at,
-      signedUrl: audio.signed_url,
-    }));
+    // One batched lookup, not one probe per object: measuring duration means
+    // downloading the file, so a per-row probe would pull the whole library on
+    // every page view. Objects with no sidecar row render as "—".
+    const metadataByFileName = await listAudioMetadata(
+      workspaceId,
+      mediaResult.audios.map((audio) => audio.name),
+    );
+
+    const audioMedia = mediaResult.audios.map((audio) => {
+      const metadata = metadataByFileName.get(audio.name);
+      return {
+        name: audio.name,
+        id: audio.id,
+        created_at: audio.created_at,
+        updated_at: audio.updated_at,
+        signedUrl: audio.signed_url,
+        durationMs: metadata?.duration_ms ?? null,
+        sizeBytes: metadata?.size_bytes ?? null,
+        sourceFileName: metadata?.source_file_name ?? null,
+      };
+    });
 
     return routeData(
       { audioMedia, workspace: workspaceData, error: null, userRole },
