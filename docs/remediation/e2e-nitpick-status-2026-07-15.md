@@ -103,16 +103,20 @@ otherwise the bun half dies importing `server/bun.ts`.
 
 ## Wave 0 — still open, needs infra access
 
-Not doable from a dev machine. See `docs/migration-ledger-drift.md`.
+Not doable from a dev machine. See `docs/migration-ledger-drift.md` for the
+failure mode and the diagnostic procedure.
 
-The review env's failing credit purchases were **not** an app bug: that database
-ran the original ledger RPC and was missing both enum-cast migrations. **Prod was
-never checked** — if it is behind the same way, credit purchases are broken there
-too, and Stripe charges before the error appears:
+Every deployed environment needs its migration ledger verified against the repo
+and reconciled — the app cannot detect this drift on its own, and a stale ledger
+RPC breaks credit purchases outright. Run per environment, after applying
+migrations and before the app redeploys:
 
 ```
 DATABASE_URL=<target> node scripts/db/check-migration-ledger.mjs --require-db
 ```
+
+Deployment-specific state is deliberately not recorded here (this repo is
+public); see the operator notes.
 
 ## Not exercised
 
