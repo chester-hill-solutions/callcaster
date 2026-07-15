@@ -77,12 +77,13 @@ export default function SignIn() {
             Don't Have an Account Yet? Click{" "}
             <span className="text-brand-primary">HERE</span> to Sign-Up!
           </NavLink>
-          <NavLink
-            to={"/remember"}
-            className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-muted-foreground transition-colors duration-150 hover:text-brand-primary hover:underline"
+          <Button
+            asChild
+            variant="outline"
+            className="min-h-[44px] w-full font-Zilla-Slab text-lg font-bold tracking-[1px]"
           >
-            I forgot my password
-          </NavLink>
+            <NavLink to="/remember">Forgot password?</NavLink>
+          </Button>
         </div>
       </AuthCard>
       <img
