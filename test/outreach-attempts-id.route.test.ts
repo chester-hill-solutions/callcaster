@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
   return {
     safeParseJson: vi.fn(),
-    authForOutreachAttempt: vi.fn(),
+    authForResource: vi.fn(),
     updateOutreachAttemptForWorkspace: vi.fn(),
   };
 });
@@ -24,7 +24,7 @@ vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/platform-data.server", () => ({
-  authForOutreachAttempt: (...args: unknown[]) => mocks.authForOutreachAttempt(...args),
+  authForResource: (...args: unknown[]) => mocks.authForResource(...args),
 }));
 vi.mock("@/lib/telephony-db.server", () => ({
   updateOutreachAttemptForWorkspace: (...args: unknown[]) =>
@@ -35,11 +35,10 @@ describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
-    mocks.authForOutreachAttempt.mockReset();
+    mocks.authForResource.mockReset();
     mocks.updateOutreachAttemptForWorkspace.mockReset();
-    mocks.authForOutreachAttempt.mockResolvedValue({
-      client: {},
-      user: { id: "u1" },
+    mocks.authForResource.mockResolvedValue({
+      userId: "u1",
       workspaceId: "w1",
     });
   });

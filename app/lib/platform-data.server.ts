@@ -165,48 +165,71 @@ export async function resolveDataPlaneAuth(
   return { userId: auth.user.id };
 }
 
-async function getCampaignWorkspaceId(
-  campaignId: string,
-): Promise<string | null> {
-  const rows = await db
-    .select({ workspace: campaignTable.workspace })
-    .from(campaignTable)
-    .where(eq(campaignTable.id, Number(campaignId)))
-    .limit(1);
-  return rows[0]?.workspace ?? null;
-}
+export type PlatformResourceKind =
+  | "campaign"
+  | "contact"
+  | "script"
+  | "survey"
+  | "outreach_attempt";
 
-async function getContactWorkspaceId(
-  contactId: string,
-): Promise<string | null> {
-  const rows = await db
-    .select({ workspace: contactTable.workspace })
-    .from(contactTable)
-    .where(eq(contactTable.id, Number(contactId)))
-    .limit(1);
-  return rows[0]?.workspace ?? null;
-}
+const RESOURCE_NOT_FOUND: Record<PlatformResourceKind, string> = {
+  campaign: "Campaign not found",
+  contact: "Contact not found",
+  script: "Script not found",
+  survey: "Survey not found",
+  outreach_attempt: "Outreach attempt not found",
+};
 
-async function getScriptWorkspaceId(
-  scriptId: string,
+export async function resolveResourceWorkspaceId(
+  kind: PlatformResourceKind,
+  id: string | number,
 ): Promise<string | null> {
-  const rows = await db
-    .select({ workspace: scriptTable.workspace })
-    .from(scriptTable)
-    .where(eq(scriptTable.id, Number(scriptId)))
-    .limit(1);
-  return rows[0]?.workspace ?? null;
-}
-
-async function getSurveyWorkspaceId(
-  surveyId: string,
-): Promise<string | null> {
-  const rows = await db
-    .select({ workspace: surveyTable.workspace })
-    .from(surveyTable)
-    .where(eq(surveyTable.survey_id, surveyId))
-    .limit(1);
-  return rows[0]?.workspace ?? null;
+  switch (kind) {
+    case "campaign": {
+      const rows = await db
+        .select({ workspace: campaignTable.workspace })
+        .from(campaignTable)
+        .where(eq(campaignTable.id, Number(id)))
+        .limit(1);
+      return rows[0]?.workspace ?? null;
+    }
+    case "contact": {
+      const rows = await db
+        .select({ workspace: contactTable.workspace })
+        .from(contactTable)
+        .where(eq(contactTable.id, Number(id)))
+        .limit(1);
+      return rows[0]?.workspace ?? null;
+    }
+    case "script": {
+      const rows = await db
+        .select({ workspace: scriptTable.workspace })
+        .from(scriptTable)
+        .where(eq(scriptTable.id, Number(id)))
+        .limit(1);
+      return rows[0]?.workspace ?? null;
+    }
+    case "survey": {
+      const rows = await db
+        .select({ workspace: surveyTable.workspace })
+        .from(surveyTable)
+        .where(eq(surveyTable.survey_id, String(id)))
+        .limit(1);
+      return rows[0]?.workspace ?? null;
+    }
+    case "outreach_attempt": {
+      const rows = await db
+        .select({ workspace: outreachAttemptTable.workspace })
+        .from(outreachAttemptTable)
+        .where(eq(outreachAttemptTable.id, Number(id)))
+        .limit(1);
+      return rows[0]?.workspace ?? null;
+    }
+    default: {
+      const _exhaustive: never = kind;
+      return _exhaustive;
+    }
+  }
 }
 
 /**
@@ -234,25 +257,48 @@ async function enforceWorkspaceRole(
   }
 }
 
-export async function authForCampaign(
+export async function authForResource(
   request: Request,
-  campaignId: string,
+  kind: PlatformResourceKind,
+  id: string | number,
   minRole?: string,
 ): Promise<(DataPlaneAuthContext & { workspaceId: string }) | Response> {
+  if (kind === "outreach_attempt") {
+    const auth = await requireJsonAuth(request);
+    if (auth instanceof Response) return auth;
+
+    const workspaceId = await resolveResourceWorkspaceId(kind, id);
+    if (!workspaceId) {
+      return jsonError(RESOURCE_NOT_FOUND[kind], 404);
+    }
+
+    try {
+      await requireWorkspaceAccess({
+        user: auth.user,
+        workspaceId,
+        minRole,
+      });
+    } catch {
+      return jsonError("Forbidden", 403);
+    }
+
+    return { userId: auth.user.id, workspaceId };
+  }
+
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getCampaignWorkspaceId(campaignId);
+  }
+
+  const workspaceId = await resolveResourceWorkspaceId(kind, id);
   if (!workspaceId) {
-    return jsonError("Campaign not found", 404);
+    return jsonError(RESOURCE_NOT_FOUND[kind], 404);
   }
 
   if (auth.authType === "api_key") {
     if (auth.workspaceId !== workspaceId) {
-      return jsonError("Campaign not found", 404);
+      return jsonError(RESOURCE_NOT_FOUND[kind], 404);
     }
-    // Workspace-scoped API keys retain full data-plane access; role gating
-    // applies to session (member) auth only. Capability gates are opt-in per route.
     return {
       userId: null,
       workspaceId,
@@ -263,126 +309,6 @@ export async function authForCampaign(
   const denied = await enforceWorkspaceRole(auth.user, workspaceId, minRole);
   if (denied) return denied;
   return { userId: auth.user.id, workspaceId };
-}
-
-export async function authForContact(
-  request: Request,
-  contactId: string,
-  minRole?: string,
-): Promise<(DataPlaneAuthContext & { workspaceId: string }) | Response> {
-  const auth = await verifyApiKeyOrSession(request);
-  if ("error" in auth) {
-    return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getContactWorkspaceId(contactId);
-  if (!workspaceId) {
-    return jsonError("Contact not found", 404);
-  }
-
-  if (auth.authType === "api_key") {
-    if (auth.workspaceId !== workspaceId) {
-      return jsonError("Contact not found", 404);
-    }
-    // Workspace-scoped API keys retain full data-plane access; role gating
-    // applies to session (member) auth only. Capability gates are opt-in per route.
-    return {
-      userId: null,
-      workspaceId,
-      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
-    };
-  }
-
-  const denied = await enforceWorkspaceRole(auth.user, workspaceId, minRole);
-  if (denied) return denied;
-  return { userId: auth.user.id, workspaceId };
-}
-
-export async function authForScript(
-  request: Request,
-  scriptId: string,
-): Promise<(DataPlaneAuthContext & { workspaceId: string }) | Response> {
-  const auth = await verifyApiKeyOrSession(request);
-  if ("error" in auth) {
-    return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getScriptWorkspaceId(scriptId);
-  if (!workspaceId) {
-    return jsonError("Script not found", 404);
-  }
-
-  if (auth.authType === "api_key") {
-    if (auth.workspaceId !== workspaceId) {
-      return jsonError("Script not found", 404);
-    }
-    return {
-      userId: null,
-      workspaceId,
-      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
-    };
-  }
-
-  await requireWorkspaceAccess({
-    user: auth.user,
-    workspaceId,
-  });
-  return { userId: auth.user.id, workspaceId };
-}
-
-export async function authForSurvey(
-  request: Request,
-  surveyId: string,
-): Promise<(DataPlaneAuthContext & { workspaceId: string }) | Response> {
-  const auth = await verifyApiKeyOrSession(request);
-  if ("error" in auth) {
-    return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getSurveyWorkspaceId(surveyId);
-  if (!workspaceId) {
-    return jsonError("Survey not found", 404);
-  }
-
-  if (auth.authType === "api_key") {
-    if (auth.workspaceId !== workspaceId) {
-      return jsonError("Survey not found", 404);
-    }
-    return {
-      userId: null,
-      workspaceId,
-      apiKey: { keyId: auth.keyId, scopes: auth.scopes },
-    };
-  }
-
-  await requireWorkspaceAccess({
-    user: auth.user,
-    workspaceId,
-  });
-  return { userId: auth.user.id, workspaceId };
-}
-
-/** Auth for outreach attempt: session-only, resolves workspace from the attempt row. */
-export async function authForOutreachAttempt(
-  request: Request,
-  outreachAttemptId: number,
-): Promise<{user: { id: string; email?: string }; workspaceId: string } | Response> {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;  const rows = await db
-    .select({ workspace: outreachAttemptTable.workspace })
-    .from(outreachAttemptTable)
-    .where(eq(outreachAttemptTable.id, outreachAttemptId))
-    .limit(1);
-  const attempt = rows[0];
-
-  if (!attempt?.workspace) {
-    return jsonError("Outreach attempt not found", 404);
-  }
-
-  try {
-    await requireWorkspaceAccess({
-      user: (auth as any).user,
-      workspaceId: attempt.workspace,
-    });
-  } catch {
-    return jsonError("Forbidden", 403);
-  }
-
-  return { user: (auth as any).user, workspaceId: attempt.workspace };
 }
 
 export async function listWorkspaceCampaignsApi(

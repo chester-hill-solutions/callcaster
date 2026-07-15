@@ -1,5 +1,5 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { authForSurvey, getSurveyDetailApi } from "@/lib/platform-data.server";
+import { authForResource, getSurveyDetailApi } from "@/lib/platform-data.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -10,7 +10,7 @@ export const loader = defineLoader({
       return jsonError("surveyId is required", 400);
     }
 
-    const auth = await authForSurvey(request, surveyId);
+    const auth = await authForResource(request, "survey", surveyId);
     if (auth instanceof Response) return auth;
 
     return { ...auth, surveyId };

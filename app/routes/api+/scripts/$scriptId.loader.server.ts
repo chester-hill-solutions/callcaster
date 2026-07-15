@@ -1,5 +1,5 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { authForScript, getScriptDetailApi } from "@/lib/platform-data.server";
+import { authForResource, getScriptDetailApi } from "@/lib/platform-data.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -10,7 +10,7 @@ export const loader = defineLoader({
       return jsonError("scriptId is required", 400);
     }
 
-    const auth = await authForScript(request, scriptId);
+    const auth = await authForResource(request, "script", scriptId);
     if (auth instanceof Response) return auth;
 
     return { ...auth, scriptId };
