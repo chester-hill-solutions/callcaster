@@ -53,7 +53,7 @@ export default function CampaignsNew() {
         </Text>
       ) : null}
       <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
-        <BrandedCardTitle>Add Campaign</BrandedCardTitle>
+        <BrandedCardTitle as="h1">Add Campaign</BrandedCardTitle>
         <Form method="POST" className="space-y-6">
           <BrandedCardContent>
             <input type="hidden" name="formAction" value="newCampaign" />

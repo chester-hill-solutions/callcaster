@@ -130,6 +130,36 @@ describe("app/components/queue/QueueTable.tsx", () => {
     render(<QueueTable {...defaultQueueTableProps()} />);
     expect(screen.getByText(/Total: 1 of 1/i)).toBeInTheDocument();
   });
+
+  test("each icon-only column sort control has an accessible name", async () => {
+    const { QueueTable } = await import("@/components/queue/QueueTable");
+    render(<QueueTable {...defaultQueueTableProps()} />);
+    for (const label of ["Name", "Phone", "Email", "Address", "Audiences", "Status"]) {
+      expect(
+        screen.getByRole("button", { name: `Sort by ${label}` }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  // Pins the behaviour the QueueSortButton extraction had to preserve. Note the
+  // sort param lags by one click: getIsSorted() is read synchronously after
+  // toggleSorting(), so it still returns the pre-toggle value. That is a
+  // pre-existing bug carried over verbatim, not a regression from the refactor
+  // — this test documents it so a future fix has to change it deliberately.
+  test("the sort control reports the sort field back to the caller", async () => {
+    const { QueueTable } = await import("@/components/queue/QueueTable");
+    const handleFilterChange = vi.fn();
+    render(
+      <QueueTable {...defaultQueueTableProps()} handleFilterChange={handleFilterChange} />,
+    );
+    const sortByPhone = screen.getByRole("button", { name: "Sort by Phone" });
+
+    fireEvent.click(sortByPhone);
+    expect(handleFilterChange).toHaveBeenNthCalledWith(1, "sort", "");
+
+    fireEvent.click(sortByPhone);
+    expect(handleFilterChange).toHaveBeenNthCalledWith(2, "sort", "phone.asc");
+  });
 });
 
 describe("app/components/queue/ContactSearchDialog.tsx", () => {

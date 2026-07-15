@@ -27,7 +27,7 @@ import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import { compareMembersByRole } from "@/lib/workspace-members";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
-import { FormField } from "@/components/ui/form-field";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
 type UserWithRole = Partial<User> & { role: string };
@@ -105,20 +105,22 @@ export default function WorkspaceSettings() {
 
   const addUserTabs = (
     <Form method="POST" className="flex w-full flex-col gap-2" ref={formRef}>
-      {actionData?.error && (
-        <p className="text-center text-2xl font-bold text-brand-primary">
-          {actionData.error}
-        </p>
-      )}
       <div className="flex gap-2">
         <input type="hidden" name="formName" value="addUser" />
-        <FormField htmlFor="username" label="Email" className="w-full">
-          <Input
-            type="text"
-            name="username"
-            id="username"
-            className="bg-transparent"
-          />
+        <FormField
+          htmlFor="username"
+          label="Email"
+          className="w-full"
+          error={actionData?.error}
+        >
+          <FormFieldControl>
+            <Input
+              type="text"
+              name="username"
+              id="username"
+              className="bg-transparent"
+            />
+          </FormFieldControl>
         </FormField>
         <FormField
           htmlFor="new_user_workspace_role"

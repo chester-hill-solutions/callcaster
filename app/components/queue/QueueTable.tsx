@@ -8,6 +8,7 @@ import {
     getCoreRowModel,
     getSortedRowModel,
     getFilteredRowModel,
+    Column,
     ColumnDef,
     flexRender,
     RowSelectionState,
@@ -47,6 +48,47 @@ const ATTEMPT_OPTIONS = ["completed", "failed", "no-answer", "voicemail", "unkno
 const ALL_AUDIENCES_VALUE = "all";
 const ALL_STATUSES_VALUE = "all";
 const ALL_DISPOSITIONS_VALUE = "all";
+
+/**
+ * The chevron is the only visible content, so the column name has to come
+ * through `aria-label` — see DESIGN.md ("Icon-only buttons require aria-label").
+ */
+function QueueSortButton<TData>({
+    column,
+    label,
+    field,
+    onSortChange,
+}: {
+    column: Column<TData, unknown>;
+    /** Human-readable column name, used for the accessible name. */
+    label: string;
+    /** Server-side sort key sent back through the filter params. */
+    field: string;
+    onSortChange: (key: string, value: string) => void;
+}) {
+    const sorted = column.getIsSorted();
+    return (
+        <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Sort by ${label}`}
+            onClick={() => {
+                column.toggleSorting();
+                const sort = column.getIsSorted();
+                onSortChange('sort', sort ? `${field}.${sort}` : '');
+            }}
+            className="h-6 px-1"
+        >
+            {sorted === "asc" ? (
+                <ChevronUp className="h-3 w-3" aria-hidden />
+            ) : sorted === "desc" ? (
+                <ChevronDown className="h-3 w-3" aria-hidden />
+            ) : (
+                <ChevronUp className="h-3 w-3 opacity-30" aria-hidden />
+            )}
+        </Button>
+    );
+}
 
 type SupportLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -291,24 +333,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Name</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `name.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Name"
+                            field="name"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -329,24 +359,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Phone</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `phone.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Phone"
+                            field="phone"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -367,24 +385,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Email</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `email.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Email"
+                            field="email"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -405,24 +411,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Address</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `address.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Address"
+                            field="address"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -446,24 +440,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Audiences</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `audiences.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Audiences"
+                            field="audiences"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Select
@@ -505,24 +487,12 @@ export function QueueTable({
                             <span className="font-medium text-xs">
                                 {isSetStatusMode ? "Set Status" : "Status"}
                             </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    column.toggleSorting();
-                                    const sort = column.getIsSorted();
-                                    handleFilterChange('sort', sort ? `status.${sort}` : '');
-                                }}
-                                className="h-6 px-1"
-                            >
-                                {column.getIsSorted() === "asc" ? (
-                                    <ChevronUp className="h-3 w-3" />
-                                ) : column.getIsSorted() === "desc" ? (
-                                    <ChevronDown className="h-3 w-3" />
-                                ) : (
-                                    <ChevronUp className="h-3 w-3 opacity-30" />
-                                )}
-                            </Button>
+                            <QueueSortButton
+                                column={column}
+                                label="Status"
+                                field="status"
+                                onSortChange={handleFilterChange}
+                            />
                         </div>
                         <Select
                             value={
