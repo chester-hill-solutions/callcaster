@@ -44,16 +44,15 @@ export const loader = defineLoader({
       campaignId: selected_id,
     })) as LiveCampaign | MessageCampaign | IVRCampaign | null;
 
+    // Deliberately NOT awaited: streamed to the client as a deferred promise
+    // and consumed via <Await> in $selected_id.route.tsx. Keep it typed as the
+    // Promise it actually is — casting it to a bare array (as this once did)
+    // makes `resultsPromise || []` a silent no-op and hides the deferral from
+    // typecheck entirely.
     const resultsPromise = fetchBasicResults({
       workspaceId: workspace_id,
       campaignId: selected_id,
-    }) as unknown as {
-      disposition: string;
-      count: number;
-      average_call_duration: string;
-      average_wait_time: string;
-      expected_total: number;
-    }[];
+    });
 
     const ivrResponsesPromise = campaignTypeCollectsIvrResponses(campaignRow.type)
       ? fetchIvrResponseResults({
@@ -81,7 +80,7 @@ export const loader = defineLoader({
       ),
       campaignDetails,
       user: user,
-      results: resultsPromise || [], // Deferred loading
+      results: resultsPromise, // Deferred: streamed, resolved via <Await>
       ivrResponses: ivrResponsesPromise,
       queueCounts,
       readiness,

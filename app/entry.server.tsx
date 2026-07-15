@@ -14,7 +14,31 @@ import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 import { logger } from "@/lib/logger.server";
 
-const ABORT_DELAY = 5_000;
+/**
+ * How long React Router's turbo-stream encoder waits for a deferred loader
+ * promise before rejecting it with "Server Timeout".
+ *
+ * React Router reads this export off the server build (`encodeViaTurboStream`
+ * in server-runtime/single-fetch) for BOTH document requests and single-fetch
+ * `.data` requests. 4950 is RR's own internal fallback, so stating it here is
+ * a no-op for timing — it exists to make the ABORT_DELAY relationship below
+ * explicit and reviewable rather than an accident of an undocumented default.
+ */
+export const streamTimeout = 4_950;
+
+/**
+ * When to abort Suspense boundaries still pending, so the HTML stream always
+ * closes.
+ *
+ * MUST stay above `streamTimeout`. turbo-stream rejects a stalled deferred at
+ * `streamTimeout` and flushes an error chunk as an inline StreamTransfer
+ * script; that rejection is the ONLY thing that can settle the client's
+ * deferred promise and let <Await errorElement> render. If React aborts first,
+ * the document is truncated before that script is emitted, the client promise
+ * never settles, and the boundary suspends forever (React #419 + a permanent
+ * "Loading results..."). The gap is the flush window for that error chunk.
+ */
+export const ABORT_DELAY = streamTimeout + 1_050;
 
 export default async function handleRequest(
   request: Request,
@@ -50,6 +74,18 @@ export default async function handleRequest(
     );
     shellRendered = true;
 
+    // Clear the abort timer only once the stream is fully DONE — never when the
+    // shell resolves. `renderToReadableStream` resolves as soon as the shell is
+    // ready, while Suspense boundaries may still be pending; clearing at that
+    // point cancels the abort and lets a never-settling boundary hold the
+    // response open forever (the deferred promise on the client is fed only by
+    // the inline StreamTransfer scripts, so it never settles and <Await>
+    // suspends indefinitely rather than reaching its errorElement).
+    void body.allReady.then(
+      () => clearTimeout(abortTimer),
+      () => clearTimeout(abortTimer),
+    );
+
     // Bots get the fully rendered document (parity with onAllReady).
     if (isbot(request.headers.get("user-agent") || "")) {
       await body.allReady;
@@ -60,7 +96,9 @@ export default async function handleRequest(
       headers: responseHeaders,
       status: responseStatusCode,
     });
-  } finally {
+  } catch (error) {
+    // The shell itself failed, so nothing will ever settle `allReady`.
     clearTimeout(abortTimer);
+    throw error;
   }
 }
