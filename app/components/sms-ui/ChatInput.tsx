@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MdImage, MdSend } from "react-icons/md";
 import { AlertTriangle } from "lucide-react";
 import ChatImages from "./ChatImages";
@@ -76,6 +76,29 @@ export default function ChatInput({
   );
   const optedOut = Boolean(selectedContact?.opt_out);
   const minScheduleValue = useMemo(() => minScheduleLocalValue(), []);
+  const hasSenderOptions = (workspaceNumbers?.length ?? 0) > 0;
+
+  /**
+   * @effect KEEP: align the controlled From selection with available sender
+   * options when `initialFrom` or the workspace number inventory changes
+   * without remounting the composer (same contact, loader refresh).
+   * @effect-deps initialFrom, workspaceNumbers (available sender option values)
+   * @effect-side-effects setSelectedFrom only
+   * @effect-why-not-loader selectedFrom is intentional user-controlled state;
+   * we only repair it when it points at a value no longer in the option list
+   * or when the computed default changes while the select was empty.
+   */
+  useEffect(() => {
+    const optionValues = new Set(
+      (workspaceNumbers ?? []).map((num) => num.phone_number),
+    );
+    if (selectedFrom && optionValues.has(selectedFrom)) return;
+    if (initialFrom && optionValues.has(initialFrom)) {
+      setSelectedFrom(initialFrom);
+      return;
+    }
+    setSelectedFrom(workspaceNumbers?.[0]?.phone_number || "");
+  }, [initialFrom, workspaceNumbers, selectedFrom]);
 
   const establishedLabel = useMemo(() => {
     if (!establishedFromNumber) return "";
@@ -99,6 +122,8 @@ export default function ChatInput({
   const isSendDisabled =
     messageFetcher.state !== "idle" ||
     optedOut ||
+    !selectedFrom ||
+    !hasSenderOptions ||
     !(selectedContact || (phoneNumber && isValid)) ||
     (sendLater && !sendAtLocal);
 
@@ -132,8 +157,14 @@ export default function ChatInput({
             id="from"
             value={selectedFrom}
             onChange={(e) => setSelectedFrom(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow"
+            disabled={!hasSenderOptions}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow disabled:cursor-not-allowed disabled:opacity-60"
           >
+            {!hasSenderOptions && (
+              <option value="" disabled>
+                No sending numbers available
+              </option>
+            )}
             {workspaceNumbers?.map((num) => (
               <option key={num.id} value={num.phone_number}>
                 {num.friendly_name || num.phone_number}
@@ -141,6 +172,18 @@ export default function ChatInput({
             ))}
           </select>
         </div>
+        {!hasSenderOptions && (
+          <div
+            role="status"
+            className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              A workspace sending number is required before chat messages can be
+              sent.
+            </span>
+          </div>
+        )}
         {isFromMismatched && (
           <div
             role="status"

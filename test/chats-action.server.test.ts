@@ -8,6 +8,15 @@ const mocks = vi.hoisted(() => ({
   linkContactToConversation: vi.fn(),
 }));
 
+const tenantDbMocks = vi.hoisted(() => ({
+  contact: {
+    findFirst: vi.fn(async () => null),
+  },
+  workspace_number: {
+    findMany: vi.fn(async () => [{ phone_number: "+15550000000" }]),
+  },
+}));
+
 vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
@@ -21,12 +30,27 @@ vi.mock("@/lib/database/chat-contact-link.server", () => ({
     mocks.linkContactToConversation(...args),
 }));
 
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => tenantDbMocks),
+}));
+
+vi.mock("@/lib/twilio-lookup.server", () => ({
+  getOrLookupLineType: vi.fn(async () => null),
+  isSmsIncapableLineType: () => false,
+}));
+
 describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
     mocks.sendMessage.mockReset();
     mocks.linkContactToConversation.mockReset();
+    tenantDbMocks.contact.findFirst.mockReset();
+    tenantDbMocks.contact.findFirst.mockResolvedValue(null);
+    tenantDbMocks.workspace_number.findMany.mockReset();
+    tenantDbMocks.workspace_number.findMany.mockResolvedValue([
+      { phone_number: "+15550000000" },
+    ]);
     mocks.verifyAuth.mockResolvedValue({
       headers: new Headers(),
       user: { id: "u1" },
