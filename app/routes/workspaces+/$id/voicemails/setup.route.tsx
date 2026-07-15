@@ -7,7 +7,6 @@ import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-r
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -193,11 +192,13 @@ export default function VoicemailSetupPage() {
                 <div className="space-y-3">
                   {numbers.map((number) => (
                     <div key={number.id} className="flex items-start gap-2">
-                      <Checkbox
+                      <input
+                        type="checkbox"
                         id={`number-${number.id}`}
                         name="numberIds"
                         value={String(number.id)}
                         defaultChecked={numbers.length === 1}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border border-primary accent-brand-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       />
                       <div className="grid gap-0.5">
                         <Label

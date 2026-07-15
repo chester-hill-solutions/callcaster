@@ -93,6 +93,11 @@ run("npm", ["run", "test:e2e:seed"], {
   env: { ...process.env, DATABASE_URL: databaseUrl },
 });
 
+console.log("[e2e-compose] seeding object storage fixtures…");
+run("node", ["scripts/e2e/seed-object-storage.mjs"], {
+  env: { ...process.env, DATABASE_URL: databaseUrl, ...e2eS3Env },
+});
+
 if (process.env.E2E_SKIP_BUILD !== "1") {
   console.log("[e2e-compose] building app…");
   run("npm", ["run", "build"], {
