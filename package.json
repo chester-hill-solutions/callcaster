@@ -34,7 +34,7 @@
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "bun run ./server/bun.ts",
     "worker": "bun run ./worker/index.ts",
-    "typecheck": "react-router typegen && tsc",
+    "typecheck": "react-router typegen && tsc && tsc -p services/tsconfig.json",
     "typecheck:deno": "node scripts/check-deno-functions.mjs",
     "test": "npm run test:node && npm run test:ui",
     "test:node": "vitest run -c vitest.node.config.ts && bun test test/server-runtime.test.ts test/twilio-webhook-prehandler.test.ts vendor/scriptkit/scriptkit-call-script-core/src/",

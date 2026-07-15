@@ -12,6 +12,10 @@ const SCAN_DIRS = [
   path.join(ROOT, "app"),
   path.join(ROOT, "worker"),
   path.join(ROOT, "client/functions"),
+  // The media-stream Bun service debits credits too (live transcription,
+  // coaching cues). It was outside this scan until 2026-07, which is how those
+  // debits shipped bypassing shared/billing-keys.ts unnoticed.
+  path.join(ROOT, "services"),
 ];
 
 const APPROVED_FILES = new Set([

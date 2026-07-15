@@ -5,6 +5,7 @@ import { Household } from "@/components/call/CallScreen.Household";
 import { CampaignHeader } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
+import { CallScreenLiveCoachingPanels } from "@/components/call/CallScreen.LiveCoachingPanels";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "react-router";
 import {
@@ -37,6 +38,9 @@ export function CallScreenLayout({
   dialogControls,
   audioControls,
   phoneVerification,
+  featureFlags,
+  callSid,
+  initialCoaching,
 }: CallScreenLayoutProps) {
   const {
     hangUp,
@@ -271,6 +275,12 @@ export function CallScreenLayout({
           completed={completed}
         />
       </div>
+      <CallScreenLiveCoachingPanels
+        workspaceId={workspaceId}
+        callSid={callSid}
+        featureFlags={featureFlags}
+        initialCoaching={initialCoaching}
+      />
       <CampaignDialogs
         isDialogOpen={isDialogOpen}
         setDialog={setDialog}

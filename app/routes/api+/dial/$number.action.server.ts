@@ -1,6 +1,9 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
 import Twilio from 'twilio';
 
@@ -29,6 +32,28 @@ export const action = defineAction({
             const formData = await request.clone().formData();
             const twiml = new Twilio.twiml.VoiceResponse();
             const number = params.number;
+            const callSid = String(formData.get("CallSid") ?? "");
+
+            if (callSid) {
+                const call = await findCallBySid(callSid);
+                const workspaceId = call?.workspace;
+                if (call && workspaceId && call.user_id) {
+                    const workspace = await getWorkspaceById(workspaceId);
+                    appendLiveTranscriptionStreamTwiml({
+                        twiml,
+                        featureFlags: workspace?.feature_flags as Record<string, unknown> | undefined,
+                        params: {
+                            workspaceId,
+                            userId: call.user_id,
+                            direction: "outbound",
+                            contactId: call.contact_id,
+                            campaignId: call.campaign_id,
+                            callSid,
+                            streamName: `call-${callSid}`,
+                        },
+                    });
+                }
+            }
 
             const dial = twiml.dial({
                 callerId: formData.get('From') as string,

@@ -61,6 +61,8 @@ export function useCallScreen() {
     isActive,
     hasAccess,
     verifiedNumbers,
+    featureFlags,
+    initialCoaching,
   } = useLoaderData<LoaderData>();
   const revalidator = useRevalidator();
   useWorkspaceEventSubscription({
@@ -446,6 +448,9 @@ export function useCallScreen() {
       ...phoneVerification,
       setSelectedDevice: handleDeviceSelect,
     },
+    featureFlags,
+    callSid,
+    initialCoaching,
   };
 }
 

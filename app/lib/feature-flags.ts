@@ -13,13 +13,3 @@ export function hasFeatureFlag(
   if (!parsed.success) return false;
   return Boolean(parsed.data[flag]);
 }
-
-/** True when live transcription or live coaching is enabled for the workspace. */
-export function coachingEnabled(
-  flags?: WorkspaceFeatureFlags | Record<string, unknown> | null,
-): boolean {
-  return (
-    hasFeatureFlag(flags, "liveTranscription") ||
-    hasFeatureFlag(flags, "liveCoaching")
-  );
-}

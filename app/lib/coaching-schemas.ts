@@ -5,6 +5,16 @@ export const WorkspaceFeatureFlags = z
   .object({
     liveTranscription: z.boolean().default(false),
     liveCoaching: z.boolean().default(false),
+    /**
+     * Post-call batch transcription of the recording (ElevenLabs Scribe batch).
+     *
+     * Default-off and off everywhere: the product policy for batch — whether it
+     * ships at all, and whether it is billed per call or bundled — is UNDECIDED.
+     * Until it is decided, no call is enqueued for batch and no call is billed
+     * for batch. The handler is kept intact so flipping this flag on is the only
+     * change needed to re-enable the path.
+     */
+    batchTranscription: z.boolean().default(false),
   })
   .passthrough();
 
@@ -45,6 +55,7 @@ export const TranscriptMetadata = z
   .object({
     deepgramModel: z.string().optional(),
     cohereModel: z.string().optional(),
+    elevenlabsModel: z.string().optional(),
     utteranceCount: z.number().optional(),
     detectedLanguage: z.string().optional(),
   })

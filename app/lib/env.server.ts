@@ -150,7 +150,11 @@ export function warnIfStripeKeyModeMismatch(): boolean {
 
 // Validate environment variables on module load
 // This will throw an error immediately if required vars are missing
-if (typeof window === 'undefined') {
+// `!("window" in globalThis)` rather than `typeof window === "undefined"`:
+// this module is also pulled in by services/** (the Bun media-stream service),
+// which typechecks without the DOM lib, so the bare `window` global is not
+// declared there. The runtime semantics are identical.
+if (!("window" in globalThis)) {
   // Only validate on server-side
   try {
     validateEnv();
@@ -220,8 +224,23 @@ export const env = {
     }
     return 'dev-media-stream-secret-change-me';
   },
-  /** Public host of the media-stream Bun service. Defaults to localhost:3001 for dev. */
-  MEDIA_STREAM_HOST: () => getEnv('MEDIA_STREAM_HOST') ?? 'localhost:3001',
+  /**
+   * Public host of the media-stream Bun service.
+   *
+   * Defaults to localhost:3001 in non-production ONLY. In production an unset
+   * value must stay undefined so the fail-closed guard in
+   * media-stream-twiml.server.ts fires (logs `media-stream-host-missing` and
+   * skips `<Stream>`); defaulting there would instead hand Twilio a
+   * `wss://localhost:3001` URL it can never reach — a silently broken
+   * `<Stream>` on every call.
+   */
+  MEDIA_STREAM_HOST: () => {
+    const value = getEnv('MEDIA_STREAM_HOST');
+    if (value) {
+      return value;
+    }
+    return isProduction() ? undefined : 'localhost:3001';
+  },
 } as const;
 
 /**

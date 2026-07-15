@@ -15,7 +15,19 @@ const mocks = vi.hoisted(() => ({
   insertTransactionHistoryIdempotent: vi.fn(),
   sendWorkspaceWebhookNotification: vi.fn(async () => ({ success: true })),
   updateCallBySid: vi.fn(),
+  persistCallRecordingToStorage: vi.fn(),
+  isBatchTranscriptionEnabled: vi.fn(),
+  enqueueJob: vi.fn(),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+
+vi.mock("@/lib/worker/handlers/elevenlabs-batch-transcribe.server", () => ({
+  isBatchTranscriptionEnabled: (...args: unknown[]) =>
+    mocks.isBatchTranscriptionEnabled(...args),
+}));
+
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 
 vi.mock("@/lib/telephony-db.server", () => ({
@@ -88,6 +100,11 @@ vi.mock("@/lib/env.server", () => {
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
+vi.mock("@/lib/call-recording-storage.server", () => ({
+  persistCallRecordingToStorage: (...args: unknown[]) =>
+    mocks.persistCallRecordingToStorage(...args),
+}));
+
 describe("webhook side-effect handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -99,6 +116,9 @@ describe("webhook side-effect handlers", () => {
       outreach_attempt_id: 10,
     });
     mocks.billTerminalCallStatus.mockResolvedValue({ inserted: true });
+    // Batch transcription is default-off; individual tests opt in.
+    mocks.isBatchTranscriptionEnabled.mockResolvedValue(false);
+    mocks.enqueueJob.mockResolvedValue(undefined);
     mocks.resolveCallOutreachContext.mockResolvedValue({
       outreachAttemptId: 10,
       workspaceId: "w1",
@@ -115,6 +135,11 @@ describe("webhook side-effect handlers", () => {
       status: "delivered",
       num_segments: "1",
       num_media: "0",
+    });
+    mocks.persistCallRecordingToStorage.mockResolvedValue({
+      ok: true,
+      audioUrl: "w1/recording-CA1.mp3",
+      skipped: false,
     });
   });
 
@@ -164,18 +189,112 @@ describe("webhook side-effect handlers", () => {
       callSid: "CA1",
       twilioParams: {
         CallSid: "CA1",
+        AccountSid: "ACmain",
         RecordingSid: "RE1",
         RecordingDuration: "12",
       },
     });
 
+    expect(mocks.persistCallRecordingToStorage).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      callSid: "CA1",
+      accountSid: "ACmain",
+      recordingSid: "RE1",
+      existingAudioUrl: undefined,
+    });
     expect(mocks.updateCallBySid).toHaveBeenCalledWith(
       "w1",
       "CA1",
       expect.objectContaining({
         recording_sid: "RE1",
         recording_duration: "12",
+        audio_url: "w1/recording-CA1.mp3",
       }),
     );
+  });
+
+  test("runRecordingSideEffects does not enqueue batch transcription while the flag is off", async () => {
+    const { runRecordingSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runRecordingSideEffects({
+      callSid: "CA1",
+      twilioParams: {
+        CallSid: "CA1",
+        AccountSid: "ACmain",
+        RecordingSid: "RE1",
+        RecordingDuration: "12",
+      },
+    });
+
+    // Default-off: the recording still persists, but no batch job is queued.
+    expect(mocks.isBatchTranscriptionEnabled).toHaveBeenCalledWith("w1");
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+    expect(mocks.persistCallRecordingToStorage).toHaveBeenCalled();
+  });
+
+  test("runRecordingSideEffects enqueues batch transcription once the flag is on", async () => {
+    mocks.isBatchTranscriptionEnabled.mockResolvedValue(true);
+
+    const { runRecordingSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runRecordingSideEffects({
+      callSid: "CA1",
+      twilioParams: {
+        CallSid: "CA1",
+        AccountSid: "ACmain",
+        RecordingSid: "RE1",
+        RecordingDuration: "12",
+      },
+    });
+
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "elevenlabs_batch_transcribe",
+        workspaceId: "w1",
+        params: { callSid: "CA1" },
+      }),
+    );
+  });
+
+  test("runRecordingSideEffects logs and continues when persist fails", async () => {
+    mocks.persistCallRecordingToStorage.mockResolvedValueOnce({
+      ok: false,
+      reason: "download_failed",
+      error: "Twilio recording fetch failed (404 Not Found)",
+    });
+
+    const { runRecordingSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await expect(
+      runRecordingSideEffects({
+        callSid: "CA1",
+        twilioParams: {
+          CallSid: "CA1",
+          AccountSid: "ACmain",
+          RecordingSid: "RE1",
+          RecordingDuration: "12",
+        },
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      "call_recording.persist_skipped",
+      expect.objectContaining({ reason: "download_failed" }),
+    );
+    expect(mocks.updateCallBySid).toHaveBeenCalledWith("w1", "CA1", {
+      recording_sid: "RE1",
+      recording_duration: "12",
+    });
+    const updatePayload = mocks.updateCallBySid.mock.calls.at(-1)?.[2] as Record<
+      string,
+      string
+    >;
+    expect(updatePayload.audio_url).toBeUndefined();
   });
 });

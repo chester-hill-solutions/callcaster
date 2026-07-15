@@ -7,6 +7,7 @@ export type BillingEventSource =
   | "voice"
   | "number_rental"
   | "purchase"
+  | "ai"
   | "adjustment"
   | "unknown";
 
@@ -24,6 +25,8 @@ function bucketToEventSource(
       return "number_rental";
     case "purchase":
       return "purchase";
+    case "ai":
+      return "ai";
     case "other":
       if (type === "CREDIT") return "purchase";
       if (type === "DEBIT" && !hasKey) return "adjustment";
@@ -50,6 +53,8 @@ export function getBillingEventSourceLabel(source: BillingEventSource): string {
       return "Number rental";
     case "purchase":
       return "Purchase";
+    case "ai":
+      return "Transcription & coaching";
     case "adjustment":
       return "Adjustment";
     default:
