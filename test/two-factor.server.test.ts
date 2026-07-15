@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
+  isTwoFactorEnforcementDisabled,
   isTwoFactorRedirectResponse,
   PRIVILEGED_WORKSPACE_ROLES,
   requireTwoFactorEnrollmentForPrivilegedUser,
@@ -81,7 +82,9 @@ describe("blockUnenrolledPrivilegedSessionUser", () => {
   beforeEach(() => {
     adminDbState.enrolled = false;
     adminDbState.roles = ["admin"];
+    delete process.env.DISABLE_2FA_ENFORCEMENT;
     delete process.env.E2E_DISABLE_2FA_ENFORCEMENT;
+    delete process.env.RAILWAY_ENVIRONMENT_NAME;
   });
 
   test("returns 403 JSON for unenrolled privileged session users", async () => {
@@ -126,7 +129,10 @@ describe("blockUnenrolledPrivilegedSessionUser", () => {
 describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
   beforeEach(() => {
     adminDbState.enrolled = false;
+    delete process.env.DISABLE_2FA_ENFORCEMENT;
     delete process.env.E2E_DISABLE_2FA_ENFORCEMENT;
+    delete process.env.E2E_TEST;
+    delete process.env.RAILWAY_ENVIRONMENT_NAME;
   });
 
   test("sudo (isPrivileged) not enrolled is redirected to /account/security", async () => {
@@ -179,5 +185,20 @@ describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
       }),
     ).resolves.toBeUndefined();
     delete process.env.E2E_TEST;
+  });
+
+  test("DISABLE_2FA_ENFORCEMENT on PR preview env short-circuits enforcement", async () => {
+    process.env.DISABLE_2FA_ENFORCEMENT = "1";
+    process.env.NODE_ENV = "production";
+    process.env.RAILWAY_ENVIRONMENT_NAME = "callcaster-pr-1047";
+    expect(isTwoFactorEnforcementDisabled()).toBe(true);
+    await expect(
+      requireTwoFactorEnrollmentForPrivilegedUser({
+        userId: "sudo-1",
+        request: new Request("http://x/admin"),
+        isPrivileged: true,
+      }),
+    ).resolves.toBeUndefined();
+    delete process.env.NODE_ENV;
   });
 });
