@@ -176,6 +176,13 @@ describe("app/lib/database/workspace.server.ts", () => {
                 return {
                   orderBy: () => adminDbMocks.selectChain(),
                   limit: () => adminDbMocks.selectChain(),
+                  then: (
+                    onFulfilled: (value: unknown) => unknown,
+                    onRejected?: (reason: unknown) => unknown,
+                  ) =>
+                    adminDbMocks
+                      .selectChain()
+                      .then(onFulfilled, onRejected),
                 };
               },
             }),
@@ -184,6 +191,11 @@ describe("app/lib/database/workspace.server.ts", () => {
               return {
                 orderBy: () => adminDbMocks.selectChain(),
                 limit: () => adminDbMocks.selectChain(),
+                then: (
+                  onFulfilled: (value: unknown) => unknown,
+                  onRejected?: (reason: unknown) => unknown,
+                ) =>
+                  adminDbMocks.selectChain().then(onFulfilled, onRejected),
               };
             },
           }),
