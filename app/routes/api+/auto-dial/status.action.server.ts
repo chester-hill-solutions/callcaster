@@ -152,12 +152,9 @@ const handleCallStatus = async (
     if (!callUpdate.outreach_attempt_id) {
       throw new Error("Missing outreach_attempt_id for auto-dial status update");
     }
-    const outreachStatus = resolveOutreachUpdate(
-      await updateOutreachAttempt(
-        String(callUpdate.outreach_attempt_id),
-        workspace,
-        { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
-      ),
+    const outreachStatus = await findOutreachAttemptById(
+      workspace,
+      callUpdate.outreach_attempt_id,
     );
     if (!outreachStatus) {
       return;
@@ -271,7 +268,7 @@ const handleParticipantJoin = async (
         await updateOutreachAttempt(
           `${dbCall.outreach_attempt_id}`,
           workspaceId,
-          { disposition: "in-progress", answered_at: new Date().toISOString() },
+          { answered_at: new Date().toISOString() },
         ),
       );
       if (!outreachStatus) {
@@ -303,7 +300,8 @@ const handleParticipantJoin = async (
 
 export const action = defineAction({
   auth: async ({ request }) => {
-    const formData = await request.formData();
+    // Clone before reading — Bun yields empty params on re-read after consume.
+    const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const underCase = twilioParamsToUnderCase(params);
 
@@ -313,7 +311,10 @@ export const action = defineAction({
       throw new Error("Missing CallSid");
     }
 
-    const forbidden = await requireTwilioSignature(request, { callSid: callSidValue });
+    const forbidden = await requireTwilioSignature(request, {
+      callSid: callSidValue,
+      params,
+    });
     if (forbidden) return forbidden;
 
     return { parsedBody: params, underCase, callSidValue };

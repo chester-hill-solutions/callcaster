@@ -42,6 +42,7 @@ export function buildCampaignDetailsForType(
   workspaceId: string,
 ): CampaignSettingsDetails {
   const sharedFields = {
+    ...currentDetails,
     campaign_id: campaignId,
     workspace: workspaceId,
   };

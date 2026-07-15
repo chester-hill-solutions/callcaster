@@ -15,13 +15,19 @@ interface MediaItem {
 interface SelectVoiceDropProps {
   campaignData: {
     voicedrop_audio?: string;
-    voicemail_file?: string;
   };
-  handleInputChange: (name: string, value: string) => void;
+  handleInputChange: (name: string, value: string | null) => void;
   mediaData: MediaItem[];
 }
 
+const NONE_VALUE = "__none__";
+
 export default function SelectVoiceDrop({campaignData, handleInputChange, mediaData}: SelectVoiceDropProps) {
+  const configuredFile = campaignData.voicedrop_audio?.trim() || null;
+  const configuredFileAvailable = configuredFile
+    ? mediaData.some((media) => media.name === configuredFile)
+    : true;
+
   return (
     <div className="flex flex-col min-w-48">
       <Label htmlFor="voicedrop_audio" className="mb-2 flex items-end gap-1">
@@ -32,13 +38,21 @@ export default function SelectVoiceDrop({campaignData, handleInputChange, mediaD
         />
       </Label>
       <Select
-        value={campaignData.voicedrop_audio || campaignData.voicemail_file}
-        onValueChange={(value) => handleInputChange("voicedrop_audio", value)}
+        value={configuredFile ?? NONE_VALUE}
+        onValueChange={(value) =>
+          handleInputChange("voicedrop_audio", value === NONE_VALUE ? null : value)
+        }
       >
         <SelectTrigger id="voicedrop_audio">
           <SelectValue placeholder="Select voicemail file" />
         </SelectTrigger>
         <SelectContent>
+          {configuredFile && !configuredFileAvailable ? (
+            <SelectItem value={configuredFile} disabled>
+              {configuredFile} — unavailable
+            </SelectItem>
+          ) : null}
+          <SelectItem value={NONE_VALUE}>None</SelectItem>
           {mediaData?.map((media: MediaItem) => (
             <SelectItem key={media.name} value={media.name}>
               {media.name}

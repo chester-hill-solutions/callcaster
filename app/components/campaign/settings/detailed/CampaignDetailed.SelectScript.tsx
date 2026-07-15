@@ -10,11 +10,13 @@ import { Script } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CampaignDetailedSelectScriptProps {
-  selectedScript: number | string;
-  handleInputChange: (name: string, value: string | number | boolean) => void;
+  selectedScript: number | string | null;
+  handleInputChange: (name: string, value: string | number | boolean | null) => void;
   scripts: Script[];
   invalid?: boolean;
 }
+
+const NONE_VALUE = "__none__";
 
 export default function SelectScript({
   selectedScript,
@@ -22,12 +24,20 @@ export default function SelectScript({
   scripts,
   invalid = false,
 }: CampaignDetailedSelectScriptProps) {
+  const selectedValue =
+    selectedScript === null || selectedScript === "" || selectedScript === 0
+      ? NONE_VALUE
+      : selectedScript.toString();
+  const selectedScriptAvailable =
+    selectedValue === NONE_VALUE ||
+    scripts.some((script) => script?.id.toString() === selectedValue);
+
   return (
     <FormField label="Script" htmlFor="script_id" className="w-[200px]">
       <Select
-        value={selectedScript?.toString()}
+        value={selectedValue}
         onValueChange={(value) =>
-          handleInputChange("script_id", parseInt(value))
+          handleInputChange("script_id", value === NONE_VALUE ? null : parseInt(value, 10))
         }
       >
         <SelectTrigger
@@ -38,11 +48,19 @@ export default function SelectScript({
           <SelectValue placeholder="Select script" />
         </SelectTrigger>
         <SelectContent>
-          {scripts?.map((script) => script && (
-            <SelectItem key={script.id} value={script.id.toString()}>
-              {script.name}
+          {selectedValue !== NONE_VALUE && !selectedScriptAvailable ? (
+            <SelectItem value={selectedValue} disabled>
+              Script {selectedValue} — unavailable
             </SelectItem>
-          ))}
+          ) : null}
+          <SelectItem value={NONE_VALUE}>None</SelectItem>
+          {scripts?.map((script) =>
+            script ? (
+              <SelectItem key={script.id} value={script.id.toString()}>
+                {script.name}
+              </SelectItem>
+            ) : null,
+          )}
         </SelectContent>
       </Select>
     </FormField>

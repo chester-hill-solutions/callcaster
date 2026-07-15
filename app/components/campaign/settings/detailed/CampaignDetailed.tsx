@@ -310,7 +310,7 @@ export const CampaignTypeSpecificSettings = ({
             <div className="flex items-end gap-2">
               <SelectScript
                 handleInputChange={handleInputChange}
-                selectedScript={'script_id' in details && details.script_id ? details.script_id : 0}
+                selectedScript={'script_id' in details ? details.script_id ?? null : null}
                 scripts={scripts}
                 invalid={isScriptMissing}
               />
@@ -349,7 +349,6 @@ export const CampaignTypeSpecificSettings = ({
               mediaData={mediaData}
               campaignData={{
                 ...('voicedrop_audio' in details && details.voicedrop_audio && { voicedrop_audio: details.voicedrop_audio }),
-                ...(campaignData.voicemail_file && { voicemail_file: campaignData.voicemail_file }),
               }}
             />
             <HouseholdSwitch

@@ -15,7 +15,6 @@ import { defineLoader } from "@/lib/handler.server";
 import {
   findCallBySid,
   updateCallBySid,
-  updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
 
 export const loader = defineLoader({
@@ -92,19 +91,6 @@ export const loader = defineLoader({
           );
         }
 
-        if (dbCall.outreach_attempt_id != null) {
-          const result = await updateOutreachAttemptForWorkspace(
-            dbCall.workspace,
-            dbCall.outreach_attempt_id,
-            { disposition: normalizedStatus },
-          );
-          if (result instanceof Response) {
-            logger.error(
-              "Error updating outreach_attempt disposition from poll",
-              result.statusText,
-            );
-          }
-        }
       }
 
       return routeData({ status: normalizedStatus }, { headers });

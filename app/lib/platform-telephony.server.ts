@@ -219,6 +219,7 @@ export async function getCampaignCallSessionApi(
     userRole?.role as MemberRole,
   );
   const isActive = campaign ? checkSchedule(campaign) : false;
+  const nextRecipient = getNextRecipient(queue, campaign.dial_type ?? "", userId);
 
   return {
     ok: true as const,
@@ -228,10 +229,10 @@ export async function getCampaignCallSessionApi(
     audiences,
     queue,
     contacts: queue.map((queueItem) => queueItem.contact),
-    next_recipient: getNextRecipient(queue, campaign.dial_type ?? "", userId),
+    next_recipient: nextRecipient,
     calls: getInitialCallsList(attempts || []),
-    recent_call: getInitialRecentCall(attempts || []),
-    recent_attempt: getInitialRecentAttempt(attempts || []),
+    recent_call: getInitialRecentCall(attempts || [], nextRecipient),
+    recent_attempt: getInitialRecentAttempt(attempts || [], nextRecipient),
     token,
     queue_count: queueCount,
     completed_count: completedCount,

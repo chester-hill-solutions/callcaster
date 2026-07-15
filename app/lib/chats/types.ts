@@ -32,6 +32,10 @@ export type ChatsLoaderData = {
   contact: Contact | null;
   error: string | null;
   optOutKeywords: string[];
+  senderSelection: {
+    mode: "from_number" | "messaging_service";
+    messagingServiceReady: boolean;
+  };
   userRole: string;
   contact_number: string | undefined;
   workspaceNumbers: RouteWorkspaceNumber[];

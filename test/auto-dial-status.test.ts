@@ -402,7 +402,7 @@ describe("api.auto-dial.status", () => {
     expect(matching.length).toBe(1);
   });
 
-  test("does not overwrite terminal disposition (completed -> busy)", async () => {
+  test("dequeues by fetched attempt without writing provider status to disposition", async () => {
     postgresStub = await usePostgresStub({ outreachDisposition: "completed" });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -476,7 +476,7 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
-  test("participant-join updates conference_id/start_time and updates queue + outreach attempt", async () => {
+  test("participant-join updates call, queue, and answered_at without provider disposition", async () => {
     postgresStub = await usePostgresStub({
       dbCall: {
         sid: "CA1",
@@ -505,6 +505,10 @@ describe("api.auto-dial.status", () => {
     } as any));
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBeGreaterThan(0);
+    expect(telephonyStubState.outreachUpdateCalls).toEqual([
+      expect.objectContaining({ answered_at: expect.any(String) }),
+    ]);
+    expect(telephonyStubState.outreachUpdateCalls[0]).not.toHaveProperty("disposition");
     expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).toHaveBeenCalledWith(
       expect.objectContaining({ contactId: 1, campaignId: 1 }),
     );

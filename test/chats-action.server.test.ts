@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   sendMessage: vi.fn(),
   linkContactToConversation: vi.fn(),
+  getEffectivePortalConfig: vi.fn(),
 }));
 
 const tenantDbMocks = vi.hoisted(() => ({
@@ -30,6 +31,11 @@ vi.mock("@/lib/database/chat-contact-link.server", () => ({
     mocks.linkContactToConversation(...args),
 }));
 
+vi.mock("@/lib/database/workspace.server", () => ({
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace: (...args: unknown[]) =>
+    mocks.getEffectivePortalConfig(...args),
+}));
+
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => tenantDbMocks),
 }));
@@ -45,6 +51,11 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     mocks.verifyAuth.mockReset();
     mocks.sendMessage.mockReset();
     mocks.linkContactToConversation.mockReset();
+    mocks.getEffectivePortalConfig.mockReset();
+    mocks.getEffectivePortalConfig.mockResolvedValue({
+      sendMode: "from_number",
+      messagingServiceSid: null,
+    });
     tenantDbMocks.contact.findFirst.mockReset();
     tenantDbMocks.contact.findFirst.mockResolvedValue(null);
     tenantDbMocks.workspace_number.findMany.mockReset();
@@ -133,5 +144,34 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       expect.objectContaining({ to: "+15555550100", body: "hi" }),
     );
     expect(mocks.linkContactToConversation).not.toHaveBeenCalled();
+  });
+
+  test("does not require from when the server resolves Messaging Service mode", async () => {
+    mocks.getEffectivePortalConfig.mockResolvedValueOnce({
+      sendMode: "messaging_service",
+      messagingServiceSid: "MG123",
+    });
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" } });
+
+    const { action } = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const formData = new FormData();
+    formData.set("body", "hi");
+    formData.set("mode", "from_number");
+
+    const res = await asRouteResponse(action(await withWorkspaceRouteArgs({
+        request: new Request("http://x/workspaces/w1/chats/+15555550100", {
+          method: "POST",
+          body: formData,
+        }),
+        params: { id: "w1", contact_number: "+15555550100" },
+      })),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ from: "", messagingServiceSid: "MG123" }),
+    );
   });
 });

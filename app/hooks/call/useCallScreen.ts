@@ -167,7 +167,6 @@ export function useCallScreen() {
     activeCall,
     recentAttemptDisposition: recentAttempt?.disposition,
     predictiveState,
-    setDisposition,
     send: send as unknown as (action: { type: string }) => void,
   });
 

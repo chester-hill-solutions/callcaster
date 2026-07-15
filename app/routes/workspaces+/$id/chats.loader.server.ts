@@ -5,6 +5,7 @@ import { fetchCampaignsByType } from "@/lib/database/campaign.server";
 import { fetchContactData } from "@/lib/database/contact.server";
 import {
   fetchConversationSummary,
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace,
   getUserRole,
 } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
@@ -55,7 +56,8 @@ export const loader = defineLoader({
     // use default keywords if onboarding not available
   }
 
-  const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
+  const [workspaceNumbers, contactData, smsCampaigns, portalConfig] =
+    await Promise.all([
     tdb.workspace_number.findMany({
       where: eq(workspaceNumberTable.type, "rented"),
     }),
@@ -72,7 +74,17 @@ export const loader = defineLoader({
       type: "message_campaign",
       tdb,
     }),
+    getEffectiveWorkspaceTwilioPortalConfigForWorkspace({ workspaceId }),
   ]);
+  const messagingServiceReady =
+    portalConfig.sendMode === "messaging_service" &&
+    Boolean(portalConfig.messagingServiceSid?.trim());
+  const senderSelection = {
+    mode: messagingServiceReady
+      ? ("messaging_service" as const)
+      : ("from_number" as const),
+    messagingServiceReady,
+  };
   const { contact, potentialContacts, contactError } = contactData || {
     contact: null,
     potentialContacts: [],
@@ -100,6 +112,7 @@ export const loader = defineLoader({
           hasMore: false,
         },
         potentialContacts: [],
+        senderSelection,
         userRole,
         workspaceNumbers: workspaceNumbers ?? [],
         contact_number,
@@ -132,6 +145,7 @@ export const loader = defineLoader({
       contact,
       error: null,
       optOutKeywords,
+      senderSelection,
       userRole,
       contact_number,
       pagination: {

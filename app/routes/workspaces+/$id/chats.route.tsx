@@ -25,6 +25,7 @@ export default function ChatsList() {
   const {
     workspace,
     workspaceNumbers,
+    senderSelection,
     registerChatActions,
     outlet,
     contact,
@@ -103,6 +104,7 @@ export default function ChatsList() {
           phoneNumber={phoneNumber}
           workspace={workspace as NonNullable<Workspace>}
           workspaceNumbers={chatInputWorkspaceNumbers}
+          senderSelection={senderSelection}
           initialFrom={initialFrom}
           establishedFromNumber={establishedFromNumber}
           handleSubmit={handleSubmit}

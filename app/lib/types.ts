@@ -23,7 +23,7 @@ export type Contact = Tables<"contact">;
 export type Queue = Tables<"campaign_queue"> | null;
 export type Message = Tables<"message"> | null;
 export type OutreachAttempt = Tables<"outreach_attempt"> & {
-  call: Call;
+  call: Call | Call[];
 };
 export type ContactAudience = Tables<"contact_audience"> | null;
 export type CampaignAudience = Tables<"campaign_audience"> | null;

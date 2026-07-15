@@ -133,7 +133,7 @@ describe("webhook side-effect handlers", () => {
       "w1",
       expect.objectContaining({ contact_id: 123 }),
     );
-    expect(mocks.updateOutreachAttemptForWorkspace).toHaveBeenCalled();
+    expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
   test("runSmsStatusSideEffects bills terminal SMS", async () => {
