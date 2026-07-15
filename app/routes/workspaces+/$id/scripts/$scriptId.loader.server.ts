@@ -3,7 +3,7 @@ import { data as routeData, redirect } from "react-router";
 import { listMedia } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { getScriptDetailApi } from "@/lib/platform-data.server";
-import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { Script } from "@/lib/types";
 

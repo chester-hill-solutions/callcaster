@@ -1,7 +1,7 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({

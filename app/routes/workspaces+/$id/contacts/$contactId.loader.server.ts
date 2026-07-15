@@ -3,7 +3,7 @@ import { data as routeData, redirect } from "react-router";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
-import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import {
   campaign as campaignTable,
   contact as contactTable,

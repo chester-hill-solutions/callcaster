@@ -165,7 +165,7 @@ describe("workspace route loaders do not leak workspace secrets", () => {
 
   test("getWorkspaceForClient projects columns in SQL, excluding secrets", async () => {
     const { getWorkspaceForClient } = await import(
-      "@/lib/workspace-members-db.server"
+      "@/lib/workspace-client-projection.server"
     );
 
     const row = await getWorkspaceForClient(workspaceId);

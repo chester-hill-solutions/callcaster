@@ -2,7 +2,7 @@ import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { listWorkspaceScriptsApi } from "@/lib/platform-data.server";
-import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { Json , Database } from "@/lib/db-types";
 import type { User } from "@/lib/types";

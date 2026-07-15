@@ -2,7 +2,7 @@ import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
-import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
 

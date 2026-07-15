@@ -25,7 +25,7 @@ vi.mock("@/lib/database/workspace.server", () => ({
   getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
 }));
 
-vi.mock("@/lib/workspace-members-db.server", () => ({
+vi.mock("@/lib/workspace-client-projection.server", () => ({
   getWorkspaceForClient: (...args: unknown[]) => mocks.getWorkspaceForClient(...args),
 }));
 

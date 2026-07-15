@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { listAudioMetadata } from "@/lib/database/workspace-audio-metadata.server";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
-import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
 

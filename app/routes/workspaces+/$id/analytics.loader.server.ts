@@ -2,10 +2,8 @@ import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { MemberRole } from "@/lib/member-role";
 import { loadWorkspaceAnalytics } from "@/lib/workspace-analytics.server";
 import { logger } from "@/lib/logger.server";
-import {
-  getWorkspaceForClient,
-  listWorkspaceMembersEnriched,
-} from "@/lib/workspace-members-db.server";
+import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { defaultAnalyticsRange } from "../../../../shared/workspace-analytics";
 import { campaign as campaignTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";

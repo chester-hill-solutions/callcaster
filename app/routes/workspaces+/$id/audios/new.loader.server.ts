@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
-import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
 
