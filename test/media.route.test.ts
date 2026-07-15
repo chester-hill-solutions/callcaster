@@ -6,7 +6,7 @@ vi.hoisted(() => {
 });
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession } from "./helpers/route-auth-mock";
+import { queueDualAuthSession, queueDualAuthUnauthorized } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
@@ -33,6 +33,12 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/database/workspace.server", () => {
+  return {
+    requireWorkspaceAccess: vi.fn(async () => undefined),
+  };
+});
+
 describe("app/routes/api+/media/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -52,6 +58,22 @@ describe("app/routes/api+/media/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toBe("https://public");
+  });
+
+  test("rejects unauthenticated uploads before storage work", async () => {
+    const { uploadObject } = await import("@/lib/object-storage.server");
+    vi.mocked(uploadObject).mockClear();
+    queueDualAuthUnauthorized();
+    const mod = await import("../app/routes/api+/media");
+    const fd = new FormData();
+    fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
+    fd.set("live_campaign_id", "1");
+    fd.set("workspace_id", "w1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://x", { method: "POST", body: fd }),
+    } as any));
+    expect(res.status).toBe(401);
+    expect(uploadObject).not.toHaveBeenCalled();
   });
 
   test("returns 500 on upload/update error", async () => {

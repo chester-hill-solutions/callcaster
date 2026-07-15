@@ -241,6 +241,9 @@ function AgentDesktopConnected({
       controller={controller}
       audio={audio}
       outboundDialDisabled={!isAvailable}
+      outboundDialDisabledReason={
+        isAvailable ? undefined : "Set your status to Available to dial out."
+      }
       waitingContent={waitingContent}
       onEndSession={controller.handleEndSession}
       headerExtra={

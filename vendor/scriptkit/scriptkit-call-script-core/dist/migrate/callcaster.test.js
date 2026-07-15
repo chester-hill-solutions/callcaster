@@ -86,6 +86,45 @@ const callcasterFlow = {
     },
 };
 describe("callcaster migrate/serialize round-trip", () => {
+    test("recorded IVR fields survive migrate -> serialize", () => {
+        const recordedFlow = {
+            pages: {
+                page_1: {
+                    id: "page_1",
+                    title: "IVR",
+                    blocks: ["recorded_1"],
+                },
+            },
+            blocks: {
+                recorded_1: {
+                    id: "recorded_1",
+                    type: "recorded",
+                    speechType: "recorded",
+                    title: "Welcome",
+                    content: "Choose an option",
+                    audioFile: "welcome.mp3",
+                    options: [
+                        { value: "1", content: "Sales", next: "sales_page" },
+                    ],
+                },
+            },
+        };
+        const back = serializeToCallcasterFlow(migrateFromCallcasterFlow(recordedFlow));
+        expect(back.blocks.recorded_1).toMatchObject({
+            type: "recorded",
+            speechType: "recorded",
+            title: "Welcome",
+            content: "Choose an option",
+            audioFile: "welcome.mp3",
+            options: [
+                {
+                    value: "1",
+                    content: "Sales",
+                    next: "sales_page",
+                },
+            ],
+        });
+    });
     test("every option.next survives migrate -> serialize", () => {
         const doc = migrateFromCallcasterFlow(callcasterFlow);
         const back = serializeToCallcasterFlow(doc);

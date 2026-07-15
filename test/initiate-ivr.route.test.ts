@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueJsonAuthSession } from "./helpers/route-auth-mock";
+import { queueJsonAuthSession, queueJsonAuthUnauthorized } from "./helpers/route-auth-mock";
 import { rpcGetCampaignQueue } from "@/lib/db-rpc.server";
 
 const WORKSPACE_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -52,6 +52,16 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     mocks.fetch.mockReset();
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
     vi.stubGlobal("fetch", mocks.fetch);
+  });
+
+  test("authenticates before parsing JSON body", async () => {
+    queueJsonAuthUnauthorized();
+    const mod = await import("../app/routes/api+/initiate-ivr");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://x", { method: "POST", body: "{bad json" }),
+    } as any));
+    expect(res.status).toBe(401);
+    expect(mocks.safeParseJson).not.toHaveBeenCalled();
   });
 
   test("throws when get_campaign_queue rpc errors", async () => {

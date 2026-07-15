@@ -8,11 +8,19 @@ export const routingRuleSchema = z.object({
 const baseBlockFields = {
     id: z.string().min(1),
     label: z.string().optional(),
+    /** Original Callcaster block title, retained independently from prompt text. */
+    title: z.string().optional(),
+    /** Original Callcaster wire content, retained through editor round-trips. */
+    content: z.string().optional(),
     prompt: z.string().optional(),
     required: z.boolean().optional(),
     routingRules: z.array(routingRuleSchema).optional(),
     /** Recorded-audio reference carried through from/to the Callcaster wire format. */
     audioFile: z.string().optional(),
+    /** Original Callcaster wire type (including recorded/synthetic/say). */
+    callcasterType: z.string().optional(),
+    /** Callcaster IVR playback mode, when supplied separately from type. */
+    speechType: z.string().optional(),
 };
 /**
  * Option shape shared by choice/select/radio/checkbox blocks. `value`/`label`
@@ -58,6 +66,7 @@ export const textareaBlockSchema = z.object({
     ...baseBlockFields,
     type: z.literal("textarea"),
     prompt: z.string().default(""),
+    options: z.array(scriptOptionSchema).optional(),
 });
 export const selectBlockSchema = z.object({
     ...baseBlockFields,

@@ -76,6 +76,7 @@ export function setDualAuthSession(session: RouteAuthSessionInput): unknown {
     session.user ? buildJsonAuth(session) : unauthorizedResponse(),
   );
   const sessionResult = {
+    auth,
     headers: session.headers ?? new Headers(),
     user: session.user ?? undefined,
   };

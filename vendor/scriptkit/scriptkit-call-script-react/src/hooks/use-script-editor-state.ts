@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CANVASS_BLOCK_TYPES,
   CALLCASTER_BLOCK_TYPES,
@@ -22,6 +22,12 @@ export function useScriptEditorState(options: UseScriptEditorStateOptions) {
   const [document, setDocument] = useState(options.initialDocument);
   const [activePageId, setActivePageId] = useState(options.initialDocument.startPageId);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDocument(options.initialDocument);
+    setActivePageId(options.initialDocument.startPageId);
+    setActiveBlockId(null);
+  }, [options.initialDocument]);
 
   const palette = options.palette ?? "callcaster";
   const blockTypes = palette === "canvass" ? CANVASS_BLOCK_TYPES : CALLCASTER_BLOCK_TYPES;

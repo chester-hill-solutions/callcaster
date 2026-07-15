@@ -21,6 +21,7 @@ type WebhookEventPickerProps = {
   onTestEvent?: (option: WebhookEventOption) => void;
   testBusy?: boolean;
   canTest?: boolean;
+  testDisabledReason?: string;
 };
 
 function EventKindRow({
@@ -128,6 +129,7 @@ export function WebhookEventPicker({
   onTestEvent,
   testBusy = false,
   canTest = false,
+  testDisabledReason,
 }: WebhookEventPickerProps) {
   const [tab, setTab] = useState<CatalogPickerTab>("all");
   const [query, setQuery] = useState("");
@@ -169,7 +171,8 @@ export function WebhookEventPicker({
   }
 
   return (
-    <CatalogPickerShell
+    <div className="space-y-2">
+      <CatalogPickerShell
       legend="Events"
       hint="Choose which workspace events CallCaster should POST to your endpoint."
       allLabel="All events"
@@ -191,20 +194,26 @@ export function WebhookEventPicker({
         tab === "selected" ? "No events selected yet." : "No events match your search."
       }
       hasCategories={categories.length > 0}
-    >
-      {categories.map(({ category, options }) => (
-        <EventCategorySection
-          key={category}
-          category={category}
-          options={options}
-          selected={selected}
-          forceOpen={trimmedQuery.length > 0 || tab === "selected"}
-          onToggle={toggleEvent}
-          onTestEvent={onTestEvent}
-          testBusy={testBusy}
-          canTest={canTest}
-        />
-      ))}
-    </CatalogPickerShell>
+      >
+        {categories.map(({ category, options }) => (
+          <EventCategorySection
+            key={category}
+            category={category}
+            options={options}
+            selected={selected}
+            forceOpen={trimmedQuery.length > 0 || tab === "selected"}
+            onToggle={toggleEvent}
+            onTestEvent={onTestEvent}
+            testBusy={testBusy}
+            canTest={canTest}
+          />
+        ))}
+      </CatalogPickerShell>
+      {onTestEvent && !canTest && testDisabledReason ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          {testDisabledReason}
+        </p>
+      ) : null}
+    </div>
   );
 }

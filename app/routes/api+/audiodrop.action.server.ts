@@ -1,4 +1,7 @@
-import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { resolveJsonAuthSession } from "@/lib/api-auth.server";
 import { playTwiml } from "@/lib/twilio-twiml.server";
@@ -38,15 +41,23 @@ export const action = defineAction({
     createSignedObjectUrl: deps?.createSignedObjectUrl ?? createSignedObjectUrl,
   };
 
+  const auth = await d.verifyAuth(request);
   const formData = await request.formData();
   const callId = formData.get("callId");
   const workspaceId = formData.get("workspaceId");
   const campaignId = formData.get("campaignId");
-  await d.verifyAuth(request);
 
   try {
+    if (typeof workspaceId !== "string" || !workspaceId) {
+      return { success: false, error: "workspaceId is required" };
+    }
+    await requireWorkspaceAccess({
+      user: auth.user,
+      workspaceId,
+    });
+
     const twilio = await d.createWorkspaceTwilioInstance({
-      workspace_id: workspaceId as string,
+      workspace_id: workspaceId,
     });
     const childCallSid = await d.findCallSidByParentCallSid(callId as string);
     if (!childCallSid) {

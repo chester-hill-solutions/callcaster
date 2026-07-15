@@ -58,4 +58,21 @@ describe("WebhookEventPicker", () => {
       expect.objectContaining({ value: "inbound_call:INSERT" }),
     );
   });
+
+  test("explains why a selected event cannot be tested", () => {
+    render(
+      <WebhookEventPicker
+        selected={new Set(["inbound_call:INSERT"])}
+        onSelectedChange={() => undefined}
+        onTestEvent={() => undefined}
+        canTest={false}
+        testDisabledReason="Enter a destination URL to test this webhook."
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Test" })).toBeDisabled();
+    expect(
+      screen.getByText("Enter a destination URL to test this webhook."),
+    ).toBeVisible();
+  });
 });

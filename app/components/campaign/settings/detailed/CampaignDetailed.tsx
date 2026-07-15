@@ -265,13 +265,36 @@ export const CampaignTypeSpecificSettings = ({
 
   const smsSendModeForUi = campaignData.sms_send_mode ?? "from_number";
 
-  const sendNowDisabled =
-    isBusy ||
-    isChanged ||
-    !hasMessageContent ||
-    (smsSendModeForUi === "messaging_service"
-      ? !String(campaignData.sms_messaging_service_sid ?? "").trim()
-      : !campaignData.caller_id);
+  const sendNowDisabledReason = isBusy
+    ? "A campaign action is already in progress."
+    : isChanged
+      ? "Save your edits before sending this message campaign."
+      : joinDisabled ||
+        (!hasMessageContent
+          ? "Message content or media is required."
+          : smsSendModeForUi === "messaging_service"
+            ? !String(campaignData.sms_messaging_service_sid ?? "").trim()
+              ? "Select and save a Messaging Service before sending."
+              : null
+            : !campaignData.caller_id
+              ? "Choose an outbound phone number before sending."
+              : null);
+  const sendNowDisabled = Boolean(sendNowDisabledReason);
+  const scheduleDisabledReason =
+    typeof scheduleDisabled === "string"
+      ? scheduleDisabled
+      : scheduleDisabled
+        ? "Campaign scheduling is unavailable."
+        : null;
+  const messageActionBlockers = Array.from(
+    new Set(
+      [
+        ...readinessIssues,
+        sendNowDisabledReason,
+        scheduleDisabledReason,
+      ].filter((reason): reason is string => Boolean(reason)),
+    ),
+  );
 
   const ivrTooltipLines = [
     `Estimated effective dial-start rate: ${formatRatePerMinute(ivrEstimate.effectiveDialAttemptsPerSecond)} CPS.`,
@@ -433,6 +456,19 @@ export const CampaignTypeSpecificSettings = ({
             senderClass={outboundEstimateInputs.portalConfig.smsSenderClass}
             disabled={isBusy}
           />
+          {messageActionBlockers.length > 0 ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Complete these items before sending or scheduling</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc space-y-1 pl-5">
+                  {messageActionBlockers.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <div className="flex gap-2 justify-end items-center">
             <Button
               type="button"
@@ -443,7 +479,7 @@ export const CampaignTypeSpecificSettings = ({
             </Button>
             <Button
               type="button"
-              disabled={!!scheduleDisabled || isBusy}
+              disabled={Boolean(scheduleDisabledReason) || isBusy}
               onClick={() => handleScheduleButton()}
             >
               Schedule Campaign

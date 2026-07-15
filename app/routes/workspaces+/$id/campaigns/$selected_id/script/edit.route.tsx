@@ -28,7 +28,7 @@ type LoaderData = ScriptEditLoaderData;
 type PageData = LoaderData["data"];
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, mediaNames = [], scripts = [], data } =
+  const { workspace_id, selected_id, mediaNames = [], data } =
     useLoaderData<LoaderData>();
   const [initData, setInitData] = useState<PageData>(data);
   const [pageData, setPageData] = useState<PageData>(data);
@@ -122,7 +122,6 @@ export default function ScriptEditor() {
             }
           });
         }}
-        scripts={scripts}
         mediaNames={mediaNames}
       />
     );

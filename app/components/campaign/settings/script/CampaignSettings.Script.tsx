@@ -32,13 +32,13 @@ type PageData = {
 type ScriptPageProps = {
   pageData: PageData;
   onPageDataChange: (data: PageData) => void;
-  scripts: Script[];
   mediaNames: string[];
 };
 
 export default function CampaignSettingsScript({
   pageData,
   onPageDataChange,
+  mediaNames,
 }: ScriptPageProps) {
   const script = pageData.campaignDetails.script;
   const document = useMemo(() => scriptToDocument(script), [script]);
@@ -103,7 +103,12 @@ export default function CampaignSettingsScript({
         ),
       }}
     >
-      <ScriptEditor document={document} onChange={handleChange} palette="callcaster" />
+      <ScriptEditor
+        document={document}
+        onChange={handleChange}
+        palette="callcaster"
+        mediaNames={mediaNames}
+      />
     </ScriptKitCallScriptUiProvider>
   );
 }

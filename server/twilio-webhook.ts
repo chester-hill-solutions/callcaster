@@ -30,8 +30,11 @@ function resolveTwilioWebhookOptions(
   const pathname = new URL(request.url).pathname;
 
   if (
-    pathname.startsWith("/api/caller-id/status") ||
-    pathname.startsWith("/api/inbound")
+    pathname === "/api/caller-id/status" ||
+    pathname === "/api/inbound" ||
+    pathname === "/api/inbound-handset" ||
+    pathname === "/api/inbound-handset-dial-end" ||
+    pathname === "/api/inbound-sms"
   ) {
     const phone = params.get("Called") || params.get("To") || "";
     if (phone) return { phoneNumber: phone };

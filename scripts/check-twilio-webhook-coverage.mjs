@@ -29,17 +29,26 @@ const EXCLUDED_SUFFIXES = [
   "error-report.action.server.ts",
   "verify-audio-session.action.server.ts",
   "verify-pin-input.action.server.ts",
-  "inbound-verification.action.server.ts",
 ];
 
 /** Twilio webhook handlers (POST from Twilio). Loader-only conference connect validated separately. */
 const TWILIO_WEBHOOK_SUFFIXES = [
+  "acd-router.action.server.ts",
+  "acd-router/agent-bridge.action.server.ts",
+  "acd-router/agent-status.action.server.ts",
+  "acd-router/complete.action.server.ts",
+  "call.action.server.ts",
   "inbound.action.server.ts",
   "inbound-sms.action.server.ts",
+  "inbound-verification.action.server.ts",
   "inbound-handset.action.server.ts",
   "inbound-handset-dial-end.action.server.ts",
+  "inbound-ivr/$numberId/$pageId.action.server.ts",
+  "inbound-ivr/$numberId/$pageId/$blockId.action.server.ts",
+  "inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
   "sms/status.action.server.ts",
   "call-status.action.server.ts",
+  "dial/$number.action.server.ts",
   "dial/status.action.server.ts",
   "auto-dial/status.action.server.ts",
   "auto-dial/$roomId.action.server.ts",
@@ -50,6 +59,7 @@ const TWILIO_WEBHOOK_SUFFIXES = [
   "ivr/$campaignId/$pageId.action.server.ts",
   "ivr/$campaignId/$pageId/$blockId.action.server.ts",
   "ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+  "twilio/trusthub/status.action.server.ts",
 ];
 
 function collectActionFiles(dir, prefix = "") {

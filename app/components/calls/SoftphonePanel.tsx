@@ -22,6 +22,7 @@ type SoftphonePanelProps = {
   headerExtra?: ReactNode;
   waitingContent?: ReactNode;
   outboundDialDisabled?: boolean;
+  outboundDialDisabledReason?: string;
   connectionStatus?: string;
   onEndSession: () => void;
 };
@@ -36,6 +37,7 @@ export function SoftphonePanel({
   headerExtra,
   waitingContent,
   outboundDialDisabled = false,
+  outboundDialDisabledReason,
   connectionStatus,
   onEndSession,
 }: SoftphonePanelProps) {
@@ -65,6 +67,7 @@ export function SoftphonePanel({
             value={controller.outboundTo}
             error={controller.outboundError}
             disabled={outboundDialDisabled}
+            disabledReason={outboundDialDisabledReason}
             onChange={controller.setOutboundTo}
             onDial={controller.handleOutboundDial}
             onClearError={controller.clearOutboundError}
