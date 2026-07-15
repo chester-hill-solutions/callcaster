@@ -425,8 +425,10 @@ export async function updateMeProfile(
     const mappedUser = mapUserProfile(user);
     const profile = await updateOwnUserProfile({
       userId,
-      first_name: mappedUser.first_name ?? currentProfile?.first_name ?? null,
-      last_name: mappedUser.last_name ?? currentProfile?.last_name ?? null,
+      first_name:
+        body.first_name ?? mappedUser.first_name ?? currentProfile?.first_name ?? null,
+      last_name:
+        body.last_name ?? mappedUser.last_name ?? currentProfile?.last_name ?? null,
       username: mappedUser.email ?? currentProfile?.username ?? userId,
     });
     if (!profile) {

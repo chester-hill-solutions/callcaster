@@ -19,7 +19,7 @@
 :surveyId
 :workspaceId
 accept-invite
-account/security
+account
 actions
 admin
 agent-bridge
@@ -157,6 +157,7 @@ responses
 results
 script/edit
 scripts
+security
 services
 sessions/:sessionId
 settings

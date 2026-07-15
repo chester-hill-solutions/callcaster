@@ -1,6 +1,6 @@
 export { loader, action } from "./account.security.loader.server";
 
-import { Form, useActionData, useLoaderData } from "react-router";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -29,6 +29,9 @@ export default function AccountSecurity() {
 
   return (
     <main className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
+      <Button asChild variant="ghost" className="w-fit">
+        <Link to="/account">← Back to account</Link>
+      </Button>
       <AuthCard
         title="Account security"
         description={

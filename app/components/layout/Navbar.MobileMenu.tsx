@@ -82,6 +82,13 @@ export const MobileMenu = ({
             </div>
             <div className="space-y-1">
               <NavLink
+                to="/account"
+                onClick={onClose}
+                className={navLinkClass}
+              >
+                Account
+              </NavLink>
+              <NavLink
                 to="/workspaces"
                 onClick={onClose}
                 className={navLinkClass}

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   changePassword: vi.fn(),
   signUpEmail: vi.fn(),
   isSignupOpen: vi.fn(() => true),
+  getUserById: vi.fn(),
+  updateOwnUserProfile: vi.fn(),
 }));
 
 vi.mock("@/lib/env.server", () => ({
@@ -27,7 +29,9 @@ vi.mock("@/lib/logger.server", () => ({
 }));
 
 vi.mock("@/lib/workspace-members-db.server", () => ({
+  getUserById: mocks.getUserById,
   listUserWorkspaceMembershipsForProfile: vi.fn(async () => []),
+  updateOwnUserProfile: mocks.updateOwnUserProfile,
 }));
 
 vi.mock("@/lib/database/workspace.server", () => ({
@@ -43,6 +47,15 @@ describe("platform-auth.server.ts", () => {
     mocks.changePassword.mockReset();
     mocks.signUpEmail.mockReset();
     mocks.isSignupOpen.mockReturnValue(true);
+    mocks.getUserById.mockReset();
+    mocks.getUserById.mockResolvedValue({
+      id: "u1",
+      first_name: "First",
+      last_name: "Last",
+      username: "a@b.com",
+    });
+    mocks.updateOwnUserProfile.mockReset();
+    mocks.updateOwnUserProfile.mockResolvedValue({ id: "u1" });
   });
 
   describe("registerUser", () => {
@@ -73,6 +86,7 @@ describe("platform-auth.server.ts", () => {
 
       const result = await mod.updateMeProfile(
         new Request("http://localhost/api/me", { headers: new Headers() }),
+        "u1",
         {
           email: "a@b.com",
           password: "newPassword123",
@@ -92,6 +106,7 @@ describe("platform-auth.server.ts", () => {
       const mod = await import("../app/lib/platform-auth.server");
       const result = await mod.updateMeProfile(
         new Request("http://localhost/api/me", { headers: new Headers() }),
+        "u1",
         {
           password: "newPassword123",
           current_password: "   ",
@@ -114,6 +129,7 @@ describe("platform-auth.server.ts", () => {
 
       const result = await mod.updateMeProfile(
         new Request("http://localhost/api/me", { headers: new Headers() }),
+        "u1",
         {
           password: "newPassword123",
           current_password: "oldPassword123",
@@ -138,12 +154,24 @@ describe("platform-auth.server.ts", () => {
 
       const result = await mod.updateMeProfile(
         new Request("http://localhost/api/me", { headers: new Headers() }),
+        "u1",
         {
           first_name: "Updated",
         } as any,
       );
 
       expect(result.ok).toBe(true);
+      expect(mocks.updateUser).toHaveBeenCalledWith({
+        body: { name: "Updated Last" },
+        headers: expect.any(Headers),
+        returnHeaders: true,
+      });
+      expect(mocks.updateOwnUserProfile).toHaveBeenCalledWith({
+        userId: "u1",
+        first_name: "Updated",
+        last_name: "Last",
+        username: "a@b.com",
+      });
       expect(mocks.changePassword).not.toHaveBeenCalled();
     });
   });

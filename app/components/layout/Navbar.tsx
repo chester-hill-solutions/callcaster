@@ -90,6 +90,12 @@ const UserDropdownMenu = ({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
+          <Link to="/account">
+            <UserIcon className="mr-2 h-4 w-4" />
+            Account
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <NavLink
             to={"/accept-invite"}
             className={
