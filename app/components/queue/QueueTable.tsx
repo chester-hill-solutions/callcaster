@@ -16,6 +16,21 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { StatusDropdown } from "./StatusDropdown";
 import { QueueTablePagination } from "./QueueTablePagination";
 import {
@@ -28,6 +43,10 @@ import {
 } from "@/lib/queue-status";
 
 const ATTEMPT_OPTIONS = ["completed", "failed", "no-answer", "voicemail", "unknown"] as const;
+
+const ALL_AUDIENCES_VALUE = "all";
+const ALL_STATUSES_VALUE = "all";
+const ALL_DISPOSITIONS_VALUE = "all";
 
 type SupportLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -447,23 +466,28 @@ export function QueueTable({
                         </Button>
                     </div>
                     <div className="relative">
-                        <select
-                            name="audiences"
-                            value={optimisticAudience}
-                            onChange={(e) => {
-                                const newValue = e.target.value;
+                        <Select
+                            value={optimisticAudience || ALL_AUDIENCES_VALUE}
+                            onValueChange={(value) => {
+                                const newValue = value === ALL_AUDIENCES_VALUE ? "" : value;
                                 setOptimisticAudience(newValue);
                                 handleFilterChange('audiences', newValue);
                             }}
-                            className="h-6 w-full rounded border border-input bg-muted/50 px-2 text-xs"
                         >
-                            <option value="">Select audience...</option>
-                            {audiences?.map(audience => (
-                                <option key={audience?.id} value={audience?.id?.toString() || ''}>
-                                    {audience?.name}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger className="h-6 w-full bg-muted/50 text-xs">
+                                <SelectValue placeholder="Select audience..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_AUDIENCES_VALUE}>Select audience...</SelectItem>
+                                {audiences?.map(audience => (
+                                    audience?.id != null ? (
+                                        <SelectItem key={audience.id} value={audience.id.toString()}>
+                                            {audience.name}
+                                        </SelectItem>
+                                    ) : null
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
             ),
@@ -473,12 +497,13 @@ export function QueueTable({
             header: ({ column, table }) => {
                 const rows = rowSelection;
                 const selectedRows = Object.keys(rows).map(String);
+                const isSetStatusMode = selectedRows.length > 0 || isAllFilteredSelected;
 
                 return (
                     <div className="space-y-1">
                         <div className="flex items-center px-1 justify-between">
                             <span className="font-medium text-xs">
-                                {selectedRows.length > 0 || isAllFilteredSelected ? "Set Status" : "Status"}
+                                {isSetStatusMode ? "Set Status" : "Status"}
                             </span>
                             <Button
                                 variant="ghost"
@@ -499,36 +524,49 @@ export function QueueTable({
                                 )}
                             </Button>
                         </div>
-                        <select
-                            name="status"
-                            value={selectedRows.length > 0 ? "" : optimisticQueueStatus}
-                            onChange={(e) => {
-                                const newValue = e.target.value;
-                                if (selectedRows.length > 0 || isAllFilteredSelected) {
-                                    handleStatusChangeOptimistic(selectedRows, newValue as QueueSettableStatus);
+                        <Select
+                            value={
+                                isSetStatusMode
+                                    ? undefined
+                                    : (optimisticQueueStatus || ALL_STATUSES_VALUE)
+                            }
+                            onValueChange={(newValue) => {
+                                if (isSetStatusMode) {
+                                    handleStatusChangeOptimistic(
+                                        selectedRows,
+                                        newValue as QueueSettableStatus,
+                                    );
                                 } else {
-                                    setOptimisticQueueStatus(newValue);
-                                    handleFilterChange('queueStatus', newValue);
+                                    const filterValue = newValue === ALL_STATUSES_VALUE ? "" : newValue;
+                                    setOptimisticQueueStatus(filterValue);
+                                    handleFilterChange('queueStatus', filterValue);
                                 }
                             }}
-                            className="h-6 w-full rounded border border-input bg-muted/50 px-2 text-xs"
                         >
-                            {selectedRows.length > 0 || isAllFilteredSelected ? (
-                                <>
-                                    <option value="">Set status...</option>
-                                    {QUEUE_SETTABLE_STATUSES.map((status) => (
-                                        <option key={status} value={status}>{status}</option>
-                                    ))}
-                                </>
-                            ) : (
-                                <>
-                                    <option value="">All statuses</option>
-                                    {QUEUE_STATUS_FILTERS.map((status) => (
-                                        <option key={status} value={status}>{status}</option>
-                                    ))}
-                                </>
-                            )}
-                        </select>
+                            <SelectTrigger className="h-6 w-full bg-muted/50 text-xs">
+                                <SelectValue
+                                    placeholder={isSetStatusMode ? "Set status..." : "All statuses"}
+                                />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {isSetStatusMode ? (
+                                    QUEUE_SETTABLE_STATUSES.map((status) => (
+                                        <SelectItem key={status} value={status}>
+                                            {status}
+                                        </SelectItem>
+                                    ))
+                                ) : (
+                                    <>
+                                        <SelectItem value={ALL_STATUSES_VALUE}>All statuses</SelectItem>
+                                        {QUEUE_STATUS_FILTERS.map((status) => (
+                                            <SelectItem key={status} value={status}>
+                                                {status}
+                                            </SelectItem>
+                                        ))}
+                                    </>
+                                )}
+                            </SelectContent>
+                        </Select>
                     </div>
                 );
             },
@@ -560,12 +598,26 @@ export function QueueTable({
                             <span className="font-medium text-xs">Support</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <select name="disposition" value={optimisticDisposition} className="h-6 w-full rounded border border-input bg-muted/50 px-2 text-xs" onChange={(e) => { const v = e.target.value; setOptimisticDisposition(v); handleFilterChange('disposition', v); }}>
-                                <option value="">Select...</option>
-                                {ATTEMPT_OPTIONS.map((attempt) => (
-                                    <option key={attempt} value={attempt}>{attempt}</option>
-                                ))}
-                            </select>
+                            <Select
+                                value={optimisticDisposition || ALL_DISPOSITIONS_VALUE}
+                                onValueChange={(value) => {
+                                    const v = value === ALL_DISPOSITIONS_VALUE ? "" : value;
+                                    setOptimisticDisposition(v);
+                                    handleFilterChange('disposition', v);
+                                }}
+                            >
+                                <SelectTrigger className="h-6 w-full bg-muted/50 text-xs">
+                                    <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_DISPOSITIONS_VALUE}>Select...</SelectItem>
+                                    {ATTEMPT_OPTIONS.map((attempt) => (
+                                        <SelectItem key={attempt} value={attempt}>
+                                            {attempt}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                 )
@@ -684,55 +736,51 @@ export function QueueTable({
             </div>
 
             {/* Table */}
-            <div className="rounded-md border">
-                <div className="relative">
-                    <div className="max-h-[800px] overflow-auto">
-                        <table className="w-full" data-testid="campaign-queue-table">
-                            <thead className="sticky top-0 bg-muted border-b">
-                                {table.getHeaderGroups().map(headerGroup => (
-                                    <tr key={headerGroup.id}>
-                                        {headerGroup.headers.map((header, i) => (
-                                            <th
-                                                key={`${i}-${header.id}`}
-                                                className="h-10 whitespace-nowrap px-2 text-left align-middle font-medium text-primary text-xs"
-                                                style={{ width: header.getSize() }}
-                                            >
-                                                {flexRender(
-                                                    header.column.columnDef.header,
-                                                    header.getContext()
-                                                )}
-                                            </th>
-                                        ))}
-                                    </tr>
+            <div className="relative max-h-[800px] overflow-auto rounded-md border">
+                <Table data-testid="campaign-queue-table">
+                    <TableHeader className="sticky top-0 z-10 bg-muted border-b">
+                        {table.getHeaderGroups().map(headerGroup => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header, i) => (
+                                    <TableHead
+                                        key={`${i}-${header.id}`}
+                                        className="h-10 whitespace-nowrap px-2 text-left align-middle font-medium text-primary text-xs"
+                                        style={{ width: header.getSize() }}
+                                    >
+                                        {flexRender(
+                                            header.column.columnDef.header,
+                                            header.getContext()
+                                        )}
+                                    </TableHead>
                                 ))}
-                            </thead>
-                            <tbody>
-                                {table.getRowModel().rows.map(row => (
-                                    <tr key={row.id} className="border-b hover:bg-muted/50 text-muted-foreground">
-                                        {row.getVisibleCells().map((cell, i) => (
-                                            <td key={`${i}-${cell.id}`} className="whitespace-nowrap p-1 px-2 text-xs">
-                                                {flexRender(
-                                                    cell.column.columnDef.cell,
-                                                    cell.getContext()
-                                                )}
-                                            </td>
-                                        ))}
-                                    </tr>
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {table.getRowModel().rows.map(row => (
+                            <TableRow key={row.id} className="text-muted-foreground">
+                                {row.getVisibleCells().map((cell, i) => (
+                                    <TableCell key={`${i}-${cell.id}`} className="whitespace-nowrap p-1 px-2 text-xs">
+                                        {flexRender(
+                                            cell.column.columnDef.cell,
+                                            cell.getContext()
+                                        )}
+                                    </TableCell>
                                 ))}
-                                <tr className="sticky bottom-0 bg-muted">
-                                    <td colSpan={columns.length} className="p-2 text-xs">
-                                        {isAllFilteredSelected ?
-                                            `Selected: ${totalCount} of ${unfilteredCount}` :
-                                            Object.keys(rowSelection).length > 0 ?
-                                                `Selected: ${Object.keys(rowSelection).length} of ${unfilteredCount}` :
-                                                `Total: ${totalCount} of ${unfilteredCount}`
-                                        }
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                            </TableRow>
+                        ))}
+                        <TableRow className="sticky bottom-0 bg-muted hover:bg-muted">
+                            <TableCell colSpan={columns.length} className="p-2 text-xs">
+                                {isAllFilteredSelected ?
+                                    `Selected: ${totalCount} of ${unfilteredCount}` :
+                                    Object.keys(rowSelection).length > 0 ?
+                                        `Selected: ${Object.keys(rowSelection).length} of ${unfilteredCount}` :
+                                        `Total: ${totalCount} of ${unfilteredCount}`
+                                }
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </div>
 
             <QueueTablePagination

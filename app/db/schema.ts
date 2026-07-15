@@ -19,6 +19,14 @@ import {
   uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { CoachingConfig } from "@/lib/coaching-schemas";
+
+export {
+  transcript_segment,
+  coaching_event,
+  coaching_session,
+  call_transcript,
+} from "./schema-transcription";
 
 export const agent_state = pgEnum("agent_state", ["offline","available","busy","wrap_up","away"]);
 export const answered_by = pgEnum("answered_by", ["human","machine","unknown"]);
@@ -41,6 +49,8 @@ export const workspace = pgTable("workspace", {
   credits: integer().notNull(),
   disabled: boolean().notNull(),
   feature_flags: jsonb().notNull(),
+  /** Live coaching config (ADR-0028 / Slice 12.1). */
+  coaching_config: jsonb().$type<CoachingConfig>(),
   id: text().notNull().primaryKey(),
   key: text(),
   name: text().notNull(),
@@ -362,6 +372,12 @@ export const call = pgTable("call", {
   recording_duration: text(),
   recording_sid: text(),
   recording_url: text(),
+  /** Railway Buckets path for our copy of the recording (Slice 12.1 / ADR-0027). */
+  audio_url: text(),
+  /** Golden transcript pointer (call_transcript.id). */
+  transcript_id: uuid(),
+  /** Post-call coaching session pointer (coaching_session.id). */
+  coaching_session_id: uuid(),
   sid: text().notNull(),
   start_time: text(),
   status: text(),
