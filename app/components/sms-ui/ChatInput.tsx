@@ -162,6 +162,15 @@ export default function ChatInput({
     !(selectedContact || (phoneNumber && isValid)) ||
     (sendLater && !sendAtLocal);
 
+  /**
+   * @effect After a scheduled-send submission completes, clear the schedule
+   * controls on success or leave them intact when the server returns an error.
+   * @effect-deps messageFetcher.data, messageFetcher.state (tracks the
+   * submission lifecycle via submittedScheduleRef / observedSubmissionRef)
+   * @effect-side-effects setSendLater, setSendAtLocal only
+   * @effect-why-not-loader Schedule UI state is client-controlled; we only
+   * reset it once the fetcher settles after an explicit user submit.
+   */
   useEffect(() => {
     if (!submittedScheduleRef.current) return;
     if (messageFetcher.state !== "idle") {

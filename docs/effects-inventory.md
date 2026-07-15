@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**93** documented / **98** total effects (5 grandfathered, ratcheting to 0).
+**98** documented / **98** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -22,8 +22,11 @@
 | `app/components/file-assets/AudioRecorder.tsx` | Release the microphone, audio graph, rAF loop and object URL when the | releaseAll (stable callback composed of stable callbacks; runs | dom (MediaStreamTrack.stop, AudioContext.close, | Imperative teardown of browser media hardware handles; |
 | `app/components/shared/SaveBar.tsx` | Wire a global Cmd/Ctrl+S keyboard shortcut to trigger onSave while there are unsaved changes. | isChanged, isSaving, onSave — the handler must see current values to guard the save and avoid double-submits. | dom (document keydown listener; removed on cleanup/re-run) | A global keyboard shortcut requires a document-level event listener; there's no loader/fetcher equivalent for DOM key events. |
 | `app/components/sms-ui/ChatInput.tsx` | KEEP: align the controlled From selection with available sender | initialFrom, workspaceNumbers (available sender option values) | setSelectedFrom only | selectedFrom is intentional user-controlled state; |
+| `app/components/sms-ui/ChatInput.tsx` | After a scheduled-send submission completes, clear the schedule | messageFetcher.data, messageFetcher.state (tracks the | setSendLater, setSendAtLocal only | Schedule UI state is client-controlled; we only |
 | `app/hooks/agent/useAgentStatus.ts` | Load the agent's current status on mount and send a heartbeat POST every 30s while mounted. | workspaceId, userId (guards + re-arms the heartbeat when either changes), refreshStatus | timer (setInterval heartbeat) + fetch (initial refreshStatus() and each heartbeat POST); interval cleared on unmount/dep change | The recurring heartbeat is live client-only polling a loader can't express; |
 | `app/hooks/call/useCallAudioControls.ts` | Create a Web Audio API AudioContext on mount for DTMF tone | [] — intentionally mount-once; the AudioContext should be | dom (Web Audio API AudioContext construction/close) | Browser audio API object construction, not |
+| `app/hooks/call/useCallAudioControls.ts` | Enumerate audio devices on mount and subscribe to OS | refreshDevices (stable callback) | subscription (mediaDevices "devicechange" listener) | Browser hardware enumeration is a client-only API. |
+| `app/hooks/call/useCallAudioControls.ts` | Apply the selected microphone and speaker device IDs to the | device, microphone, output | dom (Twilio Device audio input/output routing) | Live Twilio audio routing follows user device picks. |
 | `app/hooks/call/useCallAudioControls.ts` | Auto-request microphone access whenever there's no live stream | stream, permissionError, requestMicrophoneAccess (re-runs | dom (navigator.mediaDevices.getUserMedia browser | Browser media-permission/hardware access is a |
 | `app/hooks/call/useCallDuration.ts` | Tick the call-duration counter once per second while connected. | callState (starts the timer on 'connected', resets otherwise) | timer (setInterval) + functional setState; cleared on unmount/state change | Wall-clock elapsed time is live client state, not server request data. |
 | `app/hooks/call/useCallHandling.ts` | Mirror `heldCalls` state into a ref so callbacks/other effects | heldCalls (re-syncs the ref whenever the held-calls list changes) | none (plain ref assignment) | Not data fetching; "latest ref" pattern for use in |
@@ -40,6 +43,8 @@
 | `app/hooks/call/useCallScreen.ts` | Let the physical/OS keyboard send DTMF digits during an active | [] — intentionally mount-once; the handler always calls | dom (window "keypress" event listener), removed on | DOM event subscription, not request/response data. |
 | `app/hooks/call/useCallState.ts` | Tick the call FSM's duration counter (dispatch TICK) once per | state, send (starts/stops the interval based on FSM state; | timer (setInterval), cleared on state change/unmount | Wall-clock elapsed time is live client timer state, |
 | `app/hooks/call/useNextRecipientSync.ts` | When the queue-provided next recipient advances, sync the | nextRecipient, send, setCallDuration, setQuestionContact | none (dispatches to state setters/reducer passed in; | nextRecipient is already realtime/loader-sourced |
+| `app/hooks/call/usePhoneVerification.ts` | Reset handset selection to computer when the previously chosen | selectedDevice, verifiedNumbers | setSelectedDevice, setPhoneConnectionStatus, | Device selection is live client state reconciled |
+| `app/hooks/call/usePhoneVerification.ts` | Surface call-in verification results from the verify fetcher: | verifyFetcher.data | toast + setVerificationPhoneNumber, setIsAddingNumber | Reacts to fetcher submission outcomes after the user |
 | `app/hooks/call/usePredictiveCallSync.ts` | Bridge predictive-dialer room state (pushed via the workspace SSE | predictiveState, queue, nextRecipient?.contact_id, send, | none (dispatches to state setters/reducer passed in; | predictiveState already arrives via a realtime SSE |
 | `app/hooks/call/useSoftphoneAudioDevices.ts` | On mount, enumerate audio devices, request microphone permission | refreshDevices (stable callback; state reconciliation uses | subscription (mediaDevices "devicechange" listener, | Browser hardware device enumeration and permission |
 | `app/hooks/call/useSoftphoneAudioDevices.ts` | When a call becomes active (or the selected mic/speaker changes | activeCall, device, selectedMicId, selectedSpeakerId (reacts | dom (imperative Device.audio.setInputDevice / | Imperative SDK/audio-hardware binding tied to an |

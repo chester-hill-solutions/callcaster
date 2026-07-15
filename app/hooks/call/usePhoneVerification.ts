@@ -25,6 +25,15 @@ export function usePhoneVerification({
   }>();
   const [verificationPhoneNumber, setVerificationPhoneNumber] = useState("");
 
+  /**
+   * @effect Reset handset selection to computer when the previously chosen
+   * verified number is no longer in the workspace list.
+   * @effect-deps selectedDevice, verifiedNumbers
+   * @effect-side-effects setSelectedDevice, setPhoneConnectionStatus,
+   * setPhoneCallSid
+   * @effect-why-not-loader Device selection is live client state reconciled
+   * against the current verified-number inventory.
+   */
   useEffect(() => {
     if (selectedDevice === "computer" || verifiedNumbers.includes(selectedDevice)) {
       return;
@@ -35,6 +44,14 @@ export function usePhoneVerification({
     setPhoneCallSid(null);
   }, [selectedDevice, verifiedNumbers]);
 
+  /**
+   * @effect Surface call-in verification results from the verify fetcher:
+   * show errors via toast or capture the dial-in number on success.
+   * @effect-deps verifyFetcher.data
+   * @effect-side-effects toast + setVerificationPhoneNumber, setIsAddingNumber
+   * @effect-why-not-loader Reacts to fetcher submission outcomes after the user
+   * starts verification; not initial route data.
+   */
   useEffect(() => {
     const data = verifyFetcher.data;
     if (!data) return;

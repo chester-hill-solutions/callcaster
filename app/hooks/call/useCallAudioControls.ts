@@ -122,6 +122,13 @@ export function useCallAudioControls({
     };
   }, []);
 
+  /**
+   * @effect Enumerate audio devices on mount and subscribe to OS
+   * devicechange events so mic/speaker pickers stay in sync with hardware.
+   * @effect-deps refreshDevices (stable callback)
+   * @effect-side-effects subscription (mediaDevices "devicechange" listener)
+   * @effect-why-not-loader Browser hardware enumeration is a client-only API.
+   */
   useEffect(() => {
     void refreshDevices();
     navigator.mediaDevices?.addEventListener?.("devicechange", refreshDevices);
@@ -130,6 +137,13 @@ export function useCallAudioControls({
     };
   }, [refreshDevices]);
 
+  /**
+   * @effect Apply the selected microphone and speaker device IDs to the
+   * active Twilio Device audio stack whenever hardware selection changes.
+   * @effect-deps device, microphone, output
+   * @effect-side-effects dom (Twilio Device audio input/output routing)
+   * @effect-why-not-loader Live Twilio audio routing follows user device picks.
+   */
   useEffect(() => {
     if (!device?.audio) return;
     if (microphone) {
