@@ -408,6 +408,24 @@ export async function updateUserProfile(args: {
   return rows[0] ?? null;
 }
 
+export async function updateOwnUserProfile(args: {
+  userId: string;
+  first_name: string | null;
+  last_name: string | null;
+  username: string;
+}) {
+  const rows = await adminDb
+    .update(userTable)
+    .set({
+      first_name: args.first_name,
+      last_name: args.last_name,
+      username: args.username,
+    })
+    .where(eq(userTable.id, args.userId))
+    .returning();
+  return rows[0] ?? null;
+}
+
 export async function setWorkspaceDisabled(workspaceId: string, disabled: boolean) {
   const rows = await adminDb
     .update(workspaceTable)

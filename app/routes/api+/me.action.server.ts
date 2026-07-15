@@ -27,16 +27,16 @@ export const loader = defineLoader({
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
   sideEffects: ["db-write"],
-  handler: async ({ request }) => {
+  handler: async ({ request, auth }) => {
     if (request.method === "PATCH") {
       const parsed = await parseJsonBodyOrResponse(request, updateMeBodySchema);
       if (parsed instanceof Response) return parsed;
 
-      const result = await updateMeProfile(request, parsed);
+      const result = await updateMeProfile(request, auth.user.id, parsed);
       if (!result.ok) {
         return jsonError(result.error, result.status);
       }
-      return jsonResponse({ user: result.data }, 200);
+      return jsonResponse({ user: result.data }, 200, result.headers);
     }
 
     return jsonError("Method not allowed", 405);

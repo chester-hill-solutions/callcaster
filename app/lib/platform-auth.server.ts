@@ -8,7 +8,11 @@ import {
   createNewWorkspace,
   getInvitesByUserId,
 } from "@/lib/database/workspace.server";
-import { listUserWorkspaceMembershipsForProfile } from "@/lib/workspace-members-db.server";
+import {
+  getUserById,
+  listUserWorkspaceMembershipsForProfile,
+  updateOwnUserProfile,
+} from "@/lib/workspace-members-db.server";
 import type {
   acceptInvitesBodySchema,
   forgotPasswordBodySchema,
@@ -364,15 +368,22 @@ export async function getMeProfile(userId: string) {
 
 export async function updateMeProfile(
   request: Request,
+  userId: string,
   body: UpdateMeBody,
 ): Promise<
-  | { ok: true; data: AuthTokensResponse["user"] }
+  | { ok: true; data: AuthTokensResponse["user"]; headers: Headers }
   | { ok: false; error: string; status: number }
 > {
+  const currentProfile = await getUserById(userId);
   const updateBody: { name?: string; email?: string } = {};
   if (body.email) updateBody.email = body.email;
   if (body.first_name || body.last_name) {
-    updateBody.name = [body.first_name, body.last_name].filter(Boolean).join(" ");
+    updateBody.name = [
+      body.first_name ?? currentProfile?.first_name,
+      body.last_name ?? currentProfile?.last_name,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (body.password) {
@@ -397,6 +408,10 @@ export async function updateMeProfile(
       return { ok: false, error: "Update failed", status: 400 };
     }
 
+    if (user.id !== userId) {
+      return { ok: false, error: "Update failed", status: 400 };
+    }
+
     if (body.password && body.current_password) {
       await auth.api.changePassword({
         body: {
@@ -407,7 +422,22 @@ export async function updateMeProfile(
       });
     }
 
-    return { ok: true, data: mapUserProfile(user) };
+    const mappedUser = mapUserProfile(user);
+    const profile = await updateOwnUserProfile({
+      userId,
+      first_name: mappedUser.first_name ?? currentProfile?.first_name ?? null,
+      last_name: mappedUser.last_name ?? currentProfile?.last_name ?? null,
+      username: mappedUser.email ?? currentProfile?.username ?? userId,
+    });
+    if (!profile) {
+      return { ok: false, error: "Profile update failed", status: 400 };
+    }
+
+    return {
+      ok: true,
+      data: mappedUser,
+      headers: mergeBetterAuthSetCookieHeaders(result?.headers),
+    };
   } catch (error) {
     return {
       ok: false,
