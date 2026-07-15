@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { getScriptExportFields } from "@/lib/script-api-db.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineAction } from "@/lib/handler.server";
 
@@ -13,8 +14,7 @@ export const action = defineAction({
     }
     const { headers, workspaceId } = access.ctx;
 
-    const formData = await request.formData();
-    const data = Object.fromEntries(formData.entries());
+    const data = await parseActionRequest(request);
 
     const idValue = data["id"];
     if (!idValue) {
