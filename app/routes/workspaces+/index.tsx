@@ -52,7 +52,7 @@ const WorkspaceCard = React.memo(
       <NavLink
         prefetch="intent"
         to={`/workspaces/${workspace.id}`}
-        className="flex h-full flex-col items-center justify-center rounded-lg border border-border bg-card p-4 text-center text-card-foreground shadow-sm transition-colors duration-150 hover:bg-accent hover:text-accent-foreground dark:border-white/20 dark:hover:bg-zinc-800"
+        className="flex h-full flex-col items-center justify-center rounded-lg border-2 border-foreground bg-card p-4 text-center text-card-foreground shadow-sm transition-colors duration-150 hover:bg-accent hover:text-accent-foreground dark:hover:bg-zinc-800"
       >
         <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold text-brand-primary dark:text-white">
           {workspace.name}
@@ -80,7 +80,7 @@ const NewWorkspaceDialog = ({
       {trigger ?? (
         <Button
           variant="outline"
-          className="h-full w-full border-2 border-black px-4 py-8 dark:border-white"
+          className="h-full w-full border-2 border-foreground px-4 py-8"
           aria-label="Add new workspace"
           disabled={isBusy}
         >
