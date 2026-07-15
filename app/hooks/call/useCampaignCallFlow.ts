@@ -1,8 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { Call } from "@twilio/voice-sdk";
 import {
   normalizeProviderStatus,
   getStateMachineAction,
+  type CallStatusEnum,
 } from "@/lib/call-status";
 import { useCallStatusPolling } from "@/hooks/call/useCallStatusPolling";
 import type {
@@ -27,7 +28,6 @@ type UseCampaignCallFlowOptions = {
   activeCall: Call | null;
   recentAttemptDisposition: string | null | undefined;
   predictiveState: PredictiveState;
-  setDisposition: (disposition: string) => void;
   send: CallStateMachineSend;
 };
 
@@ -38,9 +38,14 @@ export function useCampaignCallFlow({
   activeCall,
   recentAttemptDisposition,
   predictiveState,
-  setDisposition,
   send,
 }: UseCampaignCallFlowOptions) {
+  const [providerState, setProviderState] = useState<{
+    callSid: string | null;
+    status: CallStatusEnum | null;
+  }>({ callSid: null, status: null });
+  const providerStatus =
+    providerState.callSid === callSid ? providerState.status : null;
   const pollingEnabled =
     !!callSid &&
     !!workspaceId &&
@@ -54,7 +59,7 @@ export function useCampaignCallFlow({
     onStatus: (status) => {
       const normalized = normalizeProviderStatus(status);
       if (normalized) {
-        setDisposition(normalized);
+        setProviderState({ callSid, status: normalized });
         const action = getStateMachineAction(normalized);
         if (action === "CONNECT") send({ type: "CONNECT" });
         else if (action === "HANG_UP") send({ type: "HANG_UP" });
@@ -66,20 +71,31 @@ export function useCampaignCallFlow({
   const getDisplayState = useCallback(
     (
       callStateValue: string,
-      dispositionValue: string | undefined,
+      statusValue: string | undefined,
       activeCallValue: ActiveCall | null,
     ): string => {
-      if (callStateValue === "failed" || dispositionValue === "failed") return "failed";
+      if (callStateValue === "failed" || statusValue === "failed" || statusValue === "busy") {
+        return "failed";
+      }
       if (
-        dispositionValue === "ringing" ||
-        (activeCallValue && !(dispositionValue === "in-progress"))
-      )
+        statusValue === "initiated" ||
+        statusValue === "queued" ||
+        statusValue === "ringing" ||
+        (activeCallValue && statusValue !== "in-progress")
+      ) {
         return "dialing";
-      if (dispositionValue === "in-progress") return "connected";
-      if (dispositionValue === "no-answer") return "no-answer";
-      if (dispositionValue === "voicemail") return "voicemail";
-      if (callStateValue === "completed" && dispositionValue) return "completed";
-      if (!activeCallValue && !dispositionValue) return "idle";
+      }
+      if (statusValue === "in-progress") return "connected";
+      if (statusValue === "no-answer") return "no-answer";
+      if (statusValue === "voicemail") return "voicemail";
+      if (
+        statusValue === "completed" ||
+        statusValue === "canceled" ||
+        (callStateValue === "completed" && statusValue)
+      ) {
+        return "completed";
+      }
+      if (!activeCallValue && !statusValue) return "idle";
       return "idle";
     },
     [],
@@ -96,7 +112,7 @@ export function useCampaignCallFlow({
             ? "idle"
             : getDisplayState(
                 state,
-                recentAttemptDisposition || undefined,
+                providerStatus ?? recentAttemptDisposition ?? undefined,
                 activeCall as unknown as ActiveCall,
               );
 

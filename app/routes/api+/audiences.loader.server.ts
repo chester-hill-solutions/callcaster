@@ -13,19 +13,22 @@ import { AppError } from "@/lib/errors.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-interface AuthSessionResponse {
-    headers: Headers;
-}
-
 interface OtherDataItem {
     key: string;
     value: string | number | boolean;
 }
 
 type AudiencesDeps = {
-  verifyAuth: (request: Request) => Promise<{ user: { id: string }; headers: Headers }>;
+  verifyAuth: (request: Request) => Promise<{
+    auth?: { authType: string; workspaceId?: string };
+    user?: { id: string };
+    headers: Headers;
+  }>;
   parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
-  requireWorkspaceAccess: (args: unknown) => Promise<void>;
+  requireWorkspaceAccess: (args: {
+    user: { id: string };
+    workspaceId: string;
+  }) => Promise<void>;
 };
 
 const AUDIENCE_CONTACT_SORT_KEYS = new Set([
@@ -41,6 +44,27 @@ const AUDIENCE_CONTACT_SORT_KEYS = new Set([
   "country",
   "created_at",
 ]);
+
+async function requireAudienceWorkspaceAccess(args: {
+  auth?: { authType: string; workspaceId?: string };
+  user?: { id: string };
+  workspaceId: string;
+  requireWorkspaceAccess: AudiencesDeps["requireWorkspaceAccess"];
+}) {
+  if (args.auth?.authType === "api_key") {
+    if (args.auth.workspaceId !== args.workspaceId) {
+      throw new AppError("Unauthorized", 403);
+    }
+    return;
+  }
+  if (!args.user) {
+    throw new AppError("Unauthorized", 401);
+  }
+  await args.requireWorkspaceAccess({
+    user: args.user,
+    workspaceId: args.workspaceId,
+  });
+}
 
 function flattenAudienceExportRows(rawData: Array<Record<string, unknown>>) {
   return rawData.map((row) => {
@@ -71,7 +95,7 @@ export const loader = defineLoader({
       parseActionRequest: deps?.parseActionRequest ?? parseActionRequest,
       requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
     };
-    const { headers, user } = await d.verifyAuth(request);
+    const { auth, headers, user } = await d.verifyAuth(request);
     const url = new URL(request.url);
     const audienceId = url.searchParams.get('audienceId');
     const returnType = url.searchParams.get('returnType');
@@ -96,12 +120,12 @@ export const loader = defineLoader({
         if (!audienceWorkspace) {
           return routeData({ error: "Audience not found" }, { status: 404, headers });
         }
-        if (user) {
-          await d.requireWorkspaceAccess({
-            user,
-            workspaceId: audienceWorkspace,
-          });
-        }
+        await requireAudienceWorkspaceAccess({
+          auth,
+          user,
+          workspaceId: audienceWorkspace,
+          requireWorkspaceAccess: d.requireWorkspaceAccess,
+        });
 
         const rawData = await listAudienceContactsForExport(audienceWorkspace, id, {
           q: q || undefined,
@@ -153,9 +177,12 @@ export const loader = defineLoader({
         return routeData({ error: "Workspace ID or audienceId is required" }, { status: 400, headers });
       }
 
-      if (user) {
-        await d.requireWorkspaceAccess({ user, workspaceId: resolvedWorkspaceId });
-      }
+      await requireAudienceWorkspaceAccess({
+        auth,
+        user,
+        workspaceId: resolvedWorkspaceId,
+        requireWorkspaceAccess: d.requireWorkspaceAccess,
+      });
 
       const data = await listAudienceContactsJson(parsedAudienceId);
       return routeData({ data }, { headers });

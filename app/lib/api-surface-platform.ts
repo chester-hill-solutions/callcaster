@@ -150,7 +150,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId.route.tsx",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId/route.tsx",
     authClass: "apiKeyOrSession",
     ownerArea: "workspace",
     exposure: "sessionOnly",
@@ -161,7 +161,8 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
-    notes: "GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
+    notes:
+      "Child index under data-plane layout middleware. GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId",

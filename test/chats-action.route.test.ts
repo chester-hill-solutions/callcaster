@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     sendMessage: vi.fn(),
     cancelScheduledMessage: vi.fn(),
     linkContactToConversation: vi.fn(),
+    getEffectivePortalConfig: vi.fn(),
     getOrLookupLineType: vi.fn(async () => null as string | null),
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   };
@@ -17,6 +18,9 @@ const mocks = vi.hoisted(() => {
 const tenantDbMocks = vi.hoisted(() => ({
   contact: {
     findFirst: vi.fn(async () => null),
+  },
+  workspace_number: {
+    findMany: vi.fn(async () => [{ phone_number: "+15550000000" }]),
   },
 }));
 
@@ -30,6 +34,10 @@ vi.mock("@/lib/chat-sms.server", () => ({
 vi.mock("@/lib/database/chat-contact-link.server", () => ({
   linkContactToConversation: (...args: unknown[]) =>
     mocks.linkContactToConversation(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace: (...args: unknown[]) =>
+    mocks.getEffectivePortalConfig(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/server/tenant-db", () => ({
@@ -63,11 +71,145 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     mocks.sendMessage.mockReset();
     mocks.cancelScheduledMessage.mockReset();
     mocks.linkContactToConversation.mockReset();
+    mocks.getEffectivePortalConfig.mockReset();
+    mocks.getEffectivePortalConfig.mockResolvedValue({
+      sendMode: "from_number",
+      messagingServiceSid: null,
+    });
     mocks.logger.error.mockReset();
     mocks.getOrLookupLineType.mockReset();
     mocks.getOrLookupLineType.mockResolvedValue(null);
     tenantDbMocks.contact.findFirst.mockReset();
     tenantDbMocks.contact.findFirst.mockResolvedValue(null);
+    tenantDbMocks.workspace_number.findMany.mockReset();
+    tenantDbMocks.workspace_number.findMany.mockResolvedValue([
+      { phone_number: "+15550000000" },
+    ]);
+  });
+
+  test("rejects a missing from number with a 400 before calling sendMessage", async () => {
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "A workspace sending number is required.",
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("sends through the Messaging Service when the composer selects it", async () => {
+    mocks.getEffectivePortalConfig.mockResolvedValueOnce({
+      sendMode: "messaging_service",
+      messagingServiceSid: " MG123 ",
+    });
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "__messaging_service__",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+
+    expect(res.status).toBe(200);
+    expect(tenantDbMocks.workspace_number.findMany).not.toHaveBeenCalled();
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "",
+        messagingServiceSid: "MG123",
+        sendMode: "messaging_service",
+      }),
+    );
+  });
+
+  test("honours an explicitly picked number over the workspace Messaging Service", async () => {
+    // Regression: the workspace default used to override the chosen number, so
+    // a picked sender was silently replaced by the Messaging Service.
+    mocks.getEffectivePortalConfig.mockResolvedValueOnce({
+      sendMode: "messaging_service",
+      messagingServiceSid: " MG123 ",
+    });
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+
+    expect(res.status).toBe(200);
+    // A chosen number must still be proven to belong to the workspace.
+    expect(tenantDbMocks.workspace_number.findMany).toHaveBeenCalled();
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "+15550000000",
+        messagingServiceSid: null,
+        sendMode: "from_number",
+      }),
+    );
+  });
+
+  test("rejects an unowned from number with a 400 before calling sendMessage", async () => {
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15559999999",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "from must be a rented phone number that belongs to this workspace",
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("accepts a from number that matches a rented workspace number by phone key", async () => {
+    tenantDbMocks.workspace_number.findMany.mockResolvedValueOnce([
+      { phone_number: "15550000000" },
+    ]);
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ from: "+15550000000" }),
+    );
   });
 
   test("rejects sending to an opted-out contact with a 403 before calling sendMessage", async () => {

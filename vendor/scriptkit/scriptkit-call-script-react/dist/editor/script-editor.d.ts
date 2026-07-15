@@ -4,5 +4,13 @@ export type ScriptEditorProps = {
     onChange: (doc: ScriptDocument) => void;
     palette?: ScriptPalette;
     readOnly?: boolean;
+    mediaNames?: string[];
 };
-export declare function ScriptEditor({ document, onChange, palette, readOnly }: ScriptEditorProps): import("react").JSX.Element;
+/**
+ * Reference editor for the headless state in `useScriptEditorState`.
+ *
+ * Deliberately plain: it injects its controls via `useCallScriptUi` so a host
+ * app can supply its own design system. Hosts wanting a first-class builder
+ * should consume the hook directly rather than restyle this.
+ */
+export declare function ScriptEditor({ document, onChange, palette, readOnly, mediaNames, }: ScriptEditorProps): import("react").JSX.Element;

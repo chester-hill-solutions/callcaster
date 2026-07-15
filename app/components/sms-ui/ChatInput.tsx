@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MdImage, MdSend } from "react-icons/md";
 import { AlertTriangle } from "lucide-react";
 import ChatImages from "./ChatImages";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { getConversationPhoneKey } from "@/lib/chat-conversation-sort";
+import { MESSAGING_SERVICE_SENDER_VALUE } from "@/lib/sms-campaign-send-mode";
 import type { Contact } from "@/lib/types";
 import type { useFetcher } from "react-router";
 
@@ -26,6 +27,11 @@ type Workspace = {
 interface ChatInputProps {
   workspace: NonNullable<Workspace>;
   workspaceNumbers: WorkspaceNumber[];
+  senderSelection: {
+    /** The composer's initial sender selection, not a lock. */
+    defaultMode: "from_number" | "messaging_service";
+    messagingServiceReady: boolean;
+  };
   initialFrom: string;
   /** The workspace number this contact has most recently been texting, if any. */
   establishedFromNumber?: string;
@@ -41,20 +47,33 @@ interface ChatInputProps {
 
 /** Twilio requires scheduled sends at least 15 minutes out — mirrors sms-send-resolve.ts. */
 const MIN_SCHEDULE_LEAD_MINUTES = 15;
+const MAX_SCHEDULE_LEAD_DAYS = 35;
+
+function scheduleLocalValue(date: Date): string {
+  date.setSeconds(0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+}
 
 function minScheduleLocalValue(): string {
-  const min = new Date(Date.now() + MIN_SCHEDULE_LEAD_MINUTES * 60 * 1000);
-  min.setSeconds(0, 0);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${min.getFullYear()}-${pad(min.getMonth() + 1)}-${pad(min.getDate())}T${pad(
-    min.getHours(),
-  )}:${pad(min.getMinutes())}`;
+  return scheduleLocalValue(
+    new Date(Date.now() + MIN_SCHEDULE_LEAD_MINUTES * 60 * 1000),
+  );
+}
+
+function maxScheduleLocalValue(): string {
+  return scheduleLocalValue(
+    new Date(Date.now() + MAX_SCHEDULE_LEAD_DAYS * 24 * 60 * 60 * 1000),
+  );
 }
 
 export default function ChatInput({
   initialFrom,
   establishedFromNumber,
   workspaceNumbers,
+  senderSelection,
   handleSubmit,
   handleImageSelect,
   handleImageRemove,
@@ -64,10 +83,17 @@ export default function ChatInput({
   phoneNumber,
   isValid,
 }: ChatInputProps) {
+  const messagingServiceReady = senderSelection.messagingServiceReady;
   const [bodyValue, setBodyValue] = useState("");
-  const [selectedFrom, setSelectedFrom] = useState(initialFrom);
+  const [selectedFrom, setSelectedFrom] = useState(() =>
+    senderSelection.defaultMode === "messaging_service" && messagingServiceReady
+      ? MESSAGING_SERVICE_SENDER_VALUE
+      : initialFrom,
+  );
   const [sendLater, setSendLater] = useState(false);
   const [sendAtLocal, setSendAtLocal] = useState("");
+  const submittedScheduleRef = useRef(false);
+  const observedSubmissionRef = useRef(false);
   const segmentInfo = useMemo(() => getSmsSegmentInfo(bodyValue), [bodyValue]);
   const hasMedia = selectedImages.filter(Boolean).length > 0;
   const creditEstimate = useMemo(
@@ -76,6 +102,38 @@ export default function ChatInput({
   );
   const optedOut = Boolean(selectedContact?.opt_out);
   const minScheduleValue = useMemo(() => minScheduleLocalValue(), []);
+  const maxScheduleValue = useMemo(() => maxScheduleLocalValue(), []);
+  const hasNumberOptions = (workspaceNumbers?.length ?? 0) > 0;
+  const hasSenderOptions = hasNumberOptions || messagingServiceReady;
+  const usesMessagingService = selectedFrom === MESSAGING_SERVICE_SENDER_VALUE;
+
+  /**
+   * @effect KEEP: align the controlled From selection with available sender
+   * options when `initialFrom` or the workspace number inventory changes
+   * without remounting the composer (same contact, loader refresh).
+   * @effect-deps initialFrom, workspaceNumbers (available sender option values)
+   * @effect-side-effects setSelectedFrom only
+   * @effect-why-not-loader selectedFrom is intentional user-controlled state;
+   * we only repair it when it points at a value no longer in the option list
+   * or when the computed default changes while the select was empty.
+   */
+  useEffect(() => {
+    const optionValues = new Set(
+      (workspaceNumbers ?? []).map((num) => num.phone_number),
+    );
+    if (messagingServiceReady) {
+      optionValues.add(MESSAGING_SERVICE_SENDER_VALUE);
+    }
+    if (selectedFrom && optionValues.has(selectedFrom)) return;
+    if (initialFrom && optionValues.has(initialFrom)) {
+      setSelectedFrom(initialFrom);
+      return;
+    }
+    setSelectedFrom(
+      workspaceNumbers?.[0]?.phone_number ||
+        (messagingServiceReady ? MESSAGING_SERVICE_SENDER_VALUE : ""),
+    );
+  }, [initialFrom, workspaceNumbers, selectedFrom, messagingServiceReady]);
 
   const establishedLabel = useMemo(() => {
     if (!establishedFromNumber) return "";
@@ -89,24 +147,51 @@ export default function ChatInput({
   }, [establishedFromNumber, workspaceNumbers]);
 
   const isFromMismatched = useMemo(() => {
+    if (usesMessagingService) return false;
     if (!establishedFromNumber || !selectedFrom) return false;
     return (
       getConversationPhoneKey(selectedFrom) !==
       getConversationPhoneKey(establishedFromNumber)
     );
-  }, [establishedFromNumber, selectedFrom]);
+  }, [establishedFromNumber, selectedFrom, usesMessagingService]);
 
   const isSendDisabled =
     messageFetcher.state !== "idle" ||
     optedOut ||
+    (!usesMessagingService && (!selectedFrom || !hasNumberOptions)) ||
     !(selectedContact || (phoneNumber && isValid)) ||
     (sendLater && !sendAtLocal);
 
+  /**
+   * @effect After a scheduled-send submission completes, clear the schedule
+   * controls on success or leave them intact when the server returns an error.
+   * @effect-deps messageFetcher.data, messageFetcher.state (tracks the
+   * submission lifecycle via submittedScheduleRef / observedSubmissionRef)
+   * @effect-side-effects setSendLater, setSendAtLocal only
+   * @effect-why-not-loader Schedule UI state is client-controlled; we only
+   * reset it once the fetcher settles after an explicit user submit.
+   */
+  useEffect(() => {
+    if (!submittedScheduleRef.current) return;
+    if (messageFetcher.state !== "idle") {
+      observedSubmissionRef.current = true;
+      return;
+    }
+    if (!observedSubmissionRef.current) return;
+
+    const data = messageFetcher.data as { error?: string } | undefined;
+    if (!data?.error) {
+      setSendLater(false);
+      setSendAtLocal("");
+    }
+    submittedScheduleRef.current = false;
+    observedSubmissionRef.current = false;
+  }, [messageFetcher.data, messageFetcher.state]);
+
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    submittedScheduleRef.current = sendLater;
     handleSubmit(e);
     setBodyValue("");
-    setSendLater(false);
-    setSendAtLocal("");
   };
 
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -131,9 +216,29 @@ export default function ChatInput({
             name="from"
             id="from"
             value={selectedFrom}
-            onChange={(e) => setSelectedFrom(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow"
+            onChange={(e) => {
+              const next = e.target.value;
+              setSelectedFrom(next);
+              // Scheduling is only valid via a Messaging Service; picking a
+              // number would otherwise submit a send the server must reject.
+              if (next !== MESSAGING_SERVICE_SENDER_VALUE) {
+                setSendLater(false);
+                setSendAtLocal("");
+              }
+            }}
+            disabled={!hasSenderOptions}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow disabled:cursor-not-allowed disabled:opacity-60"
           >
+            {!hasSenderOptions && (
+              <option value="" disabled>
+                No sending numbers available
+              </option>
+            )}
+            {messagingServiceReady && (
+              <option value={MESSAGING_SERVICE_SENDER_VALUE}>
+                Messaging Service (automatic sender)
+              </option>
+            )}
             {workspaceNumbers?.map((num) => (
               <option key={num.id} value={num.phone_number}>
                 {num.friendly_name || num.phone_number}
@@ -141,6 +246,18 @@ export default function ChatInput({
             ))}
           </select>
         </div>
+        {!hasSenderOptions && (
+          <div
+            role="status"
+            className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              A workspace sending number is required before chat messages can be
+              sent.
+            </span>
+          </div>
+        )}
         {isFromMismatched && (
           <div
             role="status"
@@ -167,6 +284,9 @@ export default function ChatInput({
             <input
               type="checkbox"
               checked={sendLater}
+              // Twilio only schedules sends through a Messaging Service, so this
+              // follows the current selection rather than the workspace default.
+              disabled={!usesMessagingService}
               onChange={(e) => {
                 setSendLater(e.target.checked);
                 if (!e.target.checked) setSendAtLocal("");
@@ -175,11 +295,19 @@ export default function ChatInput({
             />
             Send later
           </label>
+          {!usesMessagingService && (
+            <span>
+              {messagingServiceReady
+                ? "Select Messaging Service to schedule"
+                : "Scheduling requires Messaging Service"}
+            </span>
+          )}
           {sendLater && (
             <input
               type="datetime-local"
               value={sendAtLocal}
               min={minScheduleValue}
+              max={maxScheduleValue}
               required
               onChange={(e) => setSendAtLocal(e.target.value)}
               className="rounded border border-input bg-background px-2 py-1 text-xs text-foreground"

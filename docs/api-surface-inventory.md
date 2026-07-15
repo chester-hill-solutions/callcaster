@@ -101,7 +101,7 @@ Interactive specs:
 | `/api/auth/invites` | GET, POST | User API | sessionOnly | yes | `routes/api+/auth/invites.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/me` | GET, PATCH | User API | sessionOnly | yes | `routes/api+/me.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces` | GET, POST | User API | sessionOnly | yes | `routes/api+/workspaces.route.tsx` | `docs/api-agent-quickstart.md` |  |
-| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.route.tsx` | `docs/api-agent-quickstart.md` | GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session. |
+| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/route.tsx` | `docs/api-agent-quickstart.md` | Child index under data-plane layout middleware. GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session. |
 | `/api/workspaces/:workspaceId` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.tsx` | `docs/api-agent-quickstart.md` | duplicate route; Middleware layout for nested workspace API routes; no direct handler. |
 | `/api/workspaces/:workspaceId/transfer-ownership` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/transfer-ownership.route.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspaces/:workspaceId/billing` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing.route.tsx` | `docs/api-agent-quickstart.md` |  |

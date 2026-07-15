@@ -9,10 +9,13 @@ export {
   routingRuleSchema,
   CANVASS_BLOCK_TYPES,
   CALLCASTER_BLOCK_TYPES,
+  IVR_PLAYBACK_TYPES,
+  isIvrPlaybackType,
 } from "./types.js";
 export type {
   ScriptDocument,
   ScriptBlock,
+  ScriptOption,
   ScriptPage,
   CallcasterFlow,
   QuickCanvassBlock,
@@ -28,7 +31,11 @@ export type {
   CallScriptServiceConfig,
   CallScriptService,
 } from "./types.js";
-export { parseDocument, validateDocument, createEmptyDocument } from "./parse.js";
+export {
+  parseDocument,
+  validateDocument,
+  createEmptyDocument,
+} from "./parse.js";
 export { evaluateRouting } from "./routing.js";
 export {
   migrateFromCallcasterFlow,

@@ -39,6 +39,7 @@ import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { welcomeCreditsKey } from "@/lib/billing-keys";
 import { seedWorkspaceSampleData } from "@/lib/seed/seed-workspace-sample-data.server";
+import { ensureProfileForUser } from "@/lib/ensure-user-profile.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { data as routeData } from "react-router";
@@ -51,6 +52,7 @@ import {
   requireWorkspaceAccess,
   workspaceMemberId,
 } from "@/lib/workspace-membership.server";
+import { authUser } from "@/db/auth-schema";
 
 export {
   addUserToWorkspace,
@@ -90,6 +92,7 @@ export {
   normalizeWorkspaceTwilioOpsConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
   getEffectiveWorkspaceTwilioPortalConfig,
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace,
   normalizeWorkspaceTwilioSyncSnapshot,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
   getWorkspaceTwilioPortalConfig,
@@ -213,6 +216,21 @@ export async function createNewWorkspace({
   const provisioningWarnings: string[] = [];
 
   try {
+    // Safety net for users who signed up before databaseHooks.user.create.after
+    // mirrored auth_user → public.user (required by workspace_users FK).
+    const [authRow] = await adminDb
+      .select({
+        id: authUser.id,
+        email: authUser.email,
+        name: authUser.name,
+      })
+      .from(authUser)
+      .where(eq(authUser.id, user_id))
+      .limit(1);
+    if (authRow) {
+      await ensureProfileForUser(authRow);
+    }
+
     const insertWorkspaceData = await rpcCreateNewWorkspace(workspaceName, user_id);
     const createdWorkspaceId = insertWorkspaceData;
     workspaceId = createdWorkspaceId;

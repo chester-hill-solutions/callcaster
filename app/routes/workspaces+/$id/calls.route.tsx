@@ -1,14 +1,10 @@
 export { loader } from "./calls.loader.server";
-export { action } from "./calls.action.server";
 
-import { Link, useFetcher, useLoaderData } from "react-router";
-import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { Link, useLoaderData } from "react-router";
 
 import { CallLogTable } from "@/components/calls/CallLogTable";
-import { IncomingCallReceiver } from "@/components/calls/IncomingCallReceiver";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
-import type { CallLogActionData } from "./calls.action.server";
 import type { CallLogLoaderData } from "./calls.loader.server";
 
 export default function WorkspaceCallLogPage() {
@@ -20,45 +16,7 @@ export default function WorkspaceCallLogPage() {
     pagination,
     workspace,
     error,
-    handsetNumber,
-    listening,
   } = useLoaderData<CallLogLoaderData>();
-  const pickupFetcher = useFetcher<CallLogActionData>();
-  const live =
-    pickupFetcher.data?.listening === true ||
-    pickupFetcher.data?.listening === false
-      ? pickupFetcher.data
-      : null;
-  const isListening = live ? live.listening === true : listening.active;
-  const listenToken = live ? (live.token ?? null) : listening.token;
-  const listenTokenError = live
-    ? (live.tokenError ?? null)
-    : listening.tokenError;
-
-  useActionFeedback(pickupFetcher.data, {
-    getError: (data) =>
-      data?.error ??
-      (data?.listening === true && data?.tokenError ? data.tokenError : undefined),
-    getSuccess: (data) =>
-      data?.listening === true || data?.listening === false,
-    successMessage: (data) => {
-      if (data.listening === true && !data.tokenError) {
-        return "Listening for incoming calls";
-      }
-      if (data.listening === false) {
-        return "Stopped listening for incoming calls";
-      }
-      return "";
-    },
-  });
-
-  const startListening = () => {
-    pickupFetcher.submit({ intent: "start_listening" }, { method: "POST" });
-  };
-
-  const stopListening = () => {
-    pickupFetcher.submit({ intent: "stop_listening" }, { method: "POST" });
-  };
 
   return (
     <div className="space-y-6">
@@ -72,64 +30,6 @@ export default function WorkspaceCallLogPage() {
           </Link>
         </Button>
       </div>
-
-      <section className="space-y-3">
-        {!isListening ? (
-          <div className="rounded-lg border border-dashed border-border/80 p-4">
-            <p className="font-Zilla-Slab text-lg font-semibold">Pick up incoming calls</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Start listening to answer inbound calls to{" "}
-              {handsetNumber ? (
-                <span className="font-mono">{handsetNumber}</span>
-              ) : (
-                "your workspace handset number"
-              )}{" "}
-              without leaving this page.
-            </p>
-            <Button
-              type="button"
-              className="mt-4"
-              onClick={startListening}
-              disabled={pickupFetcher.state !== "idle" || !handsetNumber}
-            >
-              Start listening
-            </Button>
-            {!handsetNumber ? (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Enable handset on a workspace number in settings first.
-              </p>
-            ) : null}
-          </div>
-        ) : listenTokenError || !listenToken ? (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-destructive">
-            {listenTokenError ?? "Unable to connect for incoming pickup."}
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-3"
-              onClick={stopListening}
-            >
-              Stop listening
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <IncomingCallReceiver
-              token={listenToken}
-              workspaceId={workspace?.id ?? ""}
-              handsetNumber={handsetNumber}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={stopListening}
-              disabled={pickupFetcher.state !== "idle"}
-            >
-              Stop listening
-            </Button>
-          </div>
-        )}
-      </section>
 
       {error ? (
         <p className="text-center font-Zilla-Slab text-lg font-semibold text-destructive">

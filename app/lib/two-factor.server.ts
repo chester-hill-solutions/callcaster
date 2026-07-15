@@ -26,10 +26,66 @@ function isTwoFactorEnrollmentExemptPath(pathname: string): boolean {
   );
 }
 
+const DISABLE_2FA_ENV_KEYS = [
+  "DISABLE_2FA_ENFORCEMENT",
+  "E2E_DISABLE_2FA_ENFORCEMENT",
+] as const;
+
+function isNonProductionRailwayEnvironment(): boolean {
+  const envName = process.env.RAILWAY_ENVIRONMENT_NAME;
+  if (!envName) {
+    return false;
+  }
+  if (envName === "production") {
+    return false;
+  }
+  return (
+    envName === "dev" ||
+    envName === "staging" ||
+    envName.startsWith("callcaster-pr-")
+  );
+}
+
+/**
+ * Whether privileged-role 2FA enrollment / disable protection is turned off.
+ * Honored in local dev, E2E, and non-production Railway envs (dev, staging, PR
+ * previews). Never honored on Railway production.
+ */
+export function isTwoFactorEnforcementDisabled(): boolean {
+  const flagSet = DISABLE_2FA_ENV_KEYS.some((key) => process.env[key] === "1");
+  if (!flagSet) {
+    return false;
+  }
+
+  if (process.env.RAILWAY_ENVIRONMENT_NAME === "production") {
+    console.error(
+      "DISABLE_2FA_ENFORCEMENT is set on Railway production — ignoring; 2FA enforcement remains active.",
+    );
+    return false;
+  }
+
+  if (
+    process.env.NODE_ENV !== "production" ||
+    process.env.E2E_TEST === "1" ||
+    isNonProductionRailwayEnvironment()
+  ) {
+    return true;
+  }
+
+  console.error(
+    "DISABLE_2FA_ENFORCEMENT is set in production — ignoring; 2FA enforcement remains active.",
+  );
+  return false;
+}
+
 async function privilegedUserNeedsTwoFactorEnrollment(
   userId: string,
   isPrivileged?: boolean,
 ): Promise<boolean> {
+  if (isTwoFactorEnforcementDisabled()) {
+    return false;
+  }
+
   const privileged =
     isPrivileged ?? (await userHasPrivilegedWorkspaceRole(userId));
   if (!privileged) {
@@ -56,6 +112,10 @@ export async function userHasPrivilegedWorkspaceRole(userId: string): Promise<bo
  * a sudo-only account could disable the 2FA the admin panel then re-mandates.
  */
 export async function userIsTwoFactorProtected(userId: string): Promise<boolean> {
+  if (isTwoFactorEnforcementDisabled()) {
+    return false;
+  }
+
   const [account] = await adminDb
     .select({ accessLevel: platformUser.access_level })
     .from(platformUser)
@@ -88,13 +148,8 @@ export async function blockUnenrolledPrivilegedSessionUser(args: {
     return null;
   }
 
-  if (process.env.E2E_DISABLE_2FA_ENFORCEMENT === "1") {
-    if (process.env.NODE_ENV !== "production" || process.env.E2E_TEST === "1") {
-      return null;
-    }
-    console.error(
-      "E2E_DISABLE_2FA_ENFORCEMENT=1 is set in production — ignoring; 2FA enforcement remains active.",
-    );
+  if (isTwoFactorEnforcementDisabled()) {
+    return null;
   }
 
   const pathname = new URL(args.request.url).pathname;
@@ -120,6 +175,10 @@ export async function requireTwoFactorForPrivilegedRoleAssignment(
   targetUserId: string,
   role: string,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  if (isTwoFactorEnforcementDisabled()) {
+    return { ok: true };
+  }
+
   if (!isPrivilegedWorkspaceRole(role)) {
     return { ok: true };
   }
@@ -154,17 +213,8 @@ export async function requireTwoFactorEnrollmentForPrivilegedUser(args: {
    */
   isPrivileged?: boolean;
 }): Promise<void> {
-  // Test-only escape hatch. Never honored in real production: a leaked env var
-  // must not silently disable a security control (mirrors
-  // TWILIO_VALIDATE_WEBHOOKS). The E2E harness runs with NODE_ENV=production
-  // and sets E2E_TEST=1 explicitly.
-  if (process.env.E2E_DISABLE_2FA_ENFORCEMENT === "1") {
-    if (process.env.NODE_ENV !== "production" || process.env.E2E_TEST === "1") {
-      return;
-    }
-    console.error(
-      "E2E_DISABLE_2FA_ENFORCEMENT=1 is set in production — ignoring; 2FA enforcement remains active.",
-    );
+  if (isTwoFactorEnforcementDisabled()) {
+    return;
   }
 
   const pathname = new URL(args.request.url).pathname;

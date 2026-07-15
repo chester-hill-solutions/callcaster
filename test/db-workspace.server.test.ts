@@ -136,6 +136,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     adminDbMocks.selectChain.mockReset();
     adminDbMocks.selectWhere.mockReset();
     adminDbMocks.updateWhere.mockReset();
+    adminDbMocks.selectChain.mockResolvedValue([]);
     authApiMocks.verifyEmail.mockReset();
     for (const fn of Object.values(rpcMocks)) {
       fn.mockReset();
@@ -174,12 +175,28 @@ describe("app/lib/database/workspace.server.ts", () => {
                 adminDbMocks.selectWhere(...args);
                 return {
                   orderBy: () => adminDbMocks.selectChain(),
+                  limit: () => adminDbMocks.selectChain(),
+                  then: (
+                    onFulfilled: (value: unknown) => unknown,
+                    onRejected?: (reason: unknown) => unknown,
+                  ) =>
+                    adminDbMocks
+                      .selectChain()
+                      .then(onFulfilled, onRejected),
                 };
               },
             }),
             where: (...args: unknown[]) => {
               adminDbMocks.selectWhere(...args);
-              return adminDbMocks.selectChain();
+              return {
+                orderBy: () => adminDbMocks.selectChain(),
+                limit: () => adminDbMocks.selectChain(),
+                then: (
+                  onFulfilled: (value: unknown) => unknown,
+                  onRejected?: (reason: unknown) => unknown,
+                ) =>
+                  adminDbMocks.selectChain().then(onFulfilled, onRejected),
+              };
             },
           }),
         }),

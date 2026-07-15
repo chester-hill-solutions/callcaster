@@ -24,7 +24,9 @@ async function main() {
     url: LOCAL_APP_URL,
   });
 
-  const twimlApp = await syncTwimlApp(baseUrl);
+  const twimlApp = await syncTwimlApp(baseUrl, {
+    allowSharedApp: args.allowSharedApp,
+  });
   const workspaceResults = await syncWorkspaceTargets({
     allWorkspaces: args.allWorkspaces,
     workspaceIds: args.workspaceIds,
@@ -45,6 +47,7 @@ async function main() {
 function parseArgs(argv) {
   const parsed = {
     allWorkspaces: false,
+    allowSharedApp: false,
     baseUrl: null,
     help: false,
     workspaceIds: [],
@@ -56,6 +59,9 @@ function parseArgs(argv) {
     switch (arg) {
       case "--all-workspaces":
         parsed.allWorkspaces = true;
+        break;
+      case "--allow-shared-app":
+        parsed.allowSharedApp = true;
         break;
       case "--base-url":
         parsed.baseUrl = argv[index + 1] ?? null;
@@ -102,6 +108,13 @@ The script resolves the public base URL in this order:
   3. ngrok local API at ${NGROK_API_URL} (fallback only)
 
 For Localtunnel, set BASE_URL in .env or pass --base-url explicitly.
+
+Flags:
+  --allow-shared-app  Repoint the TwiML App even when its current voice URL is
+                      not a localhost/tunnel URL. Refused by default, because a
+                      TwiML App holds one voice URL and repointing a deployed
+                      environment's app breaks browser calling for its users.
+                      Prefer giving local dev its own TwiML App instead.
 `.trim());
 }
 
@@ -213,13 +226,84 @@ function requireEnv(name) {
   return value;
 }
 
-async function syncTwimlApp(baseUrl) {
+/**
+ * Hosts a local dev tunnel can legitimately live on. A TwiML App already
+ * pointing at one of these is someone's dev app and is safe to repoint.
+ */
+const DEV_TUNNEL_HOST_PATTERNS = [
+  /^localhost$/i,
+  /^127\.0\.0\.1$/,
+  /\.loca\.lt$/i,
+  /\.ngrok\.io$/i,
+  /\.ngrok\.app$/i,
+  /\.ngrok-free\.app$/i,
+  /\.trycloudflare\.com$/i,
+  /\.serveo\.net$/i,
+];
+
+function isDevTunnelUrl(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return false;
+  }
+
+  let hostname;
+  try {
+    hostname = new URL(value).hostname;
+  } catch {
+    return false;
+  }
+
+  return DEV_TUNNEL_HOST_PATTERNS.some((pattern) => pattern.test(hostname));
+}
+
+/**
+ * A TwiML App holds exactly one voice URL, so repointing one that a deployed
+ * environment is using silently breaks browser calling for every user of that
+ * environment until someone notices. Twilio's only symptom is a spoken
+ * "an unexpected error has occurred" (error 11200), which gives no hint at the
+ * cause, so refuse rather than rely on the operator spotting it.
+ */
+async function assertTwimlAppIsSafeToRepoint({ application, appSid, allowSharedApp }) {
+  const currentVoiceUrl = application.voiceUrl ?? "";
+
+  if (allowSharedApp || isDevTunnelUrl(currentVoiceUrl)) {
+    return;
+  }
+
+  throw new Error(
+    [
+      `Refusing to repoint TwiML App ${appSid} ("${application.friendlyName ?? "unnamed"}").`,
+      ``,
+      `Its voice URL is currently:`,
+      `  ${currentVoiceUrl || "(unset)"}`,
+      ``,
+      `That is not a localhost or tunnel URL, so a deployed environment is almost`,
+      `certainly using this app. Repointing it at your tunnel would break browser`,
+      `calling for everyone on that environment, and would keep breaking it after`,
+      `your tunnel closes.`,
+      ``,
+      `Give local dev its own TwiML App and point TWILIO_APP_SID in .env at it:`,
+      `  https://console.twilio.com/us1/develop/voice/manage/twiml-apps`,
+      ``,
+      `If you are certain this app is not shared, re-run with --allow-shared-app.`,
+    ].join("\n"),
+  );
+}
+
+async function syncTwimlApp(baseUrl, { allowSharedApp = false } = {}) {
   const client = new Twilio.Twilio(
     requireEnv("TWILIO_SID"),
     requireEnv("TWILIO_AUTH_TOKEN"),
   );
   const appSid = requireEnv("TWILIO_APP_SID");
   const voiceUrl = `${baseUrl}/api/call`;
+
+  const existing = await client.applications(appSid).fetch();
+  await assertTwimlAppIsSafeToRepoint({
+    application: existing,
+    appSid,
+    allowSharedApp,
+  });
 
   const application = await client.applications(appSid).update({
     voiceMethod: "POST",
@@ -228,6 +312,7 @@ async function syncTwimlApp(baseUrl) {
 
   return {
     sid: application.sid,
+    previousVoiceUrl: existing.voiceUrl ?? null,
     voiceUrl,
   };
 }
@@ -406,6 +491,10 @@ function printSummary({ baseUrl, twimlApp, workspaceResults }) {
   console.log("Calling dev sync complete.");
   console.log(`Base URL: ${baseUrl}`);
   console.log(`TwiML App: ${twimlApp.sid} -> ${twimlApp.voiceUrl}`);
+
+  if (twimlApp.previousVoiceUrl && twimlApp.previousVoiceUrl !== twimlApp.voiceUrl) {
+    console.log(`  (was: ${twimlApp.previousVoiceUrl})`);
+  }
 
   if (workspaceResults.length === 0) {
     console.log("Workspace numbers: skipped (no workspace target provided).");

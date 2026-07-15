@@ -13,6 +13,7 @@ const autoDialMocks = vi.hoisted(() => ({
   insertCallResults: [] as Array<Record<string, unknown> | null>,
   updateCallCalls: [] as unknown[],
   deleteCallCalls: [] as unknown[],
+  verifiedNumbers: ["+15550001111"] as string[] | null,
 }));
 
 vi.mock("@/lib/workspace-credits.server", () => ({
@@ -22,6 +23,10 @@ vi.mock("@/lib/workspace-credits.server", () => ({
     }
     return autoDialMocks.creditsBalance;
   }),
+}));
+
+vi.mock("@/lib/user-audio.server", () => ({
+  getUserVerifiedAudioNumbers: vi.fn(async () => autoDialMocks.verifiedNumbers),
 }));
 
 vi.mock("@/lib/campaign-ivr.server", () => ({
@@ -85,6 +90,7 @@ function resetAutoDialMocks() {
   autoDialMocks.insertCallResults = [{ sid: "pending" }, { sid: "CA1" }];
   autoDialMocks.updateCallCalls = [];
   autoDialMocks.deleteCallCalls = [];
+  autoDialMocks.verifiedNumbers = ["+15550001111"];
 }
 
 describe("startAutoDialConference", () => {
@@ -125,5 +131,22 @@ describe("startAutoDialConference", () => {
     if (result.ok) {
       expect(result.conferenceName).toMatch(/^u1~/);
     }
+  });
+
+  test("rejects an unverified phone device before creating call state", async () => {
+    const result = await startAutoDialConference({
+      userId: "u1",
+      workspaceId: "w1",
+      campaignId: 1,
+      callerId: "+1555",
+      selectedDevice: "+15559999999",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      error: "Selected device is not a verified phone number",
+    });
+    expect(autoDialMocks.insertCalls).toEqual([]);
   });
 });

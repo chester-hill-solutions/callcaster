@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
-import {
-  logTwilioAdapterResult,
-  replaceCallInputStream,
-} from "@/lib/twilio/twilio-call-adapter.client";
 import type { MicCoordinator } from "@/lib/twilio/call-session-types";
+import {
+  getUsableAudioDevices,
+  reconcileAudioDeviceId,
+} from "@/hooks/call/audio-device-selection";
 
 type UseSoftphoneAudioDevicesOptions = {
   device: Device | null;
@@ -14,9 +14,7 @@ type UseSoftphoneAudioDevicesOptions = {
   speakerSelectIdPrefix?: string;
 };
 
-/**
- * Audio device selection and local speaker mute — mic mute is coordinated by call session owner.
- */
+/** Audio device selection — mic mute is coordinated by the call session owner. */
 export function useSoftphoneAudioDevices({
   device,
   activeCall,
@@ -24,34 +22,29 @@ export function useSoftphoneAudioDevices({
 }: UseSoftphoneAudioDevicesOptions) {
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
-  const [selectedMicId, setSelectedMicId] = useState("");
-  const [selectedSpeakerId, setSelectedSpeakerId] = useState("");
-  const [speakerMuted, setSpeakerMuted] = useState(false);
+  const [selectedMicId, setSelectedMicId] = useState<string | null>(null);
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string | null>(null);
 
   const refreshDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      setMicrophones(devices.filter((d) => d.kind === "audioinput"));
-      setSpeakers(devices.filter((d) => d.kind === "audiooutput"));
-      if (
-        selectedMicId === "" &&
-        devices.some((d) => d.kind === "audioinput")
-      ) {
-        const first = devices.find((d) => d.kind === "audioinput");
-        if (first?.deviceId) setSelectedMicId(first.deviceId);
-      }
-      if (
-        selectedSpeakerId === "" &&
-        devices.some((d) => d.kind === "audiooutput")
-      ) {
-        const first = devices.find((d) => d.kind === "audiooutput");
-        if (first?.deviceId) setSelectedSpeakerId(first.deviceId);
-      }
+      const nextMicrophones = getUsableAudioDevices(devices, "audioinput");
+      const nextSpeakers = getUsableAudioDevices(devices, "audiooutput");
+      setMicrophones(nextMicrophones);
+      setSpeakers(nextSpeakers);
+      setSelectedMicId((current) =>
+        reconcileAudioDeviceId(nextMicrophones, current),
+      );
+      setSelectedSpeakerId((current) =>
+        reconcileAudioDeviceId(nextSpeakers, current),
+      );
     } catch {
       setMicrophones([]);
       setSpeakers([]);
+      setSelectedMicId(null);
+      setSelectedSpeakerId(null);
     }
-  }, [selectedMicId, selectedSpeakerId]);
+  }, []);
 
   const permissionRequestedRef = useRef(false);
   /**
@@ -59,9 +52,8 @@ export function useSoftphoneAudioDevices({
    * once (so device labels are populated), and subscribe to the OS
    * "devicechange" event to keep the mic/speaker lists fresh as hardware is
    * plugged/unplugged.
-   * @effect-deps refreshDevices (a useCallback that changes identity only when
-   * selectedMicId/selectedSpeakerId change, causing a controlled resubscribe
-   * so the "pick a default device" logic inside it sees current selections)
+   * @effect-deps refreshDevices (stable callback; state reconciliation uses
+   * functional updates so the listener always sees the current selection)
    * @effect-side-effects subscription (mediaDevices "devicechange" listener,
    * removed on unmount/refreshDevices change) + dom (getUserMedia permission
    * prompt, requested at most once via permissionRequestedRef)
@@ -83,9 +75,9 @@ export function useSoftphoneAudioDevices({
         })
         .catch(() => {});
     }
-    navigator.mediaDevices?.addEventListener("devicechange", refreshDevices);
+    navigator.mediaDevices?.addEventListener?.("devicechange", refreshDevices);
     return () =>
-      navigator.mediaDevices?.removeEventListener("devicechange", refreshDevices);
+      navigator.mediaDevices?.removeEventListener?.("devicechange", refreshDevices);
   }, [refreshDevices]);
 
   /**
@@ -116,22 +108,9 @@ export function useSoftphoneAudioDevices({
       if (!device?.audio) return;
       device.audio
         .setInputDevice(deviceId)
-        .then(() => {
-          micCoordinator.setMicMuted(false);
-          if (activeCall) {
-            navigator.mediaDevices
-              .getUserMedia({ audio: { deviceId } })
-              .then((stream) =>
-                replaceCallInputStream(activeCall, stream).then((result) =>
-                  logTwilioAdapterResult(result, "replaceCallInputStream"),
-                ),
-              )
-              .catch(() => {});
-          }
-        })
         .catch(() => {});
     },
-    [device, activeCall, micCoordinator],
+    [device],
   );
 
   const handleSpeakerChange = useCallback(
@@ -147,23 +126,14 @@ export function useSoftphoneAudioDevices({
     micCoordinator.setMicMuted(!micCoordinator.isMicMuted);
   }, [device, micCoordinator]);
 
-  const handleMuteSpeaker = useCallback(() => {
-    if (!device?.audio) return;
-    const next = !speakerMuted;
-    setSpeakerMuted(next);
-    device.audio.incoming(next);
-  }, [device, speakerMuted]);
-
   return {
     microphones,
     speakers,
     selectedMicId,
     selectedSpeakerId,
     micMuted: micCoordinator.isMicMuted,
-    speakerMuted,
     handleMicChange,
     handleSpeakerChange,
     handleMuteMic,
-    handleMuteSpeaker,
   };
 }

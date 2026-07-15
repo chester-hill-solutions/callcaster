@@ -112,7 +112,7 @@ describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data 
         select: () => ({
           from: () => ({
             innerJoin: () => ({ where: () => ({ orderBy: () => [] }) }),
-            where: () => [],
+            where: () => ({ limit: async () => [] }),
           }),
         }),
         update: () => ({

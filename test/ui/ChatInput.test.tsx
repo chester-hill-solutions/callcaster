@@ -16,6 +16,10 @@ function baseProps(overrides: Record<string, unknown> = {}) {
   return {
     workspace: { id: "w1", name: "W", owner: null, users: null, created_at: "" },
     workspaceNumbers: [{ id: "1", phone_number: "+15550000000" }],
+    senderSelection: {
+      defaultMode: "from_number",
+      messagingServiceReady: false,
+    },
     initialFrom: "+15550000000",
     handleSubmit: vi.fn((e: React.FormEvent) => e.preventDefault()),
     handleImageSelect: vi.fn(),
@@ -28,6 +32,154 @@ function baseProps(overrides: Record<string, unknown> = {}) {
     ...overrides,
   } as React.ComponentProps<typeof ChatInput>;
 }
+
+describe("ChatInput From sender selection", () => {
+  test("offers Messaging Service as a selected option rather than replacing the picker", () => {
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+          establishedFromNumber: "+15559999999",
+          senderSelection: {
+            defaultMode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
+
+    // The picker must stay on screen: hiding it left users unable to send at all
+    // when the workspace Messaging Service was misconfigured.
+    const picker = screen.getByRole("combobox");
+    expect(picker).toHaveValue("__messaging_service__");
+    expect(
+      screen.getByRole("option", { name: /messaging service \(automatic sender\)/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/starts a new thread/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send message/i })).toBeEnabled();
+  });
+
+  test("lets the user pick a workspace number instead of the Messaging Service", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [{ id: "1", phone_number: "+15550000000", friendly_name: "Main" }],
+          initialFrom: "+15550000000",
+          senderSelection: {
+            defaultMode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveValue("__messaging_service__");
+    await user.selectOptions(screen.getByRole("combobox"), "+15550000000");
+    expect(screen.getByRole("combobox")).toHaveValue("+15550000000");
+    expect(screen.getByRole("button", { name: /send message/i })).toBeEnabled();
+  });
+
+  test("offers only real numbers when the Messaging Service has no available senders", () => {
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [{ id: "1", phone_number: "+15550000000", friendly_name: "Main" }],
+          initialFrom: "+15550000000",
+          senderSelection: {
+            defaultMode: "from_number",
+            messagingServiceReady: false,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveValue("+15550000000");
+    expect(
+      screen.queryByRole("option", { name: /messaging service/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("clears a pending schedule when switching from Messaging Service to a number", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [{ id: "1", phone_number: "+15550000000", friendly_name: "Main" }],
+          initialFrom: "+15550000000",
+          senderSelection: {
+            defaultMode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: /send later/i }));
+    expect(screen.getByLabelText(/send at/i)).toBeInTheDocument();
+
+    // Twilio only schedules via a Messaging Service, so the schedule must not
+    // survive a switch to a plain number.
+    await user.selectOptions(screen.getByRole("combobox"), "+15550000000");
+    expect(screen.getByRole("checkbox", { name: /send later/i })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /send later/i })).toBeDisabled();
+    expect(screen.queryByLabelText(/send at/i)).not.toBeInTheDocument();
+  });
+
+  test("disables Send and explains when no sending numbers are available", () => {
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+        })}
+      />,
+    );
+    expect(screen.getByRole("combobox")).toBeDisabled();
+    expect(
+      screen.getByRole("option", { name: /no sending numbers available/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/workspace sending number is required/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
+  });
+
+  test("recovers from an invalid initialFrom by selecting the first available number", () => {
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [
+            { id: "1", phone_number: "+15550000000", friendly_name: "Main" },
+            { id: "2", phone_number: "+15551111111" },
+          ],
+          initialFrom: "+15559999999",
+        })}
+      />,
+    );
+    expect(screen.getByRole("combobox")).toHaveValue("+15550000000");
+    expect(screen.getByRole("button", { name: /send message/i })).toBeEnabled();
+  });
+
+  test("updates the selected From value when the user changes options", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [
+            { id: "1", phone_number: "+15550000000", friendly_name: "Main" },
+            { id: "2", phone_number: "+15551111111", friendly_name: "Alt" },
+          ],
+          initialFrom: "+15550000000",
+        })}
+      />,
+    );
+
+    await user.selectOptions(screen.getByRole("combobox"), "+15551111111");
+    expect(screen.getByRole("combobox")).toHaveValue("+15551111111");
+  });
+});
 
 describe("ChatInput opt-out and send-later", () => {
   test("enables Send for a normal contact", () => {
@@ -43,16 +195,66 @@ describe("ChatInput opt-out and send-later", () => {
     expect(screen.getByText(/this contact has opted out/i)).toBeInTheDocument();
   });
 
-  test("reveals a datetime picker when Send later is toggled and keeps Send disabled until a time is set", async () => {
-    const user = userEvent.setup();
+  test("disables Send later with an explanation without Messaging Service", () => {
     render(<ChatInput {...baseProps()} />);
+
+    expect(screen.getByRole("checkbox", { name: /send later/i })).toBeDisabled();
+    expect(
+      screen.getByText(/scheduling requires messaging service/i),
+    ).toBeInTheDocument();
+  });
+
+  test("reveals a bounded datetime picker when Messaging Service scheduling is enabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+          senderSelection: {
+            defaultMode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
     expect(screen.queryByLabelText(/send at/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("checkbox", { name: /send later/i }));
 
     const sendAtInput = screen.getByLabelText(/send at/i);
     expect(sendAtInput).toBeInTheDocument();
+    expect(sendAtInput).toHaveAttribute("min");
+    expect(sendAtInput).toHaveAttribute("max");
     expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
+  });
+
+  test("keeps schedule controls after submit until success is observed", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+          senderSelection: {
+            defaultMode: "messaging_service",
+            messagingServiceReady: true,
+          },
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: /send later/i }));
+    fireEvent.change(screen.getByLabelText(/send at/i), {
+      target: { value: "2026-08-01T12:00" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/type your message/i), {
+      target: { value: "scheduled" },
+    });
+    await user.click(screen.getByRole("button", { name: /send message/i }));
+
+    expect(screen.getByRole("checkbox", { name: /send later/i })).toBeChecked();
+    expect(screen.getByLabelText(/send at/i)).toHaveValue("2026-08-01T12:00");
   });
 });
 

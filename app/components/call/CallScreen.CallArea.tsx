@@ -82,6 +82,11 @@ export const CallArea: React.FC<CallAreaProps> = ({
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
   };
+  const hasValidDisposition =
+    disposition !== "idle" &&
+    dispositionOptions.some((option) =>
+      (typeof option === "string" ? option : option.value) === disposition
+    );
 
   return (
     <div className={cn(callPanelShellClass, "justify-between")}>
@@ -207,7 +212,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
             <Button
               type="button"
               variant="outline"
-              disabled={isBusy || disposition === "idle"}
+              disabled={isBusy || !hasValidDisposition}
               onClick={() => handleDequeueNext()}
               className="flex-1 rounded-full text-xs"
             >

@@ -19,7 +19,7 @@ const VALID_CALL_STATUSES: CallStatusEnum[] = [
   "initiated",
 ];
 
-/** Normalize provider status to DB call_status / disposition (lowercase, valid enum). */
+/** Normalize provider status to the DB call_status enum (lowercase, valid enum). */
 export function normalizeProviderStatus(providerStatus: string | null | undefined): CallStatusEnum | null {
   if (providerStatus == null || providerStatus === "") return null;
   const lower = String(providerStatus).toLowerCase();

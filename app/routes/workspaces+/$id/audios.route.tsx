@@ -59,9 +59,14 @@ export default function WorkspaceAudiosPage() {
         emptyMessage="Add Your Own Audio to this Workspace!"
         emptyDescription="Upload or record audio to use in IVR campaigns and voicemail drops."
         addAction={
-          <Button asChild className="font-Zilla-Slab text-lg font-semibold">
-            <Link to="./new">Add Audio</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" className="font-Zilla-Slab text-lg font-semibold">
+              <Link to="./record">Record audio</Link>
+            </Button>
+            <Button asChild className="font-Zilla-Slab text-lg font-semibold">
+              <Link to="./new">Add Audio</Link>
+            </Button>
+          </div>
         }
       >
         {workspaceAudios != null && !isWorkspaceAudioEmpty ? (

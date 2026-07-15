@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createWorkspaceRealtimeMock, createWorkspaceEventSourceMock } from "./hooks-test-helpers";
+import { createWorkspaceEventSourceMock } from "./hooks-test-helpers";
 
 const messagingMocks = vi.hoisted(() => ({
   fetchConversationSummaries: vi.fn(),
@@ -95,23 +95,6 @@ describe("realtime hooks", () => {
       { workspaceId: "ws" },
     );
     expect(onChange).toHaveBeenCalled();
-  });
-
-  test("useRealtimeData returns initial data and stable state", async () => {
-    const { useRealtimeData } = await import("@/hooks/realtime/useRealtimeData");
-    const { client } = createWorkspaceRealtimeMock();
-
-    const withInitial = renderHook(() =>
-      useRealtimeData(client as any, "ws", "contact", [{ id: 1 } as any]),
-    );
-    expect(withInitial.result.current.data).toHaveLength(1);
-
-    const withoutInitial = renderHook(() =>
-      useRealtimeData(client as any, "ws", "workspace_users", null),
-    );
-    expect(withoutInitial.result.current.data).toHaveLength(0);
-    expect(withoutInitial.result.current.isSyncing).toBe(false);
-    expect(withoutInitial.result.current.error).toBeNull();
   });
 
   test("useChatRealTime inserts and dedupes messages", async () => {

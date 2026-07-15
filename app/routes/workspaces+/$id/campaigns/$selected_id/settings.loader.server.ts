@@ -142,6 +142,11 @@ export const loader = defineLoader({
         Boolean((campaignType as Campaign | null)?.sms_send_mode === "messaging_service")
           ? messagingServiceReady
           : undefined,
+      workspacePhoneNumbers: phoneNumbersResult.data ?? [],
+      workspaceScriptIds: campaignWithAudience.scripts.flatMap((script) =>
+        script?.id == null ? [] : [script.id],
+      ),
+      workspaceAudioNames: mediaData.map((media) => media.name),
     },
   );
 

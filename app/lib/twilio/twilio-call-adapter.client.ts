@@ -10,10 +10,6 @@ export {
 
 type CallWithMute = Call & { mute?: (muted: boolean) => void };
 
-type CallWithInputStream = Call & {
-  _setInputTracksFromStream?: (stream: MediaStream) => Promise<void>;
-};
-
 /** Result of an adapter operation against optional Twilio Voice SDK capabilities. */
 export type TwilioAdapterResult =
   | { status: "ok" }
@@ -36,23 +32,6 @@ export function setCallMuted(
   }
   try {
     withMute.mute(muted);
-    return { status: "ok" };
-  } catch (error) {
-    return { status: "error", error };
-  }
-}
-
-export async function replaceCallInputStream(
-  call: Call | null | undefined,
-  stream: MediaStream,
-): Promise<TwilioAdapterResult> {
-  if (!call) return { status: "invalid_call" };
-  const withStream = call as CallWithInputStream;
-  if (typeof withStream._setInputTracksFromStream !== "function") {
-    return { status: "unsupported" };
-  }
-  try {
-    await withStream._setInputTracksFromStream(stream);
     return { status: "ok" };
   } catch (error) {
     return { status: "error", error };

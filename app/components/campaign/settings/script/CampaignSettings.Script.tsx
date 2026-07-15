@@ -17,10 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  documentToScript,
-  scriptToDocument,
-} from "@/lib/call-script-service";
+import { documentToScript, scriptToDocument } from "@/lib/call-script-service";
 
 type PageData = {
   campaignDetails: {
@@ -32,13 +29,13 @@ type PageData = {
 type ScriptPageProps = {
   pageData: PageData;
   onPageDataChange: (data: PageData) => void;
-  scripts: Script[];
   mediaNames: string[];
 };
 
 export default function CampaignSettingsScript({
   pageData,
   onPageDataChange,
+  mediaNames,
 }: ScriptPageProps) {
   const script = pageData.campaignDetails.script;
   const document = useMemo(() => scriptToDocument(script), [script]);
@@ -60,15 +57,25 @@ export default function CampaignSettingsScript({
     <ScriptKitCallScriptUiProvider
       components={{
         Button: ({ onClick, disabled, children, type = "button" }) => (
-          <Button type={type} onClick={onClick} disabled={disabled} size="sm" variant="outline">
+          <Button
+            type={type}
+            onClick={onClick}
+            disabled={disabled}
+            size="sm"
+            variant="outline"
+          >
             {children as React.ReactNode}
           </Button>
         ),
+        // Wraps the control so the label is actually associated with it. The
+        // UI-kit contract has no id to thread through for htmlFor, and an
+        // unassociated <Label> leaves every field unlabelled for screen
+        // readers (and unfindable by role/label in tests).
         Field: ({ label, children }) => (
-          <div className="grid gap-2">
-            <Label>{label}</Label>
+          <Label className="grid gap-2 font-normal">
+            <span className="font-medium">{label}</span>
             {children as React.ReactNode}
-          </div>
+          </Label>
         ),
         Textarea: ({ value, onChange, placeholder, readOnly, rows = 3 }) => (
           <Textarea
@@ -103,7 +110,12 @@ export default function CampaignSettingsScript({
         ),
       }}
     >
-      <ScriptEditor document={document} onChange={handleChange} palette="callcaster" />
+      <ScriptEditor
+        document={document}
+        onChange={handleChange}
+        palette="callcaster"
+        mediaNames={mediaNames}
+      />
     </ScriptKitCallScriptUiProvider>
   );
 }

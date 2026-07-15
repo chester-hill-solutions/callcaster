@@ -13,6 +13,7 @@ import {
   removeInvite,
 } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { createWorkspaceApiKey } from "@/lib/platform-members.server";
+import { parseApiKeyScopesFromForm } from "@/lib/api-key-capabilities.shared";
 import { MemberRole } from "@/lib/member-role";
 import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { defineAction } from "@/lib/handler.server";
@@ -115,10 +116,7 @@ export const action = defineAction({
           return routeData({ error: "API key name is required" }, { headers, status: 400 });
         }
 
-        const scopes = formData
-          .getAll("scopes")
-          .map((value) => String(value).trim())
-          .filter(Boolean);
+        const scopes = parseApiKeyScopesFromForm(formData);
         if (scopes.length === 0) {
           return routeData(
             { error: "Select at least one capability scope" },

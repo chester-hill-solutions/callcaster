@@ -6,6 +6,12 @@ import type { Database } from "@/lib/db-types";
 import { Script } from "../types";
 import { logger } from "../logger.server";
 import { rpcGetCampaignStats } from "@/lib/db-rpc.server";
+import {
+  aggregateIvrResponses,
+  campaignTypeCollectsIvrResponses,
+  type IvrQuestionResults,
+  type IvrScriptShape,
+} from "@/lib/ivr-results";
 import { getSignedUrls } from "./workspace.server";
 import {
   countCampaignQueueRows,
@@ -141,6 +147,60 @@ export async function fetchBasicResults({
   );
 
   return messageResults.length > 0 ? messageResults : baseResults;
+}
+
+/**
+ * Per-question IVR response counts for a campaign.
+ *
+ * `get_campaign_stats` only aggregates `outreach_attempt.disposition`, so the
+ * responses written to `outreach_attempt.result` need a separate read to reach
+ * the results screen.
+ */
+export async function fetchIvrResponseResults({
+  workspaceId,
+  campaignId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string;
+  tdb?: TenantDb;
+}): Promise<IvrQuestionResults[]> {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const campaignIdNum = Number(campaignId);
+
+  try {
+    const campaign = await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, campaignIdNum),
+      columns: { type: true, script_id: true },
+    });
+    if (!campaignTypeCollectsIvrResponses(campaign?.type)) {
+      return [];
+    }
+
+    const [attempts, script] = await Promise.all([
+      tdb.outreach_attempt.findMany({
+        where: and(
+          eq(outreachAttemptTable.campaign_id, campaignIdNum),
+          isNotNull(outreachAttemptTable.result),
+        ),
+        columns: { result: true },
+      }),
+      campaign?.script_id
+        ? tdb.script.findFirst({
+            where: eq(scriptTable.id, campaign.script_id),
+            columns: { steps: true },
+          })
+        : null,
+    ]);
+
+    return aggregateIvrResponses(
+      attempts,
+      (script?.steps as IvrScriptShape) ?? null,
+    );
+  } catch (error) {
+    logger.error("Error fetching IVR response results:", error);
+    return [];
+  }
 }
 
 export async function fetchCampaignCounts({

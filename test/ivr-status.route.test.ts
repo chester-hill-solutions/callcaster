@@ -374,6 +374,41 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ["completed"],
+    ["failed"],
+    ["no-answer"],
+  ])("records %s as the outreach disposition so results are not filtered out", async (callStatus) => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: callStatus, Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+
+    // `get_campaign_stats` filters out attempts whose disposition is NULL, so a
+    // terminal callback that only persists the `call` row leaves the campaign
+    // results screen empty.
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      1,
+      expect.objectContaining({ disposition: callStatus }),
+    );
+  });
+
+  test("skips the disposition write when the call has no outreach attempt", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ outreach_attempt_id: null }));
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
+  });
+
   test("covers switch default (non-terminal callStatus, non-machine)", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });

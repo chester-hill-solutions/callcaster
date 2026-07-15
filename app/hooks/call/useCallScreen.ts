@@ -80,8 +80,7 @@ export function useCallScreen() {
   });
 
   const phoneVerification = usePhoneVerification({
-    workspaceId,
-    callerId: campaign?.caller_id,
+    verifiedNumbers,
   });
 
   const { state, context, send } = useCallState();
@@ -167,7 +166,6 @@ export function useCallScreen() {
     activeCall,
     recentAttemptDisposition: recentAttempt?.disposition,
     predictiveState,
-    setDisposition,
     send: send as unknown as (action: { type: string }) => void,
   });
 
@@ -332,13 +330,10 @@ export function useCallScreen() {
 
   const handleDeviceSelect = useCallback(
     (device: string) => {
-      phoneVerification.setSelectedDevice(device);
-      if (device !== "computer") {
-        void phoneVerification.handlePhoneDeviceSelection(
-          device,
-          audioControls.requestMicrophoneAccess,
-        );
-      }
+      void phoneVerification.handlePhoneDeviceSelection(
+        device,
+        audioControls.requestMicrophoneAccess,
+      );
     },
     [phoneVerification, audioControls.requestMicrophoneAccess],
   );
@@ -415,6 +410,8 @@ export function useCallScreen() {
 
   const audioControlsGroup = {
     stream: audioControls.stream,
+    selectedMicrophone: audioControls.microphone,
+    selectedSpeaker: audioControls.output,
     availableMicrophones: audioControls.availableMicrophones,
     availableSpeakers: audioControls.availableSpeakers,
     handleMicrophoneChange: audioControls.handleMicrophoneChange,

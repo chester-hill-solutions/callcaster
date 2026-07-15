@@ -58,6 +58,7 @@
         "tailwindcss-animate": "^1.0.7",
         "twilio": "^5.0.4",
         "wavefile": "^11.0.0",
+        "wavesurfer.js": "^7.12.10",
         "ws": "^8.16.0",
         "zod": "^4.4.3",
       },
@@ -2245,6 +2246,8 @@
     "w3c-xmlserializer": ["w3c-xmlserializer@5.0.0", "", { "dependencies": { "xml-name-validator": "^5.0.0" } }, "sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA=="],
 
     "wavefile": ["wavefile@11.0.0", "", { "bin": "bin/wavefile.js" }, "sha512-/OBiAALgWU24IG7sC84cDO/KfFuvajWc5Uec0oV2zrpOOZZDgGdOwHwgEzOrwh8jkubBk7PtZfQBIcI1OaE5Ng=="],
+
+    "wavesurfer.js": ["wavesurfer.js@7.12.10", "", {}, "sha512-M3AC5biFmvfy7Oxe8FN6I88H0z1c8Vuz81N6Oq2CY4kOumNDb6U1/0qg4pomjP619vJqdWADlgUcpOKvfGifng=="],
 
     "web-namespaces": ["web-namespaces@2.0.1", "", {}, "sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ=="],
 

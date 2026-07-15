@@ -6,7 +6,12 @@ export {
   type RoutingTestModeProps,
   type RoutingFlowPreviewProps,
 } from "./routing/index.js";
-export { useScriptEditorState, type UseScriptEditorStateOptions } from "./hooks/index.js";
+export {
+  useScriptEditorState,
+  blockLabel,
+  type UseScriptEditorStateOptions,
+  type RoutingTarget,
+} from "./hooks/index.js";
 export {
   ScriptKitCallScriptUiProvider,
   useCallScriptUi,

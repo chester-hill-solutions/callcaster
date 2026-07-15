@@ -5,10 +5,13 @@ import { fetchCampaignsByType } from "@/lib/database/campaign.server";
 import { fetchContactData } from "@/lib/database/contact.server";
 import {
   fetchConversationSummary,
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace,
   getUserRole,
 } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
+import type { Json } from "@/lib/db-types";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
@@ -44,6 +47,7 @@ export const loader = defineLoader({
   const tdb = createTenantDb(workspaceId);
 
   let optOutKeywords = parseOptOutKeywords(null);
+  let attachedSenderPhoneNumbers: string[] = [];
   try {
     const onboarding = await getWorkspaceMessagingOnboardingState({
       workspaceId,
@@ -51,11 +55,14 @@ export const loader = defineLoader({
     optOutKeywords = parseOptOutKeywords(
       onboarding.businessProfile.optOutKeywords,
     );
+    attachedSenderPhoneNumbers =
+      onboarding.messagingService.attachedSenderPhoneNumbers;
   } catch {
     // use default keywords if onboarding not available
   }
 
-  const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
+  const [workspaceNumbers, contactData, smsCampaigns, portalConfig] =
+    await Promise.all([
     tdb.workspace_number.findMany({
       where: eq(workspaceNumberTable.type, "rented"),
     }),
@@ -72,7 +79,29 @@ export const loader = defineLoader({
       type: "message_campaign",
       tdb,
     }),
+    getEffectiveWorkspaceTwilioPortalConfigForWorkspace({ workspaceId }),
   ]);
+  // A configured SID alone is not enough to send: a Messaging Service with no
+  // attached senders fails at Twilio. Mirrors the campaign settings loader so
+  // both surfaces agree on what "ready" means.
+  const messagingServiceReady =
+    portalConfig.sendMode === "messaging_service" &&
+    workspaceMessagingServiceHasAvailableSenders({
+      messagingServiceSid: portalConfig.messagingServiceSid,
+      attachedSenderPhoneNumbers,
+      workspaceNumbers: workspaceNumbers.map((n) => ({
+        phone_number: n.phone_number,
+        capabilities: n.capabilities as Json | null,
+      })),
+    });
+  const senderSelection = {
+    // The composer's initial selection only — every workspace number stays
+    // selectable so a misconfigured Messaging Service is never a dead end.
+    defaultMode: messagingServiceReady
+      ? ("messaging_service" as const)
+      : ("from_number" as const),
+    messagingServiceReady,
+  };
   const { contact, potentialContacts, contactError } = contactData || {
     contact: null,
     potentialContacts: [],
@@ -100,6 +129,7 @@ export const loader = defineLoader({
           hasMore: false,
         },
         potentialContacts: [],
+        senderSelection,
         userRole,
         workspaceNumbers: workspaceNumbers ?? [],
         contact_number,
@@ -132,6 +162,7 @@ export const loader = defineLoader({
       contact,
       error: null,
       optOutKeywords,
+      senderSelection,
       userRole,
       contact_number,
       pagination: {

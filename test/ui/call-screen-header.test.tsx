@@ -81,6 +81,8 @@ function baseProps(overrides: Partial<any> = {}) {
     mediaStream: null,
     availableMicrophones: [{ deviceId: "m1", label: "Mic 1" }] as any[],
     availableSpeakers: [{ deviceId: "s1", label: "Spk 1" }] as any[],
+    selectedMicrophone: "m1",
+    selectedSpeaker: "s1",
     onLeaveCampaign: vi.fn(),
     onReportError: vi.fn(),
     handleMicrophoneChange: vi.fn(),
@@ -100,7 +102,7 @@ function baseProps(overrides: Partial<any> = {}) {
     newPhoneNumber: "",
     onNewPhoneNumberChange: vi.fn(),
     onVerifyNewNumber: vi.fn(),
-    pin: "",
+    verificationPhoneNumber: "",
     ...overrides,
   };
 }
@@ -211,7 +213,7 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
     expect(screen.getByText("Unmute Microphone")).toBeInTheDocument();
   });
 
-  test("add-number dialog and PIN overlay wiring", async () => {
+  test("add-number dialog and call-in instructions wiring", async () => {
     const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
     const onAddNumberCancel = vi.fn();
     const onVerifyNewNumber = vi.fn();
@@ -261,9 +263,16 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onAddNumberCancel).toHaveBeenCalledTimes(1);
 
-    // 3. PIN dialog branch
-    rerender(<CampaignHeader {...baseProps({ pin: "1234" })} />);
-    expect(screen.getByText(/enter the PIN: 1234/i)).toBeInTheDocument();
+    // 3. Call-in instructions dialog branch
+    rerender(
+      <CampaignHeader
+        {...baseProps({
+          newPhoneNumber: "+15550001111",
+          verificationPhoneNumber: "+15559990000",
+        })}
+      />,
+    );
+    expect(screen.getByText(/call \+15559990000 from \+15550001111/i)).toBeInTheDocument();
   });
 });
 

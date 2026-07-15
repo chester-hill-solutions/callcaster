@@ -21,7 +21,8 @@ function recordingSideEffectsIdempotencyKey(
 
 export const action = defineAction({
   auth: async ({ request }: ActionFunctionArgs): Promise<RecordingAuth | Response> => {
-    const formData = await request.formData();
+    // Clone before reading — Bun yields empty params on re-read after consume.
+    const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const callSid = params.CallSid?.trim();
 
@@ -29,7 +30,7 @@ export const action = defineAction({
       return { params, callSid: null };
     }
 
-    const forbidden = await requireTwilioSignature(request, { callSid });
+    const forbidden = await requireTwilioSignature(request, { callSid, params });
     if (forbidden) return forbidden;
 
     return { params, callSid };

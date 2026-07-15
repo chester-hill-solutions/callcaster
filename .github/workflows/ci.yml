@@ -27,6 +27,12 @@ jobs:
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      # The app resolves @chester-hill-solutions/scriptkit-* to vendor/ via a
+      # node_modules symlink, and those packages' "main" points at their
+      # committed dist/. Nothing else builds them, so a src/ edit without a
+      # rebuild silently ships stale code. Build here; the `git diff
+      # --exit-code` at the end of this job then fails on a stale dist/.
+      - run: npm run vendor:build
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:node
@@ -40,6 +46,7 @@ jobs:
       - run: npm run tools:api:surface:check
       - run: npm run check:route-server-leaks
       - run: npm run check:twilio-webhooks
+      - run: npm run check:request-body-consumption
       - run: npm run check:middleware
       - run: npm run check:credit-writes
       - run: npm run check:effects

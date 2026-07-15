@@ -1,1 +1,1 @@
-export { useScriptEditorState, type UseScriptEditorStateOptions } from "../hooks/use-script-editor-state.js";
+export { useScriptEditorState, blockLabel, type UseScriptEditorStateOptions, type RoutingTarget, } from "../hooks/use-script-editor-state.js";

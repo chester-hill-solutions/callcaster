@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { getDualAuthUser, requireDualAuth , resolveDualAuthSession } from "@/lib/api-auth.server";
+import { resolveDualAuthSession } from "@/lib/api-auth.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import {
@@ -10,10 +10,6 @@ import {
   findAudienceWorkspaceById,
   upsertAudienceById,
 } from "@/lib/audience-upload-db.server";
-
-interface AuthSessionResponse {
-  headers: Headers;
-}
 
 interface AudienceData {
   id: number;
@@ -23,13 +19,38 @@ interface AudienceData {
 type AudiencesDeps = {
   verifyAuth: (
     request: Request,
-  ) => Promise<{ headers: Headers; user?: { id: string } }>;
+  ) => Promise<{
+    auth?: { authType: string; workspaceId?: string };
+    headers: Headers;
+    user?: { id: string };
+  }>;
   parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
   requireWorkspaceAccess: (args: {
     user: { id: string };
     workspaceId: string;
   }) => Promise<void>;
 };
+
+async function requireAudienceWorkspaceAccess(args: {
+  auth?: { authType: string; workspaceId?: string };
+  user?: { id: string };
+  workspaceId: string;
+  requireWorkspaceAccess: AudiencesDeps["requireWorkspaceAccess"];
+}) {
+  if (args.auth?.authType === "api_key") {
+    if (args.auth.workspaceId !== args.workspaceId) {
+      throw new AppError("Unauthorized", 403);
+    }
+    return;
+  }
+  if (!args.user) {
+    throw new AppError("Unauthorized", 401);
+  }
+  await args.requireWorkspaceAccess({
+    user: args.user,
+    workspaceId: args.workspaceId,
+  });
+}
 
 export const action = defineAction({
   sideEffects: ["db-write"],
@@ -43,7 +64,7 @@ export const action = defineAction({
     requireWorkspaceAccess:
       deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
   };
-  const { headers, user } = await d.verifyAuth(request);
+  const { auth, headers, user } = await d.verifyAuth(request);
 
   const method = request.method;
 
@@ -69,9 +90,12 @@ export const action = defineAction({
       if (!workspaceId) {
         return routeData({ error: "Audience not found" }, { status: 404, headers });
       }
-      if (user) {
-        await d.requireWorkspaceAccess({ user, workspaceId });
-      }
+      await requireAudienceWorkspaceAccess({
+        auth,
+        user,
+        workspaceId,
+        requireWorkspaceAccess: d.requireWorkspaceAccess,
+      });
 
       const { id: _id, ...updateValues } = data;
       const update = await upsertAudienceById(data.id, updateValues);
@@ -96,9 +120,12 @@ export const action = defineAction({
       if (!workspaceId) {
         return routeData({ error: "Audience not found" }, { status: 404, headers });
       }
-      if (user) {
-        await d.requireWorkspaceAccess({ user, workspaceId });
-      }
+      await requireAudienceWorkspaceAccess({
+        auth,
+        user,
+        workspaceId,
+        requireWorkspaceAccess: d.requireWorkspaceAccess,
+      });
 
       const deleted = await deleteAudienceById(id);
       if (!deleted) {

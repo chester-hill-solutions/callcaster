@@ -27,12 +27,9 @@ import {
 } from "@/lib/types";
 import type { CampaignStatus } from "@/lib/db-types";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
-import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 
 import type { CampaignState } from "@/lib/campaign-home.types";
 export type { CampaignState } from "@/lib/campaign-home.types";
-
-type CampaignTable = "campaign";
 
 /** Tables whose row changes affect dashboard queue + disposition counts from the loader. */
 const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
@@ -47,6 +44,7 @@ export default function CampaignScreen() {
     hasAccess,
     campaignDetails: initialCampaignDetails,
     results,
+    ivrResponses,
     selected_id,
     queueCounts,
     readiness,
@@ -67,23 +65,12 @@ export default function CampaignScreen() {
   const isCampaignParentRoute = route.length === 5;
   const revalidator = useRevalidator();
   const lastRevalidateRef = useRef(0);
-  const realtimeTable: CampaignTable = "campaign";
   const workspaceRouteId = route[2] ?? "";
   const safeQueueCounts = {
     fullCount: queueCounts.fullCount ?? 0,
     queuedCount: queueCounts.queuedCount ?? 0,
   };
-  const { data: campaignDetailsArray } = useRealtimeData(
-    null,
-    workspaceRouteId,
-    realtimeTable,
-    [
-      initialCampaignDetails
-        ? { ...initialCampaignDetails, id: Number(selected_id) }
-        : null,
-    ],
-  );
-  const campaignDetails = campaignDetailsArray?.[0];
+  const campaignDetails = initialCampaignDetails;
 
   useWorkspaceEventSubscription({
     workspaceId: workspaceRouteId,
@@ -123,15 +110,31 @@ export default function CampaignScreen() {
               if (!campaignData) {
                 return <ErrorLoadingResults />;
               }
-              return resolvedResults.length < 1 ? (
-                <NoResultsYet />
-              ) : (
-                <ResultsDisplay
-                  results={resolvedResults}
-                  campaign={campaignData}
-                  hasAccess={hasAccess}
-                  queueCounts={safeQueueCounts}
-                />
+              return (
+                <Suspense fallback={<LoadingResults />}>
+                  <Await
+                    resolve={ivrResponses}
+                    errorElement={<ErrorLoadingResults />}
+                  >
+                    {(resolvedIvrResponses) => {
+                      const ivr = resolvedIvrResponses ?? [];
+                      // An IVR campaign can have recorded keypresses before any
+                      // terminal status callback lands a disposition, so the
+                      // empty state has to consider both sources.
+                      return resolvedResults.length < 1 && ivr.length < 1 ? (
+                        <NoResultsYet />
+                      ) : (
+                        <ResultsDisplay
+                          results={resolvedResults}
+                          campaign={campaignData}
+                          hasAccess={hasAccess}
+                          queueCounts={safeQueueCounts}
+                          ivrResponses={ivr}
+                        />
+                      );
+                    }}
+                  </Await>
+                </Suspense>
               );
             }}
           </Await>

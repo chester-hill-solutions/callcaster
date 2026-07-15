@@ -8,8 +8,10 @@ import { data as routeData, redirect } from "react-router";
 import {
   fetchBasicResults,
   fetchCampaignDetails,
+  fetchIvrResponseResults,
   fetchQueueCounts,
 } from "@/lib/database/campaign.server";
+import { campaignTypeCollectsIvrResponses } from "@/lib/ivr-results";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
@@ -53,6 +55,13 @@ export const loader = defineLoader({
       expected_total: number;
     }[];
 
+    const ivrResponsesPromise = campaignTypeCollectsIvrResponses(campaignRow.type)
+      ? fetchIvrResponseResults({
+          workspaceId: workspace_id,
+          campaignId: selected_id,
+        })
+      : Promise.resolve([]);
+
     const readiness = getCampaignReadiness(campaignRow, campaignDetails, {
       queueCount: queueCounts.queuedCount ?? queueCounts.fullCount,
     });
@@ -73,6 +82,7 @@ export const loader = defineLoader({
       campaignDetails,
       user: user,
       results: resultsPromise || [], // Deferred loading
+      ivrResponses: ivrResponsesPromise,
       queueCounts,
       readiness,
       joinDisabled,

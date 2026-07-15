@@ -1,9 +1,35 @@
-import { eq } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { isObject } from "@/lib/type-safety-utils";
 
 export type WorkspaceTwilioData = Record<string, unknown>;
+
+/**
+ * Resolve a workspace id from a Twilio AccountSid embedded in `workspace.twilio_data`.
+ * Used as a webhook-auth fallback when the call/message row is not yet visible
+ * (create→insert race on outbound IVR/SMS).
+ */
+export async function findWorkspaceIdByTwilioAccountSid(
+  accountSid: string,
+): Promise<string | null> {
+  const trimmed = accountSid.trim();
+  if (!trimmed) return null;
+
+  const rows = await adminDb
+    .select({ id: workspaceTable.id })
+    .from(workspaceTable)
+    .where(
+      or(
+        sql`${workspaceTable.twilio_data}->>'sid' = ${trimmed}`,
+        sql`${workspaceTable.twilio_data}->>'account_sid' = ${trimmed}`,
+        sql`${workspaceTable.twilio_data}->>'accountSid' = ${trimmed}`,
+      ),
+    )
+    .limit(1);
+
+  return rows[0]?.id ?? null;
+}
 
 /**
  * Per-process, in-memory TTL cache for `workspace.twilio_data`.

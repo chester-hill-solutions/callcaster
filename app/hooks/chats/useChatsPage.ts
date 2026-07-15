@@ -9,6 +9,7 @@ import {
   useSearchParams,
 } from "react-router";
 import { isOptOutMessage } from "@/lib/chat-opt-out";
+import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import { useContactSearch } from "@/hooks/contact/useContactSearch";
@@ -50,6 +51,7 @@ export function useChatsPage() {
     campaigns,
     workspaceNumbers,
     optOutKeywords,
+    senderSelection,
   } = useLoaderData<ChatsLoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
   const hideStopConversations = searchParams.get("hide_stop") === "1";
@@ -67,7 +69,7 @@ export function useChatsPage() {
   const chatActionsRef = useRef<{
     addOptimisticMessage?: (p: {
       body: string;
-      from: string;
+      from?: string;
       to: string;
       media?: string;
       sid?: string;
@@ -123,14 +125,17 @@ export function useChatsPage() {
   }, [loadedChats, contact_number]);
 
   const initialFrom = useMemo(() => {
-    if (establishedFromNumber) {
-      const establishedKey = getConversationPhoneKey(establishedFromNumber);
-      const matchedWorkspaceNumber = chatInputWorkspaceNumbers.find(
-        (num) => getConversationPhoneKey(num.phone_number) === establishedKey,
-      );
-      return matchedWorkspaceNumber?.phone_number || establishedFromNumber;
-    }
-    return chatInputWorkspaceNumbers[0]?.phone_number || "";
+    const fallback = chatInputWorkspaceNumbers[0]?.phone_number || "";
+    if (!establishedFromNumber) return fallback;
+
+    const establishedKey = getConversationPhoneKey(establishedFromNumber);
+    const matchedWorkspaceNumber = chatInputWorkspaceNumbers.find(
+      (num) => getConversationPhoneKey(num.phone_number) === establishedKey,
+    );
+    // Only use a sender that appears in the From options. An historical
+    // conversation number that is no longer rented would leave the controlled
+    // <select> with a blank selection.
+    return matchedWorkspaceNumber?.phone_number || fallback;
   }, [establishedFromNumber, chatInputWorkspaceNumbers]);
 
   const chatsRoutePath = `/workspaces/${workspace.id}/chats`;
@@ -328,10 +333,17 @@ export function useChatsPage() {
       const formData = new FormData(target);
       formData.append("media", JSON.stringify(selectedImages));
       const body = (formData.get("body") as string) || "";
+      // Resolve the sender the same way the action does, so the optimistic
+      // bubble shows the number the message will actually be sent from. A
+      // Messaging Service send has no specific number, hence `undefined`.
+      const selection = parseChatSenderSelection({
+        rawFrom: formData.get("from") as string | null,
+        messagingServiceAvailable: senderSelection.messagingServiceReady,
+      });
       const from =
-        (formData.get("from") as string) ||
-        workspaceNumbers?.[0]?.phone_number ||
-        "";
+        selection.mode === "messaging_service"
+          ? undefined
+          : selection.fromNumber || workspaceNumbers?.[0]?.phone_number || "";
       const media = formData.get("media") as string | undefined;
       const pendingSid = `pending-${Date.now()}`;
       pendingOptimisticMessageRef.current = { sid: pendingSid, body };
@@ -357,6 +369,7 @@ export function useChatsPage() {
       messageFetcher,
       selectedImages,
       setSelectedImages,
+      senderSelection.messagingServiceReady,
       workspaceNumbers,
     ],
   );
@@ -518,6 +531,7 @@ export function useChatsPage() {
   return {
     workspace,
     workspaceNumbers,
+    senderSelection,
     registerChatActions,
     outlet,
     contact,

@@ -54,8 +54,8 @@ export const loader = defineLoader({
     ]);
     const nextRecipient = getNextRecipient(queue, campaign.dial_type ?? "", user.id);
     const initalCallsList = getInitialCallsList(attempts || []);
-    const initialRecentCall = getInitialRecentCall(attempts || []);
-    const initialRecentAttempt = getInitialRecentAttempt(attempts || []);
+    const initialRecentCall = getInitialRecentCall(attempts || [], nextRecipient);
+    const initialRecentAttempt = getInitialRecentAttempt(attempts || [], nextRecipient);
     const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole as MemberRole);
     const isActive = campaign ? checkSchedule(campaign) : false;
 

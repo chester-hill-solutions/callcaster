@@ -18,6 +18,7 @@ import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from 'twilio';
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
+import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 
 interface DialRequest {
   to_number: string;
@@ -55,11 +56,18 @@ export const action = defineAction({
         typeof contact_id !== "string" ||
         typeof workspace_id !== "string" ||
         typeof queue_id !== "string" ||
-        typeof caller_id !== "string"
+        typeof caller_id !== "string" ||
+        (selected_device !== undefined && typeof selected_device !== "string")
     ) {
         throw new Response("Invalid dial payload", { status: 400 });
     }
     await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+    if (selected_device && selected_device !== "computer") {
+        const verifiedNumbers = await getUserVerifiedAudioNumbers(user.id);
+        if (!verifiedNumbers?.includes(selected_device)) {
+            throw new Response("Selected device is not a verified phone number", { status: 400 });
+        }
+    }
 
     const credits = await getWorkspaceCreditsBalance(workspace_id);
     if (credits === null) {

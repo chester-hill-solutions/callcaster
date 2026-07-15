@@ -30,10 +30,12 @@ const STATUS_OPTIONS: { value: AgentState; label: string; color: string }[] = [
   { value: "offline", label: "Offline", color: "bg-muted-foreground" },
 ];
 
-const STATUS_REASONS: Record<string, string[]> = {
-  away: ["break", "lunch", "meeting", "training", "other"],
+const STATUS_REASONS: Record<"away" | "offline", string[]> = {
+  away: ["break", "lunch", "meeting", "training"],
   offline: ["ended_shift", "device_issue"],
 };
+
+type ReasonedAgentState = Extract<AgentState, "away" | "offline">;
 
 export default function AgentDesktop() {
   const loaderData = useLoaderData<HandsetLoaderData>();
@@ -77,17 +79,17 @@ export default function AgentDesktop() {
   useEndSessionOnUnmount(endSession);
 
   const handleSetStatus = useCallback(
-    async (to: AgentState, reason?: string) => {
+    async (to: AgentState, reason?: string): Promise<boolean> => {
       if (to === "available") {
         const ok = await runDeviceCheck();
         if (!ok) {
           setRuntimeError(
             "Cannot go Available: microphone access required. Check your browser permissions.",
           );
-          return;
+          return false;
         }
       }
-      await setStatus(to, reason ?? undefined);
+      return setStatus(to, reason ?? undefined);
     },
     [setStatus],
   );
@@ -171,7 +173,7 @@ type AgentDesktopConnectedProps = {
   clientIdentity: string;
   workspaceId: string;
   effectiveStatus: HandsetLoaderData["agentStatus"];
-  onSetStatus: (to: AgentState, reason?: string) => Promise<void>;
+  onSetStatus: (to: AgentState, reason?: string) => Promise<boolean>;
   statusLoading: boolean;
   statusError: string | null;
   runtimeError?: string;
@@ -239,6 +241,9 @@ function AgentDesktopConnected({
       controller={controller}
       audio={audio}
       outboundDialDisabled={!isAvailable}
+      outboundDialDisabledReason={
+        isAvailable ? undefined : "Set your status to Available to dial out."
+      }
       waitingContent={waitingContent}
       onEndSession={controller.handleEndSession}
       headerExtra={
@@ -262,37 +267,49 @@ function StatusBar({
   error,
 }: {
   currentStatus: HandsetLoaderData["agentStatus"];
-  onSetStatus: (to: AgentState, reason?: string) => Promise<void>;
+  onSetStatus: (to: AgentState, reason?: string) => Promise<boolean>;
   disabled: boolean;
   error?: string;
 }) {
   const [reason, setReason] = useState<string>("");
-  const [showReasons, setShowReasons] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<ReasonedAgentState | null>(
+    null,
+  );
 
   const currentState = currentStatus?.status ?? "offline";
 
   const handleSetStatus = useCallback(
     async (to: AgentState) => {
       if (to === "away" || to === "offline") {
-        setShowReasons(true);
+        setPendingStatus(to);
+        setReason("");
         return;
       }
-      await onSetStatus(to);
-      setShowReasons(false);
-      setReason("");
+      const ok = await onSetStatus(to);
+      if (ok) {
+        setPendingStatus(null);
+        setReason("");
+      }
     },
     [onSetStatus],
   );
 
   const handleReasonSubmit = useCallback(
     async (selectedReason: string) => {
-      const to = showReasons ? "away" : "available";
-      await onSetStatus(to === "away" ? "away" : to, selectedReason || undefined);
-      setShowReasons(false);
-      setReason("");
+      if (!pendingStatus) return;
+      const ok = await onSetStatus(pendingStatus, selectedReason || undefined);
+      if (ok) {
+        setPendingStatus(null);
+        setReason("");
+      }
     },
-    [onSetStatus, showReasons],
+    [onSetStatus, pendingStatus],
   );
+
+  const handleCancelReason = useCallback(() => {
+    setPendingStatus(null);
+    setReason("");
+  }, []);
 
   return (
     <div className="flex flex-col gap-2">
@@ -334,26 +351,26 @@ function StatusBar({
         </div>
       </div>
 
-      {showReasons && (
+      {pendingStatus && (
         <div className="flex items-center gap-2 rounded-lg border p-2">
           <Select
             value={reason}
             onValueChange={(v) => {
               setReason(v);
-              handleReasonSubmit(v);
+              void handleReasonSubmit(v);
             }}
           >
             <SelectTrigger className="h-8 w-full text-xs">
-              <SelectValue placeholder="Select a reason..." />
+              <SelectValue
+                placeholder={`Select a reason for ${pendingStatus}...`}
+              />
             </SelectTrigger>
             <SelectContent>
-              {(STATUS_REASONS[currentState === "available" ? "away" : "offline"] ?? []).map(
-                (r) => (
-                  <SelectItem key={r} value={r} className="text-xs">
-                    {r}
-                  </SelectItem>
-                ),
-              )}
+              {(STATUS_REASONS[pendingStatus] ?? []).map((r) => (
+                <SelectItem key={r} value={r} className="text-xs">
+                  {r}
+                </SelectItem>
+              ))}
               <SelectItem value="other" className="text-xs">
                 Other
               </SelectItem>
@@ -364,10 +381,7 @@ function StatusBar({
             variant="ghost"
             size="sm"
             className="h-8 text-xs"
-            onClick={() => {
-              setShowReasons(false);
-              onSetStatus("available");
-            }}
+            onClick={handleCancelReason}
           >
             Cancel
           </Button>

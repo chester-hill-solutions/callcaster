@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Message } from "@/lib/types";
 import type { Database, Tables } from "@/lib/db-types";
-import { compareByRecentActivity } from "@/lib/chat-conversation-sort";
+import {
+  compareByRecentActivity,
+  isInboundMessageDirection,
+} from "@/lib/chat-conversation-sort";
 import {
   fetchConversationSummaries,
   markConversationRead,
@@ -126,12 +129,14 @@ export const useChatRealTime = ({
           return curr;
         }
         messageIdsRef.current.add(newMessage.sid);
-        // Replace pending message with same body/from/to if present
+        // Messaging Service optimistic messages have no fabricated From value,
+        // so reconcile those by body/to while retaining From matching for
+        // phone-number sends.
         const withoutMatchingPending = curr.filter((m) => {
           if (!m?.sid?.startsWith?.("pending-")) return true;
           return !(
             m.body === newMessage.body &&
-            phoneNumbersMatch(m.from, newMessage.from) &&
+            (!m.from || phoneNumbersMatch(m.from, newMessage.from)) &&
             phoneNumbersMatch(m.to, newMessage.to)
           );
         });
@@ -149,7 +154,7 @@ export const useChatRealTime = ({
   const addOptimisticMessage = useCallback(
     (params: {
       body: string;
-      from: string;
+      from?: string;
       to: string;
       media?: string;
       sid?: string;
@@ -158,7 +163,7 @@ export const useChatRealTime = ({
       const pending = {
         sid: params.sid ?? `pending-${Date.now()}`,
         body: params.body,
-        from: params.from,
+        from: params.from ?? null,
         to: params.to,
         workspace,
         direction: "outbound",
@@ -328,9 +333,12 @@ export const useConversationSummaryRealTime = ({
   const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
     const typedPayload = payload as RealtimeChangePayload<Tables<"message">>;
     const newRow = typedPayload.new;
-    if (typedPayload.eventType === 'INSERT' && newRow?.workspace === workspace) {
-      if (!newRow) return;
+    if (!newRow || newRow.workspace !== workspace) return;
+    if (typedPayload.eventType !== 'INSERT' && typedPayload.eventType !== 'UPDATE') {
+      return;
+    }
 
+    if (typedPayload.eventType === 'INSERT') {
       // For new messages, we need to update unread counts
       if (newRow.status === "received") {
         // Check if this is for the active contact

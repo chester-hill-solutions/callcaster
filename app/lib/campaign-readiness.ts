@@ -15,6 +15,8 @@ export type CampaignReadinessCode =
   | "campaign_not_loaded"
   | "campaign_type_required"
   | "outbound_number_required"
+  | "outbound_number_unavailable"
+  | "outbound_number_incapable"
   | "messaging_sid_required"
   | "messaging_senders_unavailable"
   | "dates_required"
@@ -25,6 +27,8 @@ export type CampaignReadinessCode =
   | "queue_empty"
   | "bulk_sender_misaligned"
   | "script_required"
+  | "script_unavailable"
+  | "audio_unavailable"
   | "message_content_required";
 
 export type CampaignReadinessIssue = {
@@ -50,6 +54,12 @@ type CampaignReadinessOptions = {
   smsMessagingServiceSendersReady?: boolean;
   /** Workspace SMS sender class for bulk throughput/deliverability gates. */
   smsSenderClass?: TwilioSmsSenderClass;
+  workspacePhoneNumbers?: Array<{
+    phone_number?: string | null;
+    capabilities?: unknown;
+  } | null>;
+  workspaceScriptIds?: Array<number | string>;
+  workspaceAudioNames?: string[];
 };
 
 type NormalizedSchedule = Record<string, ScheduleDay>;
@@ -64,6 +74,8 @@ const SCHEDULE_READINESS_CODES = new Set<CampaignReadinessCode>([
 
 export const CAMPAIGN_CONTENT_READINESS_CODES = [
   "script_required",
+  "script_unavailable",
+  "audio_unavailable",
   "message_content_required",
 ] as const satisfies readonly CampaignReadinessCode[];
 
@@ -72,6 +84,14 @@ function issue(
   message: string,
 ): CampaignReadinessIssue {
   return { code, message };
+}
+
+function hasCapability(capabilities: unknown, capability: "sms" | "voice"): boolean {
+  if (!capabilities || typeof capabilities !== "object" || Array.isArray(capabilities)) {
+    return false;
+  }
+  const value = (capabilities as Record<string, unknown>)[capability];
+  return value === true || value === "true";
 }
 
 function issuesToMessages(issues: CampaignReadinessIssue[]): string[] {
@@ -226,6 +246,71 @@ function getContentIssue(
   return hasScript ? null : issue("script_required", "Script is required");
 }
 
+function getResourceIssues(
+  campaignData: Campaign,
+  details: CampaignDetails,
+  options: CampaignReadinessOptions,
+): CampaignReadinessIssue[] {
+  const resourceIssues: CampaignReadinessIssue[] = [];
+  const messageUsesMessagingService =
+    campaignData.type === "message" &&
+    campaignData.sms_send_mode === "messaging_service";
+
+  if (campaignData.caller_id && !messageUsesMessagingService && options.workspacePhoneNumbers) {
+    const callerNumber = options.workspacePhoneNumbers.find(
+      (number) => number?.phone_number === campaignData.caller_id,
+    );
+    if (!callerNumber) {
+      resourceIssues.push(
+        issue(
+          "outbound_number_unavailable",
+          "The configured outbound phone number is unavailable in this workspace",
+        ),
+      );
+    } else {
+      const requiredCapability = campaignData.type === "message" ? "sms" : "voice";
+      if (!hasCapability(callerNumber.capabilities, requiredCapability)) {
+        resourceIssues.push(
+          issue(
+            "outbound_number_incapable",
+            `The configured outbound phone number does not support ${requiredCapability}`,
+          ),
+        );
+      }
+    }
+  }
+
+  const scriptId =
+    details && "script_id" in details ? details.script_id : campaignData.script_id;
+  if (
+    campaignData.type !== "message" &&
+    scriptId &&
+    options.workspaceScriptIds &&
+    !options.workspaceScriptIds.some((id) => String(id) === String(scriptId))
+  ) {
+    resourceIssues.push(
+      issue("script_unavailable", "The configured script is unavailable in this workspace"),
+    );
+  }
+
+  const configuredAudio = [
+    campaignData.voicemail_file,
+    campaignData.type === "live_call" && details && "voicedrop_audio" in details
+      ? details.voicedrop_audio
+      : null,
+  ].filter((name): name is string => Boolean(name));
+  if (
+    options.workspaceAudioNames &&
+    configuredAudio.some((name) => !options.workspaceAudioNames?.includes(name))
+  ) {
+    resourceIssues.push(
+      issue("audio_unavailable", "A configured campaign audio file is unavailable"),
+    );
+  }
+
+  return resourceIssues;
+}
+
 export function getCampaignContentReadinessIssues(
   issues: readonly CampaignReadinessIssue[] | readonly string[],
 ): string[] {
@@ -374,6 +459,7 @@ export function getCampaignReadiness(
   if (contentIssue) {
     commonIssues.push(contentIssue);
   }
+  commonIssues.push(...getResourceIssues(campaignData, details, options));
 
   const startIssues = issuesToMessages(commonIssues);
 

@@ -277,22 +277,58 @@ describe("app/components/file-assets/columns.tsx", () => {
   test("column defs render cells", async () => {
     const { mediaColumns } = await import("@/components/file-assets/columns");
     expect(mediaColumns.length).toBeGreaterThan(0);
+    // Sidecar-backed columns read row.original; the Edit action renders a Link,
+    // so these cells need a router.
+    const original = {
+      name: "f.mp3",
+      id: "f.mp3",
+      created_at: new Date().toISOString(),
+      signedUrl: "https://cdn.example/a.mp3",
+      durationMs: 125_000,
+      sizeBytes: 2048,
+      sourceFileName: "intro.mp3",
+    };
     const row = {
-      getValue: (k: string) =>
-        k === "created_at"
-          ? new Date().toISOString()
-          : k === "signedUrl"
-            ? "https://cdn.example/a.mp3"
-            : "f.mp3",
+      original,
+      getValue: (k: string) => (original as Record<string, unknown>)[k],
     };
     for (const col of mediaColumns) {
       if (col.cell && typeof col.cell === "function") {
         render(
-          <>
+          <MemoryRouter>
             {(col.cell as (ctx: { row: typeof row }) => React.ReactNode)({ row })}
-          </>,
+          </MemoryRouter>,
         );
       }
     }
+    expect(screen.getByText("2:05")).toBeInTheDocument();
+    expect(screen.getByText("intro.mp3")).toBeInTheDocument();
+    expect(screen.getByText("2 KB")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  test("sidecar columns show a dash rather than zero when metadata is absent", async () => {
+    const { mediaColumns } = await import("@/components/file-assets/columns");
+    // Objects predating the sidecar have no row: "unknown", not "0:00".
+    const original = {
+      name: "legacy.mp3",
+      id: "legacy.mp3",
+      created_at: new Date().toISOString(),
+      signedUrl: null,
+      durationMs: null,
+      sizeBytes: null,
+      sourceFileName: null,
+    };
+    const row = {
+      original,
+      getValue: (k: string) => (original as Record<string, unknown>)[k],
+    };
+    const lengthColumn = mediaColumns.find((c) => c.id === "durationMs" || (c as { accessorKey?: string }).accessorKey === "durationMs");
+    render(
+      <MemoryRouter>
+        {(lengthColumn?.cell as (ctx: { row: typeof row }) => React.ReactNode)({ row })}
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });

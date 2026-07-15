@@ -14,10 +14,11 @@ Both implementations share `readTwilioWorkspaceCredentials()` (camelCase and sna
 ## Auth token resolution
 
 1. **Prefer workspace credentials** — if `workspace.twilio_data` includes `authToken` / `auth_token`, use it for signature validation and Twilio REST calls.
-2. **Dev/test fallback** — when workspace credentials are missing and the runtime is non-production, fall back to `TWILIO_AUTH_TOKEN` (main account).
-3. **Production fail-closed** — in production, missing workspace credentials yield no auth token; webhook validation fails (403 or 500 depending on helper).
+2. **CallSid / MessageSid first** — resolve the workspace from the call or message row when present.
+3. **AccountSid fallback** — if the row is missing (create→insert race), look up the workspace by webhook `AccountSid` against `workspace.twilio_data.sid` (also `account_sid` / `accountSid`).
+4. **Production fail-closed** — missing workspace credentials yield no auth token; webhook validation returns 403 hangup TwiML. Failures are logged as `twilio.webhook.auth_failed` with a reason (`missing_signature`, `missing_credentials`, `invalid_signature`, `resolver_error`). Bun pre-handler exceptions log `twilio.webhook.prehandler_error` instead of failing silently.
 
-App helpers live in `app/lib/twilio-webhook.server.ts` (`validateWorkspaceTwilioWebhook`, `validateTwilioWebhookForCallSid`, `validateTwilioWebhookForMessageSid`, etc.). Edge status handlers (`sms-status`, `ivr-status`, …) import the shared Edge copy of `resolveTwilioWebhookAuthToken`.
+App helpers live in `app/lib/twilio-webhook.server.ts` (`requireTwilioSignature`, etc.).
 
 ## Validation toggle
 

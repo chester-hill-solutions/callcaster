@@ -78,6 +78,28 @@ describe("app/components/campaign/home/CampaignHomeScreen/CampaignNav.tsx", () =
   });
 });
 
+describe("app/components/campaign/home/CampaignHomeScreen/CampaignInstructions.tsx", () => {
+  test("blocks Join Campaign and exposes the reason", async () => {
+    const { CampaignInstructions } = await import(
+      "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions"
+    );
+    render(
+      <SmokeRouter>
+        <CampaignInstructions
+          campaignData={{}}
+          totalCalls={0}
+          expectedTotal={10}
+          joinDisabled="Only campaign admins can join."
+        />
+      </SmokeRouter>,
+    );
+
+    expect(screen.queryByRole("link", { name: "Join Campaign" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join Campaign" })).toBeDisabled();
+    expect(screen.getByText("Only campaign admins can join.")).toBeVisible();
+  });
+});
+
 describe("app/components/campaign/settings/detailed/live/CampaignDetailed.Live.Switches.tsx", () => {
   test("household and dial type switches", async () => {
     const { DialTypeSwitch, HouseholdSwitch } = await import(
@@ -132,6 +154,61 @@ describe("app/components/campaign/settings/detailed/CampaignDetailed.ActivateBut
         handleScheduleButton={handleScheduleButton}
       />,
     );
+  });
+});
+
+describe("app/components/campaign/settings/detailed/CampaignDetailed.tsx", () => {
+  test("shows Send Now and Schedule Campaign blocker reasons", async () => {
+    const { CampaignTypeSpecificSettings } = await import(
+      "@/components/campaign/settings/detailed/CampaignDetailed"
+    );
+    render(
+      <CampaignTypeSpecificSettings
+        campaignData={makeCampaign({
+          type: "message",
+          caller_id: "+15551234567",
+          sms_send_mode: "from_number",
+        })}
+        handleInputChange={vi.fn()}
+        mediaData={[]}
+        scripts={[]}
+        handleActivateButton={vi.fn()}
+        handleScheduleButton={vi.fn()}
+        details={{
+          workspace: "ws-1",
+          campaign_id: 1,
+          body_text: "",
+          message_media: [],
+        } as never}
+        mediaLinks={[]}
+        isChanged={false}
+        isBusy={false}
+        joinDisabled="Message content or media is required."
+        scheduleDisabled="Calling hours are required."
+        readinessIssues={["Message content or media is required."]}
+        surveys={[]}
+        queueCount={10}
+        phoneNumbers={[]}
+        outboundEstimateInputs={{
+          portalConfig: {
+            sendMode: "from_number",
+            messagingServiceSid: null,
+            smsSenderClass: "unknown",
+            trafficClass: "unknown",
+            throughputProduct: "none",
+            smsTargetMps: 1,
+            parallelDispatchEnabled: false,
+          } as never,
+          syncSnapshot: { phoneNumberCount: 0 } as never,
+        }}
+        handleNavigate={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Send Now" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Schedule Campaign" })).toBeDisabled();
+    expect(screen.getByText("Message content or media is required.")).toBeVisible();
+    expect(screen.getByText("Calling hours are required.")).toBeVisible();
   });
 });
 

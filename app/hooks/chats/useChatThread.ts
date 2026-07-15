@@ -21,7 +21,7 @@ type ChatThreadOutletContext = {
     actions: {
       addOptimisticMessage?: (p: {
         body: string;
-        from: string;
+        from?: string;
         to: string;
         media?: string;
         sid?: string;

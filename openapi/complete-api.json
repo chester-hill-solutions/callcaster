@@ -6985,7 +6985,7 @@
       "patch": {
         "operationId": "patchWorkspaces_workspaceId",
         "summary": "PATCH /api/workspaces/:workspaceId",
-        "description": "GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
+        "description": "Child index under data-plane layout middleware. GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
         "tags": [
           "Integrator API",
           "workspace"
@@ -7051,7 +7051,7 @@
       "delete": {
         "operationId": "deleteWorkspaces_workspaceId",
         "summary": "DELETE /api/workspaces/:workspaceId",
-        "description": "GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
+        "description": "Child index under data-plane layout middleware. GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
         "tags": [
           "Integrator API",
           "workspace"

@@ -32,10 +32,13 @@ import {
 } from "@/lib/database/campaign.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import { defineAction } from "@/lib/handler.server";
+import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -180,17 +183,28 @@ export const action = defineAction({
             );
           }
 
-          const campaignDetails = await fetchCampaignDetails({
-            workspaceId: workspace_id,
-            campaignId: selected_id,
-          });
-
-          const queueCounts = await fetchQueueCounts({
-            workspaceId: workspace_id,
-            campaignId: selected_id,
-          });
+          const tdb = createTenantDb(workspace_id);
+          const [campaignDetails, queueCounts, phoneNumbersResult, scripts, audioList] =
+            await Promise.all([
+              fetchCampaignDetails({
+                workspaceId: workspace_id,
+                campaignId: selected_id,
+              }),
+              fetchQueueCounts({
+                workspaceId: workspace_id,
+                campaignId: selected_id,
+              }),
+              getWorkspacePhoneNumbers({ workspaceId: workspace_id }),
+              tdb.script.findMany({ columns: { id: true } }),
+              listWorkspaceAudiosApi(user.id, workspace_id),
+            ]);
           const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as unknown as CampaignDetails, {
             queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
+            workspacePhoneNumbers: phoneNumbersResult.data ?? [],
+            workspaceScriptIds: scripts.map((script) => script.id),
+            workspaceAudioNames: audioList.ok
+              ? audioList.audios.map((audio) => audio.name)
+              : [],
           });
           const readinessError =
             status === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;

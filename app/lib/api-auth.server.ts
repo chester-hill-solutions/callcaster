@@ -233,6 +233,7 @@ export async function resolveDualAuthSession(request: Request) {
   }
   const { headers } = await getSession(request);
   return {
+    auth,
     headers,
     user: getDualAuthUser(auth) ?? undefined,
   };
