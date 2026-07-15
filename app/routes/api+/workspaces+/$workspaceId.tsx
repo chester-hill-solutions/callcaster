@@ -1,15 +1,15 @@
 export { middleware } from "./$workspaceId.middleware.server";
-export { loader, action } from "./$workspaceId.action.server";
 
 import { Outlet } from "react-router";
 
 /**
- * Data-plane layout + segment handlers for `/api/workspaces/:workspaceId`.
+ * Data-plane layout for `/api/workspaces/:workspaceId/*`.
  *
- * Middleware must live on this module (same pattern as `workspaces+/$id.tsx`)
- * so GET/PATCH/DELETE on the parent path inherit `dataPlaneAuthContext`.
- * A sibling `$workspaceId.route.tsx` does not nest under this layout in
- * remix-flat-routes, so loaders there never see middleware context.
+ * Middleware lives here so nested resource routes inherit
+ * `dataPlaneAuthContext`. Segment GET/PATCH/DELETE handlers live in
+ * `$workspaceId/route.tsx` (a child index) — not a sibling `.route.tsx`
+ * and not on this layout (a default component would force HTML document
+ * responses for parent-path GETs).
  */
 export default function WorkspaceApiLayout() {
   return <Outlet />;
