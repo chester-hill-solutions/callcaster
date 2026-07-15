@@ -686,7 +686,7 @@ export function QueueTable({
             {/* Table */}
             <div className="rounded-md border">
                 <div className="relative">
-                    <div className="max-h-[800px] overflow-y-auto">
+                    <div className="max-h-[800px] overflow-auto">
                         <table className="w-full" data-testid="campaign-queue-table">
                             <thead className="sticky top-0 bg-muted border-b">
                                 {table.getHeaderGroups().map(headerGroup => (
@@ -694,7 +694,7 @@ export function QueueTable({
                                         {headerGroup.headers.map((header, i) => (
                                             <th
                                                 key={`${i}-${header.id}`}
-                                                className="h-10 px-2 text-left align-middle font-medium text-primary text-xs"
+                                                className="h-10 whitespace-nowrap px-2 text-left align-middle font-medium text-primary text-xs"
                                                 style={{ width: header.getSize() }}
                                             >
                                                 {flexRender(
@@ -710,7 +710,7 @@ export function QueueTable({
                                 {table.getRowModel().rows.map(row => (
                                     <tr key={row.id} className="border-b hover:bg-muted/50 text-muted-foreground">
                                         {row.getVisibleCells().map((cell, i) => (
-                                            <td key={`${i}-${cell.id}`} className="p-1 px-2 text-xs">
+                                            <td key={`${i}-${cell.id}`} className="whitespace-nowrap p-1 px-2 text-xs">
                                                 {flexRender(
                                                     cell.column.columnDef.cell,
                                                     cell.getContext()
