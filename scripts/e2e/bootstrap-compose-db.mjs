@@ -41,6 +41,7 @@ const steps = [
   "drizzle/0007_workspace_api_key_scopes.sql",
   "drizzle/0008_chs_workspace_membership.sql",
   "client/migrations/20260714140000_fix_create_new_workspace_role_cast.sql",
+  "client/migrations/20260715120000_workspace_audio_metadata.sql",
 ];
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);

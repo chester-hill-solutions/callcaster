@@ -35,8 +35,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
 
       # The compose bootstrap applies drizzle/ + client/migrations via psql.
-      - name: Install psql client
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Install psql client and ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client ffmpeg
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
