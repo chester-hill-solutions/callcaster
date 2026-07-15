@@ -6,7 +6,6 @@
  */
 
 import { resolveObjectStorageEnvRequired } from "./object-storage-config";
-import { logger } from "./logger.server";
 
 type EnvConfig = {
   DATABASE_URL: string;
@@ -133,7 +132,7 @@ export function warnIfStripeKeyModeMismatch(): boolean {
 
   if (mismatch && !stripeKeyModeMismatchLogged) {
     stripeKeyModeMismatchLogged = true;
-    logger.error(
+    console.error(
       'STRIPE MISCONFIGURATION: STRIPE_SECRET_KEY is a TEST-mode key while NODE_ENV is "production"',
       {
         guard: 'stripe-key-mode-mismatch',
