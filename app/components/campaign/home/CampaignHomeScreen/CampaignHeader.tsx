@@ -3,17 +3,23 @@ import { Megaphone } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Heading } from "@/components/ui/typography";
 import type { Enums } from "@/lib/db-types";
+import {
+  CampaignQueueProgress,
+  type CampaignQueueProgressCounts,
+} from "@/components/campaign/CampaignQueueProgress";
 
 type HeaderProps = {
   title: string;
   isDesktop: boolean;
   status: Enums<"campaign_status">;
+  queueProgress?: CampaignQueueProgressCounts | null;
 };
 
 export const CampaignHeader = ({
   title,
   isDesktop = false,
   status,
+  queueProgress,
 }: HeaderProps) => {
   return (
     <div
@@ -30,6 +36,13 @@ export const CampaignHeader = ({
           {title}
         </Heading>
         <StatusBadge status={status} className="ml-2" />
+        {queueProgress?.totalCount ? (
+          <CampaignQueueProgress
+            completedCount={queueProgress.completedCount}
+            totalCount={queueProgress.totalCount}
+            className="ml-1 text-xs font-medium normal-case"
+          />
+        ) : null}
       </NavLink>
     </div>
   );

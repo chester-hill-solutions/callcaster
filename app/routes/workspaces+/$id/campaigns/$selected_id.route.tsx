@@ -69,7 +69,15 @@ export default function CampaignScreen() {
   const safeQueueCounts = {
     fullCount: queueCounts.fullCount ?? 0,
     queuedCount: queueCounts.queuedCount ?? 0,
+    completedCount: queueCounts.completedCount ?? 0,
   };
+  const campaignQueueProgress =
+    safeQueueCounts.fullCount > 0
+      ? {
+          completedCount: safeQueueCounts.completedCount,
+          totalCount: safeQueueCounts.fullCount,
+        }
+      : null;
   const campaignDetails = initialCampaignDetails;
 
   useWorkspaceEventSubscription({
@@ -90,12 +98,14 @@ export default function CampaignScreen() {
         title={campaignData?.title || ""}
         status={(campaignData?.status as CampaignStatus) || "pending"}
         isDesktop={false}
+        queueProgress={campaignQueueProgress}
       />
       <div className="flex flex-col items-start justify-between gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center">
         <CampaignHeader
           title={campaignData?.title || ""}
           isDesktop
           status={(campaignData?.status as CampaignStatus) || "pending"}
+          queueProgress={campaignQueueProgress}
         />
         <NavigationLinks
           hasAccess={hasAccess}

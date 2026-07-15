@@ -8,6 +8,7 @@ import {
   getWorkspaceInfoWithDetails,
   getWorkspacePhoneNumbers,
 } from "@/lib/database/workspace.server";
+import { fetchWorkspaceCampaignQueueProgressMap } from "@/lib/campaign-queue-search.server";
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { workspaceContext } from "@/lib/route-context.server";
 import { defineLoader } from "@/lib/handler.server";
@@ -17,6 +18,7 @@ type LoaderData = {
   userRole: string | null | undefined;
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
+  campaignQueueProgress: Record<string, { completedCount: number; totalCount: number }>;
 };
 
 export const loader = defineLoader({
@@ -33,12 +35,13 @@ export const loader = defineLoader({
 
     try {
       const pathname = url.pathname;
-      const [onboarding, phoneNumbersResult, recentOutboundCount, workspaceData] =
+      const [onboarding, phoneNumbersResult, recentOutboundCount, workspaceData, campaignQueueProgressMap] =
         await Promise.all([
           getWorkspaceMessagingOnboardingState({ workspaceId }),
           getWorkspacePhoneNumbers({ workspaceId }),
           getWorkspaceRecentOutboundMessageCount({ workspaceId }),
           getWorkspaceInfoWithDetails({ workspaceId, userId }),
+          fetchWorkspaceCampaignQueueProgressMap(workspaceId),
         ]);
       const readiness = deriveWorkspaceMessagingReadiness({
         onboarding,
@@ -61,6 +64,12 @@ export const loader = defineLoader({
         userRole,
         workspaceData,
         onboardingReadiness: readiness,
+        campaignQueueProgress: Object.fromEntries(
+          [...campaignQueueProgressMap.entries()].map(([campaignId, counts]) => [
+            String(campaignId),
+            counts,
+          ]),
+        ),
       } satisfies LoaderData, { headers });
     } catch (error) {
       if (

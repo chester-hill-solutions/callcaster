@@ -14,6 +14,7 @@ import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
+import type { CampaignQueueProgressCounts } from "@/components/campaign/CampaignQueueProgress";
 import {
   Campaign,
   ContextType,
@@ -26,6 +27,7 @@ type LoaderData = {
   userRole: string | null | undefined;
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
+  campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
 };
 
 function WorkspaceResolvedView({
@@ -34,12 +36,14 @@ function WorkspaceResolvedView({
   outlet,
   context,
   onboardingReadiness,
+  campaignQueueProgress,
 }: {
   resolvedData: WorkspaceInfoWithDetails;
   userRole: string | null | undefined;
   outlet: ReturnType<typeof useOutlet>;
   context: ContextType;
   onboardingReadiness: WorkspaceMessagingReadiness;
+  campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
 }) {
   const normalizedWorkspace = resolvedData.workspace as unknown as {
     id: string;
@@ -70,7 +74,7 @@ function WorkspaceResolvedView({
 
   useWorkspaceEventSubscription({
     workspaceId: workspace.id,
-    table: "campaign",
+    table: ["campaign", "campaign_queue"],
     onChange: () => revalidator.revalidate(),
   });
 
@@ -82,6 +86,7 @@ function WorkspaceResolvedView({
       <WorkspaceNav
         workspace={workspace}
         campaigns={campaigns as Campaign[]}
+        campaignQueueProgress={campaignQueueProgress}
         userRole={
           (userRole as MemberRole | null | undefined) ?? MemberRole.Member
         }
@@ -160,7 +165,7 @@ function WorkspaceResolvedView({
 }
 
 export default function Workspace() {
-  const { workspaceData, userRole, onboardingReadiness } =
+  const { workspaceData, userRole, onboardingReadiness, campaignQueueProgress } =
     useLoaderData<LoaderData>();
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
@@ -173,6 +178,7 @@ export default function Workspace() {
         outlet={outlet}
         context={context}
         onboardingReadiness={onboardingReadiness}
+        campaignQueueProgress={campaignQueueProgress}
       />
     </main>
   );

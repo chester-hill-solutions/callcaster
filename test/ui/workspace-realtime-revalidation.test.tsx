@@ -83,7 +83,7 @@ describe("workspace campaign realtime revalidation", () => {
     ).toBeInTheDocument();
     expect(mocks.subscriptionOptions).toMatchObject({
       workspaceId: "ws-1",
-      table: "campaign",
+      table: ["campaign", "campaign_queue"],
     });
 
     act(() => mocks.subscriptionOptions?.onChange());
