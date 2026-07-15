@@ -39,7 +39,9 @@ export type WorkspaceReadinessSenderPool = {
 };
 
 export type WorkspaceReadinessContext = {
-  onboarding: WorkspaceMessagingOnboardingState;
+  // `steps` is derived from this context (see `buildOnboardingStepsForState`),
+  // so requiring it here would be circular.
+  onboarding: Omit<WorkspaceMessagingOnboardingState, "steps">;
   workspaceNumbers: WorkspaceReadinessNumber[];
   recentOutboundCount?: number;
   /** Precomputed first-number flag; falls back to `workspaceHasFirstNumber`. */

@@ -51,7 +51,7 @@ export type BuildOnboardingStepsContext = {
 };
 
 function buildReadinessContext(
-  onboarding: WorkspaceMessagingOnboardingState,
+  onboarding: Omit<WorkspaceMessagingOnboardingState, "steps">,
   workspaceNumbers: WorkspaceReadinessContext["workspaceNumbers"],
   context: BuildOnboardingStepsContext = {},
   extras: Partial<WorkspaceReadinessContext> = {},
@@ -79,7 +79,9 @@ function isBusinessBasicsComplete(ctx: WorkspaceReadinessContext): boolean {
   return predicatePassed("emergency_address_present", ctx);
 }
 
-function isEmergencyReady(onboarding: WorkspaceMessagingOnboardingState): boolean {
+function isEmergencyReady(
+  onboarding: Omit<WorkspaceMessagingOnboardingState, "steps">,
+): boolean {
   return (
     onboarding.emergencyVoice.address.status === "validated" &&
     onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length > 0
@@ -87,7 +89,7 @@ function isEmergencyReady(onboarding: WorkspaceMessagingOnboardingState): boolea
 }
 
 export function buildOnboardingStepsForState(
-  onboarding: WorkspaceMessagingOnboardingState,
+  onboarding: Omit<WorkspaceMessagingOnboardingState, "steps">,
   context: BuildOnboardingStepsContext = {},
 ): WorkspaceOnboardingStepState[] {
   const hasFirstNumber = context.hasFirstNumber ?? false;
