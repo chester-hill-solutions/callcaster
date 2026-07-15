@@ -1,7 +1,7 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
@@ -22,7 +22,7 @@ export const loader = defineLoader({
       const campaign = await findCampaignInWorkspace(workspaceId, Number(ref) || 0);
       campaignType = campaign?.type;
     }
-    const workspaceData = await getWorkspaceById(workspaceId);
+    const workspaceData = await getWorkspaceForClient(workspaceId);
     if (!workspaceData) {
       return routeData({ workspace: null, error: "Workspace not found" }, { headers, status: 404 });
     }

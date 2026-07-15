@@ -2,7 +2,7 @@ import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -91,7 +91,7 @@ export const loader = defineLoader({
       campaigns,
       contactsResult,
     ] = await Promise.all([
-      getWorkspaceById(workspaceId),
+      getWorkspaceForClient(workspaceId),
       tdb.campaign.findMany({
         columns: { id: true, title: true, status: true },
         orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],

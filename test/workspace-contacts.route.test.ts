@@ -6,7 +6,7 @@ import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   getUserRole: vi.fn(),
-  getWorkspaceById: vi.fn(),
+  getWorkspaceForClient: vi.fn(),
   listWorkspaceContactsApi: vi.fn(),
   logger: {
     error: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock("@/lib/database/workspace.server", () => ({
 }));
 
 vi.mock("@/lib/workspace-members-db.server", () => ({
-  getWorkspaceById: (...args: unknown[]) => mocks.getWorkspaceById(...args),
+  getWorkspaceForClient: (...args: unknown[]) => mocks.getWorkspaceForClient(...args),
 }));
 
 vi.mock("@/lib/platform-data.server", () => ({
@@ -73,7 +73,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
     mocks.getUserRole.mockReset();
-    mocks.getWorkspaceById.mockReset();
+    mocks.getWorkspaceForClient.mockReset();
     mocks.listWorkspaceContactsApi.mockReset();
     mocks.logger.error.mockReset();
   });
@@ -84,7 +84,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
-    mocks.getWorkspaceById.mockResolvedValueOnce(makeWorkspace());
+    mocks.getWorkspaceForClient.mockResolvedValueOnce(makeWorkspace());
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=jo")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
@@ -106,7 +106,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
-    mocks.getWorkspaceById.mockResolvedValueOnce(makeWorkspace());
+    mocks.getWorkspaceForClient.mockResolvedValueOnce(makeWorkspace());
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=example.com")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
@@ -128,7 +128,7 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
-    mocks.getWorkspaceById.mockResolvedValueOnce(makeWorkspace());
+    mocks.getWorkspaceForClient.mockResolvedValueOnce(makeWorkspace());
     mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=1234")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");

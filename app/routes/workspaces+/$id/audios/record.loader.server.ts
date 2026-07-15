@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 
 import { defineLoader } from "@/lib/handler.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 
 export const loader = defineLoader({
@@ -11,7 +11,7 @@ export const loader = defineLoader({
     if (!result.ok) return result.response;
     const { headers, workspaceId } = result.ctx;
 
-    const workspaceData = await getWorkspaceById(workspaceId);
+    const workspaceData = await getWorkspaceForClient(workspaceId);
     if (!workspaceData) {
       return routeData(
         { workspace: null, error: "Workspace not found" },

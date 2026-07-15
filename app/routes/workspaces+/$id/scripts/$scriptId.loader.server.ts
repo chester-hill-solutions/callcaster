@@ -3,12 +3,12 @@ import { data as routeData, redirect } from "react-router";
 import { listMedia } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { getScriptDetailApi } from "@/lib/platform-data.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { Script } from "@/lib/types";
 
 export type ScriptIdLoaderData = {
-  workspace: NonNullable<Awaited<ReturnType<typeof getWorkspaceById>>>;
+  workspace: NonNullable<Awaited<ReturnType<typeof getWorkspaceForClient>>>;
   workspace_id: string;
   selected_id: string;
   script: Script | null;
@@ -27,7 +27,7 @@ export const loader = defineLoader({
 
     const { userRole } = auth;
 
-    const workspaceData = await getWorkspaceById(workspace_id);
+    const workspaceData = await getWorkspaceForClient(workspace_id);
     if (!workspaceData) {
       throw redirect("/workspaces");
     }

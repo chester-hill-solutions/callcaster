@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { listAudioMetadata } from "@/lib/database/workspace-audio-metadata.server";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -15,7 +15,7 @@ export const loader = defineLoader({
 
     const { headers, user, workspaceId, userRole } = access.ctx;
 
-    const workspaceData = await getWorkspaceById(workspaceId);
+    const workspaceData = await getWorkspaceForClient(workspaceId);
 
     if (!workspaceData) {
       return routeData(

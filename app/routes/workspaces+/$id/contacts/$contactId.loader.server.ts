@@ -3,7 +3,7 @@ import { data as routeData, redirect } from "react-router";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-members-db.server";
 import {
   campaign as campaignTable,
   contact as contactTable,
@@ -19,7 +19,7 @@ import type { Audience, Contact } from "@/lib/types";
 import { defineLoader } from "@/lib/handler.server";
 
 export type ContactIdLoaderData = {
-  workspace: NonNullable<Awaited<ReturnType<typeof getWorkspaceById>>>;
+  workspace: NonNullable<Awaited<ReturnType<typeof getWorkspaceForClient>>>;
   workspace_id: string;
   selected_id: string;
   contact: Contact | null;
@@ -46,7 +46,7 @@ export const loader = defineLoader({
       return redirect(`/workspaces/${workspace_id}`);
     }
 
-    const workspaceData = await getWorkspaceById(workspace_id);
+    const workspaceData = await getWorkspaceForClient(workspace_id);
     if (!workspaceData) {
       return redirect(`/workspaces/${workspace_id}`);
     }

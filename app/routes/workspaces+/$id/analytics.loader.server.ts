@@ -3,7 +3,7 @@ import { MemberRole } from "@/lib/member-role";
 import { loadWorkspaceAnalytics } from "@/lib/workspace-analytics.server";
 import { logger } from "@/lib/logger.server";
 import {
-  getWorkspaceById,
+  getWorkspaceForClient,
   listWorkspaceMembersEnriched,
 } from "@/lib/workspace-members-db.server";
 import { defaultAnalyticsRange } from "../../../../shared/workspace-analytics";
@@ -65,7 +65,7 @@ export const loader = defineLoader({
     }
     const tdb = createTenantDb(workspaceId);
     const [workspace, campaigns] = await Promise.all([
-      getWorkspaceById(workspaceId),
+      getWorkspaceForClient(workspaceId),
       tdb.campaign.findMany({
         columns: { id: true, title: true, status: true },
         orderBy: [desc(campaignTable.created_at)],
