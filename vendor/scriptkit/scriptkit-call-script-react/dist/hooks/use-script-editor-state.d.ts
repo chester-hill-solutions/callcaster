@@ -18,6 +18,8 @@ export declare function useScriptEditorState(options: UseScriptEditorStateOption
             body: string;
             id: string;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             prompt?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
@@ -25,111 +27,168 @@ export declare function useScriptEditorState(options: UseScriptEditorStateOption
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "yes_no";
             prompt: string;
             id: string;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "choice";
             prompt: string;
             options: {
                 value: string;
                 label: string;
+                next?: string | undefined;
+                content?: string | undefined;
             }[];
             id: string;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "text";
             prompt: string;
             id: string;
             placeholder?: string | undefined;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "support";
             prompt: string;
             id: string;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "textarea";
             prompt: string;
             id: string;
+            options?: {
+                value: string;
+                label: string;
+                next?: string | undefined;
+                content?: string | undefined;
+            }[] | undefined;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "select";
             prompt: string;
             options: {
                 value: string;
                 label: string;
+                next?: string | undefined;
+                content?: string | undefined;
             }[];
             id: string;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "radio";
             prompt: string;
             options: {
                 value: string;
                 label: string;
+                next?: string | undefined;
+                content?: string | undefined;
             }[];
             id: string;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         } | {
             type: "checkbox";
             prompt: string;
             options: {
                 value: string;
                 label: string;
+                next?: string | undefined;
+                content?: string | undefined;
             }[];
             id: string;
             label?: string | undefined;
+            title?: string | undefined;
+            content?: string | undefined;
             required?: boolean | undefined;
             routingRules?: {
                 answerValue: string;
                 targetPageId?: string | undefined;
                 targetBlockId?: string | undefined;
             }[] | undefined;
+            audioFile?: string | undefined;
+            callcasterType?: string | undefined;
+            speechType?: string | undefined;
         }>;
     };
     activePageId: string;

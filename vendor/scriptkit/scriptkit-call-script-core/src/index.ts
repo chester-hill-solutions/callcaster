@@ -29,7 +29,11 @@ export type {
   CallScriptServiceConfig,
   CallScriptService,
 } from "./types.js";
-export { parseDocument, validateDocument, createEmptyDocument } from "./parse.js";
+export {
+  parseDocument,
+  validateDocument,
+  createEmptyDocument,
+} from "./parse.js";
 export { evaluateRouting } from "./routing.js";
 export {
   migrateFromCallcasterFlow,

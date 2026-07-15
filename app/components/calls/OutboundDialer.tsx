@@ -46,10 +46,9 @@ export function OutboundDialer({
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span
-                className={disabled ? "inline-flex cursor-not-allowed" : "inline-flex"}
-                tabIndex={disabled && disabledReason ? 0 : undefined}
-              >
+              {/* A disabled button cannot receive focus, so its tooltip needs a focusable wrapper. */}
+              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+              <span className={disabled ? "inline-flex cursor-not-allowed" : "inline-flex"} tabIndex={disabled && disabledReason ? 0 : undefined}>
                 <Button
                   type="button"
                   onClick={onDial}

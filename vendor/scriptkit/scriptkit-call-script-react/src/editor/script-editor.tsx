@@ -24,7 +24,11 @@ export function ScriptEditor({
   mediaNames = [],
 }: ScriptEditorProps) {
   const ui = useCallScriptUi();
-  const editor = useScriptEditorState({ initialDocument: document, palette, onChange });
+  const editor = useScriptEditorState({
+    initialDocument: document,
+    palette,
+    onChange,
+  });
 
   return (
     <div className="call-script-root call-script-editor">
@@ -42,9 +46,20 @@ export function ScriptEditor({
       </aside>
 
       <section>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            marginBottom: "1rem",
+          }}
+        >
           {editor.blockTypes.map((type) => (
-            <ui.Button key={type} onClick={() => editor.addBlock(type as ScriptBlock["type"])} disabled={readOnly}>
+            <ui.Button
+              key={type}
+              onClick={() => editor.addBlock(type as ScriptBlock["type"])}
+              disabled={readOnly}
+            >
               Add {type}
             </ui.Button>
           ))}
@@ -182,12 +197,19 @@ function BlockEditor({
               />
             </ui.Field>
           )}
-          <ui.Field label={block.callcasterType === "recorded" ? "Audio file" : "Speech text"}>
+          <ui.Field
+            label={
+              block.callcasterType === "recorded" ? "Audio file" : "Speech text"
+            }
+          >
             {block.callcasterType === "recorded" && mediaNames.length > 0 ? (
               <ui.Select
                 value={block.audioFile ?? ""}
                 readOnly={readOnly}
-                options={mediaNames.map((name) => ({ value: name, label: name }))}
+                options={mediaNames.map((name) => ({
+                  value: name,
+                  label: name,
+                }))}
                 onChange={(value) =>
                   onChange({ audioFile: value } as Partial<ScriptBlock>)
                 }
@@ -204,7 +226,11 @@ function BlockEditor({
           </ui.Field>
         </>
       )}
-      {options.length > 0 || block.type === "choice" || block.type === "select" || block.type === "radio" || block.type === "checkbox" ? (
+      {options.length > 0 ||
+      block.type === "choice" ||
+      block.type === "select" ||
+      block.type === "radio" ||
+      block.type === "checkbox" ? (
         <ui.Field label="Options (comma-separated value:label)">
           <ui.Textarea
             value={options.map((o) => `${o.value}:${o.label}`).join("\n")}
@@ -218,7 +244,10 @@ function BlockEditor({
         </ui.Field>
       ) : null}
       {options.map((option, index) => (
-        <ui.Field key={`${option.value}-${index}`} label={`Next target for ${option.label}`}>
+        <ui.Field
+          key={`${option.value}-${index}`}
+          label={`Next target for ${option.label}`}
+        >
           <ui.Input
             value={option.next ?? ""}
             placeholder="Page/block ID or hangup"
@@ -251,11 +280,13 @@ export function mergeEditedOptions(
     .map((line, index) => {
       const separatorIndex = line.indexOf(":");
       const value =
-        separatorIndex === -1 ? line.trim() : line.slice(0, separatorIndex).trim();
+        separatorIndex === -1
+          ? line.trim()
+          : line.slice(0, separatorIndex).trim();
       const label =
         separatorIndex === -1
           ? value
-          : (line.slice(separatorIndex + 1).trim() || value);
+          : line.slice(separatorIndex + 1).trim() || value;
       const existing =
         existingOptions.find((option) => option.value === value) ??
         existingOptions[index];

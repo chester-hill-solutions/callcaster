@@ -108,9 +108,7 @@ describe("callcaster migrate/serialize round-trip", () => {
           title: "Welcome",
           content: "Choose an option",
           audioFile: "welcome.mp3",
-          options: [
-            { value: "1", content: "Sales", next: "sales_page" },
-          ],
+          options: [{ value: "1", content: "Sales", next: "sales_page" }],
         },
       },
     };
@@ -143,8 +141,7 @@ describe("callcaster migrate/serialize round-trip", () => {
       const originalOptions = rawBlock.options ?? [];
       const roundTrippedOptions =
         (back.blocks[blockId]?.options as
-          | Array<{ next?: string; content?: string }>
-          | undefined) ?? [];
+          Array<{ next?: string; content?: string }> | undefined) ?? [];
 
       expect(roundTrippedOptions).toHaveLength(originalOptions.length);
       originalOptions.forEach((original, index) => {

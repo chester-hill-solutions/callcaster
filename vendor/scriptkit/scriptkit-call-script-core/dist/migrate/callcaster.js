@@ -77,7 +77,9 @@ function normalizeCallcasterBlock(id, raw) {
                 return {
                     answerValue: String(r.answerValue ?? r.value ?? ""),
                     targetPageId: r.targetPageId ? String(r.targetPageId) : undefined,
-                    targetBlockId: r.targetBlockId ? String(r.targetBlockId) : undefined,
+                    targetBlockId: r.targetBlockId
+                        ? String(r.targetBlockId)
+                        : undefined,
                 };
             })
             : undefined,
