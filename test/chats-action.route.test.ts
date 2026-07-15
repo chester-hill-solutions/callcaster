@@ -18,6 +18,9 @@ const tenantDbMocks = vi.hoisted(() => ({
   contact: {
     findFirst: vi.fn(async () => null),
   },
+  workspace_number: {
+    findMany: vi.fn(async () => [{ phone_number: "+15550000000" }]),
+  },
 }));
 
 vi.mock("@/lib/auth.server", () => ({
@@ -68,6 +71,72 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     mocks.getOrLookupLineType.mockResolvedValue(null);
     tenantDbMocks.contact.findFirst.mockReset();
     tenantDbMocks.contact.findFirst.mockResolvedValue(null);
+    tenantDbMocks.workspace_number.findMany.mockReset();
+    tenantDbMocks.workspace_number.findMany.mockResolvedValue([
+      { phone_number: "+15550000000" },
+    ]);
+  });
+
+  test("rejects a missing from number with a 400 before calling sendMessage", async () => {
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "A workspace sending number is required.",
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("rejects an unowned from number with a 400 before calling sendMessage", async () => {
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15559999999",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "from must be a rented phone number that belongs to this workspace",
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("accepts a from number that matches a rented workspace number by phone key", async () => {
+    tenantDbMocks.workspace_number.findMany.mockResolvedValueOnce([
+      { phone_number: "15550000000" },
+    ]);
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ from: "+15550000000" }),
+    );
   });
 
   test("rejects sending to an opted-out contact with a 403 before calling sendMessage", async () => {

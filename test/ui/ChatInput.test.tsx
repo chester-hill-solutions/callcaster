@@ -29,6 +29,61 @@ function baseProps(overrides: Record<string, unknown> = {}) {
   } as React.ComponentProps<typeof ChatInput>;
 }
 
+describe("ChatInput From sender selection", () => {
+  test("disables Send and explains when no sending numbers are available", () => {
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [],
+          initialFrom: "",
+        })}
+      />,
+    );
+    expect(screen.getByRole("combobox")).toBeDisabled();
+    expect(
+      screen.getByRole("option", { name: /no sending numbers available/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/workspace sending number is required/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
+  });
+
+  test("recovers from an invalid initialFrom by selecting the first available number", () => {
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [
+            { id: "1", phone_number: "+15550000000", friendly_name: "Main" },
+            { id: "2", phone_number: "+15551111111" },
+          ],
+          initialFrom: "+15559999999",
+        })}
+      />,
+    );
+    expect(screen.getByRole("combobox")).toHaveValue("+15550000000");
+    expect(screen.getByRole("button", { name: /send message/i })).toBeEnabled();
+  });
+
+  test("updates the selected From value when the user changes options", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        {...baseProps({
+          workspaceNumbers: [
+            { id: "1", phone_number: "+15550000000", friendly_name: "Main" },
+            { id: "2", phone_number: "+15551111111", friendly_name: "Alt" },
+          ],
+          initialFrom: "+15550000000",
+        })}
+      />,
+    );
+
+    await user.selectOptions(screen.getByRole("combobox"), "+15551111111");
+    expect(screen.getByRole("combobox")).toHaveValue("+15551111111");
+  });
+});
+
 describe("ChatInput opt-out and send-later", () => {
   test("enables Send for a normal contact", () => {
     render(<ChatInput {...baseProps()} />);

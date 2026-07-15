@@ -123,14 +123,17 @@ export function useChatsPage() {
   }, [loadedChats, contact_number]);
 
   const initialFrom = useMemo(() => {
-    if (establishedFromNumber) {
-      const establishedKey = getConversationPhoneKey(establishedFromNumber);
-      const matchedWorkspaceNumber = chatInputWorkspaceNumbers.find(
-        (num) => getConversationPhoneKey(num.phone_number) === establishedKey,
-      );
-      return matchedWorkspaceNumber?.phone_number || establishedFromNumber;
-    }
-    return chatInputWorkspaceNumbers[0]?.phone_number || "";
+    const fallback = chatInputWorkspaceNumbers[0]?.phone_number || "";
+    if (!establishedFromNumber) return fallback;
+
+    const establishedKey = getConversationPhoneKey(establishedFromNumber);
+    const matchedWorkspaceNumber = chatInputWorkspaceNumbers.find(
+      (num) => getConversationPhoneKey(num.phone_number) === establishedKey,
+    );
+    // Only use a sender that appears in the From options. An historical
+    // conversation number that is no longer rented would leave the controlled
+    // <select> with a blank selection.
+    return matchedWorkspaceNumber?.phone_number || fallback;
   }, [establishedFromNumber, chatInputWorkspaceNumbers]);
 
   const chatsRoutePath = `/workspaces/${workspace.id}/chats`;
