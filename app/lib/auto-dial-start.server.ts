@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import type TwilioSDK from "twilio";
+import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 
 type TwilioClient = TwilioSDK.Twilio;
 
@@ -41,6 +42,17 @@ export async function startAutoDialConference(
   input: StartAutoDialConferenceInput,
 ): Promise<StartAutoDialConferenceResult> {
   const { userId, workspaceId, campaignId, callerId, selectedDevice } = input;
+
+  if (selectedDevice !== "computer") {
+    const verifiedNumbers = await getUserVerifiedAudioNumbers(userId);
+    if (!verifiedNumbers?.includes(selectedDevice)) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Selected device is not a verified phone number",
+      };
+    }
+  }
 
   const credits = await getWorkspaceCreditsBalance(workspaceId);
   if (credits === null) {

@@ -207,6 +207,70 @@ describe("app/lib/campaign-readiness.ts", () => {
     expect(readiness.startIssues).toContain("Script is required");
   });
 
+  test("rejects unavailable or incapable workspace resources", () => {
+    const readiness = getCampaignReadiness(
+      {
+        type: "live_call",
+        caller_id: "+15555550100",
+        voicemail_file: "missing-voicemail.mp3",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: validSchedule,
+      } as any,
+      {
+        script_id: 42,
+        voicedrop_audio: "missing-drop.mp3",
+      } as any,
+      {
+        queueCount: 1,
+        workspacePhoneNumbers: [
+          { phone_number: "+15555550100", capabilities: { sms: true, voice: false } },
+        ],
+        workspaceScriptIds: [7],
+        workspaceAudioNames: ["available.mp3"],
+      },
+    );
+
+    expect(readiness.startIssues).toEqual(
+      expect.arrayContaining([
+        "The configured outbound phone number does not support voice",
+        "The configured script is unavailable in this workspace",
+        "A configured campaign audio file is unavailable",
+      ]),
+    );
+  });
+
+  test("rejects a foreign caller ID and accepts owned resources", () => {
+    const baseCampaign = {
+      type: "live_call",
+      caller_id: "+15555550100",
+      start_date: "2026-03-10T10:00:00.000Z",
+      end_date: "2026-03-11T10:00:00.000Z",
+      schedule: validSchedule,
+    } as any;
+    const details = { script_id: 42, voicedrop_audio: "drop.mp3" } as any;
+
+    const foreign = getCampaignReadiness(baseCampaign, details, {
+      queueCount: 1,
+      workspacePhoneNumbers: [],
+      workspaceScriptIds: [42],
+      workspaceAudioNames: ["drop.mp3"],
+    });
+    expect(foreign.startIssues).toContain(
+      "The configured outbound phone number is unavailable in this workspace",
+    );
+
+    const owned = getCampaignReadiness(baseCampaign, details, {
+      queueCount: 1,
+      workspacePhoneNumbers: [
+        { phone_number: "+15555550100", capabilities: { voice: true } },
+      ],
+      workspaceScriptIds: [42],
+      workspaceAudioNames: ["drop.mp3"],
+    });
+    expect(owned.startIssues).toEqual([]);
+  });
+
   test("filters content readiness issues for the detailed settings section", () => {
     const issues = getCampaignContentReadinessIssues([
       { code: "script_required", message: "Script is required" },

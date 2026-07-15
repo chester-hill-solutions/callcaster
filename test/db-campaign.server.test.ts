@@ -165,6 +165,30 @@ describe("app/lib/database/campaign.server.ts", () => {
     expect(res.campaignDetails).toMatchObject({ campaign_id: 1, script_id: 2 });
   });
 
+  test("updateCampaign persists an explicitly cleared script as SQL null", async () => {
+    const mod = await import("../app/lib/database/campaign.server");
+    tdbMocks.campaign.update.mockResolvedValueOnce([
+      { id: 1, type: "live_call", script_id: null },
+    ]);
+
+    await mod.updateCampaign({
+      campaignData: {
+        campaign_id: "1",
+        workspace: "w1",
+        title: "T",
+        type: "live_call",
+        script_id: null,
+      },
+      campaignDetails: { campaign_id: "1", script_id: null },
+    });
+
+    expect(tdbMocks.campaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({ script_id: null }),
+      }),
+    );
+  });
+
   test("updateCampaign covers live_call detail fields on unified row", async () => {
     const mod = await import("../app/lib/database/campaign.server");
 

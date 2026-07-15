@@ -70,4 +70,23 @@ describe("campaign-settings", () => {
       voicedrop_audio: "audio",
     });
   });
+
+  test("type changes preserve dormant channel fields", () => {
+    const details = {
+      body_text: "Keep this message",
+      message_media: ["image.png"],
+      script_id: 1,
+      voicedrop_audio: "drop.mp3",
+    } as never;
+
+    const messageDetails = buildCampaignDetailsForType("message", details, 4, "ws-3");
+    const liveDetails = buildCampaignDetailsForType("live_call", messageDetails, 4, "ws-3");
+
+    expect(liveDetails).toMatchObject({
+      body_text: "Keep this message",
+      message_media: ["image.png"],
+      script_id: 1,
+      voicedrop_audio: "drop.mp3",
+    });
+  });
 });

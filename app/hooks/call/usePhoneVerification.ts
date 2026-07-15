@@ -1,14 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger.client";
 
 export function usePhoneVerification({
-  workspaceId,
-  callerId,
+  verifiedNumbers,
 }: {
-  workspaceId: string;
-  callerId: string | null | undefined;
+  verifiedNumbers: string[];
 }) {
   const [selectedDevice, setSelectedDevice] = useState<"computer" | string>("computer");
   const [phoneConnectionStatus, setPhoneConnectionStatus] = useState<
@@ -19,26 +17,47 @@ export function usePhoneVerification({
   const [newPhoneNumber, setNewPhoneNumber] = useState("");
 
   const verifyFetcher = useFetcher<{
-    verificationId: string;
-    callSid: string;
-    pin: string;
+    success?: boolean;
+    verificationId?: string;
+    phoneNumber?: string;
+    expiresAt?: string;
     error?: string;
   }>();
-  const pin = verifyFetcher.data?.pin;
+  const [verificationPhoneNumber, setVerificationPhoneNumber] = useState("");
 
-  const handleVerifyNewNumber = useCallback(async () => {
-    verifyFetcher.load(
-      `/api/verify-audio-session?phoneNumber=${newPhoneNumber}&fromNumber=${callerId}&workspace_id=${workspaceId}`,
-    );
-    toast.success(
-      "Verification call initiated. Please answer your phone to complete verification.",
-    );
+  useEffect(() => {
+    if (selectedDevice === "computer" || verifiedNumbers.includes(selectedDevice)) {
+      return;
+    }
+
+    setSelectedDevice("computer");
+    setPhoneConnectionStatus("disconnected");
+    setPhoneCallSid(null);
+  }, [selectedDevice, verifiedNumbers]);
+
+  useEffect(() => {
+    const data = verifyFetcher.data;
+    if (!data) return;
+    if (data.error || !data.success || !data.phoneNumber) {
+      toast.error(data.error ?? "Failed to start call-in verification.");
+      return;
+    }
+
+    setVerificationPhoneNumber(data.phoneNumber);
     setIsAddingNumber(false);
-  }, [verifyFetcher, newPhoneNumber, callerId, workspaceId]);
+  }, [verifyFetcher.data]);
+
+  const handleVerifyNewNumber = useCallback(() => {
+    setVerificationPhoneNumber("");
+    verifyFetcher.load(
+      `/api/verify-call-in-session?phoneNumber=${encodeURIComponent(newPhoneNumber)}`,
+    );
+  }, [verifyFetcher, newPhoneNumber]);
 
   const handlePhoneDeviceSelection = useCallback(
     async (phoneNumber: string, requestMicrophoneAccess: () => Promise<void>) => {
       if (phoneNumber === "computer") {
+        setSelectedDevice("computer");
         setPhoneConnectionStatus("disconnected");
         setPhoneCallSid(null);
         await requestMicrophoneAccess();
@@ -47,8 +66,8 @@ export function usePhoneVerification({
 
       try {
         setSelectedDevice(phoneNumber);
-        setPhoneConnectionStatus("connected");
-        toast.success("Connected to your phone. You can now make calls.");
+        setPhoneConnectionStatus("disconnected");
+        setPhoneCallSid(null);
       } catch (error) {
         logger.error("Error connecting phone device:", error);
         toast.error("Failed to connect to your phone. Please try again.");
@@ -76,7 +95,7 @@ export function usePhoneVerification({
       newPhoneNumber,
       setNewPhoneNumber,
       handleVerifyNewNumber,
-      pin,
+      verificationPhoneNumber,
       handlePhoneDeviceSelection,
     }),
     [
@@ -86,7 +105,7 @@ export function usePhoneVerification({
       isAddingNumber,
       newPhoneNumber,
       handleVerifyNewNumber,
-      pin,
+      verificationPhoneNumber,
       handlePhoneDeviceSelection,
     ],
   );

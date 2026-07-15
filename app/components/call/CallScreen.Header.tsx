@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { AUDIO_DEVICE_UNAVAILABLE_VALUE } from "@/hooks/call/audio-device-selection";
 import {
   Mic,
   MicOff,
@@ -45,6 +46,8 @@ interface CampaignHeaderProps {
   mediaStream: MediaStream | null;
   availableMicrophones: MediaDeviceInfo[];
   availableSpeakers: MediaDeviceInfo[];
+  selectedMicrophone: string | null;
+  selectedSpeaker: string | null;
   onLeaveCampaign: () => void;
   onReportError: () => void;
   handleMicrophoneChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -64,7 +67,7 @@ interface CampaignHeaderProps {
   newPhoneNumber: string;
   onNewPhoneNumberChange: (value: string) => void;
   onVerifyNewNumber: () => void;
-  pin: string;
+  verificationPhoneNumber: string;
 }
 
 const creditBadgeClass: Record<CampaignHeaderProps["creditState"], string> = {
@@ -90,6 +93,8 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   mediaStream: _mediaStream,
   availableMicrophones,
   availableSpeakers,
+  selectedMicrophone,
+  selectedSpeaker,
   onLeaveCampaign,
   onReportError,
   handleMicrophoneChange,
@@ -109,12 +114,10 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   newPhoneNumber,
   onNewPhoneNumberChange,
   onVerifyNewNumber,
-  pin,
+  verificationPhoneNumber,
 }) => {
   const microphoneSelectId = "campaign-microphone-select";
   const speakerSelectId = "campaign-speaker-select";
-  const defaultMicrophoneId = availableMicrophones[0]?.deviceId ?? "";
-  const defaultSpeakerId = availableSpeakers[0]?.deviceId ?? "";
 
   return (
     <div className={cn("flex w-full flex-col gap-4 p-4", className)}>
@@ -176,7 +179,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                 }
               >
                 <Select
-                  defaultValue={defaultMicrophoneId}
+                  value={selectedMicrophone ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
                   onValueChange={(value) =>
                     handleMicrophoneChange({
                       target: { value },
@@ -198,6 +201,11 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                         {microphone.label}
                       </SelectItem>
                     ))}
+                    {availableMicrophones.length === 0 ? (
+                      <SelectItem value={AUDIO_DEVICE_UNAVAILABLE_VALUE} disabled>
+                        Microphone unavailable
+                      </SelectItem>
+                    ) : null}
                   </SelectContent>
                 </Select>
               </FormField>
@@ -211,7 +219,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                 }
               >
                 <Select
-                  defaultValue={defaultSpeakerId}
+                  value={selectedSpeaker ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
                   onValueChange={(value) =>
                     handleSpeakerChange({
                       target: { value },
@@ -233,6 +241,11 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                         {speaker.label}
                       </SelectItem>
                     ))}
+                    {availableSpeakers.length === 0 ? (
+                      <SelectItem value={AUDIO_DEVICE_UNAVAILABLE_VALUE} disabled>
+                        Speaker unavailable
+                      </SelectItem>
+                    ) : null}
                   </SelectContent>
                 </Select>
               </FormField>
@@ -328,12 +341,13 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
           </DialogContent>
         </Dialog>
       ) : null}
-      {pin ? (
-        <Dialog open={Boolean(pin)}>
+      {verificationPhoneNumber ? (
+        <Dialog open={Boolean(verificationPhoneNumber)}>
           <DialogContent className="max-w-md">
-            <DialogTitle className="sr-only">Phone verification PIN</DialogTitle>
+            <DialogTitle>Verify by calling in</DialogTitle>
             <DialogDescription>
-              On your phone, enter the PIN: {pin}
+              Call {verificationPhoneNumber} from {newPhoneNumber} within 10
+              minutes. Your number will be verified when the call connects.
             </DialogDescription>
           </DialogContent>
         </Dialog>
