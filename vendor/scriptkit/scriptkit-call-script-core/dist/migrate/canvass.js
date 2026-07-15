@@ -61,6 +61,7 @@ export function migrateFromQuickCanvassBlocks(blocksInput) {
     return {
         version: 1,
         startPageId: pageId,
+        pageOrder: [pageId],
         pages: {
             [pageId]: {
                 id: pageId,

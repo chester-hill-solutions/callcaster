@@ -6,7 +6,10 @@ import type {
   ScriptPalette,
 } from "@chester-hill-solutions/scriptkit-call-script-core";
 import { useCallScriptUi } from "../context.js";
-import { useScriptEditorState } from "../hooks/use-script-editor-state.js";
+import {
+  useScriptEditorState,
+  type RoutingTarget,
+} from "../hooks/use-script-editor-state.js";
 
 export type ScriptEditorProps = {
   document: ScriptDocument;
@@ -16,6 +19,16 @@ export type ScriptEditorProps = {
   mediaNames?: string[];
 };
 
+/** Stands in for "no routing target"; see routingOptions below. */
+const NO_ROUTING_TARGET = "__none__";
+
+/**
+ * Reference editor for the headless state in `useScriptEditorState`.
+ *
+ * Deliberately plain: it injects its controls via `useCallScriptUi` so a host
+ * app can supply its own design system. Hosts wanting a first-class builder
+ * should consume the hook directly rather than restyle this.
+ */
 export function ScriptEditor({
   document,
   onChange,
@@ -34,15 +47,34 @@ export function ScriptEditor({
     <div className="call-script-root call-script-editor">
       <aside className="call-script-pages">
         <p className="call-script-muted">Pages</p>
-        {Object.values(editor.document.pages).map((page: ScriptPage) => (
-          <ui.Button
-            key={page.id}
-            onClick={() => editor.setActivePageId(page.id)}
-            disabled={readOnly && page.id !== editor.activePageId}
-          >
-            {page.title}
-          </ui.Button>
+        {editor.orderedPages.map((page: ScriptPage, index: number) => (
+          <div key={page.id} className="call-script-page-row">
+            <ui.Button
+              onClick={() => editor.setActivePageId(page.id)}
+              disabled={readOnly && page.id !== editor.activePageId}
+            >
+              {page.title}
+              {page.id === editor.document.startPageId ? " (start)" : ""}
+            </ui.Button>
+            {!readOnly && (
+              <>
+                <ui.Button onClick={() => editor.movePage(page.id, index - 1)}>
+                  Move up
+                </ui.Button>
+                <ui.Button onClick={() => editor.movePage(page.id, index + 1)}>
+                  Move down
+                </ui.Button>
+                <ui.Button onClick={() => editor.setStartPage(page.id)}>
+                  Set as start
+                </ui.Button>
+                <ui.Button onClick={() => editor.removePage(page.id)}>
+                  Remove page
+                </ui.Button>
+              </>
+            )}
+          </div>
         ))}
+        {!readOnly && <ui.Button onClick={() => editor.addPage()}>Add page</ui.Button>}
       </aside>
 
       <section>
@@ -54,6 +86,16 @@ export function ScriptEditor({
             marginBottom: "1rem",
           }}
         >
+          {editor.activePage && !readOnly && (
+            <ui.Field label="Page title">
+              <ui.Input
+                value={editor.activePage.title}
+                onChange={(value) =>
+                  editor.renamePage(editor.activePageId, value)
+                }
+              />
+            </ui.Field>
+          )}
           {editor.blockTypes.map((type) => (
             <ui.Button
               key={type}
@@ -65,7 +107,7 @@ export function ScriptEditor({
           ))}
         </div>
 
-        {editor.activePage?.blockIds.map((blockId: string) => {
+        {editor.activePage?.blockIds.map((blockId: string, index: number) => {
           const block = editor.document.blocks[blockId];
           if (!block) {
             return null;
@@ -81,8 +123,17 @@ export function ScriptEditor({
                 block={block}
                 readOnly={readOnly}
                 mediaNames={mediaNames}
+                routingTargets={editor.routingTargets}
                 onChange={(patch) => editor.updateBlock(blockId, patch)}
                 onRemove={() => editor.removeBlock(blockId)}
+                onDuplicate={() => editor.duplicateBlock(blockId)}
+                onMoveUp={() => editor.moveBlock(blockId, index - 1)}
+                onMoveDown={() => editor.moveBlock(blockId, index + 1)}
+                onOptionAdd={() => editor.addOption(blockId)}
+                onOptionChange={(optionId, patch) =>
+                  editor.updateOption(blockId, optionId, patch)
+                }
+                onOptionRemove={(optionId) => editor.removeOption(blockId, optionId)}
               />
             </div>
           );
@@ -102,16 +153,30 @@ type BlockEditorProps = {
   block: ScriptBlock;
   readOnly: boolean;
   mediaNames: string[];
+  routingTargets: RoutingTarget[];
   onChange: (patch: Partial<ScriptBlock>) => void;
   onRemove: () => void;
+  onDuplicate: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onOptionAdd: () => void;
+  onOptionChange: (optionId: string, patch: Partial<ScriptOption>) => void;
+  onOptionRemove: (optionId: string) => void;
 };
 
 function BlockEditor({
   block,
   readOnly,
   mediaNames,
+  routingTargets,
   onChange,
   onRemove,
+  onDuplicate,
+  onMoveUp,
+  onMoveDown,
+  onOptionAdd,
+  onOptionChange,
+  onOptionRemove,
 }: BlockEditorProps) {
   const ui = useCallScriptUi();
 
@@ -123,6 +188,26 @@ function BlockEditor({
     block.callcasterType === "synthetic" ||
     block.callcasterType === "say" ||
     block.speechType !== undefined;
+  const takesOptions =
+    block.type === "choice" ||
+    block.type === "select" ||
+    block.type === "radio" ||
+    block.type === "checkbox" ||
+    options.length > 0;
+
+  const routingOptions = [
+    // Sentinel rather than "": host Select implementations (Radix, for one)
+    // reject an empty-string item value, since that is how they represent
+    // "nothing selected".
+    { value: NO_ROUTING_TARGET, label: "(no target)" },
+    ...routingTargets.map((target) => ({
+      value: target.id,
+      label:
+        target.kind === "block"
+          ? `${target.pageTitle} — ${target.label}`
+          : target.label,
+    })),
+  ];
 
   return (
     <div style={{ display: "grid", gap: "0.5rem" }}>
@@ -226,76 +311,62 @@ function BlockEditor({
           </ui.Field>
         </>
       )}
-      {options.length > 0 ||
-      block.type === "choice" ||
-      block.type === "select" ||
-      block.type === "radio" ||
-      block.type === "checkbox" ? (
-        <ui.Field label="Options (comma-separated value:label)">
-          <ui.Textarea
-            value={options.map((o) => `${o.value}:${o.label}`).join("\n")}
-            readOnly={readOnly}
-            onChange={(raw) => {
-              onChange({
-                options: mergeEditedOptions(raw, options),
-              } as Partial<ScriptBlock>);
-            }}
-          />
-        </ui.Field>
-      ) : null}
-      {options.map((option, index) => (
-        <ui.Field
-          key={`${option.value}-${index}`}
-          label={`Next target for ${option.label}`}
-        >
-          <ui.Input
-            value={option.next ?? ""}
-            placeholder="Page/block ID or hangup"
-            readOnly={readOnly}
-            onChange={(next) =>
-              onChange({
-                options: options.map((candidate, candidateIndex) =>
-                  candidateIndex === index
-                    ? { ...candidate, next: next || undefined }
-                    : candidate,
-                ),
-              } as Partial<ScriptBlock>)
-            }
-          />
-        </ui.Field>
-      ))}
-      {!readOnly && <ui.Button onClick={onRemove}>Remove block</ui.Button>}
+      {takesOptions && (
+        <>
+          {options.map((option, index) => (
+            // Keyed by the option's stable id, not its index or value, so a row
+            // isn't remounted (losing focus) while its value is being typed.
+            <div key={option.id ?? index} style={{ display: "grid", gap: "0.25rem" }}>
+              <ui.Field label="Option value">
+                <ui.Input
+                  value={option.value}
+                  readOnly={readOnly}
+                  onChange={(value) =>
+                    onOptionChange(option.id ?? "", { value })
+                  }
+                />
+              </ui.Field>
+              <ui.Field label="Option label">
+                <ui.Input
+                  value={option.label}
+                  readOnly={readOnly}
+                  onChange={(label) =>
+                    onOptionChange(option.id ?? "", { label, content: label })
+                  }
+                />
+              </ui.Field>
+              <ui.Field label="Next target">
+                <ui.Select
+                  // `||`, not `??`: legacy wire data stores "no target" as an
+                  // empty string, which would otherwise select nothing at all.
+                  value={option.next || NO_ROUTING_TARGET}
+                  readOnly={readOnly}
+                  options={routingOptions}
+                  onChange={(next) =>
+                    onOptionChange(option.id ?? "", {
+                      next: next === NO_ROUTING_TARGET ? undefined : next,
+                    })
+                  }
+                />
+              </ui.Field>
+              {!readOnly && (
+                <ui.Button onClick={() => onOptionRemove(option.id ?? "")}>
+                  Remove option
+                </ui.Button>
+              )}
+            </div>
+          ))}
+          {!readOnly && <ui.Button onClick={onOptionAdd}>Add option</ui.Button>}
+        </>
+      )}
+      {!readOnly && (
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <ui.Button onClick={onMoveUp}>Move up</ui.Button>
+          <ui.Button onClick={onMoveDown}>Move down</ui.Button>
+          <ui.Button onClick={onDuplicate}>Duplicate block</ui.Button>
+          <ui.Button onClick={onRemove}>Remove block</ui.Button>
+        </div>
+      )}
     </div>
   );
-}
-
-export function mergeEditedOptions(
-  raw: string,
-  existingOptions: ScriptOption[],
-): ScriptOption[] {
-  return raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const separatorIndex = line.indexOf(":");
-      const value =
-        separatorIndex === -1
-          ? line.trim()
-          : line.slice(0, separatorIndex).trim();
-      const label =
-        separatorIndex === -1
-          ? value
-          : line.slice(separatorIndex + 1).trim() || value;
-      const existing =
-        existingOptions.find((option) => option.value === value) ??
-        existingOptions[index];
-
-      return {
-        ...existing,
-        value,
-        label,
-        ...(existing?.content !== undefined ? { content: label } : {}),
-      };
-    });
 }

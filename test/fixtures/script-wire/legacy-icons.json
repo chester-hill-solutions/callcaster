@@ -1,0 +1,76 @@
+{
+  "pages": {
+    "page_1": {
+      "id": "page_1",
+      "title": "Call outcome",
+      "blocks": ["b_radio", "b_bool", "b_drop", "b_multi", "b_textblock", "b_notes"]
+    },
+    "page_2": {
+      "id": "page_2",
+      "title": "Escalation",
+      "blocks": ["b_escalate"]
+    }
+  },
+  "blocks": {
+    "b_radio": {
+      "id": "b_radio",
+      "type": "radio",
+      "title": "Outcome",
+      "content": "How did the call go?",
+      "options": [
+        { "content": "Needs support", "value": "support", "next": "page_2", "Icon": "SupportButton" },
+        { "content": "Positive", "value": "good", "next": "", "Icon": "ThumbUp" },
+        { "content": "Negative", "value": "bad", "next": "", "Icon": "ThumbDown" }
+      ]
+    },
+    "b_bool": {
+      "id": "b_bool",
+      "type": "boolean",
+      "title": "Consent",
+      "content": "Did they consent to a follow-up?",
+      "text": "Consent given",
+      "options": []
+    },
+    "b_drop": {
+      "id": "b_drop",
+      "type": "dropdown",
+      "title": "Region",
+      "content": "Which region are they in?",
+      "options": [
+        { "content": "Ontario", "value": "on", "next": "" },
+        { "content": "Quebec", "value": "qc", "next": "" }
+      ]
+    },
+    "b_multi": {
+      "id": "b_multi",
+      "type": "multi",
+      "title": "Interests",
+      "content": "Which topics interest them?",
+      "options": [
+        { "content": "Housing", "value": "housing", "next": "" },
+        { "content": "Transit", "value": "transit", "next": "" }
+      ]
+    },
+    "b_textblock": {
+      "id": "b_textblock",
+      "type": "textblock",
+      "title": "Closing",
+      "content": "Thank them for their time.",
+      "options": []
+    },
+    "b_notes": {
+      "id": "b_notes",
+      "type": "textarea",
+      "title": "Notes",
+      "content": "Any other notes?",
+      "options": []
+    },
+    "b_escalate": {
+      "id": "b_escalate",
+      "type": "textarea",
+      "title": "Escalation notes",
+      "content": "Describe the issue.",
+      "options": []
+    }
+  }
+}
