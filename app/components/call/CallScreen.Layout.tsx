@@ -15,6 +15,7 @@ import type { Call } from "@twilio/voice-sdk";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
 import type { Tables } from "@/lib/db-types";
+import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
 
 export function CallScreenLayout({
   isBusy,
@@ -222,7 +223,9 @@ export function CallScreenLayout({
                 }
             }
             displayState={displayState}
-            dispositionOptions={((campaignDetails.disposition_options as unknown) as string[]).map((option) => ({
+            dispositionOptions={normalizeDispositionOptions(
+              campaignDetails.disposition_options,
+            ).map((option) => ({
               value: option,
               label: option,
             }))}
