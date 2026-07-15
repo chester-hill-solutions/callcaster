@@ -14,7 +14,14 @@ export default mergeConfig(
     test: {
       name: "ui",
       environment: "jsdom",
-      include: ["test/ui/**/*.test.{ts,tsx,js,jsx}"],
+      // The vendored scriptkit editor is consumed only by this app, and its
+      // own `npm test` never runs in CI (nothing builds or tests vendor/).
+      // Run its React tests here so the state machine is covered by the same
+      // gate as the app that depends on it.
+      include: [
+        "test/ui/**/*.test.{ts,tsx,js,jsx}",
+        "vendor/scriptkit/**/test/**/*.test.{ts,tsx}",
+      ],
       setupFiles: ["test/setup.ui.ts"],
       pool: "forks",
       maxWorkers: 2,

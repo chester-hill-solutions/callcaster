@@ -16,6 +16,7 @@ import {
 import type { DatabaseReadiness } from "../app/server/db-health.server.ts";
 import { isTwilioWebhookPath } from "./twilio-webhook-paths.ts";
 import { runBootSmokeChecks } from "../app/server/boot-checks.server.ts";
+import { ensureEnvironmentTwimlApp } from "../app/server/environment-twiml-app.server.ts";
 type TwilioWebhookModule = typeof import("./twilio-webhook.ts");
 let twilioWebhookModule: TwilioWebhookModule | null = null;
 
@@ -516,6 +517,19 @@ export async function startServer({
   buildPath?: string;
 } = {}) {
   initializeSentry("callcaster-web", env);
+
+  // Sets TWILIO_APP_SID on non-production environments, so must precede the
+  // required-env check that reads it. No-ops in production and outside Railway.
+  const environmentTwimlApp = await ensureEnvironmentTwimlApp(env);
+  if (environmentTwimlApp.status === "provisioned") {
+    log("info", "environment TwiML App ready", {
+      sid: environmentTwimlApp.sid,
+      friendlyName: environmentTwimlApp.friendlyName,
+      voiceUrl: environmentTwimlApp.voiceUrl,
+      created: environmentTwimlApp.created,
+    });
+  }
+
   validateEnvironment(env);
 
   const readyState: ReadyState = {

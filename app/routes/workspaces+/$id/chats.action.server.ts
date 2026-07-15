@@ -5,6 +5,7 @@ import { normalizePhoneNumber } from "@/lib/utils";
 import { cancelScheduledMessage, sendMessage } from "@/lib/chat-sms.server";
 import { linkContactToConversation } from "@/lib/database/chat-contact-link.server";
 import { getEffectiveWorkspaceTwilioPortalConfigForWorkspace } from "@/lib/database/workspace.server";
+import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
 import { eq } from "drizzle-orm";
 import {
   contact as contactTable,
@@ -111,13 +112,22 @@ export const action = defineAction({
     );
   }
 
-  const messagingServiceSid =
+  const workspaceMessagingServiceSid =
     portalConfig.sendMode === "messaging_service"
       ? portalConfig.messagingServiceSid?.trim() || null
       : null;
-  const fromNumber = messagingServiceSid
-    ? ""
-    : String(data["from"] || "").trim();
+  // The composer chooses per message: the Messaging Service is one option among
+  // the workspace's numbers, so an explicitly picked number must win over the
+  // workspace default rather than being silently replaced by it.
+  const senderSelection = parseChatSenderSelection({
+    rawFrom: typeof data["from"] === "string" ? data["from"] : null,
+    messagingServiceAvailable: Boolean(workspaceMessagingServiceSid),
+  });
+  const messagingServiceSid =
+    senderSelection.mode === "messaging_service"
+      ? workspaceMessagingServiceSid
+      : null;
+  const fromNumber = senderSelection.fromNumber;
 
   if (!messagingServiceSid) {
     if (!fromNumber) {
@@ -208,6 +218,9 @@ export const action = defineAction({
       user: user as unknown as BaseUser,
       portalConfig,
       messagingServiceSid,
+      // Without this a `from_number` send would fall back to the workspace's
+      // portal Messaging Service and ignore the number the user picked.
+      sendMode: senderSelection.mode,
       sendAt: sendAt || null,
     });
     if (!params.contact_number) return redirect(contact_number);

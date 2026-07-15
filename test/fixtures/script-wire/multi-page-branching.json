@@ -1,0 +1,64 @@
+{
+  "pages": {
+    "intro": {
+      "id": "intro",
+      "title": "Intro",
+      "blocks": ["b_open", "b_qualify"]
+    },
+    "qualified": {
+      "id": "qualified",
+      "title": "Qualified",
+      "blocks": ["b_pitch", "b_close"]
+    },
+    "unqualified": {
+      "id": "unqualified",
+      "title": "Unqualified",
+      "blocks": ["b_thanks"]
+    }
+  },
+  "blocks": {
+    "b_open": {
+      "id": "b_open",
+      "type": "textblock",
+      "title": "Opening",
+      "content": "Hi, this is [Agent] from [Company].",
+      "options": []
+    },
+    "b_qualify": {
+      "id": "b_qualify",
+      "type": "radio",
+      "title": "Qualify",
+      "content": "Are you the homeowner?",
+      "options": [
+        { "content": "Yes", "value": "yes", "next": "qualified" },
+        { "content": "No", "value": "no", "next": "unqualified" },
+        { "content": "Refused", "value": "refused", "next": "unqualified" }
+      ]
+    },
+    "b_pitch": {
+      "id": "b_pitch",
+      "type": "textblock",
+      "title": "Pitch",
+      "content": "Here is what we offer.",
+      "options": []
+    },
+    "b_close": {
+      "id": "b_close",
+      "type": "dropdown",
+      "title": "Close",
+      "content": "How interested are they?",
+      "options": [
+        { "content": "Very", "value": "very", "next": "" },
+        { "content": "Somewhat", "value": "somewhat", "next": "" },
+        { "content": "Not at all", "value": "not", "next": "" }
+      ]
+    },
+    "b_thanks": {
+      "id": "b_thanks",
+      "type": "textblock",
+      "title": "Thanks",
+      "content": "Thanks for your time.",
+      "options": []
+    }
+  }
+}

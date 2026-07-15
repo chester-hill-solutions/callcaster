@@ -1,80 +1,27 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { loadCallLogPage } from "@/lib/call-log.server";
-import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
-import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
 import { defineLoader } from "@/lib/handler.server";
-import type { User } from "@/lib/types";
-import { and, eq, gt } from "drizzle-orm";
-import { handset_session as handsetSessionTable, workspace as workspaceTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { workspace as workspaceTable } from "@/db/schema";
 // workspace is the global tenancy root table; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
-
-const EMPTY_LISTENING = {
-  active: false,
-  token: null,
-  tokenError: null,
-} as const;
-
-async function loadIncomingListeningState(args: { workspaceId: string; userId: string }) {
-  const tdb = createTenantDb(args.workspaceId);
-  const { data: handsetData } = await getHandsetNumberForWorkspace({
-    workspaceId: args.workspaceId,
-  });
-  const handsetNumber = handsetData?.phone_number ?? null;
-  const now = new Date().toISOString();
-  const session = await tdb.handset_session.findFirst({
-    where: and(
-      eq(handsetSessionTable.user_id, args.userId),
-      eq(handsetSessionTable.status, "active"),
-      gt(handsetSessionTable.expires_at, now),
-    ),
-    columns: { client_identity: true },
-    orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
-  });
-
-  if (!session?.client_identity) {
-    return {
-      handsetNumber,
-      listening: { ...EMPTY_LISTENING },
-    };
-  }
-
-  const tokenResult = await createHandsetAccessToken({workspaceId: args.workspaceId,
-    clientIdentity: session.client_identity,
-  });
-
-  return {
-    handsetNumber,
-    listening: {
-      active: true,
-      token: tokenResult.token,
-      tokenError: tokenResult.error,
-    },
-  };
-}
 
 export type CallLogLoaderData = Awaited<ReturnType<typeof loadCallLogPage>> & {
   workspace: { id: string; name: string; credits: number } | null;
   userRole: string | null;
   campaigns: Array<{ id: number; title: string | null; status: string | null }>;
   error: string | null;
-  handsetNumber: string | null;
-  listening: {
-    active: boolean;
-    token: string | null;
-    tokenError: string | null;
-  };
 };
 
 export const loader = defineLoader({
   auth: workspaceRouteAuth,
   sideEffects: ["db-read"],
   handler: async ({ auth, url }) => {
-    const { headers, user, workspaceId, userRole } = auth;
+    const { headers, workspaceId, userRole } = auth;
 
     if (!workspaceId) {
       return routeData(
@@ -98,8 +45,6 @@ export const loader = defineLoader({
           userRole: null,
           campaigns: [],
           error: "Workspace ID is required",
-          handsetNumber: null,
-          listening: { ...EMPTY_LISTENING },
         } satisfies CallLogLoaderData,
         { headers, status: 400 },
       );
@@ -147,29 +92,16 @@ export const loader = defineLoader({
           userRole,
           campaigns: campaigns ?? [],
           error: "Workspace not found",
-          handsetNumber: null,
-          listening: { ...EMPTY_LISTENING },
         } satisfies CallLogLoaderData,
         { headers, status: 404 },
       );
     }
 
     try {
-      const [callLog, incomingState] = await Promise.all([
-        loadCallLogPage({
-          workspaceId,
-          requestUrl: url.href,
-        }),
-        user
-          ? loadIncomingListeningState({
-              workspaceId,
-              userId: user.id,
-            })
-          : Promise.resolve({
-              handsetNumber: null,
-              listening: { ...EMPTY_LISTENING },
-            }),
-      ]);
+      const callLog = await loadCallLogPage({
+        workspaceId,
+        requestUrl: url.href,
+      });
 
       return routeData(
         {
@@ -178,8 +110,6 @@ export const loader = defineLoader({
           userRole,
           campaigns: campaigns ?? [],
           error: null,
-          handsetNumber: incomingState.handsetNumber,
-          listening: incomingState.listening,
         } satisfies CallLogLoaderData,
         { headers },
       );
@@ -206,8 +136,6 @@ export const loader = defineLoader({
           userRole,
           campaigns: campaigns ?? [],
           error: "Failed to load call log. Please try again.",
-          handsetNumber: null,
-          listening: { ...EMPTY_LISTENING },
         } satisfies CallLogLoaderData,
         { headers, status: 500 },
       );

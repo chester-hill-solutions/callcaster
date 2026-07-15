@@ -15,6 +15,12 @@ export type FileObject = {
   created_at: string;
   updated_at?: string;
   signedUrl?: string | null;
+  /** From the workspace_audio sidecar. Absent for objects predating it, so
+   * every consumer must treat null as "unknown", not as zero. */
+  durationMs?: number | null;
+  sizeBytes?: number | null;
+  /** Set when this object was cut from another library file. */
+  sourceFileName?: string | null;
 };
 
 export type Audience = Tables<"audience">;
@@ -567,7 +573,15 @@ export type IVROption = {
 
 export type Block = {
   id: string;
-  type: "radio" | "dropdown" | "boolean" | "multi" | "textarea" | "textblock" | "audio";
+  /**
+   * `select`/`dropdown` and `checkbox`/`multi` are synonyms: the first of each
+   * pair is the documented vocabulary (docs/script-json-format.md) and what the
+   * builder writes for new blocks, the second is legacy. Result.tsx renders each
+   * pair identically; existing blocks keep the type they were written with (see
+   * toWireType in the scriptkit core migrate module).
+   */
+  type: "radio" | "dropdown" | "select" | "boolean" | "multi" | "checkbox"
+    | "textarea" | "textblock" | "audio";
   title: string;
   content: string;
   options: BlockOption[] | IVROption[];

@@ -10,6 +10,7 @@
 :contactId
 :contactNumber
 :contact_number
+:fileName/edit
 :id
 :number
 :numberId
@@ -146,6 +147,7 @@ pricing
 purchase
 queue
 queues
+record
 release
 remember
 reset

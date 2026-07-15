@@ -269,11 +269,11 @@ export default function Credits() {
                 });
                 return (
                   <TableRow key={transaction.id}>
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell>
                       {new Date(transaction.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell>{getBillingEventSourceLabel(source)}</TableCell>
-                    <TableCell className="max-w-xs text-xs">
+                    <TableCell className="max-w-xs truncate text-xs">
                       {getTransactionDisplayDescription({
                         type: transaction.type as TransactionType,
                         amount: transaction.amount,

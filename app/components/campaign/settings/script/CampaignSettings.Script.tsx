@@ -67,11 +67,15 @@ export default function CampaignSettingsScript({
             {children as React.ReactNode}
           </Button>
         ),
+        // Wraps the control so the label is actually associated with it. The
+        // UI-kit contract has no id to thread through for htmlFor, and an
+        // unassociated <Label> leaves every field unlabelled for screen
+        // readers (and unfindable by role/label in tests).
         Field: ({ label, children }) => (
-          <div className="grid gap-2">
-            <Label>{label}</Label>
+          <Label className="grid gap-2 font-normal">
+            <span className="font-medium">{label}</span>
             {children as React.ReactNode}
-          </div>
+          </Label>
         ),
         Textarea: ({ value, onChange, placeholder, readOnly, rows = 3 }) => (
           <Textarea

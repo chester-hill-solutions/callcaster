@@ -10,6 +10,8 @@ import {
 } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
+import type { Json } from "@/lib/db-types";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
@@ -45,6 +47,7 @@ export const loader = defineLoader({
   const tdb = createTenantDb(workspaceId);
 
   let optOutKeywords = parseOptOutKeywords(null);
+  let attachedSenderPhoneNumbers: string[] = [];
   try {
     const onboarding = await getWorkspaceMessagingOnboardingState({
       workspaceId,
@@ -52,6 +55,8 @@ export const loader = defineLoader({
     optOutKeywords = parseOptOutKeywords(
       onboarding.businessProfile.optOutKeywords,
     );
+    attachedSenderPhoneNumbers =
+      onboarding.messagingService.attachedSenderPhoneNumbers;
   } catch {
     // use default keywords if onboarding not available
   }
@@ -76,11 +81,23 @@ export const loader = defineLoader({
     }),
     getEffectiveWorkspaceTwilioPortalConfigForWorkspace({ workspaceId }),
   ]);
+  // A configured SID alone is not enough to send: a Messaging Service with no
+  // attached senders fails at Twilio. Mirrors the campaign settings loader so
+  // both surfaces agree on what "ready" means.
   const messagingServiceReady =
     portalConfig.sendMode === "messaging_service" &&
-    Boolean(portalConfig.messagingServiceSid?.trim());
+    workspaceMessagingServiceHasAvailableSenders({
+      messagingServiceSid: portalConfig.messagingServiceSid,
+      attachedSenderPhoneNumbers,
+      workspaceNumbers: workspaceNumbers.map((n) => ({
+        phone_number: n.phone_number,
+        capabilities: n.capabilities as Json | null,
+      })),
+    });
   const senderSelection = {
-    mode: messagingServiceReady
+    // The composer's initial selection only — every workspace number stays
+    // selectable so a misconfigured Messaging Service is never a dead end.
+    defaultMode: messagingServiceReady
       ? ("messaging_service" as const)
       : ("from_number" as const),
     messagingServiceReady,

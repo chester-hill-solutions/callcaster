@@ -18,6 +18,7 @@ import {
   ScheduleValidationError,
 } from "@/lib/sms-send-resolve";
 import { updateMessageBySid } from "@/lib/message-db.server";
+import type { CampaignSmsSendMode } from "@/lib/sms-campaign-send-mode";
 
 export const sendMessage = async ({
   body,
@@ -30,6 +31,7 @@ export const sendMessage = async ({
   portalConfig,
   messageIntent,
   messagingServiceSid,
+  sendMode,
   sendAt,
 }: {
   body: string;
@@ -42,6 +44,12 @@ export const sendMessage = async ({
   portalConfig?: WorkspaceTwilioOpsConfig;
   messageIntent?: TwilioMessageIntent | null;
   messagingServiceSid?: string | null;
+  /**
+   * The sender the caller resolved for this message. `from_number` suppresses
+   * the workspace portal's Messaging Service fallback so an explicitly chosen
+   * `from` is the sender actually used.
+   */
+  sendMode?: CampaignSmsSendMode | null;
   /** "Send later" — ISO string, must be 15min-35days from now and requires a Messaging Service sender. */
   sendAt?: string | null;
 }) => {
@@ -58,7 +66,7 @@ export const sendMessage = async ({
   if (sendAt) {
     const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
       explicitRequestSid: messagingServiceSid ?? null,
-      campaignSmsSendMode: undefined,
+      campaignSmsSendMode: sendMode ?? undefined,
       campaignSmsMessagingServiceSid: undefined,
       portalConfig: resolvedPortalConfig,
     });
@@ -91,6 +99,7 @@ export const sendMessage = async ({
         statusCallback,
         portalConfig: resolvedPortalConfig,
         explicitMessagingServiceSid: messagingServiceSid,
+        campaignSmsSendMode: sendMode ?? undefined,
         messageIntent,
         schedule,
       }),

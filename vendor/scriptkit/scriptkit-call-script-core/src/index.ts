@@ -9,6 +9,8 @@ export {
   routingRuleSchema,
   CANVASS_BLOCK_TYPES,
   CALLCASTER_BLOCK_TYPES,
+  IVR_PLAYBACK_TYPES,
+  isIvrPlaybackType,
 } from "./types.js";
 export type {
   ScriptDocument,

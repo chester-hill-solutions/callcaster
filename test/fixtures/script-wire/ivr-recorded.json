@@ -1,0 +1,67 @@
+{
+  "pages": {
+    "page_1": {
+      "id": "page_1",
+      "title": "Main menu",
+      "blocks": ["b_greeting", "b_menu"]
+    },
+    "page_sales": {
+      "id": "page_sales",
+      "title": "Sales",
+      "blocks": ["b_sales"]
+    },
+    "page_voicemail": {
+      "id": "page_voicemail",
+      "title": "Voicemail",
+      "blocks": ["b_vm"],
+      "speechType": "synthetic",
+      "say": "Please leave a message after the tone."
+    }
+  },
+  "blocks": {
+    "b_greeting": {
+      "id": "b_greeting",
+      "type": "recorded",
+      "speechType": "recorded",
+      "title": "Greeting",
+      "content": "Thanks for calling.",
+      "audioFile": "greeting.mp3",
+      "responseType": null,
+      "options": []
+    },
+    "b_menu": {
+      "id": "b_menu",
+      "type": "recorded",
+      "speechType": "recorded",
+      "title": "Menu",
+      "content": "Press one for sales, two for support.",
+      "audioFile": "menu.mp3",
+      "responseType": "dtmf",
+      "options": [
+        { "content": "Sales", "value": "1", "next": "page_sales" },
+        { "content": "Voicemail", "value": "2", "next": "page_voicemail" },
+        { "content": "Any", "value": "vx-any", "next": "page_sales" }
+      ]
+    },
+    "b_sales": {
+      "id": "b_sales",
+      "type": "synthetic",
+      "speechType": "synthetic",
+      "title": "Sales handoff",
+      "content": "Connecting you to sales.",
+      "audioFile": "Connecting you to sales now.",
+      "responseType": null,
+      "options": []
+    },
+    "b_vm": {
+      "id": "b_vm",
+      "type": "say",
+      "speechType": "synthetic",
+      "title": "Voicemail prompt",
+      "content": "Leave a message.",
+      "audioFile": "Please leave a message after the tone.",
+      "responseType": "speech",
+      "options": []
+    }
+  }
+}

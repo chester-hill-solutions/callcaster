@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -7,6 +7,41 @@ import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 type MessageRow = typeof messageTable.$inferSelect;
 
 const DEFAULT_MESSAGE_PAGE_SIZE = 50;
+
+/**
+ * Expand a phone number into the plausible raw formats it may have been
+ * stored as (no CHECK constraint enforces E.164 on `message.from`/`to`).
+ * Used with `inArray` instead of normalizing the column itself, so lookups
+ * can still use any index on from/to rather than forcing a seq scan.
+ *
+ * Handles already-'+'-prefixed, 11-digit leading-1, and bare 10-digit input.
+ * Junk/empty input is returned as its own sole variant rather than throwing.
+ */
+export function expandPhoneMatchVariants(phone: string): string[] {
+  if (!phone) return [phone];
+
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return [phone];
+
+  const e164 =
+    digits.length === 10
+      ? `+1${digits}`
+      : digits.length === 11 && digits.startsWith("1")
+        ? `+${digits}`
+        : phone.startsWith("+")
+          ? phone
+          : `+${digits}`;
+
+  const variants = new Set<string>([phone, e164]);
+
+  const e164Digits = e164.replace(/\D/g, "");
+  variants.add(e164Digits);
+  if (e164Digits.length === 11 && e164Digits.startsWith("1")) {
+    variants.add(e164Digits.slice(1));
+  }
+
+  return Array.from(variants);
+}
 
 export async function fetchMessagePageForContact(
   workspaceId: string,
@@ -40,13 +75,30 @@ export async function markReceivedMessagesAsDeliveredForPhone(
   options?: { tdb?: TenantDb },
 ): Promise<void> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
-  await tdb.message.update({
+  const variants = expandPhoneMatchVariants(phone);
+  const where = and(
+    eq(messageTable.status, "received"),
+    or(inArray(messageTable.from, variants), inArray(messageTable.to, variants)),
+  );
+  const existingRows = (await tdb.message.findMany({ where })) as MessageRow[];
+  const updatedRows = (await tdb.message.update({
     set: { status: "delivered" },
-    where: and(
-      eq(messageTable.status, "received"),
-      or(eq(messageTable.from, phone), eq(messageTable.to, phone)),
-    ),
-  });
+    where,
+  })) as MessageRow[];
+  if (updatedRows.length === 0) return;
+
+  const existingBySid = new Map(
+    (existingRows ?? []).map((row) => [row.sid, row]),
+  );
+  for (const row of updatedRows) {
+    const existing = existingBySid.get(row.sid) ?? null;
+    await emitChatMessageEvent(
+      workspaceId,
+      "UPDATE",
+      row as Record<string, unknown>,
+      existing as Record<string, unknown> | null,
+    );
+  }
 }
 
 export async function markMessageAsDeliveredBySid(
@@ -55,10 +107,21 @@ export async function markMessageAsDeliveredBySid(
   options?: { tdb?: TenantDb },
 ): Promise<void> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
-  await tdb.message.update({
+  const where = and(eq(messageTable.sid, sid), eq(messageTable.status, "received"));
+  const existingRows = (await tdb.message.findMany({ where, limit: 1 })) as MessageRow[];
+  const existing = existingRows?.[0] ?? null;
+  const [row] = (await tdb.message.update({
     set: { status: "delivered" },
-    where: and(eq(messageTable.sid, sid), eq(messageTable.status, "received")),
-  });
+    where,
+  })) as MessageRow[];
+  if (row) {
+    await emitChatMessageEvent(
+      workspaceId,
+      "UPDATE",
+      row as Record<string, unknown>,
+      existing as Record<string, unknown> | null,
+    );
+  }
 }
 
 /**

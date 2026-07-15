@@ -87,13 +87,13 @@ CallCaster serves **six distinct user types** across a React Router v7 applicati
 
 | Field | Detail |
 |-------|--------|
-| **Goal** | Answer inbound calls and manage SMS conversations |
+| **Goal** | Review the call log and manage SMS conversations |
 | **Trigger** | Agent navigates to `/workspaces/{id}/calls` or `/workspaces/{id}/chats` |
-| **Steps** | **Calls:** 1. `/calls` → 2. Configure handset number in settings (if missing) → 3. Click "Start listening" → 4. Answer incoming call via `IncomingCallPanel` → 5. Review call log table.<br><br>**Chats:** 1. `/chats` → 2. Select conversation or search contact number → 3. Type/select from number → 4. Send message (with optional images) → 5. Scroll history via infinite load |
-| **Components** | `IncomingCallReceiver`, `IncomingCallPanel`, `CallLogTable`, `SoftphonePanel`, `ChatThreadView`, `ChatMessages`, `ChatInput`, `ChatHeader`, `ChatOptOutBanner` |
-| **Actions** | Start/Stop listening → Answer/Decline call → Set status (Available/Away/Offline) → Select reason → Dial outbound → Click conversation → Type message → Attach image → Send → Hide STOP conversations |
-| **Outcome** | Inbound call answered or SMS sent; conversation updated in real time |
-| **Pain points** | • Two inbound call surfaces (`/calls` and `/handset`) confuse agents.<br>• Handset requires pre-configuration; no inline setup from the calls page.<br>• Status change requires reason selection in two steps; clunky.<br>• Chat textarea is cleared via DOM manipulation, not React state.<br>• Realtime inserts auto-scroll the thread, interrupting reading.<br>• Mobile chat requires extra taps to open/close conversation sheet. |
+| **Steps** | **Calls:** 1. `/calls` → 2. Filter/sort the call log table → 3. Page through history. (Answering inbound calls happens on `/handset` — see journey 15.)<br><br>**Chats:** 1. `/chats` → 2. Select conversation or search contact number → 3. Type/select from number → 4. Send message (with optional images) → 5. Scroll history via infinite load |
+| **Components** | `CallLogTable`, `ChatThreadView`, `ChatMessages`, `ChatInput`, `ChatHeader`, `ChatOptOutBanner` |
+| **Actions** | Filter/sort call log → Page results → Click conversation → Type message → Attach image → Send → Hide STOP conversations |
+| **Outcome** | Call history reviewed or SMS sent; conversation updated in real time |
+| **Pain points** | • Status change requires reason selection in two steps; clunky.<br>• Chat textarea is cleared via DOM manipulation, not React state.<br>• Realtime inserts auto-scroll the thread, interrupting reading.<br>• Mobile chat requires extra taps to open/close conversation sheet. |
 
 ### 5. System Admin: Monitor & Manage
 
@@ -378,7 +378,7 @@ CallCaster serves **six distinct user types** across a React Router v7 applicati
 | **Goal** | Receive and handle inbound calls routed to the workspace handset |
 | **Trigger** | Inbound call arrives to the workspace's handset number |
 | **Steps** | 1. Agent navigates to `/handset` → 2. Sets status to "Available" (requires mic permission) → 3. Waits for calls → 4. Incoming call rings → 5. `IncomingCallPanel` shows caller info → 6. Agent answers → 7. Call connected → 8. Call ends → 9. Session ends on page unmount |
-| **Components** | `HandsetCallPanel`, `SoftphonePanel`, `IncomingCallPanel`, `IncomingCallReceiver` |
+| **Components** | `HandsetCallPanel`, `SoftphonePanel`, `IncomingCallPanel` |
 | **Actions** | Set Available → Grant mic permission → Wait → Answer call → Handle call → Hang up → Change status or end session |
 | **Outcome** | Inbound call handled; caller connected to agent; session logged |
 | **Pain points** | • Every "Available" click re-requests `getUserMedia` and immediately stops the stream—sluggish.<br>• Reason dropdown for Away/Offline is inline and easy to miss.<br>• Outbound dialing disabled when not Available; no quick callback capability.<br>• Session end on unmount uses fetcher; fast navigation may cancel the request.<br>• Two tabs open = two independent Twilio devices = duplicate registrations. |
