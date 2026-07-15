@@ -19,6 +19,7 @@ were wrong, and two would have caused real damage if implemented literally.
 | A11Y-02 | Settings gear is unlabeled | No icon-only Settings gear exists; the only one has visible text. |
 | UX-08 / UX-10 | missing `aria-invalid`; missing `role`/`aria-valuenow` | Both real, both different causes. `aria-describedby` sat on a wrapper `<div>` (announcing nothing) and was unused by every call site. `progress.tsx` never forwarded `value` to Radix's Root. |
 | UX-01 | SMS settings show the wrong label | True, but the screen edits `campaign.schedule` — a different field entirely. See the `sms_send_window` gap below. |
+| UX-09 | marketing chrome bleeds into `/workspaces/*` | **Not a bug — deliberate.** `Navbar` is one global nav that adapts: it takes `params`, derives `workspaceId` (`Navbar.tsx:160`) and renders workspace links when inside a workspace (`:130`). Hiding it under `/workspaces/*` would be the regression. No change made. |
 
 ## Landed
 
@@ -117,6 +118,19 @@ DATABASE_URL=<target> node scripts/db/check-migration-ledger.mjs --require-db
 
 Deployment-specific state is deliberately not recorded here (this repo is
 public); see the operator notes.
+
+## UX-07 (SSE console errors) — NOT investigated
+
+The spike was cancelled before it reported. Nothing here was changed for it and
+no diagnosis was reached — do not read its absence from the fixed list as "no
+issue found".
+
+The question worth answering first, because it decides the severity: **does the
+SSE endpoint hold a connection from the postgres pool?** `app/server/db.ts` sets
+`max: 10` with no timeouts, so if each SSE client parks a connection, ten viewers
+can exhaust the pool and every later query queues forever. If it does not, this
+is most likely benign EventSource reconnect noise (browsers log a console error
+on every reconnect, including normal ones) and is cosmetic.
 
 ## Not exercised
 
