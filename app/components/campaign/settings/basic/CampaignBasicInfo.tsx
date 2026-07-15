@@ -48,14 +48,13 @@ const getButtonStates = (
       states["schedule"] = "Inactive";
       states["archive"] = "Inactive";
       states["pause"] = "Active";
-      states["schedule"] = "Inactive";
       break;
     case "draft":
     case "pending":
       states["play"] = isPlayDisabled ? "Disabled" : "Inactive";
       states["pause"] = "Inactive";
       states["archive"] = "Inactive";
-      states["schedule"] = "Disabled";
+      states["schedule"] = isPlayDisabled ? "Disabled" : "Inactive";
       break;
     case "scheduled":
       states["play"] = isPlayDisabled ? "Disabled" : "Inactive";
@@ -71,6 +70,25 @@ const getButtonStates = (
   }
 
   return states;
+};
+
+const activeControlTooltip = (
+  type: "play" | "pause" | "archive" | "schedule",
+): string => {
+  switch (type) {
+    case "play":
+      return "Currently running";
+    case "pause":
+      return "Currently paused";
+    case "archive":
+      return "Currently archived";
+    case "schedule":
+      return "Currently scheduled";
+    default: {
+      const _exhaustive: never = type;
+      return _exhaustive;
+    }
+  }
 };
 
 // Component Props Interface
@@ -125,8 +143,8 @@ export const CampaignBasicInfo = ({
       ? (scheduleDisabled || tooltip)
       : type === "play" && startDisabledReason
         ? startDisabledReason
-        : state === "Active"
-          ? `Currently ${type === "play" ? "running" : `${type}ed`}`
+        : state === "Active" && type !== "duplicate"
+          ? activeControlTooltip(type)
           : tooltip;
     return (
       <TooltipProvider>

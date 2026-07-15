@@ -1,27 +1,23 @@
 import { listUserWorkspaces } from "@/lib/platform-workspace.server";
 import { data as routeData } from "react-router";
-import {
-  createAuthLayoutLoader,
-} from "@/lib/auth-layout.server";
+import { createAuthLayoutLoader } from "@/lib/auth-layout.server";
 import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import { defineLoader } from "@/lib/handler.server";
+import { logger } from "@/lib/logger.server";
 
-interface Workspace {
-  id: string;
-  name: string;
-}
-
-interface WorkspaceUser {
-  last_accessed: string;
+export type WorkspaceListItem = {
+  last_accessed: string | null;
   role: string;
-  workspace: Workspace;
-}
+  workspace: {
+    id: string;
+    name: string;
+  };
+};
 
-interface LoaderData {
-  workspaces: WorkspaceUser[] | null;
-  userId: string;
+export type WorkspacesIndexLoaderData = {
+  workspaces: WorkspaceListItem[] | null;
   error: string | null;
-}
+};
 
 const authLayoutLoader = createAuthLayoutLoader({
   onAuthenticated: async ({ user, request }) => {
@@ -37,7 +33,7 @@ export const loader = defineLoader({
   auth: (args) => authLayoutLoader(args),
   sideEffects: ["db-read"],
   handler: async ({ auth: layout }) => {
-    const { user, userId } = layout.data;
+    const { user } = layout.data;
     const headers =
       layout.init?.headers instanceof Headers
         ? layout.init.headers
@@ -46,22 +42,33 @@ export const loader = defineLoader({
     const result = await listUserWorkspaces(user.id);
 
     if (!result.ok) {
+      logger.error("Failed to load workspaces for index", {
+        userId: user.id,
+        error: result.error,
+      });
       return routeData(
         {
           workspaces: null,
-          userId,
-          error: result.error,
-        } satisfies LoaderData,
+          error: "Failed to load workspaces. Please refresh and try again.",
+        } satisfies WorkspacesIndexLoaderData,
         { headers },
       );
     }
 
+    const workspaces: WorkspaceListItem[] = result.workspaces.map((row) => ({
+      last_accessed: row.last_accessed ?? null,
+      role: String(row.role ?? ""),
+      workspace: {
+        id: row.workspace.id,
+        name: row.workspace.name,
+      },
+    }));
+
     return routeData(
       {
-        workspaces: result.workspaces as WorkspaceUser[],
-        userId,
+        workspaces,
         error: null,
-      } satisfies LoaderData,
+      } satisfies WorkspacesIndexLoaderData,
       { headers },
     );
   },

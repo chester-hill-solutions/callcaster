@@ -205,6 +205,7 @@ export const CampaignTypeSpecificSettings = ({
   handleNavigate: (e: React.MouseEvent<HTMLButtonElement>) => void,
   hideReadinessAlerts?: boolean,
 }) => {
+  const isScheduled = campaignData.status === "scheduled";
   const isScriptMissing = "script_id" in details && !details.script_id;
   const contentReadinessIssues = getCampaignContentReadinessIssues(readinessIssues);
   const isIvrCampaign =
@@ -479,10 +480,10 @@ export const CampaignTypeSpecificSettings = ({
             </Button>
             <Button
               type="button"
-              disabled={Boolean(scheduleDisabledReason) || isBusy}
+              disabled={Boolean(scheduleDisabledReason) || isBusy || isScheduled}
               onClick={() => handleScheduleButton()}
             >
-              Schedule Campaign
+              {isScheduled ? "Scheduled" : "Schedule Campaign"}
             </Button>
           </div>
         </div>

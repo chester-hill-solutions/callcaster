@@ -2,7 +2,6 @@ import { Link, NavLink, Params, useLocation } from "react-router";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,15 +14,19 @@ import { Menu, User as UserIcon, LogOut } from "lucide-react";
 import { capitalize } from "@/lib/utils";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
+import type {
+  RootNavbarUser,
+  RootWorkspaceSummary,
+} from "@/root.loader.server";
 
 type NavbarProps = {
   className?: string;
   handleSignOut: () => Promise<
     { success: string | null; error: string | null }
   >;
-  workspaces: WorkspaceData[] | null;
+  workspaces: RootWorkspaceSummary[] | null;
   isSignedIn: boolean;
-  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
+  user: RootNavbarUser | null;
   params: Params<string>;
 };
 
@@ -57,7 +60,7 @@ const UserDropdownMenu = ({
   handleSignOut,
   workspaceId,
 }: {
-  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
+  user: RootNavbarUser | null;
   handleSignOut: () => Promise<
     { success: string | null; error: string | null }
   >;
@@ -134,7 +137,7 @@ const UserDropdownMenu = ({
 export default function Navbar({
   className,
   handleSignOut,
-  workspaces,
+  workspaces: _workspaces,
   isSignedIn,
   user,
   params,
@@ -182,7 +185,7 @@ export default function Navbar({
               <NavButton to="/signup">Sign Up</NavButton>
             </>
           )}
-          {workspaces && <NavButton to={"/workspaces"}>Workspaces</NavButton>}
+          {isSignedIn && <NavButton to={"/workspaces"}>Workspaces</NavButton>}
           {user && (
             <UserDropdownMenu
               user={user}
@@ -195,22 +198,26 @@ export default function Navbar({
         <div className="flex items-center gap-2 sm:hidden">
           <ModeToggle />
           <button
+            type="button"
             className="rounded-md border border-border bg-background/80 p-2 text-2xl"
             onClick={() => setMobileMenuOpen(true)}
-            aria-label="Open menu"
+            aria-label="Open navigation menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation-menu"
           >
             <Menu className="h-6 w-6" />
           </button>
         </div>
       </nav>
-      {mobileMenuOpen && (
+      <div id="mobile-navigation-menu">
         <MobileMenu
+          open={mobileMenuOpen}
+          onOpenChange={setMobileMenuOpen}
           isSignedIn={isSignedIn}
           user={user ?? null}
           handleSignOut={handleSignOut}
-          onClose={() => setMobileMenuOpen(false)}
         />
-      )}
+      </div>
     </header>
   );
 }

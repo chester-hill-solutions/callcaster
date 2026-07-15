@@ -216,6 +216,25 @@ export async function createNewWorkspace({
   const provisioningWarnings: string[] = [];
 
   try {
+    // Domain tables + create_new_workspace RPC key users by uuid. Better Auth now
+    // uses generateId=crypto.randomUUID(), but legacy nanoid auth rows cannot be
+    // mirrored into public.user / cast for the RPC.
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        user_id,
+      )
+    ) {
+      logger.error("createNewWorkspace rejected non-uuid auth user id", {
+        userId: user_id,
+      });
+      return {
+        data: null,
+        error:
+          "This account uses an unsupported user id format. Sign out and sign up again, or contact support.",
+        provisioningWarning: null,
+      };
+    }
+
     // Safety net for users who signed up before databaseHooks.user.create.after
     // mirrored auth_user → public.user (required by workspace_users FK).
     const [authRow] = await adminDb

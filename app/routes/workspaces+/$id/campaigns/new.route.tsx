@@ -24,7 +24,7 @@ import { Text } from "@/components/ui/typography";
 export const meta: MetaFunction = () => [{ title: "New Campaign — CallCaster" }];
 
 const CREATION_SECTION_CLASS =
-  "mx-auto w-full max-w-2xl px-2 py-6 sm:px-4";
+  "mx-auto w-full max-w-2xl px-4 pb-8 pt-6 sm:px-6";
 
 export default function CampaignsNew() {
   const isLiveCallEnabled = true;
@@ -38,9 +38,6 @@ export default function CampaignsNew() {
       ? "message"
       : "robocall";
   const [campaignType, setCampaignType] = useState(defaultType);
-  const [campaignPhase, setCampaignPhase] = useState<
-    "identification" | "persuasion" | "gotv"
-  >("identification");
   const [nameMissing, setNameMissing] = useState(false);
 
   return (
@@ -98,34 +95,6 @@ export default function CampaignsNew() {
                       Interactive Voice Recording
                     </SelectItem>
                   ) : null}
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField
-              htmlFor="campaign-phase"
-              label="Campaign Phase"
-              description="Where this campaign fits in your outreach: identifying supporters, persuading undecideds, or getting out the vote."
-            >
-              <input type="hidden" name="campaign-phase" value={campaignPhase} />
-              <Select
-                value={campaignPhase}
-                onValueChange={(next) =>
-                  setCampaignPhase(
-                    next === "persuasion" || next === "gotv"
-                      ? next
-                      : "identification",
-                  )
-                }
-              >
-                <SelectTrigger id="campaign-phase">
-                  <SelectValue placeholder="Select campaign phase" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="identification">
-                    Identification
-                  </SelectItem>
-                  <SelectItem value="persuasion">Persuasion</SelectItem>
-                  <SelectItem value="gotv">GOTV</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>

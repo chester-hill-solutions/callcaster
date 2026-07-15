@@ -183,7 +183,7 @@ UI changes:
 - [x] Admin client in route-unimportable module (`app/server/admin-db.ts`; `no-restricted-imports` ESLint rule on `app/routes/**` blocks `@/server/db` + `@/server/admin-db`)
 - [x] Drop the 1 remaining RLS policy (`phone_verification`) in a cutover migration (`20260628130500_adr_0004_drop_phone_verification_rls.sql`; `verify-audio-session` loader cut over to service-role client + explicit `user_id` scope)
 
-**Files:** `app/db/workspace-scoped-tables.ts` (28-table registry), `app/server/tenant-db.ts` (`createTenantDb` + `withAppCurrentUser` + `TenantDb`/`ScopedTableApi` types), `app/server/admin-db.ts`, `app/server/db.ts` (admin export removed), `app/lib/database/workspace.server.ts` + `app/lib/workspace-route.server.ts` + `app/lib/workspace-api-route.server.ts` (404 on non-member), `test/tenant-db.test.ts` (17 tests), `.eslintrc.cjs` (route import boundary).
+**Files:** `app/db/workspace-scoped-tables.ts` (28-table registry), `app/server/tenant-db.ts` (`createTenantDb` + `withAppCurrentUser` + `TenantDb`/`ScopedTableApi` types), `app/server/admin-db.ts`, `app/server/db.ts` (admin export removed), `app/lib/database/workspace.server.ts` + `app/lib/workspace-route.server.ts` (404 on non-member), `test/tenant-db.test.ts` (17 tests), `.eslintrc.cjs` (route import boundary).
 **Verified:** typecheck clean, 1262/1262 node tests, 253/253 UI tests, lint clean (2 pre-existing `scripts.route.tsx` errors), routes verify OK, API surface 131/131.
 
 ### Phase 3 — Big-bang Supabase→Drizzle migration (blocked on Railway)

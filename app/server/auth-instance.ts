@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { twoFactor } from "better-auth/plugins";
 import { db } from "./db";
 import * as authSchema from "../db/auth-schema";
+import { resolveAuthTrustedOrigins } from "@/lib/auth-trusted-origins.server";
 import { env } from "@/lib/env.server";
 import { ensureProfileForUser } from "@/lib/ensure-user-profile.server";
 
@@ -13,6 +14,9 @@ function createAuth() {
     appName: "CallCaster",
     baseURL: env.BETTER_AUTH_URL(),
     secret: env.BETTER_AUTH_SECRET(),
+    // Localtunnel / review hosts: browser Origin is often loopback or a different
+    // public host than BASE_URL. Resolve per-request so signup/sign-in CSRF passes.
+    trustedOrigins: resolveAuthTrustedOrigins,
     emailAndPassword: {
       enabled: true,
     },

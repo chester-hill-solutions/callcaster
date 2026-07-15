@@ -5,8 +5,10 @@ import {
 } from "@/lib/rcs-onboarding-flags";
 import {
   buildOnboardingStepsForState,
+  evaluateWorkspaceReadiness,
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
+  type WorkspaceReadinessContext,
 } from "@/lib/messaging-onboarding.server";
 import {
   loadWorkspaceTwilioData,
@@ -116,75 +118,21 @@ export function hydrateWorkspaceRcsOnboardingState(
 export function getWorkspaceRcsBlockingIssues(
   onboarding: WorkspaceMessagingOnboardingState,
 ): string[] {
-  const rcsDraft = getDerivedRcsState(onboarding);
-  const businessProfile = onboarding.businessProfile;
-  const issues: string[] = [];
-
-  if (!onboarding.selectedChannels.includes("rcs")) {
-    issues.push("Enable the RCS channel in channel selection before preparing the sender package.");
-  }
-  if (!onboarding.messagingService.serviceSid) {
-    issues.push("Provision the shared Messaging Service before starting RCS sender registration.");
-  }
-  if (!businessProfile.legalBusinessName.trim()) {
-    issues.push("Add the legal business name in Business basics.");
-  }
-  if (!businessProfile.websiteUrl.trim()) {
-    issues.push("Add the public website URL in Business basics.");
-  }
-  if (!businessProfile.privacyPolicyUrl.trim()) {
-    issues.push("Add the privacy policy URL in Business basics.");
-  }
-  if (!businessProfile.termsOfServiceUrl.trim()) {
-    issues.push("Add the terms of service URL in Business basics.");
-  }
-  if (!businessProfile.supportEmail.trim()) {
-    issues.push("Add a support email in Business basics.");
-  }
-  if (!businessProfile.useCaseSummary.trim()) {
-    issues.push("Describe the messaging use case in Business basics.");
-  }
-  if (!businessProfile.optInWorkflow.trim()) {
-    issues.push("Describe the opt-in workflow in Business basics.");
-  }
-  if (businessProfile.sampleMessages.length === 0) {
-    issues.push("Add at least one sample message in Business basics.");
-  }
-  if (!rcsDraft.displayName.trim()) {
-    issues.push("Add the RCS sender display name.");
-  }
-  if (!rcsDraft.publicDescription.trim()) {
-    issues.push("Add the public RCS sender description.");
-  }
-  if (!rcsDraft.notificationEmail.trim()) {
-    issues.push("Add the RCS notification email.");
-  }
-  if (!rcsDraft.representativeName.trim()) {
-    issues.push("Add the authorized representative name.");
-  }
-  if (!rcsDraft.representativeTitle.trim()) {
-    issues.push("Add the authorized representative title.");
-  }
-  if (!rcsDraft.representativeEmail.trim()) {
-    issues.push("Add the authorized representative email.");
-  }
-  if (!rcsDraft.logoImageUrl.trim()) {
-    issues.push("Upload a square logo image URL for the sender package.");
-  }
-  if (!rcsDraft.bannerImageUrl.trim()) {
-    issues.push("Upload a banner image URL for the sender package.");
-  }
-  if (!rcsDraft.optInPolicyImageUrl.trim()) {
-    issues.push("Upload an opt-in policy or consent screenshot URL.");
-  }
-  if (!rcsDraft.useCaseVideoUrl.trim()) {
-    issues.push("Upload a use case video URL for Twilio review.");
-  }
-  if (rcsDraft.regions.length === 0) {
-    issues.push("List at least one destination country for the RCS sender.");
-  }
-
-  return issues;
+  const ctx: WorkspaceReadinessContext = {
+    onboarding,
+    workspaceNumbers: [],
+    rcsDraft: getDerivedRcsState(onboarding),
+    rcsOnboardingEnabled: isRcsOnboardingEnabled(),
+  };
+  const results = evaluateWorkspaceReadiness(ctx, {
+    forChannel: "rcs",
+    exclude: ["rcs_ready"],
+    messageOverrides: {
+      messaging_service_not_provisioned:
+        "Provision the shared Messaging Service before starting RCS sender registration.",
+    },
+  });
+  return results.map((result) => result.message);
 }
 
 async function persistWorkspaceRcsState({
@@ -285,7 +233,6 @@ export async function updateWorkspaceRcsOnboarding({
   });
   nextOnboarding = hydrateWorkspaceRcsOnboardingState(nextOnboarding);
   nextOnboarding = mergeWorkspaceMessagingOnboardingState(nextOnboarding, {
-    steps: buildOnboardingStepsForState(nextOnboarding),
     reviewState: {
       ...nextOnboarding.reviewState,
       lastUpdatedAt: new Date().toISOString(),

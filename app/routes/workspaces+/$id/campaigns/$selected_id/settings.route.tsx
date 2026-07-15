@@ -159,6 +159,7 @@ export default function CampaignSettingsRoute() {
     prevInitialCampaignData !== initialCampaignData ||
     prevCampaignDetails !== campaignDetails
   ) {
+    const previousStatus = prevInitialCampaignData.status;
     setPrevInitialCampaignData(initialCampaignData);
     setPrevCampaignDetails(campaignDetails);
     if (!isChanged) {
@@ -166,6 +167,10 @@ export default function CampaignSettingsRoute() {
       setSavedCampaignDetails(campaignDetails);
       setDraftCampaignData(initialCampaignData);
       setDraftCampaignDetails(campaignDetails);
+    } else if (initialCampaignData.status !== previousStatus) {
+      const nextStatus = initialCampaignData.status as CampaignStatus;
+      setDraftCampaignData((current) => ({ ...current, status: nextStatus }));
+      setSavedCampaignData((current) => ({ ...current, status: nextStatus }));
     }
   }
 
@@ -458,13 +463,21 @@ export default function CampaignSettingsRoute() {
           if (type === "play" || type === "archive") {
             setConfirmStatus(type);
           } else if (type === "pause") {
+            setDraftCampaignData((current) => ({ ...current, status: "paused" }));
+            setSavedCampaignData((current) => ({ ...current, status: "paused" }));
             handleStatusChange("paused");
           } else if (type === "schedule") {
+            setDraftCampaignData((current) => ({ ...current, status: "scheduled" }));
+            setSavedCampaignData((current) => ({ ...current, status: "scheduled" }));
             handleStatusChange("scheduled");
           }
         }}
         handleConfirmStatus={handleConfirmStatus}
-        handleScheduleButton={() => handleStatusChange("scheduled")}
+        handleScheduleButton={() => {
+          setDraftCampaignData((current) => ({ ...current, status: "scheduled" }));
+          setSavedCampaignData((current) => ({ ...current, status: "scheduled" }));
+          handleStatusChange("scheduled");
+        }}
         formFetcher={fetcher}
         user={user}
         startDisabledReason={startDisabledReason}

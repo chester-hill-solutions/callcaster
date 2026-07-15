@@ -412,7 +412,7 @@ export default function AudienceUploader({
 
   return (
     <div className="space-y-6">
-      <div className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+      <div className="block text-sm font-medium text-foreground">
         <div>
           <div className="flex items-baseline gap-4">
             <div>Upload contacts (.csv file):</div>
@@ -527,7 +527,7 @@ export default function AudienceUploader({
                         {pendingContactHeaders.map(header => (
                           <TableHead key={header} className="whitespace-nowrap px-3 py-2">
                             {header}
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                               → {headerMapping[header]}
                             </div>
                           </TableHead>
@@ -555,14 +555,14 @@ export default function AudienceUploader({
             </>
           ) : (
             <div className="space-y-2">
-              <div className="text-sm text-gray-600 dark:text-gray-300">
+              <div className="text-sm text-foreground">
                 ✓ {fullContactData.length} contacts ready to upload
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">
+              <div className="text-sm text-muted-foreground">
                 ✓ Headers mapped successfully
               </div>
               {splitNameColumn && (
-                <div className="text-sm text-gray-600 dark:text-gray-300">
+                <div className="text-sm text-muted-foreground">
                   ✓ Names will be split into First/Last name
                 </div>
               )}
@@ -635,7 +635,7 @@ export default function AudienceUploader({
               Try Again
             </Button>
           ) : (
-            <p className="text-sm text-gray-600 italic">
+            <p className="text-sm italic text-muted-foreground">
               Please wait while your contacts are being processed...
             </p>
           )}

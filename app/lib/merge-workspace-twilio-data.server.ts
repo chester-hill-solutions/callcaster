@@ -123,9 +123,18 @@ export async function persistWorkspaceTwilioData(
   workspaceId: string,
   twilioData: WorkspaceTwilioData,
 ): Promise<void> {
+  const onboarding = twilioData.onboarding;
+  const dataForPersistence =
+    isObject(onboarding) && "steps" in onboarding
+      ? {
+          ...twilioData,
+          onboarding: (({ steps: _steps, ...rest }) => rest)(onboarding),
+        }
+      : twilioData;
+
   await adminDb
     .update(workspaceTable)
-    .set({ twilio_data: JSON.stringify(twilioData) })
+    .set({ twilio_data: JSON.stringify(dataForPersistence) })
     .where(eq(workspaceTable.id, workspaceId));
   invalidateWorkspaceTwilioData(workspaceId);
 }

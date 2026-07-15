@@ -234,7 +234,6 @@ export async function ensureWorkspaceTwilioBootstrap({
           ? "first_number"
           : preBootstrapStep
         : "messaging_service",
-      steps: buildOnboardingStepsForState(nextOnboarding),
       subaccountBootstrap: {
         ...nextOnboarding.subaccountBootstrap,
         status: nextOnboarding.messagingService.serviceSid ? "live" : "provisioning",
@@ -258,7 +257,6 @@ export async function ensureWorkspaceTwilioBootstrap({
     logger.error("Error bootstrapping workspace Twilio resources:", bootstrapError);
     nextOnboarding = mergeWorkspaceMessagingOnboardingState(nextOnboarding, {
       status: "provisioning",
-      steps: buildOnboardingStepsForState(nextOnboarding),
       subaccountBootstrap: {
         ...nextOnboarding.subaccountBootstrap,
         status: "rejected",

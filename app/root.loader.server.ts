@@ -1,27 +1,49 @@
-import { data as routeData, redirect, type LoaderFunctionArgs , Params } from "react-router";
+import { data as routeData, redirect, type LoaderFunctionArgs, Params } from "react-router";
 
 import { getSession } from "@/lib/auth.server";
-import { env as envUtil } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import {
   listUserWorkspaceSummaries,
   loadUserWithInvites,
 } from "@/lib/workspace-members-db.server";
-import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
+
+export type RootNavbarInvite = {
+  id: string;
+};
+
+export type RootNavbarUser = {
+  id: string;
+  first_name: string | null;
+  username: string | null;
+  workspace_invite: RootNavbarInvite[];
+};
+
+export type RootWorkspaceSummary = {
+  id: string;
+  name: string;
+};
 
 export type RootLoaderData = {
-  env: ENV;
-  session: { token: string } | null;
-  workspaces: WorkspaceData[] | null;
-  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
+  isSignedIn: boolean;
+  workspaces: RootWorkspaceSummary[] | null;
+  user: RootNavbarUser | null;
   params: Params<string>;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const env: ENV = {
-    BASE_URL: envUtil.BASE_URL(),
+function toNavbarUser(
+  userData: NonNullable<Awaited<ReturnType<typeof loadUserWithInvites>>>,
+): RootNavbarUser {
+  return {
+    id: userData.id,
+    first_name: userData.first_name ?? null,
+    username: userData.username ?? null,
+    workspace_invite: userData.workspace_invite.map((invite) => ({
+      id: invite.id,
+    })),
   };
+}
 
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const qParam = url.searchParams.get("q");
 
@@ -38,19 +60,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
   }
 
-  const { session, user: authUser, headers } = await getSession(request);
+  const { user: authUser, headers } = await getSession(request);
   if (!authUser) {
     return routeData(
       {
-        env,
-        session: null,
+        isSignedIn: false,
         workspaces: null,
         user: null,
         params,
-      },
+      } satisfies RootLoaderData,
       { headers },
     );
   }
+
   try {
     const [userData, workspaces] = await Promise.all([
       loadUserWithInvites(authUser.id),
@@ -59,24 +81,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     return routeData(
       {
-        env,
-        session: session ? { token: session.token } : null,
-        workspaces: workspaces as unknown as WorkspaceData[] | null,
-        user: userData as (User & { workspace_invite: WorkspaceInvite[] }) | null,
+        isSignedIn: true,
+        workspaces,
+        user: userData ? toNavbarUser(userData) : null,
         params,
-      },
+      } satisfies RootLoaderData,
       { headers },
     );
   } catch (error) {
     logger.error("Error loading workspaces or user data", error);
     return routeData(
       {
-        env,
-        session: session ? { token: session.token } : null,
+        isSignedIn: true,
         workspaces: null,
         user: null,
         params,
-      },
+      } satisfies RootLoaderData,
       { headers },
     );
   }

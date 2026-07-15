@@ -61,10 +61,11 @@ type LoaderData = {
     balance: number;
     history: TransactionRow[];
   };
+  stripeKeyMode: "test" | "live" | "unknown";
 };
 
 export default function Credits() {
-  const { credits } = useLoaderData<LoaderData>();
+  const { credits, stripeKeyMode } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(MIN_CREDITS);
@@ -87,11 +88,36 @@ export default function Credits() {
     { amount: 25000, price: 500 },
   ];
 
+  const customCostLabel =
+    isCustom && selectedCredits >= MIN_CREDITS
+      ? formatCurrency(estimatedCost)
+      : null;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-2">
       <Heading as="h1" level={2} branded={false}>
         Credits
       </Heading>
+
+      {stripeKeyMode === "test" ? (
+        <Alert variant="warning">
+          <AlertTitle>Stripe is in test mode</AlertTitle>
+          <AlertDescription>
+            This environment uses Stripe test keys. Real cards are declined —
+            use a{" "}
+            <a
+              href="https://docs.stripe.com/testing#cards"
+              className="underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Stripe test card
+            </a>{" "}
+            (for example <code className="text-sm">4242 4242 4242 4242</code>
+            ). Live purchases require live Stripe keys on this deployment.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {paymentStatus === "success" ? (
         <Alert variant="success">
@@ -214,9 +240,11 @@ export default function Credits() {
                 placeholder="Enter credits"
                 min={MIN_CREDITS}
               />
-              <Text variant="small" className="mt-1">
-                {isCustom && selectedCredits > 0 && `${formatCurrency(estimatedCost)} CAD`}
-              </Text>
+              {customCostLabel ? (
+                <Text variant="small" className="mt-1">
+                  {customCostLabel}
+                </Text>
+              ) : null}
             </div>
           </div>
 

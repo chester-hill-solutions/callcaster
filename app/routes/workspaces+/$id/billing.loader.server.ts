@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { getWorkspaceBilling } from "@/lib/platform-billing.server";
+import { env, getStripeKeyMode } from "@/lib/env.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -15,11 +16,14 @@ export const loader = defineLoader({
       throw new Error(billing.error);
     }
 
+    const stripeKeyMode = getStripeKeyMode(env.STRIPE_SECRET_KEY());
+
     return routeData({
       credits: {
         balance: billing.balance,
         history: billing.transactions,
       },
+      stripeKeyMode,
     });
   },
 });

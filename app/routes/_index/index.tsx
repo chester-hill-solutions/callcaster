@@ -134,6 +134,14 @@ const HeroSection = () => (
     <p className="animate-fade-in-up animation-delay-300 text-3xl font-semibold text-foreground">
       Real Time Connections. Real Conversations. Real Results.
     </p>
+    <div className="animate-fade-in-up animation-delay-300 mt-8 flex flex-wrap items-center justify-center gap-3">
+      <Button asChild size="lg" className="text-xl">
+        <NavLink to="./signup">Sign Up</NavLink>
+      </Button>
+      <Button asChild size="lg" variant="outline" className="text-xl">
+        <NavLink to="./pricing">View Pricing</NavLink>
+      </Button>
+    </div>
   </div>
 );
 const WhyPhoneCalls = () => (
@@ -190,7 +198,7 @@ const ServiceShowcase = () => (
   <div className="animate-fade-in-up animation-delay-900 mb-16 font-Zilla-Slab">
     <h2 className="mb-6 text-center text-3xl font-bold">Our Services</h2>
     <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-      <Card className="p-8 bg-brand-secondary">
+      <Card className="p-8 bg-brand-secondary text-brand-primary dark:bg-card dark:text-card-foreground">
         <h3 className="mb-4 text-2xl font-bold">
           Predictive Dialer <br />& PowerDialer
         </h3>
@@ -216,7 +224,7 @@ const ServiceShowcase = () => (
         <p className="text-xl font-bold">Affordable per Dial pricing</p>
       </Card>
 
-      <Card className="p-8 bg-brand-secondary">
+      <Card className="p-8 bg-brand-secondary text-brand-primary dark:bg-card dark:text-card-foreground">
         <h3 className="mb-4 text-2xl font-bold">
           Interactive Voice Recordings & Voicedrops
         </h3>
@@ -241,7 +249,7 @@ const ServiceShowcase = () => (
         <p className="text-xl font-bold">Pricing based on volume</p>
       </Card>
 
-      <Card className="p-8 bg-brand-secondary">
+      <Card className="p-8 bg-brand-secondary text-brand-primary dark:bg-card dark:text-card-foreground">
         <h3 className="mb-4 text-2xl font-bold">
           Text Messaging Blasts & Two-Way Conversations
         </h3>

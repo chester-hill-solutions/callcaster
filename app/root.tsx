@@ -62,10 +62,9 @@ function GlobalNavigationIndicator() {
 }
 
 export default function App() {
-  const { env, session, workspaces, user, params } =
+  const { isSignedIn, workspaces, user, params } =
     useLoaderData<RootLoaderData>();
 
-  const isSignedIn = session?.token != null;
   const navigate = useNavigate();
 
   const signOut = useCallback(async (): Promise<{
@@ -118,7 +117,7 @@ export default function App() {
             user={user ?? null}
             params={params}
           />
-          <Outlet context={{ env }} />
+          <Outlet context={{} satisfies Record<string, never>} />
           <Toaster position="top-right" richColors visibleToasts={3} />
           <ScrollRestoration />
           <Scripts />

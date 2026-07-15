@@ -84,7 +84,12 @@ describe("root.tsx", () => {
     mocks.createBrowserClient.mockReset();
     mocks.workspaceMembersDb.loadUserWithInvites.mockReset();
     mocks.workspaceMembersDb.listUserWorkspaceSummaries.mockReset();
-    mocks.workspaceMembersDb.loadUserWithInvites.mockResolvedValue({ id: "u1" });
+    mocks.workspaceMembersDb.loadUserWithInvites.mockResolvedValue({
+      id: "u1",
+      first_name: "Ada",
+      username: "ada",
+      workspace_invite: [{ id: "invite-1" }],
+    });
     mocks.workspaceMembersDb.listUserWorkspaceSummaries.mockResolvedValue([{ id: "w1", name: "W" }] as any[]);
   });
 
@@ -109,12 +114,6 @@ describe("root.tsx", () => {
   });
 
   test("loader does not redirect when decoded q is missing contactId or surveyId", async () => {
-    const client = {
-      auth: {
-        getSession: vi.fn(async () => ({ data: { session: { token: null } } })),
-        getUser: vi.fn(async () => ({ data: { user: null } })),
-      },
-    };
     mocks.getSession.mockReturnValueOnce({ session: null, user: null, headers: new Headers() });
 
     const mod = await import("../../app/root");
@@ -127,12 +126,6 @@ describe("root.tsx", () => {
   });
 
   test("loader logs when q decode fails and continues; no-user returns workspaces null", async () => {
-    const client = {
-      auth: {
-        getSession: vi.fn(async () => ({ data: { session: { token: null } } })),
-        getUser: vi.fn(async () => ({ data: { user: null } })),
-      },
-    };
     mocks.getSession.mockReturnValueOnce({ session: null, user: null, headers: new Headers({ "Set-Cookie": "a=1" }) });
 
     const mod = await import("../../app/root");
@@ -143,6 +136,9 @@ describe("root.tsx", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.isSignedIn).toBe(false);
+    expect(body.session).toBeUndefined();
+    expect(body.env).toBeUndefined();
     expect(body.workspaces).toBeNull();
     expect(body.user).toBeNull();
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -151,38 +147,8 @@ describe("root.tsx", () => {
     );
   });
 
-  test("loader with user and no errors does not log errors", async () => {
-    const client = {
-      auth: {
-        getSession: vi.fn(async () => ({ data: { session: { token: "t" } } })),
-        getUser: vi.fn(async () => ({ data: { user: { id: "u1" } } })),
-      },
-      from: vi.fn((table: string) => {
-        if (table === "user") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { id: "u1" }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "workspace_users") {
-          return {
-            select: () => ({
-              eq: () => ({
-                order: async () => ({
-                  data: [{ workspace: { id: "w1", name: "W" } }],
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-    mocks.getSession.mockReturnValueOnce({ session: { token: "t" }, user: { id: "u1" }, headers: new Headers() });
+  test("loader with user projects navbar-safe fields without session token", async () => {
+    mocks.getSession.mockReturnValueOnce({ session: { token: "secret-token" }, user: { id: "u1" }, headers: new Headers() });
 
     const mod = await import("../../app/root");
     const res = await asRouteResponse(mod.loader({
@@ -190,6 +156,18 @@ describe("root.tsx", () => {
       params: {},
     } as any));
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      isSignedIn: true,
+      workspaces: [{ id: "w1", name: "W" }],
+      user: {
+        id: "u1",
+        first_name: "Ada",
+        username: "ada",
+        workspace_invite: [{ id: "invite-1" }],
+      },
+      params: {},
+    });
     expect(mocks.logger.error).not.toHaveBeenCalledWith(
       "Error loading workspaces or user data",
       expect.anything()
@@ -197,36 +175,6 @@ describe("root.tsx", () => {
   });
 
   test("loader with user loads user/workspaces and logs when errors present", async () => {
-    const client = {
-      auth: {
-        getSession: vi.fn(async () => ({ data: { session: { token: "t" } } })),
-        getUser: vi.fn(async () => ({ data: { user: { id: "u1" } } })),
-      },
-      from: vi.fn((table: string) => {
-        if (table === "user") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { id: "u1" }, error: { message: "u" } }),
-              }),
-            }),
-          };
-        }
-        if (table === "workspace_users") {
-          return {
-            select: () => ({
-              eq: () => ({
-                order: async () => ({
-                  data: [{ workspace: { id: "w1", name: "W" } }],
-                  error: { message: "w" },
-                }),
-              }),
-            }),
-          };
-        }
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
     mocks.workspaceMembersDb.loadUserWithInvites.mockRejectedValueOnce(new Error("u"));
     mocks.workspaceMembersDb.listUserWorkspaceSummaries.mockRejectedValueOnce(new Error("w"));
     mocks.getSession.mockReturnValueOnce({ session: { token: "t" }, user: { id: "u1" }, headers: new Headers() });
@@ -237,6 +185,10 @@ describe("root.tsx", () => {
       params: {},
     } as any));
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.isSignedIn).toBe(true);
+    expect(body.user).toBeNull();
+    expect(body.workspaces).toBeNull();
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Error loading workspaces or user data",
       expect.anything()
@@ -253,8 +205,7 @@ describe("root.tsx", () => {
     };
     mocks.createBrowserClient.mockReturnValueOnce({ auth });
     mocks.loaderData = {
-      env: { BETTER_AUTH_URL: "http://client", BETTER_AUTH_KEY: "pk", BASE_URL: "http://base" },
-      session: { token: "t" },
+      isSignedIn: true,
       workspaces: [],
       user: null,
       params: {},
@@ -285,10 +236,9 @@ describe("root.tsx", () => {
     };
     mocks.createBrowserClient.mockReturnValueOnce({ auth });
     mocks.loaderData = {
-      env: { BETTER_AUTH_URL: "http://client", BETTER_AUTH_KEY: "pk", BASE_URL: "http://base" },
-      session: { token: null },
+      isSignedIn: false,
       workspaces: null,
-      user: { id: "u1" },
+      user: { id: "u1", first_name: null, username: "u", workspace_invite: [] },
       params: {},
     };
 

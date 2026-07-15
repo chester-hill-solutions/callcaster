@@ -9,7 +9,6 @@ import type {
   agent_state,
   answered_by,
   call_status,
-  campaign_phase,
   campaign_status,
   campaign_type,
   dial_types,
@@ -68,7 +67,8 @@ export type Json =
 export type AgentState = (typeof agent_state.enumValues)[number];
 export type AnsweredBy = (typeof answered_by.enumValues)[number];
 export type CallStatus = (typeof call_status.enumValues)[number];
-export type CampaignPhase = (typeof campaign_phase.enumValues)[number];
+/** Reserved for ADR-0020; no `campaign.phase` column yet — do not add a bogus pgEnum. */
+export type CampaignPhase = "identification" | "persuasion" | "gotv";
 export type CampaignStatus = (typeof campaign_status.enumValues)[number];
 export type CampaignType = (typeof campaign_type.enumValues)[number];
 export type DialTypes = (typeof dial_types.enumValues)[number];

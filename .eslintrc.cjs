@@ -204,12 +204,6 @@ module.exports = {
                 message:
                   "Data-plane child routes must use getDataPlaneRouteContext from @/lib/data-plane-route.server.",
               },
-              {
-                name: "@/lib/workspace-api-route.server",
-                importNames: ["withWorkspaceApiLoader", "withWorkspaceApiAction"],
-                message:
-                  "Data-plane child routes must use getDataPlaneRouteContext from @/lib/data-plane-route.server.",
-              },
             ],
           },
         ],

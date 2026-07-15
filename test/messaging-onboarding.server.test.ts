@@ -371,7 +371,7 @@ describe("messaging onboarding helpers", () => {
     );
   });
 
-  test("merges stored steps by id when first_number was not persisted", () => {
+  test("recomputes steps from state and ignores stored steps", () => {
     const legacySteps = DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.steps.filter(
       (step) => step.id !== "first_number",
     );

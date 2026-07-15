@@ -12,7 +12,6 @@ import {
 } from "@/lib/messaging-onboarding/defaults.server";
 import { buildOnboardingStepsForState } from "@/lib/messaging-onboarding/readiness.server";
 import {
-  mergeStoredOnboardingSteps,
   normalizeA2p10dlcSection,
   normalizeBusinessProfile,
   normalizeEmergencyAddress,
@@ -30,7 +29,6 @@ export {
   parseStringArray,
   pickEnumValue,
   normalizeStep,
-  mergeStoredOnboardingSteps,
   normalizeEmergencyAddress,
   normalizeReviewState,
 } from "@/lib/messaging-onboarding/normalize-sections.server";
@@ -160,7 +158,6 @@ export function normalizeWorkspaceMessagingOnboardingState(
   if (!isObject(value)) {
     const defaultState = {
       ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-      steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => ({ ...step })),
     };
 
     return {
@@ -168,11 +165,6 @@ export function normalizeWorkspaceMessagingOnboardingState(
       steps: buildOnboardingStepsForState(defaultState, { hasFirstNumber: false }),
     };
   }
-
-  const steps =
-    Array.isArray(value.steps) && value.steps.length > 0
-      ? mergeStoredOnboardingSteps(value.steps)
-      : DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => ({ ...step }));
 
   const selectedChannels = parseStringArray(value.selectedChannels).filter(
     (channel): channel is WorkspaceOnboardingChannel =>
@@ -233,7 +225,6 @@ export function normalizeWorkspaceMessagingOnboardingState(
       selectedChannels.length > 0
         ? selectedChannels
         : DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.selectedChannels,
-    steps,
     businessProfile,
     messagingService,
     subaccountBootstrap,

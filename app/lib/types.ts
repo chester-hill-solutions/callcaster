@@ -5,9 +5,8 @@ export type ENV = {
   BASE_URL: string | undefined;
 };
 
-export type ContextType = {
-  env: ENV;
-};
+/** Parent→child UI outlet context. Do not put session tokens or secrets here. */
+export type ContextType = Record<string, never>;
 
 export type FileObject = {
   name: string;
@@ -474,6 +473,7 @@ export interface WorkspaceMessagingOnboardingState {
   currentStep: string;
   operatingCountry: WorkspaceOperatingCountry;
   selectedChannels: WorkspaceOnboardingChannel[];
+  /** Computed at read time via `buildOnboardingStepsForState`; not persisted. */
   steps: WorkspaceOnboardingStepState[];
   businessProfile: WorkspaceMessagingBusinessProfile;
   messagingService: WorkspaceMessagingServiceState;
@@ -504,7 +504,7 @@ export type TwilioAccountData = (Partial<AccountInstance> & {
   authToken?: string;
   portalConfig?: WorkspaceTwilioOpsConfig | null;
   portalSync?: WorkspaceTwilioSyncSnapshot | null;
-  onboarding?: WorkspaceMessagingOnboardingState | null;
+  onboarding?: Omit<WorkspaceMessagingOnboardingState, "steps"> | null;
 }) | null;
 
 export enum WorkspaceTableNames {
