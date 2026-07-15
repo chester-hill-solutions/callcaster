@@ -90,8 +90,13 @@ export default function ScriptEditor() {
       />
       {/*
         Persistent editor header: the SaveBar above only appears once the form is
-        dirty, so without this there is no title, no way back to the script list,
-        and no visible save control on a pristine script.
+        dirty, so without this there is no title and no way back to the script
+        list on a pristine script.
+
+        Saving deliberately stays with the SaveBar rather than being mirrored
+        here. It already owns Cmd/Ctrl+S and Reset, and a second "Save" is both
+        redundant and ambiguous once the form is dirty — two buttons whose
+        accessible names differ only by a suffix.
       */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -109,13 +114,6 @@ export default function ScriptEditor() {
             </Text>
           </div>
         </div>
-        <Button
-          size="sm"
-          onClick={handleSaveUpdate}
-          disabled={!isChanged || isSaving}
-        >
-          {isSaving ? "Saving..." : "Save"}
-        </Button>
       </div>
       <div className="h-full flex-grow p-4">
         <CampaignSettingsScript
