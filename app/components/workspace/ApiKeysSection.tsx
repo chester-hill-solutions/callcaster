@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { PRODUCT_CAPABILITIES } from "@/lib/capabilities";
+import { ApiKeyCapabilityPicker } from "@/components/workspace/ApiKeyCapabilityPicker";
 
 type ApiKeysSectionProps = {
   workspaceId: string;
@@ -18,10 +18,6 @@ type ApiKeysSectionProps = {
   defaultShowCreateForm?: boolean;
   variant?: "elevated" | "flat";
 };
-
-const SCOPE_OPTIONS = Object.entries(PRODUCT_CAPABILITIES) as Array<
-  [keyof typeof PRODUCT_CAPABILITIES, string]
->;
 
 export default function ApiKeysSection({
   workspaceId,
@@ -209,28 +205,7 @@ export default function ApiKeysSection({
                 placeholder="e.g. Production, Zapier"
               />
             </FormField>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Capability scopes</legend>
-              <p className="text-xs text-muted-foreground">
-                Required. Keys only access the scopes you select.
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {SCOPE_OPTIONS.map(([id, description]) => (
-                  <label
-                    key={id}
-                    className="flex items-start gap-2 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      name="scopes"
-                      value={id}
-                      className="mt-1"
-                    />
-                    {`${id} — ${description}`}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <ApiKeyCapabilityPicker />
             <div className="flex gap-2">
               <Button type="submit" data-testid="api-key-submit">
                 Create key

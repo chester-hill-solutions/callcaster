@@ -12,7 +12,8 @@ ownerTest.describe("Workspace API keys @authenticated", () => {
     await expect(page.getByTestId("api-key-create-form")).toBeVisible();
     await page.locator("#api-key-name").fill("E2E Playwright Key");
     // Capability scopes are required on create after the CHS capability cutover.
-    await page.locator('input[name="scopes"][value="messages.send"]').check();
+    await page.locator('input[data-scope-value="messages.send"]').check();
+    await expect(page.locator('input[type="hidden"][name="scopes"][value="messages.send"]')).toHaveCount(1);
     await page.getByTestId("api-key-submit").click();
     await page.waitForURL(/\/settings/);
     await expect(page.getByTestId("api-key-reveal")).toBeVisible({ timeout: 30_000 });
