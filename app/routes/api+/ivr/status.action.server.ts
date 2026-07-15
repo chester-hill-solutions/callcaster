@@ -173,6 +173,18 @@ export const action = defineAction({
                 userId: dbCall.user_id ?? null,
                 note: `IVR Call ${callSid}, Campaign ${campaignData.title ?? "unknown"}`,
             });
+            // `processCallStatusWebhook` only persists the `call` row, so without
+            // this the attempt keeps a NULL disposition and `get_campaign_stats`
+            // filters the call out of campaign results entirely. Twilio's
+            // terminal statuses are already valid disposition values; a machine
+            // answer that later reports `completed` keeps its `voicemail`
+            // disposition via the terminal-transition guard in
+            // `updateOutreachAttemptForWorkspace`.
+            if (dbCall.outreach_attempt_id) {
+                await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, {
+                    disposition: callStatus,
+                });
+            }
         }
     } catch (error) {
         logger.error("Error processing IVR status:", error);

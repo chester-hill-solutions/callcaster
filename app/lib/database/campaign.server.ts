@@ -504,6 +504,7 @@ export {
   fetchCampaignCounts,
   fetchCampaignData,
   fetchCampaignDetails,
+  fetchIvrResponseResults,
   fetchQueueCounts,
   fetchCampaignAudience,
   fetchAdvancedCampaignDetails,

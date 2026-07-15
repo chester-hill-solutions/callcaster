@@ -1,7 +1,9 @@
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
 import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
+import { IvrResponseBreakdown } from "./ResultsScreen.IvrResponses";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
+import type { IvrQuestionResults } from "@/lib/ivr-results";
 import { useParams } from "react-router";
 
 type CampaignResult = {
@@ -19,8 +21,10 @@ const ResultsScreen = ({
   isBusy,
   results,
   hasAccess,
-  queueCounts
-}: { 
+  queueCounts,
+  /** Present only for campaign types whose scripts collect IVR responses. */
+  ivrResponses,
+}: {
   totalsByDisposition: Record<string, number> | null;
   totalOfAllResults: number;
   isBusy: boolean;
@@ -30,6 +34,7 @@ const ResultsScreen = ({
     fullCount: number;
     queuedCount: number;
   };
+  ivrResponses?: IvrQuestionResults[] | null;
 }) => {
   const params = useParams();
   const campaignId = params.selected_id || "";
@@ -52,6 +57,7 @@ const ResultsScreen = ({
           totalsByDisposition={safeDispositionTotals}
           totalOfAllResults={totalOfAllResults}
         />
+        {ivrResponses ? <IvrResponseBreakdown ivrResponses={ivrResponses} /> : null}
         <KeyMetrics
           results={results}
           totalsByDisposition={safeDispositionTotals}

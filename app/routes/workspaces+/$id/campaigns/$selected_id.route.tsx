@@ -44,6 +44,7 @@ export default function CampaignScreen() {
     hasAccess,
     campaignDetails: initialCampaignDetails,
     results,
+    ivrResponses,
     selected_id,
     queueCounts,
     readiness,
@@ -109,15 +110,31 @@ export default function CampaignScreen() {
               if (!campaignData) {
                 return <ErrorLoadingResults />;
               }
-              return resolvedResults.length < 1 ? (
-                <NoResultsYet />
-              ) : (
-                <ResultsDisplay
-                  results={resolvedResults}
-                  campaign={campaignData}
-                  hasAccess={hasAccess}
-                  queueCounts={safeQueueCounts}
-                />
+              return (
+                <Suspense fallback={<LoadingResults />}>
+                  <Await
+                    resolve={ivrResponses}
+                    errorElement={<ErrorLoadingResults />}
+                  >
+                    {(resolvedIvrResponses) => {
+                      const ivr = resolvedIvrResponses ?? [];
+                      // An IVR campaign can have recorded keypresses before any
+                      // terminal status callback lands a disposition, so the
+                      // empty state has to consider both sources.
+                      return resolvedResults.length < 1 && ivr.length < 1 ? (
+                        <NoResultsYet />
+                      ) : (
+                        <ResultsDisplay
+                          results={resolvedResults}
+                          campaign={campaignData}
+                          hasAccess={hasAccess}
+                          queueCounts={safeQueueCounts}
+                          ivrResponses={ivr}
+                        />
+                      );
+                    }}
+                  </Await>
+                </Suspense>
               );
             }}
           </Await>
