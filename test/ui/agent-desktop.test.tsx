@@ -34,7 +34,7 @@ vi.mock("@/components/ui/select", () => ({
 
 vi.mock("react-router", () => ({
   Link: ({ children, to, ...props }: any) => (
-    <a href={typeof to === "string" ? to : "#"} {...props}>
+    <a href={typeof to === "string" ? to : "/"} {...props}>
       {children}
     </a>
   ),

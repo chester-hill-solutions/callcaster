@@ -12,7 +12,7 @@ export const action = defineAction({
     if (auth instanceof Response) return auth;
     const user = getDualAuthUser(auth);
     if (!user) {
-      return routeData({ error: "Unauthorized" }, { status: 401 });
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     return { user };
   },
