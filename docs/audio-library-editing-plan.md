@@ -1,6 +1,6 @@
 # Audio Library — Editing, Clipping, and On-Screen Recording — Implementation Plan
 
-**Status:** Foundation landed (3 commits). UI streams 3–5 not started. Blocked on a concurrent agent's working-tree churn; execute when that settles.
+**Status:** ✅ Streams 1–6 delivered. Record → trim → save works end-to-end, verified in a browser and against the real dev stack. Remaining: apply the migration to deployed databases, and the follow-ups at the bottom.
 **Scope:** Edit/trim audio in the workspace library, save reusable cuts ("clips") with lineage, and record audio on-screen — without breaking the filename references that live campaigns depend on.
 **Origin:** Closes two pain points already logged in `docs/user-journey-audit.md:180` ("No audio trim or preview editing before save") and `:564` ("No inline actions from the table"). The library empty state at `app/routes/workspaces+/$id/audios.route.tsx:60` has promised "Upload or **record** audio" since before this work.
 
@@ -40,9 +40,18 @@ Consequences that must not be designed away:
 |---|---|
 | `4517c48d` | ffmpeg restored to the runtime image; `trimAudioBuffer`; `probeAudioDurationMs`; `workspace_audio` table + migration; `findAudioUsage`; `resolveAvailableBaseName` |
 | `bb2aa67c` | `uploadObject` now honours `upsert: false` (was silently ignored) |
-| `845549de` | `AudioRecorder.tsx` component (not yet wired to any route) |
+| `845549de` | `AudioRecorder.tsx` component |
+| `34fa278b` | `AudioClipEditor`, the `$fileName/edit` and `record` routes, sidecar read/write, and the library columns |
 
-Verified: 34 unit tests; trim/probe exercised against real ffmpeg; migration exercised against real Postgres 17 (9/9 constraint cases); `upsert` exercised against real MinIO (412 PreconditionFailed).
+**Verification performed**
+
+- Unit: 34 tests across `audio.server`, `audio-usage`, `object-storage-upsert`. Full node suite 1832 passing; UI suite 387 passing.
+- Real ffmpeg: a 1000→3000ms cut renders 2038ms.
+- Real Postgres 17: migration applies; 9/9 constraint cases behave as designed.
+- Real MinIO: repeat conditional PUT refused with 412/PreconditionFailed.
+- **Real dev stack (MinIO + Postgres + ffmpeg)**: 5042ms source → clip object genuinely in the bucket at 2038ms, metadata row with correct lineage; a second cut resolves to `-clip-2` rather than clobbering; inverted range refused before any write; overwrite keeps the name and shortens the source in place (5042ms → 1541ms).
+- **Real browser** (`e2e/specs/audio-clip-editor.spec.ts`, 5 passing): the library renders Length/Derived from/Size/Edit; the record page mounts and requests a microphone; the clip editor loads the waveform — which is the only real proof the lazy wavesurfer import works, since bundle analysis alone can't show it executing.
+- Gates green: `typecheck` (only the 4 pre-existing errors), `lint`, `check:handlers`, `check:type-safety`, `check:dry`, `check:route-server-leaks`, `check:client-bundle`, `build`.
 
 ---
 
@@ -54,6 +63,9 @@ Verified: 34 unit tests; trim/probe exercised against real ffmpeg; migration exe
 4. **Two lockfiles are load-bearing.** Docker runs `bun install --frozen-lockfile` (bun.lock); CI runs `npm ci` (package-lock.json). Adding a dep requires updating **both** or one of the two pipelines breaks.
 5. **`app/AudioStreamer.tsx` is dead code** (zero imports) — a WebSocket streamer, not an uploader. Delete it during Stream 4; do not use it as a reference for save-to-library.
 6. **`app/db/schema.ts` is hand-synced.** Never run `drizzle-kit generate` against it — the file's own banner warns it emits destructive DDL. New DDL goes in `client/migrations/*.sql` with a timestamp prefix.
+7. **`recording-` is a reserved filename prefix.** `isWorkspaceAudioFile()` filters it out as a Twilio call recording, so a library object named that way uploads successfully and is then invisible. On-screen takes are named `recorded-<stamp>` for exactly this reason. The same trap applies to `voicemail-`.
+8. **You cannot seed MinIO with `docker cp`.** Its backend is erasure-coded, so a raw file dropped into `/data/<bucket>/` is not a readable object. Seed through `uploadObject` (which also applies the `workspaceAudio/` key prefix when `S3_BUCKET_AUDIO` is unset and the fallback bucket is used).
+9. **Scope table-row selectors in E2E.** An unscoped `getByRole("link", {name: "Edit"})` on `/audios` also matches page chrome and silently navigates to `/billing`. Filter by row.
 
 ---
 
