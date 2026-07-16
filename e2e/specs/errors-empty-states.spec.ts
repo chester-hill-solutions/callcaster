@@ -37,6 +37,29 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
     await page.goto(workspacePath(E2E_WORKSPACES.empty.id, "audios"));
     await expect(page.getByText("Add Your Own Audio to this Workspace!")).toBeVisible();
   });
+
+  // Regression: the campaign hub streamed `results` as a deferred promise. For a
+  // real browser the shell flushed with the fallback and the turbo-stream was
+  // never closed, so the client's decoded promise could never settle — React
+  // #419, then "Loading results..." forever. Bots were unaffected (entry.server
+  // awaits body.allReady for them), and a never-settling promise never rejects,
+  // so <Await errorElement> never fired either. Only a browser catches this:
+  // asserting the stream closes, or asserting SSR output, both pass while the
+  // page stays broken. So this waits out hydration and checks what a user sees.
+  ownerTest("ERR-12 campaign hub renders after hydration", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (e) => pageErrors.push(e.message));
+
+    await page.goto(
+      workspacePath(E2E_WORKSPACES.ready.id, `campaigns/${E2E_CAMPAIGNS.liveCall.id}`),
+    );
+
+    await expect(page.getByText("Your Campaign Results Will Show Here")).toBeVisible();
+    await expect(page.getByText("Loading results...")).toHaveCount(0);
+
+    // #419 = "the server did not finish this Suspense boundary".
+    expect(pageErrors.filter((e) => e.includes("419")), pageErrors.join("\n")).toEqual([]);
+  });
 });
 
 callerTest("ERR-07 caller empty workspace copy", async ({ page }) => {
