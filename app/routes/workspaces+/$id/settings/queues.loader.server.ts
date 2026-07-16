@@ -16,13 +16,14 @@ export const loader = defineLoader({
       return redirect("..");
     }
 
-    const { queues, members, numbers } = await loadInboundQueueSettings(workspaceId);
+    const { queues, members, numbers, agents } = await loadInboundQueueSettings(workspaceId);
 
     return routeData(
       {
         queues,
         members,
         numbers,
+        agents,
         workspaceId,
       },
       { headers },

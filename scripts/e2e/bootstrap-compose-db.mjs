@@ -45,6 +45,9 @@ const steps = [
   "client/migrations/20260715120000_workspace_audio_metadata.sql",
   "client/migrations/20260715140000_drop_legacy_rls.sql",
   "client/migrations/20260715150000_slice_12_1_transcription_coaching_schema.sql",
+  "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql",
+  "client/migrations/20260716130000_fix_remaining_queue_dial_rpcs.sql",
+  "client/migrations/20260716140000_fix_dequeue_contact_bigint.sql",
 ];
 
 /**

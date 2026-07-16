@@ -6,10 +6,12 @@ import {
   useActionData,
   useLoaderData,
   useNavigation,
+  useOutletContext,
   useSearchParams,
 } from "react-router";
 import type { MetaFunction } from "react-router";
 import { useState } from "react";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 
 export const meta: MetaFunction = () => [{ title: "Billing — CallCaster" }];
 
@@ -66,6 +68,12 @@ type LoaderData = {
 
 export default function Credits() {
   const { credits, stripeKeyMode } = useLoaderData<LoaderData>();
+  const { userRole } = useOutletContext<{ userRole?: string | null }>();
+  // The purchase action is gated to Admin+ server-side (billing.action.server.ts).
+  // Nav already hides the "Credits" link from callers/members; this gate covers
+  // the page's own content for anyone who lands here directly, so the write
+  // form isn't shown to a role that will always get a 403 on submit.
+  const canPurchase = hasMinRole(userRole ?? undefined, MemberRole.Admin);
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(MIN_CREDITS);
@@ -183,6 +191,11 @@ export default function Credits() {
 
       <Section variant="flat">
         <SectionHeader branded={false} compact title="Purchase Credits" />
+        {!canPurchase ? (
+          <Text variant="muted" className="rounded-lg border bg-muted/30 p-4">
+            Contact your workspace admin or owner to purchase credits.
+          </Text>
+        ) : (
         <Form method="post" className="space-y-4">
           <input type="hidden" name="amount" value={selectedCredits || ""} />
           <Text variant="muted" className="rounded-lg border bg-muted/30 p-4">
@@ -270,6 +283,7 @@ export default function Credits() {
             {isSubmitting ? "Redirecting to checkout…" : "Purchase Credits"}
           </Button>
         </Form>
+        )}
       </Section>
 
       <Section variant="flat">

@@ -43,6 +43,7 @@ interface NavItem {
   subItems?: Array<{
     name: string;
     path: string;
+    callerHidden?: boolean;
   }>;
 }
 
@@ -59,7 +60,10 @@ const NAV_ITEMS: NavItem[] = [
     end: true,
     icon: Megaphone,
     subItems: [
-      { name: "New Campaign", path: "campaigns/new" },
+      // Creating a campaign always 403s server-side for callers
+      // (new.action.server.ts requires Admin+); hide the entry point the
+      // same way the other write-only nav items are hidden below.
+      { name: "New Campaign", path: "campaigns/new", callerHidden: true },
       { name: "Archived Campaigns", path: "campaigns/archive" },
     ],
   },
@@ -180,10 +184,13 @@ const WorkspaceNav = ({
             const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
             const showCampaignSubNav =
               item.name === "Campaigns" && isWithinWorkspace;
+            const visibleStaticSubItems = (item.subItems ?? []).filter(
+              (subItem) => !userIsCaller || !subItem.callerHidden,
+            );
             const campaignSubItems: CampaignNavSubItem[] =
               item.name === "Campaigns"
                 ? [
-                    ...(item.subItems ?? []),
+                    ...visibleStaticSubItems,
                     ...campaigns.map((campaign) => ({
                       name:
                         campaign.title?.trim() ||
@@ -192,7 +199,7 @@ const WorkspaceNav = ({
                       status: campaign.status,
                     })),
                   ]
-                : item.subItems ?? [];
+                : visibleStaticSubItems;
 
             return (
               <div key={item.name} className="space-y-1">

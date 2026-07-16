@@ -29,6 +29,28 @@ describe("app/components/shared/AuthCard.tsx", () => {
     expect(screen.getByText("header extra")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
   });
+
+  // Regression test for the /signup double-h1 bug (audit-F #3): AuthCard used
+  // to always bake its title into a level-1 <h1>, so any page that already
+  // renders its own <h1> (like signup.tsx) ended up with two. AuthCard now
+  // defaults to h1 (correct for pages where it's the only heading, e.g.
+  // signin) but accepts headingAs="h2" for pages that provide their own h1.
+  test("renders the title as an h1 by default", async () => {
+    const { AuthCard } = await import("@/components/shared/AuthCard");
+    render(<AuthCard title="Login" />);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Login" }),
+    ).toBeInTheDocument();
+  });
+
+  test("renders the title as an h2 when headingAs is overridden", async () => {
+    const { AuthCard } = await import("@/components/shared/AuthCard");
+    render(<AuthCard title="Create Account" headingAs="h2" />);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Create Account" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+  });
 });
 
 describe("app/components/shared/BrandedCard.tsx", () => {

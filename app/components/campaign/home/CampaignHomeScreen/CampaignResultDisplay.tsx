@@ -1,6 +1,7 @@
 import { useNavigation } from "react-router";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
+import { Heading } from "@/components/ui/typography";
 import type { CampaignState } from "@/lib/campaign-home.types";
 import {
   campaignTypeCollectsIvrResponses,
@@ -126,9 +127,9 @@ export const ResultsDisplay = ({
 
 export const NoResultsYet = () => (
   <div className="flex flex-auto items-center justify-center gap-2 pb-20 sm:flex-col">
-    <h1 className="font-Zilla-Slab text-4xl text-gray-400">
+    <Heading level={1} branded className="text-center">
       Your Campaign Results Will Show Here
-    </h1>
+    </Heading>
   </div>
 );
 

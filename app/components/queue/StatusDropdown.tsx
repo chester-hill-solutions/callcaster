@@ -26,7 +26,10 @@ export function StatusDropdown({ currentStatus, onSelect }: StatusDropdownProps)
             value={currentValue}
             onValueChange={(value) => onSelect(value as QueueSettableStatus)}
         >
-            <SelectTrigger className="h-6 text-xs px-2 rounded border border-gray-200">
+            <SelectTrigger
+                className="h-6 text-xs px-2 rounded border border-gray-200"
+                aria-label="Set contact status"
+            >
                 <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>

@@ -1,9 +1,10 @@
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { CardAction } from "twilio/lib/rest/content/v1/content";
 import { data as routeData } from "react-router";
 import { Flags } from "@/lib/types";
 import { handleNewCampaign } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
 import { defineAction } from "@/lib/handler.server";
+import { MemberRole } from "@/lib/member-role";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -19,6 +20,13 @@ export const action = defineAction({
           error: "Workspace not found",
         },
         { headers },
+      );
+    }
+
+    if (!hasMinRole(userRole, MemberRole.Admin)) {
+      return routeData(
+        { error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
       );
     }
 

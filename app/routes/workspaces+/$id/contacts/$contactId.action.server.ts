@@ -1,10 +1,11 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { updateContact } from "@/lib/database/contact.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { defineAction } from "@/lib/handler.server";
+import { MemberRole } from "@/lib/member-role";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 
 export type ContactFormData = {
   id?: number;
@@ -22,17 +23,24 @@ export type ContactFormData = {
 };
 
 export const action = defineAction({
+  auth: workspaceRouteAuth,
   sideEffects: ["db-write"],
-  handler: async ({ request, params, context }) => {
+  handler: async ({ request, params, auth }) => {
   const { id: workspace_id, contactId: selected_id } = params;
+  const { user, userRole, headers } = auth;
 
   if (!workspace_id || !selected_id) {
     return routeData({ error: "Missing required parameters" }, { status: 400 });
   }
 
-  try {
-    const { user } = getWorkspaceRouteContext(context)
+  if (!hasMinRole(userRole, MemberRole.Member)) {
+    return routeData(
+      { error: "You don't have permission to perform this action" },
+      { headers, status: 403 },
+    );
+  }
 
+  try {
     await requireWorkspaceAccess({
       user: { id: user.id },
       workspaceId: workspace_id,

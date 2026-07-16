@@ -6,7 +6,7 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
-import { Heading, Text } from "@/components/ui/typography";
+import { Heading, Text, type HeadingProps } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 
 export interface AuthCardProps
@@ -15,6 +15,13 @@ export interface AuthCardProps
   description?: React.ReactNode;
   headerContent?: React.ReactNode;
   contentClassName?: string;
+  /**
+   * Tag to render the card's title as. Defaults to "h1" for the common case
+   * where this card's title is the page's only heading (signin, reset
+   * password, etc). Pass "h2" when the page already renders its own h1
+   * above/around the card, so the page never ends up with two h1s.
+   */
+  headingAs?: HeadingProps["as"];
 }
 
 export function AuthCard({
@@ -24,6 +31,7 @@ export function AuthCard({
   description,
   headerContent,
   title,
+  headingAs = "h1",
   ...props
 }: AuthCardProps) {
   return (
@@ -35,7 +43,7 @@ export function AuthCard({
       {...props}
     >
       <CardHeader className="space-y-3 text-center">
-        <Heading level={1} branded className="text-4xl sm:text-5xl">
+        <Heading level={1} as={headingAs} branded className="text-4xl sm:text-5xl">
           {title}
         </Heading>
         {description ? (

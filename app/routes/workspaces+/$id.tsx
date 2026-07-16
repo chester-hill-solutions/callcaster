@@ -86,7 +86,11 @@ function WorkspaceResolvedView({
           (userRole as MemberRole | null | undefined) ?? MemberRole.Member
         }
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
+      <main
+        id="workspace-main-content"
+        tabIndex={-1}
+        className="flex min-w-0 flex-1 flex-col gap-4 focus:outline-none"
+      >
         {liveCredits <= 0 ? (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
             <div className="font-medium">
@@ -154,7 +158,7 @@ function WorkspaceResolvedView({
             />
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -166,15 +170,28 @@ export default function Workspace() {
   const context = useOutletContext<ContextType>();
 
   return (
-    <main className="mx-auto flex min-h-[80vh] w-full flex-col px-4 py-6 sm:px-6">
-      <WorkspaceResolvedView
-        resolvedData={workspaceData}
-        userRole={userRole}
-        outlet={outlet}
-        context={context}
-        onboardingReadiness={onboardingReadiness}
-      />
-    </main>
+    <>
+      <a
+        href="#workspace-main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:ring-2 focus:ring-ring"
+      >
+        Skip to main content
+      </a>
+      {/* Plain div, not <main>: the real <main> landmark now wraps only the
+          actual page content inside WorkspaceResolvedView, deliberately
+          excluding WorkspaceNav's sidebar so the skip link above actually
+          bypasses it (a landmark that wrapped the sidebar too would still
+          hand focus to the sidebar's first link on the very next Tab). */}
+      <div className="mx-auto flex min-h-[80vh] w-full flex-col px-4 py-6 sm:px-6">
+        <WorkspaceResolvedView
+          resolvedData={workspaceData}
+          userRole={userRole}
+          outlet={outlet}
+          context={context}
+          onboardingReadiness={onboardingReadiness}
+        />
+      </div>
+    </>
   );
 }
 

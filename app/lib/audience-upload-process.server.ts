@@ -349,10 +349,13 @@ export const processAudienceUpload = async (
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Update audience status
+    // Update audience status. audience_status enum is
+    // pending|processing|completed|error — there is no "active" value (see
+    // drizzle/0000_baseline.sql:86). A finalized, successfully-imported
+    // audience maps to "completed".
     await tdb.audience.update({
       set: {
-        status: "active",
+        status: "completed",
         total_contacts: processedCount,
       },
       where: eq(audienceTable.id, audienceId),

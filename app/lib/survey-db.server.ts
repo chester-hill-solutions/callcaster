@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { formatDateUtc, safeFilenamePart, toCsvString } from "@/lib/csv";
 import { logger } from "@/lib/logger.server";
 import { isInvalidTextRepresentation, isUniqueViolation } from "@/lib/parse-utils.server";
@@ -13,7 +13,7 @@ import {
   survey_response as surveyResponseTable,
   user as userTable,
 } from "@/db/schema";
-import { db } from "@/server/db";
+import { db, type Database } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 
 type SurveyRow = typeof surveyTable.$inferSelect;
@@ -314,23 +314,23 @@ export async function createSurveyWithStructure(args: {
   return survey;
 }
 
-export async function updateSurveyMetadata(args: {
-  workspaceId: string;
-  surveyPublicId: string;
-  title: string;
-  is_active: boolean;
-}) {
-  const tdb = createTenantDb(args.workspaceId);
-  const rows = await tdb.survey.update({
-    set: {
-      title: args.title,
-      is_active: args.is_active,
-      updated_at: new Date().toISOString(),
-    },
-    where: eq(surveyTable.survey_id, args.surveyPublicId),
-  });
-  return rows[0] ?? null;
-}
+/**
+ * Update a survey's title/active flag and, when `pages` is supplied, sync the
+ * full page/question/option structure to match it. Pages/questions/options
+ * are matched by their public `page_id`/`question_id`/`option_value` (unique
+ * per parent in the live schema) and upserted; anything no longer present in
+ * `pages` is deleted (cascading to its own children and any historical
+ * `response_answer` rows — removing a question is expected to remove answers
+ * to it). Runs in a transaction so a partial structure never lands.
+ *
+ * `pages` is optional so existing metadata-only callers keep working; the
+ * survey edit flow must pass `surveyData.pages` or edits to questions/pages
+ * remain a silent no-op (this was the root cause of the P1 "editing a survey
+ * discards question/page edits" bug).
+ */
+// updateSurveyMetadata moved to survey-structure.server.ts (size ratchet).
+export { updateSurveyMetadata } from "@/lib/survey-structure.server";
+
 
 export async function deleteSurveyByPublicId(workspaceId: string, surveyPublicId: string) {
   const tdb = createTenantDb(workspaceId);

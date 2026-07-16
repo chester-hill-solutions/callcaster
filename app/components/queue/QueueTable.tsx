@@ -465,7 +465,10 @@ export function QueueTable({
                                 handleFilterChange('audiences', newValue);
                             }}
                         >
-                            <SelectTrigger className="h-6 w-full bg-muted/50 text-xs">
+                            <SelectTrigger
+                                className="h-6 w-full bg-muted/50 text-xs"
+                                aria-label="Filter by audience"
+                            >
                                 <SelectValue placeholder="Select audience..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -522,7 +525,10 @@ export function QueueTable({
                                 }
                             }}
                         >
-                            <SelectTrigger className="h-6 w-full bg-muted/50 text-xs">
+                            <SelectTrigger
+                                className="h-6 w-full bg-muted/50 text-xs"
+                                aria-label={isSetStatusMode ? "Set status for selected contacts" : "Filter by status"}
+                            >
                                 <SelectValue
                                     placeholder={isSetStatusMode ? "Set status..." : "All statuses"}
                                 />
@@ -585,7 +591,10 @@ export function QueueTable({
                                     handleFilterChange('disposition', v);
                                 }}
                             >
-                                <SelectTrigger className="h-6 w-full bg-muted/50 text-xs">
+                                <SelectTrigger
+                                    className="h-6 w-full bg-muted/50 text-xs"
+                                    aria-label="Filter by support level"
+                                >
                                     <SelectValue placeholder="Select..." />
                                 </SelectTrigger>
                                 <SelectContent>

@@ -1,4 +1,4 @@
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
   Audience,
   Campaign,
@@ -39,6 +39,7 @@ import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign
 import { defineAction } from "@/lib/handler.server";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { MemberRole } from "@/lib/member-role";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -102,9 +103,16 @@ export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, params, auth }) => {
   const { id: workspace_id, selected_id } = params;
-  const { user } = auth;
+  const { user, userRole, headers } = auth;
 
   if (!selected_id || !workspace_id) return redirect("/");
+
+  if (!hasMinRole(userRole, MemberRole.Admin)) {
+    return routeData(
+      { error: "You don't have permission to perform this action" },
+      { headers, status: 403 },
+    );
+  }
 
   const data = await parseActionRequest(request);
   const intent = String(data.intent ?? "");

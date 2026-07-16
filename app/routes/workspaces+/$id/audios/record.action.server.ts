@@ -11,8 +11,9 @@ import { listMediaObjects } from "@/lib/adapters/media-library.adapter.server";
 import { upsertAudioMetadata } from "@/lib/database/workspace-audio-metadata.server";
 import { defineAction } from "@/lib/handler.server";
 import { logger } from "@/lib/logger.server";
+import { MemberRole } from "@/lib/member-role";
 import { ObjectExistsError, uploadObject } from "@/lib/object-storage.server";
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 
 /**
  * Named for when it was taken; the user renames by clipping.
@@ -34,7 +35,14 @@ export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write", "external"],
   handler: async ({ request, auth }) => {
-    const { headers, user, workspaceId } = auth;
+    const { headers, user, workspaceId, userRole } = auth;
+
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData(
+        { error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
+      );
+    }
 
     if (workspaceId == null) {
       return routeData(

@@ -31,12 +31,26 @@ type WorkspaceNumber = {
   inbound_queue_id: number | null;
 };
 
+type WorkspaceAgent = {
+  user_id: string;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: string | null;
+};
+
 type LoaderData = {
   queues: Queue[];
   members: QueueMember[];
   numbers: WorkspaceNumber[];
+  agents: WorkspaceAgent[];
   workspaceId: string;
 };
+
+function formatAgentLabel(agent: WorkspaceAgent) {
+  const fullName = [agent.first_name, agent.last_name].filter(Boolean).join(" ").trim();
+  return fullName || agent.username || `${agent.user_id.substring(0, 8)}...`;
+}
 
 type QueueFormData = {
   name: string;
@@ -52,7 +66,7 @@ const getQueueActionSuccess = (data: QueueActionResult | undefined) =>
   Boolean(data && "ok" in data && data.ok);
 
 export default function QueueSettings() {
-  const { queues, members, numbers, workspaceId } = useLoaderData<LoaderData>();
+  const { queues, members, numbers, agents, workspaceId } = useLoaderData<LoaderData>();
   useOutletContext<{ }>();
   const createFetcher = useFetcher<QueueActionResult>({ key: "queue-create" });
   const editFetcher = useFetcher<QueueActionResult>({ key: "queue-edit" });
@@ -243,11 +257,22 @@ export default function QueueSettings() {
                 }}
               >
                 <option value="" disabled>Add agent...</option>
-                {Array.from(
-                  new Set(members.filter((m) => m.queue_id !== queue.id).map((m) => m.user_id)),
-                ).length === 0 && (
-                  <option value="" disabled>All agents already assigned</option>
-                )}
+                {(() => {
+                  const assignedToThisQueue = new Set(
+                    getQueueMembers(queue.id).map((m) => m.user_id),
+                  );
+                  const availableAgents = agents.filter(
+                    (agent) => !assignedToThisQueue.has(agent.user_id),
+                  );
+                  if (availableAgents.length === 0) {
+                    return <option value="" disabled>All agents already assigned</option>;
+                  }
+                  return availableAgents.map((agent) => (
+                    <option key={agent.user_id} value={agent.user_id}>
+                      {formatAgentLabel(agent)}
+                    </option>
+                  ));
+                })()}
               </select>
               <div className="flex flex-wrap gap-2">
                 {getQueueMembers(queue.id).map((member) => (

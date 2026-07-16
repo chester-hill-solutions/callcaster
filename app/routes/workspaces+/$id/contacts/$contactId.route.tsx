@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLoaderData, useSubmit } from "react-router";
 import { toast } from "sonner";
 
 import ContactDetails from "@/components/contact/ContactDetails";
+import type { ContactDetailsHandle } from "@/components/contact/ContactDetails";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
 
@@ -16,6 +17,7 @@ export default function ContactScreen() {
   const { contact, selected_id, userRole, audiences } =
     useLoaderData<ContactIdLoaderData>();
   const submit = useSubmit();
+  const detailsRef = useRef<ContactDetailsHandle>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -23,7 +25,12 @@ export default function ContactScreen() {
   const handleSave = useCallback((): void => {
     try {
       setIsSaving(true);
-      submit({}, { method: "post" });
+      const values = detailsRef.current?.getFormValues() ?? {};
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(values)) {
+        formData.set(key, value ?? "");
+      }
+      submit(formData, { method: "post" });
     } catch {
       toast.error("Couldn't save the contact. Please try again.");
     } finally {
@@ -32,6 +39,7 @@ export default function ContactScreen() {
   }, [submit]);
 
   const handleReset = useCallback((): void => {
+    detailsRef.current?.reset();
     setHasChanges(false);
   }, []);
 
@@ -55,10 +63,12 @@ export default function ContactScreen() {
       }
     >
       <ContactDetails
+        ref={detailsRef}
         contact={contact ?? undefined}
         audiences={audiences}
         userRole={userRole}
         onChangesChange={setHasChanges}
+        startEditable={selected_id === "new"}
       />
     </PageShell>
   );

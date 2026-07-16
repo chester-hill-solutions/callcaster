@@ -4,6 +4,7 @@ import {
   inbound_queue_member as inboundQueueMemberTable,
 } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
 
 export async function loadInboundQueueSettings(
   workspaceId: string,
@@ -32,7 +33,12 @@ export async function loadInboundQueueSettings(
     },
   });
 
-  return { queues, members, numbers };
+  // Full workspace roster, independent of `members` (which only lists
+  // agents already assigned to *some* queue). Without this the "Add agent"
+  // picker has no candidates to offer for a brand-new queue.
+  const agents = await listWorkspaceMembersEnriched(workspaceId);
+
+  return { queues, members, numbers, agents };
 }
 
 export async function createInboundQueue(args: {

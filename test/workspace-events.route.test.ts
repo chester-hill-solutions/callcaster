@@ -69,6 +69,31 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
     ).rejects.toThrow("Data plane auth context missing");
   });
 
+  test("loader writes bytes immediately (before any heartbeat interval fires)", async () => {
+    // Regression test for the reconnect-every-~10s bug: Bun's fetch server
+    // has a 10s idleTimeout unless overridden (see server/bun.ts), but the
+    // old code only wrote its first byte at HEARTBEAT_INTERVAL_MS (15s) —
+    // 5s too late, so Bun cut the socket before any byte flowed. The stream
+    // must now write a "connected" marker synchronously on start(), with no
+    // timers advanced at all.
+    const mod = await import(
+      "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
+    );
+    const response = await mod.loader(
+      await withDataPlaneRouteArgs({
+        request: new Request("http://localhost/api/workspaces/ws-1/events"),
+        params: { workspaceId: "ws-1" },
+      }),
+    );
+
+    const reader = (response as Response).body!.getReader();
+    const { value, done } = await reader.read();
+    expect(done).toBe(false);
+    const text = new TextDecoder().decode(value);
+    expect(text).toContain(": connected");
+    await reader.cancel();
+  });
+
   test("loader returns 400 when workspaceId is missing", async () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"

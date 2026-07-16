@@ -1,7 +1,7 @@
 export { loader } from "./edit.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, Link, useLoaderData, useSubmit } from "react-router";
-import { useState } from "react";
+import { data as routeData, type LoaderFunctionArgs, Link, useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
 
 import { SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -14,20 +14,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save, ArrowLeft } from "lucide-react";
 
+type UpdateSurveyResult = { success: true; survey: { survey_id: string } } | { error: string };
+
 export default function EditSurveyPage() {
   const { survey, formData: initialFormData, workspaceId } = useLoaderData();
-  const submit = useSubmit();
+  const fetcher = useFetcher<UpdateSurveyResult>();
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState<SurveyFormData>(initialFormData);
 
+  // /api/surveys is a resource route (no component) — submitting via a plain
+  // useSubmit() navigation lands the browser on that bare JSON response
+  // (a blank page) instead of back on the survey the user just edited. Submit
+  // through a fetcher instead and redirect client-side once it succeeds.
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data && "success" in fetcher.data && fetcher.data.success) {
+      navigate(`/workspaces/${workspaceId}/surveys/${survey.survey_id}`);
+    }
+  }, [fetcher.state, fetcher.data, navigate, workspaceId, survey.survey_id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const formDataToSubmit = new FormData();
     formDataToSubmit.append("surveyData", JSON.stringify(formData));
     formDataToSubmit.append("surveyId", survey.survey_id);
 
-    submit(formDataToSubmit, {
+    fetcher.submit(formDataToSubmit, {
       method: "PATCH",
       action: "/api/surveys",
     });
@@ -406,11 +419,17 @@ export default function EditSurveyPage() {
             <Plus className="w-4 h-4 mr-2" />
             Add Page
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={fetcher.state !== "idle"}>
             <Save className="w-4 h-4 mr-2" />
-            Save Changes
+            {fetcher.state !== "idle" ? "Saving..." : "Save Changes"}
           </Button>
         </div>
+
+        {fetcher.data && "error" in fetcher.data && fetcher.data.error && (
+          <p role="alert" className="text-sm text-destructive mt-4">
+            {fetcher.data.error}
+          </p>
+        )}
       </form>
     </PageShell>
   );

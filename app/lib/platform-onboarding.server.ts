@@ -343,10 +343,27 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
   // ensureWorkspaceTwilioBootstrap; there is no dedicated wizard step for it.
   // Ensure it exists (idempotent) so the first-number step can attach senders.
   if (!current.messagingService.serviceSid) {
-    await ensureWorkspaceTwilioBootstrap({
-      workspaceId: ctx.workspaceId,
-      actorUserId: ctx.user.id,
-    });
+    try {
+      await ensureWorkspaceTwilioBootstrap({
+        workspaceId: ctx.workspaceId,
+        actorUserId: ctx.user.id,
+      });
+    } catch (error) {
+      // Surface a friendly payload error rather than letting this throw:
+      // an uncaught throw here bubbles up as a 500, which trips the route's
+      // ErrorBoundary and strands the user on a blank page instead of the
+      // wizard showing a message and staying on the Channels step.
+      return {
+        kind: "payload",
+        data: {
+          error:
+            error instanceof Error
+              ? error.message
+              : "We couldn't set up messaging for this workspace. Please try again.",
+        },
+        status: 400,
+      };
+    }
   }
 
   await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,

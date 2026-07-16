@@ -341,6 +341,12 @@ export async function createServer(options: CreateServerOptions = {}) {
   return Bun.serve({
     hostname: options.host ?? HOST,
     port: options.port ?? PORT,
+    // Bun's default idleTimeout is 10s. The SSE endpoint at
+    // api+/workspaces+/$workspaceId/events.loader.server.ts holds
+    // long-lived connections open with periodic heartbeats; without an
+    // explicit idleTimeout, Bun cuts those sockets before any byte can be
+    // written, forcing a reconnect loop every ~10s (max allowed is 255s).
+    idleTimeout: 120,
     fetch: async (request) => {
       const logger = requestLogger(request);
       const url = new URL(request.url);

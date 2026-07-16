@@ -1,14 +1,23 @@
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { updateCampaignScriptId } from "@/lib/campaign-ivr.server";
 import { createWorkspaceScript } from "@/lib/script-api-db.server";
+import { MemberRole } from "@/lib/member-role";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
-    const { headers, user, workspaceId } = auth;
+    const { headers, user, workspaceId, userRole } = auth;
+
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData(
+        { error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
+      );
+    }
+
     if (workspaceId == null) {
       return routeData(
         { success: false, error: "Workspace does not exist" },

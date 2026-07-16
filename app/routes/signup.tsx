@@ -87,6 +87,7 @@ const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
       title="Create Account"
       description="Sign up to create a workspace and start calling."
       className="bg-secondary py-2"
+      headingAs="h2"
     >
       {error ? (
         <Text className="block text-center text-destructive">{error}</Text>
@@ -152,6 +153,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
         title="Request Access"
         description="Registration is currently available by invitation. Contact us to let us know you're interested."
         className="min-w-[400px] flex-initial bg-secondary py-2"
+        headingAs="h2"
       >
         <fetcher.Form
           className="space-y-4"

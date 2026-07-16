@@ -9,7 +9,7 @@ import {
   verifyRespondentToken,
 } from "@/lib/survey-respondent-token.server";
 import {
-  getSurveyByInternalId,
+  getActiveSurveyByPublicId,
   loadContactById,
   saveSurveyAnswer,
 } from "@/lib/survey-db.server";
@@ -65,12 +65,11 @@ async function handleSaveAnswer(request: Request) {
     return routeData({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const surveyIdNum = parseInt(surveyId, 10);
-  if (Number.isNaN(surveyIdNum)) {
-    return routeData({ error: "Invalid survey ID" }, { status: 400 });
-  }
-
-  const survey = await getSurveyByInternalId(surveyIdNum);
+  // The public survey page (app/routes/survey+/$surveyId.tsx) always sends the
+  // public slug (`survey.survey_id`, e.g. "e2e-survey-public") in this field,
+  // never the numeric internal id — mirror survey-complete's lookup so answers
+  // actually resolve to a survey instead of 400ing on every non-numeric slug.
+  const survey = await getActiveSurveyByPublicId(surveyId);
   if (!survey) {
     return routeData({ error: "Survey not found" }, { status: 404 });
   }
