@@ -264,6 +264,7 @@ const NumberRow = ({
           className="text-destructive hover:text-destructive/80"
           onClick={() => handleNumberRemoval(number.id)}
           disabled={isBusy}
+          aria-label={`Release ${number.phone_number ?? "this number"}`}
         >
           <MdClose />
         </Button>
@@ -301,6 +302,7 @@ const NumberRow = ({
                 variant={"ghost"}
                 className="rounded-full"
                 onClick={() => setIsEditingNumber(number.id)}
+                aria-label={`Edit caller ID for ${number.phone_number ?? "this number"}`}
               >
                 <Edit />
               </Button>
@@ -467,6 +469,7 @@ const IncomingActivitySelect = ({
           disabled={number.type === "caller_id"}
           defaultValue={number.inbound_action || ""}
           onChange={(e) => onChange(number.id, e.target.value)}
+          aria-label={`Incoming call handling for ${number.phone_number ?? "number"}`}
           aria-describedby={
             forwardingUnavailable ? forwardingDisabledReasonId : undefined
           }
@@ -522,6 +525,7 @@ const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: 
       className="w-full rounded border p-2"
       defaultValue={number?.inbound_audio || ""}
       onChange={(e) => onChange(number?.id, e.target.value)}
+      aria-label={`Voicemail message for ${number?.phone_number ?? "number"}`}
     >
       <option value="">Select a voice message</option>
       {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number | string; name: string }, index: number) => (

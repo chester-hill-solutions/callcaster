@@ -291,8 +291,8 @@ const WorkspaceSettings = () => {
         <h1 className="px-4 pt-2 text-2xl font-semibold tracking-tight">
           Phone numbers
         </h1>
-        <div className="flex flex-wrap gap-4 p-4">
-          <Panel className="flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
+        <div className="flex min-w-0 flex-wrap gap-4 p-4">
+          <Panel className="min-w-0 flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
             <NumbersTable
               phoneNumbers={phoneNumbers || []}
               users={users}
@@ -310,11 +310,11 @@ const WorkspaceSettings = () => {
               isBusy={updateFetcher.state !== "idle"}
             />
           </Panel>
-          <div className="flex flex-shrink-0 flex-grow basis-full flex-col gap-4 lg:basis-[calc(33.333%-1rem)]">
-            <Panel className="">
+          <div className="flex min-w-0 flex-shrink-0 flex-grow basis-full flex-col gap-4 lg:basis-[calc(33.333%-1rem)]">
+            <Panel className="min-w-0">
               <NumberCallerId />
             </Panel>
-            <Panel className="">
+            <Panel className="min-w-0">
               <NumberPurchase
                 fetcher={fetcher}
                 workspaceId={workspaceId ?? ""}

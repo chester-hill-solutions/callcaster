@@ -72,7 +72,10 @@ export default function TeamMember({
           <Sheet>
             {userRole !== MemberRole.Caller && memberRole !== "invited" && (
               <SheetTrigger asChild>
-                <Button className="h-fit rounded-full bg-transparent p-2">
+                <Button
+                  className="h-fit rounded-full bg-transparent p-2"
+                  aria-label={`Manage ${member.username ?? "team member"}`}
+                >
                   {theme === "dark" ? (
                     <GrUserSettings
                       size="16px"
@@ -93,7 +96,11 @@ export default function TeamMember({
               <Form method="POST">
                 <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
-              <Button className="h-fit rounded-full bg-transparent p-2" type="submit">
+              <Button
+                className="h-fit rounded-full bg-transparent p-2"
+                type="submit"
+                aria-label={`Cancel invite for ${member.username ?? "this member"}`}
+              >
                 {theme === "dark" ? (
                   <MdCancel
                     size="16px"

@@ -280,8 +280,15 @@ export default function ContactsPage() {
                     header: "Edit",
                     cell: ({ row }) => {
                       const id = row.original.id;
+                      const contactName = [row.original.firstname, row.original.surname]
+                        .filter(Boolean)
+                        .join(" ");
                       return (
-                        <Button variant="ghost" asChild>
+                        <Button
+                          variant="ghost"
+                          asChild
+                          aria-label={contactName ? `Edit ${contactName}` : "Edit contact"}
+                        >
                           <NavLink to={`./${id}`} relative="path">
                             <MdEdit />
                           </NavLink>

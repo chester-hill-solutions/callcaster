@@ -1,6 +1,6 @@
 export { action } from "./new.action.server";
 
-import { Form, Link, useActionData } from "react-router";
+import { Form, Link, useActionData, useOutletContext } from "react-router";
 import type { MetaFunction } from "react-router";
 import { useState } from "react";
 import {
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Text } from "@/components/ui/typography";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 
 export const meta: MetaFunction = () => [{ title: "New Campaign — CallCaster" }];
 
@@ -31,6 +32,13 @@ export default function CampaignsNew() {
   const isMessageEnabled = true;
   const isRobocallEnabled = true;
 
+  const { userRole } = useOutletContext<{ userRole?: string | null }>();
+  // Creating a campaign is gated to Admin+ server-side (new.action.server.ts).
+  // The nav entry point is already hidden for callers; this covers anyone who
+  // still lands here directly (bookmark, shared link, back button) so the
+  // write form isn't shown to a role that will always get a 403 on submit.
+  const canCreate = hasMinRole(userRole ?? undefined, MemberRole.Admin);
+
   const actionData = useActionData<{ error?: unknown }>();
   const defaultType = isLiveCallEnabled
     ? "live_call"
@@ -39,6 +47,28 @@ export default function CampaignsNew() {
       : "robocall";
   const [campaignType, setCampaignType] = useState(defaultType);
   const [nameMissing, setNameMissing] = useState(false);
+
+  if (!canCreate) {
+    return (
+      <section id="form" className={CREATION_SECTION_CLASS}>
+        <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
+          <BrandedCardTitle as="h1">Add Campaign</BrandedCardTitle>
+          <BrandedCardContent>
+            <Text variant="muted">
+              Contact your workspace admin or owner to create a campaign.
+            </Text>
+          </BrandedCardContent>
+          <BrandedCardActions>
+            <Button asChild variant="outline" className="w-full">
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </BrandedCardActions>
+        </BrandedCard>
+      </section>
+    );
+  }
 
   return (
     <section id="form" className={CREATION_SECTION_CLASS}>

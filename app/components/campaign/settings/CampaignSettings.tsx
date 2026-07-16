@@ -215,7 +215,7 @@ export const CampaignSettings = ({
     }
 
     if (confirmStatus === "archive") {
-      return "Are you sure you want to archive this campaign? It will be hidden from your campaigns list, and can't be undone.";
+      return "Are you sure you want to archive this campaign? It will be hidden from your campaigns list. You can restore it later from the Archived Campaigns page.";
     }
 
     return "";

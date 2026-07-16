@@ -39,7 +39,7 @@ export function QueueHeader({
                     </Button>
                 ) : !selectedAudience ? (
                     <Select onValueChange={(value) => onSelectedAudienceChange(Number(value))}>
-                        <SelectTrigger>
+                        <SelectTrigger aria-label="Select audience to add">
                             <SelectValue placeholder="Select Audience" />
                         </SelectTrigger>
                         <SelectContent>
