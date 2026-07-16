@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   useFetcher,
   useLoaderData,
@@ -331,6 +332,13 @@ export function useChatsPage() {
       if (!toNumber || messageFetcher.state !== "idle") return;
 
       const formData = new FormData(target);
+      // ChatInput only renders a hidden `contact_number` field for the
+      // "new number" composer flow (header search); replying inside an
+      // already-open thread has no such field in the DOM, so `toNumber`
+      // (route param or header state) must be set explicitly or the action
+      // receives no destination number at all and 500s before it can even
+      // attempt the send.
+      formData.set("contact_number", toNumber);
       formData.append("media", JSON.stringify(selectedImages));
       const body = (formData.get("body") as string) || "";
       // Resolve the sender the same way the action does, so the optimistic
@@ -391,6 +399,7 @@ export function useChatsPage() {
       return;
     }
 
+    toast.error(data.error);
     chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
     const bodyField = document.getElementById("body") as
       | HTMLTextAreaElement
