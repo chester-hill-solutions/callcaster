@@ -80,8 +80,15 @@ async function handleCampaignDuplicate(
 ) {
   const parsedData = JSON.parse(campaignData);
 
+  // Don't trust the client's (possibly stale/edited) draft for the script
+  // reference — read the source campaign's real script_id off the DB so the
+  // duplicate always points at a script that actually exists in this
+  // workspace. Null it out if the source has none.
+  const sourceCampaign = await findCampaignInWorkspace(workspace_id, selected_id);
+
   const campaign = await insertCampaignForWorkspace(workspace_id, {
     ...parsedData,
+    script_id: sourceCampaign?.script_id ?? null,
     live_questions: parsedData.live_questions ?? parsedData.questions ?? null,
   });
 

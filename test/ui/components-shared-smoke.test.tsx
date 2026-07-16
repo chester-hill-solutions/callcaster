@@ -192,13 +192,13 @@ describe("app/components/shared/QueryParamBanner.tsx", () => {
 });
 
 describe("app/components/shared/RouteErrorBoundary.tsx", () => {
-  test("shows the message from a thrown Error", async () => {
+  test("shows the message from a legit user-facing Error", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { RouteErrorBoundary } = await import(
       "@/components/shared/RouteErrorBoundary"
     );
     const Thrower = () => {
-      throw new Error("route render failed");
+      throw new Error("Campaign name is required.");
     };
     const router = createMemoryRouter(
       [
@@ -212,9 +212,40 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
     );
     render(<RouterProvider router={router} />);
     expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
-    expect(screen.getByText("route render failed")).toBeInTheDocument();
+    expect(screen.getByText("Campaign name is required.")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Reload Page" }),
+    ).toBeInTheDocument();
+  });
+
+  test("does not leak a raw/internal error message and shows a friendly fallback instead", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { RouteErrorBoundary } = await import(
+      "@/components/shared/RouteErrorBoundary"
+    );
+    const rawMessage =
+      'Failed query: insert into "campaign" ("workspace", "caller_id") values ($1, $2) - null value in column "script_id" violates not-null constraint';
+    const Thrower = () => {
+      throw new Error(rawMessage);
+    };
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/",
+          element: <Thrower />,
+          errorElement: <RouteErrorBoundary />,
+        },
+      ],
+      { initialEntries: ["/"] },
+    );
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(screen.queryByText(rawMessage)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Failed query:/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Something went wrong. Please try again or contact support if the problem persists.",
+      ),
     ).toBeInTheDocument();
   });
 
