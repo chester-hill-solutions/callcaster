@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { listWorkspaceAudiencesApi } from "@/lib/platform-data.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -14,7 +14,7 @@ export const loader = defineLoader({
 
     const { headers, workspaceId, userRole } = access.ctx;
 
-    const workspaceData = await getWorkspaceById(workspaceId);
+    const workspaceData = await getWorkspaceForClient(workspaceId);
 
     if (!workspaceData) {
       return routeData(

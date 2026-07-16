@@ -103,43 +103,24 @@ export default function CampaignScreen() {
           joinDisabled={joinDisabled}
         />
       </div>
-      {hasAccess && isCampaignParentRoute && (
-        <Suspense fallback={<LoadingResults />}>
-          <Await resolve={results} errorElement={<ErrorLoadingResults />}>
-            {(resolvedResults) => {
-              if (!campaignData) {
-                return <ErrorLoadingResults />;
-              }
-              return (
-                <Suspense fallback={<LoadingResults />}>
-                  <Await
-                    resolve={ivrResponses}
-                    errorElement={<ErrorLoadingResults />}
-                  >
-                    {(resolvedIvrResponses) => {
-                      const ivr = resolvedIvrResponses ?? [];
-                      // An IVR campaign can have recorded keypresses before any
-                      // terminal status callback lands a disposition, so the
-                      // empty state has to consider both sources.
-                      return resolvedResults.length < 1 && ivr.length < 1 ? (
-                        <NoResultsYet />
-                      ) : (
-                        <ResultsDisplay
-                          results={resolvedResults}
-                          campaign={campaignData}
-                          hasAccess={hasAccess}
-                          queueCounts={safeQueueCounts}
-                          ivrResponses={ivr}
-                        />
-                      );
-                    }}
-                  </Await>
-                </Suspense>
-              );
-            }}
-          </Await>
-        </Suspense>
-      )}
+      {hasAccess &&
+        isCampaignParentRoute &&
+        (!campaignData ? (
+          <ErrorLoadingResults />
+        ) : results.length < 1 && ivrResponses.length < 1 ? (
+          // An IVR campaign can have recorded keypresses before any terminal
+          // status callback lands a disposition, so the empty state has to
+          // consider both sources.
+          <NoResultsYet />
+        ) : (
+          <ResultsDisplay
+            results={results}
+            campaign={campaignData}
+            hasAccess={hasAccess}
+            queueCounts={safeQueueCounts}
+            ivrResponses={ivrResponses}
+          />
+        ))}
       {isCampaignParentRoute &&
         !hasAccess &&
         campaignData &&

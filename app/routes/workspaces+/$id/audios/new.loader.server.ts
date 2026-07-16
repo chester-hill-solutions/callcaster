@@ -1,6 +1,6 @@
 import { data as routeData } from "react-router";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -11,7 +11,7 @@ export const loader = defineLoader({
     if (!result.ok) return result.response;
     const { headers, workspaceId } = result.ctx;
 
-    const workspaceData = await getWorkspaceById(workspaceId);
+    const workspaceData = await getWorkspaceForClient(workspaceId);
     if (!workspaceData) {
       return routeData({ workspace: null, error: "Workspace not found" }, { headers, status: 404 });
     }

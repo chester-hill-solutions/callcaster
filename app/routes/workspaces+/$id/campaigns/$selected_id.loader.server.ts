@@ -44,23 +44,31 @@ export const loader = defineLoader({
       campaignId: selected_id,
     })) as LiveCampaign | MessageCampaign | IVRCampaign | null;
 
-    const resultsPromise = fetchBasicResults({
-      workspaceId: workspace_id,
-      campaignId: selected_id,
-    }) as unknown as {
-      disposition: string;
-      count: number;
-      average_call_duration: string;
-      average_wait_time: string;
-      expected_total: number;
-    }[];
-
-    const ivrResponsesPromise = campaignTypeCollectsIvrResponses(campaignRow.type)
-      ? fetchIvrResponseResults({
-          workspaceId: workspace_id,
-          campaignId: selected_id,
-        })
-      : Promise.resolve([]);
+    // Awaited, NOT deferred. These were streamed to the client as deferred
+    // promises and consumed via <Await>, but that hung the page: for a real
+    // browser (bots take the `await body.allReady` path in entry.server and are
+    // unaffected) the shell flushed with the fallback and the turbo-stream was
+    // never closed, so the client's decoded promise could never settle —
+    // React #419, then "Loading results..." forever. A never-settling promise
+    // is not a rejecting one, so <Await errorElement> never fired either.
+    //
+    // The deferral bought ~25ms (get_campaign_stats) against a fully-resolved
+    // document of ~150ms, so awaiting is strictly better than a broken page.
+    // Re-defer only with a browser test that asserts the content renders AFTER
+    // hydration — the previous regression test only asserted the stream closed,
+    // which is why this survived.
+    const [results, ivrResponses] = await Promise.all([
+      fetchBasicResults({
+        workspaceId: workspace_id,
+        campaignId: selected_id,
+      }),
+      campaignTypeCollectsIvrResponses(campaignRow.type)
+        ? fetchIvrResponseResults({
+            workspaceId: workspace_id,
+            campaignId: selected_id,
+          })
+        : Promise.resolve([]),
+    ]);
 
     const readiness = getCampaignReadiness(campaignRow, campaignDetails, {
       queueCount: queueCounts.queuedCount ?? queueCounts.fullCount,
@@ -81,8 +89,8 @@ export const loader = defineLoader({
       ),
       campaignDetails,
       user: user,
-      results: resultsPromise || [], // Deferred loading
-      ivrResponses: ivrResponsesPromise,
+      results,
+      ivrResponses,
       queueCounts,
       readiness,
       joinDisabled,

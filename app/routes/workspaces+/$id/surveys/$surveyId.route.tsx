@@ -73,18 +73,21 @@ type LoaderData = {
   recentResponses: SurveyResponse[];
   workspaceId: string;
   userRole: unknown;
+  /** Request origin, from the loader — see the note on `origin` there. */
+  origin: string;
 };
 
 export default function SurveyDetailPage() {
   const outlet = useOutlet();
   const parentContext = useOutletContext<ContextType>();
-  const { survey, recentResponses, workspaceId, userRole } = useLoaderData<LoaderData>();
+  const { survey, recentResponses, workspaceId, userRole, origin } =
+    useLoaderData<LoaderData>();
 
   if (outlet) {
     return <Outlet context={parentContext} />;
   }
 
-  const surveyUrl = `${window.location.origin}/survey/${survey.survey_id}`;
+  const surveyUrl = `${origin}/survey/${survey.survey_id}`;
 
   return (
     <PageShell

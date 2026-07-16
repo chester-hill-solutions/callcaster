@@ -27,8 +27,8 @@ export const CampaignSettingsQueue = ({
 
   return (
     <div className="rounded-md border">
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="space-y-2">
+      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 space-y-2">
           <div>
             <h2 className="font-medium">Queue Readiness</h2>
             <p className="text-sm text-muted-foreground">
@@ -39,7 +39,7 @@ export const CampaignSettingsQueue = ({
                   : "Add contacts before starting this campaign."}
             </p>
           </div>
-          <div className="flex items-center divide-x">
+          <div className="flex flex-wrap items-center gap-y-2 divide-x">
             <div className="pr-4">
               <span className="text-xs text-muted-foreground">Ready to send</span>
               <p className="text-sm font-medium">{queued}</p>
@@ -54,7 +54,7 @@ export const CampaignSettingsQueue = ({
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" asChild>
           <NavLink to="../queue">Manage Queue</NavLink>
         </Button>
       </div>

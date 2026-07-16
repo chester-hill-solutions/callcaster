@@ -215,4 +215,32 @@ describe("call-screen.server", () => {
     expect(result.queueCount).toBe(10);
     expect(result.completedCount).toBe(4);
   });
+
+  test("getCallScreenData defaults null disposition_options to an empty array", async () => {
+    tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockResolvedValue({
+      id: 1,
+      script: null,
+      disposition_options: null,
+    });
+    tenantDbMocks.outreachFindMany.mockResolvedValue([]);
+    tenantDbMocks.callFindMany.mockResolvedValue([]);
+
+    const result = await getCallScreenData("1", "ws-1", "user-1");
+    expect(result.campaignDetails.disposition_options).toEqual([]);
+    // The call screen maps over this directly — it must never be null.
+    expect(() => result.campaignDetails.disposition_options.map((o) => o)).not.toThrow();
+  });
+
+  test("getCallScreenData narrows non-string disposition_options entries", async () => {
+    tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockResolvedValue({
+      id: 1,
+      script: null,
+      disposition_options: ["answered", 7, null, "busy"],
+    });
+    tenantDbMocks.outreachFindMany.mockResolvedValue([]);
+    tenantDbMocks.callFindMany.mockResolvedValue([]);
+
+    const result = await getCallScreenData("1", "ws-1", "user-1");
+    expect(result.campaignDetails.disposition_options).toEqual(["answered", "busy"]);
+  });
 });

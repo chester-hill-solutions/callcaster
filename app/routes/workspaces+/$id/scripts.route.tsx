@@ -169,6 +169,7 @@ export default function WorkspaceScripts() {
                   <Button
                     variant="ghost"
                     type="button"
+                    aria-label={`Download ${script.name}`}
                     disabled={downloadFetcher.state !== "idle"}
                     onClick={() => {
                       downloadFetcher.submit(
@@ -177,7 +178,7 @@ export default function WorkspaceScripts() {
                       );
                     }}
                   >
-                    <MdDownload />
+                    <MdDownload aria-hidden />
                   </Button>
                 );
               },
@@ -188,8 +189,12 @@ export default function WorkspaceScripts() {
                 const script = row.original as ScriptWithParsedSteps;
                 return (
                   <Button variant="ghost" asChild>
-                    <NavLink to={`./${script.id}`} relative="path">
-                      <MdEdit />
+                    <NavLink
+                      to={`./${script.id}`}
+                      relative="path"
+                      aria-label={`Edit ${script.name}`}
+                    >
+                      <MdEdit aria-hidden />
                     </NavLink>
                   </Button>
                 );

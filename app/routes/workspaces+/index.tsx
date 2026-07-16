@@ -222,6 +222,16 @@ export default function Workspaces() {
   const actionError = actionData?.error ?? null;
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  /**
+   * @effect Reopen the create-workspace dialog when the action comes back with an
+   *   error, so the failure is shown against the form the user filled in.
+   * @effect-deps actionError (the action's error, per submission)
+   * @effect-side-effects none (local setState)
+   * @effect-why-not-loader The error is already action data — this only drives
+   *   local dialog visibility. It is not derived state (`open={dialogOpen ||
+   *   !!actionError}`) because that would pin the dialog open for as long as the
+   *   error stays in actionData, leaving the user unable to dismiss it.
+   */
   useEffect(() => {
     if (actionError) {
       setDialogOpen(true);

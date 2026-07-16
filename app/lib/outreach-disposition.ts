@@ -25,6 +25,17 @@ export function canTransitionOutreachDisposition(
   return !(TERMINAL_OUTREACH_DISPOSITIONS.has(c) && c !== n);
 }
 
+/**
+ * `campaign.disposition_options` is a nullable jsonb column (`Json`), so it can be
+ * null, a scalar, or an array of anything. Narrow it to the string list the call
+ * screen expects instead of casting the `Json` away.
+ */
+export function normalizeDispositionOptions(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((option): option is string => typeof option === "string")
+    : [];
+}
+
 export function shouldUpdateOutreachDisposition(args: {
   currentDisposition: string | null | undefined;
   nextDisposition: string | null | undefined;

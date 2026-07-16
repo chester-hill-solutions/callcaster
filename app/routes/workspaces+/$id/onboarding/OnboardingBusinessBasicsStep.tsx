@@ -1,11 +1,17 @@
+import { useState } from "react";
 import { Form } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Tables } from "@/lib/db-types";
+import {
+  businessProfileFieldRequiredMessage,
+  type BusinessProfileFieldKey,
+} from "@/lib/messaging-onboarding/predicates";
 import { OPERATING_COUNTRY_OPTIONS } from "./constants";
 import type { OnboardingPendingActions, OnboardingStepProps } from "./types";
 
@@ -27,6 +33,39 @@ export function OnboardingBusinessBasicsStep({
   emergencyEligibleNumbers,
 }: OnboardingBusinessBasicsStepProps) {
   const { isSavingBusinessProfile, isReviewingEmergencyVoice } = pending;
+  const [missingFields, setMissingFields] = useState<
+    Partial<Record<BusinessProfileFieldKey, boolean>>
+  >({});
+
+  const markMissing = (field: BusinessProfileFieldKey, missing: boolean) => {
+    setMissingFields((current) =>
+      current[field] === missing ? current : { ...current, [field]: missing },
+    );
+  };
+
+  /**
+   * Shared wiring for the baseline-required fields: native constraint validation
+   * blocks the submit, and `onInvalid` turns the browser's bubble into the
+   * repo's inline FormField error. The action re-checks server-side regardless.
+   */
+  const requiredFieldProps = <T extends HTMLInputElement | HTMLTextAreaElement>(
+    field: BusinessProfileFieldKey,
+  ) => ({
+    required: true,
+    "aria-invalid": missingFields[field] || undefined,
+    onInvalid: (event: React.FormEvent<T>) => {
+      event.preventDefault();
+      markMissing(field, true);
+    },
+    onChange: (event: React.ChangeEvent<T>) => {
+      if (event.target.value.trim()) {
+        markMissing(field, false);
+      }
+    },
+  });
+
+  const requiredFieldError = (field: BusinessProfileFieldKey) =>
+    missingFields[field] ? businessProfileFieldRequiredMessage(field) : undefined;
 
   return (
     <Card>
@@ -51,19 +90,22 @@ export function OnboardingBusinessBasicsStep({
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="legalBusinessName">Legal business name</Label>
-                <p className="text-xs text-muted-foreground">
-                  Use the registered company name, not an internal project name or nickname.
-                </p>
+              <FormField
+                htmlFor="legalBusinessName"
+                label="Legal business name"
+                required
+                description="Use the registered company name, not an internal project name or nickname."
+                error={requiredFieldError("legalBusinessName")}
+              >
                 <Input
                   id="legalBusinessName"
                   name="legalBusinessName"
                   placeholder="Acme Health Services LLC"
                   defaultValue={onboarding.businessProfile.legalBusinessName}
                   disabled={isReadOnly}
+                  {...requiredFieldProps<HTMLInputElement>("legalBusinessName")}
                 />
-              </div>
+              </FormField>
               <div className="space-y-2">
                 <Label htmlFor="businessType">Business type</Label>
                 <p className="text-xs text-muted-foreground">
@@ -97,11 +139,13 @@ export function OnboardingBusinessBasicsStep({
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="websiteUrl">Website URL</Label>
-                <p className="text-xs text-muted-foreground">
-                  Link the public site that shows the business, brand, or program customers will recognize.
-                </p>
+              <FormField
+                htmlFor="websiteUrl"
+                label="Website URL"
+                required
+                description="Link the public site that shows the business, brand, or program customers will recognize."
+                error={requiredFieldError("websiteUrl")}
+              >
                 <Input
                   id="websiteUrl"
                   name="websiteUrl"
@@ -109,8 +153,9 @@ export function OnboardingBusinessBasicsStep({
                   placeholder="https://www.acmehealth.com"
                   defaultValue={onboarding.businessProfile.websiteUrl}
                   disabled={isReadOnly}
+                  {...requiredFieldProps<HTMLInputElement>("websiteUrl")}
                 />
-              </div>
+              </FormField>
               <div className="space-y-2">
                 <Label htmlFor="privacyPolicyUrl">Privacy policy URL</Label>
                 <p className="text-xs text-muted-foreground">
@@ -177,19 +222,23 @@ export function OnboardingBusinessBasicsStep({
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="useCaseSummary">Use case summary</Label>
-                <p className="text-xs text-muted-foreground">
-                  Summarize the program in 2-4 sentences. Mention who receives the messages and why.
-                </p>
+              <FormField
+                className="md:col-span-2"
+                htmlFor="useCaseSummary"
+                label="Use case summary"
+                required
+                description="Summarize the program in 2-4 sentences. Mention who receives the messages and why."
+                error={requiredFieldError("useCaseSummary")}
+              >
                 <Textarea
                   id="useCaseSummary"
                   name="useCaseSummary"
                   placeholder="We send appointment reminders and follow-up confirmations to patients who request updates during scheduling."
                   defaultValue={onboarding.businessProfile.useCaseSummary}
                   disabled={isReadOnly}
+                  {...requiredFieldProps<HTMLTextAreaElement>("useCaseSummary")}
                 />
-              </div>
+              </FormField>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="optInWorkflow">Opt-in workflow</Label>
                 <p className="text-xs text-muted-foreground">
@@ -242,19 +291,23 @@ export function OnboardingBusinessBasicsStep({
                   disabled={isReadOnly}
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="sampleMessages">Sample messages</Label>
-                <p className="text-xs text-muted-foreground">
-                  Enter one real example per line. Include the actual tone and content users will receive.
-                </p>
+              <FormField
+                className="md:col-span-2"
+                htmlFor="sampleMessages"
+                label="Sample messages"
+                required
+                description="Enter one real example per line. Include the actual tone and content users will receive."
+                error={requiredFieldError("sampleMessages")}
+              >
                 <Textarea
                   id="sampleMessages"
                   name="sampleMessages"
                   placeholder={`Acme Health: Your appointment with Dr. Lee is tomorrow at 9:30 AM. Reply C to confirm or STOP to opt out.\nAcme Health: Your prescription is ready for pickup at our Market Street location.`}
                   defaultValue={onboarding.businessProfile.sampleMessages.join("\n")}
                   disabled={isReadOnly}
+                  {...requiredFieldProps<HTMLTextAreaElement>("sampleMessages")}
                 />
-              </div>
+              </FormField>
             </div>
           </div>
 

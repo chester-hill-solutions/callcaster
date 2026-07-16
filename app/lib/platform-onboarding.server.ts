@@ -21,6 +21,10 @@ import {
   type OnboardingActionData,
   type OnboardingActionName,
 } from "@/lib/onboarding-actions.server";
+import {
+  businessProfileFieldRequiredMessage,
+  findMissingBusinessProfileFields,
+} from "@/lib/messaging-onboarding/predicates";
 import { reviewWorkspaceEmergencyVoice } from "@/lib/onboarding/emergency-voice.server";
 import { persistWorkspaceOnboardingState } from "@/lib/onboarding/onboarding-persist.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
@@ -396,6 +400,22 @@ async function handleSaveBusinessProfile(
   const current = await getWorkspaceMessagingOnboardingState({workspaceId: ctx.workspaceId,
   });
   const businessProfile = buildBusinessProfile(formData, current.businessProfile);
+
+  // Gate the step server-side: `buildBusinessProfile` overwrites the core fields
+  // from the submitted form unconditionally, so this validates exactly the state
+  // that would be persisted. Returning a payload (not a redirect) is what keeps
+  // the wizard on Business basics instead of advancing to path_selection.
+  const missingFields = findMissingBusinessProfileFields(businessProfile);
+  if (missingFields.length > 0) {
+    return {
+      kind: "payload",
+      data: {
+        error: missingFields.map(businessProfileFieldRequiredMessage).join(" "),
+      },
+      status: 400,
+    };
+  }
+
   const addressStreet = String(formData.get("addressStreet") ?? formData.get("address_street") ?? "");
   const addressCity = String(formData.get("addressCity") ?? formData.get("address_city") ?? "");
   const addressRegion = String(formData.get("addressRegion") ?? formData.get("address_region") ?? "");

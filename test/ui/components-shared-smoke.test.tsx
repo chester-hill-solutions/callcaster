@@ -243,6 +243,20 @@ describe("app/components/shared/SaveBar.tsx", () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
+  // Asserts the token classes rather than computed colors: jsdom does not load
+  // Tailwind, so the class list is the only observable signal that the bar is
+  // themed via tokens (and therefore dark-mode safe) instead of raw literals.
+  test("uses design tokens rather than hardcoded colors", async () => {
+    const { SaveBar } = await import("@/components/shared/SaveBar");
+    const { container } = render(<SaveBar isChanged onSave={vi.fn()} />);
+    const bar = container.firstElementChild as HTMLElement;
+    expect(bar).toHaveClass("bg-background");
+    expect(bar.className).not.toMatch(/bg-white/);
+
+    const save = screen.getByRole("button", { name: "Save Changes" });
+    expect(save.className).not.toMatch(/bg-red-|text-white/);
+  });
+
   test("saves via keyboard shortcut and hides when unchanged", async () => {
     const { SaveBar } = await import("@/components/shared/SaveBar");
     const onSave = vi.fn();
@@ -324,6 +338,26 @@ describe("app/components/shared/TablePagination.tsx", () => {
       <TablePagination currentPage={1} totalPages={1} onPageChange={onPageChange} />,
     );
     fireEvent.click(screen.getByLabelText("Go to previous page"));
+    fireEvent.click(screen.getByLabelText("Go to next page"));
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  test("disables next when there are no results", async () => {
+    const TablePagination = (await import("@/components/shared/TablePagination"))
+      .default;
+    const onPageChange = vi.fn();
+    render(
+      <TablePagination
+        currentPage={1}
+        totalPages={0}
+        pageSize={25}
+        totalCount={0}
+        showSummary
+        onPageChange={onPageChange}
+      />,
+    );
+    expect(screen.getByLabelText("Go to next page")).toBeDisabled();
+    expect(screen.getByLabelText("Go to previous page")).toBeDisabled();
     fireEvent.click(screen.getByLabelText("Go to next page"));
     expect(onPageChange).not.toHaveBeenCalled();
   });

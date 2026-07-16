@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger.server";
 import { fetchCampaignWithScriptForWorkspace } from "@/lib/campaign-ivr.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { getUserById } from "@/lib/workspace-members-db.server";
+import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
 
 export async function getCallScreenData(
   campaignId: string,
@@ -82,7 +83,10 @@ export async function getCallScreenData(
   return {
     workspaceData: workspaceData.data,
     campaign,
-    campaignDetails: campaign,
+    campaignDetails: {
+      ...campaign,
+      disposition_options: normalizeDispositionOptions(campaign.disposition_options),
+    },
     audiences: audiences.data,
     queueCount,
     completedCount,

@@ -92,10 +92,36 @@ function parseSchedule(schedule: Campaign["schedule"]): Record<DayName, Schedule
   }
 }
 
+/**
+ * SMS campaigns dispatch messages rather than dial, so the same weekly schedule
+ * is presented as a "send window". The stored field is `campaign.schedule`
+ * either way — only the wording changes.
+ */
+const SCHEDULE_COPY = {
+  call: {
+    label: "Calling Hours",
+    show: "Set Calling Hours",
+    hide: "Hide Calling Hours",
+    apply: "Apply Calling Hours",
+    empty: "No calling hours set",
+    endTooltip: "The latest time to begin dialing.",
+  },
+  message: {
+    label: "Send Window",
+    show: "Set Send Window",
+    hide: "Hide Send Window",
+    apply: "Apply Send Window",
+    empty: "No send window set",
+    endTooltip: "The latest time to send messages.",
+  },
+} as const;
+
 export default function SelectDates({
   campaignData,
   handleInputChange,
 }: SelectDatesProps) {
+  const copy =
+    campaignData.type === "message" ? SCHEDULE_COPY.message : SCHEDULE_COPY.call;
   const [showSchedule, setShowSchedule] = useState(false);
   const [currentSchedule, setCurrentSchedule] = useState<Record<DayName, ScheduleDay>>(() =>
     parseSchedule(campaignData.schedule),
@@ -253,7 +279,7 @@ export default function SelectDates({
           : "All day",
       }));
 
-    if (!activeDays?.length) return "No calling hours set";
+    if (!activeDays?.length) return copy.empty;
     if (activeDays.length === 7 && activeDays.every((day) => day.time === "All day"))
       return "24/7";
 
@@ -302,10 +328,10 @@ export default function SelectDates({
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="text-gray-500" size={20} />
-            <Label className="font-semibold">Calling Hours</Label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Clock className="shrink-0 text-muted-foreground" size={20} />
+            <Label className="font-semibold">{copy.label}</Label>
           </div>
           <Button
             variant="outline"
@@ -315,11 +341,11 @@ export default function SelectDates({
             }}
             size="sm"
           >
-            {showSchedule ? "Hide Calling Hours" : "Set Calling Hours"}
+            {showSchedule ? copy.hide : copy.show}
           </Button>
         </div>
 
-        <div className="rounded-md bg-gray-100 p-4">
+        <div className="rounded-md bg-muted p-4">
           {getScheduleSummary()}
         </div>
 
@@ -351,9 +377,10 @@ export default function SelectDates({
               schedule={scheduleForDisplay}
               handleCheckboxChange={handleCheckboxChange}
               handleTimeChange={handleTimeChange}
+              endTooltip={copy.endTooltip}
             />
             <div className="flex justify-end">
-              <Button onClick={handleSave}>Apply Calling Hours</Button>
+              <Button onClick={handleSave}>{copy.apply}</Button>
             </div>
           </div>
         )}

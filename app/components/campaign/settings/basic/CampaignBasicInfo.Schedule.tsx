@@ -23,10 +23,17 @@ type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'sat
 type Schedule = Record<DayName, Day>;
 
 
-const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange }: {
+const WeeklyScheduleTable = ({
+  schedule,
+  handleCheckboxChange,
+  handleTimeChange,
+  endTooltip = "The latest time to begin dialing.",
+}: {
   schedule: Schedule,
   handleCheckboxChange: (day: DayName) => void;
   handleTimeChange: (day: DayName, field: "start" | "end", localValue: string, index: number) => void;
+  /** Channel-specific hint for the End column ("dialing" vs "sending"). */
+  endTooltip?: string;
 }) => {
   return (
     <Table>
@@ -35,7 +42,7 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
           <TableHead>Day</TableHead>
           <TableHead>Active</TableHead>
           <TableHead>Start</TableHead>
-          <TableHead>End{" "}<InfoPopover tooltip="The latest time to begin dialing." /></TableHead>
+          <TableHead>End{" "}<InfoPopover tooltip={endTooltip} /></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

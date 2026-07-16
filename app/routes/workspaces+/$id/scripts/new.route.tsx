@@ -74,7 +74,7 @@ export default function NewScript() {
         </Text>
       ) : null}
       <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
-        <BrandedCardTitle>Add Script</BrandedCardTitle>
+        <BrandedCardTitle as="h1">Add Script</BrandedCardTitle>
         <BrandedCardContent>
           <Form
             method="POST"

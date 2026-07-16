@@ -7,7 +7,7 @@ import { defineLoader } from "@/lib/handler.server";
 export const loader = defineLoader({
   auth: workspaceRouteAuth,
   sideEffects: ["db-read"],
-  handler: async ({ params, auth }) => {
+  handler: async ({ params, auth, url }) => {
     const { surveyId } = params;
     const { user, workspaceId, userRole } = auth;
 
@@ -31,6 +31,10 @@ export const loader = defineLoader({
       workspaceId,
       user,
       userRole,
+      // The public survey link is built from this. It must come from the
+      // request, not `window.location` — reading window during render crashed
+      // SSR outright (ReferenceError: window is not defined -> 500).
+      origin: url.origin,
     });
   },
 });

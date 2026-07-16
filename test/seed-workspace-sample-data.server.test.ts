@@ -92,6 +92,11 @@ describe("app/lib/seed/seed-workspace-sample-data.server.ts", () => {
 });
 
 describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data seeding", () => {
+  // createNewWorkspace rejects non-uuid auth user ids (legacy nanoid rows cannot be
+  // mirrored into public.user / cast for the create_new_workspace RPC), so this
+  // fixture must be a real uuid like Better Auth's generateId=crypto.randomUUID().
+  const AUTH_USER_ID = "3f8b1c2a-5d4e-4f6a-9b7c-8e1d2a3b4c5d";
+
   const workspaceDbMocks = vi.hoisted(() => ({
     seedWorkspaceSampleData: vi.fn(),
   }));
@@ -189,7 +194,7 @@ describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data 
     const mod = await import("../app/lib/database/workspace.server");
     const result = await mod.createNewWorkspace({
       workspaceName: "W",
-      user_id: "u1",
+      user_id: AUTH_USER_ID,
     });
 
     expect(result.data).toBe("w_new");
@@ -197,7 +202,7 @@ describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data 
     expect(result.provisioningWarning).toContain("Sample data seeding failed");
     expect(workspaceDbMocks.seedWorkspaceSampleData).toHaveBeenCalledWith(
       "w_new",
-      "u1",
+      AUTH_USER_ID,
     );
   });
 
@@ -210,7 +215,7 @@ describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data 
     const mod = await import("../app/lib/database/workspace.server");
     const result = await mod.createNewWorkspace({
       workspaceName: "W",
-      user_id: "u1",
+      user_id: AUTH_USER_ID,
     });
 
     expect(result.data).toBe("w_new");

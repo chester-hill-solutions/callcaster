@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**98** documented / **98** total effects (0 grandfathered, ratcheting to 0).
+**100** documented / **100** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -21,6 +21,7 @@
 | `app/components/file-assets/AudioRecorder.tsx` | Tick the visible elapsed timer roughly 4x/second while a take is | phase (starts the interval on 'recording'; any other phase | timer (setInterval), cleared on phase change/unmount | Wall-clock elapsed time is live client timer state, |
 | `app/components/file-assets/AudioRecorder.tsx` | Release the microphone, audio graph, rAF loop and object URL when the | releaseAll (stable callback composed of stable callbacks; runs | dom (MediaStreamTrack.stop, AudioContext.close, | Imperative teardown of browser media hardware handles; |
 | `app/components/shared/SaveBar.tsx` | Wire a global Cmd/Ctrl+S keyboard shortcut to trigger onSave while there are unsaved changes. | isChanged, isSaving, onSave — the handler must see current values to guard the save and avoid double-submits. | dom (document keydown listener; removed on cleanup/re-run) | A global keyboard shortcut requires a document-level event listener; there's no loader/fetcher equivalent for DOM key events. |
+| `app/components/shared/mode-toggle.tsx` | Flag that we are past hydration so the resolved-theme icon can render. | none (mount only) | none (local setState) | The theme comes from localStorage/`prefers-color-scheme`, |
 | `app/components/sms-ui/ChatInput.tsx` | KEEP: align the controlled From selection with available sender | initialFrom, workspaceNumbers (available sender option values) | setSelectedFrom only | selectedFrom is intentional user-controlled state; |
 | `app/components/sms-ui/ChatInput.tsx` | After a scheduled-send submission completes, clear the schedule | messageFetcher.data, messageFetcher.state (tracks the | setSendLater, setSendAtLocal only | Schedule UI state is client-controlled; we only |
 | `app/hooks/agent/useAgentStatus.ts` | Load the agent's current status on mount and send a heartbeat POST every 30s while mounted. | workspaceId, userId (guards + re-arms the heartbeat when either changes), refreshStatus | timer (setInterval heartbeat) + fetch (initial refreshStatus() and each heartbeat POST); interval cleared on unmount/dep change | The recurring heartbeat is live client-only polling a loader can't express; |
@@ -107,3 +108,4 @@
 | `app/hooks/utils/useUnsavedChangesGuard.ts` | Warn on tab close/refresh via beforeunload while there are unsaved changes. | isChanged (only subscribes while there's something to lose) | dom (window 'beforeunload' listener; removed on cleanup/when isChanged flips) | Not data fetching — beforeunload is a browser-native tab-close guard that |
 | `app/hooks/workspace/useApiKeys.ts` | CANDIDATE-REMOVE Fetches from the API keys resource route (external system) on mount | workspaceId, hasAccess, initialKeys.length. `listFetcher` is intentionally omitted | fetch (listFetcher.load against /api/workspace-api-keys) | Fallback fetch for data the route loader is expected to provide — if the |
 | `app/routes/docs.tsx` | Dynamically import and imperatively mount the Scalar API-reference widget into containerRef for the active spec. | config.url — remounts the widget against the newly selected spec (public vs. complete) when it changes. | dom (imperative third-party widget mount) + dynamic import; instance destroyed on cleanup/re-run. | Scalar's `createApiReference` is an imperative DOM-mounting API from a lazily-loaded client bundle, not data a loader could hand to a component tree. |
+| `app/routes/workspaces+/index.tsx` | Reopen the create-workspace dialog when the action comes back with an | actionError (the action's error, per submission) | none (local setState) | The error is already action data — this only drives |

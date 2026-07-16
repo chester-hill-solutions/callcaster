@@ -2,7 +2,7 @@ import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { listWorkspaceScriptsApi } from "@/lib/platform-data.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { Json , Database } from "@/lib/db-types";
 import type { User } from "@/lib/types";
@@ -55,7 +55,7 @@ export const loader = defineLoader({
     }
 
     const roleResult = await getUserRole({user: user as User, workspaceId: workspaceId as string });
-    const workspace = await getWorkspaceById(workspaceId);
+    const workspace = await getWorkspaceForClient(workspaceId);
     const scriptsResult = await listWorkspaceScriptsApi(workspaceId);
 
     if (!scriptsResult.ok || !workspace) {

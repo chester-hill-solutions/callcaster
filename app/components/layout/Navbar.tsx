@@ -72,11 +72,25 @@ const UserDropdownMenu = ({
         <Button
           data-testid="navbar-user-menu"
           variant="outline"
-          className="relative border border-border bg-background/90 transition-colors duration-150 hover:border-foreground hover:bg-accent dark:text-secondary-foreground dark:hover:bg-accent"
+          aria-label={
+            user.workspace_invite.length > 0
+              ? `Account menu, ${user.workspace_invite.length} pending invitation${
+                  user.workspace_invite.length === 1 ? "" : "s"
+                }`
+              : "Account menu"
+          }
+          // The navbar surface stays pale brand-blue in both themes, so this
+          // control cannot follow bg-background/foreground the way the rest of
+          // the app does — dark:text-secondary-foreground put near-black text
+          // on a near-black button. Mirror ModeToggle, its neighbour.
+          className="relative border border-transparent bg-white/70 text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white dark:bg-black/70 dark:text-brand-secondary dark:hover:bg-black"
         >
-          <UserIcon className="h-5 w-5" />
+          <UserIcon className="h-5 w-5" aria-hidden />
           {user.workspace_invite.length > 0 && (
-            <div className="text-dd absolute -right-1 -top-2 h-5 w-5 items-center rounded-full bg-primary font-Zilla-Slab text-white">
+            <div
+              aria-hidden
+              className="absolute -right-1 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary font-Zilla-Slab text-xs text-primary-foreground"
+            >
               {user.workspace_invite.length}
             </div>
           )}

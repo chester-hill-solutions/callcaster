@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router";
-import { noop, SmokeRouter, DataSmokeRouter } from "./_helpers/component-smoke";
+import { SmokeRouter, DataSmokeRouter } from "./_helpers/component-smoke";
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ setTheme: vi.fn(), theme: "light", resolvedTheme: "light" }),
@@ -250,18 +250,43 @@ describe("app/components/layout/Navbar.tsx", () => {
 describe("app/components/layout/Navbar.MobileMenu.tsx", () => {
   test("mobile menu toggles", async () => {
     const { MobileMenu } = await import("@/components/layout/Navbar.MobileMenu");
-    render(
-      <SmokeRouter>
-        <MobileMenu
-          isSignedIn
-          user={{ id: "u1", username: "user", workspace_invite: [] } as never}
-          handleSignOut={async () => ({ success: null, error: null })}
-          onClose={noop}
-        />
-      </SmokeRouter>,
-    );
-    const menuBtn = screen.getAllByRole("button")[0];
-    fireEvent.click(menuBtn);
+
+    // MobileMenu is a controlled Sheet: it renders nothing until `open`, and asks
+    // its owner to close via `onOpenChange`. Drive it the way Navbar.tsx does.
+    function Harness() {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <SmokeRouter>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open navigation menu
+          </button>
+          <MobileMenu
+            open={open}
+            onOpenChange={setOpen}
+            isSignedIn
+            user={
+              {
+                id: "u1",
+                first_name: "ada",
+                username: "user",
+                workspace_invite: [],
+              } as never
+            }
+            handleSignOut={async () => ({ success: null, error: null })}
+          />
+        </SmokeRouter>
+      );
+    }
+    render(<Harness />);
+
+    expect(screen.queryByRole("link", { name: "Workspaces" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation menu" }));
+    expect(screen.getByRole("link", { name: "Workspaces" })).toBeInTheDocument();
+
+    // Picking a destination has to close the sheet, or it covers the page it navigated to.
+    fireEvent.click(screen.getByRole("link", { name: "Workspaces" }));
+    expect(screen.queryByRole("link", { name: "Workspaces" })).toBeNull();
   });
 });
 

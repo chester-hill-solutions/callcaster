@@ -625,8 +625,11 @@ export interface ResultsScreenProps {
   isBusy: boolean;
 }
 
-export interface CampaignDetails extends Tables<"live_campaign"> {
+export interface CampaignDetails
+  extends Omit<Tables<"live_campaign">, "disposition_options"> {
   script: Script;
+  /** Normalized at the read boundary (getCallScreenData) — never null. */
+  disposition_options: string[];
 }
 
 export type CampaignState = {

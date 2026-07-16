@@ -2,7 +2,14 @@ export { loader } from "./setup.loader.server";
 export { action } from "./setup.action.server";
 
 import { useState } from "react";
-import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
+import {
+  Form,
+  Link,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+  useParams,
+} from "react-router";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,6 +53,8 @@ export default function VoicemailSetupPage() {
   const { numbers, members, greetings, error } = useLoaderData<LoaderData>();
   const actionData = useActionData<{ error?: string }>();
   const { state } = useNavigation();
+  const params = useParams();
+  const workspaceId = params.id;
 
   const [source, setSource] = useState<"existing" | "upload">(
     greetings.length > 0 ? "existing" : "upload",
@@ -79,7 +88,7 @@ export default function VoicemailSetupPage() {
               there is nothing to attach a greeting to yet.
             </Text>
             <Button asChild>
-              <Link to="../settings/numbers" relative="path">
+              <Link to={`/workspaces/${workspaceId}/settings/numbers`}>
                 Add a phone number
               </Link>
             </Button>

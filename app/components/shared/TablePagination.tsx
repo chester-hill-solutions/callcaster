@@ -114,7 +114,7 @@ const TablePagination = ({
                 buttonVariants({ variant: "ghost", size: "default" }),
                 "gap-1 pr-2.5",
               )}
-              disabled={currentPage === totalPages}
+              disabled={currentPage >= totalPages}
               onClick={() => {
                 if (currentPage < totalPages) {
                   onPageChange(currentPage + 1);

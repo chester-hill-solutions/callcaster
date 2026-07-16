@@ -22,7 +22,15 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function ArchivedCampaigns() {
   const { archivedCampaigns } = useLoaderData();
-  const { workspace } = useOutletContext<{ workspace: { id: string } }>();
+  const { workspace, campaigns } = useOutletContext<{
+    workspace: { id: string };
+    campaigns: Campaign[];
+  }>();
+  // "Create your first campaign" is only true when the workspace really has no
+  // campaigns in flight; drafts count, they just haven't been archived yet.
+  const draftCount = (campaigns ?? []).filter(
+    (campaign) => campaign.status === "draft",
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -47,11 +55,26 @@ export default function ArchivedCampaigns() {
           <Text variant="muted" className="text-lg">
             No archived campaigns found
           </Text>
-          <Button asChild className="mt-4">
-            <Link to={`/workspaces/${workspace.id}/campaigns/new`}>
-              Create Your First Campaign
-            </Link>
-          </Button>
+          {draftCount > 0 ? (
+            <>
+              <Text variant="muted" className="mt-2">
+                {draftCount === 1
+                  ? "You have 1 draft campaign that hasn't been archived yet."
+                  : `You have ${draftCount} draft campaigns that haven't been archived yet.`}
+              </Text>
+              <Button asChild className="mt-4">
+                <Link to={`/workspaces/${workspace.id}/campaigns`}>
+                  View drafts
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <Button asChild className="mt-4">
+              <Link to={`/workspaces/${workspace.id}/campaigns/new`}>
+                Create your first campaign
+              </Link>
+            </Button>
+          )}
         </div>
       ) : (
         <ul className="divide-y divide-border">

@@ -5,6 +5,7 @@
  * Usage: DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster node scripts/e2e/bootstrap-compose-db.mjs
  */
 import { spawnSync } from "node:child_process";
+import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,7 +43,56 @@ const steps = [
   "drizzle/0008_chs_workspace_membership.sql",
   "client/migrations/20260714140000_fix_create_new_workspace_role_cast.sql",
   "client/migrations/20260715120000_workspace_audio_metadata.sql",
+  "client/migrations/20260715140000_drop_legacy_rls.sql",
+  "client/migrations/20260715150000_slice_12_1_transcription_coaching_schema.sql",
 ];
+
+/**
+ * `client/migrations/*.sql` files that this bootstrap deliberately skips because
+ * the `drizzle/*.sql` baseline above already contains their effect. Anything in
+ * the directory that is in neither list is a mistake — see the guard below.
+ */
+const coveredByBaseline = new Set([
+  "20260704000000_update_pg_cron_to_remix_routes.sql",
+  "20260704000002_unique_workspace_api_key_prefix.sql",
+  "20260704000003_extend_job_table.sql",
+  "20260704000005_drop_legacy_triggers.sql",
+  "20260705000100_add_call_user_id.sql",
+  "20260705000200_acd_duplicate_offer_guard.sql",
+  "20260705000200_add_campaign_queue_workspace.sql",
+  "20260705000200_survey_response_unique_result_id.sql",
+  "20260706120000_auth_two_factor.sql",
+  "20260713150000_workspace_api_key_scopes.sql",
+  "20260713180000_chs_workspace_membership.sql",
+]);
+
+/**
+ * Fail loudly when a migration is added to client/migrations/ but not wired in
+ * here. Otherwise the compose database silently drifts from app/db/schema.ts and
+ * E2E fails far away from the cause: adding `workspace.coaching_config` without
+ * appending its migration turned every bare `select()` on `workspace` into
+ * `column "coaching_config" does not exist`.
+ */
+const listed = new Set(
+  steps
+    .filter((step) => step.startsWith("client/migrations/"))
+    .map((step) => path.basename(step)),
+);
+const unwired = readdirSync(path.join(rootDir, "client/migrations"))
+  .filter((file) => file.endsWith(".sql"))
+  .filter((file) => !listed.has(file) && !coveredByBaseline.has(file))
+  .sort();
+
+if (unwired.length > 0) {
+  console.error(
+    "[e2e-bootstrap] migrations exist in client/migrations/ but are wired into neither\n" +
+      "`steps` nor `coveredByBaseline` in this file:\n" +
+      unwired.map((file) => `  ${file}`).join("\n") +
+      "\n\nAppend each to `steps` (in filename order), or to `coveredByBaseline` if\n" +
+      "the drizzle/ baseline already contains its effect.",
+  );
+  process.exit(1);
+}
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
 

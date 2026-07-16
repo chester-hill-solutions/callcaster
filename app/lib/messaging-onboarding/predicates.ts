@@ -39,7 +39,9 @@ export type WorkspaceReadinessSenderPool = {
 };
 
 export type WorkspaceReadinessContext = {
-  onboarding: WorkspaceMessagingOnboardingState;
+  // `steps` is derived from this context (see `buildOnboardingStepsForState`),
+  // so requiring it here would be circular.
+  onboarding: Omit<WorkspaceMessagingOnboardingState, "steps">;
   workspaceNumbers: WorkspaceReadinessNumber[];
   recentOutboundCount?: number;
   /** Precomputed first-number flag; falls back to `workspaceHasFirstNumber`. */
@@ -110,6 +112,54 @@ export const BUSINESS_PROFILE_REQUIRED_FIELDS: Record<
 };
 
 export type BusinessProfileFieldKey = keyof WorkspaceMessagingBusinessProfile;
+
+const BUSINESS_PROFILE_REQUIRED_FIELD_CHANNELS = Object.keys(
+  BUSINESS_PROFILE_REQUIRED_FIELDS,
+) as (keyof typeof BUSINESS_PROFILE_REQUIRED_FIELDS)[];
+
+/**
+ * The business-profile fields every messaging channel requires, derived as the
+ * intersection of the per-channel lists above rather than restated as a second
+ * list — so it can never drift from the source of truth.
+ *
+ * The Business basics step runs *before* channel selection, so the wizard cannot
+ * know which channel's list applies when step 1 is submitted. This baseline is
+ * what is safe to demand from every workspace regardless of the path it later
+ * picks; the channel-specific extras stay with the readiness predicates, which
+ * surface them once a channel is actually selected.
+ */
+export const BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
+  BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc.filter((field) =>
+    BUSINESS_PROFILE_REQUIRED_FIELD_CHANNELS.every((channel) =>
+      BUSINESS_PROFILE_REQUIRED_FIELDS[channel].includes(field),
+    ),
+  );
+
+/**
+ * Returns the baseline required fields that are still blank on `profile`.
+ * Empty array means the profile clears the Business basics gate.
+ */
+export function findMissingBusinessProfileFields(
+  profile: WorkspaceMessagingBusinessProfile,
+  fields: readonly BusinessProfileFieldKey[] = BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS,
+): BusinessProfileFieldKey[] {
+  return fields.filter((field) => !isBusinessProfileFieldComplete(profile, field));
+}
+
+/**
+ * Human-readable "X is required." copy for a baseline field, reusing the
+ * existing per-channel predicate wording (the a2p10dlc phrasing is the neutral
+ * one and covers every baseline field).
+ */
+export function businessProfileFieldRequiredMessage(
+  field: BusinessProfileFieldKey,
+): string {
+  return (
+    BUSINESS_PROFILE_FIELD_MESSAGES[field].a2p10dlc ??
+    BUSINESS_PROFILE_FIELD_MESSAGES[field].sms ??
+    "This field is required."
+  );
+}
 
 function isBusinessProfileFieldComplete(
   profile: WorkspaceMessagingBusinessProfile,

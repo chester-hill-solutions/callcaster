@@ -122,6 +122,43 @@ describe("app/components/campaign/settings/detailed/live/CampaignDetailed.Live.S
   });
 });
 
+describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", () => {
+  test("uses calling-hours wording for call campaigns", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    render(
+      <SelectDates
+        campaignData={makeCampaign({ type: "live_call", schedule: null })}
+        handleInputChange={handleInputChange}
+      />,
+    );
+    expect(screen.getByText("Calling Hours")).toBeInTheDocument();
+    expect(screen.getByText("No calling hours set")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Set Calling Hours" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Send Window")).not.toBeInTheDocument();
+  });
+
+  test("uses send-window wording for message campaigns", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    render(
+      <SelectDates
+        campaignData={makeCampaign({ type: "message", schedule: null })}
+        handleInputChange={handleInputChange}
+      />,
+    );
+    expect(screen.getByText("Send Window")).toBeInTheDocument();
+    expect(screen.getByText("No send window set")).toBeInTheDocument();
+
+    // The schedule editor itself must switch wording too, not just the header.
+    fireEvent.click(screen.getByRole("button", { name: "Set Send Window" }));
+    expect(
+      screen.getByRole("button", { name: "Apply Send Window" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Calling Hours/)).not.toBeInTheDocument();
+  });
+});
+
 describe("app/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus.tsx", () => {
   test("status select", async () => {
     const SelectStatus = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus")).default;

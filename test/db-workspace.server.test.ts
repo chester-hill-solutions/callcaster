@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { inspect } from "node:util";
 import { asRouteResponse } from "./helpers/route-result";
 
+// createNewWorkspace rejects non-uuid auth user ids (legacy nanoid rows cannot be
+// mirrored into public.user / cast for the create_new_workspace RPC), so this
+// fixture must be a real uuid like Better Auth's generateId=crypto.randomUUID().
+const AUTH_USER_ID = "3f8b1c2a-5d4e-4f6a-9b7c-8e1d2a3b4c5d";
+
 const objectStorageMocks = vi.hoisted(() => ({
   createSignedObjectUrl: vi.fn(async () => "u"),
   listObjects: vi.fn(async () => [{ name: "a", id: "a", created_at: "t", updated_at: "t" }]),
@@ -369,7 +374,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(
       mod.createNewWorkspace({
         workspaceName: "W",
-        user_id: "u1",
+        user_id: AUTH_USER_ID,
       }),
     ).resolves.toEqual({
       data: "w_new",
@@ -394,7 +399,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(
       mod.createNewWorkspace({
         workspaceName: "W",
-        user_id: "u1",
+        user_id: AUTH_USER_ID,
       }),
     ).resolves.toMatchObject({
       data: "w_new",
@@ -409,7 +414,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(
       mod.createNewWorkspace({
         workspaceName: "W",
-        user_id: "u1",
+        user_id: AUTH_USER_ID,
       }),
     ).resolves.toMatchObject({ data: null, error: "rpc" });
     expect(logger.error).toHaveBeenCalled();
@@ -420,7 +425,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(
       mod.createNewWorkspace({
         workspaceName: "W",
-        user_id: "u1",
+        user_id: AUTH_USER_ID,
       }),
     ).resolves.toMatchObject({
       data: "w_new",
@@ -438,7 +443,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(
       mod.createNewWorkspace({
         workspaceName: "W",
-        user_id: "u1",
+        user_id: AUTH_USER_ID,
       }),
     ).resolves.toMatchObject({
       data: "w_new",
@@ -451,7 +456,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(
       mod.createNewWorkspace({
         workspaceName: "W",
-        user_id: "u1",
+        user_id: AUTH_USER_ID,
       }),
     ).resolves.toMatchObject({
       data: "w_new",
@@ -464,7 +469,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(
       mod.createNewWorkspace({
         workspaceName: "W",
-        user_id: "u1",
+        user_id: AUTH_USER_ID,
       }),
     ).resolves.toEqual({
       data: null,

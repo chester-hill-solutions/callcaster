@@ -319,14 +319,15 @@ export default function ChatInput({
           <div className="flex flex-1 items-start gap-2">
             <label
               htmlFor="image"
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-md border border-transparent text-gray-500 transition-colors hover:border-blue-200 hover:text-blue-500"
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
             >
-              <MdImage size={24} />
+              <MdImage size={24} aria-hidden />
+              <span className="sr-only">Attach image</span>
             </label>
             <input
               type="file"
               id="image"
-              className="hidden"
+              className="sr-only"
               accept="image/*"
               onChange={handleImageSelect}
             />
