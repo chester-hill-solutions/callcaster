@@ -91,12 +91,21 @@ export const action = defineAction({
     }
   }
 
-  const contact_number = normalizePhoneNumber(
-    params["contact_number"] || (data["contact_number"] as string),
-  );
-
   if (!workspaceId) {
     return routeData({ error: "Workspace is required" }, { status: 400 });
+  }
+
+  let contact_number: string;
+  try {
+    contact_number = normalizePhoneNumber(
+      params["contact_number"] || (data["contact_number"] as string),
+    );
+  } catch (error) {
+    logger.error("Error normalizing chat send destination number:", error);
+    return routeData(
+      { error: "A valid destination phone number is required." },
+      { status: 400 },
+    );
   }
 
   let portalConfig: WorkspaceTwilioOpsConfig;

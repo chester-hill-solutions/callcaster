@@ -8,6 +8,10 @@ build/
 # Coverage
 coverage/
 
+# Generated Playwright artifacts
+e2e/playwright-report/
+test-results/
+
 # Local tooling
 .opencode/
 .agents/

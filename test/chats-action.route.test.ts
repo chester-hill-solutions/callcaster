@@ -106,6 +106,34 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  test("returns a 400 with a clean message (not an uncaught 500) when the destination number is missing from both params and form data", async () => {
+    // Reproduces the real browser submit target: ChatInput's <Form> has no
+    // `action`, so it defaults to the parent "chats" route (no
+    // `:contact_number` param), and the hidden `contact_number` field is only
+    // rendered for the header's "new number" composer flow — not for a reply
+    // inside an already-open thread. Before the fix, normalizePhoneNumber()
+    // threw synchronously and escaped to defineAction's generic 500 handler
+    // with an internal message ("Phone number input must be a non-empty
+    // string"), which the client rendered as a raw INTERNAL_SERVER_ERROR
+    // instead of surfacing a clear, actionable error.
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          from: "+15550000000",
+        }),
+        params: { id: "w1" },
+      })),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "A valid destination phone number is required.",
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
   test("sends through the Messaging Service when the composer selects it", async () => {
     mocks.getEffectivePortalConfig.mockResolvedValueOnce({
       sendMode: "messaging_service",

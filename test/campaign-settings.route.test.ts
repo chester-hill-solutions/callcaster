@@ -298,4 +298,74 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       error: "duplicate failed",
     });
   });
+
+  test("duplicate copies the source campaign's actual script_id, ignoring a mismatched client-supplied value", async () => {
+    makeDbClientForSettingsRoute({
+      campaign: {
+        id: 99,
+        workspace: "w1",
+        type: "robocall",
+        script_id: 42,
+      },
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({
+      user: { id: "u1" },
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "duplicate",
+      // Client sends a stale/tampered script_id that doesn't belong to this
+      // campaign's script — the server must ignore it and use the source's.
+      campaignData: JSON.stringify({
+        title: "Copy me",
+        type: "robocall",
+        script_id: 950001,
+      }),
+    });
+
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      actionType: "duplicate",
+    });
+    expect(campaignIvrMocks.insertCampaignForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      expect.objectContaining({ script_id: 42 }),
+    );
+  });
+
+  test("duplicate nulls out script_id when the source campaign has none", async () => {
+    makeDbClientForSettingsRoute({
+      campaign: {
+        id: 99,
+        workspace: "w1",
+        type: "message",
+        script_id: null,
+      },
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({
+      user: { id: "u1" },
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "duplicate",
+      campaignData: JSON.stringify({ title: "Copy me", type: "message" }),
+    });
+
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+
+    expect(res.status).toBe(200);
+    expect(campaignIvrMocks.insertCampaignForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      expect.objectContaining({ script_id: null }),
+    );
+  });
 });
