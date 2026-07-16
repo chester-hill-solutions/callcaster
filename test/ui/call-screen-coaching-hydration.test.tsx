@@ -17,7 +17,15 @@ vi.mock("@/lib/logger.client", () => ({
 }));
 
 const eventSourceCtor = vi.fn();
-const listeners = new Set<(event: MessageEvent<string>) => void>();
+/**
+ * Keyed by event name. The hook registers a `workspace_event` handler and a
+ * terminal `access_revoked` handler; a type-agnostic set would hand every frame
+ * to both, so a plain transcript event would trip the revoked path and close
+ * the stream.
+ */
+type SseHandler = (event: MessageEvent<string>) => void;
+const listeners = new Map<string, Set<SseHandler>>();
+const workspaceEventListeners = () => listeners.get("workspace_event") ?? new Set();
 
 class FakeEventSource {
   onerror: ((event: Event) => void) | null = null;
@@ -26,12 +34,14 @@ class FakeEventSource {
     eventSourceCtor(url);
   }
 
-  addEventListener(_type: string, handler: (event: MessageEvent<string>) => void) {
-    listeners.add(handler);
+  addEventListener(type: string, handler: SseHandler) {
+    const set = listeners.get(type) ?? new Set<SseHandler>();
+    set.add(handler);
+    listeners.set(type, set);
   }
 
-  removeEventListener(_type: string, handler: (event: MessageEvent<string>) => void) {
-    listeners.delete(handler);
+  removeEventListener(type: string, handler: SseHandler) {
+    listeners.get(type)?.delete(handler);
   }
 
   close = vi.fn();
@@ -47,7 +57,7 @@ function emitWorkspaceEvent(eventType: string, payload: Record<string, unknown>)
     created_at: "2026-07-15T00:00:00Z",
   });
   act(() => {
-    for (const handler of listeners) {
+    for (const handler of [...workspaceEventListeners()]) {
       handler(new MessageEvent("workspace_event", { data }));
     }
   });
@@ -100,7 +110,7 @@ describe("CallScreenLiveCoachingPanels hydration", () => {
 
     // Transcript tab is the default; the segment is on screen with no traffic.
     expect(screen.getByText("Hello from before the reload")).toBeInTheDocument();
-    expect(listeners.size).toBe(1);
+    expect(workspaceEventListeners().size).toBe(1);
   });
 
   test("hydrated cues are rendered, not just hydrated segments", () => {

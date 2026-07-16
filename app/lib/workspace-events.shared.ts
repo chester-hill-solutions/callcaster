@@ -65,3 +65,15 @@ export function matchesPostgresChangeFilter(
   if (!row) return false;
   return String(row[column] ?? "") === expected;
 }
+
+/**
+ * SSE event name for a stream terminated because the subscriber's workspace
+ * access was revoked mid-stream.
+ *
+ * Lives here so the producing loader and the consuming hooks share one literal,
+ * and so client code can reference it without importing a `.server` module.
+ * Clients must `close()` on this: EventSource auto-reconnects after a
+ * server-side close, and each retry would be rejected by the data-plane
+ * middleware, leaving the tab in a retry loop.
+ */
+export const ACCESS_REVOKED_EVENT = "access_revoked";

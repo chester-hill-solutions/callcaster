@@ -16,9 +16,17 @@ vi.mock("@/lib/logger.client", () => ({ logger: loggerMock }));
 const toastMock = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-/** Captures the handler so tests can push frames the way the SSE loader would. */
-const listeners = new Set<(message: MessageEvent<string>) => void>();
+/**
+ * Captures handlers so tests can push frames the way the SSE loader would.
+ * Keyed by event name: the loader distinguishes `workspace_event` from the
+ * terminal `access_revoked` frame, so the double must too.
+ */
+type SseHandler = (message: MessageEvent<string>) => void;
+const listeners = new Map<string, Set<SseHandler>>();
 const eventSourceCtor = vi.fn();
+/** Constructed instances, so tests can assert close() on the live one. */
+const instances: FakeEventSource[] = [];
+const lastEventSource = () => instances.at(-1)!;
 
 class FakeEventSource {
   onerror: ((event: Event) => void) | null = null;
@@ -26,24 +34,33 @@ class FakeEventSource {
 
   constructor(url: string) {
     eventSourceCtor(url);
+    instances.push(this);
   }
 
-  addEventListener(_type: string, handler: (message: MessageEvent<string>) => void) {
-    listeners.add(handler);
+  addEventListener(type: string, handler: SseHandler) {
+    const set = listeners.get(type) ?? new Set<SseHandler>();
+    set.add(handler);
+    listeners.set(type, set);
   }
 
-  removeEventListener(_type: string, handler: (message: MessageEvent<string>) => void) {
-    listeners.delete(handler);
+  removeEventListener(type: string, handler: SseHandler) {
+    listeners.get(type)?.delete(handler);
   }
 }
 
-function emit(record: unknown) {
-  const data = typeof record === "string" ? record : JSON.stringify(record);
+function emitAs(type: string, data: string) {
   act(() => {
-    for (const handler of listeners) {
+    for (const handler of [...(listeners.get(type) ?? [])]) {
       handler({ data } as MessageEvent<string>);
     }
   });
+}
+
+function emit(record: unknown) {
+  emitAs(
+    "workspace_event",
+    typeof record === "string" ? record : JSON.stringify(record),
+  );
 }
 
 function frame(event_type: string, payload: unknown) {
@@ -52,10 +69,51 @@ function frame(event_type: string, payload: unknown) {
 
 beforeEach(() => {
   listeners.clear();
+  instances.length = 0;
   eventSourceCtor.mockReset();
   loggerMock.error.mockReset();
+  loggerMock.warn.mockReset();
   toastMock.error.mockReset();
   vi.stubGlobal("EventSource", FakeEventSource);
+});
+
+describe("access revoked mid-stream", () => {
+  test("closes the EventSource instead of letting it reconnect", () => {
+    renderHook(() => useCallCoaching("ws-1", "CA123"));
+    const source = lastEventSource();
+    expect(source.close).not.toHaveBeenCalled();
+
+    emitAs("access_revoked", JSON.stringify({ reason: "workspace_access_revoked" }));
+
+    // Without an explicit close, EventSource retries a stream the middleware
+    // will reject every time — a silent reconnect loop.
+    expect(source.close).toHaveBeenCalled();
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  test("leaves already-received transcript state intact", () => {
+    const { result } = renderHook(() => useCallCoaching("ws-1", "CA123"));
+
+    emit(
+      frame("transcript_segment", {
+        callSid: "CA123",
+        segmentId: "seg-1",
+        speaker: 0,
+        speakerLabel: "agent",
+        text: "already delivered",
+        startMs: 0,
+        endMs: 500,
+        fillerCount: 0,
+      }),
+    );
+    expect(result.current.segments).toHaveLength(1);
+
+    emitAs("access_revoked", JSON.stringify({ reason: "workspace_access_revoked" }));
+
+    // Blanking the panel mid-call would read as a transcription failure; the
+    // stream simply stops.
+    expect(result.current.segments).toHaveLength(1);
+  });
 });
 
 describe("SSE subscribe gate (WS-1 behaviour, preserved)", () => {
