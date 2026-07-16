@@ -3,6 +3,7 @@ import { CampaignSettingsPage } from "../pages/CampaignSettingsPage";
 import { WorkspacePage } from "../pages/WorkspacePage";
 import {
   E2E_CAMPAIGNS,
+  E2E_SURVEY,
   E2E_WORKSPACES,
   workspacePath,
 } from "../fixtures/seed";
@@ -59,6 +60,20 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
 
     // #419 = "the server did not finish this Suspense boundary".
     expect(pageErrors.filter((e) => e.includes("419")), pageErrors.join("\n")).toEqual([]);
+  });
+
+  // Regression: the survey detail page built its public link from
+  // `window.location.origin` during render, so SSR died outright
+  // (ReferenceError: window is not defined -> 500) and every survey link on the
+  // surveys list was a dead end. Its /edit and /responses children were fine,
+  // which is what hid it: the useOutlet() early-return fires before the
+  // `window` read, so only the bare detail page ever crashed.
+  ownerTest("ERR-13 survey detail page renders (no window during SSR)", async ({ page }) => {
+    const res = await page.goto(
+      workspacePath(E2E_WORKSPACES.ready.id, `surveys/${E2E_SURVEY.publicId}`),
+    );
+    expect(res?.status(), "survey detail status").toBe(200);
+    await expect(page.getByRole("heading", { name: "E2E Public Survey" })).toBeVisible();
   });
 });
 
