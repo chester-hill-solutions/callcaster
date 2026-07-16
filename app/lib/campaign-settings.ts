@@ -32,6 +32,10 @@ export function normalizeCampaignData(
   return {
     ...campaignData,
     schedule: normalizeSchedule(campaignData.schedule) as Schedule | null,
+    sms_send_window: normalizeSchedule(
+      (campaignData as CampaignWithAudiences & { sms_send_window?: unknown })
+        .sms_send_window,
+    ),
   } as CampaignWithAudiences;
 }
 

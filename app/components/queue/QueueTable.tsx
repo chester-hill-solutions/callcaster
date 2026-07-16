@@ -73,9 +73,18 @@ function QueueSortButton<TData>({
             size="sm"
             aria-label={`Sort by ${label}`}
             onClick={() => {
-                column.toggleSorting();
-                const sort = column.getIsSorted();
-                onSortChange('sort', sort ? `${field}.${sort}` : '');
+                // Compute next sort before toggling — getIsSorted() still
+                // returns the pre-toggle value if read immediately after
+                // toggleSorting() (React state update is async).
+                const current = column.getIsSorted();
+                const next: false | "asc" | "desc" =
+                    current === false ? "asc" : current === "asc" ? "desc" : false;
+                if (next === false) {
+                    column.clearSorting();
+                } else {
+                    column.toggleSorting(next === "desc", false);
+                }
+                onSortChange("sort", next ? `${field}.${next}` : "");
             }}
             className="h-6 px-1"
         >

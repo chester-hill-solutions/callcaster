@@ -110,8 +110,7 @@ export const MobileMenu = ({
                   onClick={close}
                   className={navLinkClass}
                 >
-                  {user.workspace_invite.length} Pending Invitation
-                  {user.workspace_invite.length !== 1 ? "s" : ""}
+                  {`${user.workspace_invite.length} Pending Invitation${user.workspace_invite.length === 1 ? "" : "s"}`}
                 </NavLink>
               </div>
               <Button

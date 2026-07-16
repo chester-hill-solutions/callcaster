@@ -119,8 +119,7 @@ const UserDropdownMenu = ({
               user.workspace_invite.length > 0 ? "bg-primary text-white" : ""
             }
           >
-            {user.workspace_invite.length} Pending Invitation
-            {user.workspace_invite.length !== 1 ? "s" : ""}
+            {`${user.workspace_invite.length} Pending Invitation${user.workspace_invite.length === 1 ? "" : "s"}`}
           </NavLink>
         </DropdownMenuItem>
         {workspaceId && (

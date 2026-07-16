@@ -51,6 +51,7 @@ const WeeklyScheduleTable = ({
             <TableCell>{day}</TableCell>
             <TableCell>
               <Checkbox
+                aria-label={`${day} active`}
                 checked={schedule[day.toLowerCase() as DayName]?.active}
                 onCheckedChange={(e) => {
                   handleCheckboxChange(day.toLowerCase() as DayName)

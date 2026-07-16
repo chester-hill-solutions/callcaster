@@ -340,7 +340,7 @@ export default function CampaignSettingsRoute() {
         ? value === "" || value == null
           ? null
           : Number(value)
-        : name === "schedule"
+        : name === "schedule" || name === "sms_send_window"
           ? normalizeSchedule(value)
           : value;
 

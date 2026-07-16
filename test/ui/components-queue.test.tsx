@@ -141,11 +141,7 @@ describe("app/components/queue/QueueTable.tsx", () => {
     }
   });
 
-  // Pins the behaviour the QueueSortButton extraction had to preserve. Note the
-  // sort param lags by one click: getIsSorted() is read synchronously after
-  // toggleSorting(), so it still returns the pre-toggle value. That is a
-  // pre-existing bug carried over verbatim, not a regression from the refactor
-  // — this test documents it so a future fix has to change it deliberately.
+  // Sort param reflects the click immediately (next order computed before toggle).
   test("the sort control reports the sort field back to the caller", async () => {
     const { QueueTable } = await import("@/components/queue/QueueTable");
     const handleFilterChange = vi.fn();
@@ -155,10 +151,10 @@ describe("app/components/queue/QueueTable.tsx", () => {
     const sortByPhone = screen.getByRole("button", { name: "Sort by Phone" });
 
     fireEvent.click(sortByPhone);
-    expect(handleFilterChange).toHaveBeenNthCalledWith(1, "sort", "");
+    expect(handleFilterChange).toHaveBeenNthCalledWith(1, "sort", "phone.asc");
 
     fireEvent.click(sortByPhone);
-    expect(handleFilterChange).toHaveBeenNthCalledWith(2, "sort", "phone.asc");
+    expect(handleFilterChange).toHaveBeenNthCalledWith(2, "sort", "phone.desc");
   });
 });
 

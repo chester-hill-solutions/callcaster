@@ -139,23 +139,44 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
     expect(screen.queryByText("Send Window")).not.toBeInTheDocument();
   });
 
-  test("uses send-window wording for message campaigns", async () => {
+  test("message campaign Apply persists sms_send_window, not schedule", async () => {
     const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    const onChange = vi.fn();
     render(
       <SelectDates
-        campaignData={makeCampaign({ type: "message", schedule: null })}
-        handleInputChange={handleInputChange}
+        campaignData={makeCampaign({ type: "message", schedule: null, sms_send_window: null })}
+        handleInputChange={onChange}
       />,
     );
-    expect(screen.getByText("Send Window")).toBeInTheDocument();
-    expect(screen.getByText("No send window set")).toBeInTheDocument();
-
-    // The schedule editor itself must switch wording too, not just the header.
     fireEvent.click(screen.getByRole("button", { name: "Set Send Window" }));
-    expect(
-      screen.getByRole("button", { name: "Apply Send Window" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Calling Hours/)).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply Send Window" }));
+    expect(onChange).toHaveBeenCalled();
+    const [field, value] = onChange.mock.calls.at(-1)!;
+    expect(field).toBe("sms_send_window");
+    expect(typeof value).toBe("string");
+    const parsed = JSON.parse(String(value));
+    expect(parsed.monday.active).toBe(true);
+  });
+
+  test("call campaign Apply persists schedule", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    const onChange = vi.fn();
+    render(
+      <SelectDates
+        campaignData={makeCampaign({ type: "live_call", schedule: null })}
+        handleInputChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Set Calling Hours" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply Calling Hours" }));
+    const [field] = onChange.mock.calls.at(-1)!;
+    expect(field).toBe("schedule");
   });
 });
 

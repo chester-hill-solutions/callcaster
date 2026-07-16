@@ -12,11 +12,26 @@ if (!DATABASE_URL) {
   );
 }
 
+/**
+ * Shared pool options. Fail closed under contention rather than queue forever
+ * (CI/local may see faster connect failures — that is intentional).
+ * Values are seconds (postgres.js conventions).
+ */
+const poolOpts = {
+  prepare: false,
+  connect_timeout: 10,
+  idle_timeout: 20,
+  max_lifetime: 60 * 30,
+} as const;
+
 /** Connection pool for queries (uses pgbouncer-friendly URL if separate). */
-const queryClient = postgres(DATABASE_URL as string, { prepare: false, max: 10 });
+const queryClient = postgres(DATABASE_URL as string, { ...poolOpts, max: 10 });
 
 /** Direct connection for LISTEN/NOTIFY (no pgbouncer). */
-const directClient = postgres((DATABASE_DIRECT_URL as string) ?? (DATABASE_URL as string), { prepare: false, max: 5 });
+const directClient = postgres(
+  (DATABASE_DIRECT_URL as string) ?? (DATABASE_URL as string),
+  { ...poolOpts, max: 5 },
+);
 
 /** Drizzle instance for all ORM queries. */
 export const db = drizzle(queryClient, { schema: { ...schema, ...authSchema } });

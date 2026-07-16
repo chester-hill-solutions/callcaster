@@ -66,6 +66,14 @@ its failure is total and silent apart from the user-facing error.
 Both paths call `apply_ledger_entry_and_sync_credits`, so a stale ledger
 function breaks both anyway. There is no fallback for schema drift.
 
+## Review-env ops notes (2026-07-15)
+
+- From a laptop, point the ledger check at **`DATABASE_PUBLIC_URL`**, not
+  `DATABASE_URL` (`*.railway.internal` is unreachable outside Railway).
+- The check script queries `AUTH_migrations.schema_migrations` **unquoted**, so
+  Postgres folds the schema name to **`auth_migrations`**. Create/seed that
+  lowercase schema (a quoted `"AUTH_migrations"` schema will not match).
+
 ## Checklist when credits or money behave strangely
 
 1. Run the ledger check against that environment with `--require-db`.
