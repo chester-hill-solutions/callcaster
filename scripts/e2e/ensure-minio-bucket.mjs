@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 /* eslint-env node */
-import { CreateBucketCommand, HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  DeleteObjectsCommand,
+  HeadBucketCommand,
+  ListObjectsV2Command,
+  S3Client,
+} from "@aws-sdk/client-s3";
 
 const endpoint = process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000";
 const bucket = process.env.S3_BUCKET ?? "callcaster";
@@ -38,10 +44,40 @@ async function ensureBucket() {
   console.log(`[e2e-minio] created bucket ${bucket}`);
 }
 
+// Objects written by prior runs (e.g. voicemail uploads, audio-clip edits) persist
+// across `docker compose down`-less re-runs since Postgres resets don't touch MinIO.
+// Purge everything so empty-state assertions (e.g. the audios-empty-copy spec) are
+// deterministic. This must run BEFORE any seed step re-populates fixture objects.
+async function purgeBucket() {
+  let continuationToken;
+  let purged = 0;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    const keys = (page.Contents ?? []).map((object) => ({ Key: object.Key }));
+    if (keys.length > 0) {
+      await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: keys, Quiet: true },
+        }),
+      );
+      purged += keys.length;
+    }
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+  console.log(`[e2e-minio] purged ${purged} object(s) from bucket ${bucket}`);
+}
+
 let lastError;
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
   try {
     await ensureBucket();
+    await purgeBucket();
     process.exit(0);
   } catch (error) {
     lastError = error;
