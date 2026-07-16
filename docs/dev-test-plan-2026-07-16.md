@@ -108,3 +108,10 @@ Priority order, from the 2026-07-16 coverage-gap analysis:
 - The E2E server sets `E2E_TEST=1` + 2FA-enforcement bypass: RBAC/2FA conclusions from
   that env understate production strictness — confirm auth-hardening items with
   enforcement on (2.4) or in the deployed env.
+- Object storage: local/compose uses MinIO as the S3-compatible stand-in; **deployed
+  envs (review and production) use Railway buckets**. Same `@aws-sdk/client-s3` code path —
+  only the endpoint/credentials differ. Storage-dependent flows (audio library, voicemail,
+  MMS media, exports) therefore need Railway bucket env wired in any deployed test target,
+  and the storage-backed audio library (lists whatever objects sit under the workspace
+  prefix) behaves identically against a Railway bucket — orphaned objects still surface as
+  metadata-less rows.
