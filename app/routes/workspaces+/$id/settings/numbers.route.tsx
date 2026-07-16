@@ -288,6 +288,9 @@ const WorkspaceSettings = () => {
       </Dialog>
       <div className="flex flex-col">
         <BackButton disabled={updateFetcher.state !== "idle"} />
+        <h1 className="px-4 pt-2 text-2xl font-semibold tracking-tight">
+          Phone numbers
+        </h1>
         <div className="flex flex-wrap gap-4 p-4">
           <Panel className="flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
             <NumbersTable

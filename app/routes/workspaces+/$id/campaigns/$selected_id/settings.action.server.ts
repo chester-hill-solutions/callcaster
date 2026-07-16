@@ -130,6 +130,7 @@ export const action = defineAction({
             campaign_id: Number(selected_id),
             workspace: workspace_id,
             schedule: normalizeSchedule(nextCampaignData.schedule),
+            sms_send_window: normalizeSchedule(nextCampaignData.sms_send_window),
           },
           campaignDetails: {
             ...nextCampaignDetails,

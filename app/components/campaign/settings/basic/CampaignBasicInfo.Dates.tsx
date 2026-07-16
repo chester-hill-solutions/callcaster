@@ -93,9 +93,10 @@ function parseSchedule(schedule: Campaign["schedule"]): Record<DayName, Schedule
 }
 
 /**
- * SMS campaigns dispatch messages rather than dial, so the same weekly schedule
- * is presented as a "send window". The stored field is `campaign.schedule`
- * either way — only the wording changes.
+ * SMS campaigns dispatch messages rather than dial, so the same weekly editor
+ * is presented as a "send window". Message campaigns persist
+ * `campaign.sms_send_window` (server-enforced); voice campaigns keep
+ * `campaign.schedule` (calling hours).
  */
 const SCHEDULE_COPY = {
   call: {
@@ -105,6 +106,7 @@ const SCHEDULE_COPY = {
     apply: "Apply Calling Hours",
     empty: "No calling hours set",
     endTooltip: "The latest time to begin dialing.",
+    field: "schedule" as const,
   },
   message: {
     label: "Send Window",
@@ -113,8 +115,15 @@ const SCHEDULE_COPY = {
     apply: "Apply Send Window",
     empty: "No send window set",
     endTooltip: "The latest time to send messages.",
+    field: "sms_send_window" as const,
   },
 } as const;
+
+function scheduleSourceForCampaign(campaignData: Campaign): unknown {
+  return campaignData.type === "message"
+    ? (campaignData as Campaign & { sms_send_window?: unknown }).sms_send_window
+    : campaignData.schedule;
+}
 
 export default function SelectDates({
   campaignData,
@@ -123,13 +132,14 @@ export default function SelectDates({
   const copy =
     campaignData.type === "message" ? SCHEDULE_COPY.message : SCHEDULE_COPY.call;
   const [showSchedule, setShowSchedule] = useState(false);
+  const scheduleSource = scheduleSourceForCampaign(campaignData);
   const [currentSchedule, setCurrentSchedule] = useState<Record<DayName, ScheduleDay>>(() =>
-    parseSchedule(campaignData.schedule),
+    parseSchedule(scheduleSource as Campaign["schedule"]),
   );
-  const [prevSchedule, setPrevSchedule] = useState(campaignData.schedule);
-  if (prevSchedule !== campaignData.schedule) {
-    setPrevSchedule(campaignData.schedule);
-    setCurrentSchedule(parseSchedule(campaignData.schedule));
+  const [prevScheduleSource, setPrevScheduleSource] = useState(scheduleSource);
+  if (prevScheduleSource !== scheduleSource) {
+    setPrevScheduleSource(scheduleSource);
+    setCurrentSchedule(parseSchedule(scheduleSource as Campaign["schedule"]));
   }
 
   const utcToLocal = (utcTime: string) => {
@@ -238,7 +248,7 @@ export default function SelectDates({
     }), {} as Record<DayName, ScheduleDay>);
     
     // Convert to a JSONB-compatible string for Postgres
-    handleInputChange("schedule", JSON.stringify(cleanSchedule));
+    handleInputChange(copy.field, JSON.stringify(cleanSchedule));
     setShowSchedule(false);
   };
 
@@ -360,7 +370,7 @@ export default function SelectDates({
                   applyScheduleToAll({ start: localToUTC("09:00"), end: localToUTC("17:00") })
                 }}
               >
-                Apply 9-5 to All Days
+                Apply 09:00–17:00 local to All Days
               </Button>
               <Button
                 variant="outline"
@@ -370,7 +380,7 @@ export default function SelectDates({
                   applyScheduleToWeekdays({ start: localToUTC("09:00"), end: localToUTC("17:00") })
                 }}
               >
-                Apply 9-5 to Weekdays
+                Apply 09:00–17:00 local to Weekdays
               </Button>
             </div>
             <WeeklyScheduleTable

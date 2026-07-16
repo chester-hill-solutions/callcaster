@@ -1,7 +1,8 @@
 # E2E nitpick remediation — status
 
-Branch: `fix/e2e-nitpick-remediation`, cut from `origin/dev` @ `d0b4ed48`.
-Companion to the plan doc (`e2e-nitpick-remediation-plan-2026-07-15.md`).
+Branch: merged to `dev` as #1052 (`4bc2d032`).
+Companion plans: original audit plan removed after landing; follow-up open work is in
+[`e2e-nitpick-followup-remediation-plan-2026-07-15.md`](./e2e-nitpick-followup-remediation-plan-2026-07-15.md).
 
 **Read this before implementing anything from the plan.** The audit's *symptoms*
 were reliable. Its *diagnoses* frequently were not — roughly half of those checked
