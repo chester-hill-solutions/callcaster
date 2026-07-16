@@ -68,7 +68,10 @@ vi.mock("@/lib/campaign-queue-search.server", () => ({
     mocks.countQueuedCampaignQueueRows(...args),
 }));
 
-vi.mock("@/lib/workspace-route.server", () => ({
+vi.mock("@/lib/workspace-route.server", async (importOriginal) => ({
+  // Keep the real hasMinRole (pure role-rank check) so the route's authz gate
+  // runs for real against the mocked userRole, instead of calling undefined.
+  ...(await importOriginal<typeof import("@/lib/workspace-route.server")>()),
   getWorkspaceRouteContext: vi.fn(() => mocks.workspaceAuth),
   workspaceRouteAuth: () => mocks.workspaceAuth,
   requireWorkspaceLoaderContext: (...args: any[]) =>

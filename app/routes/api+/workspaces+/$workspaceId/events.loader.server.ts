@@ -97,6 +97,13 @@ export async function loader({ request, params, context }: LoaderFunctionArgs) {
         }
       }, HEARTBEAT_INTERVAL_MS);
 
+      // Bun's idleTimeout counts from the last byte written, not from
+      // connection open. HEARTBEAT_INTERVAL_MS (15s) alone left a ~5s window
+      // where nothing was written before Bun's old 10s default idleTimeout
+      // fired (server/bun.ts now sets idleTimeout: 120s, but write
+      // immediately regardless so the stream is never silent from t=0).
+      controller.enqueue(encoder.encode(": connected\n\n"));
+
       request.signal.addEventListener("abort", closeStream);
 
       void (async () => {

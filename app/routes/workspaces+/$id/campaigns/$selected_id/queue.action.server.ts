@@ -1,4 +1,4 @@
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { eq } from "drizzle-orm";
 import {
@@ -18,6 +18,7 @@ import { contact_audience as contactAudienceTable } from "@/db/schema";
 import { db } from "@/server/db";
 import type { Contact } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
+import { MemberRole } from "@/lib/member-role";
 
 const EMPTY_FILTERS: QueueSearchFilters = {
   name: "",
@@ -34,9 +35,16 @@ export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, params, auth }) => {
     const { selected_id } = params;
-    const { workspaceId } = auth;
+    const { workspaceId, userRole, headers } = auth;
 
     if (!selected_id) throw redirect("../../");
+
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData(
+        { error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
+      );
+    }
 
     const data = await parseActionRequest(request);
     const intent = data.intent as string;

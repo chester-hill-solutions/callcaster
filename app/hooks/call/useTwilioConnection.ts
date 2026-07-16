@@ -150,11 +150,19 @@ export function useTwilioConnection({
         attachTwilioListener(device, "incoming", handleIncoming),
       ];
 
-      device.register().catch((err: Error) => {
-        logger.error("Failed to register device:", err);
-        setError(err);
+      device.register().catch((err: unknown) => {
+        // Twilio's Voice SDK can reject register() with `undefined` (not an
+        // Error) for signaling-level auth failures — the real error is
+        // delivered separately via the device "error" event. The
+        // `(err: Error)` annotation this replaced was a lie: at runtime
+        // `err` could be undefined, and passing it straight through crashed
+        // downstream `err.message` accesses (see useSoftphoneController.ts).
+        const error =
+          err instanceof Error ? err : new Error("Twilio device registration failed");
+        logger.error("Failed to register device:", error);
+        setError(error);
         setStatus("RegistrationFailed");
-        onErrorRef.current?.(err);
+        onErrorRef.current?.(error);
         onCallStateChangeRef.current?.("failed");
       });
     };

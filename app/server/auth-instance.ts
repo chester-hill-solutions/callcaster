@@ -6,6 +6,7 @@ import * as authSchema from "../db/auth-schema";
 import { resolveAuthTrustedOrigins } from "@/lib/auth-trusted-origins.server";
 import { env } from "@/lib/env.server";
 import { ensureProfileForUser } from "@/lib/ensure-user-profile.server";
+import { sendResetPasswordEmail } from "@/lib/send-reset-password-email.server";
 
 let authInstance: ReturnType<typeof createAuth> | null = null;
 
@@ -19,6 +20,11 @@ function createAuth() {
     trustedOrigins: resolveAuthTrustedOrigins,
     emailAndPassword: {
       enabled: true,
+      // Without this, Better Auth's requestPasswordReset endpoint throws
+      // RESET_PASSWORD_DISABLED before ever writing an auth_verification
+      // row — forgot-password was completely dead (P0-7). See
+      // app/lib/send-reset-password-email.server.ts.
+      sendResetPassword: sendResetPasswordEmail,
     },
     database: drizzleAdapter(db, {
       provider: "pg",

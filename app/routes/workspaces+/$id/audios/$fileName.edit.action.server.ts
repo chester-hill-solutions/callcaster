@@ -2,7 +2,8 @@ import { data as routeData, redirect } from "react-router";
 
 import { createWorkspaceAudioClip } from "@/lib/audio-clip.server";
 import { defineAction } from "@/lib/handler.server";
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { MemberRole } from "@/lib/member-role";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 
 function parseMs(value: FormDataEntryValue | null) {
   const parsed = Number.parseFloat(String(value ?? ""));
@@ -13,7 +14,14 @@ export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write", "external"],
   handler: async ({ request, params, auth }) => {
-    const { headers, user, workspaceId } = auth;
+    const { headers, user, workspaceId, userRole } = auth;
+
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData(
+        { error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
+      );
+    }
 
     if (workspaceId == null) {
       return routeData(

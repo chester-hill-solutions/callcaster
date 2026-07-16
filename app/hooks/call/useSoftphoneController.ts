@@ -31,7 +31,11 @@ export function useSoftphoneController({
   const deviceOptions = useMemo(() => ({ allowIncomingWhileBusy: true }), []);
 
   const handleConnectionError = useCallback(
-    (err: Error) => onError(err.message),
+    // Defensive: Twilio's register() can reject with an undefined/messageless
+    // reason (see useTwilioConnection.ts's device.register().catch); optional
+    // chain + fallback so a missing message never throws
+    // "Cannot read properties of undefined (reading 'message')" here.
+    (err: Error) => onError(err?.message ?? "Twilio connection error"),
     [onError],
   );
 
@@ -48,7 +52,8 @@ export function useSoftphoneController({
     device: connection.device,
     workspaceId,
     onStatusChange: noop,
-    onError: (err) => onError(err.message),
+    // Same defensive guard as handleConnectionError above.
+    onError: (err) => onError(err?.message ?? "Call error"),
     onDeviceBusyChange: noop,
   });
 

@@ -279,7 +279,11 @@ export const useWorkspaceRealtime = ({
 
     eventSource.addEventListener("workspace_event", onWorkspaceEvent);
     eventSource.onerror = () => {
-      logger.error("Campaign workspace SSE connection error");
+      // Transient EventSource reconnects are normal (e.g. idle-timeout
+      // recycling); the browser retries automatically. Matches the sibling
+      // hook's level (useWorkspaceEventSubscription.ts) so this doesn't
+      // scream ERROR for routine reconnects.
+      logger.debug("Campaign workspace SSE connection interrupted; EventSource will retry");
     };
 
     return () => {

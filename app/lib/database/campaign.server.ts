@@ -162,12 +162,18 @@ export async function updateCampaign({
   client?: never;
 }) {
   const {
-    campaign_id: id,
+    campaign_id,
+    id: legacyId,
     workspace,
     audiences,
     details,
     ...restCampaignData
   } = campaignData;
+
+  // Some callers (e.g. the script editor's PATCH /api/campaigns) only send
+  // the campaign's primary key under `id`, not `campaign_id`. Accept either,
+  // preferring `campaign_id` when both are present.
+  const id = campaign_id ?? legacyId;
 
   if (!id) throw new Error("Campaign ID is required");
   if (!workspace) throw new Error("Workspace is required");

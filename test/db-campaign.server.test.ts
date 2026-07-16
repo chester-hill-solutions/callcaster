@@ -233,6 +233,59 @@ describe("app/lib/database/campaign.server.ts", () => {
     ).rejects.toThrow("Campaign ID is required");
   });
 
+  // Regression for P0-5: the script editor's PATCH /api/campaigns request
+  // sends campaignData with a top-level `id` (e.g. "910004") and no
+  // `campaign_id`. updateCampaign must accept that shape instead of
+  // throwing "Campaign ID is required".
+  test("updateCampaign succeeds when campaignData only has `id` (no campaign_id)", async () => {
+    const mod = await import("../app/lib/database/campaign.server");
+
+    tdbMocks.campaign.update.mockResolvedValueOnce([
+      { id: 910004, type: "message", script_id: null, body_text: "hi" },
+    ]);
+
+    const res = await mod.updateCampaign({
+      campaignData: {
+        id: "910004",
+        workspace: "w1",
+        title: "T",
+        type: "message",
+        body_text: "hi",
+      } as any,
+      campaignDetails: { campaign_id: "910004" },
+    });
+
+    expect(res.campaign).toMatchObject({ id: 910004 });
+    // `id` must not leak into the row update as a stray column.
+    expect(tdbMocks.campaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.not.objectContaining({ id: expect.anything() }),
+      }),
+    );
+  });
+
+  test("updateCampaign prefers campaign_id over id when both are present", async () => {
+    const mod = await import("../app/lib/database/campaign.server");
+
+    tdbMocks.campaign.update.mockResolvedValueOnce([{ id: 1, type: "message" }]);
+
+    await mod.updateCampaign({
+      campaignData: {
+        id: "999",
+        campaign_id: "1",
+        workspace: "w1",
+        title: "T",
+        type: "message",
+      } as any,
+      campaignDetails: { campaign_id: "1" },
+    });
+
+    const call = tdbMocks.campaign.update.mock.calls[0][0];
+    // eq(campaignTable.id, Number(id)) — the bound param is queryChunks[3].
+    const targetedId = (call.where as any).queryChunks[3].value;
+    expect(targetedId).toBe(1);
+  });
+
   test("deleteCampaign throws on error; otherwise completes", async () => {
     const mod = await import("../app/lib/database/campaign.server");
     tdbMocks.campaign.delete.mockResolvedValueOnce(undefined);

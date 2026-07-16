@@ -1,4 +1,4 @@
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import {
   findCampaignMessageMedia,
@@ -6,15 +6,23 @@ import {
 } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import { MemberRole } from "@/lib/member-role";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write"],
   handler: async ({ request, params, auth }) => {
     const campaignId = params.selected_id;
-    const { headers, workspaceId } = auth;
+    const { headers, workspaceId, userRole } = auth;
     if (!campaignId || !workspaceId) {
       throw new Response("Campaign ID is required", { status: 400 });
+    }
+
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData(
+        { success: false, error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
+      );
     }
 
     const formData = await request.formData();

@@ -399,4 +399,50 @@ describe("realtime hooks", () => {
     expect(result.current.disposition).toBe("answered");
     expect(result.current.availableCredits).toBeGreaterThan(10);
   });
+
+  test("useWorkspaceRealtime downgrades SSE onerror to logger.debug (reconnects are normal, not errors)", async () => {
+    // Regression test: transient EventSource reconnects (e.g. Bun's idle
+    // timeout recycling the connection) were previously logged via
+    // logger.error, spamming error-tracking for every routine reconnect. The
+    // sibling hook (useWorkspaceEventSubscription) already treats this as
+    // debug-level; useWorkspaceRealtime must match.
+    const { useWorkspaceRealtime } = await import("@/hooks/realtime/useWorkspaceRealtime");
+    const { logger } = await import("@/lib/logger.client");
+    const { getLastInstance } = createWorkspaceEventSourceMock();
+
+    const user = { id: "user-1" };
+    const init = {
+      queue: [],
+      predictiveQueue: [],
+      callsList: [],
+      attempts: [],
+      recentCall: null,
+      recentAttempt: null,
+      nextRecipient: null,
+      phoneNumbers: [],
+      credits: 10,
+    } as any;
+
+    renderHook(() =>
+      useWorkspaceRealtime({
+        user,
+        init,
+        campaign_id: 1,
+        predictive: false,
+        setQuestionContact: vi.fn(),
+        workspace: "ws",
+        setCallDuration: vi.fn(),
+        setUpdate: vi.fn(),
+      } as any),
+    );
+
+    act(() => {
+      getLastInstance()?.onerror?.(new Event("error"));
+    });
+
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringContaining("SSE connection interrupted"),
+    );
+  });
 });
