@@ -77,6 +77,7 @@ export const loader = defineLoader({
       workspace: campaignRow.workspace ?? workspace_id,
       script: scriptRow,
       message_media: campaignRow.message_media ?? undefined,
+      body_text: (campaignRow as { body_text?: string | null }).body_text ?? "",
       disposition_options: (campaignRow.disposition_options ?? undefined) as BaseCampaignDetails["disposition_options"],
       questions: (campaignRow.live_questions ?? undefined) as BaseCampaignDetails["questions"],
       voicedrop_audio: campaignRow.voicedrop_audio,
