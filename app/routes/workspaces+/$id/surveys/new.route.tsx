@@ -1,7 +1,7 @@
 export { loader } from "./new.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, useSubmit, useNavigate } from "react-router";
-import { useState } from "react";
+import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
 
 import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save } from "lucide-react";
 
+type CreateSurveyResult = { success: true; survey: { survey_id: string } } | { error: string };
+
 export default function NewSurveyPage() {
   const { workspaceId } = useLoaderData();
-  const submit = useSubmit();
+  const fetcher = useFetcher<CreateSurveyResult>();
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState<SurveyFormData>({
     survey_id: "",
     title: "",
@@ -33,14 +35,24 @@ export default function NewSurveyPage() {
     ]
   });
 
+  // /api/surveys is a resource route (no component) — submitting via a plain
+  // useSubmit() navigation lands the browser on that bare JSON response
+  // (a blank page) instead of the survey the user just created. Submit
+  // through a fetcher instead and redirect client-side once it succeeds.
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data && "success" in fetcher.data && fetcher.data.success) {
+      navigate(`/workspaces/${workspaceId}/surveys/${fetcher.data.survey.survey_id}`);
+    }
+  }, [fetcher.state, fetcher.data, navigate, workspaceId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const formDataToSubmit = new FormData();
     formDataToSubmit.append("surveyData", JSON.stringify(formData));
     formDataToSubmit.append("workspaceId", workspaceId);
 
-    submit(formDataToSubmit, {
+    fetcher.submit(formDataToSubmit, {
       method: "POST",
       action: "/api/surveys",
     });
@@ -391,6 +403,12 @@ export default function NewSurveyPage() {
           </Card>
         ))}
 
+        {fetcher.data && "error" in fetcher.data && fetcher.data.error && (
+          <p role="alert" className="text-sm text-destructive mb-4">
+            {fetcher.data.error}
+          </p>
+        )}
+
         <div className="flex gap-4">
           <Button
             type="button"
@@ -400,9 +418,9 @@ export default function NewSurveyPage() {
             <Plus className="w-4 h-4 mr-2" />
             Add Page
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={fetcher.state !== "idle"}>
             <Save className="w-4 h-4 mr-2" />
-            Create Survey
+            {fetcher.state !== "idle" ? "Creating..." : "Create Survey"}
           </Button>
         </div>
       </form>

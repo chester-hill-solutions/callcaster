@@ -1,13 +1,14 @@
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { createEmptyAudience } from "@/lib/audience-upload-db.server";
 import { defineAction } from "@/lib/handler.server";
+import { MemberRole } from "@/lib/member-role";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
-    const { headers, user, workspaceId } = auth;
+    const { headers, user, workspaceId, userRole } = auth;
     if (workspaceId == null) {
       return routeData(
         {
@@ -15,6 +16,13 @@ export const action = defineAction({
           error: "Workspace not found",
         },
         { headers },
+      );
+    }
+
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData(
+        { success: false, error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
       );
     }
 

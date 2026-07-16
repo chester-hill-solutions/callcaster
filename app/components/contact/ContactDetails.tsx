@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useImperativeHandle, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
-import { FaEdit, FaSave } from "react-icons/fa";
+import { FaEdit } from "react-icons/fa";
 import ContactFields from "./ContactDetailsFields";
 import OtherDataFields from "./ContactDetailsOtherFields";
 import RecentContacts from "./RecentContacts";
@@ -22,6 +22,13 @@ export interface ContactDetailsProps {
   userRole?: string;
   onDirtyChange?: (isDirty: boolean) => void;
   onChangesChange?: (hasChanges: boolean) => void;
+  /**
+   * Contacts created via "New Contact" have no saved state to protect, so the
+   * fields should be editable on arrival instead of gated behind an Edit
+   * button that only makes sense once there is something to accidentally
+   * overwrite.
+   */
+  startEditable?: boolean;
 }
 
 export interface ContactDetailsState {
@@ -34,16 +41,80 @@ export interface ContactUpdateData {
   [key: string]: unknown;
 }
 
-const ContactDetails: React.FC<ContactDetailsProps> = ({
-  contact,
-  audiences,
-  userRole,
-  onDirtyChange,
-  onChangesChange,
-}) => {
-  const [editMode, setEditMode] = useState<boolean>(false);
+/** Text fields editable via ContactFields — the set the Save button submits. */
+const EDITABLE_FIELD_NAMES = [
+  "firstname",
+  "surname",
+  "phone",
+  "email",
+  "address",
+  "city",
+  "province",
+  "postal",
+] as const;
+
+/** Imperative handle so the route's single header Save/Reset can read and
+ * clear this component's in-progress edits without lifting all field state
+ * up (audiences/other-data stay local; only the persisted text fields need
+ * to reach the action). */
+export interface ContactDetailsHandle {
+  getFormValues: () => Record<string, string>;
+  reset: () => void;
+}
+
+function buildFieldValues(
+  contact?: Contact | null,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const name of EDITABLE_FIELD_NAMES) {
+    const value = contact?.[name];
+    values[name] = value != null ? String(value) : "";
+  }
+  return values;
+}
+
+const ContactDetails = React.forwardRef<
+  ContactDetailsHandle,
+  ContactDetailsProps
+>(function ContactDetails(
+  {
+    contact,
+    audiences,
+    userRole,
+    onDirtyChange,
+    onChangesChange,
+    startEditable = false,
+  },
+  ref,
+) {
+  const [editMode, setEditMode] = useState<boolean>(startEditable);
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
+    buildFieldValues(contact),
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getFormValues: () => fieldValues,
+      reset: () => {
+        setFieldValues(buildFieldValues(contact));
+        setIsDirty(false);
+        setHasChanges(false);
+        onDirtyChange?.(false);
+        onChangesChange?.(false);
+      },
+    }),
+    [fieldValues, contact, onDirtyChange, onChangesChange],
+  );
+
+  // The values ContactFields renders: saved contact data overlaid with
+  // whatever the user has typed so far, so edits are visible immediately.
+  const effectiveContact = useMemo(
+    () => ({ ...(contact ?? {}), ...fieldValues }) as Contact,
+    [contact, fieldValues],
+  );
 
   // Enhanced handlers with better type safety
   const handleEdit = useCallback((): void => {
@@ -56,30 +127,18 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
     }
   }, [onDirtyChange]);
 
-  const handleSave = useCallback((): void => {
-    try {
-      setEditMode(false);
-      setIsDirty(false);
-      setHasChanges(false);
-      onDirtyChange?.(false);
-      onChangesChange?.(false);
-    } catch (error) {
-      logger.error('Error saving contact:', error);
-    }
-  }, [onDirtyChange, onChangesChange]);
-
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     try {
       const { name, value } = e.target;
-      const updateData: ContactUpdateData = { [name]: value };
-      
-      // Update contact data (this would typically be passed from parent)
+      setFieldValues((prev) => ({ ...prev, [name]: value }));
+      setIsDirty(true);
       setHasChanges(true);
+      onDirtyChange?.(true);
       onChangesChange?.(true);
     } catch (error) {
       logger.error('Error handling input change:', error);
     }
-  }, [onChangesChange]);
+  }, [onDirtyChange, onChangesChange]);
 
   const handleAudienceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     try {
@@ -131,7 +190,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
       
       <CardContent>
         <ContactFields
-          contact={contact}
+          contact={effectiveContact}
           editMode={editMode}
           onInputChange={handleInputChange}
         />
@@ -185,24 +244,19 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
         
         <RecentContacts contact={contact} />
       </CardContent>
-      
-      <CardFooter className="flex justify-end space-x-2">
-        {editMode ? (
-          <Button
-            onClick={handleSave}
-            className="bg-success text-success-foreground hover:bg-success/90"
-            disabled={!hasChanges}
-          >
-            <FaSave className="mr-2" /> Save
-          </Button>
-        ) : (
+
+      {/* There is only one working Save action (the page header's, which
+          submits to the server) — this footer's only job is the Edit gate
+          for existing contacts. New contacts start editable and skip it. */}
+      {!editMode && (
+        <CardFooter className="flex justify-end space-x-2">
           <Button onClick={handleEdit}>
             <FaEdit className="mr-2" /> Edit
           </Button>
-        )}
-      </CardFooter>
+        </CardFooter>
+      )}
     </Card>
   );
-};
+});
 
 export default ContactDetails;

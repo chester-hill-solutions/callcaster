@@ -27,7 +27,10 @@ export async function markAudienceUpdating(
 ): Promise<void> {
   const tdb = createTenantDb(workspaceId);
   await tdb.audience.update({
-    set: { status: "updating" },
+    // audience_status enum is pending|processing|completed|error (no "updating"
+    // value exists — see drizzle/0000_baseline.sql:86). An existing audience
+    // receiving a new upload is mid-operation, which maps to "processing".
+    set: { status: "processing" },
     where: eq(audienceTable.id, audienceId),
   });
 }
@@ -128,7 +131,12 @@ export async function createEmptyAudience(
   const tdb = createTenantDb(workspaceId);
   const [row] = await tdb.audience.insert({
     name,
-    status: "empty",
+    // audience_status enum is pending|processing|completed|error — there is no
+    // "empty" value (see drizzle/0000_baseline.sql:86). A manually-created
+    // audience has no upload pending and is immediately usable, so it's
+    // represented as "completed" (consistent with the post-import finalize
+    // state in audience-upload-process.server.ts).
+    status: "completed",
   });
   return row ?? null;
 }

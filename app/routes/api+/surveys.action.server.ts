@@ -99,6 +99,9 @@ async function handleUpdateSurvey(
       surveyPublicId: surveyId,
       title: surveyData.title,
       is_active: surveyData.is_active,
+      // Persist the edited page/question/option structure, not just metadata —
+      // without this, question edits are silently discarded (audit-C 2b).
+      pages: surveyData.pages,
     });
 
     if (!survey) {
