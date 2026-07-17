@@ -50,4 +50,41 @@ describe("app/components/contacts/ContactsPage.tsx", () => {
       await screen.findByRole("link", { name: "Edit Ada Lovelace" }),
     ).toBeInTheDocument();
   });
+
+  test("workspace empty state uses flat empty-state composition", async () => {
+    const ContactsPage = (await import("@/components/contacts/ContactsPage"))
+      .default;
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/workspaces/:id/contacts",
+          Component: ContactsPage,
+          loader: () => ({
+            contacts: [],
+            workspace: { id: "ws-1", name: "Test", credits: 10, feature_flags: null },
+            error: null,
+            userRole: "admin",
+            flags: null,
+            campaigns: [],
+            pagination: {
+              currentPage: 1,
+              totalPages: 0,
+              totalCount: 0,
+              pageSize: 25,
+            },
+          }),
+        },
+      ],
+      { initialEntries: ["/workspaces/ws-1/contacts"] },
+    );
+    const { container } = render(createElement(RouterProvider, { router }));
+
+    expect(
+      await screen.findByTestId("workspace-resource-empty-state"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Add your first contact" }),
+    ).toBeInTheDocument();
+    expect(container.querySelector("[data-slot='card']")).toBeNull();
+  });
 });

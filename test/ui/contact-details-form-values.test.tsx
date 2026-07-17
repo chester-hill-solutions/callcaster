@@ -81,4 +81,25 @@ describe("ContactDetails form values", () => {
     });
     expect(ref.current?.getFormValues()).toMatchObject({ firstname: "Original" });
   });
+
+  test("other-data remove actions have accessible names in edit mode", () => {
+    render(
+      <ContactDetails
+        contact={
+          {
+            id: 5,
+            firstname: "Original",
+            surname: "Name",
+            other_data: JSON.stringify([{ notes: "VIP" }]),
+          } as any
+        }
+        audiences={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+    expect(
+      screen.getByRole("button", { name: "Remove notes field" }),
+    ).toBeInTheDocument();
+  });
 });

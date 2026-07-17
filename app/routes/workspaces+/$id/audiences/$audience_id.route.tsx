@@ -110,28 +110,24 @@ export default function AudienceView() {
           />
         </TabsContent>
 
-        <TabsContent value="upload">
-          <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg shadow">
-            <h2 className="font-Zilla-Slab text-xl font-semibold mb-4 text-brand-primary dark:text-white">
-              Upload Contacts to {audience?.name}
-            </h2>
-            <AudienceUploader
-              existingAudienceId={audience_id}
-              onUploadComplete={handleUploadComplete}
-            />
-          </div>
+        <TabsContent value="upload" className="space-y-4">
+          <Heading as="h2" level={3} branded={false}>
+            Upload Contacts to {audience?.name}
+          </Heading>
+          <AudienceUploader
+            existingAudienceId={audience_id}
+            onUploadComplete={handleUploadComplete}
+          />
         </TabsContent>
 
-        <TabsContent value="history">
-          <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg shadow">
-            <h2 className="font-Zilla-Slab text-xl font-semibold mb-4 text-brand-primary dark:text-white">
-              Upload History
-            </h2>
-            <AudienceUploadHistory
-              audienceId={Number(audience_id)}
-              workspaceId={workspace_id ?? ""}
-            />
-          </div>
+        <TabsContent value="history" className="space-y-4">
+          <Heading as="h2" level={3} branded={false}>
+            Upload History
+          </Heading>
+          <AudienceUploadHistory
+            audienceId={Number(audience_id)}
+            workspaceId={workspace_id ?? ""}
+          />
         </TabsContent>
       </Tabs>
     </main>

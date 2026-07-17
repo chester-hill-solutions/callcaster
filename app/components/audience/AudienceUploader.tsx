@@ -500,9 +500,9 @@ export default function AudienceUploader({
       </div>
       
       {pendingFileName && (
-        <div className="rounded-lg border p-4 bg-zinc-100 dark:bg-zinc-900">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-zinc-900 dark:text-white">Map CSV Headers</h3>
+        <div className="rounded-md border bg-muted/40 p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-medium text-foreground">Map CSV Headers</h3>
             {!isHeaderMappingConfirmed ? (
               <Button
                 onClick={handleConfirmMapping}
@@ -585,9 +585,9 @@ export default function AudienceUploader({
                 </div>
               ) : null}
 
-              <div className="mt-4 rounded-lg border p-4">
-                <h3 className="mb-4 font-medium text-zinc-900 dark:text-white">Data Preview (First 5 rows)</h3>
-                <div className="overflow-x-auto">
+              <div className="mt-4 border-t border-border pt-4">
+                <h3 className="mb-4 font-medium text-foreground">Data Preview (First 5 rows)</h3>
+                <div className="overflow-x-auto rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
