@@ -27,9 +27,11 @@ Canonical **inventory** of visual surfaces in CallCaster. Usage rules: [design-s
 **Remaining systemic problems:**
 
 1. Workspace panel is the surface owner, but many child routes still mount `Card` / `BrandedCard` / ad hoc bordered shells as page containers (depth ≥3 common).
-2. Navbar still discards root `workspaces` (`_workspaces`) — no picker; credits live in sidebar with campaign-only revalidation.
+2. Credit chrome revalidation is incomplete: Navbar and call-session subscribe to `transaction_history`, but ledger writes do not yet emit those events; mobile/sidebar/banner parity still needs consolidation.
 3. Uneven primitive adoption: raw `<select>`/`<table>`/`textarea`, dual icon libraries, raw palette classes vs semantic tokens.
-4. Several inactive/orphan components remain mounted in tests or unused in production.
+4. Several inactive/orphan components remain unused in production.
+
+**Resolved since prior ledger:** Navbar desktop picker + mobile workspace list (Admin+-gated credits projection); `OnboardingOverviewCard` removed and ProgressStrip is the sole progress surface; `WorkspaceResourceListShell` empty state is flat (no Card).
 
 ---
 
@@ -200,7 +202,7 @@ All use `cn()` unless noted.
 
 **Workspace surface owner:** [`app/routes/workspaces+/$id.tsx`](../app/routes/workspaces+/$id.tsx) — `rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6`.
 
-**Onboarding chrome:** `OnboardingProgressStrip` mounts under Navbar when onboarding match has strip data. `OnboardingOverviewCard` **removed from tree** (file gone); `test/ui/onboarding-goal-step.test.tsx` still imports it — broken coupling.
+**Onboarding chrome:** `OnboardingProgressStrip` mounts under Navbar when onboarding match has strip data. `OnboardingOverviewCard` removed; goal-step tests import ProgressStrip.
 
 ### Workspace child routes (panel context)
 
@@ -245,8 +247,8 @@ All use `cn()` unless noted.
 
 | Surface | Source | Notes |
 |---------|--------|-------|
-| Navbar | `layout/Navbar.tsx` | Wordmark, Docs, Workspaces link, account, theme; **no picker**; `workspaces` unused |
-| Mobile Sheet | `Navbar.MobileMenu.tsx` | User inset Card-like; no workspace list |
+| Navbar | `layout/Navbar.tsx` | Wordmark, Docs, workspace picker (`navbar-workspace-picker`), Admin+ credits, account, theme |
+| Mobile Sheet | `Navbar.MobileMenu.tsx` | Workspace list + optional credits; user inset Card-like |
 | WorkspaceNav | `WorkspaceNav.tsx` | Sibling elevated shell; Admin+ credits footer box |
 | OnboardingProgressStrip | onboarding | Route chrome under Navbar — **conforming placement** |
 | Credit banners | `$id.tsx` | Above panel; prefer `Alert`; raw amber on onboarding banner |
@@ -279,10 +281,10 @@ Every distinct stacking pattern observed:
 
 | Concern | Current | Gap / recommendation |
 |---------|---------|----------------------|
-| Workspace picker | Root loader fetches `listUserWorkspaceSummaries` → `{id,name}`; Navbar `_workspaces` unused | Compact picker in Navbar + mobile Sheet parity; route to `/workspaces/:id` root only |
-| Credits in chrome | WorkspaceNav Admin+ footer badge; ProgressStrip shows credits; layout low/zero banners for all roles | Navbar authorized readout optional; keep server Admin+ purchase gate; do not invent client-only auth |
-| Credit revalidation | `$id.tsx` SSE: `table: "campaign"` only | Subscribe `transaction_history` (or workspace credits) → `revalidator.revalidate()`; update `workspace-realtime-revalidation.test.tsx` |
-| Onboarding progress | ProgressStrip under Navbar | **Conforming.** Remove stale OverviewCard test import |
+| Workspace picker | Root `listUserWorkspaceSummaries` → `{id,name,role,credits|null}`; desktop DropdownMenu + mobile list | **Implemented.** Keep root-only `/workspaces/:id` destinations; cover truncation/RBAC in tests |
+| Credits in chrome | Navbar Admin+ readout + WorkspaceNav footer + ProgressStrip + layout banners | Keep server Admin+ nulling; consolidate revalidation (see credit event wave) |
+| Credit revalidation | Navbar owns a credit EventSource; `$id.tsx` owns campaign; producer missing | Emit `transaction_history` from ledger write; consolidate multi-table subscription |
+| Onboarding progress | ProgressStrip under Navbar | **Conforming.** OverviewCard removed; goal-step tests import ProgressStrip |
 | Never hide as auth | Nav role filters are presentation | Server gates remain source of truth |
 
 **Target chrome composition:**
@@ -312,13 +314,13 @@ Workspace panel: flat step / page content only
 | R1 | Container Card / BrandedCard inside panel | Today, onboarding steps, creation routes, voicemail setup, Softphone | `PageShell` / `Section variant="flat"` + FormField |
 | R2 | Nested bordered form groups | OnboardingBusinessBasics, CampaignSettings, MessageSettings | muted insets / fieldsets |
 | R3 | Ad hoc Panel / brand chrome | numbers.route `Panel`, audience detail tab shell | shared panel classes or flat Section |
-| R4 | Empty-state Card in panel | ResourceListShell, NumbersTable, NumberSummaryList, ContactsPage | flat empty (ResourceListShell pattern without Card) |
+| R4 | Empty-state Card in panel | NumbersTable, NumberSummaryList, ContactsPage (ResourceListShell flattened) | adopt `WorkspaceResourceEmptyState` |
 | R5 | Table strategy split | QueueTable, AudienceUploadHistory, NumbersTable, admin tables | DataTable + ui/table; specialize only filters |
 | R6 | Dual icon libraries | Navbar migrated; chats/campaign remnants | lucide-react |
 | R7 | Transparent / disabled Card chrome | ConversationList | `div`/`section` |
 | R8 | Absolute Card as modal | Question EditModal | `Dialog` |
 | R9 | Invalid list nesting | `services.tsx` + `ServiceCard` both `<li>` | one list item owner |
-| R10 | Orphan / inactive UI | `HandsetCallPanel`, `CallScreen.TopBar`, `ContactTable` chain, `CustomCard`, `ErrorBoundary`, OverviewCard test import | delete or rewire deliberately |
+| R10 | Orphan / inactive UI | `HandsetCallPanel`, `CallScreen.TopBar`, `ContactTable` chain, `CustomCard`, `ErrorBoundary` | delete after import scan |
 | R11 | Admin parent always shows dashboard above Outlet | `admin+/route.tsx` | index-only dashboard; child routes without stacked shell |
 | R12 | Softphone padding + Card | SoftphonePanel / AgentDesktop | flat section; drop `container p-6` |
 | R13 | Campaign setup progress in content Card | CampaignSetupGuide | route chrome under Navbar / settings header strip |
@@ -335,8 +337,8 @@ Workspace panel: flat step / page content only
 4. **CampaignSettings** — flat sections; demote SetupGuide to chrome; flatten CostPanel outer Card.
 5. **Audience detail / uploader** — flatten tab shells; one bordered table max.
 6. **ContactDetails + RecentContacts** — flat detail; restrain attempt elevation.
-7. **Navbar workspace picker + credit revalidation story.**
-8. **Question EditModal → Dialog; services list semantics; fix OverviewCard test import.**
+7. **Credit event production + chrome revalidation consolidation** (picker already landed).
+8. **Question EditModal → Dialog; services list semantics.**
 
 ---
 
@@ -374,7 +376,7 @@ Relocate deliberately if redesigning shells:
 
 | Selector / contract | Where |
 |---------------------|-------|
-| `onboarding-step` | ProgressStrip (OverviewCard removed — update `OnboardingPage.ts` / broken unit import) |
+| `onboarding-step` | ProgressStrip (sole owner) |
 | `skipped-first-number-notice` | OnboardingWizard Alert |
 | `campaign-goals` / `campaign-goal-*` | campaigns/new |
 | `campaign-launch-review` / `campaign-readiness` | CampaignSettings / BasicInfo |
@@ -422,7 +424,7 @@ Domain inventories were produced in parallel and reconciled against live/source 
 
 No code changes in this audit task. Suggested implementation sequence:
 
-1. Fix broken `OnboardingOverviewCard` test import; assert ProgressStrip `onboarding-step` only.
+1. Keep ProgressStrip as sole `onboarding-step` owner; flatten inner onboarding groups.
 2. Flatten onboarding steps + CampaignSettings + Softphone (largest depth defects).
 3. numbers route: kill ad hoc Panel; flatten empty states.
 4. Navbar picker + `transaction_history` layout revalidation.
