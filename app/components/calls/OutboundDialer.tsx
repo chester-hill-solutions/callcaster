@@ -29,7 +29,7 @@ export function OutboundDialer({
   onClearError,
 }: OutboundDialerProps) {
   return (
-    <div className="mt-4 rounded-lg border p-4">
+    <div className="space-y-2">
       <p className="text-sm font-medium text-muted-foreground">Dial out</p>
       <div className="mt-2 flex gap-2">
         <Input
