@@ -1,15 +1,16 @@
 export { loader } from "./numbers.loader.server";
 export { action } from "./numbers.action.server";
 
-import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect , Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
-import { useCallback, useRef, useState } from "react";
+import { Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
+import { useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useActionFeedback, useFetcherOnIdle } from "@/hooks/utils";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   Dialog,
   DialogContent,
@@ -293,13 +294,31 @@ const WorkspaceSettings = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div className="flex flex-col">
-        <BackButton disabled={updateFetcher.state !== "idle"} />
-        <h1 className="px-4 pt-2 text-2xl font-semibold tracking-tight">
-          Phone numbers
-        </h1>
-        <div className="flex min-w-0 flex-wrap gap-4 p-4">
-          <Panel className="min-w-0 flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
+      <PageShell
+        title="Phone numbers"
+        description="Manage inbound routing, rent numbers, and verify caller IDs."
+        actions={
+          <Button
+            asChild
+            disabled={updateFetcher.state !== "idle"}
+            variant="outline"
+            size="sm"
+          >
+            <Link to=".." relative="path">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back
+            </Link>
+          </Button>
+        }
+      >
+        <div className="grid min-w-0 gap-0 lg:grid-cols-[2fr_1fr] lg:gap-8">
+          <Section variant="flat" className="min-w-0">
+            <SectionHeader
+              branded={false}
+              compact
+              title="Your numbers"
+              description="Set how each number routes inbound calls."
+            />
             <NumberSummaryList
               phoneNumbers={phoneNumbers || []}
               users={users}
@@ -317,47 +336,24 @@ const WorkspaceSettings = () => {
               onApplyPreset={handleApplyPreset}
               isBusy={updateFetcher.state !== "idle"}
             />
-          </Panel>
-          <div className="flex min-w-0 flex-shrink-0 flex-grow basis-full flex-col gap-4 lg:basis-[calc(33.333%-1rem)]">
-            <Panel className="min-w-0">
+          </Section>
+          <div className="min-w-0 space-y-0">
+            <Section variant="flat">
               <NumberCallerId />
-            </Panel>
-            <Panel className="min-w-0">
+            </Section>
+            <Section variant="flat">
+              <SectionHeader branded={false} compact title="Rent a number" />
               <NumberPurchase
                 fetcher={fetcher}
                 workspaceId={workspaceId ?? ""}
                 creditsBalance={creditsBalance}
               />
-            </Panel>
+            </Section>
           </div>
         </div>
-      </div>
+      </PageShell>
     </>
   );
 };
 
-const BackButton = ({ disabled }: { disabled: boolean }) => (
-  <div className="flex justify-end pr-4 pt-4">
-    <Button asChild disabled={disabled} variant="outline" size="sm">
-      <Link to=".." relative="path">
-        <ArrowLeft className="mr-1 h-4 w-4" />
-        Back
-      </Link>
-    </Button>
-  </div>
-);
-
-const Panel = ({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className: string;
-}) => (
-  <div
-    className={`rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white ${className}`}
-  >
-    {children}
-  </div>
-);
 export default WorkspaceSettings;

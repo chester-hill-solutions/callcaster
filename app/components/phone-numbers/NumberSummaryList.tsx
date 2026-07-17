@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceResourceListShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -339,34 +341,43 @@ function NumberSummaryRow({
             });
           }}
         >
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <label className="sr-only" htmlFor={`preset-${number.id}`}>
-              Routing preset
-            </label>
-            <select
-              id={`preset-${number.id}`}
-              value={presetId}
-              onChange={(event) =>
-                setPresetId(
-                  event.target.value as Exclude<InboundRoutingPresetId, "custom">,
-                )
-              }
-              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <FormField
+              htmlFor={`preset-${number.id}`}
+              label="Routing preset"
+              className="min-w-0 flex-1"
             >
-              {rankedPresets.map((preset) => (
-                <option
-                  key={preset.id}
-                  value={preset.id}
-                  disabled={
-                    preset.id === "forward" && verifiedCallerIds.length === 0
+              <FormFieldControl>
+                <select
+                  id={`preset-${number.id}`}
+                  value={presetId}
+                  onChange={(event) =>
+                    setPresetId(
+                      event.target.value as Exclude<
+                        InboundRoutingPresetId,
+                        "custom"
+                      >,
+                    )
                   }
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  aria-label="Routing preset"
                 >
-                  {preset.id === "forward" && verifiedCallerIds.length === 0
-                    ? "Forward call — verify caller ID first"
-                    : preset.label}
-                </option>
-              ))}
-            </select>
+                  {rankedPresets.map((preset) => (
+                    <option
+                      key={preset.id}
+                      value={preset.id}
+                      disabled={
+                        preset.id === "forward" && verifiedCallerIds.length === 0
+                      }
+                    >
+                      {preset.id === "forward" && verifiedCallerIds.length === 0
+                        ? "Forward call — verify caller ID first"
+                        : preset.label}
+                    </option>
+                  ))}
+                </select>
+              </FormFieldControl>
+            </FormField>
             <Button
               type="submit"
               disabled={isBusy}
@@ -422,14 +433,10 @@ export function NumberSummaryList({
 
   if (phoneNumbers.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Connect your first phone number</CardTitle>
-          <CardDescription>
-            Rent a number or verify a caller ID to start calling.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <WorkspaceResourceEmptyState
+        emptyMessage="Connect your first phone number"
+        emptyDescription="Rent a number or verify a caller ID to start calling."
+      />
     );
   }
 
