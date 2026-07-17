@@ -236,7 +236,7 @@ export function OnboardingFirstNumberStep({
         <div className="space-y-6">
           {smsGoal ? (
             <TooltipProvider>
-              <div className="rounded-lg bg-muted/30 p-4 text-sm text-muted-foreground">
+              <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
                 <p>
                   For SMS blasts, a toll-free number supports higher sending volume after
                   verification. A local number works for lighter texting at a lower rate.
@@ -281,13 +281,11 @@ export function OnboardingFirstNumberStep({
           ) : null}
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-4 rounded-lg border p-4">
-              <div>
-                <h3 className="font-medium">Rent a Canadian number</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Best for inbound SMS, inbound calls, and full two-way messaging.
-                </p>
-              </div>
+            <fieldset className="space-y-4 rounded-md bg-muted/40 p-3">
+              <legend className="text-sm font-medium">Rent a Canadian number</legend>
+              <p className="text-sm text-muted-foreground">
+                Best for inbound SMS, inbound calls, and full two-way messaging.
+              </p>
               {isReadOnly ? (
                 <p className="text-sm text-muted-foreground">
                   Only workspace owners and admins can rent numbers. Ask an admin to complete this
@@ -302,17 +300,15 @@ export function OnboardingFirstNumberStep({
                   onPurchaseComplete={handlePurchaseComplete}
                 />
               )}
-            </div>
+            </fieldset>
 
-            <div className="space-y-4 rounded-lg border p-4">
-              <div>
-                <h3 className="font-medium">Verify your own number</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Use a phone number you already own. Verified numbers work for outbound SMS and
-                  calls, but not for inbound SMS or calls. Rent a number above if you need inbound
-                  traffic.
-                </p>
-              </div>
+            <fieldset className="space-y-4 rounded-md bg-muted/40 p-3">
+              <legend className="text-sm font-medium">Verify your own number</legend>
+              <p className="text-sm text-muted-foreground">
+                Use a phone number you already own. Verified numbers work for outbound SMS and
+                calls, but not for inbound SMS or calls. Rent a number above if you need inbound
+                traffic.
+              </p>
               {isReadOnly ? (
                 <p className="text-sm text-muted-foreground">
                   Only workspace owners and admins can verify numbers. Ask an admin to complete this
@@ -327,7 +323,7 @@ export function OnboardingFirstNumberStep({
                   fetcher={verifyFetcher}
                 />
               )}
-            </div>
+            </fieldset>
           </div>
 
           {rentedNumbers.length > 0 && !isReadOnly ? (

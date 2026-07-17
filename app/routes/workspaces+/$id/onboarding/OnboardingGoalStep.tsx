@@ -15,6 +15,7 @@ import {
   goalNeedsSmsCompliance,
 } from "@/lib/messaging-onboarding/goals";
 import type { WorkspaceOnboardingGoal } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { GOAL_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 
@@ -57,17 +58,21 @@ export function OnboardingGoalStep({
           ))}
 
           <TooltipProvider>
-            <div className="space-y-3" role="radiogroup" aria-label="Onboarding goal">
+            <fieldset className="space-y-3">
+              <legend className="sr-only">Onboarding goal</legend>
               {GOAL_OPTIONS.map((option) => {
                 const checked = selectedGoal === option.id;
                 return (
-                  <div
+                  <label
                     key={option.id}
-                    className={
+                    htmlFor={`goal-${option.id}`}
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-md p-3 transition-colors",
                       checked
-                        ? "flex items-start gap-3 rounded-lg border border-primary/50 ring-1 ring-primary/30 p-4"
-                        : "flex items-start gap-3 rounded-lg border p-4"
-                    }
+                        ? "bg-primary/10 ring-1 ring-primary/30"
+                        : "bg-muted/40 hover:bg-muted/60",
+                      isReadOnly && "cursor-default",
+                    )}
                   >
                     <input
                       id={`goal-${option.id}`}
@@ -79,19 +84,17 @@ export function OnboardingGoalStep({
                       disabled={isReadOnly}
                       className="mt-1"
                     />
-                    <div className="flex-1">
-                      <Label htmlFor={`goal-${option.id}`} className="font-medium">
-                        {option.label}
-                      </Label>
+                    <span className="flex-1">
+                      <span className="font-medium">{option.label}</span>
                       <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
-                    </div>
-                  </div>
+                    </span>
+                  </label>
                 );
               })}
-            </div>
+            </fieldset>
 
             {selectedGoal === "sms_blast" ? (
-              <div className="rounded-lg bg-muted/30 p-4 text-sm text-muted-foreground">
+              <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
                 <p>
                   For texting at higher volume, a toll-free number is usually the smoother path. A
                   local number can send texts too, at a lower throughput.
@@ -112,8 +115,8 @@ export function OnboardingGoalStep({
           </TooltipProvider>
 
           {showTollFreeFields ? (
-            <div className="space-y-4 border-t border-border/60 pt-4">
-              <p className="text-sm font-medium">Toll-free verification details</p>
+            <fieldset className="space-y-4 border-t border-border/60 pt-4">
+              <legend className="text-sm font-medium">Toll-free verification details</legend>
               <p className="text-sm text-muted-foreground">
                 These details help carriers approve higher-volume texting on a toll-free number.
               </p>
@@ -171,12 +174,12 @@ export function OnboardingGoalStep({
                   disabled={isReadOnly}
                 />
               </div>
-            </div>
+            </fieldset>
           ) : null}
 
           {showA2pFields ? (
-            <div className="space-y-4 border-t border-border/60 pt-4">
-              <p className="text-sm font-medium">US brand registration details</p>
+            <fieldset className="space-y-4 border-t border-border/60 pt-4">
+              <legend className="text-sm font-medium">US brand registration details</legend>
               <p className="text-sm text-muted-foreground">
                 Needed for application-to-person texting on US local numbers.
               </p>
@@ -243,7 +246,7 @@ export function OnboardingGoalStep({
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
           ) : null}
       </Form>
     </Section>

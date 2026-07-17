@@ -77,18 +77,16 @@ export function OnboardingBusinessBasicsStep({
       />
       <Form id={formId} method="post" className="space-y-6">
           <input type="hidden" name="_action" value="save_business_profile" />
-          <div className="rounded-lg bg-muted/30 p-4 text-sm text-muted-foreground">
+          <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
             Use the registered business name, a public website, and clear examples of what contacts
             will hear or receive.
           </div>
 
-          <div className="space-y-4 border-t border-border/60 pt-6">
-            <div>
-              <div className="font-medium">Business identity</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                This is the basic profile a reviewer uses to understand who this workspace represents.
-              </p>
-            </div>
+          <fieldset className="space-y-4 border-t border-border/60 pt-6">
+            <legend className="text-base font-medium">Business identity</legend>
+            <p className="text-sm text-muted-foreground">
+              This is the basic profile a reviewer uses to understand who this workspace represents.
+            </p>
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 htmlFor="legalBusinessName"
@@ -212,15 +210,13 @@ export function OnboardingBusinessBasicsStep({
                 />
               </div>
             </div>
-          </div>
+          </fieldset>
 
-          <div className="space-y-4 border-t border-border/60 pt-6">
-            <div>
-              <div className="font-medium">Messaging program details</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Describe the messages plainly enough that someone outside the team can tell what users signed up to receive.
-              </p>
-            </div>
+          <fieldset className="space-y-4 border-t border-border/60 pt-6">
+            <legend className="text-base font-medium">Messaging program details</legend>
+            <p className="text-sm text-muted-foreground">
+              Describe the messages plainly enough that someone outside the team can tell what users signed up to receive.
+            </p>
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 className="md:col-span-2"
@@ -309,15 +305,13 @@ export function OnboardingBusinessBasicsStep({
                 />
               </FormField>
             </div>
-          </div>
+          </fieldset>
 
-          <div className="space-y-4 border-t border-border/60 pt-6">
-            <div>
-              <div className="font-medium">Emergency voice address</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Fill this out if the workspace needs voice emergency compliance. Use a real physical service address, not a PO box.
-              </p>
-            </div>
+          <fieldset className="space-y-4 border-t border-border/60 pt-6">
+            <legend className="text-base font-medium">Emergency voice address</legend>
+            <p className="text-sm text-muted-foreground">
+              Fill this out if the workspace needs voice emergency compliance. Use a real physical service address, not a PO box.
+            </p>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="addressStreet">Street address</Label>
@@ -370,7 +364,7 @@ export function OnboardingBusinessBasicsStep({
                 />
               </div>
             </div>
-          </div>
+          </fieldset>
           {!isReadOnly ? (
             <Button type="submit" disabled={isSavingBusinessProfile} aria-busy={isSavingBusinessProfile}>
               {isSavingBusinessProfile ? "Saving business details..." : "Save business details"}
@@ -380,23 +374,23 @@ export function OnboardingBusinessBasicsStep({
         {onboarding.selectedChannels.includes("voice_compliance") ? (
           <div className="mt-6 space-y-4 border-t border-border/60 pt-6">
             <div>
-              <div className="font-medium">Emergency voice review</div>
+              <h3 className="font-medium">Emergency voice review</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Validate the saved service address and reconcile existing rented voice numbers after the address is saved.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border p-4">
+              <div className="rounded-md bg-muted/40 p-3">
                 <div className="text-sm text-muted-foreground">Address status</div>
                 <div className="mt-1 font-medium capitalize">
                   {onboarding.emergencyVoice.address.status.replaceAll("_", " ")}
                 </div>
               </div>
-              <div className="rounded-lg border p-4">
+              <div className="rounded-md bg-muted/40 p-3">
                 <div className="text-sm text-muted-foreground">Emergency-ready numbers</div>
                 <div className="mt-1 font-medium">{onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length}</div>
               </div>
-              <div className="rounded-lg border p-4">
+              <div className="rounded-md bg-muted/40 p-3">
                 <div className="text-sm text-muted-foreground">Last reviewed</div>
                 <div className="mt-1 font-medium">
                   {onboarding.emergencyVoice.lastReviewedAt
@@ -419,7 +413,7 @@ export function OnboardingBusinessBasicsStep({
                   {voiceCapableWorkspaceNumbers.map((number) => (
                     <div
                       key={number.id ?? number.phone_number ?? "workspace-number"}
-                      className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                      className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm"
                     >
                       <span className="font-mono">{number.phone_number}</span>
                       <Badge

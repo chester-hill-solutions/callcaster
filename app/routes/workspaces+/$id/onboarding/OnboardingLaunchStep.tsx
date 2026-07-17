@@ -108,7 +108,7 @@ export function OnboardingLaunchStep({
             .map((step) => {
               const meta = WIZARD_STEP_META.find((item) => item.id === step.id);
               return (
-                <div key={step.id} className="rounded-lg border p-3">
+                <div key={step.id} className="rounded-md bg-muted/40 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{meta?.label ?? step.label}</span>
                     <StatusBadge status={step.status} />
