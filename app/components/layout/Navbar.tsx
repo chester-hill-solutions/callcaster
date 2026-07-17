@@ -1,4 +1,4 @@
-import { Link, NavLink, Params, useLocation, useRevalidator } from "react-router";
+import { Link, NavLink, Params, useLocation } from "react-router";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import {
 import { Check, ChevronDown, Menu, User as UserIcon, LogOut } from "lucide-react";
 import { capitalize } from "@/lib/utils";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
-import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
 import type {
@@ -104,36 +103,25 @@ const WorkspacePicker = ({
 };
 
 /**
- * Admin+ credit readout for the active workspace. Subscribes to
- * `transaction_history` changes over the workspace SSE stream so the balance
- * revalidates when a debit or top-up lands, instead of going stale until the
- * next navigation.
+ * Admin+ credit readout for the active workspace. Freshness comes from the
+ * workspace-tree `transaction_history` subscription in `workspaces+/$id.tsx`,
+ * which revalidates root + workspace loaders together.
  */
 const NavbarCredits = ({
   workspace,
 }: {
   workspace: RootWorkspaceSummary & { credits: number };
-}) => {
-  const revalidator = useRevalidator();
-  useWorkspaceEventSubscription({
-    workspaceId: workspace.id,
-    table: "transaction_history",
-    onChange: () => {
-      void revalidator.revalidate();
-    },
-  });
-  return (
-    <Link
-      to={`/workspaces/${workspace.id}/billing`}
-      data-testid="navbar-credits"
-      aria-label={`Credits: ${workspace.credits.toLocaleString()}. Open billing.`}
-      className="inline-flex h-10 items-center rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
-    >
-      Credits&nbsp;
-      <span className="tabular-nums">{workspace.credits.toLocaleString()}</span>
-    </Link>
-  );
-};
+}) => (
+  <Link
+    to={`/workspaces/${workspace.id}/billing`}
+    data-testid="navbar-credits"
+    aria-label={`Credits: ${workspace.credits.toLocaleString()}. Open billing.`}
+    className="inline-flex h-10 items-center rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
+  >
+    Credits&nbsp;
+    <span className="tabular-nums">{workspace.credits.toLocaleString()}</span>
+  </Link>
+);
 
 /** Show credits only for Admin+ members; the server nulls credits otherwise. */
 function creditWorkspaceFor(

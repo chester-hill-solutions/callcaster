@@ -78,13 +78,13 @@ vi.mock("@/components/workspace/WorkspaceToday", () => ({
   default: () => <div>Workspace Today</div>,
 }));
 
-describe("workspace campaign realtime revalidation", () => {
+describe("workspace campaign and credit realtime revalidation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.subscriptionOptions = null;
   });
 
-  test("renders loader data and revalidates on campaign SSE events", () => {
+  test("subscribes to campaign and transaction_history and revalidates once per matching event", () => {
     render(<Workspace />);
 
     expect(
@@ -92,7 +92,7 @@ describe("workspace campaign realtime revalidation", () => {
     ).toBeInTheDocument();
     expect(mocks.subscriptionOptions).toMatchObject({
       workspaceId: "ws-1",
-      table: "campaign",
+      table: ["campaign", "transaction_history"],
     });
 
     act(() => mocks.subscriptionOptions?.onChange());

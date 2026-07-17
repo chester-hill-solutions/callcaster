@@ -102,9 +102,12 @@ function WorkspaceResolvedView({
   ).filter(Boolean);
   const revalidator = useRevalidator();
 
+  // One workspace-tree EventSource for campaign + ledger freshness. Root and
+  // workspace loaders revalidate together so Navbar, mobile menu, WorkspaceNav,
+  // and low-credit banners stay in sync without a duplicate credit subscription.
   useWorkspaceEventSubscription({
     workspaceId: workspace.id,
-    table: "campaign",
+    table: ["campaign", "transaction_history"],
     onChange: () => revalidator.revalidate(),
   });
 
