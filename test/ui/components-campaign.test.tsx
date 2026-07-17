@@ -182,16 +182,6 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
   });
 });
 
-describe("app/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus.tsx", () => {
-  test("status select", async () => {
-    const SelectStatus = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus")).default;
-    render(
-      <SelectStatus handleInputChange={handleInputChange} campaignData={{ status: "draft" }} />,
-    );
-    expect(screen.getByText("Campaign Status")).toBeInTheDocument();
-  });
-});
-
 describe("app/components/campaign/settings/detailed/CampaignDetailed.ActivateButtons.tsx", () => {
   test("schedule button", async () => {
     const ActivateButtons = (await import("@/components/campaign/settings/detailed/CampaignDetailed.ActivateButtons")).default;

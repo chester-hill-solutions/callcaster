@@ -81,49 +81,6 @@ describe("app/components/shared/BrandedCard.tsx", () => {
   });
 });
 
-describe("app/components/shared/ErrorBoundary.tsx", () => {
-  test("renders children when there is no error", async () => {
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    render(
-      <ErrorBoundary>
-        <span>all good</span>
-      </ErrorBoundary>,
-    );
-    expect(screen.getByText("all good")).toBeInTheDocument();
-  });
-
-  test("renders the default error UI when a child throws", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    const Thrower = () => {
-      throw new Error("child exploded");
-    };
-    render(
-      <ErrorBoundary>
-        <Thrower />
-      </ErrorBoundary>,
-    );
-    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
-    expect(screen.getByText("child exploded")).toBeInTheDocument();
-  });
-
-  test("renders a custom fallback when a child throws", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    const onError = vi.fn();
-    const Thrower = () => {
-      throw new Error("boom");
-    };
-    render(
-      <ErrorBoundary fallback={<div>custom fallback</div>} onError={onError}>
-        <Thrower />
-      </ErrorBoundary>,
-    );
-    expect(screen.getByText("custom fallback")).toBeInTheDocument();
-    expect(onError).toHaveBeenCalled();
-  });
-});
-
 describe("app/components/shared/InfoPopover.tsx", () => {
   test("renders the info tooltip trigger", async () => {
     const InfoPopover = (await import("@/components/shared/InfoPopover")).default;

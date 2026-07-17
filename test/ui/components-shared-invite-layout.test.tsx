@@ -44,30 +44,6 @@ describe("app/components/shared/BrandedCard.tsx", () => {
   });
 });
 
-describe("app/components/shared/ErrorBoundary.tsx", () => {
-  test("renders children when no error", async () => {
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    render(
-      <ErrorBoundary>
-        <span>ok</span>
-      </ErrorBoundary>,
-    );
-    expect(screen.getByText("ok")).toBeInTheDocument();
-  });
-
-  test("shows fallback on child error", async () => {
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    const boundary = new ErrorBoundary({
-      children: <span>ok</span>,
-      fallback: <div>fallback</div>,
-    });
-    boundary.state = ErrorBoundary.getDerivedStateFromError(new Error("boom"));
-
-    render(<>{boundary.render()}</>);
-    expect(screen.getByText("fallback")).toBeInTheDocument();
-  });
-});
-
 describe("app/components/shared/InfoPopover.tsx", () => {
   test("renders trigger and content", async () => {
     const InfoPopover = (await import("@/components/shared/InfoPopover")).default;

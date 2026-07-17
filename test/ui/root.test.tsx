@@ -34,10 +34,6 @@ vi.mock("@/components/layout/Navbar", () => ({
   },
 }));
 
-vi.mock("@/components/shared/ErrorBoundary", () => ({
-  ErrorBoundary: () => null,
-}));
-
 vi.mock("@/lib/env.server", () => ({ env: mocks.envUtil }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/auth.server", () => ({

@@ -185,6 +185,33 @@ describe("goal-based onboarding UI", () => {
     ).toBeInTheDocument();
   });
 
+  test("toll-free verification fields stay hidden until the customer opts in", () => {
+    const { container } = renderWithRouter(
+      createElement(OnboardingGoalStep, {
+        onboarding: minimalOnboarding(),
+        isReadOnly: false,
+        pending,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: /SMS blast/i }));
+    expect(screen.queryByText("Toll-free verification details")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Set Up Toll Free/i }));
+    expect(screen.getByText("Toll-free verification details")).toBeInTheDocument();
+    // DBA pre-fills from the legal business name captured on the first step.
+    expect(screen.getByLabelText(/Doing business as/i)).toHaveValue("Acme");
+
+    fireEvent.click(screen.getByRole("button", { name: /Continue with Local Number/i }));
+    expect(screen.queryByText("Toll-free verification details")).toBeNull();
+
+    const channelInputs = Array.from(
+      container.querySelectorAll<HTMLInputElement>('input[name="selectedChannels"]'),
+    ).map((input) => input.value);
+    expect(channelInputs).toContain("local_number");
+    expect(channelInputs).not.toContain("toll_free_bulk_sms");
+  });
+
   test("progress strip shows step position and a compact credits link", () => {
     renderWithRouter(
       createElement(OnboardingProgressStrip, {

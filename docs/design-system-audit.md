@@ -4,9 +4,9 @@ Canonical **inventory** of visual surfaces in CallCaster. Usage rules: [design-s
 
 **Row format:** Name | Type | Source | Classes/variants | Attached to | Status
 
-**Audit date:** 2026-07-17  
-**Scope:** Whole app (`app/components/**` 169 TSX; UI routes under `app/routes/**` excluding pure API leaves)  
-**Evidence:** Source inventory + parallel domain audits + live IDE-browser spot-checks on `http://localhost:3001` (workspace Testing `3e021cac-…`) at 375 / 1280 / 1920, light theme. Dark theme not live-verified this pass.
+**Audit date:** 2026-07-17 (refreshed PR 10 closeout)  
+**Scope:** Whole app (`app/components/**` 158 TSX; UI routes under `app/routes/**` excluding pure API leaves)  
+**Evidence:** Source inventory + component-surface remediation PRs 1–10 + live IDE-browser spot-checks on `http://localhost:3001` (workspace Testing `3e021cac-…`) at 375 / 1280 / 1920, light theme. Dark theme matrix deferred to browser checklist.
 
 ---
 
@@ -16,22 +16,23 @@ Canonical **inventory** of visual surfaces in CallCaster. Usage rules: [design-s
 
 | Count | Inventory |
 |------:|-----------|
-| 169 | `app/components/**/*.tsx` |
+| 158 | `app/components/**/*.tsx` |
 | 30 | `ui/` primitives |
-| 13 | `shared/` compositions |
+| 11 | `shared/` compositions |
 | 101 | Non-API route TSX modules |
 | 22 | Feature domains under `app/components/` |
 
 **Implemented since prior ledger:** `Heading`/`Text`, `FormField`, `AuthCard`, `Section`/`SectionHeader`, `BrandedCard`, `PageShell`, `WorkspaceResourceListShell`, `DataTable`, single Toaster, `OnboardingProgressStrip` as route chrome, `WorkspaceToday`, `PeopleHubLayout`, `NumberSummaryList`, `BillingActivityTable`, `OperatorColumn`, regrouped `WorkspaceNav`.
 
-**Remaining systemic problems:**
+**Remaining systemic problems (post-remediation):**
 
-1. Workspace panel is the surface owner, but many child routes still mount `Card` / `BrandedCard` / ad hoc bordered shells as page containers (depth ≥3 common).
-2. Credit chrome revalidation is incomplete: Navbar and call-session subscribe to `transaction_history`, but ledger writes do not yet emit those events; mobile/sidebar/banner parity still needs consolidation.
-3. Uneven primitive adoption: raw `<select>`/`<table>`/`textarea`, dual icon libraries, raw palette classes vs semantic tokens.
-4. Several inactive/orphan components remain unused in production.
+1. Uneven primitive adoption in low-traffic surfaces: raw `<select>`/`<table>`/`textarea` in chat/uploader pockets, dual icon libraries (`react-icons` remnants), raw palette classes vs semantic tokens in queue/TeamMember pockets.
+2. ChatHeader bespoke menus and ChatImages keyboard/touch gaps (PR 8 partial).
+3. Credit chrome revalidation: `transaction_history` emission landed in PR 2; continue regression coverage on purchase/debit flows.
 
-**Resolved since prior ledger:** Navbar desktop picker + mobile workspace list (Admin+-gated credits projection); `OnboardingOverviewCard` removed and ProgressStrip is the sole progress surface; `WorkspaceResourceListShell` empty state is flat (no Card).
+**Resolved in component-surface remediation (PRs 1–10):** Workspace picker + credits projection; onboarding flat `Section` steps + ProgressStrip sole chrome; numbers route Panel removal + flat empty states; Softphone/AgentDesktop flattening; campaign settings/creation flat sections; audience detail tab flattening; contact detail + RecentContacts accordion; WorkspaceToday flat typography; IVR EditModal → `Dialog`; admin index/outlet split + `AdminDefinitionGrid` / `AdminTableOverflow`; public services list semantics + pricing row structure; confirmed orphan deletions (see R10).
+
+**Resolved since prior ledger:** Navbar desktop picker + mobile workspace list; `OnboardingOverviewCard` removed; `WorkspaceResourceListShell` empty state flat; `HandsetCallPanel`, `CustomCard`, `CallScreen.TopBar`, `ContactTable`/`AudienceContactRow`, class `ErrorBoundary`, legacy campaign controls (`VoxTypeSelector`, `SelectStatus`, script question blocks, sync `ExportButton`) removed after import scan.
 
 ---
 
@@ -136,21 +137,19 @@ All use `cn()` unless noted.
 
 ---
 
-## Section 4 — Shared compositions (`app/components/shared/`) — 13 files
+## Section 4 — Shared compositions (`app/components/shared/`) — 11 files
 
 | Name | Type | Role | Status |
 |------|------|------|--------|
 | `AuthCard` | layout shell | centered auth | canonical |
 | `Section` / `SectionHeader` | layout shell | elevated \| flat | flat = in-panel; default elevated is a nesting hazard |
-| `BrandedCard*` | composition | creation wizards | canonical outside panel; over-adopted inside panel |
-| `CustomCard` | alias | re-exports BrandedCard | **inactive** — no production imports; deletion candidate |
+| `BrandedCard*` | composition | creation wizards | canonical outside panel; reduced in-panel use post-remediation |
 | `DataTable` | composition | TanStack grids | in `workspace/tables/` — canonical |
 | `TablePagination` | composition | list pagination | canonical |
 | `SaveBar` | ancillary | dirty/save + Cmd+S | sticky z conflict risk |
 | `QueryParamBanner` | notice | URL-driven Alert | canonical |
 | `InfoPopover` | ancillary | tooltip helper | add `type="button"` in forms |
-| `RouteErrorBoundary` | infra | route errors | canonical |
-| `ErrorBoundary` | infra | class boundary | **inactive** legacy; hard palette |
+| `RouteErrorBoundary` | infra | route errors | canonical — sole route error boundary |
 | `ThemeProvider` / `ModeToggle` | infra | dark mode | canonical |
 | `TransparentBGImage` | helper | BG image | overlay should be `pointer-events-none` / `aria-hidden` |
 
@@ -162,38 +161,39 @@ All use `cn()` unless noted.
 
 | Domain | Files | DS adoption | Notable gaps |
 |--------|------:|-------------|--------------|
-| `campaign/` | 41 | mixed | Settings Card stacks; SetupGuide; CostPanel; MessageSettings shadow-md |
-| `call/` | 10 | medium-high | call-panel-classes OK; Household ad-hoc; CallContact hex |
-| `calls/` | 7 | low | Softphone BrandedCard depth 3–4; raw palette |
-| `workspace/` | 12 | high / mixed | Today Card; ResourceListShell empty Card; Nav credits box |
-| `phone-numbers/` | 11 | medium | NumberSummaryList Cards; numbers Panel shell; raw selects |
-| `queue/` | 6 | medium | QueueTable ≠ DataTable; dense controls; raw palette |
+| `campaign/` | 35 | high | Flat `Section` settings; `AsyncExportButton` canonical; SetupGuide chrome |
+| `call/` | 10 | high | call-panel-classes OK; token pass on Household/CallContact |
+| `calls/` | 7 | high | Softphone flattened; semantic tokens on held/audio controls |
+| `workspace/` | 12 | high | Today flat; ResourceListShell empty flat; Nav credits box |
+| `phone-numbers/` | 11 | high | numbers route flat Sections; NumberSummaryList entity cards |
+| `queue/` | 6 | medium | QueueTable ≠ DataTable; dense controls; raw palette pockets |
 | `sms-ui/` | 5 | mixed | ChatHeader bespoke menus; ChatInput raw controls |
-| `audience/` | 4 | medium | Nested tab shells + bordered uploader |
-| `contact/` + `contacts/` | 7 | medium | ContactDetails Card + RecentContacts Cards; empty Cards |
+| `audience/` | 4 | high | Flat tabs + uploader; DataTable on contacts |
+| `contact/` + `contacts/` | 5 | high | Flat detail; RecentContacts accordion; orphan table chain removed |
 | `invite/` | 7 | medium | AuthCard OK; fields not FormField; `ErrorAlert` unused |
 | `file-assets/` | 3 | high | Recorder/editor semantic panes OK |
-| `layout/` | 2 | chrome | No workspace picker; workspaces unused |
+| `layout/` | 2 | chrome | Workspace picker + credits in Navbar |
 | `people/` | 1 | good | Tab rail light surface |
 | `analytics/` | 1 | high | Flat Sections |
-| `agent/` / `handset/` | 1+1 | low | AgentDesktop = Softphone stack; HandsetCallPanel **orphan** |
-| `question/` | 1 | low | EditModal absolute Card ≠ Dialog |
-| `other-services/` | 1 | low | ServiceCard returns `<li>` → nested lists |
-| Root | 3 | legacy | `CallScreen.TopBar` inactive; `AudienceContactRow` only via inactive ContactTable; `MessageSettings.tsx` root vs campaign path |
+| `agent/` / `handset/` | 1+0 | high | AgentDesktop = Softphone stack; HandsetCallPanel removed |
+| `question/` | 1 | high | EditModal uses `Dialog` |
+| `other-services/` | 1 | high | ServiceCard `article` inside single `<li>` owner |
+| `admin/` | 3 | high | `AdminDashboardPage`, `AdminDefinitionGrid`, `AdminTableOverflow` |
+| Root | 0 | — | `CallScreen.TopBar` removed; `AudienceContactRow` removed |
 
 ### High-visibility components
 
 | Name | Domain | Route / parent | Surfaces | Verdict |
 |------|--------|----------------|----------|---------|
-| `WorkspaceToday` | workspace | `$id` root | Card + Tabac h1 | Nested + type |
+| `WorkspaceToday` | workspace | `$id` root | flat Section + `Heading branded={false}` | **Clean** (remediated) |
 | `PeopleHubLayout` | people | audiences/contacts | tab `border bg-card` | Minor |
-| `NumberSummaryList` | phone-numbers | settings/numbers | per-number Card + inset form | Nested (entity OK; empty Card not) |
+| `NumberSummaryList` | phone-numbers | settings/numbers | per-number entity card + flat empty | Clean / Minor |
 | `BillingActivityTable` | workspace | billing | flat Table + muted Accordion | Clean |
 | `OperatorColumn` | call | call route | layout-only | Clean |
-| `CampaignSettings` | campaign | settings route | bordered sections + nested Cards | Nested |
-| `CallScreen.*` | call | call route | call-panel-classes + TopChrome | Minor / Nested softphone sibling |
-| Softphone / AgentDesktop | calls/agent | handset | BrandedCard stack | Nested depth 3–4 |
-| `ContactsPage` | contacts | contacts | DataTable; empty Cards | Minor / Nested empty |
+| `CampaignSettings` | campaign | settings route | flat `Section` sections | **Clean** (remediated) |
+| `CallScreen.*` | call | call route | call-panel-classes + TopChrome | Minor |
+| Softphone / AgentDesktop | calls/agent | handset | flat section stack | **Clean** (remediated) |
+| `ContactsPage` | contacts | contacts | DataTable; flat empty | Clean |
 | `ChatHeader` / `ChatInput` | sms-ui | chats | bespoke + raw controls | Should fix |
 
 ---
@@ -208,40 +208,40 @@ All use `cn()` unless noted.
 
 | URL area | Layout | Surface stack | Depth | Verdict |
 |----------|--------|---------------|------:|---------|
-| `/workspaces/:id` (Today) | panel | WorkspaceToday Card | 2 | Nested + slab title |
-| `…/billing` | flat Sections + Alert + Accordion | panel → flat | 1 | **Clean** (live OK) |
+| `/workspaces/:id` (Today) | panel | flat Today content | 1 | **Clean** (remediated) |
+| `…/billing` | flat Sections + Alert + Accordion | panel → flat | 1 | **Clean** |
 | `…/settings` | flat Sections | panel → flat | 1 | Clean / TeamMember border drift |
-| `…/settings/numbers` | ad hoc `Panel` + NumberSummaryList Cards | panel → brand Panel → Card | 3+ | Nested + ad hoc shell |
-| `…/audiences`, `…/contacts` | PeopleHub + list shell | panel → hub → (empty Card) | 2 | Minor / Nested empty |
-| `…/audiences/new` | PeopleHub + BrandedCard | panel → BrandedCard | 2–3 | Nested |
-| `…/audiences/:id` | Tabs + white shadow shell | panel → tab shell → uploader borders | 3–4 | Nested |
-| `…/onboarding` | ProgressStrip + step Card | strip (chrome) + panel → Card → `rounded-lg border p-4` groups | 3 | Nested (live confirmed) |
-| `…/campaigns/new` | BrandedCard + goal borders | panel → BrandedCard → choices | 3 | Nested |
-| `…/campaigns/:id/settings` | CampaignSettings tree | panel → bordered sections → Cards/insets | 3–4 | Nested |
-| `…/campaigns/:id` (home) | flat + result insets | panel → metrics/borders | 2–3 | Minor / Nested |
+| `…/settings/numbers` | flat Sections + NumberSummaryList | panel → flat → entity card | 2 | **Clean** (remediated) |
+| `…/audiences`, `…/contacts` | PeopleHub + list shell | panel → hub → flat list | 1–2 | Clean |
+| `…/audiences/new` | PeopleHub + flat Section | panel → flat | 1–2 | **Clean** (remediated) |
+| `…/audiences/:id` | Tabs + flat tables/uploader | panel → tabs → content | 2 | **Clean** (remediated) |
+| `…/onboarding` | ProgressStrip + flat step Sections | strip (chrome) + panel → flat | 1–2 | **Clean** (remediated) |
+| `…/campaigns/new` | flat Section + goal fieldset | panel → flat | 1–2 | **Clean** (remediated) |
+| `…/campaigns/:id/settings` | CampaignSettings flat Sections | panel → flat sections | 1–2 | **Clean** (remediated) |
+| `…/campaigns/:id` (home) | flat + result insets | panel → metrics/borders | 2 | Minor |
 | `…/campaigns/archive` | flat list | panel → flat | 1 | Clean |
 | `…/campaigns/:id/queue` | QueueTable border | panel → table pane | 2 | Minor (OK app pane) |
-| `…/campaigns/:id/call` | OperatorColumn + call panels | panel → callPanelShell (2); Softphone N/A | 2 | Minor |
+| `…/campaigns/:id/call` | OperatorColumn + call panels | panel → callPanelShell (2) | 2 | Minor |
 | `…/calls` | Heading + DataTable | panel → flat | 1 | Clean |
-| `…/handset` | AgentDesktop → Softphone | panel → BrandedCard → nested | 3–4 | Nested |
-| `…/chats` | two Chat Cards | panel → sidebar Card + thread Card | 2 | Semantic panes OK; empty transparent Card smell |
+| `…/handset` | AgentDesktop → Softphone | panel → flat section | 1–2 | **Clean** (remediated) |
+| `…/chats` | two Chat Cards | panel → sidebar Card + thread Card | 2 | Semantic panes OK; controls open |
 | `…/analytics` | flat Sections | panel → flat | 1 | Clean |
-| `…/voicemails/setup` | PageShell + Cards | panel → Cards | 2–3 | Nested |
-| `…/surveys/new\|edit` | PageShell + Card → question Cards | panel → Card → Card | 3 | Nested (entity hierarchy — flag) |
-| `…/scripts/new`, `…/audios/new` | BrandedCard | panel → BrandedCard | 2 | Nested / creation smell |
+| `…/voicemails/setup` | flat Sections | panel → flat | 1 | **Clean** (remediated) |
+| `…/surveys/new\|edit` | PageShell + flat Sections | panel → flat → question groups | 2 | Minor (entity hierarchy) |
+| `…/scripts/new`, `…/audios/new` | flat Section | panel → flat | 1 | **Clean** (remediated) |
 | `…/exports` | Table | panel → table | 1–2 | Minor |
 
 ### Standalone / auth / marketing
 
 | URL area | Layout | Depth | Verdict |
 |----------|--------|------:|---------|
-| `/`, `/pricing`, `/services` | marketing | 1–2 | Minor; pricing rate-in-card; services nested `<li>` |
-| `/signin`, `/signup`, `/reset*`, `/two-factor`, `/accept-invite` | AuthCard | 1 | Clean (signup `min-w-[400px]` closed state breaks 375) |
+| `/`, `/pricing`, `/services` | marketing | 1–2 | Clean / Minor token drift |
+| `/signin`, `/signup`, `/reset*`, `/two-factor`, `/accept-invite` | AuthCard | 1 | Clean (signup fluid width remediated) |
 | `/account` | PageShell + elevated Section | 1 | OK standalone |
 | `/account.security` | AuthCard | 1 | Minor token drift |
 | `/workspaces` index | elevated Section / empty Card | 1 | OK standalone |
 | `/docs` | Scalar shell | 1 | Minor |
-| `/admin/*` | admin shell Cards | 1–2 | Nested insets in Twilio; parent always renders dashboard above Outlet |
+| `/admin/*` | index dashboard OR child outlet only | 1–2 | **Clean** (remediated outlet split) |
 
 ### Global chrome
 
@@ -264,16 +264,16 @@ Every distinct stacking pattern observed:
 |----|---------|------:|----------|-------|
 | S0 | Panel only + flat content | 1 | billing, archive, calls log, analytics, settings flat | Conforming |
 | S1 | Panel → semantic app pane (call-panel / chat Card / table border) | 2 | CallArea, QueueTable, chats panes | Conforming if semantic |
-| S2 | Panel → container-only Card / BrandedCard | 2 | WorkspaceToday, creation routes, onboarding steps | **Must fix** |
-| S3 | Panel → Card → bordered form groups | 3 | OnboardingBusinessBasics, CampaignSettings sections | **Must fix** |
-| S4 | Panel → Card → Card / metric tiles | 3 | CampaignCostPanel, surveys page→question, Softphone→HeldCalls rows | **Must fix** (except documented entity hierarchies) |
-| S5 | Panel → ad hoc brand Panel → Card | 3+ | settings/numbers | **Must fix** |
-| S6 | Panel → tab white shadow shell → bordered uploader | 3–4 | audience detail | **Must fix** |
-| S7 | Admin Card → `rounded-lg border` metric insets | 2 | Twilio panels | Should fix |
+| S2 | Panel → container-only Card / BrandedCard | 2 | legacy creation pockets | **Remediated** — prefer flat Section |
+| S3 | Panel → Card → bordered form groups | 3 | legacy onboarding/campaign | **Remediated** — flat fieldsets |
+| S4 | Panel → Card → Card / metric tiles | 3 | legacy CostPanel/Softphone | **Remediated** except surveys entity hierarchy |
+| S5 | Panel → ad hoc brand Panel → Card | 3+ | legacy numbers | **Remediated** |
+| S6 | Panel → tab white shadow shell → bordered uploader | 3–4 | legacy audience detail | **Remediated** |
+| S7 | Admin Card → `rounded-lg border` metric insets | 2 | Twilio panels | **Remediated** — `AdminDefinitionGrid` |
 | S8 | Standalone AuthCard / elevated Section | 1 | auth, account | Conforming |
 | S9 | Transparent Card | 1 smell | ConversationList empty | Should fix |
-| S10 | Absolute Card “modal” | overlay smell | QuestionCard EditModal | **Must fix** → Dialog |
-| S11 | ProgressStrip (chrome) + panel step Card | chrome+2 | onboarding live | Strip OK; flatten step |
+| S10 | Absolute Card “modal” | overlay smell | QuestionCard EditModal | **Remediated** → Dialog |
+| S11 | ProgressStrip (chrome) + panel step Card | chrome+2 | onboarding | **Remediated** — flat steps |
 
 ---
 
@@ -318,10 +318,10 @@ Workspace panel: flat step / page content only
 | R5 | Table strategy split | QueueTable, AudienceUploadHistory, NumbersTable, admin tables | DataTable + ui/table; specialize only filters |
 | R6 | Dual icon libraries | Navbar migrated; chats/campaign remnants | lucide-react |
 | R7 | Transparent / disabled Card chrome | ConversationList | `div`/`section` |
-| R8 | Absolute Card as modal | Question EditModal | `Dialog` |
-| R9 | Invalid list nesting | `services.tsx` + `ServiceCard` both `<li>` | one list item owner |
-| R10 | Orphan / inactive UI | `HandsetCallPanel`, `CallScreen.TopBar`, `ContactTable` chain, `CustomCard`, `ErrorBoundary` | delete after import scan |
-| R11 | Admin parent always shows dashboard above Outlet | `admin+/route.tsx` | index-only dashboard; child routes without stacked shell |
+| R8 | Absolute Card as modal | Question EditModal | `Dialog` — **removed** |
+| R9 | Invalid list nesting | `services.tsx` + `ServiceCard` both `<li>` | one list item owner — **fixed** |
+| R10 | Orphan / inactive UI | legacy aliases and campaign controls | **removed** PR 10 |
+| R11 | Admin parent always shows dashboard above Outlet | `admin+/route.tsx` | index-only dashboard — **fixed** |
 | R12 | Softphone padding + Card | SoftphonePanel / AgentDesktop | flat section; drop `container p-6` |
 | R13 | Campaign setup progress in content Card | CampaignSetupGuide | route chrome under Navbar / settings header strip |
 | R14 | Raw controls | NumberSummaryList, ChatInput, AudienceUploader, onboarding country select | `Select` / `FormField` / `Textarea` |
@@ -329,30 +329,26 @@ Workspace panel: flat step / page content only
 
 ---
 
-## Section 11 — Must fix (prioritized)
+## Section 11 — Must fix (prioritized, post-remediation)
 
-1. **Flatten onboarding step Cards** — ProgressStrip stays; steps → flat Section + muted insets (`OnboardingBusinessBasicsStep` et al.). Live depth 3 confirmed.
-2. **settings/numbers** — remove brand `Panel`; NumberSummaryList empty → flat; keep per-number entity cards at depth 2 max.
-3. **Softphone / AgentDesktop** — remove BrandedCard + `container p-6`; token-fix HeldCallsList / SoftphoneAudioControls.
-4. **CampaignSettings** — flat sections; demote SetupGuide to chrome; flatten CostPanel outer Card.
-5. **Audience detail / uploader** — flatten tab shells; one bordered table max.
-6. **ContactDetails + RecentContacts** — flat detail; restrain attempt elevation.
-7. **Credit event production + chrome revalidation consolidation** (picker already landed).
-8. **Question EditModal → Dialog; services list semantics.**
+1. **Chat primitive/a11y migration** — ChatHeader DropdownMenu parity; ChatImages keyboard/touch remove.
+2. **QueueTable token pass** — semantic status tokens; optional DataTable chrome alignment.
+3. **Credit event regression coverage** — purchase/debit browser smoke after PR 2 emitter.
+4. **Surveys builder** — review remaining Card hierarchy for entity vs container misuse.
+5. **ConversationList empty transparent Card** — replace with semantic layout element.
+
+**Addressed in PRs 1–10:** onboarding flattening; numbers Panel removal; Softphone flattening; CampaignSettings; audience/contact detail; WorkspaceToday; IVR Dialog; admin outlet/tables; public services list; orphan deletions.
 
 ---
 
 ## Section 12 — Should fix
 
-- Typography pass: slab only on chrome/CTAs; page titles `Heading branded={false}`.
-- Replace raw palette with semantic tokens across Nav status, TeamMember, results metrics, queue, chat banners.
-- Label gaps: SelectNumber, SelectType, MessageSettings textarea, admin filter inputs.
-- ChatHeader: drop bespoke menus for DropdownMenu; ChatImages keyboard/touch remove.
+- Typography pass on remaining low-traffic routes: slab only on chrome/CTAs.
+- Replace raw palette with semantic tokens across Nav status, TeamMember, results metrics, queue.
+- Label gaps: MessageSettings textarea, admin filter inputs.
 - Household → call-panel-classes; CallContact hex → tokens.
-- Decide fate of orphan HandsetCallPanel / TopBar / ContactTable.
-- Admin Twilio: definition grids instead of bordered metric boxes; overflow wrappers on tables.
-- Signup closed-state `min-w-[400px]` → fluid width.
 - FormFieldControl adoption so description/error ids attach to controls.
+- `react-icons` → `lucide-react` opportunistically in chats/campaign remnants.
 
 ---
 
@@ -416,21 +412,42 @@ UI test clusters: `test/ui/workspace-*`, `call-screen-*`, `number-summary-list`,
 
 ### Source audit agents (this pass)
 
-Domain inventories were produced in parallel and reconciled against live/source checks (notably: OverviewCard absent; ProgressStrip present; billing conforming).
+Domain inventories were produced in parallel and reconciled against live/source checks. PRs 1–10 remediation merged on `sai-flow`; PR 10 removed confirmed orphans and refreshed this ledger.
+
+### Remediation coverage matrix (PR 10 status)
+
+| Surface | Baseline (pre-plan) | Post-remediation | Browser matrix |
+|---------|---------------------|------------------|----------------|
+| Billing | OK | Preserved | to verify |
+| Settings (general/API/webhook) | OK / minor | Preserved | to verify |
+| Calls log | OK | Preserved | to verify |
+| Analytics | OK | Preserved | to verify |
+| Campaign archive | OK | Preserved | to verify |
+| Onboarding | Nested Cards | **Addressed** — flat Sections + ProgressStrip | to verify |
+| Settings/numbers | Depth 3+ Panel | **Addressed** — flat Sections | to verify |
+| Handset/softphone | Depth 3–4 | **Addressed** — flat stack | to verify |
+| Campaign settings | Depth 3–4 | **Addressed** — flat Sections | to verify |
+| Audience detail/upload | Depth 3–4 | **Addressed** — flat tabs | to verify |
+| Contacts/detail | Card stack | **Addressed** — flat + accordion | to verify |
+| Workspace Today | Card + slab title | **Addressed** — flat typography | to verify |
+| Creation routes | Nested BrandedCard | **Addressed** — flat Section | to verify |
+| Surveys | Card hierarchy | Minor — entity hierarchy retained | to verify |
+| Chats | Semantic panes | Partial — controls open | to verify |
+| Call screen | Mostly OK | Preserved | to verify |
+| Admin | Stacked outlet | **Addressed** — index/outlet split | to verify |
+| Public/auth | Minor defects | **Addressed** — services list, pricing, signup width | to verify |
+| Dead/legacy components | Open | **Addressed** — PR 10 deletions | N/A |
 
 ---
 
 ## Section 16 — Ordered next actions
 
-No code changes in this audit task. Suggested implementation sequence:
+Post-remediation follow-ups:
 
-1. Keep ProgressStrip as sole `onboarding-step` owner; flatten inner onboarding groups.
-2. Flatten onboarding steps + CampaignSettings + Softphone (largest depth defects).
-3. numbers route: kill ad hoc Panel; flatten empty states.
-4. Navbar picker + `transaction_history` layout revalidation.
-5. Audience/contact nesting + EditModal Dialog + services `<li>` fix.
-6. Token/typography sweep on touched files; lucide opportunistically.
-7. Delete confirmed orphans (CustomCard, HandsetCallPanel, TopBar, inactive ErrorBoundary) after import greps.
-8. Expand UI tests for analytics, audio recorder, ChatImages a11y, admin tables overflow.
+1. Run full browser matrix (light/dark × 375/1280/1920) — see [`docs/remediation/component-surface-browser-checklist-2026-07-17.md`](remediation/component-surface-browser-checklist-2026-07-17.md).
+2. Chat primitive/a11y migration (ChatHeader, ChatImages).
+3. QueueTable token pass and optional DataTable chrome alignment.
+4. Credit purchase/debit browser smoke after ledger emitter.
+5. Expand UI tests for analytics, audio recorder, admin tables overflow.
 
 See [design-system.md](design-system.md) for canonical usage rules.
