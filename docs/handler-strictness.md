@@ -33,27 +33,31 @@ through `createErrorResponse`. `auth` is pluggable, so it fits both the API styl
 Note: the codebase's `createErrorResponse` returns React Router's `data()` result
 (not a raw `Response`); the factory's return type accounts for both.
 
-## The gate (ratchet)
+## The gate (ratchet complete — hard fail)
 
-`npm run check:handlers` (in `ci:local`) requires new/changed route modules to
-define their handler via the factory. The **272 existing hand-written handlers**
-are grandfathered per-file in `scripts/handlers-baseline.json`; the gate fails
-only when a file gains a **new raw handler**. Migrate one, then
-`npm run tools:handlers:baseline` to ratchet the count down (goal: 0).
+`npm run check:handlers` (in `ci:local`) fails on **any** route `action`/`loader`
+not defined via the factory. The migration is done: the 272 hand-written handlers
+that were grandfathered in `scripts/handlers-baseline.json` were ratcheted down to
+zero, and the baseline (and `tools:handlers:baseline`) has been removed — there is
+no grandfather path for new raw handlers.
 
-## Migrating (the ratchet-down work)
+## Writing a new handler
 
-Wrap the existing `action`/`loader` in `defineAction`/`defineLoader`: move the
-auth guard into `auth`, the body schema into `input`, and keep the domain logic
-in `handler`. Watch two things:
+Wrap the `action`/`loader` in `defineAction`/`defineLoader`: put the auth guard in
+`auth`, the body schema in `input`, and the domain logic in `handler`. Watch two
+things:
 - **Auth failures must be real `Response`s** (the existing guards already return
   `createErrorResponse`/`new Response`) — `data()` is not a `Response`, so a
   `data()` returned from `auth` would not short-circuit.
-- Preserve each handler's existing response shape and its route test.
+- The factory maps thrown non-`Response` errors through `createErrorResponse`
+  (JSON 500); thrown `Response`s propagate untouched (redirects, 404s).
 
 ## Next strengthen step
 
-Once a category of handlers is fully migrated, make its `sideEffects` declaration
-enforceable — e.g. a handler declaring `credit` must route through the ledger RPC
-(fold `check:credit-writes` in as a declared facet), and a mutating handler must
-declare a non-`db-read` effect.
+With every handler through the factory, `sideEffects` declarations now cover the
+whole route surface. Make them enforceable — e.g. a handler declaring `credit`
+must route through the ledger RPC (fold `check:credit-writes` in as a declared
+facet), and a mutating handler must declare a non-`db-read` effect. Current
+distribution: `db-write` dominates actions; 6 actions declare `["none"]` and 4
+declare `["db-read"]` — audit those 10 before promoting "action must declare a
+mutation" to a hard rule.

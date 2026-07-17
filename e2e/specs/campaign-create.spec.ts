@@ -13,14 +13,14 @@ ownerTest.describe("Campaign create @authenticated", () => {
       await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "campaigns/new"));
       await page.locator("#campaign-name").fill(uniqueName);
       await selectCampaignType(page, type);
-      await page.getByRole("button", { name: "Add Campaign" }).click();
+      await page.getByRole("button", { name: "Create campaign" }).click();
       await expect(page).toHaveURL(/\/campaigns\/\d+\/settings/);
     });
   }
 
   ownerTest("CAM-04 empty title validation", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "campaigns/new"));
-    await page.getByRole("button", { name: "Add Campaign" }).click();
+    await page.getByRole("button", { name: "Create campaign" }).click();
     await expect(page).toHaveURL(/\/campaigns\/new$/);
   });
 });

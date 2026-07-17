@@ -64,7 +64,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     expect(mocks.safeParseJson).not.toHaveBeenCalled();
   });
 
-  test("throws when get_campaign_queue rpc errors", async () => {
+  test("returns 500 when get_campaign_queue rpc errors", async () => {
     mocks.safeParseJson.mockResolvedValueOnce({
       campaign_id: 1,
       user_id: { id: "u1" },
@@ -73,7 +73,9 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     vi.mocked(rpcGetCampaignQueue).mockRejectedValueOnce(new Error("rpc"));
     const mod = await import("../app/routes/api+/initiate-ivr");
-    await expect(mod.action({ request: new Request("http://x", { method: "POST" }) } as any)).rejects.toThrow("rpc");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "rpc" });
   });
 
   test("returns creditsError when ivr endpoint reports creditsError", async () => {
