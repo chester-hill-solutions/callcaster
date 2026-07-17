@@ -59,6 +59,12 @@ export function OnboardingWizard({
     : readWizardStep(urlStep, onboarding.currentStep, visibleSteps);
   const stepIndex = activeStep ? visibleSteps.indexOf(activeStep) : -1;
 
+  /**
+   * @effect Keep the `?step=` search param aligned with the resolved active wizard step after goal-driven step lists change.
+   * @effect-deps activeStep (canonical step after goal/visibility resolution); urlStep (current query); showIntro (skip while intro is showing); navigate (replace navigation)
+   * @effect-side-effects navigation — `navigate(..., { replace: true })` updates the URL without adding history entries
+   * @effect-why-not-loader Step resolution depends on client-only intro state and goal-derived visibility; a loader cannot replace the query mid-wizard without a client redirect.
+   */
   useEffect(() => {
     if (!activeStep || showIntro) return;
     if (urlStep === activeStep) return;

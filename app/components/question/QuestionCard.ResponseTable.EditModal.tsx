@@ -42,6 +42,12 @@ export const EditResponseModal = ({
   const [input, setInput] = useState(initialInput || "");
   const [nextAction, setNextAction] = useState(initialNextAction);
 
+  /**
+   * @effect Reset the edit form to the row being edited whenever the dialog opens or its seed values change.
+   * @effect-deps isOpen (only reset while open); initialInput / initialNextAction (row values from the parent table)
+   * @effect-side-effects none — local controlled-input state only
+   * @effect-why-not-loader Dialog draft state is ephemeral UI; loaders cannot seed per-open modal drafts.
+   */
   useEffect(() => {
     if (!isOpen) return;
     setInput(initialInput || "");
