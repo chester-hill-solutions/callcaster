@@ -277,7 +277,7 @@ export function OnboardingWizard({
       ) : null}
 
       {!showIntro && activeStep ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           {previousStep ? (
             <Button type="button" variant="outline" asChild disabled={isFormSubmitting}>
               <Link to={`?step=${previousStep}`} replace>
