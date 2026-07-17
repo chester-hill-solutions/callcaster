@@ -44,8 +44,9 @@ export function OnboardingChannelsStep({
   };
 
   // operatingCountry drives which optional paths we highlight. For "BOTH" both
-  // paths are highlighted and neither is pre-checked.
+  // regional paths are highlighted and neither is pre-checked.
   const isRelevantPath = (id: string): boolean => {
+    if (id === "local_number") return country === "CA" || country === "BOTH";
     if (id === "toll_free_bulk_sms") return country === "CA" || country === "BOTH";
     if (id === "a2p10dlc") return country === "US" || country === "BOTH";
     return false;

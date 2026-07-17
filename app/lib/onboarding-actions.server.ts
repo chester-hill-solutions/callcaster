@@ -19,6 +19,12 @@ const ALL_CHANNEL_OPTIONS: Array<{
   description: string;
 }> = [
   {
+    id: "local_number",
+    label: "Local Number",
+    description:
+      "Canadian local number for inbound SMS and calls; rent one in the next step.",
+  },
+  {
     id: "toll_free_bulk_sms",
     label: "Toll-free bulk SMS",
     description:

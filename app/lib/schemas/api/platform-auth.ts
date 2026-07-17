@@ -65,6 +65,8 @@ const workspaceOnboardingChannelSchema = z.enum([
   "a2p10dlc",
   "rcs",
   "voice_compliance",
+  "toll_free_bulk_sms",
+  "local_number",
 ]);
 
 const workspaceOnboardingStatusSchema = z.enum([

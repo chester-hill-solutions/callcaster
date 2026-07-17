@@ -225,7 +225,7 @@ export async function patchWorkspaceOnboarding(
   updates: {
     current_step?: string;
     selected_channels?: Array<
-      "a2p10dlc" | "rcs" | "voice_compliance" | "toll_free_bulk_sms"
+      "a2p10dlc" | "rcs" | "voice_compliance" | "toll_free_bulk_sms" | "local_number"
     >;
     status?: ReturnType<typeof asWorkspaceOnboardingStatus>;
   },

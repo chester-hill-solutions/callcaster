@@ -287,6 +287,7 @@ export const WORKSPACE_ONBOARDING_CHANNEL_VALUES = [
   "rcs",
   "voice_compliance",
   "toll_free_bulk_sms",
+  "local_number",
 ] as const;
 
 export const WORKSPACE_OPERATING_COUNTRY_VALUES = [
