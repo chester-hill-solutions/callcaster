@@ -178,20 +178,13 @@ export default function AudienceUploader({
   // Add new state for status polling
   const [statusPollingEnabled, setStatusPollingEnabled] = useState(false);
   const [currentUploadId, setCurrentUploadId] = useState<number | null>(null);
-  const [pollFailureCount, setPollFailureCount] = useState(0);
 
   const scheduleRedirect = useTimeoutFn();
 
+  // Transient status-refresh failures must not become terminal upload errors —
+  // the background import may still be running. Keep polling with a warning.
   const registerPollFailure = () => {
     setUploadWarning("Live progress is delayed. Retrying automatically...");
-    setPollFailureCount((count) => {
-      const next = count + 1;
-      if (next >= 5) {
-        setUploadError("We could not refresh upload progress right now. You can stay on this page or try again in a moment.");
-        setStatusPollingEnabled(false);
-      }
-      return next;
-    });
   };
 
   const applyUploadState = (nextState: {
@@ -203,12 +196,29 @@ export default function AudienceUploader({
     stage?: string | null;
   }) => {
     const nextStatus = nextState.status || null;
-    const nextTotal = nextState.total_contacts || 0;
-    const nextProcessed = nextState.processed_contacts || 0;
+    const serverTotal =
+      typeof nextState.total_contacts === "number" ? nextState.total_contacts : null;
+    const serverProcessed =
+      typeof nextState.processed_contacts === "number"
+        ? nextState.processed_contacts
+        : null;
 
     setUploadStatus(nextStatus);
-    setTotalContacts(nextTotal);
-    setProcessedContacts(nextProcessed);
+
+    // Prefer server totals once available; keep client-seeded totals while the
+    // server still reports 0 (upload row created but parser not finished).
+    if (serverTotal != null && serverTotal > 0) {
+      setTotalContacts(serverTotal);
+      if (serverProcessed != null) {
+        setProcessedContacts(serverProcessed);
+        setUploadProgress(Math.round((serverProcessed / serverTotal) * 100));
+      }
+    } else if (serverProcessed != null) {
+      setProcessedContacts(serverProcessed);
+      if (totalContacts > 0) {
+        setUploadProgress(Math.round((serverProcessed / totalContacts) * 100));
+      }
+    }
 
     if (typeof nextState.audience_id !== "undefined" && nextState.audience_id !== null) {
       setAudienceId(String(nextState.audience_id));
@@ -218,13 +228,10 @@ export default function AudienceUploader({
       setUploadWarning(null);
     }
 
-    if (nextTotal > 0) {
-      setUploadProgress(Math.round((nextProcessed / nextTotal) * 100));
-    }
-
     if (nextStatus === "completed") {
       setUploadProgress(100);
       setStatusPollingEnabled(false);
+      setUploadWarning(null);
       if (onUploadComplete && nextState.audience_id) {
         onUploadComplete(String(nextState.audience_id));
       } else if (!onUploadComplete) {
@@ -241,6 +248,7 @@ export default function AudienceUploader({
 
     if (nextStatus === "error") {
       setUploadError(nextState.error_message || "An error occurred during upload");
+      setUploadWarning(null);
       setStatusPollingEnabled(false);
     }
   };
@@ -273,16 +281,33 @@ export default function AudienceUploader({
         const response = await fetch(
           `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspaceId}`
         );
-        const data = await response.json();
 
-        if (data.error) {
+        let data: {
+          error?: string;
+          status?: string;
+          total_contacts?: number;
+          processed_contacts?: number;
+          error_message?: string;
+          audience_id?: string | number;
+          stage?: string;
+        } | null = null;
+        try {
+          data = (await response.json()) as typeof data;
+        } catch (parseError) {
+          logger.error("Error parsing upload status response:", parseError);
           registerPollFailure();
           return;
         }
 
-        setPollFailureCount(0);
+        // HTTP/auth failures and endpoint errors are transient for the UI —
+        // only an upload record with status "error" is terminal.
+        if (!response.ok || data?.error) {
+          registerPollFailure();
+          return;
+        }
+
         setUploadWarning(null);
-        applyUploadState(data);
+        applyUploadState(data ?? {});
       } catch (error) {
         logger.error("Error polling status:", error);
         registerPollFailure();
@@ -392,14 +417,20 @@ export default function AudienceUploader({
       
       const data = await response.json();
       
-      if (data.error) {
-        throw new Error(data.error);
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Upload request failed");
       }
       
+      // Seed progress from the already-parsed CSV so the UI does not show
+      // 0/0 while waiting for the first server status update.
+      const seededTotal = fullContactData.length;
+      setTotalContacts(seededTotal);
+      setProcessedContacts(0);
+      setUploadProgress(0);
+
       // Start polling for status
       setCurrentUploadId(data.upload_id);
       setStatusPollingEnabled(true);
-      setPollFailureCount(0);
       setUploadStatus("processing");
       setAudienceId(data.audience_id);
       
@@ -627,7 +658,6 @@ export default function AudienceUploader({
                 setUploadStatus(null);
                 setUploadError(null);
                 setUploadWarning(null);
-                setPollFailureCount(0);
               }}
               variant="outline"
               className="mt-4"

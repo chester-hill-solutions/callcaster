@@ -84,10 +84,6 @@ vi.mock("@/server/tenant-db", () => ({
   }),
 }));
 
-vi.mock("@/lib/auth.server", () => ({
-  getSession: () => ({ headers: new Headers({ "set-cookie": "x=y" }),
-  }),
-}));
 vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
@@ -121,7 +117,7 @@ describe("api.audience-upload-status loader", () => {
     downloadObjectMock.mockImplementation(async () => {
       if (downloadMode.kind === "throw") throw downloadMode.value;
       if (downloadMode.kind === "error")
-        return { data: null, error: new Error(downloadMode.message) };
+        throw new Error(downloadMode.message);
       return Buffer.from(JSON.stringify(downloadMode.statusJson), "utf-8");
     });
 
@@ -162,10 +158,9 @@ describe("api.audience-upload-status loader", () => {
     expect(res.status).toBe(400);
   });
 
-  test("returns 500 when storage download errors", async () => {
+  test("returns DB-backed status when storage sidecar download errors", async () => {
     downloadMode = { kind: "error", message: "nope" };
     setDualAuthSession({
-            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
@@ -176,7 +171,11 @@ describe("api.audience-upload-status loader", () => {
     } as any)));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
+      uploadId: 1,
+      audience_id: 2,
+      status: "pending",
       file_name: "f.csv",
+      total_contacts: 2,
       processed_contacts: 1,
       stage: "Processing contacts",
     });

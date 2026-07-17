@@ -1022,7 +1022,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     ).toBeInTheDocument();
   });
 
-  test("polling status=processing with total_contacts=0 does not update progress", async () => {
+  test("polling status=processing with total_contacts=0 keeps client-seeded total", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
     const client = makeDbClient();
@@ -1076,12 +1076,147 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
     await waitFor(() => expect(mocks.interval.ms).toBe(2000));
 
+    expect(screen.getByText("0 / 1 contacts")).toBeInTheDocument();
+
     await act(async () => {
       await mocks.interval.cb?.();
     });
 
     expect(screen.getByText("Processing...")).toBeInTheDocument();
-    expect(screen.getByText("0 / 0 contacts")).toBeInTheDocument();
+    // Client-seeded CSV count is kept while the server still reports 0.
+    expect(screen.getByText("0 / 1 contacts")).toBeInTheDocument();
     expect(screen.getByRole("progressbar").textContent).toBe("0");
+  });
+
+  test("repeated status poll failures keep polling with a warning (non-terminal)", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    const client = makeDbClient();
+
+    const { container } = render(
+      <AudienceUploader client={client} audienceName="A1" />,
+    );
+
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
+    const csv = ["Phone", "123"].join("\n");
+    const file = new File([csv], "x.csv", { type: "text/csv" });
+    (file as any).text = async () => csv;
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+
+    (globalThis as any).fetch = vi.fn(async (url: string) => {
+      if (String(url).includes("/api/audience-upload-status")) {
+        return {
+          ok: false,
+          status: 500,
+          async json() {
+            return { error: "temporary" };
+          },
+        } as any;
+      }
+      if (String(url).includes("/api/audience-upload")) {
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "a1" };
+          },
+        } as any;
+      }
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
+    });
+    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+
+    for (let i = 0; i < 6; i++) {
+      await act(async () => {
+        await mocks.interval.cb?.();
+      });
+    }
+
+    expect(
+      screen.getByText("Live progress is delayed. Retrying automatically..."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "We could not refresh upload progress right now. You can stay on this page or try again in a moment.",
+      ),
+    ).toBeNull();
+    expect(screen.getByText("Processing...")).toBeInTheDocument();
+    // Polling stays enabled for transient refresh failures.
+    expect(mocks.interval.ms).toBe(2000);
+  });
+
+  test("non-JSON status response is treated as a transient poll failure", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    const client = makeDbClient();
+
+    const { container } = render(
+      <AudienceUploader client={client} audienceName="A1" />,
+    );
+
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
+    const csv = ["Phone", "123"].join("\n");
+    const file = new File([csv], "x.csv", { type: "text/csv" });
+    (file as any).text = async () => csv;
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+
+    (globalThis as any).fetch = vi.fn(async (url: string) => {
+      if (String(url).includes("/api/audience-upload-status")) {
+        return {
+          ok: false,
+          status: 502,
+          async json() {
+            throw new Error("Unexpected token < in JSON");
+          },
+        } as any;
+      }
+      if (String(url).includes("/api/audience-upload")) {
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "a1" };
+          },
+        } as any;
+      }
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
+    });
+    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+
+    await act(async () => {
+      await mocks.interval.cb?.();
+    });
+
+    expect(
+      screen.getByText("Live progress is delayed. Retrying automatically..."),
+    ).toBeInTheDocument();
+    expect(mocks.interval.ms).toBe(2000);
+    expect(screen.queryByText("Error")).toBeNull();
   });
 });
