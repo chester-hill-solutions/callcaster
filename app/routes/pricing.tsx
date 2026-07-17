@@ -36,8 +36,8 @@ const SERVICE_ICONS: Record<string, ReactNode> = {
 };
 
 const PricingRow = ({ icon, service, type, rates }: PricingRowProps) => (
-  <div className="mb-8 overflow-hidden rounded-xl border border-border bg-card last:mb-0">
-    <div className="flex items-center gap-3 border-b border-border bg-muted/40 p-6">
+  <section className="mb-8 overflow-hidden rounded-xl border border-border bg-card last:mb-0">
+    <header className="flex items-center gap-3 border-b border-border bg-muted/40 p-4 sm:p-6">
       <span className="text-brand-primary">{icon}</span>
       <div>
         <h3 className="font-Zilla-Slab text-2xl font-bold uppercase text-brand-primary">
@@ -45,30 +45,26 @@ const PricingRow = ({ icon, service, type, rates }: PricingRowProps) => (
         </h3>
         <p className="font-Zilla-Slab text-lg text-muted-foreground">{type}</p>
       </div>
-    </div>
-    <div className="grid gap-4 p-6 md:grid-cols-2">
+    </header>
+    <dl className="divide-y divide-border p-4 sm:grid sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-border sm:p-0">
       {rates.map((rate) => (
         <div
           key={`${service}-${rate.name}`}
-          className="rounded-lg border border-border/70 bg-background p-6"
+          className="bg-card p-4 sm:p-6"
         >
-          <div className="mb-2">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-Zilla-Slab text-lg font-semibold text-foreground">
-                {rate.name}
-              </span>
-              <span className="font-Zilla-Slab text-xl font-bold text-brand-primary">
-                {rate.price}
-              </span>
-            </div>
-          </div>
-          <p className="font-Zilla-Slab text-base text-muted-foreground">
+          <dt className="font-Zilla-Slab text-lg font-semibold text-foreground">
+            {rate.name}
+          </dt>
+          <dd className="mt-1 font-Zilla-Slab text-xl font-bold text-brand-primary">
+            {rate.price}
+          </dd>
+          <dd className="mt-2 font-Zilla-Slab text-base text-muted-foreground">
             {rate.description}
-          </p>
+          </dd>
         </div>
       ))}
-    </div>
-  </div>
+    </dl>
+  </section>
 );
 
 export default function Pricing() {

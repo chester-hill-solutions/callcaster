@@ -32,7 +32,7 @@ const SectionText = ({ children }: SectionTextProps) => (
 
 export default function OtherServices() {
   return (
-    <main className="flex h-full flex-col gap-4 rounded-sm p-8 dark:text-white md:mx-auto md:mt-8 md:w-[80%] md:items-start">
+    <main className="flex h-full flex-col gap-4 rounded-sm p-4 sm:p-8 dark:text-white md:mx-auto md:mt-8 md:w-[80%] md:items-start">
       <SectionTitle>Services</SectionTitle>
       <SectionText>
         Crafted by a team of experienced campaign organizers, our services are
