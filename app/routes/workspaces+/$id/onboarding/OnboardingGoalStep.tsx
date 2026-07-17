@@ -1,24 +1,23 @@
 import { useMemo, useState } from "react";
 import { Form } from "react-router";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import InfoPopover from "@/components/shared/InfoPopover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import {
   channelsForOnboardingGoal,
   goalNeedsSmsCompliance,
 } from "@/lib/messaging-onboarding/goals";
-import type {
-  WorkspaceOnboardingChannel,
-  WorkspaceOnboardingGoal,
-} from "@/lib/types";
+import type { WorkspaceOnboardingGoal } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { GOAL_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
-
-type SmsNumberPath = "local" | "toll_free";
 
 export function OnboardingGoalStep({
   formId = "onboarding-channels-form",
@@ -31,31 +30,16 @@ export function OnboardingGoalStep({
   const [selectedGoal, setSelectedGoal] = useState<WorkspaceOnboardingGoal | null>(
     () => onboarding.selectedGoal,
   );
-  const [smsNumberPath, setSmsNumberPath] = useState<SmsNumberPath | null>(() => {
-    if (onboarding.selectedGoal !== "sms_blast") return null;
-    if (onboarding.selectedChannels.includes("toll_free_bulk_sms")) return "toll_free";
-    if (onboarding.selectedChannels.includes("local_number")) return "local";
-    return null;
-  });
 
-  const derivedChannels = useMemo<WorkspaceOnboardingChannel[]>(() => {
-    if (!selectedGoal) return [];
+  const derivedChannels = useMemo(() => {
+    if (!selectedGoal) return [] as string[];
     return channelsForOnboardingGoal(selectedGoal, onboarding.operatingCountry);
   }, [selectedGoal, onboarding.operatingCountry]);
 
   const showSmsCompliance = goalNeedsSmsCompliance(selectedGoal);
-  const offersTollFree =
+  const showTollFreeFields =
     showSmsCompliance && derivedChannels.includes("toll_free_bulk_sms");
-  // Swap toll-free for a local number when the customer opts out of toll-free setup.
-  const submittedChannels = useMemo<WorkspaceOnboardingChannel[]>(() => {
-    if (!offersTollFree || smsNumberPath !== "local") return derivedChannels;
-    return derivedChannels.map((channel) =>
-      channel === "toll_free_bulk_sms" ? "local_number" : channel,
-    );
-  }, [derivedChannels, offersTollFree, smsNumberPath]);
-
-  const showTollFreeFields = offersTollFree && smsNumberPath === "toll_free";
-  const showA2pFields = showSmsCompliance && submittedChannels.includes("a2p10dlc");
+  const showA2pFields = showSmsCompliance && derivedChannels.includes("a2p10dlc");
 
   return (
     <Section variant="flat">
@@ -69,10 +53,11 @@ export function OnboardingGoalStep({
           {selectedGoal ? (
             <input type="hidden" name="selectedGoal" value={selectedGoal} />
           ) : null}
-          {submittedChannels.map((channel) => (
+          {derivedChannels.map((channel) => (
             <input key={channel} type="hidden" name="selectedChannels" value={channel} />
           ))}
 
+          <TooltipProvider>
             <fieldset className="space-y-3">
               <legend className="sr-only">Onboarding goal</legend>
               {GOAL_OPTIONS.map((option) => {
@@ -95,10 +80,7 @@ export function OnboardingGoalStep({
                       name="goalChoice"
                       value={option.id}
                       checked={checked}
-                      onChange={() => {
-                        setSelectedGoal(option.id);
-                        setSmsNumberPath(null);
-                      }}
+                      onChange={() => setSelectedGoal(option.id)}
                       disabled={isReadOnly}
                       className="mt-1"
                     />
@@ -112,43 +94,25 @@ export function OnboardingGoalStep({
             </fieldset>
 
             {selectedGoal === "sms_blast" ? (
-              <div className="space-y-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-                <div className="flex items-start gap-2">
-                  <span className="mt-0.5 shrink-0">
-                    <InfoPopover
-                      size={16}
-                      tooltip="Carriers apply different sending limits by number type. Toll-free numbers support higher-volume outreach once verification finishes."
-                    />
-                  </span>
-                  <p>
-                    For texting at higher volume, a toll-free number is usually the smoother path.
-                    A local number can send texts too, at a lower throughput.
-                  </p>
-                </div>
-                {offersTollFree ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={smsNumberPath === "toll_free" ? "default" : "outline"}
-                      onClick={() => setSmsNumberPath("toll_free")}
-                      disabled={isReadOnly}
-                    >
-                      Set Up Toll Free
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={smsNumberPath === "local" ? "default" : "outline"}
-                      onClick={() => setSmsNumberPath("local")}
-                      disabled={isReadOnly}
-                    >
-                      Continue with Local Number
-                    </Button>
-                  </div>
-                ) : null}
+              <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                <p>
+                  For texting at higher volume, a toll-free number is usually the smoother path. A
+                  local number can send texts too, at a lower throughput.
+                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="mt-2 text-xs font-medium underline">
+                      Why this matters
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Carriers apply different sending limits by number type. Toll-free numbers support
+                    higher-volume outreach once verification finishes.
+                  </TooltipContent>
+                </Tooltip>
               </div>
             ) : null}
+          </TooltipProvider>
 
           {showTollFreeFields ? (
             <fieldset className="space-y-4 border-t border-border/60 pt-4">
@@ -163,7 +127,7 @@ export function OnboardingGoalStep({
                     id="doingBusinessAs"
                     name="doingBusinessAs"
                     placeholder="Acme Health"
-                    defaultValue={profile.doingBusinessAs || profile.legalBusinessName}
+                    defaultValue={profile.doingBusinessAs}
                     disabled={isReadOnly}
                   />
                 </div>
