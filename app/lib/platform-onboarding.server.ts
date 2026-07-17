@@ -43,6 +43,7 @@ import {
 } from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { buildA2pBlockingIssues, provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 
 // Compliance channels that trigger the Twilio compliance provisioning job.
@@ -292,6 +293,50 @@ async function handleAdvanceStep(ctx: OnboardingActionContext): Promise<Onboardi
     updates: { currentStep: targetStep },
   });
   return { kind: "redirect", step: targetStep };
+}
+
+async function handleSaveWorkspaceName(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
+  const formData = resolveOnboardingInput(ctx.input);
+  const name = String(
+    formData.get("workspaceName") ?? formData.get("workspace_name") ?? "",
+  ).trim();
+
+  if (!name) {
+    return {
+      kind: "payload",
+      data: { error: "Enter a workspace name to continue." },
+      status: 400,
+    };
+  }
+  if (name.length > 200) {
+    return {
+      kind: "payload",
+      data: { error: "Workspace name must be 200 characters or fewer." },
+      status: 400,
+    };
+  }
+
+  const result = await updateWorkspaceName(ctx.user.id, ctx.workspaceId, name);
+  if (!result.ok) {
+    return {
+      kind: "payload",
+      data: { error: result.error },
+      status: result.status,
+    };
+  }
+
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
+    actorUserId: ctx.actorUserId,
+    updates: {
+      status: "collecting_business",
+      currentStep: "business_profile",
+    },
+  });
+
+  return { kind: "redirect", step: "business_profile" };
 }
 
 async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
@@ -676,6 +721,7 @@ async function handleAttachRcsSender(
 }
 
 const ONBOARDING_ACTION_HANDLERS = {
+  save_workspace_name: handleSaveWorkspaceName,
   advance_step: handleAdvanceStep,
   skip_first_number: handleSkipFirstNumber,
   verify_caller_id: handleVerifyCallerId,

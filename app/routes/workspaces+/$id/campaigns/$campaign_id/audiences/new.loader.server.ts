@@ -1,5 +1,5 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
-import { data as routeData } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -27,6 +27,13 @@ export const loader = defineLoader({
       return routeData({ campaign: null, error: "Campaign not found" }, { headers, status: 404 });
     }
 
-    return routeData({ campaign: campaignData, error: null }, { headers });
+    const query = new URLSearchParams({
+      campaignId,
+      returnTo: `/workspaces/${workspaceId}/campaigns/${campaignId}`,
+    });
+    return redirect(
+      `/workspaces/${workspaceId}/audiences/new?${query.toString()}`,
+      { headers },
+    );
   },
 });

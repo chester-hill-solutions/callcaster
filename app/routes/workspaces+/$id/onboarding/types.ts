@@ -6,6 +6,7 @@ import type {
 } from "@/lib/types";
 
 export type OnboardingPendingActions = {
+  isSavingWorkspaceName: boolean;
   isSavingBusinessProfile: boolean;
   isSavingChannels: boolean;
   isProvisioningA2P: boolean;

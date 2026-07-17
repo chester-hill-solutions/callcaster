@@ -1,7 +1,7 @@
 import { Form, Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
 
 type OnboardingChecklistLinkStepProps = {
@@ -36,15 +36,14 @@ export function OnboardingChecklistLinkStep({
   helperText,
 }: OnboardingChecklistLinkStepProps) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>{title}</CardTitle>
-          <StatusBadge status={complete ? "complete" : "pending"} />
-        </div>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title={title}
+        description={description}
+        actions={<StatusBadge status={complete ? "complete" : "pending"} />}
+      />
+      <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
           {complete ? completeLabel : incompleteLabel}
         </p>
@@ -70,7 +69,7 @@ export function OnboardingChecklistLinkStep({
             </Form>
           ) : null}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 }

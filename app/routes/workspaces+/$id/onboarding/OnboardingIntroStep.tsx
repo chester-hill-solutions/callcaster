@@ -1,48 +1,66 @@
+import { Form } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { WIZARD_STEP_META } from "./constants";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Section, SectionHeader } from "@/components/shared/Section";
 
 type OnboardingIntroStepProps = {
   workspaceName: string;
-  onStart: () => void;
+  isReadOnly: boolean;
+  isSaving: boolean;
+  error?: string | null;
 };
 
-const INTRO_STEPS = WIZARD_STEP_META.filter((step) =>
-  ["business_profile", "path_selection", "audience", "first_number", "script", "campaign_info", "credits"].includes(
-    step.id,
-  ),
-);
-
-export function OnboardingIntroStep({ workspaceName, onStart }: OnboardingIntroStepProps) {
+export function OnboardingIntroStep({
+  workspaceName,
+  isReadOnly,
+  isSaving,
+  error,
+}: OnboardingIntroStepProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Set up {workspaceName}</CardTitle>
-        <CardDescription>
-          A short walkthrough to get you ready for a live call session, IVR, or SMS blast.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <ol className="space-y-3 text-sm text-muted-foreground">
-          {INTRO_STEPS.map((step, index) => (
-            <li key={step.id} className="flex gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium text-foreground">
-                {index + 1}
-              </span>
-              <span>
-                <span className="font-medium text-foreground">{step.label}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-        <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-          Each step serves the goal you pick. You can continue past a step and finish it later from
-          Settings.
-        </div>
-        <Button type="button" onClick={onStart}>
-          Start setup
-        </Button>
-      </CardContent>
-    </Card>
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title="Name your workspace"
+        description="Choose the name your team will see across campaigns, contacts, and billing."
+      />
+      <div className="max-w-2xl">
+        {isReadOnly ? (
+          <p className="text-sm text-muted-foreground">
+            Workspace name: <span className="font-medium text-foreground">{workspaceName}</span>
+          </p>
+        ) : (
+          <Form method="post" className="space-y-6">
+            <input type="hidden" name="_action" value="save_workspace_name" />
+            {error ? (
+              <Alert variant="destructive" role="alert">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+            <FormField
+              htmlFor="workspaceName"
+              label="Workspace name"
+              required
+            >
+              <Input
+                id="workspaceName"
+                name="workspaceName"
+                type="text"
+                defaultValue={workspaceName}
+                maxLength={200}
+                required
+                autoComplete="organization"
+                disabled={isSaving}
+                aria-invalid={Boolean(error) || undefined}
+              />
+            </FormField>
+            <Button type="submit" disabled={isSaving} aria-busy={isSaving}>
+              {isSaving ? "Saving…" : "Continue"}
+            </Button>
+          </Form>
+        )}
+      </div>
+    </Section>
   );
 }

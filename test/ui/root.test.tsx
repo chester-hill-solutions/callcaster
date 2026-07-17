@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => {
     createBrowserClient: vi.fn(),
     workspaceMembersDb: {
       loadUserWithInvites: vi.fn(async () => ({ id: "u1" })),
-      listUserWorkspaceSummaries: vi.fn(async () => [{ id: "w1", name: "W" }] as any[]),
+      listUserWorkspaceSummaries: vi.fn(async () => [{ id: "w1", name: "W", role: "admin", credits: 5 }] as any[]),
     },
   };
 });
@@ -95,7 +95,7 @@ describe("root.tsx", () => {
       username: "ada",
       workspace_invite: [{ id: "invite-1" }],
     });
-    mocks.workspaceMembersDb.listUserWorkspaceSummaries.mockResolvedValue([{ id: "w1", name: "W" }] as any[]);
+    mocks.workspaceMembersDb.listUserWorkspaceSummaries.mockResolvedValue([{ id: "w1", name: "W", role: "admin", credits: 5 }] as any[]);
   });
 
   test("links includes stylesheet", async () => {
@@ -164,7 +164,7 @@ describe("root.tsx", () => {
     const body = await res.json();
     expect(body).toEqual({
       isSignedIn: true,
-      workspaces: [{ id: "w1", name: "W" }],
+      workspaces: [{ id: "w1", name: "W", role: "admin", credits: 5 }],
       user: {
         id: "u1",
         first_name: "Ada",

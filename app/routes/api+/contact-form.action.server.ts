@@ -23,6 +23,12 @@ export const action = defineAction({
     const email = String(data.email ?? "").trim();
     const name = String(data.name ?? "").trim();
     const message = String(data.message ?? "").trim();
+    const honeypot = String(data.company_website ?? "").trim();
+
+    if (honeypot) {
+      // Bot filled the hidden field; pretend success without sending anything.
+      return routeData({ success: true, message: "Email sent" });
+    }
 
     if (!email) {
       return routeData({ error: "Email is required" }, { status: 400 });

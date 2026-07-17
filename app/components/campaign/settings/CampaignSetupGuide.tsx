@@ -18,6 +18,8 @@ type CampaignSetupGuideProps = {
   allComplete: boolean;
   onDismiss: () => void;
   onStartCampaign?: () => void;
+  title?: string;
+  launchActionLabel?: string;
 };
 
 function StepStatusIcon({ status }: { status: CampaignSetupStep["status"] }) {
@@ -65,6 +67,8 @@ export function CampaignSetupGuide({
   allComplete,
   onDismiss,
   onStartCampaign,
+  title = "Set up your campaign",
+  launchActionLabel = "Start campaign",
 }: CampaignSetupGuideProps) {
   const currentStep = steps.find((step) => step.status === "current");
 
@@ -73,10 +77,10 @@ export function CampaignSetupGuide({
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Set up your first campaign</CardTitle>
+            <CardTitle>{title}</CardTitle>
             <CardDescription>
               {allComplete
-                ? "You're ready to launch. Save any changes, then start your campaign."
+                ? "Your campaign is ready for review and launch."
                 : `Step ${currentStepNumber} of ${totalSteps} — complete each step below to get started.`}
             </CardDescription>
           </div>
@@ -116,7 +120,7 @@ export function CampaignSetupGuide({
                       ? "Done"
                       : step.status === "current"
                         ? "Current"
-                        : "Pending"}
+                        : "Upcoming"}
                   </Badge>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">{step.description}</p>
@@ -127,7 +131,7 @@ export function CampaignSetupGuide({
         {allComplete && onStartCampaign ? (
           <div className="flex justify-end">
             <Button type="button" onClick={onStartCampaign}>
-              Start campaign
+              {launchActionLabel}
             </Button>
           </div>
         ) : null}

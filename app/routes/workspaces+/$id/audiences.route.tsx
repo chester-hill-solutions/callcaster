@@ -6,10 +6,11 @@ import { DataTable } from "@/components/workspace/tables/DataTable";
 import { audienceColumns } from "@/components/workspace/tables/columns";
 import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
+import { PeopleHubLayout } from "@/components/people/PeopleHubLayout";
 
 import type { ContextType } from "@/lib/types";
 
-export const meta: MetaFunction = () => [{ title: "Audiences — CallCaster" }];
+export const meta: MetaFunction = () => [{ title: "Call lists — CallCaster" }];
 
 export default function WorkspaceAudiencesPage() {
   const outlet = useOutlet();
@@ -22,32 +23,38 @@ export default function WorkspaceAudiencesPage() {
   const isWorkspaceAudienceEmpty = !audienceData?.length;
 
   if (outlet) {
-    return <Outlet context={parentContext} />;
+    return (
+      <PeopleHubLayout>
+        <Outlet context={parentContext} />
+      </PeopleHubLayout>
+    );
   }
 
-  const title = "Audiences";
+  const title = "Call lists";
 
   return (
-    <WorkspaceResourceListShell
-      title={title}
-      error={error}
-      isEmpty={isWorkspaceAudienceEmpty}
-      emptyMessage="Add An Audience To This Workspace"
-      emptyDescription="Audiences are the contact lists your campaigns dial and message. Upload a CSV or build one from your contacts."
-      addAction={
-        <Button asChild className="font-Zilla-Slab text-lg font-semibold">
-          <Link to="./new">Add Audience</Link>
-        </Button>
-      }
-    >
-      {!isWorkspaceAudienceEmpty ? (
-        <DataTable
-          className="font-semibold text-foreground"
-          columns={audienceColumns}
-          data={audienceData}
-        />
-      ) : null}
-    </WorkspaceResourceListShell>
+    <PeopleHubLayout>
+      <WorkspaceResourceListShell
+        title={title}
+        error={error}
+        isEmpty={isWorkspaceAudienceEmpty}
+        emptyMessage="Add a Call list to this workspace"
+        emptyDescription="Call lists organize the contacts your campaigns dial and message. Upload a CSV or build one from your contacts."
+        addAction={
+          <Button asChild className="font-Zilla-Slab text-lg font-semibold">
+            <Link to="./new">Add Call list</Link>
+          </Button>
+        }
+      >
+        {!isWorkspaceAudienceEmpty ? (
+          <DataTable
+            className="font-semibold text-foreground"
+            columns={audienceColumns}
+            data={audienceData}
+          />
+        ) : null}
+      </WorkspaceResourceListShell>
+    </PeopleHubLayout>
   );
 }
 

@@ -158,11 +158,10 @@ export default function ContactsPage() {
               <Card className="w-full max-w-md">
                 <CardHeader className="items-center gap-2 text-center">
                   <Heading as="h2" level={3} branded={false}>
-                    Add Your Own Contacts to this Workspace!
+                    Add your first contact
                   </Heading>
                   <Text variant="muted" className="max-w-sm">
-                    Contacts are the people you call and text. Add one
-                    manually or import an audience CSV.
+                    Add contacts one at a time or import a CSV into a Call list.
                   </Text>
                   <div className="flex justify-center pt-2">
                     <Button
@@ -181,11 +180,10 @@ export default function ContactsPage() {
           <Card className="w-full max-w-md">
             <CardHeader className="items-center gap-2 text-center">
               <Heading as="h2" level={3} branded={false}>
-                No contacts found
+                Try another search
               </Heading>
               <Text variant="muted" className="max-w-sm">
-                No contacts match &quot;{searchTerm}&quot;. Try a different
-                search term.
+                Contacts matching &quot;{searchTerm}&quot; will appear here.
               </Text>
             </CardHeader>
           </Card>

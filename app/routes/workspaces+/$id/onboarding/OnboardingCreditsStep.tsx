@@ -1,6 +1,6 @@
 import { Form, Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import { NUMBER_RENTAL_MONTHLY_CREDITS } from "@/lib/number-rental";
 
 type OnboardingCreditsStepProps = {
@@ -15,16 +15,14 @@ export function OnboardingCreditsStep({
   isReadOnly,
 }: OnboardingCreditsStepProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Credits</CardTitle>
-        <CardDescription>
-          Credits power calls, texts, and phone number rental. Add some when you are ready to run
-          outreach.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm">
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title="Credits"
+        description="Credits power calls, texts, and phone number rental. Add some when you are ready to run outreach."
+      />
+      <div className="space-y-4">
+        <div className="flex max-w-md flex-wrap items-center justify-between gap-3 text-sm">
           <div>
             <div className="text-muted-foreground">Current balance</div>
             <div className="text-lg font-semibold tabular-nums">
@@ -46,7 +44,7 @@ export function OnboardingCreditsStep({
             <Button type="submit">Continue to review</Button>
           </Form>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 }

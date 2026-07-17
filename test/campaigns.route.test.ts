@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
     updateCampaign: vi.fn(),
     deleteCampaign: vi.fn(),
     createCampaign: vi.fn(),
-    updateOrCopyScript: vi.fn(),
+    updateCampaignWithScript: vi.fn(),
     createErrorResponse: vi.fn((_e: any) => new Response("err", { status: 400 })),
     requireWorkspaceAccess: vi.fn(),
   };
@@ -26,7 +26,8 @@ vi.mock("@/lib/database/campaign.server", () => ({
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
   deleteCampaign: (...args: any[]) => mocks.deleteCampaign(...args),
   createCampaign: (...args: any[]) => mocks.createCampaign(...args),
-  updateOrCopyScript: (...args: any[]) => mocks.updateOrCopyScript(...args),
+  updateCampaignWithScript: (...args: any[]) =>
+    mocks.updateCampaignWithScript(...args),
 }));
 vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: (...args: any[]) =>
@@ -53,7 +54,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     mocks.updateCampaign.mockReset();
     mocks.deleteCampaign.mockReset();
     mocks.createCampaign.mockReset();
-    mocks.updateOrCopyScript.mockReset();
+    mocks.updateCampaignWithScript.mockReset();
     mocks.createErrorResponse.mockClear();
   });
 
@@ -80,28 +81,27 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
       scriptData: JSON.stringify({ id: 5, name: "S", steps: {} }),
       saveScriptAsCopy: "false",
     });
-    mocks.updateOrCopyScript.mockResolvedValueOnce({ id: 5, name: "S" });
-    mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1, script_id: 5 }, campaignDetails: { campaign_id: 1 } });
+    mocks.updateCampaignWithScript.mockResolvedValueOnce({
+      campaign: { id: 1, script_id: 5 },
+      campaignDetails: { campaign_id: 1 },
+      scriptId: 5,
+      script: { id: 5, name: "S" },
+    });
 
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
 
-    expect(mocks.updateOrCopyScript).toHaveBeenCalledWith(
+    expect(mocks.updateCampaignWithScript).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: "w1",
         scriptData: { id: 5, name: "S", steps: {} },
         saveAsCopy: false,
-        created_by: "u1",
+        actorId: "u1",
       }),
     );
-    // The resolved script id must be threaded onto campaignData before
-    // updateCampaign runs, so the campaign actually links to the script.
-    expect(mocks.updateCampaign).toHaveBeenCalledWith({
-      campaignData: expect.objectContaining({ id: 1, title: "t", script_id: 5 }),
-      campaignDetails: { x: 1 },
-    });
+    expect(mocks.updateCampaign).not.toHaveBeenCalled();
     await expect(res.json()).resolves.toMatchObject({
       campaign: { id: 1, script_id: 5 },
       scriptId: 5,
@@ -117,15 +117,19 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
       scriptData: JSON.stringify({ id: 5, name: "S" }),
       saveScriptAsCopy: "true",
     });
-    mocks.updateOrCopyScript.mockResolvedValueOnce({ id: 9, name: "S (Copy)" });
-    mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1, script_id: 9 }, campaignDetails: {} });
+    mocks.updateCampaignWithScript.mockResolvedValueOnce({
+      campaign: { id: 1, script_id: 9 },
+      campaignDetails: {},
+      scriptId: 9,
+      script: { id: 9, name: "S (Copy)" },
+    });
 
     const mod = await import("../app/routes/api+/campaigns");
     await mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any);
 
-    expect(mocks.updateOrCopyScript).toHaveBeenCalledWith(
+    expect(mocks.updateCampaignWithScript).toHaveBeenCalledWith(
       expect.objectContaining({ saveAsCopy: true }),
     );
   });
@@ -146,7 +150,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
       request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
 
-    expect(mocks.updateOrCopyScript).not.toHaveBeenCalled();
+    expect(mocks.updateCampaignWithScript).not.toHaveBeenCalled();
     expect(mocks.updateCampaign).toHaveBeenCalledWith({
       campaignData: expect.objectContaining({ id: 1, title: "t" }),
       campaignDetails: {},
@@ -162,7 +166,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
       scriptData: JSON.stringify({ id: 5, name: "S" }),
       saveScriptAsCopy: "false",
     });
-    mocks.updateOrCopyScript.mockRejectedValueOnce(new Error("duplicate name"));
+    mocks.updateCampaignWithScript.mockRejectedValueOnce(new Error("duplicate name"));
 
     const mod = await import("../app/routes/api+/campaigns");
     const res = await asRouteResponse(mod.action({

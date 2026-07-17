@@ -21,6 +21,9 @@ export type RootNavbarUser = {
 export type RootWorkspaceSummary = {
   id: string;
   name: string;
+  role: string;
+  /** Present for Admin+ members only; null hides the navbar credit readout. */
+  credits: number | null;
 };
 
 export type RootLoaderData = {

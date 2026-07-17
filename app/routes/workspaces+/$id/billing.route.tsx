@@ -16,6 +16,7 @@ import { hasMinRole, MemberRole } from "@/lib/member-role";
 export const meta: MetaFunction = () => [{ title: "Billing — CallCaster" }];
 
 import { Section, SectionHeader } from "@/components/shared/Section";
+import { BillingActivityTable } from "@/components/workspace/BillingActivityTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Accordion,
@@ -25,21 +26,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Heading, Text } from "@/components/ui/typography";
-import {
-  getTransactionDisplayDescription,
-  getBillingEventSource,
-  getBillingEventSourceLabel,
-  type TransactionType,
-} from "@/lib/transaction-history-display";
 import {
   CREDIT_PRICE_CAD,
   MIN_CREDITS,
@@ -52,7 +39,7 @@ import {
 type TransactionRow = {
   id: string;
   created_at: string;
-  type: string;
+  type: "CREDIT" | "DEBIT";
   amount: number;
   note?: string | null;
   idempotency_key?: string | null;
@@ -287,75 +274,8 @@ export default function Credits() {
       </Section>
 
       <Section variant="flat">
-        <SectionHeader branded={false} compact title="Credit Usage Log" />
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Idempotency key</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {credits.history.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center">
-                    <Text variant="muted">
-                      No credit usage yet. Purchases and campaign spend will
-                      appear here.
-                    </Text>
-                  </TableCell>
-                </TableRow>
-              ) : null}
-              {credits.history.map((transaction: TransactionRow) => {
-                const source = getBillingEventSource({
-                  type: transaction.type as TransactionType,
-                  idempotencyKey:
-                    "idempotency_key" in transaction &&
-                    typeof transaction.idempotency_key === "string"
-                      ? transaction.idempotency_key
-                      : null,
-                });
-                return (
-                  <TableRow key={transaction.id}>
-                    <TableCell>
-                      {new Date(transaction.created_at).toLocaleString()}
-                    </TableCell>
-                    <TableCell>{getBillingEventSourceLabel(source)}</TableCell>
-                    <TableCell className="max-w-xs truncate text-xs">
-                      {getTransactionDisplayDescription({
-                        type: transaction.type as TransactionType,
-                        amount: transaction.amount,
-                        note:
-                          "note" in transaction &&
-                          typeof transaction.note === "string"
-                            ? transaction.note
-                            : null,
-                      })}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {typeof transaction.idempotency_key === "string"
-                        ? transaction.idempotency_key
-                        : "—"}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right ${
-                        transaction.type === "CREDIT"
-                          ? "text-success"
-                          : "text-destructive"
-                      }`}
-                    >
-                      {transaction.amount}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <SectionHeader branded={false} compact title="Activity" />
+        <BillingActivityTable history={credits.history} />
       </Section>
     </div>
   );

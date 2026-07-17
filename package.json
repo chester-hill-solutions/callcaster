@@ -6,6 +6,7 @@
   "scripts": {
     "build": "react-router build",
     "dev": "node ./scripts/local/dev.mjs",
+    "dev:local": "node ./scripts/local/dev-local.mjs",
     "dev:calling:sync": "bun ./scripts/local/sync-calling-dev.mjs",
     "tools:sync-inbound-sms": "bun ./scripts/one-off/sync-inbound-sms-from-twilio.mjs",
     "tools:routes:baseline": "node scripts/verify-route-tree.mjs --update-baseline",

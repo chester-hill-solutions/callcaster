@@ -21,7 +21,10 @@ import {
 
 
 import { useWorkspaceRealtime } from "@/hooks/realtime/useWorkspaceRealtime";
-import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
+import {
+  NumberSummaryList,
+  type RoutingPresetSubmission,
+} from "@/components/phone-numbers/NumberSummaryList";
 import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import {
@@ -238,6 +241,10 @@ const WorkspaceSettings = () => {
     setNumberPendingRemoval(numberId);
   };
 
+  const handleApplyPreset = (submission: RoutingPresetSubmission) => {
+    updateFetcher.submit(submission, { method: "POST" });
+  };
+
   const confirmNumberRemoval = () => {
     if (numberPendingRemoval == null) return;
     updateFetcher.submit(
@@ -293,7 +300,7 @@ const WorkspaceSettings = () => {
         </h1>
         <div className="flex min-w-0 flex-wrap gap-4 p-4">
           <Panel className="min-w-0 flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
-            <NumbersTable
+            <NumberSummaryList
               phoneNumbers={phoneNumbers || []}
               users={users}
               mediaNames={mediaNames}
@@ -307,6 +314,7 @@ const WorkspaceSettings = () => {
               onInboundQueueChange={handleInboundQueueChange}
               onInboundScriptChange={handleInboundScriptChange}
               onNumberRemoval={handleNumberRemoval}
+              onApplyPreset={handleApplyPreset}
               isBusy={updateFetcher.state !== "idle"}
             />
           </Panel>

@@ -14,7 +14,6 @@ import { Heading, Text } from "@/components/ui/typography";
 
 
 
-import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import {
@@ -26,6 +25,7 @@ import {
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import { compareMembersByRole } from "@/lib/workspace-members";
+import { getWorkspaceRoleDisplayName } from "@/lib/workspace-role-display";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -156,7 +156,7 @@ export default function WorkspaceSettings() {
                   value={role.valueOf()}
                   className=""
                 >
-                  {capitalize(role.valueOf())}
+                  {getWorkspaceRoleDisplayName(role)}
                 </option>
               );
             })}
@@ -206,7 +206,7 @@ export default function WorkspaceSettings() {
         <div className="space-y-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Owner
+              Administrator
             </p>
             {workspaceOwner ? (
               <TeamMember

@@ -38,10 +38,19 @@ vi.mock("react-router", async () => {
         shouldRedirectToOnboarding: false,
         warnings: [],
       },
+      today: {
+        kind: "review_campaigns",
+        href: "/workspaces/ws-1/campaigns",
+        unreadCount: 0,
+        runningCampaignTitle: null,
+      },
     }),
     useOutlet: () => null,
     useOutletContext: () => ({}),
     useRevalidator: () => ({ revalidate: mocks.revalidate }),
+    // No onboarding child match in these bare renders, so the layout skips
+    // the onboarding progress strip.
+    useMatches: () => [],
   };
 });
 
@@ -65,8 +74,8 @@ vi.mock("@/components/workspace/WorkspaceNav", () => ({
   ),
 }));
 
-vi.mock("@/components/campaign/CampaignEmptyState", () => ({
-  default: () => <div>Campaign empty state</div>,
+vi.mock("@/components/workspace/WorkspaceToday", () => ({
+  default: () => <div>Workspace Today</div>,
 }));
 
 describe("workspace campaign realtime revalidation", () => {

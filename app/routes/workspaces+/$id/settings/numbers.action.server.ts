@@ -1,5 +1,6 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
+  applyWorkspaceNumberRoutingPreset,
   deleteWorkspaceNumber,
   patchWorkspaceNumber,
   verifyWorkspaceCallerId,
@@ -10,6 +11,9 @@ import {
 import { MemberRole } from "@/lib/member-role";
 import { normalizeInboundRingCount } from "../../../../../shared/inbound-rings";
 import { defineAction } from "@/lib/handler.server";
+import type { InboundRoutingPresetApplication } from "../../../../../shared/inbound-routing-presets";
+import { parseRoutingPresetApplication } from "@/lib/routing-preset-form";
+import { data as routeData } from "react-router";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -58,6 +62,31 @@ export const action = defineAction({
       );
       if (!result.ok) return { error: result.error };
       return null;
+    }
+
+    if (formName === "apply-routing-preset") {
+      let application: InboundRoutingPresetApplication;
+      try {
+        application = parseRoutingPresetApplication(data);
+      } catch (error) {
+        return routeData(
+          {
+            error:
+              error instanceof Error ? error.message : "Choose valid routing settings",
+          },
+          { status: 400 },
+        );
+      }
+      const result = await applyWorkspaceNumberRoutingPreset(
+        user.id,
+        workspace_id,
+        String(data.numberId ?? ""),
+        application,
+      );
+      if (!result.ok) {
+        return routeData({ error: result.error }, { status: result.status });
+      }
+      return { success: "Routing preset applied" };
     }
 
     if (formName === "update-incoming-activity") {

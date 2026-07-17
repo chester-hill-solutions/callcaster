@@ -2,13 +2,14 @@ import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import {
   countRentedWorkspaceNumbers,
   countVerifiedCallerIdNumbers,
   workspaceHasFirstNumber,
 } from "@/lib/messaging-onboarding/predicates";
 import { wizardStepsForGoal } from "@/lib/messaging-onboarding/goals";
+import { productGoalForOnboardingGoal } from "@/lib/campaign-goals";
 import { WIZARD_STEP_META } from "./constants";
 import type { OnboardingStepProps } from "./types";
 
@@ -53,16 +54,18 @@ export function OnboardingLaunchStep({
   const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
   const hasFirstNumber = workspaceHasFirstNumber(numbers);
   const visibleStepIds = new Set(wizardStepsForGoal(onboarding.selectedGoal));
+  const campaignGoal = onboarding.selectedGoal
+    ? productGoalForOnboardingGoal(onboarding.selectedGoal)
+    : null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Ready to launch</CardTitle>
-        <CardDescription>
-          Review your setup progress, then open the workspace to start your campaign.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title="Ready to launch"
+        description="Review your setup progress, then open the workspace to start your campaign."
+      />
+      <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Badge variant={hasFirstNumber ? "secondary" : "outline"}>
             {formatPhoneNumberBadge(rentedCount, verifiedCallerIdCount)}
@@ -119,13 +122,19 @@ export function OnboardingLaunchStep({
             <Link to={`/workspaces/${workspaceId}`}>Go to workspace</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link to={`/workspaces/${workspaceId}/campaigns/new`}>Create campaign</Link>
+            <Link
+              to={`/workspaces/${workspaceId}/campaigns/new${
+                campaignGoal ? `?goal=${encodeURIComponent(campaignGoal)}` : ""
+              }`}
+            >
+              Create campaign
+            </Link>
           </Button>
           <Button variant="outline" asChild>
             <Link to={`/workspaces/${workspaceId}/settings/numbers`}>Manage numbers</Link>
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 }

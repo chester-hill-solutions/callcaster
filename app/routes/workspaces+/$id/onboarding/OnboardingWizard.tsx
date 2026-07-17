@@ -3,11 +3,6 @@ import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
-  isWizardOnboardingStepId,
-  resolvePersistedWizardStep,
-  type WizardOnboardingStepId,
-} from "@/lib/messaging-onboarding/wizard-steps";
-import {
   nextWizardStep,
   previousWizardStep,
   wizardStepsForGoal,
@@ -21,30 +16,15 @@ import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
 import { OnboardingGoalStep } from "./OnboardingGoalStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
 import { OnboardingLaunchStep } from "./OnboardingLaunchStep";
-import { OnboardingOverviewCard } from "./OnboardingOverviewCard";
-import { WIZARD_STEP_META } from "./constants";
 import { hasVoiceCapability } from "./utils";
+import { readWizardStep } from "./wizard-step-resolution";
 import type { OnboardingPendingActions } from "./types";
-
-function readWizardStep(
-  urlStep: string | null,
-  currentStep: string | null | undefined,
-  visibleSteps: WizardOnboardingStepId[],
-): WizardOnboardingStepId {
-  if (urlStep && isWizardOnboardingStepId(urlStep) && visibleSteps.includes(urlStep)) {
-    return urlStep;
-  }
-  const persisted = resolvePersistedWizardStep(currentStep);
-  if (visibleSteps.includes(persisted)) {
-    return persisted;
-  }
-  return visibleSteps[0] ?? "business_profile";
-}
 
 type OnboardingWizardProps = OnboardingLoaderData & {
   pending: OnboardingPendingActions;
   a2pBlockingIssues: string[];
   a2pErrors: string[];
+  actionError?: string | null;
 };
 
 export function OnboardingWizard({
@@ -62,6 +42,7 @@ export function OnboardingWizard({
   scripts,
   audienceCount,
   campaignCount,
+  actionError,
 }: OnboardingWizardProps) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -83,8 +64,6 @@ export function OnboardingWizard({
     if (urlStep === activeStep) return;
     navigate(`?step=${activeStep}`, { replace: true });
   }, [activeStep, navigate, showIntro, urlStep]);
-  const progressValue =
-    stepIndex >= 0 ? ((stepIndex + 1) / visibleSteps.length) * 100 : 0;
 
   const hasFirstNumber = workspaceHasFirstNumber(phoneNumbers ?? []);
   const isFormSubmitting = navigation.state !== "idle";
@@ -171,23 +150,8 @@ export function OnboardingWizard({
     }
   })();
 
-  const activeMeta = WIZARD_STEP_META.find((step) => step.id === activeStep);
-
   return (
     <div className="space-y-6">
-      {!showIntro && activeStep ? (
-        <OnboardingOverviewCard
-          onboarding={onboarding}
-          workspaceName={workspaceName}
-          workspaceId={workspaceId}
-          creditsBalance={creditsBalance}
-          activeStep={activeStep}
-          visibleSteps={visibleSteps}
-          stepIndex={stepIndex}
-          progressValue={progressValue}
-        />
-      ) : null}
-
       {showSkippedFirstNumberNotice ? (
         <Alert variant="warning" data-testid="skipped-first-number-notice">
           <AlertDescription>
@@ -199,12 +163,9 @@ export function OnboardingWizard({
       {showIntro ? (
         <OnboardingIntroStep
           workspaceName={workspaceName}
-          onStart={() => {
-            setShowIntro(false);
-            navigate(`/workspaces/${workspaceId}/onboarding?step=business_profile`, {
-              replace: true,
-            });
-          }}
+          isReadOnly={isReadOnly}
+          isSaving={pending.isSavingWorkspaceName}
+          error={actionError}
         />
       ) : null}
 
@@ -345,12 +306,6 @@ export function OnboardingWizard({
             {footerContinue}
           </div>
         </div>
-      ) : null}
-
-      {!showIntro && activeStep && stepIndex >= 0 ? (
-        <p className="text-center text-xs text-muted-foreground">
-          Step {stepIndex + 1} of {visibleSteps.length}: {activeMeta?.label ?? ""}
-        </p>
       ) : null}
     </div>
   );

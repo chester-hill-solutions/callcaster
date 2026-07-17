@@ -5,6 +5,10 @@ import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
 import type { RealtimeChangePayload } from "@/lib/workspace-events.shared";
 import type { Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
+import {
+  sumUnreadConversationCount,
+  UNREAD_CONVERSATION_PAGE_SIZE,
+} from "@/lib/chats/unread-count";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -16,8 +20,6 @@ const POLL_INTERVAL_MS = 30_000;
 // maxPageSize in app/lib/pagination.server.ts) and sum unread_count client-side.
 // Workspaces with more than 100 distinct conversations will undercount unread
 // messages sitting in conversations beyond the first page.
-const UNREAD_PAGE_SIZE = 100;
-
 /**
  * Tracks a workspace-wide unread conversation count for nav badges.
  *
@@ -39,16 +41,13 @@ export function useUnreadConversationsCount(
     inFlightRef.current = true;
     try {
       const params = new URLSearchParams({
-        page_size: String(UNREAD_PAGE_SIZE),
+        page_size: String(UNREAD_CONVERSATION_PAGE_SIZE),
       });
       const conversations = await fetchConversationSummaries(
         workspaceId,
         params,
       );
-      const total = conversations.reduce(
-        (sum, conversation) => sum + (conversation.unread_count || 0),
-        0,
-      );
+      const total = sumUnreadConversationCount(conversations);
       // A late response for a previous workspace must not clobber the
       // count for the workspace we've since switched to.
       if (currentWorkspaceIdRef.current === workspaceId) {

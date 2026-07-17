@@ -1,12 +1,25 @@
 import { QueueList } from "@/components/call/CallScreen.QueueList";
-import { CallArea } from "@/components/call/CallScreen.CallArea";
+import {
+  CallArea,
+  DispositionBar,
+} from "@/components/call/CallScreen.CallArea";
 import { CallQuestionnaire } from "@/components/call/CallScreen.Questionnaire";
 import { Household } from "@/components/call/CallScreen.Household";
-import { CampaignHeader } from "@/components/call/CallScreen.Header";
+import { CampaignHeader, TopChrome } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
+import { OperatorColumn } from "@/components/call/CallScreen.OperatorColumn";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { NavLink } from "react-router";
+import { Grid3X3, List, Settings } from "lucide-react";
 import {
   declineIncomingCall,
   IncomingCallPanel,
@@ -77,13 +90,8 @@ export function CallScreenLayout({
     requeueContacts,
   } = queueControls;
 
-  const {
-    questionContact,
-    attemptList,
-    handleResponse,
-    update,
-    saveData,
-  } = formState;
+  const { questionContact, attemptList, handleResponse, update, saveData } =
+    formState;
 
   const {
     isDialogOpen,
@@ -118,6 +126,12 @@ export function CallScreenLayout({
     handleVerifyNewNumber,
     verificationPhoneNumber,
   } = phoneVerification;
+  const dispositionOptions = normalizeDispositionOptions(
+    campaignDetails.disposition_options,
+  ).map((option) => ({
+    value: option,
+    label: option,
+  }));
 
   return (
     <div className="w-full space-y-6">
@@ -128,71 +142,159 @@ export function CallScreenLayout({
           role="alert"
         >
           <p className="font-Zilla-Slab text-xl font-semibold">
-            {hasAccess ? "No Credits Remaining" : "Campaign Disabled"}
+            {hasAccess ? "Credit balance depleted" : "Campaign credits required"}
           </p>
           <p className="mt-2 text-sm">
             {hasAccess
-              ? "Purchase more credits to continue this campaign."
-              : "Please contact your administrator to enable the campaign."}
+              ? "Add credits to continue this campaign."
+              : "Contact a workspace administrator to continue this campaign."}
           </p>
           {hasAccess ? (
             <Button asChild className="mt-3">
               <NavLink to="../../../billing" relative="path">
-                Purchase Credits
+                Add credits
               </NavLink>
             </Button>
           ) : null}
         </div>
       ) : null}
-      <div className="flex flex-col gap-4 rounded-2xl border-2 border-brand-secondary/40 p-4 sm:p-6 lg:flex-row lg:items-start">
-        <CampaignHeader
-          className="min-w-0 flex-1"
-          campaign={campaign}
-          count={count}
-          completed={completed}
-          onLeaveCampaign={() => {
-            hangUp();
-            device?.destroy();
-            requeueContacts();
-            navigate(-1);
-          }}
-          onReportError={() => setReportDialog(!isReportDialogOpen)}
-          mediaStream={stream}
-          availableMicrophones={availableMicrophones}
-          availableSpeakers={availableSpeakers}
-          selectedMicrophone={selectedMicrophone}
-          selectedSpeaker={selectedSpeaker}
-          handleMicrophoneChange={handleMicrophoneChange}
-          handleSpeakerChange={handleSpeakerChange}
-          handleMuteMicrophone={handleMuteMicrophone}
-          isMicrophoneMuted={isMicrophoneMuted}
-          availableCredits={availableCredits}
-          creditState={creditState}
-          hasAccess={hasAccess}
-          phoneStatus={phoneConnectionStatus}
-          selectedDevice={selectedDevice}
-          onDeviceSelect={setSelectedDevice}
-          verifiedNumbers={verifiedNumbers}
-          isAddingNumber={isAddingNumber}
-          onAddNumberClick={() => setIsAddingNumber(true)}
-          onAddNumberCancel={() => setIsAddingNumber(false)}
-          newPhoneNumber={newPhoneNumber}
-          onNewPhoneNumberChange={setNewPhoneNumber}
-          onVerifyNewNumber={handleVerifyNewNumber}
-          verificationPhoneNumber={verificationPhoneNumber}
-        />
-        <div className="shrink-0 self-center lg:self-start">
-          <PhoneKeypad
-            onKeyPress={handleDTMF}
-            displayState={displayState}
-            displayColor={displayColor}
-            callDuration={callDuration}
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="space-y-6">
-          {incomingCall ? (
+      <TopChrome
+        campaign={campaign}
+        count={count}
+        completed={completed}
+        availableCredits={availableCredits}
+        creditState={creditState}
+        hasAccess={hasAccess}
+        predictive={campaign.dial_type === "predictive"}
+        onLeaveCampaign={() => {
+          hangUp();
+          device?.destroy();
+          requeueContacts();
+          navigate(-1);
+        }}
+        onReportError={() => setReportDialog(!isReportDialogOpen)}
+      >
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Open queue"
+            >
+              <List className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-[min(92vw,32rem)] overflow-y-auto sm:max-w-lg">
+            <SheetHeader className="mb-4">
+              <SheetTitle>Call queue</SheetTitle>
+              <SheetDescription>
+                Review recipients, skip contacts, or load the next queue.
+              </SheetDescription>
+            </SheetHeader>
+            <QueueList
+              isBusy={isBusy}
+              householdMap={householdMap}
+              groupByHousehold={groupByHousehold}
+              queue={campaign.dial_type === "call" ? queue : predictiveQueue}
+              handleNextNumber={handleNextNumber}
+              nextRecipient={nextRecipient}
+              handleQueueButton={() => fetchMore({ householdMap })}
+              predictive={campaign.dial_type === "predictive"}
+              count={count}
+              completed={completed}
+            />
+          </SheetContent>
+        </Sheet>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Open keypad"
+            >
+              <Grid3X3 className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-[min(92vw,22rem)]">
+            <SheetHeader className="mb-4">
+              <SheetTitle>DTMF keypad</SheetTitle>
+              <SheetDescription>
+                Send keypad tones during the active call. Keyboard digits remain
+                available.
+              </SheetDescription>
+            </SheetHeader>
+            <PhoneKeypad
+              onKeyPress={handleDTMF}
+              displayState={displayState}
+              displayColor={displayColor}
+              callDuration={callDuration}
+              showStatus={false}
+            />
+          </SheetContent>
+        </Sheet>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Open call settings"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-[min(94vw,38rem)] overflow-y-auto sm:max-w-xl">
+            <SheetHeader>
+              <SheetTitle>Call settings</SheetTitle>
+              <SheetDescription>
+                Choose audio devices, calling device, and microphone state.
+              </SheetDescription>
+            </SheetHeader>
+            <CampaignHeader
+              settingsOnly
+              className="px-0"
+              campaign={campaign}
+              count={count}
+              completed={completed}
+              onLeaveCampaign={() => {
+                hangUp();
+                device?.destroy();
+                requeueContacts();
+                navigate(-1);
+              }}
+              onReportError={() => setReportDialog(!isReportDialogOpen)}
+              mediaStream={stream}
+              availableMicrophones={availableMicrophones}
+              availableSpeakers={availableSpeakers}
+              selectedMicrophone={selectedMicrophone}
+              selectedSpeaker={selectedSpeaker}
+              handleMicrophoneChange={handleMicrophoneChange}
+              handleSpeakerChange={handleSpeakerChange}
+              handleMuteMicrophone={handleMuteMicrophone}
+              isMicrophoneMuted={isMicrophoneMuted}
+              availableCredits={availableCredits}
+              creditState={creditState}
+              hasAccess={hasAccess}
+              phoneStatus={phoneConnectionStatus}
+              selectedDevice={selectedDevice}
+              onDeviceSelect={setSelectedDevice}
+              verifiedNumbers={verifiedNumbers}
+              isAddingNumber={isAddingNumber}
+              onAddNumberClick={() => setIsAddingNumber(true)}
+              onAddNumberCancel={() => setIsAddingNumber(false)}
+              newPhoneNumber={newPhoneNumber}
+              onNewPhoneNumberChange={setNewPhoneNumber}
+              onVerifyNewNumber={handleVerifyNewNumber}
+              verificationPhoneNumber={verificationPhoneNumber}
+            />
+          </SheetContent>
+        </Sheet>
+      </TopChrome>
+      <OperatorColumn
+        incoming={
+          incomingCall ? (
             <IncomingCallPanel
               incomingCall={incomingCall as Call}
               callHandling={{
@@ -202,7 +304,9 @@ export function CallScreenLayout({
               }}
               onDecline={() => declineIncomingCall(incomingCall as Call)}
             />
-          ) : null}
+          ) : null
+        }
+        call={
           <CallArea
             conference={conference ? { parameters: { Sid: conference } } : null}
             isBusy={isBusy || deviceIsBusy}
@@ -213,22 +317,18 @@ export function CallScreenLayout({
             handleVoiceDrop={handleVoiceDrop}
             hangUp={
               campaign.dial_type === "predictive"
-                ? () => handleConferenceEnd({
-                  activeCall: activeCall as unknown as ActiveCall,
-                  setConference: () => setConference(null),
-                  workspaceId,
-                })
+                ? () =>
+                    handleConferenceEnd({
+                      activeCall: activeCall as unknown as ActiveCall,
+                      setConference: () => setConference(null),
+                      workspaceId,
+                    })
                 : () => {
-                  if (hangUp) hangUp();
-                }
+                    if (hangUp) hangUp();
+                  }
             }
             displayState={displayState}
-            dispositionOptions={normalizeDispositionOptions(
-              campaignDetails.disposition_options,
-            ).map((option) => ({
-              value: option,
-              label: option,
-            }))}
+            dispositionOptions={dispositionOptions}
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}
@@ -237,43 +337,98 @@ export function CallScreenLayout({
             callState={callState}
             callDuration={callDuration}
             voiceDrop={Boolean(campaignDetails.voicedrop_audio)}
+            showDisposition={false}
           />
-          <Household
+        }
+        disposition={
+          <DispositionBar
+            isBusy={isBusy || deviceIsBusy}
+            nextRecipient={nextRecipient}
+            handleDequeueNext={handleDequeueNext}
+            disposition={disposition}
+            dispositionOptions={dispositionOptions}
+            setDisposition={setDisposition}
+          />
+        }
+        household={
+          house?.length ? (
+            <Household
+              isBusy={isBusy}
+              house={house}
+              switchQuestionContact={(args: { contact: QueueItem }) =>
+                switchQuestionContact({ contact: args.contact })
+              }
+              attemptList={
+                attemptList as unknown as (Tables<"outreach_attempt"> & {
+                  result?: { status?: string };
+                })[]
+              }
+              questionContact={questionContact}
+            />
+          ) : null
+        }
+        script={
+          <CallQuestionnaire
+            key={questionContact?.contact_id ?? "none"}
             isBusy={isBusy}
-            house={house ?? []}
-            switchQuestionContact={(args: { contact: QueueItem }) => switchQuestionContact({ contact: args.contact })}
-            attemptList={attemptList as unknown as (Tables<"outreach_attempt"> & { result?: { status?: string } })[]}
-            questionContact={questionContact}
-          />
-        </div>
-        <CallQuestionnaire
-          key={questionContact?.contact_id ?? "none"}
-          isBusy={isBusy}
-          handleResponse={(response: { pageId: string; blockId: string; value: string | number | boolean | string[] | null | undefined }) => {
-            const value = response.value;
-            if (value !== undefined && value !== null) {
-              handleResponse({ blockId: response.blockId, value: typeof value === "string" || Array.isArray(value) ? value : String(value) });
+            handleResponse={(response: {
+              pageId: string;
+              blockId: string;
+              value: string | number | boolean | string[] | null | undefined;
+            }) => {
+              const value = response.value;
+              if (value !== undefined && value !== null) {
+                handleResponse({
+                  blockId: response.blockId,
+                  value:
+                    typeof value === "string" || Array.isArray(value)
+                      ? value
+                      : String(value),
+                });
+              }
+            }}
+            campaignDetails={
+              campaignDetails as unknown as CampaignDetails & {
+                script: {
+                  steps: {
+                    pages?: Record<
+                      string,
+                      { id: string; title: string; blocks: string[] }
+                    >;
+                    blocks?: Record<
+                      string,
+                      {
+                        id: string;
+                        type: string;
+                        title: string;
+                        content: string;
+                        options?: Array<{
+                          value: string;
+                          label: string;
+                          next: string;
+                        }>;
+                        audioFile: string;
+                      }
+                    >;
+                  };
+                };
+              }
             }
-          }}
-          campaignDetails={campaignDetails as unknown as CampaignDetails & { script: { steps: { pages?: Record<string, { id: string; title: string; blocks: string[] }>; blocks?: Record<string, { id: string; type: string; title: string; content: string; options?: Array<{ value: string; label: string; next: string }>; audioFile: string }> } } }}
-          update={(update || {}) as Record<string, Record<string, string | number | boolean | string[] | null | undefined>>}
-          nextRecipient={questionContact}
-          handleQuickSave={saveData}
-          disabled={!questionContact}
-        />
-        <QueueList
-          isBusy={isBusy}
-          householdMap={householdMap}
-          groupByHousehold={groupByHousehold}
-          queue={campaign.dial_type === "call" ? queue : predictiveQueue}
-          handleNextNumber={handleNextNumber}
-          nextRecipient={nextRecipient}
-          handleQueueButton={() => fetchMore({ householdMap })}
-          predictive={campaign.dial_type === "predictive"}
-          count={count}
-          completed={completed}
-        />
-      </div>
+            update={
+              (update || {}) as Record<
+                string,
+                Record<
+                  string,
+                  string | number | boolean | string[] | null | undefined
+                >
+              >
+            }
+            nextRecipient={questionContact}
+            handleQuickSave={saveData}
+            disabled={!questionContact}
+          />
+        }
+      />
       <CampaignDialogs
         isDialogOpen={isDialogOpen}
         setDialog={setDialog}
@@ -286,7 +441,9 @@ export function CallScreenLayout({
           dial_type: campaign.dial_type || "call",
           voicemail_file: Boolean(campaign.voicemail_file),
         }}
-        fetchMore={fetchMore as unknown as (params: Record<string, unknown>) => void}
+        fetchMore={
+          fetchMore as unknown as (params: Record<string, unknown>) => void
+        }
         householdMap={householdMap}
         currentState={currentState}
         isActive={isActive}

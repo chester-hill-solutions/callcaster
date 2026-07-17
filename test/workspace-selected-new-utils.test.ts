@@ -11,10 +11,7 @@ vi.mock("@/lib/database/contact.server", async () => {
   return { ...actual, bulkCreateContacts };
 });
 vi.mock("@/lib/database/workspace.server", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/database/workspace.server")
-  >("@/lib/database/workspace.server");
-  return { ...actual, getWorkspacePhoneNumbers };
+  return { getWorkspacePhoneNumbers };
 });
 
 const enqueueContactsForCampaign = vi.fn(async () => undefined);
@@ -243,6 +240,65 @@ describe("WorkspaceSelectedNewUtils", () => {
     fdRobo.set("campaign-type", "robocall");
     const r2 = await asRouteResponse(mod.handleNewCampaign({ formData: fdRobo, workspaceId: "w1", headers }));
     expect(r2.status).toBe(302);
+  });
+
+  test.each([
+    ["live_calling", "live_call"],
+    ["text_campaign", "message"],
+    ["automated_phone_menu", "robocall"],
+  ] as const)(
+    "handleNewCampaign maps %s goal to %s",
+    async (goal, expectedType) => {
+      const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+      const fd = new FormData();
+      fd.set("campaign-name", `${goal} campaign`);
+      fd.set("campaign-goal", goal);
+
+      const response = await asRouteResponse(
+        mod.handleNewCampaign({
+          formData: fd,
+          workspaceId: "w1",
+          headers: new Headers(),
+        }),
+      );
+
+      expect(response.status).toBe(302);
+      expect(tenantDbState.insertedCampaign).toMatchObject({
+        type: expectedType,
+      });
+    },
+  );
+
+  test("handleNewCampaign accepts legacy campaign-type posts and rejects invalid goals", async () => {
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+    const legacy = new FormData();
+    legacy.set("campaign-name", "Advanced menu");
+    legacy.set("campaign-type", "simple_ivr");
+
+    const legacyResponse = await asRouteResponse(
+      mod.handleNewCampaign({
+        formData: legacy,
+        workspaceId: "w1",
+        headers: new Headers(),
+      }),
+    );
+    expect(legacyResponse.status).toBe(302);
+    expect(tenantDbState.insertedCampaign).toMatchObject({ type: "simple_ivr" });
+
+    const invalid = new FormData();
+    invalid.set("campaign-name", "Invalid");
+    invalid.set("campaign-goal", "email");
+    const invalidResponse = await asRouteResponse(
+      mod.handleNewCampaign({
+        formData: invalid,
+        workspaceId: "w1",
+        headers: new Headers(),
+      }),
+    );
+    expect(invalidResponse.status).toBe(400);
+    expect(await invalidResponse.json()).toMatchObject({
+      error: { message: "Choose a campaign goal" },
+    });
   });
 
   test("handleNewCampaign seeds schedule, dates, and auto caller_id for a single workspace number", async () => {

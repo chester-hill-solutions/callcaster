@@ -5,9 +5,10 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 import { OnboardingGoalStep } from "@/routes/workspaces+/$id/onboarding/OnboardingGoalStep";
 import { OnboardingCreditsStep } from "@/routes/workspaces+/$id/onboarding/OnboardingCreditsStep";
-import { OnboardingOverviewCard } from "@/routes/workspaces+/$id/onboarding/OnboardingOverviewCard";
+import { OnboardingProgressStrip } from "@/routes/workspaces+/$id/onboarding/OnboardingProgressStrip";
 
 const pending = {
+  isSavingWorkspaceName: false,
   isSavingBusinessProfile: false,
   isSavingChannels: false,
   isProvisioningA2P: false,
@@ -143,10 +144,10 @@ function minimalOnboarding(
   };
 }
 
-function renderWithRouter(ui: ReactElement) {
+function renderWithRouter(ui: ReactElement, initialEntry = "/") {
   const router = createMemoryRouter(
     [{ path: "/", element: ui }],
-    { initialEntries: ["/"] },
+    { initialEntries: [initialEntry] },
   );
   return render(createElement(RouterProvider, { router }));
 }
@@ -184,10 +185,12 @@ describe("goal-based onboarding UI", () => {
     ).toBeInTheDocument();
   });
 
-  test("overview shows compact credits link instead of a large alert", () => {
+  test("progress strip shows step position and a compact credits link", () => {
     renderWithRouter(
-      createElement(OnboardingOverviewCard, {
+      createElement(OnboardingProgressStrip, {
         onboarding: minimalOnboarding({
+          selectedGoal: "sms_blast",
+          currentStep: "audience",
           steps: [
             {
               id: "audience",
@@ -200,16 +203,29 @@ describe("goal-based onboarding UI", () => {
         workspaceName: "Acme",
         workspaceId: "w1",
         creditsBalance: 0,
-        activeStep: "audience",
-        visibleSteps: ["business_profile", "path_selection", "audience", "first_number"],
-        stepIndex: 2,
-        progressValue: 50,
       }),
+      "/?step=audience",
     );
 
+    expect(screen.getByTestId("onboarding-step")).toBeInTheDocument();
+    expect(screen.getByText("Setup: Acme")).toBeInTheDocument();
+    expect(screen.getByText(/Step 3 of \d+ — Audience/)).toBeInTheDocument();
     expect(screen.getByText(/Credits:/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Add credits/i })).toBeInTheDocument();
     expect(screen.queryByText(/Add credits before renting a number/i)).toBeNull();
+  });
+
+  test("progress strip stays hidden on the intro (no step param)", () => {
+    renderWithRouter(
+      createElement(OnboardingProgressStrip, {
+        onboarding: minimalOnboarding(),
+        workspaceName: "Acme",
+        workspaceId: "w1",
+        creditsBalance: 0,
+      }),
+    );
+
+    expect(screen.queryByTestId("onboarding-step")).toBeNull();
   });
 
   test("credits step stays compact and actionable", () => {

@@ -29,6 +29,7 @@ export const NumbersTable = ({
   mediaNames = [],
   queues = [],
   scripts = [],
+  forwardingNumbers,
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
@@ -46,6 +47,7 @@ export const NumbersTable = ({
   mediaNames: { id: number | string; name: string }[];
   queues?: { id: number; name: string }[];
   scripts?: { id: number; name: string }[];
+  forwardingNumbers?: WorkspaceNumbers[];
   onIncomingActivityChange: (id: number, value: string) => void;
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
@@ -138,9 +140,9 @@ export const NumbersTable = ({
     [onNumberRemoval],
   );
 
-  const verifiedNumbers = numbers.filter(
-    (number) => number?.type === "caller_id",
-  );
+  const verifiedNumbers =
+    forwardingNumbers ??
+    numbers.filter((number) => number?.type === "caller_id");
 
   return (
       <>

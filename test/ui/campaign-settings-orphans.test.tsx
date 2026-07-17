@@ -8,7 +8,7 @@ import SelectVoicemail from "@/components/campaign/settings/detailed/CampaignDet
 import SelectVoiceDrop from "@/components/campaign/settings/detailed/live/CampaignDetailed.Live.SelectVoiceDrop";
 
 describe("campaign settings orphan values", () => {
-  test("shows IVR types and preserves an unsupported current type", () => {
+  test("keeps IVR types in Advanced and preserves an unsupported current type", () => {
     render(
       <SelectType
         campaignData={{ type: "email" } as never}
@@ -17,11 +17,27 @@ describe("campaign settings orphan values", () => {
     );
 
     fireEvent.click(document.querySelector("#type")!);
-    expect(screen.getByText("Simple IVR")).toBeInTheDocument();
-    expect(screen.getByText("Complex IVR")).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "email — legacy (unsupported)" })).toHaveAttribute(
+    expect(screen.getByRole("option", { name: "email · Legacy campaign" })).toHaveAttribute(
       "data-disabled",
     );
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent.click(screen.getByText("Advanced IVR"));
+    fireEvent.click(document.querySelector("#advanced-ivr-type")!);
+    expect(screen.getByRole("option", { name: "Simple IVR" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Complex IVR" })).toBeInTheDocument();
+  });
+
+  test("opens Advanced IVR for an existing advanced campaign", () => {
+    render(
+      <SelectType
+        campaignData={{ type: "complex_ivr" } as never}
+        handleInputChange={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelector("details")).toHaveAttribute("open");
+    expect(document.querySelector("#advanced-ivr-type")).toHaveTextContent("Complex IVR");
   });
 
   test("shows unavailable caller ID and script values", () => {

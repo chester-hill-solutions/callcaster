@@ -2,7 +2,7 @@ import React from "react";
 import { NavLink, useLocation } from "react-router";
 import {
   BarChart3,
-  BookUser,
+  CalendarDays,
   ClipboardList,
   CreditCard,
   FileText,
@@ -27,7 +27,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useUnreadConversationsCount } from "@/hooks/chats/useUnreadConversationsCount";
-import { MemberRole } from "./TeamMember";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { workspacePanelHeightClass } from "./workspace-panel-classes";
 
 function formatUnreadBadgeCount(count: number): string {
@@ -38,13 +38,18 @@ interface NavItem {
   name: string;
   path: string;
   end?: boolean;
-  callerHidden?: boolean;
+  minRole?: MemberRole;
   icon: React.ComponentType<{ className?: string }>;
   subItems?: Array<{
     name: string;
     path: string;
-    callerHidden?: boolean;
+    minRole?: MemberRole;
   }>;
+}
+
+interface NavGroup {
+  name: string;
+  items: NavItem[];
 }
 
 type CampaignNavSubItem = {
@@ -53,31 +58,81 @@ type CampaignNavSubItem = {
   status?: string | null;
 };
 
-const NAV_ITEMS: NavItem[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
-    name: "Campaigns",
-    path: "",
-    end: true,
-    icon: Megaphone,
-    subItems: [
-      // Creating a campaign always 403s server-side for callers
-      // (new.action.server.ts requires Admin+); hide the entry point the
-      // same way the other write-only nav items are hidden below.
-      { name: "New Campaign", path: "campaigns/new", callerHidden: true },
-      { name: "Archived Campaigns", path: "campaigns/archive" },
+    name: "Work",
+    items: [
+      { name: "Today", path: "", end: true, icon: CalendarDays },
+      {
+        name: "Campaigns",
+        path: "campaigns",
+        icon: Megaphone,
+        subItems: [
+          {
+            name: "New Campaign",
+            path: "campaigns/new",
+            minRole: MemberRole.Admin,
+          },
+          { name: "Archived Campaigns", path: "campaigns/archive" },
+        ],
+      },
+      { name: "Messages", path: "chats", icon: MessageSquare },
+      { name: "Calls", path: "calls", icon: Phone },
+      { name: "Voicemails", path: "voicemails", icon: Voicemail },
+      { name: "Handset", path: "handset", icon: Headset },
     ],
   },
-  { name: "Chats", path: "chats", icon: MessageSquare },
-  { name: "Calls", path: "calls", icon: Phone },
-  { name: "Voicemails", path: "voicemails", icon: Voicemail },
-  { name: "Analytics", path: "analytics", icon: BarChart3 },
-  { name: "Handset", path: "handset", icon: Headset },
-  { name: "Scripts", path: "scripts", callerHidden: true, icon: FileText },
-  { name: "Surveys", path: "surveys", callerHidden: true, icon: ClipboardList },
-  { name: "Audio", path: "audios", callerHidden: true, icon: AudioLines },
-  { name: "Audiences", path: "audiences", callerHidden: true, icon: Users },
-  { name: "Contacts", path: "contacts", callerHidden: true, icon: BookUser },
-  { name: "Exports", path: "exports", callerHidden: true, icon: Upload },
+  {
+    name: "Prepare",
+    items: [
+      {
+        name: "Scripts",
+        path: "scripts",
+        minRole: MemberRole.Member,
+        icon: FileText,
+      },
+      {
+        name: "Surveys",
+        path: "surveys",
+        minRole: MemberRole.Member,
+        icon: ClipboardList,
+      },
+      {
+        name: "Audio",
+        path: "audios",
+        minRole: MemberRole.Member,
+        icon: AudioLines,
+      },
+      {
+        name: "People",
+        path: "audiences",
+        minRole: MemberRole.Member,
+        icon: Users,
+        subItems: [
+          { name: "Call lists", path: "audiences" },
+          { name: "Contacts", path: "contacts" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Review",
+    items: [
+      { name: "Analytics", path: "analytics", icon: BarChart3 },
+      {
+        name: "Exports",
+        path: "exports",
+        minRole: MemberRole.Member,
+        icon: Upload,
+      },
+    ],
+  },
+  {
+    name: "Setup",
+    items: [
+      { name: "Settings", path: "settings", icon: Settings },
+    ],
+  },
 ];
 
 interface WorkspaceNavProps {
@@ -103,13 +158,12 @@ const WorkspaceNav = ({
 }: WorkspaceNavProps) => {
   const location = useLocation();
   const unreadChatsCount = useUnreadConversationsCount(workspace.id);
-  const userIsCaller = userRole === MemberRole.Caller;
-  const isAdmin =
-    userRole === MemberRole.Admin || userRole === MemberRole.Owner;
+  const isAdmin = hasMinRole(userRole, MemberRole.Admin);
   const baseUrl = `/workspaces/${workspace.id}`;
-  const filteredItems = NAV_ITEMS.filter(
-    (item) => !userIsCaller || !item.callerHidden,
-  );
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => hasMinRole(userRole, item.minRole)),
+  })).filter((group) => group.items.length > 0);
 
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
     `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors ${
@@ -159,16 +213,19 @@ const WorkspaceNav = ({
     return normalized.charAt(0).toUpperCase() + normalized.slice(1);
   };
 
-  const isWithinWorkspace =
-    location.pathname === baseUrl ||
-    location.pathname.startsWith(`${baseUrl}/`);
   const isCampaignsParentActive =
-    location.pathname === baseUrl ||
-    location.pathname.startsWith(`${baseUrl}/campaigns`);
+    location.pathname === `${baseUrl}/campaigns` ||
+    location.pathname.startsWith(`${baseUrl}/campaigns/`);
+  const isPeopleParentActive =
+    location.pathname === `${baseUrl}/audiences` ||
+    location.pathname.startsWith(`${baseUrl}/audiences/`) ||
+    location.pathname === `${baseUrl}/contacts` ||
+    location.pathname.startsWith(`${baseUrl}/contacts/`);
 
   const navBody = (
     <>
-      <div className="border-b border-border/60 px-4 py-4">
+      {/* px-6 = body px-3 + item px-3, so this text lines up with nav item text. */}
+      <div className="border-b border-border/60 px-6 py-4">
         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
           Workspace
         </p>
@@ -177,95 +234,108 @@ const WorkspaceNav = ({
         </h2>
       </div>
 
-      <div className="flex flex-1 flex-col justify-between gap-6 px-3 py-4">
-        <nav className="space-y-1">
-          {filteredItems.map((item) => {
-            const Icon = item.icon;
-            const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
-            const showCampaignSubNav =
-              item.name === "Campaigns" && isWithinWorkspace;
-            const visibleStaticSubItems = (item.subItems ?? []).filter(
-              (subItem) => !userIsCaller || !subItem.callerHidden,
-            );
-            const campaignSubItems: CampaignNavSubItem[] =
-              item.name === "Campaigns"
-                ? [
-                    ...visibleStaticSubItems,
-                    ...campaigns.map((campaign) => ({
-                      name:
-                        campaign.title?.trim() ||
-                        `Campaign ${String(campaign.id)}`,
-                      path: `campaigns/${campaign.id}`,
-                      status: campaign.status,
-                    })),
-                  ]
-                : visibleStaticSubItems;
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
+        <nav
+          aria-label="Workspace sections"
+          className="min-h-0 space-y-5 overflow-y-auto pr-1"
+        >
+          {visibleGroups.map((group) => (
+            <section key={group.name} aria-label={group.name}>
+              <h3 className="mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {group.name}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
+                  const isCampaignsItem = item.path === "campaigns";
+                  const isPeopleItem = item.name === "People";
+                  const showCampaignSubNav =
+                    isCampaignsItem && isCampaignsParentActive;
+                  const showSubNav =
+                    showCampaignSubNav || isPeopleItem;
+                  const visibleStaticSubItems = (item.subItems ?? []).filter(
+                    (subItem) => hasMinRole(userRole, subItem.minRole),
+                  );
+                  const campaignSubItems: CampaignNavSubItem[] =
+                    isCampaignsItem
+                      ? [
+                          ...visibleStaticSubItems,
+                          ...campaigns.map((campaign) => ({
+                            name:
+                              campaign.title?.trim() ||
+                              `Campaign ${String(campaign.id)}`,
+                            path: `campaigns/${campaign.id}`,
+                            status: campaign.status,
+                          })),
+                        ]
+                      : visibleStaticSubItems;
 
-            return (
-              <div key={item.name} className="space-y-1">
-                <NavLink
-                  to={itemTo}
-                  className={(navState) =>
-                    primaryLinkClass({
-                      isActive:
-                        item.name === "Campaigns"
-                          ? isCampaignsParentActive
-                          : navState.isActive,
-                    })
-                  }
-                  end={item.end}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                  {item.name === "Chats" && unreadChatsCount > 0 ? (
-                    <span
-                      data-testid="chats-unread-badge"
-                      className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
-                    >
-                      {formatUnreadBadgeCount(unreadChatsCount)}
-                    </span>
-                  ) : null}
-                </NavLink>
-                {campaignSubItems.length > 0 && showCampaignSubNav ? (
-                  <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
-                    {campaignSubItems.map((subItem) => {
-                      const subItemTo = subItem.path
-                        ? `${baseUrl}/${subItem.path}`
-                        : baseUrl;
-                      return (
-                        <NavLink
-                          key={subItem.path || subItem.name}
-                          to={subItemTo}
-                          className={subLinkClass}
-                        >
-                          <span className="min-w-0 truncate">{subItem.name}</span>
-                          {subItem.status ? (
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
-                                subItem.status,
-                              )}`}
-                            >
-                              {formatCampaignStatus(subItem.status)}
-                            </span>
-                          ) : null}
-                        </NavLink>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                  return (
+                    <div key={item.name} className="space-y-1">
+                      <NavLink
+                        to={itemTo}
+                        className={(navState) =>
+                          primaryLinkClass({
+                            isActive: isCampaignsItem
+                              ? isCampaignsParentActive
+                              : isPeopleItem
+                                ? isPeopleParentActive
+                              : navState.isActive,
+                          })
+                        }
+                        end={item.end}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                        {item.path === "chats" && unreadChatsCount > 0 ? (
+                          <span
+                            data-testid="chats-unread-badge"
+                            className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                          >
+                            {formatUnreadBadgeCount(unreadChatsCount)}
+                          </span>
+                        ) : null}
+                      </NavLink>
+                      {campaignSubItems.length > 0 && showSubNav ? (
+                        <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
+                          {campaignSubItems.map((subItem) => {
+                            const subItemTo = subItem.path
+                              ? `${baseUrl}/${subItem.path}`
+                              : baseUrl;
+                            return (
+                              <NavLink
+                                key={subItem.path || subItem.name}
+                                to={subItemTo}
+                                className={subLinkClass}
+                              >
+                                <span className="min-w-0 truncate">
+                                  {subItem.name}
+                                </span>
+                                {subItem.status ? (
+                                  <span
+                                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
+                                      subItem.status,
+                                    )}`}
+                                  >
+                                    {formatCampaignStatus(subItem.status)}
+                                  </span>
+                                ) : null}
+                              </NavLink>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </section>
+          ))}
         </nav>
 
-        <div className="rounded-lg border border-border/80 bg-card/70 p-2">
-          <NavLink to={`${baseUrl}/settings`} className={utilityLinkClass} end>
-            <span className="inline-flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Settings
-            </span>
-          </NavLink>
-          {isAdmin ? (
+        {isAdmin ? (
+          <div className="shrink-0 rounded-lg border border-border/80 bg-card/70 p-2">
             <NavLink to={`${baseUrl}/billing`} className={utilityLinkClass}>
               <span className="inline-flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
@@ -275,8 +345,8 @@ const WorkspaceNav = ({
                 {workspace.credits}
               </span>
             </NavLink>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </>
   );

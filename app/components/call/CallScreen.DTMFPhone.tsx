@@ -7,6 +7,7 @@ interface PhoneKeypadProps {
   displayState: string;
   displayColor: string;
   callDuration: number;
+  showStatus?: boolean;
 }
 
 export function PhoneKeypad({
@@ -14,28 +15,31 @@ export function PhoneKeypad({
   displayState,
   displayColor,
   callDuration,
+  showStatus = true,
 }: PhoneKeypadProps) {
   return (
     <div
       className="overflow-hidden rounded-lg border-2 border-border"
       style={{ borderColor: displayColor }}
     >
-      <div
-        className="flex items-center justify-center rounded-t-lg px-3 py-2 font-Tabac-Slab text-sm text-white"
-        style={{ background: displayColor }}
-      >
-        {displayState === "failed" && <span>Call Failed</span>}
-        {displayState === "dialing" && (
-          <span>Dialing... {formatTimeShort(callDuration)}</span>
-        )}
-        {displayState === "connected" && (
-          <span>Connected {formatTimeShort(callDuration)}</span>
-        )}
-        {displayState === "no-answer" && <span>No Answer</span>}
-        {displayState === "voicemail" && <span>Voicemail Left</span>}
-        {displayState === "completed" && <span>Call Completed</span>}
-        {displayState === "idle" && <span>Pending</span>}
-      </div>
+      {showStatus ? (
+        <div
+          className="flex items-center justify-center rounded-t-lg px-3 py-2 font-Tabac-Slab text-sm text-white"
+          style={{ background: displayColor }}
+        >
+          {displayState === "failed" && <span>Call Failed</span>}
+          {displayState === "dialing" && (
+            <span>Dialing... {formatTimeShort(callDuration)}</span>
+          )}
+          {displayState === "connected" && (
+            <span>Connected {formatTimeShort(callDuration)}</span>
+          )}
+          {displayState === "no-answer" && <span>No Answer</span>}
+          {displayState === "voicemail" && <span>Voicemail Left</span>}
+          {displayState === "completed" && <span>Call Completed</span>}
+          {displayState === "idle" && <span>Pending</span>}
+        </div>
+      ) : null}
       <div className="grid grid-cols-3 gap-2 p-4">
         {KEYPAD_KEYS.map((item) => (
           <Button

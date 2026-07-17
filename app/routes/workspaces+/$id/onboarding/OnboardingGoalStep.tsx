@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Form } from "react-router";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import {
   channelsForOnboardingGoal,
   goalNeedsSmsCompliance,
@@ -41,15 +41,13 @@ export function OnboardingGoalStep({
   const showA2pFields = showSmsCompliance && derivedChannels.includes("a2p10dlc");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>What are you setting up?</CardTitle>
-        <CardDescription>
-          Pick the outcome you want first. Setup steps adapt to that goal so you can launch sooner.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form id={formId} method="post" className="space-y-4">
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title="What are you setting up?"
+        description="Pick the outcome you want first. Setup steps adapt to that goal so you can launch sooner."
+      />
+      <Form id={formId} method="post" className="space-y-4">
           <input type="hidden" name="_action" value="save_channels" />
           {selectedGoal ? (
             <input type="hidden" name="selectedGoal" value={selectedGoal} />
@@ -93,7 +91,7 @@ export function OnboardingGoalStep({
             </div>
 
             {selectedGoal === "sms_blast" ? (
-              <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              <div className="rounded-lg bg-muted/30 p-4 text-sm text-muted-foreground">
                 <p>
                   For texting at higher volume, a toll-free number is usually the smoother path. A
                   local number can send texts too, at a lower throughput.
@@ -114,7 +112,7 @@ export function OnboardingGoalStep({
           </TooltipProvider>
 
           {showTollFreeFields ? (
-            <div className="space-y-4 rounded-lg border p-4">
+            <div className="space-y-4 border-t border-border/60 pt-4">
               <p className="text-sm font-medium">Toll-free verification details</p>
               <p className="text-sm text-muted-foreground">
                 These details help carriers approve higher-volume texting on a toll-free number.
@@ -177,7 +175,7 @@ export function OnboardingGoalStep({
           ) : null}
 
           {showA2pFields ? (
-            <div className="space-y-4 rounded-lg border p-4">
+            <div className="space-y-4 border-t border-border/60 pt-4">
               <p className="text-sm font-medium">US brand registration details</p>
               <p className="text-sm text-muted-foreground">
                 Needed for application-to-person texting on US local numbers.
@@ -247,8 +245,7 @@ export function OnboardingGoalStep({
               </div>
             </div>
           ) : null}
-        </Form>
-      </CardContent>
-    </Card>
+      </Form>
+    </Section>
   );
 }

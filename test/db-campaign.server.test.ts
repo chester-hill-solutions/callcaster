@@ -25,10 +25,16 @@ const tdbMocks = vi.hoisted(() => ({
 
 const dbMocks = vi.hoisted(() => ({
   select: vi.fn(),
+  transaction: vi.fn(),
 }));
 
 const rpcMocks = vi.hoisted(() => ({
   rpcGetCampaignStats: vi.fn(),
+}));
+
+const persistenceMocks = vi.hoisted(() => ({
+  persistCampaignScript: vi.fn(),
+  persistCampaignScriptWithTenantDb: vi.fn(),
 }));
 
 const queueSearchMocks = vi.hoisted(() => ({
@@ -50,12 +56,24 @@ describe("app/lib/database/campaign.server.ts", () => {
       }
     }
     dbMocks.select.mockReset();
+    dbMocks.transaction.mockReset();
+    dbMocks.transaction.mockImplementation(async (callback) =>
+      callback({ transaction: true }),
+    );
+    persistenceMocks.persistCampaignScript.mockReset();
+    persistenceMocks.persistCampaignScriptWithTenantDb.mockReset();
     vi.doMock("@/server/tenant-db", () => ({
       createTenantDb: vi.fn(() => tdbMocks),
+    }));
+    vi.doMock("@/lib/script-persistence.server", () => ({
+      persistCampaignScript: persistenceMocks.persistCampaignScript,
+      persistCampaignScriptWithTenantDb:
+        persistenceMocks.persistCampaignScriptWithTenantDb,
     }));
     vi.doMock("@/server/db", () => ({
       db: {
         select: dbMocks.select,
+        transaction: dbMocks.transaction,
       },
     }));
     vi.doMock("../app/lib/logger.server", () => ({
@@ -377,13 +395,11 @@ describe("app/lib/database/campaign.server.ts", () => {
     ).rejects.toThrow("Error creating campaign: retry");
   });
 
-  test("updateOrCopyScript covers insert/update, copy naming, and duplicate name error", async () => {
+  test("updateOrCopyScript delegates campaign-context persistence and maps duplicate names", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
 
-    tdbMocks.script.findFirst.mockResolvedValue({ id: 1, name: "S" });
-
-    tdbMocks.script.insert.mockResolvedValueOnce([{ id: 2, name: "S (Copy)" }]);
+    persistenceMocks.persistCampaignScript.mockResolvedValueOnce({ id: 2, name: "S (Copy)" });
     const copy = await mod.updateOrCopyScript({
       workspaceId: "w1",
       scriptData: { id: 1, name: "S" } as any,
@@ -393,19 +409,17 @@ describe("app/lib/database/campaign.server.ts", () => {
       created_at: "t",
     });
     expect(copy?.name).toContain("(Copy)");
-
-    tdbMocks.script.update.mockResolvedValueOnce([{ id: 1, name: "S2" }]);
-    const updated = await mod.updateOrCopyScript({
+    expect(persistenceMocks.persistCampaignScript).toHaveBeenCalledWith({
       workspaceId: "w1",
-      scriptData: { id: 1, name: "S2" } as any,
-      saveAsCopy: false,
-      campaignData: { id: 1 } as any,
-      created_by: "u1",
-      created_at: "t",
+      campaignId: 1,
+      scriptId: 1,
+      content: { name: "S", steps: undefined, type: undefined },
+      actorId: "u1",
+      saveAsCopy: true,
+      timestamp: "t",
     });
-    expect(updated?.name).toBe("S2");
 
-    tdbMocks.script.update.mockRejectedValueOnce({ code: "23505" });
+    persistenceMocks.persistCampaignScript.mockRejectedValueOnce({ code: "23505" });
     await expect(
       mod.updateOrCopyScript({
         workspaceId: "w1",
@@ -418,7 +432,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     ).rejects.toThrow("already exists");
     expect(logger.error).toHaveBeenCalled();
 
-    tdbMocks.script.update.mockRejectedValueOnce(new Error("x"));
+    persistenceMocks.persistCampaignScript.mockRejectedValueOnce(new Error("x"));
     await expect(
       mod.updateOrCopyScript({
         workspaceId: "w1",
@@ -431,19 +445,61 @@ describe("app/lib/database/campaign.server.ts", () => {
     ).rejects.toThrow("x");
   });
 
-  test("updateOrCopyScript covers no-id (new script) branch", async () => {
+  test("updateOrCopyScript requires a campaign id", async () => {
     const mod = await import("../app/lib/database/campaign.server");
+    await expect(
+      mod.updateOrCopyScript({
+        workspaceId: "w1",
+        scriptData: { name: "New" } as any,
+        saveAsCopy: false,
+        campaignData: {} as any,
+        created_by: "u1",
+        created_at: "t",
+      }),
+    ).rejects.toThrow("Campaign ID is required");
+  });
 
-    tdbMocks.script.insert.mockResolvedValueOnce([{ id: 1, name: "New" }]);
-    const out = await mod.updateOrCopyScript({
-      workspaceId: "w1",
-      scriptData: { name: "New" } as any,
-      saveAsCopy: false,
-      campaignData: { id: 1 } as any,
-      created_by: "u1",
-      created_at: "t",
+  test("updateCampaignWithScript rejects one transaction when the full campaign update fails after insertion", async () => {
+    const mod = await import("../app/lib/database/campaign.server");
+    persistenceMocks.persistCampaignScriptWithTenantDb.mockResolvedValueOnce({
+      id: 8,
+      name: "Survey (Copy)",
     });
-    expect(out).toMatchObject({ id: 1, name: "New" });
+    tdbMocks.campaign.update.mockResolvedValueOnce([]);
+
+    await expect(
+      mod.updateCampaignWithScript({
+        workspaceId: "w1",
+        campaignData: {
+          id: "9",
+          workspace: "w1",
+          title: "Campaign",
+          type: "live_call",
+        } as any,
+        campaignDetails: { campaign_id: "9" },
+        scriptData: { id: 4, name: "Survey", steps: {} } as any,
+        saveAsCopy: false,
+        actorId: "u1",
+        timestamp: "now",
+      }),
+    ).rejects.toThrow("Error updating campaign: row not found");
+
+    expect(persistenceMocks.persistCampaignScriptWithTenantDb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "w1",
+        campaignId: 9,
+        tdb: tdbMocks,
+      }),
+    );
+    expect(tdbMocks.campaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({ script_id: 8 }),
+      }),
+    );
+    expect(dbMocks.transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: "serializable" },
+    );
   });
 
   test("updateCampaignScript updates script_id on unified campaign row", async () => {

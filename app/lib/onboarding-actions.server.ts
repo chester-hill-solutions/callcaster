@@ -181,6 +181,7 @@ export function readChannelInlineBusinessFields(
 }
 
 export type OnboardingActionName =
+  | "save_workspace_name"
   | "save_channels"
   | "bootstrap_messaging_service"
   | "save_business_profile"
@@ -193,6 +194,7 @@ export type OnboardingActionName =
   | "verify_caller_id";
 
 export const ONBOARDING_ACTION_NAMES = new Set<OnboardingActionName>([
+  "save_workspace_name",
   "save_channels",
   "bootstrap_messaging_service",
   "save_business_profile",

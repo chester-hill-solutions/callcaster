@@ -3,11 +3,14 @@ import { useCallback, useState } from "react";
 import { useFetcherOnIdle } from "@/hooks/utils";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
-import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
+import {
+  NumberSummaryList,
+  type RoutingPresetSubmission,
+} from "@/components/phone-numbers/NumberSummaryList";
 import { CallerIdVerificationDialog } from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { CallerIdVerificationForm } from "@/components/phone-numbers/CallerIdVerificationForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +26,8 @@ import {
 } from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingActionData } from "../onboarding.action.server";
 import type { OnboardingStepProps } from "./types";
+import type { InboundRoutingPresetId } from "../../../../../shared/inbound-routing-presets";
+import type { WorkspaceOnboardingGoal } from "@/lib/types";
 
 type OnboardingFirstNumberStepProps = Pick<
   OnboardingStepProps,
@@ -43,6 +48,25 @@ type OnboardingFirstNumberStepProps = Pick<
 // building a second inbound-routing/handset write path (Phase G, Q44-46/59).
 function numbersSettingsActionPath(workspaceId: string): string {
   return `/workspaces/${workspaceId}/settings/numbers`;
+}
+
+function presetOrderForGoal(
+  goal: WorkspaceOnboardingGoal | null,
+): readonly InboundRoutingPresetId[] {
+  switch (goal) {
+    case "live_call":
+      return ["agent", "queue", "voicemail", "automated_menu", "forward", "webhook_only"];
+    case "ivr":
+      return ["automated_menu", "voicemail", "queue", "agent", "forward", "webhook_only"];
+    case "sms_blast":
+      return ["voicemail", "agent", "queue", "automated_menu", "forward", "webhook_only"];
+    case null:
+      return ["agent", "queue", "automated_menu", "voicemail", "forward", "webhook_only"];
+    default: {
+      const exhaustiveGoal: never = goal;
+      return exhaustiveGoal;
+    }
+  }
 }
 
 export function OnboardingFirstNumberStep({
@@ -164,6 +188,13 @@ export function OnboardingFirstNumberStep({
     [routingFetcher, actionPath],
   );
 
+  const handleApplyPreset = useCallback(
+    (submission: RoutingPresetSubmission) => {
+      routingFetcher.submit(submission, { method: "POST", action: actionPath });
+    },
+    [routingFetcher, actionPath],
+  );
+
   useFetcherOnIdle(verifyFetcher, (data) => {
     if (data?.validationRequest) {
       setVerificationDialogOpen(true);
@@ -174,21 +205,18 @@ export function OnboardingFirstNumberStep({
 
   if (!messagingReady) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Phone number</CardTitle>
-          <CardDescription>
-            Messaging setup is still finishing. Refresh in a moment, then add a phone number.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertDescription>
-              Workspace messaging is preparing. Once it is ready you can search for numbers here.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+      <Section variant="flat">
+        <SectionHeader
+          compact
+          title="Phone number"
+          description="Messaging setup is still finishing. Refresh in a moment, then add a phone number."
+        />
+        <Alert>
+          <AlertDescription>
+            Workspace messaging is preparing. Once it is ready you can search for numbers here.
+          </AlertDescription>
+        </Alert>
+      </Section>
     );
   }
 
@@ -199,18 +227,16 @@ export function OnboardingFirstNumberStep({
         onOpenChange={setVerificationDialogOpen}
         validationRequest={verifyFetcher.data?.validationRequest}
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>Phone number</CardTitle>
-          <CardDescription>
-            Rent a number for inbound and outbound traffic, or verify a number you already own for
-            outbound calling and texting.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <Section variant="flat">
+        <SectionHeader
+          compact
+          title="Phone number"
+          description="Rent a number for inbound and outbound traffic, or verify a number you already own for outbound calling and texting."
+        />
+        <div className="space-y-6">
           {smsGoal ? (
             <TooltipProvider>
-              <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              <div className="rounded-lg bg-muted/30 p-4 text-sm text-muted-foreground">
                 <p>
                   For SMS blasts, a toll-free number supports higher sending volume after
                   verification. A local number works for lighter texting at a lower rate.
@@ -305,23 +331,21 @@ export function OnboardingFirstNumberStep({
           </div>
 
           {rentedNumbers.length > 0 && !isReadOnly ? (
-            <div className="space-y-2 rounded-lg border p-4">
+            <div className="space-y-2 border-t border-border/60 pt-6">
               <div>
-                <h3 className="font-medium">Inbound routing &amp; handset</h3>
+                <h3 className="font-medium">Inbound routing</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose who handles incoming calls (agent, queue, or IVR script), whether to ring
-                  your handset, how many rings before falling back, and the voicemail greeting for
-                  each rented number. Unless you change it here, incoming calls route to the
-                  workspace owner.
+                  Choose a routing preset for each rented number. Advanced settings include
+                  handset behavior, ring count, voicemail greetings, and individual routing fields.
                 </p>
               </div>
-              <NumbersTable
-                title="Your rented numbers"
+              <NumberSummaryList
                 phoneNumbers={rentedNumbers}
                 users={workspaceUsers}
                 mediaNames={mediaNames}
                 queues={inboundQueues}
                 scripts={scripts}
+                verifiedCallerIds={numbers}
                 onIncomingActivityChange={handleIncomingActivityChange}
                 onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
                 onCallerIdChange={handleCallerIdChange}
@@ -330,8 +354,9 @@ export function OnboardingFirstNumberStep({
                 onInboundQueueChange={handleInboundQueueChange}
                 onInboundScriptChange={handleInboundScriptChange}
                 onNumberRemoval={handleNumberRemoval}
+                onApplyPreset={handleApplyPreset}
+                presetOrder={presetOrderForGoal(onboarding.selectedGoal)}
                 isBusy={isRoutingBusy}
-                hideEmptyState
               />
             </div>
           ) : null}
@@ -343,8 +368,8 @@ export function OnboardingFirstNumberStep({
             </Link>
             .
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
     </>
   );
 }

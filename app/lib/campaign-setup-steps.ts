@@ -6,11 +6,20 @@ import type {
   Schedule,
   WorkspaceNumbers,
 } from "@/lib/types";
+import type { CampaignType } from "@/lib/db-types";
 import {
   getCampaignReadiness,
   isContentReadinessComplete,
   isScheduleReadinessComplete,
 } from "@/lib/campaign-readiness";
+import {
+  getCampaignReadinessAction,
+  resolveCampaignReadinessRoute,
+} from "@/lib/campaign-readiness-actions";
+import {
+  productGoalForCampaignType,
+  type CampaignProductGoal,
+} from "@/lib/campaign-goals";
 
 export const DEFAULT_WEEKDAY_CALLING_SCHEDULE: Schedule = {
   monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
@@ -61,7 +70,42 @@ export type CampaignSetupStepsResult = {
   currentStepNumber: number;
   totalSteps: number;
   allComplete: boolean;
+  goal: CampaignProductGoal | null;
+  guideTitle: string;
+  launchActionLabel: string;
 };
+
+function getGuideCopy(goal: CampaignProductGoal | null): {
+  guideTitle: string;
+  launchActionLabel: string;
+} {
+  switch (goal) {
+    case "live_calling":
+      return {
+        guideTitle: "Set up live calling",
+        launchActionLabel: "Start calling",
+      };
+    case "text_campaign":
+      return {
+        guideTitle: "Set up your text campaign",
+        launchActionLabel: "Start text campaign",
+      };
+    case "automated_phone_menu":
+      return {
+        guideTitle: "Set up your automated phone menu",
+        launchActionLabel: "Start phone menu",
+      };
+    case null:
+      return {
+        guideTitle: "Set up your campaign",
+        launchActionLabel: "Start campaign",
+      };
+    default: {
+      const _exhaustive: never = goal;
+      return _exhaustive;
+    }
+  }
+}
 
 export function getDefaultCampaignDates(): { start_date: string; end_date: string } {
   const start = new Date();
@@ -239,15 +283,32 @@ export function getCampaignSetupSteps(
   } = options;
 
   if (!campaignData) {
+    const copy = getGuideCopy(null);
     return {
       steps: [],
       currentStepId: null,
       currentStepNumber: 0,
       totalSteps: 0,
       allComplete: false,
+      goal: null,
+      ...copy,
     };
   }
 
+  const supportedCampaignTypes: readonly CampaignType[] = [
+    "message",
+    "robocall",
+    "simple_ivr",
+    "complex_ivr",
+    "live_call",
+    "email",
+  ];
+  const goal =
+    campaignData.type &&
+    supportedCampaignTypes.includes(campaignData.type as CampaignType)
+      ? productGoalForCampaignType(campaignData.type as CampaignType)
+      : null;
+  const guideCopy = getGuideCopy(goal);
   const readiness = getCampaignReadiness(campaignData, campaignDetails, {
     queueCount,
     smsMessagingServiceSendersReady,
@@ -266,7 +327,7 @@ export function getCampaignSetupSteps(
       id: "messaging",
       label: "Messaging setup",
       description:
-        "Finish messaging onboarding so Twilio can send SMS from this workspace.",
+        "Finish messaging setup to prepare this workspace for text campaigns.",
       complete: isMessagingStepComplete(
         campaignData,
         smsMessagingServiceSendersReady,
@@ -289,17 +350,22 @@ export function getCampaignSetupSteps(
   }
 
   const contentMeta = buildContentStep(campaignData, workspaceId, scriptsCount);
-  stepDefinitions.push({
+  const contentStep = {
     id: "content",
-    label: contentMeta.label,
+    label:
+      goal === "live_calling"
+        ? "Calling script"
+        : goal === "automated_phone_menu"
+          ? "Phone menu script"
+          : contentMeta.label,
     description: contentMeta.description,
     complete: isContentReadinessComplete(readiness.issues),
     action: contentMeta.action,
-  });
+  } satisfies (typeof stepDefinitions)[number];
 
-  stepDefinitions.push({
+  const scheduleStep = {
     id: "schedule",
-    label: "Dates and hours",
+    label: goal === "text_campaign" ? "Send schedule" : "Calling schedule",
     description:
       "Set when this campaign runs and which days and times outreach is allowed.",
     complete: isScheduleReadinessComplete(readiness.issues),
@@ -308,16 +374,29 @@ export function getCampaignSetupSteps(
       targetId: "campaign-setup-schedule",
       label: "Set schedule",
     },
-  });
+  } satisfies (typeof stepDefinitions)[number];
 
   const queueMeta = buildQueueStep(audienceCount, workspaceId);
-  stepDefinitions.push({
+  const queueStep = {
     id: "queue",
-    label: "Contacts in queue",
+    label:
+      goal === "live_calling"
+        ? "Contacts to call"
+        : goal === "text_campaign"
+          ? "Message recipients"
+          : "Contacts to dial",
     description: queueMeta.description,
     complete: isQueueStepComplete(queueCount),
     action: queueMeta.action,
-  });
+  } satisfies (typeof stepDefinitions)[number];
+
+  if (goal === "live_calling") {
+    stepDefinitions.push(contentStep, queueStep, scheduleStep);
+  } else if (goal === "text_campaign") {
+    stepDefinitions.push(contentStep, scheduleStep, queueStep);
+  } else {
+    stepDefinitions.push(scheduleStep, contentStep, queueStep);
+  }
 
   const prerequisiteSteps = stepDefinitions;
   const prerequisitesComplete = prerequisiteSteps.every((step) => step.complete);
@@ -363,11 +442,36 @@ export function getCampaignSetupSteps(
     };
   });
 
+  const firstIssue = readiness.issues[0];
+  if (firstIssue && firstIncompleteIndex >= 0) {
+    const correctiveAction = getCampaignReadinessAction(firstIssue.code);
+    const currentStep = steps[firstIncompleteIndex];
+    if (currentStep) {
+      if (correctiveAction.type === "scroll") {
+        currentStep.action = correctiveAction;
+      } else if (campaignData.id != null) {
+        const href = resolveCampaignReadinessRoute(correctiveAction, {
+          workspaceId,
+          campaignId: campaignData.id,
+        });
+        if (href) {
+          currentStep.action = {
+            type: "link",
+            href,
+            label: correctiveAction.label,
+          };
+        }
+      }
+    }
+  }
+
   return {
     steps,
     currentStepId,
     currentStepNumber,
     totalSteps: actionableSteps.length,
     allComplete: prerequisitesComplete && readiness.issues.length === 0,
+    goal,
+    ...guideCopy,
   };
 }

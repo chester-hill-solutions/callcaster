@@ -68,7 +68,7 @@ export function AudienceTable({
   const [contacts, setContacts] = useState<Contact[]>(transformedContacts);
   const [audienceInfo, setAudienceInfo] = useState(initialAudience);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") ?? "");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
 
   const removeFetcher = useFetcher<{ error?: string }>();
@@ -104,6 +104,24 @@ export function AudienceTable({
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", "1");
     newParams.set("pageSize", newSize);
+    setSearchParams(newParams);
+  };
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const newParams = new URLSearchParams(searchParams);
+    const query = searchTerm.trim();
+    if (query) newParams.set("q", query);
+    else newParams.delete("q");
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
+  const clearSearch = () => {
+    setSearchTerm("");
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("q");
+    newParams.set("page", "1");
     setSearchParams(newParams);
   };
 
@@ -237,7 +255,7 @@ export function AudienceTable({
         />
       </div>
       <div className="flex justify-between items-center mb-4">
-        <div className="relative w-72">
+        <form className="relative w-72" onSubmit={handleSearch} role="search">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search contacts..."
@@ -250,12 +268,17 @@ export function AudienceTable({
               variant="ghost"
               size="sm"
               className="absolute right-0 top-0 h-full"
-              onClick={() => setSearchTerm("")}
+              type="button"
+              aria-label="Clear contact search"
+              onClick={clearSearch}
             >
               <X className="h-4 w-4" />
             </Button>
           )}
-        </div>
+          <button type="submit" className="sr-only">
+            Search contacts
+          </button>
+        </form>
 
         <div className="flex items-center gap-2">
           <Select
@@ -345,7 +368,9 @@ export function AudienceTable({
             {filteredContacts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  {searchTerm ? "No contacts found matching your search" : "No contacts in this audience yet"}
+                  {searchTerm
+                    ? "Contacts matching your search will appear here"
+                    : "Add contacts to start building this Call list"}
                 </TableCell>
               </TableRow>
             ) : (

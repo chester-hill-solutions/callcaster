@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Form } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import type { Tables } from "@/lib/db-types";
 import {
   businessProfileFieldRequiredMessage,
@@ -68,22 +69,20 @@ export function OnboardingBusinessBasicsStep({
     missingFields[field] ? businessProfileFieldRequiredMessage(field) : undefined;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Business basics</CardTitle>
-        <CardDescription>
-          Share the business identity and contact details used across live calls, IVR, and SMS.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form id={formId} method="post" className="space-y-6">
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title="Business basics"
+        description="Share the business identity and contact details used across live calls, IVR, and SMS."
+      />
+      <Form id={formId} method="post" className="space-y-6">
           <input type="hidden" name="_action" value="save_business_profile" />
-          <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+          <div className="rounded-lg bg-muted/30 p-4 text-sm text-muted-foreground">
             Use the registered business name, a public website, and clear examples of what contacts
             will hear or receive.
           </div>
 
-          <div className="space-y-4 rounded-lg border p-4">
+          <div className="space-y-4 border-t border-border/60 pt-6">
             <div>
               <div className="font-medium">Business identity</div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -215,7 +214,7 @@ export function OnboardingBusinessBasicsStep({
             </div>
           </div>
 
-          <div className="space-y-4 rounded-lg border p-4">
+          <div className="space-y-4 border-t border-border/60 pt-6">
             <div>
               <div className="font-medium">Messaging program details</div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -312,7 +311,7 @@ export function OnboardingBusinessBasicsStep({
             </div>
           </div>
 
-          <div className="space-y-4 rounded-lg border p-4">
+          <div className="space-y-4 border-t border-border/60 pt-6">
             <div>
               <div className="font-medium">Emergency voice address</div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -379,7 +378,7 @@ export function OnboardingBusinessBasicsStep({
           ) : null}
         </Form>
         {onboarding.selectedChannels.includes("voice_compliance") ? (
-          <div className="mt-6 space-y-4 rounded-lg border p-4">
+          <div className="mt-6 space-y-4 border-t border-border/60 pt-6">
             <div>
               <div className="font-medium">Emergency voice review</div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -407,9 +406,11 @@ export function OnboardingBusinessBasicsStep({
               </div>
             </div>
             {onboarding.emergencyVoice.address.validationError ? (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                {onboarding.emergencyVoice.address.validationError}
-              </div>
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {onboarding.emergencyVoice.address.validationError}
+                </AlertDescription>
+              </Alert>
             ) : null}
             <div className="space-y-2">
               <div className="text-sm font-medium">Workspace rented voice numbers</div>
@@ -456,7 +457,6 @@ export function OnboardingBusinessBasicsStep({
             ) : null}
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+    </Section>
   );
 }

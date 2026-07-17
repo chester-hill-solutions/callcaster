@@ -1,6 +1,12 @@
 export { action } from "./new.action.server";
 
-import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation, useSearchParams } from "react-router";
+import {
+  useActionData,
+  useNavigation,
+  useParams,
+  useSearchParams,
+  useSubmit,
+} from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
 import {
@@ -16,7 +22,7 @@ import { Text } from "@/components/ui/typography";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
-import type { Database } from "@/lib/db-types";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 export default function AudiencesNew() {
   const actionData = useActionData();
@@ -29,13 +35,15 @@ export default function AudiencesNew() {
   const [searchParams] = useSearchParams();
   const initialStep = searchParams.get("step") === "upload" ? 2 : 1;
   const initialName = searchParams.get("name") ?? "";
+  const campaignId = searchParams.get("campaignId") ?? undefined;
+  const returnTo = workspaceId
+    ? validatePeopleReturnPath(searchParams.get("returnTo"), workspaceId)
+    : null;
 
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [audienceName, setAudienceName] = useState(initialName);
   
-  useOutletContext<{ }>();
-
   const handleCreateAudience = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -46,6 +54,8 @@ export default function AudiencesNew() {
     const formData = new FormData();
     formData.append("formAction", "createAudience");
     formData.append("audience-name", audienceName);
+    if (campaignId) formData.append("campaign-id", campaignId);
+    if (returnTo) formData.append("return-to", returnTo);
     
     submit(formData, { method: "POST" });
   };
@@ -64,7 +74,7 @@ export default function AudiencesNew() {
       className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
     >
       <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
-        <BrandedCardTitle as="h1">Add an Audience</BrandedCardTitle>
+        <BrandedCardTitle as="h1">Add a Call list</BrandedCardTitle>
         {actionData?.error ? (
           <Text className="text-center text-destructive">
             Error: {actionData.error}
@@ -100,12 +110,12 @@ export default function AudiencesNew() {
             {currentStep === 1 ? (
               <div className="space-y-4">
               <form onSubmit={handleCreateAudience} className="space-y-6">
-                <FormField htmlFor="audience-name" label="Audience Name">
+                <FormField htmlFor="audience-name" label="Call list name">
                   <Input
                     type="text"
                     name="audience-name"
                     id="audience-name"
-                    aria-label="Audience Name"
+                    aria-label="Call list name"
                     defaultValue=""
                     onChange={(e) => setAudienceName(e.target.value)}
                     required
@@ -117,7 +127,7 @@ export default function AudiencesNew() {
                   disabled={!audienceName || isSubmitting}
                   className="bg-brand-primary text-white hover:bg-brand-secondary"
                 >
-                  Create Empty Audience
+                  Create Call list
                 </Button>
               </form>
 
@@ -160,6 +170,8 @@ export default function AudiencesNew() {
               <div className="space-y-6">
                 <AudienceUploader 
                   audienceName={audienceName}
+                  campaignId={campaignId}
+                  returnTo={returnTo}
                 />
                 
                 <div className="flex items-center justify-between gap-4">
@@ -180,7 +192,7 @@ export default function AudiencesNew() {
               <div className="text-center">
                 <h3 className="text-lg font-medium mb-2">Upload Complete</h3>
                 <Text variant="muted">
-                  Your audience has been created and contacts are being processed.
+                  Your Call list is ready and contacts are being processed.
                 </Text>
               </div>
               </div>

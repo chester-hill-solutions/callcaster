@@ -2,6 +2,8 @@ import { desc, eq } from "drizzle-orm";
 import {
   audience as audienceTable,
   audience_upload as audienceUploadTable,
+  campaign as campaignTable,
+  campaign_audience as campaignAudienceTable,
 } from "@/db/schema";
 import type { Json } from "@/lib/db-types";
 import { createTenantDb } from "@/server/tenant-db";
@@ -73,6 +75,35 @@ export async function createAudienceUploadRecord(args: {
     split_name_column: args.splitNameColumn,
   });
   return row ?? null;
+}
+
+export async function findCampaignForAudienceUpload(
+  workspaceId: string,
+  campaignId: number,
+): Promise<boolean> {
+  const tdb = createTenantDb(workspaceId);
+  const campaign = await tdb.campaign.findFirst({
+    where: eq(campaignTable.id, campaignId),
+    columns: { id: true },
+  });
+  return campaign != null;
+}
+
+export async function linkAudienceToCampaign(args: {
+  workspaceId: string;
+  campaignId: number;
+  audienceId: number;
+}): Promise<boolean> {
+  if (!(await findCampaignForAudienceUpload(args.workspaceId, args.campaignId))) {
+    return false;
+  }
+
+  await db.insert(campaignAudienceTable).values({
+    campaign_id: args.campaignId,
+    audience_id: args.audienceId,
+    created_at: new Date().toISOString(),
+  });
+  return true;
 }
 
 export async function findAudienceUploadById(

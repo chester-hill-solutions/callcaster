@@ -213,7 +213,12 @@ describe("api.audiences route", () => {
     contactAudienceMocks.findAudienceWorkspaceById.mockResolvedValue("w1");
     contactAudienceMocks.listAudienceContactsForExport.mockResolvedValueOnce([
       {
-        other_data: [{ key: "X", value: "1" }, "bad" as any, { key: "Y" } as any],
+        other_data: [
+          { key: "X", value: "1" },
+          { Custom: "2" },
+          "bad" as any,
+          { key: "Y" } as any,
+        ],
         contact: { firstname: "a" },
       },
       { other_data: [], contact: { firstname: "b" } },
@@ -231,6 +236,7 @@ describe("api.audiences route", () => {
     } as any));
     const text = await res.text();
     expect(text).toContain("X");
+    expect(text).toContain("Custom");
 
     contactAudienceMocks.listAudienceContactsForExport.mockResolvedValueOnce([]);
     const resEmpty = await asRouteResponse(mod.loader({

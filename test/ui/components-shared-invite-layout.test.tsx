@@ -228,7 +228,7 @@ describe("app/components/layout/Navbar.tsx", () => {
         />
       </SmokeRouter>,
     );
-    expect(screen.getByText(/Home|WS|user/i)).toBeTruthy();
+    expect(screen.getAllByText(/Home|WS|user/i).length).toBeGreaterThan(0);
   });
 
   test("signed-out navbar", async () => {
@@ -273,6 +273,9 @@ describe("app/components/layout/Navbar.MobileMenu.tsx", () => {
               } as never
             }
             handleSignOut={async () => ({ success: null, error: null })}
+            workspaces={null}
+            activeWorkspaceId={undefined}
+            creditWorkspace={null}
           />
         </SmokeRouter>
       );

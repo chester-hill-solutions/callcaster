@@ -88,6 +88,8 @@ export type CampaignSettingsProps = {
   setupGuideCurrentStepNumber?: number;
   setupGuideTotalSteps?: number;
   setupGuideAllComplete?: boolean;
+  setupGuideTitle?: string;
+  setupGuideLaunchActionLabel?: string;
   onDismissSetupGuide?: () => void;
   campaignBilling?: CampaignBillingSummary | null;
 };
@@ -132,6 +134,8 @@ export const CampaignSettings = ({
   setupGuideCurrentStepNumber = 1,
   setupGuideTotalSteps = 1,
   setupGuideAllComplete = false,
+  setupGuideTitle,
+  setupGuideLaunchActionLabel,
   onDismissSetupGuide,
   campaignBilling = null,
 }: CampaignSettingsProps) => {
@@ -139,87 +143,139 @@ export const CampaignSettings = ({
     confirmStatus === "play"
       ? activeIntent === "status" && isBusy
         ? "Starting..."
-        : "Start Campaign"
+        : setupGuideLaunchActionLabel ?? "Start campaign"
       : activeIntent === "status" && isBusy
         ? "Archiving..."
         : "Archive Campaign";
 
-  const renderConfirmDescription = () => {
-
-    if (confirmStatus === "play") {
-      return (
-        <div className="space-y-4">
-          <div className="font-medium text-lg">
-            Are you sure you want to start this campaign? {
-              campaignData?.type === "live_call" ?
-                "This will make your campaign active and available for callers." :
-                campaignData?.type === "message" ?
-                  "This will begin sending messages to your contacts." :
-                  "This will begin dialing contacts automatically."
-            }
-          </div>
-
-          <div className="rounded-lg bg-muted p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-primary">💰</span>
-              <div>
-                <p className="font-medium">Credits Available: {credits || 0}</p>
-                <p className="text-sm text-muted-foreground">
-                  {campaignBilling?.estimate.rateDescription ??
-                    (campaignData?.type === "message"
-                      ? "1 credit per SMS segment"
-                      : "See campaign settings for voice rates")}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-primary">📞</span>
-              <div>
-                <p className="font-medium">
-                  Contacts to {campaignData?.type === "message" ? "Message" : "Dial"}: {queueCount}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Estimated cost:{" "}
-                  {formatCredits(
-                    campaignBilling?.estimate.totalCredits ?? queueCount,
-                  )}{" "}
-                  credits (
-                  {formatCurrency(
-                    (campaignBilling?.estimate.totalCredits ?? queueCount) *
-                      CREDIT_PRICE_CAD,
-                  )}
-                  )
-                  {campaignBilling && campaignBilling.actualDebitCredits > 0 && (
-                    <>
-                      {" "}
-                      · Actual so far: {formatCredits(campaignBilling.actualDebitCredits)}{" "}
-                      credits
-                    </>
-                  )}
-                  {queueCount > (credits || 0) && (
-                    <span className="text-destructive"> (Exceeds available credits)</span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {queueCount > (credits || 0) && (
-            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-              ⚠️ Warning: Your campaign will be paused when you run out of credits
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (confirmStatus === "archive") {
-      return "Are you sure you want to archive this campaign? It will be hidden from your campaigns list. You can restore it later from the Archived Campaigns page.";
-    }
-
-    return "";
+  const selectedScriptId =
+    campaignDetails && "script_id" in campaignDetails
+      ? campaignDetails.script_id
+      : campaignData.script_id;
+  const selectedScript = scripts.find(
+    (script) => String(script.id) === String(selectedScriptId),
+  );
+  const contentSummary =
+    campaignData.type === "message"
+      ? campaignDetails &&
+        "body_text" in campaignDetails &&
+        campaignDetails.body_text?.trim()
+        ? campaignDetails.body_text.trim()
+        : campaignDetails &&
+            "message_media" in campaignDetails &&
+            campaignDetails.message_media?.length
+          ? "Message with media"
+          : "Add message content"
+      : selectedScript?.name ??
+        (selectedScriptId ? `Script ${selectedScriptId}` : "Select a script");
+  const numberSummary =
+    campaignData.type === "message" &&
+    campaignData.sms_send_mode === "messaging_service"
+      ? "Messaging service"
+      : campaignData.caller_id || "Select a number";
+  const formatReviewDate = (value: string | null | undefined) => {
+    if (!value) return "Set a date";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? "Set a date"
+      : parsed.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
   };
+  const scheduleValue =
+    typeof campaignData.schedule === "string"
+      ? (() => {
+          try {
+            return JSON.parse(campaignData.schedule) as unknown;
+          } catch {
+            return null;
+          }
+        })()
+      : campaignData.schedule;
+  const activeScheduleDays =
+    scheduleValue && typeof scheduleValue === "object"
+      ? Object.values(scheduleValue).filter(
+          (day) =>
+            day &&
+            typeof day === "object" &&
+            "active" in day &&
+            day.active === true,
+        ).length
+      : 0;
+  const estimatedCredits = campaignBilling?.estimate.totalCredits ?? queueCount;
+
+  const startReview = (
+    <div className="space-y-4" data-testid="campaign-launch-review">
+      <dl className="grid gap-3 rounded-lg border bg-muted/30 p-4 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Outbound number
+          </dt>
+          <dd className="mt-1 text-sm">{numberSummary}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Content
+          </dt>
+          <dd className="mt-1 line-clamp-2 text-sm">{contentSummary}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Schedule
+          </dt>
+          <dd className="mt-1 text-sm">
+            {formatReviewDate(campaignData.start_date)}–{formatReviewDate(campaignData.end_date)}
+            {activeScheduleDays > 0
+              ? ` · ${activeScheduleDays} active day${activeScheduleDays === 1 ? "" : "s"}`
+              : ""}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Queue
+          </dt>
+          <dd className="mt-1 text-sm">{queueCount.toLocaleString()} contacts</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Credits
+          </dt>
+          <dd className="mt-1 text-sm">{formatCredits(credits || 0)} available</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Estimate
+          </dt>
+          <dd className="mt-1 text-sm">
+            {formatCredits(estimatedCredits)} credits (
+            {formatCurrency(estimatedCredits * CREDIT_PRICE_CAD)})
+          </dd>
+        </div>
+      </dl>
+      <p className="text-sm text-muted-foreground">
+        {campaignBilling?.estimate.rateDescription ??
+          (campaignData.type === "message"
+            ? "SMS usage is estimated by message segment."
+            : "Voice usage is estimated from the configured campaign rate.")}
+      </p>
+      {readinessIssues.length > 0 ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+          <p className="text-sm font-medium text-destructive">Complete before launch</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-destructive">
+            {readinessIssues.map((issue) => (
+              <li key={issue}>{issue}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+          Ready to launch.
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -234,12 +290,20 @@ export const CampaignSettings = ({
         <DialogContent className="bg-white dark:bg-slate-900">
         <DialogHeader>
           <DialogTitle>
-            {confirmStatus === "play" ? "Start Campaign" : confirmStatus === "archive" ? "Archive Campaign" : ""}
+            {confirmStatus === "play" ? "Review campaign launch" : confirmStatus === "archive" ? "Archive Campaign" : ""}
           </DialogTitle>
-        </DialogHeader>
           <DialogDescription>
-            {renderConfirmDescription()}
+            {confirmStatus === "play"
+              ? "Confirm the campaign setup, audience, and estimated usage."
+              : "Archive this campaign and move it out of the active campaign list."}
           </DialogDescription>
+        </DialogHeader>
+          {confirmStatus === "play" ? startReview : null}
+          {confirmStatus === "archive" ? (
+            <p className="text-sm text-muted-foreground">
+              You can restore it later from the archived campaigns page.
+            </p>
+          ) : null}
 
           <DialogFooter>
             <Button
@@ -253,7 +317,9 @@ export const CampaignSettings = ({
             <Button
               onClick={() => handleConfirmStatus(confirmStatus)}
               variant={confirmStatus === "archive" ? "destructive" : "default"}
-              disabled={isBusy}
+              disabled={
+                isBusy || (confirmStatus === "play" && readinessIssues.length > 0)
+              }
             >
               {confirmActionLabel}
             </Button>
@@ -294,6 +360,8 @@ export const CampaignSettings = ({
             currentStepNumber={setupGuideCurrentStepNumber}
             totalSteps={setupGuideTotalSteps}
             allComplete={setupGuideAllComplete}
+            title={setupGuideTitle}
+            launchActionLabel={setupGuideLaunchActionLabel}
             onDismiss={() => onDismissSetupGuide?.()}
             onStartCampaign={() => handleConfirmStatus("play")}
           />

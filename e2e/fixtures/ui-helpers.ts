@@ -1,10 +1,6 @@
 import type { Page } from "@playwright/test";
 
-const CAMPAIGN_TYPE_OFFSET: Record<string, number> = {
-  live_call: 0,
-  message: 1,
-  robocall: 2,
-};
+type CreationCampaignType = "live_call" | "message" | "robocall";
 
 /** Radix Select exposes a combobox button, not a native <select>. */
 export async function selectRadixOption(
@@ -27,14 +23,25 @@ export async function selectRadixOption(
 
 export async function selectCampaignType(
   page: Page,
-  type: keyof typeof CAMPAIGN_TYPE_OFFSET,
+  type: CreationCampaignType,
 ): Promise<void> {
-  if (type === "live_call") return;
-  await page.locator('[data-testid="campaign-type"]').click();
-  for (let i = 0; i < CAMPAIGN_TYPE_OFFSET[type]; i += 1) {
-    await page.keyboard.press("ArrowDown");
+  let goal: "live_calling" | "text_campaign" | "automated_phone_menu";
+  switch (type) {
+    case "live_call":
+      goal = "live_calling";
+      break;
+    case "message":
+      goal = "text_campaign";
+      break;
+    case "robocall":
+      goal = "automated_phone_menu";
+      break;
+    default: {
+      const _exhaustive: never = type;
+      return _exhaustive;
+    }
   }
-  await page.keyboard.press("Enter");
+  await page.getByTestId(`campaign-goal-${goal}`).check();
 }
 
 /** Controlled React inputs sometimes miss Playwright fill(); set native value + events. */

@@ -1,4 +1,4 @@
-import { Link, NavLink, Params, useLocation } from "react-router";
+import { Link, NavLink, Params, useLocation, useRevalidator } from "react-router";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, User as UserIcon, LogOut } from "lucide-react";
+import { Check, ChevronDown, Menu, User as UserIcon, LogOut } from "lucide-react";
 import { capitalize } from "@/lib/utils";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
 import type {
@@ -42,7 +44,7 @@ export const NavButton = ({
   <NavLink
     to={to}
     className={({ isActive }) =>
-      `rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-bold transition-colors duration-150 ease-in-out ${
+      `inline-flex h-10 items-center rounded-lg border px-2.5 font-Zilla-Slab text-sm font-bold transition-colors duration-150 ease-in-out ${
         isActive
           ? "border-brand-primary bg-brand-primary text-primary-foreground"
           : // The navbar keeps its pale brand-blue in both themes, so the pills
@@ -54,6 +56,97 @@ export const NavButton = ({
     {children}
   </NavLink>
 );
+
+const WorkspacePicker = ({
+  workspaces,
+  activeWorkspaceId,
+}: {
+  workspaces: RootWorkspaceSummary[];
+  activeWorkspaceId: string | undefined;
+}) => {
+  const active = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          data-testid="navbar-workspace-picker"
+          aria-label={active ? `Switch workspace, current: ${active.name}` : "Workspaces"}
+          className="flex h-10 max-w-[200px] items-center gap-1 rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
+        >
+          <span className="truncate">{active ? active.name : "Workspaces"}</span>
+          <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-64">
+        <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {workspaces.map((workspace) => (
+          <DropdownMenuItem key={workspace.id} asChild>
+            <Link
+              to={`/workspaces/${workspace.id}`}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="min-w-0 truncate">{workspace.name}</span>
+              {workspace.id === activeWorkspaceId ? (
+                <Check className="h-4 w-4 shrink-0" aria-hidden />
+              ) : null}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/workspaces">All workspaces</Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+/**
+ * Admin+ credit readout for the active workspace. Subscribes to
+ * `transaction_history` changes over the workspace SSE stream so the balance
+ * revalidates when a debit or top-up lands, instead of going stale until the
+ * next navigation.
+ */
+const NavbarCredits = ({
+  workspace,
+}: {
+  workspace: RootWorkspaceSummary & { credits: number };
+}) => {
+  const revalidator = useRevalidator();
+  useWorkspaceEventSubscription({
+    workspaceId: workspace.id,
+    table: "transaction_history",
+    onChange: () => {
+      void revalidator.revalidate();
+    },
+  });
+  return (
+    <Link
+      to={`/workspaces/${workspace.id}/billing`}
+      data-testid="navbar-credits"
+      aria-label={`Credits: ${workspace.credits.toLocaleString()}. Open billing.`}
+      className="inline-flex h-10 items-center rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
+    >
+      Credits&nbsp;
+      <span className="tabular-nums">{workspace.credits.toLocaleString()}</span>
+    </Link>
+  );
+};
+
+/** Show credits only for Admin+ members; the server nulls credits otherwise. */
+function creditWorkspaceFor(
+  workspaces: RootWorkspaceSummary[] | null,
+  activeWorkspaceId: string | undefined,
+): (RootWorkspaceSummary & { credits: number }) | null {
+  if (!workspaces || !activeWorkspaceId) return null;
+  const active = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
+  if (!active) return null;
+  if (typeof active.credits !== "number") return null;
+  if (!hasMinRole(active.role, MemberRole.Admin)) return null;
+  return { ...active, credits: active.credits };
+}
 
 const UserDropdownMenu = ({
   user,
@@ -150,13 +243,14 @@ const UserDropdownMenu = ({
 export default function Navbar({
   className,
   handleSignOut,
-  workspaces: _workspaces,
+  workspaces,
   isSignedIn,
   user,
   params,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const workspaceId = params.id;
+  const creditWorkspace = creditWorkspaceFor(workspaces, workspaceId);
   const location = useLocation();
   const [prevPathname, setPrevPathname] = useState(location.pathname);
 
@@ -183,22 +277,24 @@ export default function Navbar({
         >
           CC
         </Link>
-        <div className="hidden items-center space-x-3 sm:flex">
-          <NavButton to="/pricing">Pricing</NavButton>
+        <div className="hidden items-center gap-2 sm:flex">
           <NavButton to="/docs">Docs</NavButton>
-          <a
-            href="mailto:info@callcaster.ca"
-            className="rounded-lg border border-transparent bg-white/70 px-3 py-2 font-Zilla-Slab text-base font-bold text-brand-primary transition-colors duration-150 ease-in-out hover:border-brand-primary/30 hover:bg-white"
-          >
-            Support
-          </a>{" "}
           {!isSignedIn && (
             <>
               <NavButton to="/signin">Sign In</NavButton>
               <NavButton to="/signup">Sign Up</NavButton>
             </>
           )}
-          {isSignedIn && <NavButton to={"/workspaces"}>Workspaces</NavButton>}
+          {isSignedIn &&
+            (workspaces && workspaces.length > 0 ? (
+              <WorkspacePicker
+                workspaces={workspaces}
+                activeWorkspaceId={workspaceId}
+              />
+            ) : (
+              <NavButton to={"/workspaces"}>Workspaces</NavButton>
+            ))}
+          {creditWorkspace ? <NavbarCredits workspace={creditWorkspace} /> : null}
           {user && (
             <UserDropdownMenu
               user={user}
@@ -229,6 +325,9 @@ export default function Navbar({
           isSignedIn={isSignedIn}
           user={user ?? null}
           handleSignOut={handleSignOut}
+          workspaces={workspaces}
+          activeWorkspaceId={workspaceId}
+          creditWorkspace={creditWorkspace}
         />
       </div>
     </header>
