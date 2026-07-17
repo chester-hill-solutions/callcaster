@@ -131,7 +131,9 @@ function onboardingState() {
 function saveChannelsForm() {
   const formData = new FormData();
   formData.set("_action", "save_channels");
-  formData.append("selectedChannels", "sms");
+  formData.set("selectedGoal", "live_call");
+  formData.append("selectedChannels", "local_number");
+  formData.append("selectedChannels", "voice_compliance");
   return formData;
 }
 
@@ -202,7 +204,7 @@ describe("save_channels bootstrap failure surfaces a friendly payload, not a thr
     expect(mapped.kind === "ui_payload" && mapped.status).toBe(400);
   });
 
-  test("still redirects to first_number on the happy path (bootstrap succeeds)", async () => {
+  test("still redirects to audience on the happy path (bootstrap succeeds)", async () => {
     mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValue(undefined);
 
     const outcome = await runOnboardingAction(
@@ -214,7 +216,7 @@ describe("save_channels bootstrap failure surfaces a friendly payload, not a thr
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "first_number" });
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
     expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledTimes(1);
   });
 });

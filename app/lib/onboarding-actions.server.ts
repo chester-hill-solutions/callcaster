@@ -1,10 +1,13 @@
 import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
 import type { CallerIdValidationRequest } from "@/lib/caller-id-verification.server";
+import { isWorkspaceOnboardingGoal } from "@/lib/messaging-onboarding/goals";
 import type {
   WorkspaceMessagingBusinessProfile,
   WorkspaceOnboardingChannel,
+  WorkspaceOnboardingGoal,
   WorkspaceOnboardingStatus,
 } from "@/lib/types";
+import { WORKSPACE_ONBOARDING_CHANNEL_VALUES } from "@/lib/types";
 
 export type OnboardingActionData = {
   success?: string;
@@ -67,8 +70,13 @@ export function asWorkspaceOnboardingStatus(
 export function readSelectedChannels(formData: FormData): WorkspaceOnboardingChannel[] {
   const values = formData.getAll("selectedChannels").map(String);
   return values.filter((value): value is WorkspaceOnboardingChannel =>
-    CHANNEL_OPTIONS.some((option) => option.id === value),
+    WORKSPACE_ONBOARDING_CHANNEL_VALUES.includes(value as WorkspaceOnboardingChannel),
   );
+}
+
+export function readSelectedGoal(formData: FormData): WorkspaceOnboardingGoal | null {
+  const raw = String(formData.get("selectedGoal") ?? formData.get("selected_goal") ?? "");
+  return isWorkspaceOnboardingGoal(raw) ? raw : null;
 }
 
 const EMPTY_BUSINESS_PROFILE: WorkspaceMessagingBusinessProfile = {

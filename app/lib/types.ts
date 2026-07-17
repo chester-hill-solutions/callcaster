@@ -290,6 +290,12 @@ export const WORKSPACE_ONBOARDING_CHANNEL_VALUES = [
   "local_number",
 ] as const;
 
+export const WORKSPACE_ONBOARDING_GOAL_VALUES = [
+  "live_call",
+  "ivr",
+  "sms_blast",
+] as const;
+
 export const WORKSPACE_OPERATING_COUNTRY_VALUES = [
   "CA",
   "US",
@@ -329,6 +335,8 @@ export const WORKSPACE_TWILIO_AUTH_MODE_VALUES = [
 
 export type WorkspaceOnboardingChannel =
   (typeof WORKSPACE_ONBOARDING_CHANNEL_VALUES)[number];
+export type WorkspaceOnboardingGoal =
+  (typeof WORKSPACE_ONBOARDING_GOAL_VALUES)[number];
 export type WorkspaceOperatingCountry =
   (typeof WORKSPACE_OPERATING_COUNTRY_VALUES)[number];
 export type WorkspaceOnboardingStatus =
@@ -474,6 +482,8 @@ export interface WorkspaceMessagingOnboardingState {
   currentStep: string;
   operatingCountry: WorkspaceOperatingCountry;
   selectedChannels: WorkspaceOnboardingChannel[];
+  /** Product goal chosen during onboarding; drives checklist steps. */
+  selectedGoal: WorkspaceOnboardingGoal | null;
   /** Computed at read time via `buildOnboardingStepsForState`; not persisted. */
   steps: WorkspaceOnboardingStepState[];
   businessProfile: WorkspaceMessagingBusinessProfile;

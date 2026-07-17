@@ -23,6 +23,8 @@ export default function WorkspaceMessagingOnboardingRoute() {
     mediaNames,
     inboundQueues,
     scripts,
+    audienceCount,
+    campaignCount,
   } = useLoaderData<OnboardingLoaderData>();
   const actionData = useActionData<OnboardingActionData>();
   const navigation = useNavigation();
@@ -85,6 +87,8 @@ export default function WorkspaceMessagingOnboardingRoute() {
       mediaNames={mediaNames}
       inboundQueues={inboundQueues}
       scripts={scripts}
+      audienceCount={audienceCount}
+      campaignCount={campaignCount}
     />
   );
 }

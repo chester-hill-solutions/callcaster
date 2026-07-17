@@ -5,6 +5,7 @@ import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
   isWizardOnboardingStepId,
+  resolvePersistedWizardStep,
 } from "@/lib/messaging-onboarding.server";
 import {
   getWorkspaceInfo,
@@ -38,13 +39,12 @@ export type OnboardingLoaderData = {
   phoneNumbers: Tables<"workspace_number">[] | null;
   creditsBalance: number;
   rcsBlockingIssues: string[];
-  // Phase G: lets OnboardingFirstNumberStep reuse NumbersTable's inbound
-  // routing/handset widgets for a just-rented number without leaving
-  // onboarding. Mirrors the data settings/numbers.loader.server.ts loads.
   workspaceUsers: { id: string; username: string }[];
   mediaNames: { id: number | string; name: string }[];
   inboundQueues: { id: number; name: string }[];
   scripts: { id: number; name: string }[];
+  audienceCount: number;
+  campaignCount: number;
 };
 
 export const loader = defineLoader({
@@ -72,6 +72,8 @@ export const loader = defineLoader({
       mediaNames,
       inboundQueues,
       scripts,
+      audienceCount,
+      campaignCount,
     ] = await Promise.all([
       getWorkspaceInfo({ workspaceId }),
       getWorkspacePhoneNumbers({ workspaceId }),
@@ -88,10 +90,18 @@ export const loader = defineLoader({
         columns: { id: true, name: true },
         orderBy: (script, { asc: ascFn }) => [ascFn(script.name)],
       }),
+      tdb.audience.count(),
+      tdb.campaign.count(),
     ]);
     const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
       hydrateWorkspaceRcsOnboardingState(applyWorkspaceOnboardingChannelPolicy(onboarding)),
       phoneNumbers ?? [],
+      {
+        audienceCount,
+        scriptCount: scripts.length,
+        campaignCount,
+        creditsBalance: creditsBalance ?? 0,
+      },
     );
     const rcsBlockingIssues =
       isRcsOnboardingEnabled() && hydratedOnboarding.selectedChannels.includes("rcs")
@@ -108,15 +118,11 @@ export const loader = defineLoader({
       recentOutboundCount,
     });
     const stepParam = url.searchParams.get("step");
-    const serverStep =
-      hydratedOnboarding.currentStep === "use_case"
-        ? "business_profile"
-        : isWizardOnboardingStepId(hydratedOnboarding.currentStep)
-          ? hydratedOnboarding.currentStep
-          : "business_profile";
+    const serverStep = resolvePersistedWizardStep(hydratedOnboarding.currentStep);
 
     if (stepParam && !isWizardOnboardingStepId(stepParam)) {
-      url.searchParams.set("step", serverStep);
+      const redirected = resolvePersistedWizardStep(stepParam);
+      url.searchParams.set("step", redirected);
       throw redirect(`${url.pathname}?${url.searchParams.toString()}`, { headers });
     }
 
@@ -139,6 +145,8 @@ export const loader = defineLoader({
         mediaNames,
         inboundQueues,
         scripts,
+        audienceCount,
+        campaignCount,
       },
       { headers },
     );

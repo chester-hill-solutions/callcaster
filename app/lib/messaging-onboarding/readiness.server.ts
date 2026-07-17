@@ -48,6 +48,10 @@ export {
 
 export type BuildOnboardingStepsContext = {
   hasFirstNumber?: boolean;
+  audienceCount?: number;
+  scriptCount?: number;
+  campaignCount?: number;
+  creditsBalance?: number;
 };
 
 function buildReadinessContext(
@@ -93,31 +97,42 @@ export function buildOnboardingStepsForState(
   context: BuildOnboardingStepsContext = {},
 ): WorkspaceOnboardingStepState[] {
   const hasFirstNumber = context.hasFirstNumber ?? false;
+  const audienceCount = context.audienceCount ?? 0;
+  const scriptCount = context.scriptCount ?? 0;
+  const campaignCount = context.campaignCount ?? 0;
+  const creditsBalance = context.creditsBalance ?? 0;
   const ctx = buildReadinessContext(onboarding, [], context);
   const stepById = Object.fromEntries(
     DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => [step.id, step]),
   ) as Record<string, WorkspaceOnboardingStepState>;
   const businessProfileStep = stepById.business_profile!;
-  const useCaseStep = stepById.use_case!;
   const pathSelectionStep = stepById.path_selection!;
+  const audienceStep = stepById.audience!;
   const firstNumberStep = stepById.first_number!;
-  const providerProvisioningStep = stepById.provider_provisioning!;
+  const scriptStep = stepById.script!;
+  const campaignInfoStep = stepById.campaign_info!;
+  const creditsStep = stepById.credits!;
   const launchChecksStep = stepById.launch_checks!;
 
   const businessBasicsComplete = isBusinessBasicsComplete(ctx);
-  const providerReady =
-    predicatePassed("a2p_approved", ctx) && predicatePassed("rcs_ready", ctx);
   const emergencyReady = isEmergencyReady(onboarding);
   const messagingProvisioned = predicatePassed("messaging_service_provisioned", ctx);
-  const pathSelected = predicatePassed("path_selection_complete", ctx);
+  const pathSelected =
+    predicatePassed("path_selection_complete", ctx) || Boolean(onboarding.selectedGoal);
+  const audienceComplete = audienceCount > 0;
+  const scriptComplete = scriptCount > 0 || onboarding.selectedGoal === "live_call";
+  const campaignComplete = campaignCount > 0;
+  const creditsComplete = creditsBalance > 0;
+  const launchComplete =
+    messagingProvisioned &&
+    hasFirstNumber &&
+    audienceComplete &&
+    campaignComplete &&
+    (!onboarding.selectedChannels.includes("voice_compliance") || emergencyReady);
 
-  return [
+  const steps: WorkspaceOnboardingStepState[] = [
     {
       ...businessProfileStep,
-      status: businessBasicsComplete ? "complete" : "in_progress",
-    },
-    {
-      ...useCaseStep,
       status: businessBasicsComplete ? "complete" : "in_progress",
     },
     {
@@ -125,24 +140,38 @@ export function buildOnboardingStepsForState(
       status: pathSelected ? "complete" : "in_progress",
     },
     {
+      ...audienceStep,
+      status: audienceComplete ? "complete" : "in_progress",
+    },
+    {
       ...firstNumberStep,
       status: hasFirstNumber ? "complete" : "in_progress",
     },
+  ];
+
+  if (onboarding.selectedGoal !== "live_call") {
+    steps.push({
+      ...scriptStep,
+      status: scriptComplete ? "complete" : "in_progress",
+    });
+  }
+
+  steps.push(
     {
-      ...providerProvisioningStep,
-      status: providerReady ? "complete" : "in_progress",
+      ...campaignInfoStep,
+      status: campaignComplete ? "complete" : "in_progress",
+    },
+    {
+      ...creditsStep,
+      status: creditsComplete ? "complete" : "in_progress",
     },
     {
       ...launchChecksStep,
-      status:
-        messagingProvisioned &&
-        hasFirstNumber &&
-        providerReady &&
-        (!onboarding.selectedChannels.includes("voice_compliance") || emergencyReady)
-          ? "complete"
-          : "pending",
+      status: launchComplete ? "complete" : "pending",
     },
-  ];
+  );
+
+  return steps;
 }
 
 export function deriveWorkspaceMessagingReadiness({
@@ -200,11 +229,13 @@ export function deriveWorkspaceMessagingReadiness({
 export function applyOnboardingStepsWithWorkspaceNumbers(
   onboarding: WorkspaceMessagingOnboardingState,
   workspaceNumbers: Array<{ type?: string | null; capabilities?: unknown }>,
+  context: Omit<BuildOnboardingStepsContext, "hasFirstNumber"> = {},
 ): WorkspaceMessagingOnboardingState {
   return {
     ...onboarding,
     steps: buildOnboardingStepsForState(onboarding, {
       hasFirstNumber: workspaceHasFirstNumber(workspaceNumbers),
+      ...context,
     }),
   };
 }

@@ -9,6 +9,13 @@ import { CallerIdVerificationForm } from "@/components/phone-numbers/CallerIdVer
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { goalNeedsSmsCompliance } from "@/lib/messaging-onboarding/goals";
+import {
   countRentedWorkspaceNumbers,
   countVerifiedCallerIdNumbers,
   isVerifiedCallerIdNumber,
@@ -163,19 +170,21 @@ export function OnboardingFirstNumberStep({
     }
   });
 
+  const smsGoal = goalNeedsSmsCompliance(onboarding.selectedGoal);
+
   if (!messagingReady) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Your first number</CardTitle>
+          <CardTitle>Phone number</CardTitle>
           <CardDescription>
-            Provision the Messaging Service first, then add a phone number to send and receive.
+            Messaging setup is still finishing. Refresh in a moment, then add a phone number.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Alert>
             <AlertDescription>
-              Complete the Messaging Service step before searching for numbers.
+              Workspace messaging is preparing. Once it is ready you can search for numbers here.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -192,13 +201,34 @@ export function OnboardingFirstNumberStep({
       />
       <Card>
         <CardHeader>
-          <CardTitle>Your first number</CardTitle>
+          <CardTitle>Phone number</CardTitle>
           <CardDescription>
-            Rent a Canadian local number for full inbound SMS and calls, or verify a number you
-            already own for outbound messaging and calling.
+            Rent a number for inbound and outbound traffic, or verify a number you already own for
+            outbound calling and texting.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {smsGoal ? (
+            <TooltipProvider>
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+                <p>
+                  For SMS blasts, a toll-free number supports higher sending volume after
+                  verification. A local number works for lighter texting at a lower rate.
+                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="mt-2 text-xs font-medium underline">
+                      Number choice tip
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Pick toll-free when you expect higher daily volume. Pick local when you mainly
+                    need a regional presence and lighter sending.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
+          ) : null}
           {hasFirstNumber ? (
             <Alert>
               <AlertDescription>
@@ -209,7 +239,7 @@ export function OnboardingFirstNumberStep({
                 {verifiedCallerIdCount > 0
                   ? `${verifiedCallerIdCount} verified caller ID${verifiedCallerIdCount === 1 ? "" : "s"} ready for outbound.`
                   : null}{" "}
-                Continue to provider setup, or add another number below.
+                Continue when you are ready, or add another number below.
               </AlertDescription>
             </Alert>
           ) : null}
