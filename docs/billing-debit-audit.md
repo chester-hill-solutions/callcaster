@@ -18,7 +18,7 @@ Direct `workspace.credits` assignment is banned (ADR-0006); the legacy `transact
 | Site | Trigger | Key builder | Amount | Status |
 |------|---------|-------------|--------|--------|
 | `app/lib/twilio-call-status.server.ts` | Terminal call + duration > 0 | `callKey(sid)` | `debitAmountFromCredits(voiceCreditsFromDurationSeconds(...))` | ✅ Compliant |
-| `app/routes/api+/sms/status.action.server.ts` | Terminal outbound SMS/MMS status | `smsKey(sid)` | `debitAmountFromCredits(segments × SMS_SEGMENT_CREDITS or MMS_CREDITS)` | ✅ Compliant |
+| `app/lib/worker/webhook-side-effects.server.ts` | Terminal outbound SMS/MMS status (worker job enqueued by `/api/sms/status`) | `smsKey(sid)` | `debitAmountFromCredits(segments × SMS_SEGMENT_CREDITS or MMS_CREDITS)` | ✅ Compliant |
 | `app/lib/number-rental-billing.server.ts` | Monthly rental cron | `numberRentalCycleKey(numberId, cycleKey)` | `debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS)` | ✅ Compliant |
 | `app/lib/platform-workspace-numbers.server.ts` | Number purchase | `numberRentalPurchaseKey(workspaceId, numberSid)` | `debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS)` | ✅ Compliant |
 
@@ -40,7 +40,7 @@ Direct `workspace.credits` assignment is banned (ADR-0006); the legacy `transact
 
 ## Edge functions / Deno
 
-No active Edge Function debit paths remain in-repo; SMS and call status billing run through Remix routes (`/api/sms/status`, call status callbacks → `twilio-call-status.server.ts`).
+No active Edge Function debit paths remain in-repo; SMS and call status billing run through app routes that enqueue Bun worker jobs (`/api/sms/status` → `webhook-side-effects.server.ts`, `/api/call-status` → worker → `twilio-call-status.server.ts`) or bill synchronously (`/api/ivr/status`, `/api/auto-dial/status`). Route-level coverage is inventoried in [credit-handler-inventory.md](./credit-handler-inventory.md).
 
 ## Violations found
 

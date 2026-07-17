@@ -15,9 +15,9 @@ test.describe("RBAC @rbac @security", () => {
     const ws = new WorkspacePage(page);
     await ws.goto(E2E_WORKSPACES.ready.id);
     await ws.expectNavVisible("Campaigns");
-    await ws.expectNavVisible("Chats");
+    await ws.expectNavVisible("Messages");
     await expect(page.getByRole("link", { name: "Scripts" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Audiences" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Call lists" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Exports" })).toHaveCount(0);
   });
 
@@ -70,8 +70,9 @@ test.describe("RBAC @rbac @security", () => {
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 0);
     const callScreen = new CallScreenPage(page);
     await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
-    await expect(page.getByTestId("credits-error-banner")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/Campaign Disabled/i)).toBeVisible();
+    const banner = page.getByTestId("credits-error-banner");
+    await expect(banner).toBeVisible({ timeout: 30_000 });
+    await expect(banner.getByText(/Campaign credits required/i)).toBeVisible();
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
   });
 });

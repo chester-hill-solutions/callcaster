@@ -319,7 +319,7 @@ export const action = defineAction({
 
     return { parsedBody: params, underCase, callSidValue };
   },
-  sideEffects: ["db-write", "twilio"],
+  sideEffects: ["db-write", "credit", "twilio"],
   handler: async ({ auth }) => {
     const { parsedBody, underCase, callSidValue } = auth;
     let realtime: any;

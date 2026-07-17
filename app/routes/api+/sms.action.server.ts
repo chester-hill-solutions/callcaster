@@ -205,7 +205,7 @@ export const action = defineAction({
     }
     return authResult;
   },
-  sideEffects: ["db-write", "credit", "twilio"],
+  sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth: authResult }) => {
 
   try {

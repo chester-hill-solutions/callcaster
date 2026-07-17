@@ -36,12 +36,14 @@ export function createCronEnqueueAction(args: {
     body: Record<string, unknown>,
     workspaceId?: string,
   ) => Record<string, unknown>;
+  /** Downstream effects of the enqueued job (e.g. "credit" for billing jobs). */
+  extraSideEffects?: SideEffect[];
 }): {
   sideEffects: SideEffect[];
   handler: (ctx: { request: Request }) => Promise<unknown>;
 } {
   return {
-    sideEffects: ["db-write"],
+    sideEffects: ["db-write", ...(args.extraSideEffects ?? [])],
     handler: async ({ request }) => {
       if (!verifyCronSecret(request)) {
         return routeData({ error: "Unauthorized" }, { status: 401 });

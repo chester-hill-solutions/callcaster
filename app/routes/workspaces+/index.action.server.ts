@@ -23,7 +23,8 @@ export const action = defineAction({
     }
     return { headers, user };
   },
-  sideEffects: ["db-write", "twilio", "external"],
+  // createNewWorkspace applies the welcome-credits grant to the ledger.
+  sideEffects: ["db-write", "credit", "twilio", "external"],
   handler: async ({ request, auth }) => {
     const { headers, user } = auth;
     const requestId = resolveRequestId(request);

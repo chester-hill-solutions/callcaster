@@ -898,7 +898,7 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "publicUnauthenticated",
     docsGuide: GUIDE.internal,
     operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-    notes: "Static TwiML gather entry; returns TwiML.",
+    notes: "Retired audio PIN flow; returns 410.",
   }),
   seed({
     path: "/api/verify-audio-session",
@@ -911,8 +911,7 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "GET", handler: "loader", bodyType: "query" },
       { method: "POST", handler: "action", bodyType: "form" },
     ],
-    securityWarning:
-      "GET requires session; POST action returns TwiML without auth check.",
+    notes: "Retired audio PIN flow; both methods return 410.",
   }),
   seed({
     path: "/api/verify-call-in-session",
@@ -931,8 +930,7 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "internalOnly",
     docsGuide: GUIDE.internal,
     operations: [{ method: "POST", handler: "action", bodyType: "form" }],
-    securityWarning: "Twilio gather callback; service role, no Twilio signature.",
-    notes: "Returns TwiML.",
+    notes: "Retired audio PIN flow; returns 410.",
   }),
   seed({
     path: "/api/workspace-api-keys",

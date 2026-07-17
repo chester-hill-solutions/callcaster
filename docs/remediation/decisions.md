@@ -54,3 +54,26 @@ Decisions captured during the grilling session that shape the implementation pla
 
 - New remediation docs in `docs/remediation/`.
 - Update existing docs only after a fix is shipped.
+
+## Business onboarding (2026-07-17)
+
+Locked in [`business-onboarding-simplification-plan-2026-07-17.md`](./business-onboarding-simplification-plan-2026-07-17.md):
+
+- **Direction:** Option 1 (launch home + contextual gates) with campaign-first bias.
+- **Intake only:** workspace name, goal, operating country — then Workspace Today checklist.
+- **Hard redirect / sidebar lock:** intake-incomplete only; not missing number or emergency address.
+- **currently_due for launch-ready:** audience, phone number, script (IVR/SMS), campaign, campaign readiness at go-live.
+- **eventually_due / warning:** credits (Today may still prioritize billing at balance ≤ 0).
+- **Emergency address:** collect at voice number rental, not in intake.
+- **TFV / A2P / messaging profile fields:** collect at SMS capability gates.
+- **Primary CTA after intake:** next missing launch dependency; prefer create/open campaign.
+
+## Credit facet ratchet (2026-07-17)
+
+Strictness-ratchet cycle 3 (`check:handlers` credit facet):
+
+- **Bidirectional enforcement:** a route matching a credit-write signal must declare `"credit"`; a route declaring `"credit"` must match a signal. Balance reads / credit-floor gates do not qualify.
+- **Signals cover async billing:** worker job enqueues (`CALL_STATUS_SIDE_EFFECTS_JOB_TYPE`, `SMS_STATUS_SIDE_EFFECTS_JOB_TYPE`, `number_rental_billing`) count as credit-write paths of the enqueuing route.
+- **Two credit gates stay separate:** `check:credit-writes` bans direct `workspace.credits` mutation (write mechanism, ADR-0006); the `credit` facet inventories route entry points. Documented in `docs/handler-strictness.md`.
+- **Generated inventory:** `docs/credit-handler-inventory.md` is emitted by every `check:handlers` run; `ci:local`'s trailing `git diff --exit-code` catches drift.
+- **Fixes landed:** 6 under-declarations (workspace-create ×2, call-status, sms/status, auto-dial/status, number-rental-billing cron) and 2 over-declarations (sms, chat_sms send routes) corrected; `createCronEnqueueAction` gained `extraSideEffects`.

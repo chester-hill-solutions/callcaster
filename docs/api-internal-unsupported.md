@@ -11,7 +11,7 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tags: **Interna
 | POST | `/api/auto-dial/dialer` | No user auth; trusts `workspace_id` / `user_id` in JSON |
 | POST | `/api/call` | Twilio Voice URL; handset cookie lookup; no Twilio signature |
 | POST | `/api/inbound-verification` | Call-in verification TwiML; service role; no Twilio signature |
-| POST | `/api/verify-pin-input` | Twilio gather callback; service role; no Twilio signature |
+| POST | `/api/verify-pin-input` | Retired audio PIN flow; returns 410 |
 
 ## Security gaps (weak / unknown auth)
 
@@ -21,7 +21,7 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tags: **Interna
 | POST | `/api/disconnect` | Twilio Device disconnect; account credentials only |
 | POST | `/api/queues` | Session client without mandatory user check on all paths |
 | POST | `/api/outreach_attempts/:id` | Duplicate legacy routes; weak session client (×2 modules) |
-| GET/POST | `/api/verify-audio-session` | POST action returns TwiML without auth |
+| GET/POST | `/api/verify-audio-session` | Retired audio PIN flow; returns 410 |
 
 **Remediation:** add signature validation or session checks before promoting any of these to supported APIs.
 
@@ -32,7 +32,7 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tags: **Interna
 | POST | `/api/contact-form` | Marketing contact form email |
 | POST | `/api/survey-answer` | Public survey respondent |
 | POST | `/api/survey-complete` | Public survey completion |
-| GET | `/api/verify-audio-pin/:pin` | Verification TwiML entry |
+| GET | `/api/verify-audio-pin/:pin` | Retired audio PIN flow; returns 410 |
 
 ## Legacy duplicate
 

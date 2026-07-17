@@ -84,10 +84,10 @@ Interactive specs:
 | `/api/surveys` | POST, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/surveys.tsx` | `docs/api-data-management.md` |  |
 | `/api/test-webhook` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/test-webhook.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/token` | GET | User API | sessionOnly | yes | `routes/api+/token.tsx` | `docs/api-telephony-control.md` | Twilio client access token for browser dialer. |
-| `/api/verify-audio-pin/:pin` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/verify-audio-pin/$pin.route.tsx` | `docs/api-internal-unsupported.md` | Static TwiML gather entry; returns TwiML. |
-| `/api/verify-audio-session` | GET, POST | User API | sessionOnly | yes | `routes/api+/verify-audio-session.tsx` | `docs/api-telephony-control.md` | GET requires session; POST action returns TwiML without auth check. |
+| `/api/verify-audio-pin/:pin` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/verify-audio-pin/$pin.route.tsx` | `docs/api-internal-unsupported.md` | Retired audio PIN flow; returns 410. |
+| `/api/verify-audio-session` | GET, POST | User API | sessionOnly | yes | `routes/api+/verify-audio-session.tsx` | `docs/api-telephony-control.md` | Retired audio PIN flow; both methods return 410. |
 | `/api/verify-call-in-session` | GET | User API | sessionOnly | yes | `routes/api+/verify-call-in-session.tsx` | `docs/api-telephony-control.md` |  |
-| `/api/verify-pin-input` | POST | Internal Trusted | internalOnly | no | `routes/api+/verify-pin-input.tsx` | `docs/api-internal-unsupported.md` | Twilio gather callback; service role, no Twilio signature. |
+| `/api/verify-pin-input` | POST | Internal Trusted | internalOnly | no | `routes/api+/verify-pin-input.tsx` | `docs/api-internal-unsupported.md` | Retired audio PIN flow; returns 410. |
 | `/api/workspace-api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspace-api-keys.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/twilio/trusthub/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/twilio/trusthub/status.route.tsx` | `docs/api-webhooks.md` | Trust Hub status_callback receiver; resolves workspace by customer-profile bundle SID and reconciles compliance status. |
 | `/api/twilio/a2p/events` | POST | Internal Trusted | internalOnly | no | `routes/api+/twilio/a2p/events.route.tsx` | `docs/api-internal-unsupported.md` | A2P Event Streams sink receiver (JSON body); sink-secret validation lands in Phase D. |

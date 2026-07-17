@@ -229,7 +229,7 @@ const WorkspaceNav = ({
         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
           Workspace
         </p>
-        <h2 className="mt-1 truncate font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
+        <h2 className="mt-1 truncate font-Tabac-Slab text-xl font-black text-brand-primary dark:text-brand-secondary">
           {workspace.name}
         </h2>
       </div>
