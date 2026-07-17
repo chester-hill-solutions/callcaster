@@ -57,9 +57,9 @@ describe("app/components/call/CallScreen.DTMFPhone.tsx", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "*" }));
-    fireEvent.click(screen.getByRole("button", { name: "0" }));
-    fireEvent.click(screen.getByRole("button", { name: "#" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dial *" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dial 0" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dial #" }));
 
     expect(onKeyPress).toHaveBeenCalledWith("*");
     expect(onKeyPress).toHaveBeenCalledWith("0");
@@ -82,6 +82,6 @@ describe("app/components/call/CallScreen.DTMFPhone.tsx", () => {
     );
 
     expect(screen.queryByText("Connected 1:01")).toBeNull();
-    expect(screen.getByRole("button", { name: "1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dial 1" })).toBeInTheDocument();
   });
 });

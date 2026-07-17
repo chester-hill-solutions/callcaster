@@ -13,11 +13,19 @@ import {
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/ui/page-shell";
+import { Section } from "@/components/shared/Section";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Text } from "@/components/ui/typography";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
@@ -81,23 +89,20 @@ export default function VoicemailSetupPage() {
       ) : null}
 
       {!hasNumbers ? (
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <Text variant="muted">
-              This workspace has no phone numbers that can receive calls, so
-              there is nothing to attach a greeting to yet.
-            </Text>
-            <Button asChild>
-              <Link to={`/workspaces/${workspaceId}/settings/numbers`}>
-                Add a phone number
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <Section variant="flat" className="space-y-4">
+          <Text variant="muted">
+            This workspace has no phone numbers that can receive calls, so
+            there is nothing to attach a greeting to yet.
+          </Text>
+          <Button asChild>
+            <Link to={`/workspaces/${workspaceId}/settings/numbers`}>
+              Add a phone number
+            </Link>
+          </Button>
+        </Section>
       ) : (
         <Form method="POST" encType="multipart/form-data" className="space-y-6">
-          <Card>
-            <CardContent className="space-y-4 pt-6">
+          <Section variant="flat" className="space-y-4">
               <FormField label="Greeting">
                 <div className="space-y-3">
                   {greetings.length > 0 ? (
@@ -189,11 +194,9 @@ export default function VoicemailSetupPage() {
                   ) : null}
                 </div>
               </FormField>
-            </CardContent>
-          </Card>
+          </Section>
 
-          <Card>
-            <CardContent className="pt-6">
+          <Section variant="flat" className="space-y-4">
               <FormField
                 label="Play it on these numbers"
                 description="Callers to the numbers you pick will hear this greeting, then be able to leave a message."
@@ -233,11 +236,9 @@ export default function VoicemailSetupPage() {
                   ))}
                 </div>
               </FormField>
-            </CardContent>
-          </Card>
+          </Section>
 
-          <Card>
-            <CardContent className="pt-6">
+          <Section variant="flat" className="space-y-4">
               <FormField
                 htmlFor="notify-email"
                 label="Who should get the voicemails?"
@@ -266,8 +267,7 @@ export default function VoicemailSetupPage() {
                   </Text>
                 )}
               </FormField>
-            </CardContent>
-          </Card>
+          </Section>
 
           <div className="flex flex-col gap-4 sm:flex-row">
             <Button type="submit" disabled={state !== "idle"} className="w-full">

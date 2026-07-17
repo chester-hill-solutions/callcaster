@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import { PageShell } from "@/components/ui/page-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -236,14 +236,13 @@ export default function EditSurveyPage() {
       }
     >
       <form onSubmit={handleSubmit}>
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Survey Details</CardTitle>
-            <CardDescription>
-              Basic information about your survey
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Section variant="flat" className="mb-6">
+          <SectionHeader
+            compact
+            title="Survey Details"
+            description="Basic information about your survey"
+          />
+          <div className="space-y-4">
             <div>
               <Label htmlFor="survey_id">Survey ID</Label>
               <Input
@@ -276,37 +275,39 @@ export default function EditSurveyPage() {
               />
               <Label htmlFor="is_active">Active</Label>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
 
         {formData.pages.map((page, pageIndex) => (
-          <Card key={page.page_id} className="mb-6">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div className="flex-1">
-                  <Input
-                    value={page.title}
-                    onChange={(e) => updatePageField(pageIndex, "title", e.target.value)}
-                    placeholder="Page title"
-                    className="text-lg font-semibold"
-                  />
-                </div>
-                {formData.pages.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removePage(pageIndex)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
+          <Section key={page.page_id} variant="flat" className="mb-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex-1">
+                <Input
+                  value={page.title}
+                  onChange={(e) => updatePageField(pageIndex, "title", e.target.value)}
+                  placeholder="Page title"
+                  className="text-lg font-semibold"
+                  aria-label={`Page ${pageIndex + 1} title`}
+                />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              {formData.pages.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label={`Remove page ${pageIndex + 1}`}
+                  onClick={() => removePage(pageIndex)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            <div className="space-y-4">
               {page.questions.map((question, questionIndex) => (
-                <Card key={question.question_id} className="p-4 border">
-                  <div className="space-y-4">
+                <div
+                  key={question.question_id}
+                  className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-4"
+                >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 space-y-4">
                         <div>
@@ -395,8 +396,7 @@ export default function EditSurveyPage() {
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
-                  </div>
-                </Card>
+                </div>
               ))}
               <Button
                 type="button"
@@ -406,8 +406,8 @@ export default function EditSurveyPage() {
                 <Plus className="w-4 h-4 mr-2" />
                 Add Question
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </Section>
         ))}
 
         <div className="flex gap-4">

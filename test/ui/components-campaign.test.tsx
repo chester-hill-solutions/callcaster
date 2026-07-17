@@ -35,7 +35,9 @@ describe("app/components/campaign/CampaignEmptyState.tsx", () => {
         <CampaignEmptyState hasAccess type="campaign" />
       </SmokeRouter>,
     );
-    expect(screen.getAllByText(/Get started/i)[0]).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Get started/i)[0],
+    ).toBeInTheDocument();
     rerender(
       <SmokeRouter>
         <CampaignEmptyState hasAccess={false} type="number" />

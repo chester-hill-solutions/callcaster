@@ -46,6 +46,7 @@ export function PhoneKeypad({
             key={item}
             type="button"
             variant="outline"
+            aria-label={`Dial ${item}`}
             className={cn(
               "h-10 w-10 min-w-10 p-0 text-base font-semibold",
               "transition-colors duration-150 hover:bg-muted",

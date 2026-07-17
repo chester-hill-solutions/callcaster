@@ -1,4 +1,5 @@
 import { CheckCircleIcon } from "lucide-react";
+import { callPanelShellClass } from "@/components/call/call-panel-classes";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/db-types";
 
@@ -29,7 +30,7 @@ export const Household = ({
 
   return (
     <section
-      className="rounded-xl border bg-card p-3"
+      className={cn(callPanelShellClass, "p-3")}
       aria-labelledby="household-members-label"
     >
       <div

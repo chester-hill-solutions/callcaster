@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Heading, Text } from "@/components/ui/typography";
 import { getWorkspaceTodayCopy } from "@/lib/workspace-today-copy";
 import type { WorkspaceTodaySelection } from "@/lib/workspace-today.server";
 
@@ -13,26 +13,30 @@ export default function WorkspaceToday({
   const copy = getWorkspaceTodayCopy(today);
 
   return (
-    <Card className="mx-auto w-full max-w-3xl border-border/80 bg-background/80">
-      <CardHeader className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <div className="space-y-3">
+        <Text
+          as="p"
+          variant="caption"
+          className="font-semibold uppercase tracking-[0.16em]"
+        >
           Today · {copy.eyebrow}
-        </p>
-        <h1 className="font-Tabac-Slab text-3xl font-black text-foreground sm:text-4xl">
+        </Text>
+        <Heading as="h1" level={1} branded={false}>
           {copy.title}
-        </h1>
-        <p className="max-w-2xl text-base text-muted-foreground">
+        </Heading>
+        <Text variant="muted" className="max-w-2xl text-base">
           {copy.description}
-        </p>
-      </CardHeader>
-      <CardContent>
+        </Text>
+      </div>
+      <div>
         <Button asChild size="lg">
           <Link to={today.href}>
             {copy.actionLabel}
             <ArrowRight className="ml-2 size-4" aria-hidden="true" />
           </Link>
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
