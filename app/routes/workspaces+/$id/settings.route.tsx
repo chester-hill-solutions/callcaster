@@ -359,8 +359,8 @@ export default function WorkspaceSettings() {
       ) : null}
 
       {hasAccess ? (
-        <Accordion type="single" collapsible className="border-b border-border/60 pb-8">
-          <AccordionItem value="webhook" className="border-border/60">
+        <Accordion type="single" collapsible>
+          <AccordionItem value="webhook" className="border-b-0">
             <AccordionTrigger className="py-0 text-base font-semibold hover:no-underline">
               Webhook
             </AccordionTrigger>

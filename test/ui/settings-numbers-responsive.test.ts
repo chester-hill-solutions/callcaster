@@ -7,15 +7,15 @@ import path from "node:path";
 // scroll affordance. Root cause was a flexbox min-width:auto blowout — the
 // NumbersTable's own <Table> wrapper already scrolls internally
 // (`overflow-auto`, see app/components/ui/table.tsx), but nothing upstream
-// let the flex row/items *shrink* to the viewport first, so the whole page
+// let the flex/grid items *shrink* to the viewport first, so the whole page
 // grew to fit the wide table instead of the table scrolling in place.
 //
+// After SURF-NUM-01 the route-local brand Panel was replaced with PageShell
+// + flat Sections. The shrink contract is now on the responsive grid and
+// Section/side wrappers (still min-w-0), not Panel classNames.
+//
 // jsdom doesn't compute layout, so this can't assert "no horizontal
-// overflow at 390px" directly (that was verified against the live preview
-// instead — see the fix agent's final report). This asserts the structural
-// fix: min-w-0 on the row and on every flex item wrapping the table/panels,
-// which is what allows the table's own overflow-auto container to actually
-// constrain and scroll instead of the ancestor chain refusing to shrink.
+// overflow at 390px" directly. This asserts the structural shrink fix.
 describe("app/routes/workspaces+/$id/settings/numbers.route.tsx responsive layout", () => {
   const source = readFileSync(
     path.resolve(
@@ -25,18 +25,18 @@ describe("app/routes/workspaces+/$id/settings/numbers.route.tsx responsive layou
     "utf-8",
   );
 
-  test("the panel row and both flex-item wrappers allow shrinking below content width", () => {
-    expect(source).toMatch(/flex min-w-0 flex-wrap gap-4 p-4/);
+  test("the responsive grid and list section allow shrinking below content width", () => {
     expect(source).toMatch(
-      /Panel className="min-w-0 flex-shrink-0 flex-grow basis-full/,
+      /grid min-w-0 gap-0 lg:grid-cols-\[2fr_1fr\] lg:gap-8/,
     );
-    expect(source).toMatch(
-      /flex min-w-0 flex-shrink-0 flex-grow basis-full flex-col/,
-    );
+    expect(source).toMatch(/Section variant="flat" className="min-w-0"/);
+    expect(source).toContain("PageShell");
+    expect(source).not.toMatch(/\bPanel\b/);
   });
 
-  test("the caller-id and purchase side panels also allow shrinking", () => {
-    const sidePanelMatches = source.match(/<Panel className="min-w-0">/g) ?? [];
-    expect(sidePanelMatches.length).toBe(2);
+  test("the caller-id and purchase side column also allows shrinking", () => {
+    expect(source).toMatch(/className="min-w-0 space-y-0"/);
+    expect(source).toContain("<NumberCallerId");
+    expect(source).toContain("<NumberPurchase");
   });
 });
