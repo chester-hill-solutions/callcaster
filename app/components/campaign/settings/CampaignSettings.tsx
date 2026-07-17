@@ -28,6 +28,7 @@ import {
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
 import { SaveBar } from "@/components/shared/SaveBar";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import { CampaignSettingsQueue } from "./CampaignSettingsQueue";
 import { CampaignSetupGuide } from "./CampaignSetupGuide";
 import type { CampaignSetupStep } from "@/lib/campaign-setup-steps";
@@ -377,8 +378,9 @@ export const CampaignSettings = ({
             name="campaignDetails"
             value={JSON.stringify(campaignDetails)}
           />
-          <div className="flex flex-col space-y-4">
-            <section className="rounded-lg border p-4">
+          <div className="flex flex-col">
+            <Section variant="flat">
+              <SectionHeader compact title="Campaign basics" />
               <CampaignBasicInfo
                 campaignData={campaignData}
                 handleInputChange={handleInputChange}
@@ -397,8 +399,9 @@ export const CampaignSettings = ({
                 }
                 hideReadinessAlerts={showSetupGuide}
               />
-            </section>
-            <section className="rounded-lg border p-4">
+            </Section>
+            <Section variant="flat">
+              <SectionHeader compact title="Campaign details" />
               <CampaignTypeSpecificSettings
                 campaignData={campaignData}
                 handleInputChange={handleInputChange}
@@ -421,15 +424,17 @@ export const CampaignSettings = ({
                 smsSendContext={smsSendContext}
                 hideReadinessAlerts={showSetupGuide}
               />
-            </section>
+            </Section>
 
-            <CampaignSettingsQueue
-              campaignQueue={campaignQueue}
-              queueCount={queueCount}
-              dequeuedCount={dequeuedCount}
-              totalCount={totalCount}
-              setupGuideActive={showSetupGuide}
-            />
+            <Section variant="flat">
+              <CampaignSettingsQueue
+                campaignQueue={campaignQueue}
+                queueCount={queueCount}
+                dequeuedCount={dequeuedCount}
+                totalCount={totalCount}
+                setupGuideActive={showSetupGuide}
+              />
+            </Section>
 
             {campaignBilling ? (
               <CampaignCostPanel

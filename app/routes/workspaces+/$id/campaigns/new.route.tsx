@@ -9,15 +9,11 @@ import {
 } from "react-router";
 import type { MetaFunction } from "react-router";
 import { useState } from "react";
-import {
-  BrandedCard,
-  BrandedCardActions,
-  BrandedCardContent,
-  BrandedCardTitle,
-} from "@/components/shared/BrandedCard";
+import { Section } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PageShell } from "@/components/ui/page-shell";
 import { Text } from "@/components/ui/typography";
 import {
   CAMPAIGN_PRODUCT_GOAL_OPTIONS,
@@ -27,9 +23,6 @@ import {
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 
 export const meta: MetaFunction = () => [{ title: "New Campaign — CallCaster" }];
-
-const CREATION_SECTION_CLASS =
-  "mx-auto w-full max-w-2xl px-4 pb-8 pt-6 sm:px-6";
 
 export default function CampaignsNew() {
   const { userRole } = useOutletContext<{ userRole?: string | null }>();
@@ -53,41 +46,39 @@ export default function CampaignsNew() {
 
   if (!canCreate) {
     return (
-      <section id="form" className={CREATION_SECTION_CLASS}>
-        <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
-          <BrandedCardTitle as="h1">Create campaign</BrandedCardTitle>
-          <BrandedCardContent>
+      <section id="form" className="px-4 pb-8 pt-6 sm:px-6">
+        <PageShell title="Create campaign" maxWidth="narrow">
+          <Section variant="flat">
             <Text variant="muted">
               Contact a workspace administrator to create a campaign.
             </Text>
-          </BrandedCardContent>
-          <BrandedCardActions>
+          </Section>
+          <div className="flex flex-col gap-2">
             <Button asChild variant="outline" className="w-full">
               <Link to=".." relative="path">
                 Back
               </Link>
             </Button>
-          </BrandedCardActions>
-        </BrandedCard>
+          </div>
+        </PageShell>
       </section>
     );
   }
 
   return (
-    <section id="form" className={CREATION_SECTION_CLASS}>
-      {actionData?.error != null ? (
-        <Text className="mb-4 text-center text-destructive">
-          {typeof actionData.error === "object" &&
-          actionData.error !== null &&
-          "message" in actionData.error
-            ? String(actionData.error.message)
-            : String(actionData.error)}
-        </Text>
-      ) : null}
-      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
-        <BrandedCardTitle as="h1">Create campaign</BrandedCardTitle>
+    <section id="form" className="px-4 pb-8 pt-6 sm:px-6">
+      <PageShell title="Create campaign" maxWidth="narrow">
+        {actionData?.error != null ? (
+          <Text className="text-center text-destructive">
+            {typeof actionData.error === "object" &&
+            actionData.error !== null &&
+            "message" in actionData.error
+              ? String(actionData.error.message)
+              : String(actionData.error)}
+          </Text>
+        ) : null}
         <Form method="POST" className="space-y-6">
-          <BrandedCardContent>
+          <Section variant="flat" className="space-y-6">
             <input type="hidden" name="formAction" value="newCampaign" />
             <FormField
               htmlFor="campaign-name"
@@ -148,8 +139,8 @@ export default function CampaignsNew() {
                 })}
               </div>
             </fieldset>
-          </BrandedCardContent>
-          <BrandedCardActions>
+          </Section>
+          <div className="flex flex-col gap-2">
             <Button
               size="lg"
               className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
@@ -162,9 +153,9 @@ export default function CampaignsNew() {
                 Back
               </Link>
             </Button>
-          </BrandedCardActions>
+          </div>
         </Form>
-      </BrandedCard>
+      </PageShell>
     </section>
   );
 }

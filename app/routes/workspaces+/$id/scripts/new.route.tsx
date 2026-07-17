@@ -6,15 +6,11 @@ import React, { useState } from "react";
 
 import { MdAdd, MdClose } from "react-icons/md";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { Section } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import {
-  BrandedCard,
-  BrandedCardActions,
-  BrandedCardContent,
-  BrandedCardTitle,
-} from "@/components/shared/BrandedCard";
+import { PageShell } from "@/components/ui/page-shell";
 import { Text } from "@/components/ui/typography";
 
 export default function NewScript() {
@@ -59,36 +55,23 @@ export default function NewScript() {
   }
 
   return (
-    <section
-      id="form"
-      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
-    >
-      {actionData?.error != null ? (
-        <Text className="mb-4 text-center text-destructive">
-          Error:{" "}
-          {actionData.error instanceof Error
-            ? actionData.error.message
-            : typeof actionData.error === "string"
-              ? actionData.error
-              : "An error occurred"}
-        </Text>
-      ) : null}
-      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
-        <BrandedCardTitle as="h1">Add Script</BrandedCardTitle>
-        <BrandedCardContent>
-          <Form
-            method="POST"
-            className="space-y-6"
-            encType="multipart/form-data"
-          >
+    <section id="form" className="px-4 pb-8 pt-6 sm:px-6">
+      <PageShell title="Add Script" maxWidth="narrow">
+        {actionData?.error != null ? (
+          <Text className="text-center text-destructive">
+            Error:{" "}
+            {actionData.error instanceof Error
+              ? actionData.error.message
+              : typeof actionData.error === "string"
+                ? actionData.error
+                : "An error occurred"}
+          </Text>
+        ) : null}
+        <Form method="POST" className="space-y-6" encType="multipart/form-data">
+          <Section variant="flat" className="space-y-6">
             <input hidden value={ref ?? ""} id="ref" name="ref" readOnly />
             <FormField htmlFor="script-name" label="Script Name">
-              <Input
-                type="text"
-                name="script-name"
-                id="script-name"
-                required
-              />
+              <Input type="text" name="script-name" id="script-name" required />
             </FormField>
             <FormField htmlFor="type" label="Script Type">
               <select
@@ -147,23 +130,22 @@ export default function NewScript() {
                 If no file is uploaded, you can create the script steps later.
               </p>
             </div>
-
-            <BrandedCardActions>
-              <Button
-                className="rounded-md bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary"
-                type="submit"
-              >
-                Save
-              </Button>
-              <Button asChild variant="outline">
-                <Link to=".." relative="path">
-                  Back
-                </Link>
-              </Button>
-            </BrandedCardActions>
-          </Form>
-        </BrandedCardContent>
-      </BrandedCard>
+          </Section>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              className="rounded-md bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary"
+              type="submit"
+            >
+              Save
+            </Button>
+            <Button asChild variant="outline">
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </div>
+        </Form>
+      </PageShell>
     </section>
   );
 }

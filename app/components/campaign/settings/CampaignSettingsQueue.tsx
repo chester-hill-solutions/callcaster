@@ -26,8 +26,8 @@ export const CampaignSettingsQueue = ({
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="rounded-md border">
-      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-2">
           <div>
             <h2 className="font-medium">Queue Readiness</h2>
@@ -59,9 +59,9 @@ export const CampaignSettingsQueue = ({
         </Button>
       </div>
 
-      <div className="divide-y">
+      <div className="divide-y border-t border-border/60">
         {campaignQueue?.slice(0, 10).map((item) => (
-          <div key={item.id} className="flex items-center justify-between px-4 py-2">
+          <div key={item.id} className="flex items-center justify-between py-2">
             <div className="flex-1">
               <p className="text-sm font-medium">
                 {`${item.contact?.firstname} ${item.contact?.surname}` || '-'}
@@ -71,7 +71,7 @@ export const CampaignSettingsQueue = ({
           </div>
         ))}
         {queued > 10 && (
-          <div className="px-4 py-2 text-center text-xs text-muted-foreground">
+          <div className="py-2 text-center text-xs text-muted-foreground">
             + {queued - 10} more contacts
           </div>
         )}
