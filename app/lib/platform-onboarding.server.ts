@@ -1,13 +1,9 @@
 import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
 import {
   getUserRole,
-  getWorkspacePhoneNumbers,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import type { Database , Tables } from "@/lib/db-types";
 import {
-  applyOnboardingStepsWithWorkspaceNumbers,
-  applyWorkspaceOnboardingChannelPolicy,
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
   isWizardOnboardingStepId,
@@ -36,7 +32,6 @@ import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import {
   TWILIO_RCS_PROVIDER,
   getWorkspaceRcsBlockingIssues,
-  hydrateWorkspaceRcsOnboardingState,
   isRcsOnboardingEnabled,
   stripDisabledRcsChannel,
   updateWorkspaceRcsOnboarding,
@@ -45,113 +40,33 @@ import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { buildA2pBlockingIssues, provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
+import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
+import type {
+  WorkspaceMessagingOnboardingState,
+  WorkspaceOperatingCountry,
+} from "@/lib/types";
+import { WORKSPACE_OPERATING_COUNTRY_VALUES } from "@/lib/types";
+import {
+  adaptRouteDataResult,
+  hydrateWorkspaceOnboarding,
+  resolveOnboardingInput,
+  type OnboardingActionContext,
+  type OnboardingHandlerResult,
+  type WorkspaceOnboardingDetail,
+} from "@/lib/platform-onboarding-helpers.server";
+
+export type {
+  OnboardingActionContext,
+  OnboardingHandlerResult,
+  WorkspaceOnboardingDetail,
+} from "@/lib/platform-onboarding-helpers.server";
+export { resolveOnboardingInput } from "@/lib/platform-onboarding-helpers.server";
 
 // Compliance channels that trigger the Twilio compliance provisioning job.
 // `toll_free_bulk_sms` is a Phase C channel referenced by string literal (it is
 // not yet in the WorkspaceOnboardingChannel union), so channels are compared as
 // plain strings here.
 const COMPLIANCE_CHANNELS = ["toll_free_bulk_sms", "a2p10dlc"] as const;
-import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
-import type {
-  WorkspaceMessagingOnboardingState,
-  WorkspaceMessagingReadiness,
-  WorkspaceOperatingCountry,
-} from "@/lib/types";
-import { WORKSPACE_OPERATING_COUNTRY_VALUES } from "@/lib/types";
-
-export type OnboardingHandlerResult =
-  | {
-      kind: "redirect";
-      step: string;
-      searchParams?: Record<string, string>;
-    }
-  | {
-      kind: "payload";
-      data: OnboardingActionData;
-      status?: number;
-    };
-
-export type OnboardingActionContext = {
-  input: FormData | Record<string, unknown>;
-  workspaceId: string;
-  user: { id: string };
-  actorUserId: string | null;
-};
-
-export type WorkspaceOnboardingDetail = {
-  onboarding: WorkspaceMessagingOnboardingState;
-  readiness: WorkspaceMessagingReadiness;
-  a2p_blocking_issues: string[];
-  rcs_blocking_issues: string[];
-  phone_numbers: Tables<"workspace_number">[] | null;
-  credits_balance: number;
-};
-
-function jsonInputToFormData(body: Record<string, unknown>): FormData {
-  const formData = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined || value === null) {
-      continue;
-    }
-    if (Array.isArray(value)) {
-      if (key === "sampleMessages" || key === "sample_messages") {
-        formData.set(
-          "sampleMessages",
-          value.map((item) => String(item)).join("\n"),
-        );
-        continue;
-      }
-      const formKey = key === "selected_channels" ? "selectedChannels" : key;
-      for (const item of value) {
-        formData.append(formKey, String(item));
-      }
-      continue;
-    }
-    if (key === "sample_messages") {
-      formData.set("sampleMessages", String(value));
-      continue;
-    }
-    formData.set(key, String(value));
-  }
-  return formData;
-}
-
-export function resolveOnboardingInput(
-  input: FormData | Record<string, unknown>,
-): FormData {
-  return input instanceof FormData ? input : jsonInputToFormData(input);
-}
-
-function adaptRouteDataResult(result: unknown): OnboardingHandlerResult {
-  if (result && typeof result === "object" && "data" in result) {
-    const wrapped = result as {
-      data: OnboardingActionData;
-      init?: number | { status?: number } | null;
-    };
-    const status =
-      typeof wrapped.init === "number"
-        ? wrapped.init
-        : wrapped.init?.status ?? 200;
-    return { kind: "payload", data: wrapped.data, status };
-  }
-  return { kind: "payload", data: {}, status: 200 };
-}
-
-async function hydrateWorkspaceOnboarding(
-  workspaceId: string,
-) {
-  const [{ data: phoneNumbers }, onboarding] = await Promise.all([
-    getWorkspacePhoneNumbers({ workspaceId }),
-    getWorkspaceMessagingOnboardingState({ workspaceId }),
-  ]);
-
-  const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
-    hydrateWorkspaceRcsOnboardingState(applyWorkspaceOnboardingChannelPolicy(onboarding)),
-    phoneNumbers ?? [],
-  );
-
-  return { phoneNumbers: phoneNumbers ?? null, onboarding: hydratedOnboarding };
-}
 
 export async function requireOnboardingAdmin(
   userId: string,
