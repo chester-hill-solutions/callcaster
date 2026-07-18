@@ -118,10 +118,10 @@ export function useCampaignCallFlow({
 
   const displayColor =
     displayState === "failed"
-      ? "hsl(var(--primary))"
+      ? "var(--primary)"
       : displayState === "connected" || displayState === "dialing"
-        ? "hsl(var(--success))"
-        : "hsl(var(--muted-foreground))";
+        ? "var(--success)"
+        : "var(--muted-foreground)";
 
   return {
     displayState,

@@ -324,7 +324,10 @@ const TimePeriodSelect = React.forwardRef<HTMLButtonElement, PeriodSelectorProps
 
     return (
       <div className="flex h-10 items-center">
-        <Select defaultValue={period} onValueChange={(value: Period) => handleValueChange(value)}>
+        <Select
+          defaultValue={period}
+          onValueChange={(value) => handleValueChange(value as Period)}
+        >
           <SelectTrigger
             ref={ref}
             className="w-[65px] focus:bg-accent focus:text-accent-foreground"
@@ -683,7 +686,7 @@ const DateTimePicker = React.forwardRef<Partial<DateTimePickerRef>, DateTimePick
             mode="single"
             selected={value}
             month={month}
-            onSelect={(d) => handleSelect(d)}
+            onSelect={(d: Date | undefined) => handleSelect(d)}
             onMonthChange={handleSelect}
             yearRange={yearRange}
             locale={locale}

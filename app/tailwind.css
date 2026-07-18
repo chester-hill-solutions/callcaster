@@ -1,98 +1,61 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource/zilla-slab/400.css";
+@import "@fontsource/zilla-slab/500.css";
+@import "@fontsource/zilla-slab/600.css";
+@import "@fontsource/zilla-slab/700.css";
+@import "@chester-hill-solutions/shad-cc/theme.css";
+
+@source "../vendor/chester-hill-solutions/shad-cc/src";
+@source "./**/*.{ts,tsx}";
+
+/* Preserve CallCaster legacy font utility class names */
+@theme inline {
+  --font-Tabac-Slab: var(--font-brand);
+  --font-Zilla-Slab: var(--font-heading);
+}
 
 @layer base {
-  @font-face {
-    font-family: "Tabac Slab";
-    font-weight: 400;
-    src: url("/fonts/Tabac%20Slab.otf") format("opentype");
-  }
-  @font-face {
-    font-family: "Tabac Slab";
-    font-weight: 900;
-    src: url("/fonts/Tabac%20Slab%20Black.otf") format("opentype");
-  }
-  @font-face {
-    font-family: "Tabac Slab";
-    font-style: italic;
-    font-weight: 900;
-    src: url("/fonts/Tabac%20Slab%20Black%20Italic.otf") format("opentype");
+  * {
+    @apply border-border outline-ring/50;
   }
 
-  :root {
-    --brand-primary: 357 75% 45%;
-    --brand-secondary: 198 100% 87%;
-    --brand-tertiary: 354 83% 88%;
-
-    --background: 0 0% 100%;
-
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: var(--brand-primary);
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: var(--brand-secondary);
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 10%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: var(--brand-primary);
-    --radius: 0.5rem;
-    --contrast-text: #333;
+  body {
+    @apply bg-background text-foreground text-sm antialiased;
   }
 
-  .dark,
-  :root[class~="dark"] {
-    --background: 220 5% 12%;
-    --foreground: 0 0% 95%;
-    --card: 220 5% 16%;
-    --card-foreground: 0 0% 95%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
-    --primary: var(--brand-primary);
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: var(--brand-secondary);
-    /* --secondary stays pale blue in dark mode, so its foreground must stay dark. */
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 4% 18%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 10%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: var(--brand-primary);
-    --contrast-text: #f1f1f1;
+  html {
+    @apply font-sans;
+  }
+
+  code,
+  kbd,
+  .font-mono {
+    font-family: var(--font-mono);
   }
 }
 
 /* Baseline for raw form controls that don't use the ui/ primitives.
    :where() keeps specificity at zero so Tailwind utilities always win. */
-:where(input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="file"]), select, textarea) {
-  border: 1px solid hsl(var(--input));
-  border-radius: calc(var(--radius) - 2px);
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+:where(
+  input:not(
+      [type="hidden"],
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="file"]
+    ),
+  select,
+  textarea
+) {
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 0.75);
+  background-color: var(--background);
+  color: var(--foreground);
   padding: 4px 8px;
 }
 
 :where(textarea)::placeholder {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 }

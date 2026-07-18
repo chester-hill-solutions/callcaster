@@ -1,29 +1,104 @@
-import * as React from "react"
-import * as PopoverPrimitive from "@radix-ui/react-popover"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import {
+  Popover as ShadPopover,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger as ShadPopoverTrigger,
+} from "@chester-hill-solutions/shad-cc/popover";
 
-const Popover = PopoverPrimitive.Root
+type PopoverRootProps = {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: React.ReactNode;
+};
 
-const PopoverTrigger = PopoverPrimitive.Trigger
+/** Radix-shaped Popover root → React Aria DialogTrigger. */
+function Popover({
+  open,
+  defaultOpen,
+  onOpenChange,
+  children,
+}: PopoverRootProps) {
+  return (
+    <ShadPopoverTrigger
+      isOpen={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={onOpenChange}
+    >
+      {children}
+    </ShadPopoverTrigger>
+  );
+}
 
-const PopoverContent = React.forwardRef<
-  React.ElementRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
-    <PopoverPrimitive.Content
-      ref={ref}
-      align={align}
-      sideOffset={sideOffset}
-      className={cn(
-        "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className
-      )}
+type PopoverTriggerProps = {
+  asChild?: boolean;
+  children?: React.ReactNode;
+  disabled?: boolean;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>;
+
+function PopoverTrigger({
+  asChild,
+  children,
+  disabled,
+  ...props
+}: PopoverTriggerProps) {
+  if (asChild && React.isValidElement(children)) {
+    if (disabled) {
+      return React.cloneElement(
+        children as React.ReactElement<{ isDisabled?: boolean; disabled?: boolean }>,
+        { isDisabled: true, disabled: true },
+      );
+    }
+    return children;
+  }
+  return (
+    <button type="button" disabled={disabled} {...props}>
+      {children}
+    </button>
+  );
+}
+
+type PopoverContentProps = React.ComponentProps<typeof ShadPopover> & {
+  align?: "start" | "center" | "end";
+  side?: "top" | "right" | "bottom" | "left";
+  sideOffset?: number;
+};
+
+function PopoverContent({
+  align,
+  side,
+  sideOffset,
+  placement,
+  offset,
+  ...props
+}: PopoverContentProps) {
+  const resolvedPlacement =
+    placement ??
+    (side && align
+      ? (`${side} ${align}` as const)
+      : side
+        ? side
+        : align
+          ? (`bottom ${align}` as const)
+          : "bottom");
+
+  return (
+    <ShadPopover
+      placement={resolvedPlacement as React.ComponentProps<typeof ShadPopover>["placement"]}
+      offset={offset ?? sideOffset ?? 4}
       {...props}
     />
-  </PopoverPrimitive.Portal>
-))
-PopoverContent.displayName = PopoverPrimitive.Content.displayName
+  );
+}
 
-export { Popover, PopoverTrigger, PopoverContent }
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverDescription,
+};
