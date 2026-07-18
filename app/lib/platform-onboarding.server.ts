@@ -44,15 +44,13 @@ import { buildA2pBlockingIssues, provisionWorkspaceA2P } from "@/lib/twilio-a2p.
 import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
-import type {
-  WorkspaceMessagingOnboardingState,
-  WorkspaceOperatingCountry,
-} from "@/lib/types";
-import { WORKSPACE_OPERATING_COUNTRY_VALUES } from "@/lib/types";
+import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 import {
   adaptRouteDataResult,
   hydrateWorkspaceOnboarding,
+  redirectToReturnToOrPayload,
   resolveOnboardingInput,
+  resolveOperatingCountryFromForm,
   type OnboardingActionContext,
   type OnboardingHandlerResult,
   type WorkspaceOnboardingDetail,
@@ -350,15 +348,10 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     }
   }
 
-  const operatingCountryRaw = String(
-    formData.get("operatingCountry") ?? formData.get("operating_country") ?? "",
+  const operatingCountry = resolveOperatingCountryFromForm(
+    formData,
+    current.operatingCountry,
   );
-  const operatingCountry: WorkspaceOperatingCountry =
-    WORKSPACE_OPERATING_COUNTRY_VALUES.includes(
-      operatingCountryRaw as WorkspaceOperatingCountry,
-    )
-      ? (operatingCountryRaw as WorkspaceOperatingCountry)
-      : current.operatingCountry;
 
   // Re-derive channels from the resolved goal + country so intake country
   // changes (CA ↔ US) update TFV/A2P selection without a second form.
@@ -455,15 +448,10 @@ async function handleSaveBusinessProfile(
     };
   }
 
-  const operatingCountryRaw = String(
-    formData.get("operatingCountry") ?? formData.get("operating_country") ?? "",
+  const operatingCountry = resolveOperatingCountryFromForm(
+    formData,
+    current.operatingCountry,
   );
-  const operatingCountry: WorkspaceOperatingCountry =
-    WORKSPACE_OPERATING_COUNTRY_VALUES.includes(
-      operatingCountryRaw as WorkspaceOperatingCountry,
-    )
-      ? (operatingCountryRaw as WorkspaceOperatingCountry)
-      : current.operatingCountry;
 
   const nextStep =
     wizardStep === "business_identity"
@@ -497,18 +485,12 @@ async function handleSaveBusinessProfile(
 
   // After intake, return to the capability surface instead of wizard steps.
   if (isWorkspaceIntakeComplete(current)) {
-    const returnTo = String(formData.get("returnTo") ?? formData.get("return_to") ?? "");
-    if (returnTo.startsWith(`/workspaces/${ctx.workspaceId}`)) {
-      return {
-        kind: "redirect_path",
-        path: returnTo,
-        searchParams: { saved: "business_profile" },
-      };
-    }
-    return {
-      kind: "payload",
-      data: { success: "Business and compliance details saved." },
-    };
+    return redirectToReturnToOrPayload(
+      formData,
+      ctx.workspaceId,
+      "business_profile",
+      "Business and compliance details saved.",
+    );
   }
 
   return { kind: "redirect", step: nextStep };
@@ -579,22 +561,12 @@ async function handleSaveServiceAddress(
     },
   });
 
-  const returnTo = String(formData.get("returnTo") ?? formData.get("return_to") ?? "");
-  if (returnTo.startsWith(`/workspaces/${ctx.workspaceId}`)) {
-    return {
-      kind: "redirect_path",
-      path: returnTo,
-      searchParams: { saved: "service_address" },
-    };
-  }
-
-  return {
-    kind: "payload",
-    data: {
-      success:
-        "Service address saved. Validate it before renting a voice-capable number.",
-    },
-  };
+  return redirectToReturnToOrPayload(
+    formData,
+    ctx.workspaceId,
+    "service_address",
+    "Service address saved. Validate it before renting a voice-capable number.",
+  );
 }
 
 async function handleReviewEmergencyVoice(

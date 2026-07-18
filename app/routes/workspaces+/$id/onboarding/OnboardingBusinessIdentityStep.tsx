@@ -1,14 +1,10 @@
-import { useState } from "react";
 import { Form } from "react-router";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Section, SectionHeader } from "@/components/shared/Section";
-import {
-  businessProfileFieldRequiredMessage,
-  type BusinessProfileFieldKey,
-} from "@/lib/messaging-onboarding/predicates";
 import { OPERATING_COUNTRY_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
+import { useRequiredBusinessProfileFields } from "./useRequiredBusinessProfileFields";
 
 type Props = Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> & {
   formId?: string;
@@ -19,34 +15,8 @@ export function OnboardingBusinessIdentityStep({
   onboarding,
   isReadOnly,
 }: Props) {
-  const [missingFields, setMissingFields] = useState<
-    Partial<Record<BusinessProfileFieldKey, boolean>>
-  >({});
-
-  const markMissing = (field: BusinessProfileFieldKey, missing: boolean) => {
-    setMissingFields((current) =>
-      current[field] === missing ? current : { ...current, [field]: missing },
-    );
-  };
-
-  const requiredFieldProps = <T extends HTMLInputElement>(
-    field: BusinessProfileFieldKey,
-  ) => ({
-    required: true,
-    "aria-invalid": missingFields[field] || undefined,
-    onInvalid: (event: React.FormEvent<T>) => {
-      event.preventDefault();
-      markMissing(field, true);
-    },
-    onChange: (event: React.ChangeEvent<T>) => {
-      if (event.target.value.trim()) {
-        markMissing(field, false);
-      }
-    },
-  });
-
-  const requiredFieldError = (field: BusinessProfileFieldKey) =>
-    missingFields[field] ? businessProfileFieldRequiredMessage(field) : undefined;
+  const { requiredFieldProps, requiredFieldError } =
+    useRequiredBusinessProfileFields();
 
   return (
     <Section variant="flat">

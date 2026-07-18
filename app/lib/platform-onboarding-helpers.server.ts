@@ -14,7 +14,9 @@ import {
 import type {
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
+  WorkspaceOperatingCountry,
 } from "@/lib/types";
+import { WORKSPACE_OPERATING_COUNTRY_VALUES } from "@/lib/types";
 
 export type OnboardingHandlerResult =
   | {
@@ -83,6 +85,43 @@ export function resolveOnboardingInput(
   input: FormData | Record<string, unknown>,
 ): FormData {
   return input instanceof FormData ? input : jsonInputToFormData(input);
+}
+
+export function resolveOperatingCountryFromForm(
+  formData: FormData,
+  fallback: WorkspaceOperatingCountry,
+): WorkspaceOperatingCountry {
+  const operatingCountryRaw = String(
+    formData.get("operatingCountry") ?? formData.get("operating_country") ?? "",
+  );
+  return WORKSPACE_OPERATING_COUNTRY_VALUES.includes(
+    operatingCountryRaw as WorkspaceOperatingCountry,
+  )
+    ? (operatingCountryRaw as WorkspaceOperatingCountry)
+    : fallback;
+}
+
+/** Prefer an in-workspace returnTo path; otherwise return a success payload. */
+export function redirectToReturnToOrPayload(
+  formData: FormData,
+  workspaceId: string,
+  savedKey: string,
+  successMessage: string,
+): OnboardingHandlerResult {
+  const returnTo = String(
+    formData.get("returnTo") ?? formData.get("return_to") ?? "",
+  );
+  if (returnTo.startsWith(`/workspaces/${workspaceId}`)) {
+    return {
+      kind: "redirect_path",
+      path: returnTo,
+      searchParams: { saved: savedKey },
+    };
+  }
+  return {
+    kind: "payload",
+    data: { success: successMessage },
+  };
 }
 
 export function adaptRouteDataResult(result: unknown): OnboardingHandlerResult {
