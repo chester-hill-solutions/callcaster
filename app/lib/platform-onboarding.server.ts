@@ -22,7 +22,10 @@ import {
   channelsForOnboardingGoal,
   nextWizardStep,
 } from "@/lib/messaging-onboarding/goals";
+import { isWorkspaceIntakeComplete } from "@/lib/messaging-onboarding/intake";
 import {
+  BUSINESS_IDENTITY_REQUIRED_FIELDS,
+  BUSINESS_PROGRAM_REQUIRED_FIELDS,
   businessProfileFieldRequiredMessage,
   findMissingBusinessProfileFields,
 } from "@/lib/messaging-onboarding/predicates";
@@ -247,11 +250,11 @@ async function handleSaveWorkspaceName(
     actorUserId: ctx.actorUserId,
     updates: {
       status: "collecting_business",
-      currentStep: "business_profile",
+      currentStep: "business_identity",
     },
   });
 
-  return { kind: "redirect", step: "business_profile" };
+  return { kind: "redirect", step: "business_identity" };
 }
 
 async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
@@ -347,11 +350,31 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     }
   }
 
+  const operatingCountryRaw = String(
+    formData.get("operatingCountry") ?? formData.get("operating_country") ?? "",
+  );
+  const operatingCountry: WorkspaceOperatingCountry =
+    WORKSPACE_OPERATING_COUNTRY_VALUES.includes(
+      operatingCountryRaw as WorkspaceOperatingCountry,
+    )
+      ? (operatingCountryRaw as WorkspaceOperatingCountry)
+      : current.operatingCountry;
+
+  // Re-derive channels from the resolved goal + country so intake country
+  // changes (CA ↔ US) update TFV/A2P selection without a second form.
+  const channelsForGoal = selectedGoal
+    ? channelsForOnboardingGoal(selectedGoal, operatingCountry)
+    : selectedChannels;
+  const resolvedChannels = stripDisabledRcsChannel(
+    channelsFromForm.length > 0 ? selectedChannels : channelsForGoal,
+  );
+
   await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: {
-      selectedChannels,
+      selectedChannels: resolvedChannels,
       selectedGoal,
+      operatingCountry,
       businessProfile,
       status: "collecting_business",
       currentStep: "audience",
@@ -361,7 +384,7 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
   // Kick off Twilio compliance provisioning when a compliance path is newly
   // selected. Idempotent enqueue — repeated saves do not stack duplicate jobs.
   const previousChannels = new Set(current.selectedChannels as string[]);
-  const nextChannels = selectedChannels as string[];
+  const nextChannels = resolvedChannels as string[];
   const newlySelectedCompliance = COMPLIANCE_CHANNELS.some(
     (channel) => nextChannels.includes(channel) && !previousChannels.has(channel),
   );
@@ -400,11 +423,28 @@ async function handleSaveBusinessProfile(
   });
   const businessProfile = buildBusinessProfile(formData, current.businessProfile);
 
-  // Gate the step server-side: `buildBusinessProfile` overwrites the core fields
-  // from the submitted form unconditionally, so this validates exactly the state
-  // that would be persisted. Returning a payload (not a redirect) is what keeps
-  // the wizard on Business basics instead of advancing to path_selection.
-  const missingFields = findMissingBusinessProfileFields(businessProfile);
+  const wizardStepRaw = String(
+    formData.get("wizardStep") ?? formData.get("wizard_step") ?? "",
+  ).trim();
+  const wizardStep =
+    wizardStepRaw === "business_identity" || wizardStepRaw === "business_program"
+      ? wizardStepRaw
+      : null;
+
+  // Identity / Program screens validate a subset; capability gates and API posts
+  // without a wizard hint still require the full baseline.
+  const missingFields =
+    wizardStep === "business_identity"
+      ? findMissingBusinessProfileFields(
+          businessProfile,
+          BUSINESS_IDENTITY_REQUIRED_FIELDS,
+        )
+      : wizardStep === "business_program"
+        ? findMissingBusinessProfileFields(
+            businessProfile,
+            BUSINESS_PROGRAM_REQUIRED_FIELDS,
+          )
+        : findMissingBusinessProfileFields(businessProfile);
   if (missingFields.length > 0) {
     return {
       kind: "payload",
@@ -415,15 +455,6 @@ async function handleSaveBusinessProfile(
     };
   }
 
-  const addressStreet = String(formData.get("addressStreet") ?? formData.get("address_street") ?? "");
-  const addressCity = String(formData.get("addressCity") ?? formData.get("address_city") ?? "");
-  const addressRegion = String(formData.get("addressRegion") ?? formData.get("address_region") ?? "");
-  const addressPostalCode = String(
-    formData.get("addressPostalCode") ?? formData.get("address_postal_code") ?? "",
-  );
-  const addressCountryCode = String(
-    formData.get("addressCountryCode") ?? formData.get("address_country_code") ?? "CA",
-  );
   const operatingCountryRaw = String(
     formData.get("operatingCountry") ?? formData.get("operating_country") ?? "",
   );
@@ -433,12 +464,13 @@ async function handleSaveBusinessProfile(
     )
       ? (operatingCountryRaw as WorkspaceOperatingCountry)
       : current.operatingCountry;
-  const hasEmergencyAddress = Boolean(
-    addressStreet.trim() &&
-      addressCity.trim() &&
-      addressRegion.trim() &&
-      addressPostalCode.trim(),
-  );
+
+  const nextStep =
+    wizardStep === "business_identity"
+      ? "business_program"
+      : wizardStep === "business_program"
+        ? "path_selection"
+        : "path_selection";
 
   await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
@@ -446,45 +478,123 @@ async function handleSaveBusinessProfile(
       businessProfile,
       operatingCountry,
       status: "collecting_business",
-      currentStep: "path_selection",
-      emergencyVoice: {
-        ...current.emergencyVoice,
-        status: hasEmergencyAddress ? "collecting_business" : current.emergencyVoice.status,
-        enabled: false,
-        emergencyEligiblePhoneNumbers: [],
-        ineligibleCallerIds: [],
-        address: {
-          ...current.emergencyVoice.address,
-          customerName: businessProfile.legalBusinessName,
-          street: addressStreet,
-          city: addressCity,
-          region: addressRegion,
-          postalCode: addressPostalCode,
-          countryCode: addressCountryCode,
-          addressSid: null,
-          status: hasEmergencyAddress ? "pending_validation" : "not_started",
-          validationError: null,
-          lastValidatedAt: null,
-        },
-        lastReviewedAt: null,
-      },
+      currentStep: nextStep,
     },
   });
 
-  // If a compliance path is already selected and the business profile now has a
-  // usable service address, (re)enqueue compliance provisioning so Trust Hub can
-  // consume the updated profile. Idempotent enqueue.
+  // If a compliance path is already selected, (re)enqueue compliance provisioning
+  // so Trust Hub can consume the updated profile. Address collection is separate
+  // (save_service_address / Numbers settings). Idempotent enqueue.
   const compliancePathSelected = COMPLIANCE_CHANNELS.some((channel) =>
     (current.selectedChannels as string[]).includes(channel),
   );
-  if (compliancePathSelected && hasEmergencyAddress) {
+  if (compliancePathSelected) {
     await enqueueWorkspaceComplianceJob(
       ctx.workspaceId,
       "business_profile_saved",
     );
   }
 
-  return { kind: "redirect", step: "path_selection" };
+  // After intake, return to the capability surface instead of wizard steps.
+  if (isWorkspaceIntakeComplete(current)) {
+    const returnTo = String(formData.get("returnTo") ?? formData.get("return_to") ?? "");
+    if (returnTo.startsWith(`/workspaces/${ctx.workspaceId}`)) {
+      return {
+        kind: "redirect_path",
+        path: returnTo,
+        searchParams: { saved: "business_profile" },
+      };
+    }
+    return {
+      kind: "payload",
+      data: { success: "Business and compliance details saved." },
+    };
+  }
+
+  return { kind: "redirect", step: nextStep };
+}
+
+async function handleSaveServiceAddress(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
+  const formData = resolveOnboardingInput(ctx.input);
+  const current = await getWorkspaceMessagingOnboardingState({
+    workspaceId: ctx.workspaceId,
+  });
+  const addressStreet = String(
+    formData.get("addressStreet") ?? formData.get("address_street") ?? "",
+  ).trim();
+  const addressCity = String(
+    formData.get("addressCity") ?? formData.get("address_city") ?? "",
+  ).trim();
+  const addressRegion = String(
+    formData.get("addressRegion") ?? formData.get("address_region") ?? "",
+  ).trim();
+  const addressPostalCode = String(
+    formData.get("addressPostalCode") ?? formData.get("address_postal_code") ?? "",
+  ).trim();
+  const addressCountryCode = String(
+    formData.get("addressCountryCode") ?? formData.get("address_country_code") ?? "CA",
+  ).trim();
+  const customerName = String(
+    formData.get("customerName") ??
+      formData.get("customer_name") ??
+      current.businessProfile.legalBusinessName ??
+      "",
+  ).trim();
+
+  if (!addressStreet || !addressCity || !addressRegion || !addressPostalCode) {
+    return {
+      kind: "payload",
+      data: {
+        error:
+          "Enter street, city, region, and postal code before renting a voice number.",
+      },
+      status: 400,
+    };
+  }
+
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
+    actorUserId: ctx.actorUserId,
+    updates: {
+      emergencyVoice: {
+        ...current.emergencyVoice,
+        status: "collecting_business",
+        address: {
+          ...current.emergencyVoice.address,
+          customerName:
+            customerName || current.emergencyVoice.address.customerName,
+          street: addressStreet,
+          city: addressCity,
+          region: addressRegion,
+          postalCode: addressPostalCode,
+          countryCode: addressCountryCode || "CA",
+          addressSid: null,
+          status: "pending_validation",
+          validationError: null,
+          lastValidatedAt: null,
+        },
+      },
+    },
+  });
+
+  const returnTo = String(formData.get("returnTo") ?? formData.get("return_to") ?? "");
+  if (returnTo.startsWith(`/workspaces/${ctx.workspaceId}`)) {
+    return {
+      kind: "redirect_path",
+      path: returnTo,
+      searchParams: { saved: "service_address" },
+    };
+  }
+
+  return {
+    kind: "payload",
+    data: {
+      success:
+        "Service address saved. Validate it before renting a voice-capable number.",
+    },
+  };
 }
 
 async function handleReviewEmergencyVoice(
@@ -643,6 +753,7 @@ const ONBOARDING_ACTION_HANDLERS = {
   save_channels: handleSaveChannels,
   bootstrap_messaging_service: handleBootstrapMessagingService,
   save_business_profile: handleSaveBusinessProfile,
+  save_service_address: handleSaveServiceAddress,
   review_emergency_voice: handleReviewEmergencyVoice,
   provision_a2p: handleProvisionA2p,
   save_rcs: handleSaveRcs,
@@ -701,6 +812,11 @@ export type MappedOnboardingResult =
       searchParams?: Record<string, string>;
     }
   | {
+      kind: "ui_redirect_path";
+      path: string;
+      searchParams?: Record<string, string>;
+    }
+  | {
       kind: "ui_payload";
       data: OnboardingActionData;
       status: number;
@@ -730,6 +846,27 @@ export function mapOnboardingHandlerResult(
         ...detail,
         redirect: {
           step: handlerResult.step,
+          search_params: handlerResult.searchParams ?? null,
+        },
+      },
+      status: 200,
+    };
+  }
+
+  if (handlerResult.kind === "redirect_path") {
+    if (target === "ui") {
+      return {
+        kind: "ui_redirect_path",
+        path: handlerResult.path,
+        searchParams: handlerResult.searchParams,
+      };
+    }
+    return {
+      kind: "api_json",
+      body: {
+        ...detail,
+        redirect: {
+          path: handlerResult.path,
           search_params: handlerResult.searchParams ?? null,
         },
       },

@@ -112,31 +112,37 @@ function parseSampleMessages(value: FormDataEntryValue | null): string[] {
 }
 
 /**
- * Builds the business-profile payload from the Business basics form. The
- * channel-scoped inline fields (TFV / A2P Trust Hub inputs) are collected on the
- * Channels step, so they are carried over from `current` unless the current form
- * explicitly provides them.
+ * Builds the business-profile payload from a form post. Only fields present on
+ * the form are overwritten so partial wizard steps (Identity vs Program) and
+ * capability gates (SMS compliance) preserve unspecified values.
  */
 export function buildBusinessProfile(
   formData: FormData,
   current: WorkspaceMessagingBusinessProfile = EMPTY_BUSINESS_PROFILE,
 ): WorkspaceMessagingBusinessProfile {
-  const base: WorkspaceMessagingBusinessProfile = {
-    ...current,
-    legalBusinessName: String(formData.get("legalBusinessName") ?? ""),
-    businessType: String(formData.get("businessType") ?? ""),
-    websiteUrl: String(formData.get("websiteUrl") ?? ""),
-    privacyPolicyUrl: String(formData.get("privacyPolicyUrl") ?? ""),
-    termsOfServiceUrl: String(formData.get("termsOfServiceUrl") ?? ""),
-    supportEmail: String(formData.get("supportEmail") ?? ""),
-    supportPhone: String(formData.get("supportPhone") ?? ""),
-    useCaseSummary: String(formData.get("useCaseSummary") ?? ""),
-    optInWorkflow: String(formData.get("optInWorkflow") ?? ""),
-    optInKeywords: String(formData.get("optInKeywords") ?? ""),
-    optOutKeywords: String(formData.get("optOutKeywords") ?? ""),
-    helpKeywords: String(formData.get("helpKeywords") ?? ""),
-    sampleMessages: parseSampleMessages(formData.get("sampleMessages")),
-  };
+  const base: WorkspaceMessagingBusinessProfile = { ...current };
+  const stringFields: Array<keyof WorkspaceMessagingBusinessProfile> = [
+    "legalBusinessName",
+    "businessType",
+    "websiteUrl",
+    "privacyPolicyUrl",
+    "termsOfServiceUrl",
+    "supportEmail",
+    "supportPhone",
+    "useCaseSummary",
+    "optInWorkflow",
+    "optInKeywords",
+    "optOutKeywords",
+    "helpKeywords",
+  ];
+  for (const field of stringFields) {
+    if (formData.has(field)) {
+      (base[field] as string) = String(formData.get(field) ?? "");
+    }
+  }
+  if (formData.has("sampleMessages")) {
+    base.sampleMessages = parseSampleMessages(formData.get("sampleMessages"));
+  }
   // Overlay channel-inline fields (TFV / A2P) onto the freshly-built base, only
   // for fields actually posted on this form.
   return readChannelInlineBusinessFields(formData, base);
@@ -185,6 +191,7 @@ export type OnboardingActionName =
   | "save_channels"
   | "bootstrap_messaging_service"
   | "save_business_profile"
+  | "save_service_address"
   | "review_emergency_voice"
   | "provision_a2p"
   | "save_rcs"
@@ -198,6 +205,7 @@ export const ONBOARDING_ACTION_NAMES = new Set<OnboardingActionName>([
   "save_channels",
   "bootstrap_messaging_service",
   "save_business_profile",
+  "save_service_address",
   "review_emergency_voice",
   "provision_a2p",
   "save_rcs",

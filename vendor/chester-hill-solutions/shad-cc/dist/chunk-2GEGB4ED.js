@@ -68,19 +68,14 @@ function Sheet({
           className: "[display:inherit] h-full max-h-[inherit] [flex-direction:inherit] [gap:inherit] outline-none",
           children: [
             children,
-            showCloseButton && /* @__PURE__ */ jsxs(
+            showCloseButton && /* @__PURE__ */ jsx(
               SheetClose,
               {
                 variant: "ghost",
-                className: "absolute top-4 right-4 bg-secondary",
+                className: "absolute top-4 right-4 text-muted-foreground hover:bg-muted hover:text-foreground",
                 size: "icon-sm",
-                children: [
-                  /* @__PURE__ */ jsx(
-                    XIcon,
-                    {}
-                  ),
-                  /* @__PURE__ */ jsx("span", { className: "sr-only", children: "Close" })
-                ]
+                "aria-label": "Close",
+                children: /* @__PURE__ */ jsx(XIcon, { className: "size-4" })
               }
             )
           ]
@@ -159,5 +154,5 @@ function SheetDescription({
 }
 
 export { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger };
-//# sourceMappingURL=chunk-HJLNHHEL.js.map
-//# sourceMappingURL=chunk-HJLNHHEL.js.map
+//# sourceMappingURL=chunk-2GEGB4ED.js.map
+//# sourceMappingURL=chunk-2GEGB4ED.js.map

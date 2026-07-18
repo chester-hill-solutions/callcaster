@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 /**
  * The first onboarding page collects the workspace name. Submitting a blank
  * name must stay on that page; a valid name updates the workspace and advances
- * to business_profile.
+ * to business_identity.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ vi.mock("@/lib/messaging-onboarding.server", () => ({
   deriveWorkspaceMessagingReadiness: () => ({ ready: false, blockingIssues: [] }),
   isWizardOnboardingStepId: (value: string) =>
     [
-      "business_profile",
+      "business_identity",
       "path_selection",
       "audience",
       "first_number",
@@ -99,7 +99,7 @@ const USER_ID = "user-1";
 function onboardingState() {
   return {
     status: "not_started",
-    currentStep: "business_profile",
+    currentStep: "business_identity",
     operatingCountry: "CA",
     selectedChannels: [] as string[],
     selectedGoal: null,
@@ -215,7 +215,7 @@ describe("save_workspace_name", () => {
         workspaceId: WORKSPACE_ID,
         updates: expect.objectContaining({
           status: "collecting_business",
-          currentStep: "business_profile",
+          currentStep: "business_identity",
         }),
       }),
     );
@@ -223,7 +223,7 @@ describe("save_workspace_name", () => {
     const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
     expect(mapped).toEqual({
       kind: "ui_redirect",
-      step: "business_profile",
+      step: "business_identity",
       searchParams: undefined,
     });
   });

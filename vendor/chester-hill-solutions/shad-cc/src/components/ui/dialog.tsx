@@ -75,7 +75,7 @@ function Dialog({
       <ModalPrimitive
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-lg border border-border bg-popover p-6 text-sm text-popover-foreground shadow-[0_2px_0_0_var(--border)] duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 sm:max-w-md",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-lg border border-border bg-popover p-6 text-sm text-popover-foreground shadow-[0_2px_0_0_var(--border)] duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 sm:max-w-lg",
           className
         )}
       >
@@ -87,12 +87,11 @@ function Dialog({
           {showCloseButton && (
             <DialogClose
               variant="ghost"
-              className="absolute top-4 right-4 bg-secondary"
+              className="absolute top-4 right-4 text-muted-foreground hover:bg-muted hover:text-foreground"
               size="icon-sm"
+              aria-label="Close"
             >
-              <XIcon
-              />
-              <span className="sr-only">Close</span>
+              <XIcon className="size-4" />
             </DialogClose>
           )}
         </DialogPrimitive>

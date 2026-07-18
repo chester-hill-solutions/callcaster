@@ -80,7 +80,12 @@ export function checklistStepsForGoal(
 export function wizardStepsForGoal(
   goal: WorkspaceOnboardingGoal | null,
 ): WizardOnboardingStepId[] {
-  return ["business_profile", "path_selection", ...checklistStepsForGoal(goal)];
+  return [
+    "business_identity",
+    "business_program",
+    "path_selection",
+    ...checklistStepsForGoal(goal),
+  ];
 }
 
 export function nextWizardStep(

@@ -10,6 +10,7 @@ import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { listObjects } from "@/lib/object-storage.server";
 import { defineLoader } from "@/lib/handler.server";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 
 export const loader = defineLoader({
   auth: workspaceRouteAuth,
@@ -30,21 +31,29 @@ export const loader = defineLoader({
     }
 
     const tdb = createTenantDb(workspaceId);
-    const [{ data: users }, { data: phoneNumbers }, creditsBalance, mediaNames, queues, scripts] =
-      await Promise.all([
-        getWorkspaceUsers({ workspaceId }),
-        getWorkspacePhoneNumbers({ workspaceId }),
-        getWorkspaceCredits(workspaceId),
-        listObjects("workspaceAudio", workspaceId),
-        tdb.inbound_queue.findMany({
-          columns: { id: true, name: true },
-          orderBy: (queue, { asc: ascFn }) => [ascFn(queue.name)],
-        }),
-        tdb.script.findMany({
-          columns: { id: true, name: true },
-          orderBy: (script, { asc: ascFn }) => [ascFn(script.name)],
-        }),
-      ]);
+    const [
+      { data: users },
+      { data: phoneNumbers },
+      creditsBalance,
+      mediaNames,
+      queues,
+      scripts,
+      onboarding,
+    ] = await Promise.all([
+      getWorkspaceUsers({ workspaceId }),
+      getWorkspacePhoneNumbers({ workspaceId }),
+      getWorkspaceCredits(workspaceId),
+      listObjects("workspaceAudio", workspaceId),
+      tdb.inbound_queue.findMany({
+        columns: { id: true, name: true },
+        orderBy: (queue, { asc: ascFn }) => [ascFn(queue.name)],
+      }),
+      tdb.script.findMany({
+        columns: { id: true, name: true },
+        orderBy: (script, { asc: ascFn }) => [ascFn(script.name)],
+      }),
+      getWorkspaceMessagingOnboardingState({ workspaceId }),
+    ]);
     const hasAccess = userRole !== MemberRole.Caller;
     if (!hasAccess) {
       return redirect(`/workspaces/${workspaceId}/settings`, { headers });
@@ -59,6 +68,8 @@ export const loader = defineLoader({
         queues,
         scripts,
         creditsBalance: creditsBalance ?? 0,
+        onboarding,
+        userRole,
       },
       { headers },
     );

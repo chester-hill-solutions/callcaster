@@ -23,6 +23,12 @@ export type OnboardingHandlerResult =
       searchParams?: Record<string, string>;
     }
   | {
+      /** Leave the wizard and open a workspace path (e.g. Today after intake). */
+      kind: "redirect_path";
+      path: string;
+      searchParams?: Record<string, string>;
+    }
+  | {
       kind: "payload";
       data: OnboardingActionData;
       status?: number;

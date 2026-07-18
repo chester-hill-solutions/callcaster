@@ -33,8 +33,9 @@ describe("messaging onboarding goals", () => {
       "launch_checks",
     ]);
     expect(checklistStepsForGoal("ivr")).toContain("script");
-    expect(wizardStepsForGoal("sms_blast")[0]).toBe("business_profile");
-    expect(wizardStepsForGoal("sms_blast")[1]).toBe("path_selection");
+    expect(wizardStepsForGoal("sms_blast")[0]).toBe("business_identity");
+    expect(wizardStepsForGoal("sms_blast")[1]).toBe("business_program");
+    expect(wizardStepsForGoal("sms_blast")[2]).toBe("path_selection");
   });
 
   test("advances past first number according to goal", () => {

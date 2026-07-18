@@ -1,5 +1,5 @@
 import { TooltipTrigger, Tooltip } from './chunk-6REUFSVH.js';
-import { Sheet, SheetHeader, SheetTitle, SheetDescription } from './chunk-HJLNHHEL.js';
+import { Sheet, SheetHeader, SheetTitle, SheetDescription } from './chunk-2GEGB4ED.js';
 import { Skeleton } from './chunk-Q5IFSK7X.js';
 import { Separator } from './chunk-RDPOVP7H.js';
 import { Input } from './chunk-6HSNWWYK.js';
@@ -606,5 +606,5 @@ function SidebarMenuSubButton({
 }
 
 export { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupAction, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSkeleton, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, SidebarProvider, SidebarRail, SidebarSeparator, SidebarTrigger, useSidebar };
-//# sourceMappingURL=chunk-LSSPLECW.js.map
-//# sourceMappingURL=chunk-LSSPLECW.js.map
+//# sourceMappingURL=chunk-XHR6QDO3.js.map
+//# sourceMappingURL=chunk-XHR6QDO3.js.map

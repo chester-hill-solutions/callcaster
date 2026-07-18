@@ -135,6 +135,14 @@ export const BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS: readonly BusinessProfile
     ),
   );
 
+/** Required fields for the Identity wizard screen. */
+export const BUSINESS_IDENTITY_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
+  ["legalBusinessName", "websiteUrl"];
+
+/** Required fields for the Program details wizard screen. */
+export const BUSINESS_PROGRAM_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
+  ["useCaseSummary", "sampleMessages"];
+
 /**
  * Returns the baseline required fields that are still blank on `profile`.
  * Empty array means the profile clears the Business basics gate.
@@ -362,7 +370,7 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
     test: (ctx) => emergencyAddressComplete(ctx),
     blockingFor: ["all"] as const,
     code: "emergency_address_required",
-    message: "Add the emergency service address in Business basics.",
+    message: "Add the emergency service address before renting a voice number.",
     severity: "error" as const,
   },
   {

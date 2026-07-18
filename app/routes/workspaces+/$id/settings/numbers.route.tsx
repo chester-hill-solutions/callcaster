@@ -28,11 +28,14 @@ import {
 } from "@/components/phone-numbers/NumberSummaryList";
 import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
+import { ServiceAddressGate } from "@/components/phone-numbers/ServiceAddressGate";
+import { SmsComplianceGate } from "@/components/phone-numbers/SmsComplianceGate";
 import {
   CallerIdVerificationDialog,
   type CallerIdValidationRequest,
 } from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { User, WorkspaceNumbers } from "@/lib/types";
+import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 
 
 
@@ -79,6 +82,8 @@ type LoaderData = {
   queues: { id: number; name: string }[];
   scripts: { id: number; name: string }[];
   creditsBalance: number;
+  onboarding: WorkspaceMessagingOnboardingState;
+  userRole: string | null | undefined;
 };
 
 const WorkspaceSettings = () => {
@@ -91,8 +96,11 @@ const WorkspaceSettings = () => {
     queues,
     scripts,
     creditsBalance,
+    onboarding,
+    userRole,
   } = useLoaderData<LoaderData>();
   useOutletContext<{ }>();
+  const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const actionData = useActionData<CallerIDResponse>();
   const [isDialogOpen, setDialog] = useState<boolean>(
     !!actionData?.validationRequest,
@@ -337,7 +345,17 @@ const WorkspaceSettings = () => {
               isBusy={updateFetcher.state !== "idle"}
             />
           </Section>
-          <div className="min-w-0 space-y-0">
+          <div className="min-w-0 space-y-6">
+            <ServiceAddressGate
+              workspaceId={workspaceId ?? ""}
+              onboarding={onboarding}
+              isReadOnly={isReadOnly}
+            />
+            <SmsComplianceGate
+              workspaceId={workspaceId ?? ""}
+              onboarding={onboarding}
+              isReadOnly={isReadOnly}
+            />
             <Section variant="flat">
               <NumberCallerId />
             </Section>

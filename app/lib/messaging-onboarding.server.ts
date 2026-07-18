@@ -6,6 +6,7 @@ export {
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "@/lib/messaging-onboarding/defaults.server";
 export type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/defaults.server";
+export { isWorkspaceIntakeComplete } from "@/lib/messaging-onboarding/intake";
 
 export {
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,

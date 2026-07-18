@@ -49,8 +49,12 @@ export default function WorkspaceMessagingOnboardingRoute() {
     getWarning: (data) => data?.warning,
     warningMessage: (data) => data?.warning ?? "",
     getError: (data) => data?.error,
-    getSuccess: (data) => Boolean(data?.success),
-    successMessage: (data) => data?.success ?? "Saved",
+    getSuccess: (data) =>
+      Boolean(data?.success) || Boolean(data?.validationRequest),
+    successMessage: (data) =>
+      data?.validationRequest
+        ? "Verification call started. Enter the code when prompted."
+        : (data?.success ?? "Saved"),
   });
 
   const pendingAction =
@@ -85,6 +89,7 @@ export default function WorkspaceMessagingOnboardingRoute() {
       a2pBlockingIssues={a2pBlockingIssues}
       a2pErrors={a2pErrors}
       actionError={actionData?.error}
+      actionData={actionData}
       workspaceUsers={workspaceUsers}
       mediaNames={mediaNames}
       inboundQueues={inboundQueues}

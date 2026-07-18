@@ -86,11 +86,26 @@ type DialogCloseProps = React.ComponentProps<typeof ShadDialogClose> & {
   asChild?: boolean;
 };
 
-function DialogClose({ asChild, children, ...props }: DialogCloseProps) {
-  if (asChild && React.isValidElement(children)) {
-    return <ShadDialogClose {...props}>{children}</ShadDialogClose>;
+/**
+ * shad-cc DialogClose is already a Button with `slot="close"`. Nesting another
+ * Button via asChild leaves a second Close control outside the modal layout —
+ * clone `slot="close"` onto the child instead.
+ */
+function DialogClose({ asChild, children, className, ...props }: DialogCloseProps) {
+  if (asChild && React.isValidElement<{ className?: string }>(children)) {
+    return React.cloneElement(children, {
+      ...props,
+      className: [children.props.className, className].filter(Boolean).join(" "),
+      // React Aria close slot — must land on the pressable itself
+      slot: "close",
+      "data-slot": "dialog-close",
+    } as never);
   }
-  return <ShadDialogClose {...props}>{children}</ShadDialogClose>;
+  return (
+    <ShadDialogClose className={className} {...props}>
+      {children}
+    </ShadDialogClose>
+  );
 }
 
 export {

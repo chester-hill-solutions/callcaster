@@ -42,7 +42,7 @@ export {
 export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnboardingState = {
   version: WORKSPACE_MESSAGING_ONBOARDING_VERSION,
   status: "not_started",
-  currentStep: "business_profile",
+  currentStep: "business_identity",
   operatingCountry: "CA",
   selectedChannels: [],
   selectedGoal: null,
@@ -227,7 +227,7 @@ export function normalizeWorkspaceMessagingOnboardingState(
       WORKSPACE_ONBOARDING_STATUS_VALUES,
       "not_started",
     ),
-    currentStep: parseOptionalString(value.currentStep) ?? "business_profile",
+    currentStep: parseOptionalString(value.currentStep) ?? "business_identity",
     operatingCountry: pickEnumValue(
       value.operatingCountry,
       WORKSPACE_OPERATING_COUNTRY_VALUES,

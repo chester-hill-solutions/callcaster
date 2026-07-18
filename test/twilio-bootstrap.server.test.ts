@@ -110,7 +110,7 @@ function makeOnboarding(overrides: Record<string, unknown> = {}) {
   return {
     version: 1,
     status: "not_started",
-    currentStep: "business_profile",
+    currentStep: "business_identity",
     selectedChannels: ["a2p10dlc", "voice_compliance"],
     steps: [],
     businessProfile: {
@@ -280,8 +280,8 @@ describe("twilio-bootstrap server", () => {
     expect(result.onboarding.messagingService.serviceSid).toBe("MG123");
     expect(result.onboarding.subaccountBootstrap.status).toBe("live");
     // Bootstrap must not fast-forward the wizard: a fresh workspace stays on
-    // business_profile so the user starts at step 1.
-    expect(result.onboarding.currentStep).toBe("business_profile");
+    // business_identity so the user starts at step 1.
+    expect(result.onboarding.currentStep).toBe("business_identity");
     expect(adminDb.updateCalls.length).toBeGreaterThan(0);
   });
 

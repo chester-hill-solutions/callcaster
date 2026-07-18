@@ -90,12 +90,11 @@ function Sheet({
           {showCloseButton && (
             <SheetClose
               variant="ghost"
-              className="absolute top-4 right-4 bg-secondary"
+              className="absolute top-4 right-4 text-muted-foreground hover:bg-muted hover:text-foreground"
               size="icon-sm"
+              aria-label="Close"
             >
-              <XIcon
-              />
-              <span className="sr-only">Close</span>
+              <XIcon className="size-4" />
             </SheetClose>
           )}
         </SheetPrimitive>

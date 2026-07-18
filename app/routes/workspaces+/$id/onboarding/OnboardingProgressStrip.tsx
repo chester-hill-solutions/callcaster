@@ -1,9 +1,10 @@
 import { Link, useSearchParams } from "react-router";
-import { Badge } from "@/components/ui/badge";
+import { badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { wizardStepsForGoal } from "@/lib/messaging-onboarding/goals";
 import { isWizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
+import { cn } from "@/lib/utils";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 import { WIZARD_STEP_META } from "./constants";
 import { readWizardStep } from "./wizard-step-resolution";
@@ -59,14 +60,20 @@ export function OnboardingProgressStrip({
             const stored = onboarding.steps.find((item) => item.id === stepId);
             const isActive = stepId === activeStep;
             const isComplete = stored?.status === "complete";
+            const variant = isActive ? "default" : isComplete ? "secondary" : "outline";
             return (
-              <Badge
+              <Link
                 key={stepId}
-                variant={isActive ? "default" : isComplete ? "secondary" : "outline"}
-                className="text-xs"
+                to={`?step=${encodeURIComponent(stepId)}`}
+                replace
+                aria-current={isActive ? "step" : undefined}
+                className={cn(
+                  badgeVariants({ variant }),
+                  "text-xs transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                )}
               >
                 {index + 1}. {meta?.shortLabel ?? stepId}
-              </Badge>
+              </Link>
             );
           })}
         </div>

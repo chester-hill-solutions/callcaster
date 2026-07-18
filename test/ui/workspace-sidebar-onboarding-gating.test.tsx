@@ -69,7 +69,7 @@ const onboardingMatch = {
   loaderData: {
     onboarding: {
       selectedGoal: null,
-      currentStep: "business_profile",
+      currentStep: "business_identity",
       steps: [],
     },
     workspaceId: "ws-1",

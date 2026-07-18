@@ -1,4 +1,5 @@
 import type { WorkspaceTodaySelection } from "@/lib/workspace-today.server";
+import { launchChecklistProgress } from "@/lib/workspace-launch-checklist";
 
 export type WorkspaceTodayCopy = {
   eyebrow: string;
@@ -30,9 +31,22 @@ export function getWorkspaceTodayCopy(
         eyebrow: "Workspace setup",
         title: "Continue workspace setup",
         description:
-          "Complete the guided setup to prepare messaging and calling.",
+          "Finish business details and the guided steps for your campaign path.",
         actionLabel: "Continue setup",
       };
+    case "launch_checklist": {
+      const progress = today.launchChecklist
+        ? launchChecklistProgress(today.launchChecklist)
+        : null;
+      return {
+        eyebrow: "Launch checklist",
+        title: "Get ready to launch your first campaign",
+        description: progress
+          ? `${progress.completeCount} of ${progress.requiredCount} launch steps complete. Open the next item to keep going.`
+          : "Complete the checklist below to prepare your first campaign.",
+        actionLabel: "Continue setup",
+      };
+    }
     case "get_number":
       return {
         eyebrow: "Phone setup",
