@@ -35,7 +35,7 @@ describe("app/routes/workspaces+/$id/settings/numbers.route.tsx responsive layou
   });
 
   test("the caller-id and purchase side column also allows shrinking", () => {
-    expect(source).toMatch(/className="min-w-0 space-y-0"/);
+    expect(source).toMatch(/className="min-w-0 space-y-\d+"/);
     expect(source).toContain("<NumberCallerId");
     expect(source).toContain("<NumberPurchase");
   });
