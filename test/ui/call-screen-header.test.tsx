@@ -28,6 +28,8 @@ vi.mock("lucide-react", () => {
     CheckCircleIcon: Icon("CheckCircleIcon"),
     ChevronDown: Icon("ChevronDown"),
     X: Icon("X"),
+    // shad-cc Dialog close control
+    XIcon: Icon("XIcon"),
   };
 });
 
