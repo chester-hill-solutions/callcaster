@@ -35,7 +35,7 @@ vi.mock("react-router", async () => {
     useLoaderData: () => ({
       userRole: "admin",
       workspaceData: {
-        workspace: { id: "ws-1", name: "Workspace One", credits: 42 },
+        workspace: { id: "ws-1", name: "Workspace One", credits: 0 },
         audiences: [],
         campaigns: [{ id: 20, title: "Loader campaign" }],
         phoneNumbers: [{ id: 30 }],
@@ -45,15 +45,24 @@ vi.mock("react-router", async () => {
         shouldRedirectToOnboarding: false,
         warnings: [],
       },
+      today: {
+        kind: "add_credits",
+        href: "/workspaces/ws-1/billing",
+        unreadCount: 0,
+        runningCampaignTitle: null,
+      },
     }),
     // Falsy on purpose: react-router's real <Outlet> needs a live route
     // match to render anything, which this bare `render()` (no
     // RouterProvider) doesn't have. Matching the working pattern in
     // workspace-realtime-revalidation.test.tsx, useOutlet: () => null takes
-    // the CampaignEmptyState branch instead, giving real, assertable content.
+    // the WorkspaceToday branch instead, giving real, assertable content.
     useOutlet: () => null,
     useOutletContext: () => ({}),
     useRevalidator: () => ({ revalidate: mocks.revalidate }),
+    // No onboarding child match in these bare renders, so the layout skips
+    // the onboarding progress strip.
+    useMatches: () => [],
   };
 });
 
@@ -65,8 +74,12 @@ vi.mock("@/components/workspace/WorkspaceNav", () => ({
   default: () => <nav data-testid="workspace-nav">Sidebar with many links</nav>,
 }));
 
-vi.mock("@/components/campaign/CampaignEmptyState", () => ({
-  default: () => <div data-testid="page-content">Campaign empty state</div>,
+vi.mock("@/components/workspace/WorkspaceToday", () => ({
+  default: () => (
+    <div data-testid="page-content">
+      <a href="/workspaces/ws-1/billing">Add credits</a>
+    </div>
+  ),
 }));
 
 describe("workspaces+/$id.tsx skip-to-content link", () => {
@@ -108,5 +121,15 @@ describe("workspaces+/$id.tsx skip-to-content link", () => {
     expect(
       nav.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  test("keeps the depleted-credit banner passive at the workspace root", () => {
+    render(<Workspace />);
+    const main = document.getElementById("workspace-main-content")!;
+
+    expect(main).toHaveTextContent("Credit balance is depleted");
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    expect(main.querySelectorAll("a")).toHaveLength(1);
+    expect(main.querySelector("a")).toHaveTextContent("Add credits");
   });
 });

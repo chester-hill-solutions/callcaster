@@ -3,30 +3,60 @@ export { middleware } from "./$id.middleware.server";
 
 import {
   useLoaderData,
+  useMatches,
   Outlet,
   useOutlet,
   useOutletContext,
   useRevalidator,
 } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
+import { OnboardingProgressStrip } from "./$id/onboarding/OnboardingProgressStrip";
+import type { OnboardingLoaderData } from "./$id/onboarding.loader.server";
 import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
-import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
+import WorkspaceToday from "@/components/workspace/WorkspaceToday";
 import {
   Campaign,
   ContextType,
   type WorkspaceMessagingReadiness,
 } from "@/lib/types";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
+import type { WorkspaceTodaySelection } from "@/lib/workspace-today.server";
 import { LOW_CREDIT_THRESHOLD } from "../../../shared/pricing";
 
 type LoaderData = {
   userRole: string | null | undefined;
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
+  today?: WorkspaceTodaySelection;
 };
+
+type OnboardingStripData = Pick<
+  OnboardingLoaderData,
+  "onboarding" | "workspaceId" | "workspaceName" | "creditsBalance"
+>;
+
+/** Loader data of the onboarding child route, when it is the active match. */
+function findOnboardingStripData(
+  matches: ReturnType<typeof useMatches>,
+): OnboardingStripData | null {
+  for (const match of matches) {
+    const data = match.loaderData;
+    if (
+      data &&
+      typeof data === "object" &&
+      "onboarding" in data &&
+      "workspaceId" in data &&
+      "workspaceName" in data &&
+      "creditsBalance" in data
+    ) {
+      return data as OnboardingStripData;
+    }
+  }
+  return null;
+}
 
 function WorkspaceResolvedView({
   resolvedData,
@@ -34,12 +64,16 @@ function WorkspaceResolvedView({
   outlet,
   context,
   onboardingReadiness,
+  today,
+  showSidebar,
 }: {
   resolvedData: WorkspaceInfoWithDetails;
   userRole: string | null | undefined;
   outlet: ReturnType<typeof useOutlet>;
   context: ContextType;
   onboardingReadiness: WorkspaceMessagingReadiness;
+  today?: WorkspaceTodaySelection;
+  showSidebar: boolean;
 }) {
   const normalizedWorkspace = resolvedData.workspace as unknown as {
     id: string;
@@ -68,9 +102,12 @@ function WorkspaceResolvedView({
   ).filter(Boolean);
   const revalidator = useRevalidator();
 
+  // One workspace-tree EventSource for campaign + ledger freshness. Root and
+  // workspace loaders revalidate together so Navbar, mobile menu, WorkspaceNav,
+  // and low-credit banners stay in sync without a duplicate credit subscription.
   useWorkspaceEventSubscription({
     workspaceId: workspace.id,
-    table: "campaign",
+    table: ["campaign", "transaction_history"],
     onChange: () => revalidator.revalidate(),
   });
 
@@ -79,13 +116,15 @@ function WorkspaceResolvedView({
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-      <WorkspaceNav
-        workspace={workspace}
-        campaigns={campaigns as Campaign[]}
-        userRole={
-          (userRole as MemberRole | null | undefined) ?? MemberRole.Member
-        }
-      />
+      {showSidebar ? (
+        <WorkspaceNav
+          workspace={workspace}
+          campaigns={campaigns as Campaign[]}
+          userRole={
+            (userRole as MemberRole | null | undefined) ?? MemberRole.Member
+          }
+        />
+      ) : null}
       <main
         id="workspace-main-content"
         tabIndex={-1}
@@ -94,10 +133,10 @@ function WorkspaceResolvedView({
         {liveCredits <= 0 ? (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
             <div className="font-medium">
-              You&apos;re out of credits. Campaigns and calls are paused
-              until you top up.
+              Credit balance is depleted. Add credits to resume campaigns and
+              calls.
             </div>
-            {canManageBilling ? (
+            {canManageBilling && outlet ? (
               <Button asChild variant="destructive" className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
                   Add credits
@@ -108,10 +147,10 @@ function WorkspaceResolvedView({
         ) : liveCredits < LOW_CREDIT_THRESHOLD ? (
           <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
             <div className="font-medium">
-              Credits are running low ({liveCredits} left). Top up to avoid
-              interruptions.
+              Credits are running low ({liveCredits} left). Add credits to keep
+              campaigns active.
             </div>
-            {canManageBilling ? (
+            {canManageBilling && outlet ? (
               <Button asChild className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
                   Add credits
@@ -131,19 +170,9 @@ function WorkspaceResolvedView({
                     Messaging onboarding still has required steps.
                   </div>
                   <p className="mt-1">{onboardingReadiness.warnings.join(" ")}</p>
-                  {userRole === "admin" || userRole === "owner" ? (
-                    <Button asChild className="mt-3">
-                      <a href={`/workspaces/${workspace.id}/onboarding`}>
-                        Continue onboarding
-                      </a>
-                    </Button>
-                  ) : null}
                 </div>
               ) : null}
-              <CampaignEmptyState
-                hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
-                type={phoneNumbers.length > 0 ? "campaign" : "number"}
-              />
+              {today ? <WorkspaceToday today={today} /> : null}
             </div>
           ) : (
             <Outlet
@@ -164,10 +193,16 @@ function WorkspaceResolvedView({
 }
 
 export default function Workspace() {
-  const { workspaceData, userRole, onboardingReadiness } =
+  const { workspaceData, userRole, onboardingReadiness, today } =
     useLoaderData<LoaderData>();
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
+  const onboardingStrip = findOnboardingStripData(useMatches());
+  // The sidebar stays hidden until onboarding is complete: while the wizard
+  // route is active, and on any workspace page while the workspace is still
+  // fresh enough that the root loader would bounce it into the wizard.
+  const showSidebar =
+    !onboardingStrip && !onboardingReadiness.shouldRedirectToOnboarding;
 
   return (
     <>
@@ -177,6 +212,7 @@ export default function Workspace() {
       >
         Skip to main content
       </a>
+      {onboardingStrip ? <OnboardingProgressStrip {...onboardingStrip} /> : null}
       {/* Plain div, not <main>: the real <main> landmark now wraps only the
           actual page content inside WorkspaceResolvedView, deliberately
           excluding WorkspaceNav's sidebar so the skip link above actually
@@ -189,6 +225,8 @@ export default function Workspace() {
           outlet={outlet}
           context={context}
           onboardingReadiness={onboardingReadiness}
+          today={today}
+          showSidebar={showSidebar}
         />
       </div>
     </>

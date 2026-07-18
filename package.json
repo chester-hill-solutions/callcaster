@@ -6,6 +6,7 @@
   "scripts": {
     "build": "react-router build",
     "dev": "node ./scripts/local/dev.mjs",
+    "dev:local": "node ./scripts/local/dev-local.mjs",
     "dev:calling:sync": "bun ./scripts/local/sync-calling-dev.mjs",
     "tools:sync-inbound-sms": "bun ./scripts/one-off/sync-inbound-sms-from-twilio.mjs",
     "tools:routes:baseline": "node scripts/verify-route-tree.mjs --update-baseline",
@@ -61,7 +62,6 @@
     "check:dry": "node scripts/check-dry.mjs",
     "tools:dry:baseline": "node scripts/check-dry.mjs --update",
     "check:handlers": "node scripts/check-handlers.mjs",
-    "tools:handlers:baseline": "node scripts/check-handlers.mjs --update-baseline",
     "ci:local": "npm run vendor:build && npm run typecheck && npm run lint && npm run test:node && npm run test:ui && npm run tools:routes:verify && npm run tools:api:surface:check && npm run check:route-server-leaks && npm run check:route-authz && npm run check:workspace-projection && npm run check:twilio-webhooks && npm run check:request-body-consumption && npm run check:middleware && npm run check:credit-writes && npm run check:effects && npm run check:type-safety && npm run check:dry && npm run check:handlers && npm run db:ledger:check && npm run build && npm run check:client-bundle && npm run tools:api:codegen && git diff --exit-code",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
@@ -176,7 +176,7 @@
     "vitest": "^4.0.18"
   },
   "engines": {
-    "node": ">=22.22.0",
+    "node": "22.x",
     "bun": ">=1.2.15"
   },
   "overrides": {

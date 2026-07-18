@@ -4,6 +4,25 @@ import { describe, expect, test, vi } from "vitest";
 import ChatInput from "@/components/sms-ui/ChatInput";
 import type { Contact } from "@/lib/types";
 
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ value, onValueChange, disabled, children }: any) => (
+    <select
+      role="combobox"
+      value={value ?? ""}
+      disabled={disabled}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: ({ placeholder }: any) => <option value="">{placeholder}</option>,
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ value, children }: any) => (
+    <option value={value}>{children}</option>
+  ),
+}));
+
 function makeMessageFetcher(overrides: Partial<{ state: string }> = {}) {
   return {
     state: overrides.state ?? "idle",
@@ -137,9 +156,6 @@ describe("ChatInput From sender selection", () => {
       />,
     );
     expect(screen.getByRole("combobox")).toBeDisabled();
-    expect(
-      screen.getByRole("option", { name: /no sending numbers available/i }),
-    ).toBeInTheDocument();
     expect(
       screen.getByText(/workspace sending number is required/i),
     ).toBeInTheDocument();

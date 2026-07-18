@@ -13,11 +13,6 @@ import { AppError } from "@/lib/errors.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-interface OtherDataItem {
-    key: string;
-    value: string | number | boolean;
-}
-
 type AudiencesDeps = {
   verifyAuth: (request: Request) => Promise<{
     auth?: { authType: string; workspaceId?: string };
@@ -70,10 +65,18 @@ function flattenAudienceExportRows(rawData: Array<Record<string, unknown>>) {
   return rawData.map((row) => {
     const flatRow: Record<string, unknown> = { ...row };
     if (row.other_data && Array.isArray(row.other_data) && row.other_data.length > 0) {
-      const otherData = row.other_data as unknown as OtherDataItem[];
+      const otherData = row.other_data as unknown[];
       otherData.forEach((item) => {
-        if (item && typeof item === "object" && "key" in item && "value" in item) {
-          flatRow[item.key] = item.value;
+        if (!item || typeof item !== "object" || Array.isArray(item)) return;
+
+        const fields = item as Record<string, unknown>;
+        if (typeof fields.key === "string" && "value" in fields) {
+          flatRow[fields.key] = fields.value;
+          return;
+        }
+
+        for (const [key, value] of Object.entries(fields)) {
+          flatRow[key] = value;
         }
       });
     }

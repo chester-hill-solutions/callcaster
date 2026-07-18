@@ -3,10 +3,7 @@ import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { safeParseJson } from "@/lib/request-utils.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-import {
-  insertScriptForWorkspace,
-  updateScriptForWorkspace,
-} from "@/lib/script-api-db.server";
+import { persistWorkspaceScript } from "@/lib/script-persistence.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 
@@ -40,21 +37,29 @@ export const action = defineAction({
     await requireWorkspaceAccess({ user, workspaceId: workspace });
 
     let updatedScript;
-    if (saveAsCopy || !id) {
-      updatedScript = await insertScriptForWorkspace({
+    if (saveAsCopy) {
+      updatedScript = await persistWorkspaceScript({
+        mode: "copy",
         workspaceId: workspace,
-        name: saveAsCopy ? `${name} (Copy)` : name,
-        steps: steps ?? null,
-        updatedBy: user.id,
+        actorId: user.id,
+        sourceScriptId: id == null ? undefined : Number(id),
+        content: { name, steps: steps ?? null },
+      });
+    } else if (!id) {
+      updatedScript = await persistWorkspaceScript({
+        mode: "create",
+        workspaceId: workspace,
+        actorId: user.id,
+        content: { name, steps: steps ?? null },
       });
     } else {
       const scriptId = typeof id === "number" ? id : Number(id);
-      updatedScript = await updateScriptForWorkspace({
+      updatedScript = await persistWorkspaceScript({
+        mode: "update",
         workspaceId: workspace,
         scriptId,
-        name,
-        steps: steps ?? null,
-        updatedBy: user.id,
+        actorId: user.id,
+        content: { name, steps: steps ?? null },
       });
     }
 

@@ -5588,7 +5588,7 @@
       "get": {
         "operationId": "getVerify_audio_pin_pin",
         "summary": "GET /api/verify-audio-pin/:pin",
-        "description": "Static TwiML gather entry; returns TwiML.",
+        "description": "Retired audio PIN flow; returns 410.",
         "tags": [
           "Public Form",
           "telephony"
@@ -5600,17 +5600,28 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "TwiML XML response",
+            "description": "Success",
             "content": {
-              "text/xml": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -5626,7 +5637,7 @@
       "get": {
         "operationId": "getVerify_audio_session",
         "summary": "GET /api/verify-audio-session",
-        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.",
+        "description": "Retired audio PIN flow; both methods return 410.",
         "tags": [
           "User API",
           "telephony"
@@ -5677,7 +5688,7 @@
       "post": {
         "operationId": "postVerify_audio_session",
         "summary": "POST /api/verify-audio-session",
-        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.",
+        "description": "Retired audio PIN flow; both methods return 410.",
         "tags": [
           "User API",
           "telephony"
@@ -5795,7 +5806,7 @@
       "post": {
         "operationId": "postVerify_pin_input",
         "summary": "POST /api/verify-pin-input",
-        "description": "Returns TwiML.\n\n**Security:** Twilio gather callback; service role, no Twilio signature.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Retired audio PIN flow; returns 410.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
           "Internal Trusted",
           "telephony"
@@ -5819,17 +5830,28 @@
         },
         "responses": {
           "200": {
-            "description": "TwiML XML response",
+            "description": "Success",
             "content": {
-              "text/xml": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

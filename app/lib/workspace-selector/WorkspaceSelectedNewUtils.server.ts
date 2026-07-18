@@ -20,8 +20,18 @@ import { createTenantDb } from "@/server/tenant-db";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace-twilio-config.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
+import {
+  CAMPAIGN_PRODUCT_GOAL_VALUES,
+  campaignTypeForProductGoal,
+  type CampaignProductGoal,
+} from "@/lib/campaign-goals";
 
-type CampaignType = "live_call" | "message" | "robocall";
+type CampaignType =
+  | "live_call"
+  | "message"
+  | "robocall"
+  | "simple_ivr"
+  | "complex_ivr";
 
 interface CampaignAudienceParams {
   campaignId: string;
@@ -36,7 +46,6 @@ interface NewAudienceParams {
   formData: FormData;
   workspaceId: string;
   headers: Headers;
-  contactsFile: File;
   campaignId?: string;
   contacts?: Array<Contact>;
   userId: string;
@@ -76,7 +85,6 @@ export async function handleNewAudience({
   formData,
   workspaceId,
   headers,
-  contactsFile,
   campaignId,
   contacts = [],
   userId,
@@ -158,13 +166,34 @@ export async function handleNewCampaign({formData,
   headers,
 }: NewCampaignParams) {
   const newCampaignName = (formData.get("campaign-name") as string | null)?.trim() ?? "";
-  const newCampaignType = formData.get("campaign-type") as CampaignType;
+  const campaignGoalValue = String(formData.get("campaign-goal") ?? "");
+  const legacyCampaignType = String(formData.get("campaign-type") ?? "");
+  const validLegacyTypes = new Set<CampaignType>([
+    "live_call",
+    "message",
+    "robocall",
+    "simple_ivr",
+    "complex_ivr",
+  ]);
+  const newCampaignType = CAMPAIGN_PRODUCT_GOAL_VALUES.includes(
+    campaignGoalValue as CampaignProductGoal,
+  )
+    ? campaignTypeForProductGoal(campaignGoalValue as CampaignProductGoal)
+    : validLegacyTypes.has(legacyCampaignType as CampaignType)
+      ? (legacyCampaignType as CampaignType)
+      : null;
   logger.debug("Campaign Type: ", newCampaignType);
 
   if (!newCampaignName) {
     return routeData(
       { campaignData: null, error: { message: "Campaign name is required" } },
       { headers },
+    );
+  }
+  if (!newCampaignType) {
+    return routeData(
+      { campaignData: null, error: { message: "Choose a campaign goal" } },
+      { status: 400, headers },
     );
   }
 
@@ -179,7 +208,12 @@ export async function handleNewCampaign({formData,
   // Q58: for voice campaigns (live_call/robocall), default the caller ID to
   // the first voice-capable rented number rather than requiring exactly one
   // workspace number to exist.
-  const isVoiceCampaign = newCampaignType === "live_call" || newCampaignType === "robocall";
+  const isVoiceCampaign = [
+    "live_call",
+    "robocall",
+    "simple_ivr",
+    "complex_ivr",
+  ].includes(newCampaignType);
   const isMessageCampaign = newCampaignType === "message";
 
   let caller_id: string | null = null;

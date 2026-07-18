@@ -55,18 +55,22 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
     expect(response.headers.get("Content-Type")).toContain("text/event-stream");
   });
 
-  test("loader throws when data-plane context is missing", async () => {
+  test("loader returns 500 when data-plane context is missing", async () => {
     const mod = await import(
       "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
     );
     const context = await createRouteContextProvider({});
-    await expect(
+    const response = await asRouteResponse(
       mod.loader({
         request: new Request("http://localhost/api/workspaces/ws-1/events"),
         params: { workspaceId: "ws-1" },
         context,
       }),
-    ).rejects.toThrow("Data plane auth context missing");
+    );
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Data plane auth context missing",
+    });
   });
 
   test("loader writes bytes immediately (before any heartbeat interval fires)", async () => {

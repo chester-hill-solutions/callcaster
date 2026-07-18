@@ -12,8 +12,7 @@ const mocks = vi.hoisted(() => {
     requireDualAuth: vi.fn(),
     getDualAuthUser: vi.fn(),
     safeParseJson: vi.fn(),
-    insertScriptForWorkspace: vi.fn(),
-    updateScriptForWorkspace: vi.fn(),
+    persistWorkspaceScript: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
@@ -32,11 +31,9 @@ vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: unknown[]) => mocks.safeParseJson(...args),
 }));
 
-vi.mock("@/lib/script-api-db.server", () => ({
-  insertScriptForWorkspace: (...args: unknown[]) =>
-    mocks.insertScriptForWorkspace(...args),
-  updateScriptForWorkspace: (...args: unknown[]) =>
-    mocks.updateScriptForWorkspace(...args),
+vi.mock("@/lib/script-persistence.server", () => ({
+  persistWorkspaceScript: (...args: unknown[]) =>
+    mocks.persistWorkspaceScript(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -47,8 +44,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     mocks.requireDualAuth.mockReset();
     mocks.getDualAuthUser.mockReset();
     mocks.safeParseJson.mockReset();
-    mocks.insertScriptForWorkspace.mockReset();
-    mocks.updateScriptForWorkspace.mockReset();
+    mocks.persistWorkspaceScript.mockReset();
     mocks.logger.error.mockReset();
   });
 
@@ -62,18 +58,19 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: true,
     });
-    mocks.insertScriptForWorkspace.mockResolvedValueOnce({ id: 1, name: "N (Copy)" });
+    mocks.persistWorkspaceScript.mockResolvedValueOnce({ id: 1, name: "N (Copy)" });
 
     const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 1, name: "N (Copy)" } });
-    expect(mocks.insertScriptForWorkspace).toHaveBeenCalledWith({
+    expect(mocks.persistWorkspaceScript).toHaveBeenCalledWith({
+      mode: "copy",
       workspaceId: "w1",
-      name: "N (Copy)",
-      steps: {},
-      updatedBy: "u1",
+      actorId: "u1",
+      sourceScriptId: 123,
+      content: { name: "N", steps: {} },
     });
   });
 
@@ -87,19 +84,19 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: false,
     });
-    mocks.updateScriptForWorkspace.mockResolvedValueOnce({ id: 2, name: "N" });
+    mocks.persistWorkspaceScript.mockResolvedValueOnce({ id: 2, name: "N" });
 
     const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 2, name: "N" } });
-    expect(mocks.updateScriptForWorkspace).toHaveBeenCalledWith({
+    expect(mocks.persistWorkspaceScript).toHaveBeenCalledWith({
+      mode: "update",
       workspaceId: "w1",
       scriptId: 2,
-      name: "N",
-      steps: {},
-      updatedBy: "u1",
+      actorId: "u1",
+      content: { name: "N", steps: {} },
     });
   });
 
@@ -113,7 +110,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: false,
     });
-    mocks.insertScriptForWorkspace.mockRejectedValueOnce(
+    mocks.persistWorkspaceScript.mockRejectedValueOnce(
       new Error("duplicate key value violates unique constraint 23505"),
     );
 
@@ -136,7 +133,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: false,
     });
-    mocks.insertScriptForWorkspace.mockRejectedValueOnce(new Error("nope"));
+    mocks.persistWorkspaceScript.mockRejectedValueOnce(new Error("nope"));
 
     const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),

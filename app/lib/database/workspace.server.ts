@@ -45,6 +45,7 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { data as routeData } from "react-router";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
+import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 import {
   addUserToWorkspace,
   getUserRole,
@@ -454,14 +455,6 @@ export async function getWorkspaceInfo({
     return { data: null, error: dbError };
   }
 }
-
-export type WorkspaceInfoWithDetails = {
-  workspace: WorkspaceData & { workspace_users: { role: MemberRole }[] };
-  workspace_users: { role: MemberRole }[];
-  campaigns: unknown[];
-  phoneNumbers: Partial<WorkspaceNumbers[]>;
-  audiences: unknown[];
-};
 
 export async function getWorkspaceInfoWithDetails({
   workspaceId,

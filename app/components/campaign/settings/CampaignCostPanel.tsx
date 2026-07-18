@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { formatCredits, formatCurrency } from "@/lib/billing-format";
 import { CREDIT_PRICE_CAD } from "@/lib/pricing";
@@ -18,14 +18,14 @@ export function CampaignCostPanel({
   const estimateCad = billing.estimate.totalCredits * CREDIT_PRICE_CAD;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Campaign cost</CardTitle>
-        <CardDescription>
-          Option B rates — estimates use queued contacts; actuals come from the credit ledger.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title="Campaign cost"
+        description="Option B rates — estimates use queued contacts; actuals come from the credit ledger."
+      />
+
+      <div className="space-y-4">
         <p className="text-sm text-muted-foreground">{billing.estimate.rateDescription}</p>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -70,7 +70,7 @@ export function CampaignCostPanel({
           Completed or dequeued contacts: {completedCount.toLocaleString()}. Voice actuals include
           per-minute charges beyond the first-minute dial estimate.
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 }

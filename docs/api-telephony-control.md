@@ -77,8 +77,8 @@ Dialer, handset, and agent-presence routes require an authenticated user via **s
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/verify-call-in-session` | Start call-in verification session |
-| GET/POST | `/api/verify-audio-session` | Outbound audio verification (split auth on POST — see internal doc) |
-| GET | `/api/verify-audio-pin/:pin` | Public TwiML gather entry |
+| GET/POST | `/api/verify-audio-session` | Retired audio PIN flow; returns 410 |
+| GET | `/api/verify-audio-pin/:pin` | Retired audio PIN flow; returns 410 |
 
 ## Internal / weak routes
 

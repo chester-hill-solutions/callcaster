@@ -18,6 +18,8 @@ const dbMocks = vi.hoisted(() => {
     markAudienceUpdating: vi.fn(),
     createAudienceForUpload: vi.fn(),
     createAudienceUploadRecord: vi.fn(),
+    findCampaignForAudienceUpload: vi.fn(),
+    linkAudienceToCampaign: vi.fn(),
   };
 });
 
@@ -73,6 +75,9 @@ vi.mock("@/lib/audience-upload-db.server", () => ({
   markAudienceUpdating: (...args: unknown[]) => dbMocks.markAudienceUpdating(...args),
   createAudienceForUpload: (...args: unknown[]) => dbMocks.createAudienceForUpload(...args),
   createAudienceUploadRecord: (...args: unknown[]) => dbMocks.createAudienceUploadRecord(...args),
+  findCampaignForAudienceUpload: (...args: unknown[]) =>
+    dbMocks.findCampaignForAudienceUpload(...args),
+  linkAudienceToCampaign: (...args: unknown[]) => dbMocks.linkAudienceToCampaign(...args),
 }));
 
 describe("app/routes/api+/audience-upload/route.tsx", () => {
@@ -86,6 +91,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     dbMocks.markAudienceUpdating.mockReset();
     dbMocks.createAudienceForUpload.mockReset();
     dbMocks.createAudienceUploadRecord.mockReset();
+    dbMocks.findCampaignForAudienceUpload.mockReset();
+    dbMocks.linkAudienceToCampaign.mockReset();
     processTdbMocks.contact.insertMany.mockReset();
     processTdbMocks.audience_upload.update.mockReset();
     processTdbMocks.audience.update.mockReset();
@@ -101,6 +108,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     dbMocks.markAudienceUpdating.mockResolvedValue(undefined);
     dbMocks.createAudienceForUpload.mockResolvedValue({ id: 1 });
     dbMocks.createAudienceUploadRecord.mockResolvedValue({ id: 99 });
+    dbMocks.findCampaignForAudienceUpload.mockResolvedValue(true);
+    dbMocks.linkAudienceToCampaign.mockResolvedValue(true);
     processTdbMocks.contact.insertMany.mockImplementation(async (rows: unknown[]) =>
       (rows as Record<string, unknown>[]).map((_, i) => ({ id: i + 1 })),
     );
@@ -186,8 +195,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
-    fd.set("contacts", new File(["x"], "c.csv"));
-    fd.set("header_mapping", JSON.stringify({ Name: "name" }));
+    fd.set("contacts", new File(["Name,Phone\nAda,4165551234"], "c.csv"));
+    fd.set("header_mapping", JSON.stringify({ Name: "name", Phone: "phone" }));
     fd.set("split_name_column", "Name");
 
     const res = await asRouteResponse(mod.action({
@@ -215,9 +224,36 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
-    fd.set("contacts", new File(["x"], "c.csv"));
+    fd.set("contacts", new File(["Phone\n4165551234"], "c.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone: "phone" }));
     const res = await asRouteResponse(mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
     expect(res.status).toBe(404);
+  }, 30000);
+
+  test("action: links a canonical upload to its campaign context", async () => {
+    const mod = await import("../app/routes/api+/audience-upload");
+    const verifyAuth = vi.fn(async () => ({
+      headers: new Headers(),
+      user: { id: "u1" },
+      null: {} as any,
+    }));
+    const fd = new FormData();
+    fd.set("workspace_id", "w1");
+    fd.set("audience_name", "Campaign list");
+    fd.set("campaign_id", "42");
+    fd.set("contacts", new File(["Phone\n4165551234"], "c.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone: "phone" }));
+
+    const res = await asRouteResponse(
+      mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any),
+    );
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.linkAudienceToCampaign).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      campaignId: 42,
+      audienceId: 1,
+    });
   }, 30000);
 
   test("action: create-audience path handles audience insert/upload insert errors and catches invalid JSON", async () => {
@@ -233,7 +269,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const fd1 = new FormData();
     fd1.set("workspace_id", "w1");
     fd1.set("audience_name", "A");
-    fd1.set("contacts", new File(["x"], "c.csv"));
+    fd1.set("contacts", new File(["Phone\n4165551234"], "c.csv"));
+    fd1.set("header_mapping", JSON.stringify({ Phone: "phone" }));
     const r1 = await asRouteResponse(mod.action({ request: makeReq(fd1), deps: { verifyAuth } } as any));
     expect(r1.status).toBe(500);
 
@@ -241,7 +278,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const fd2 = new FormData();
     fd2.set("workspace_id", "w1");
     fd2.set("audience_name", "A");
-    fd2.set("contacts", new File(["x"], "c.csv"));
+    fd2.set("contacts", new File(["Phone\n4165551234"], "c.csv"));
+    fd2.set("header_mapping", JSON.stringify({ Phone: "phone" }));
     const r2 = await asRouteResponse(mod.action({ request: makeReq(fd2), deps: { verifyAuth } } as any));
     expect(r2.status).toBe(500);
 
@@ -251,7 +289,7 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     fdBadJson.set("contacts", new File(["x"], "c.csv"));
     fdBadJson.set("header_mapping", "{");
     const r3 = await asRouteResponse(mod.action({ request: makeReq(fdBadJson), deps: { verifyAuth } } as any));
-    expect(r3.status).toBe(500);
+    expect(r3.status).toBe(400);
   }, 30000);
 
   test("action: create-audience success message and background .catch logging", async () => {
@@ -270,8 +308,9 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_name", "A");
-    fd.set("contacts", new File(["x"], "c.csv"));
-    // omit header_mapping and split_name_column to hit default {} / null branches
+    fd.set("contacts", new File(["Phone\n4165551234"], "c.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone: "phone" }));
+    // omit split_name_column to hit its null branch
     const res = await asRouteResponse(mod.action({
       request: makeReq(fd),
       deps: { verifyAuth, processAudienceUpload },
@@ -297,7 +336,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_name", "A");
-    fd.set("contacts", new File(["x"], "c.csv"));
+    fd.set("contacts", new File(["Phone\n4165551234"], "c.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone: "phone" }));
     const res = await asRouteResponse(mod.action({ request: makeReq(fd) } as any));
     expect(res.status).toBe(200);
   }, 30000);
@@ -314,7 +354,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
-    fd.set("contacts", new File(["x"], "c.csv"));
+    fd.set("contacts", new File(["Phone\n4165551234"], "c.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone: "phone" }));
     const res = await asRouteResponse(mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Unknown error" });
@@ -355,6 +396,39 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
       email: "a@b.co",
     });
     expect(logger.error).not.toHaveBeenCalled();
+  }, 30000);
+
+  test("processAudienceUpload normalizes phones and skips invalid rows", async () => {
+    vi.useFakeTimers();
+    const mod = await import("../app/routes/api+/audience-upload");
+    const uploadPromise = mod.processAudienceUpload(
+      1,
+      2,
+      "w1",
+      "u1",
+      Buffer.from("csv", "utf-8").toString("base64"),
+      { Phone: "phone" },
+      null,
+      {
+        parseCSV: vi.fn(() => ({
+          headers: ["Phone"],
+          contacts: [{ Phone: "(416) 555-1234" }, { Phone: "123" }],
+        })) as any,
+      },
+    );
+    await vi.runAllTimersAsync();
+    await uploadPromise;
+    vi.useRealTimers();
+
+    expect(processTdbMocks.contact.insertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ phone: "+14165551234" }),
+    ]);
+    expect(processTdbMocks.audience.update).toHaveBeenCalledWith(
+      expect.objectContaining({ set: expect.objectContaining({ total_contacts: 1 }) }),
+    );
+    expect(objectStorageMocks.uploads.at(-1)?.body).toContain(
+      '"skipped_invalid_contacts":1',
+    );
   }, 30000);
 
   test("processAudienceUpload: header mismatch and insert errors go through catch and write error status", async () => {

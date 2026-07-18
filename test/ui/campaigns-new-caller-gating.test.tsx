@@ -34,7 +34,7 @@ async function renderNewCampaign(userRole?: string) {
   );
 
   render(createElement(RouterProvider, { router }));
-  await screen.findByRole("heading", { name: "Add Campaign" });
+  await screen.findByRole("heading", { name: "Create campaign" });
 }
 
 // Creating a campaign is gated Admin+ server-side (new.action.server.ts).
@@ -47,9 +47,9 @@ describe("campaigns/new hides the create form from roles that can't use it", () 
     await renderNewCampaign("caller");
 
     expect(screen.queryByLabelText(/campaign name/i)).toBeNull();
-    expect(screen.queryByRole("button", { name: /^add campaign$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^create campaign$/i })).toBeNull();
     expect(
-      screen.getByText(/contact your workspace admin or owner to create a campaign/i),
+      screen.getByText(/contact a workspace administrator to create a campaign/i),
     ).toBeInTheDocument();
   });
 
@@ -64,7 +64,7 @@ describe("campaigns/new hides the create form from roles that can't use it", () 
 
     expect(screen.getByLabelText(/campaign name/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /^add campaign$/i }),
+      screen.getByRole("button", { name: /^create campaign$/i }),
     ).toBeInTheDocument();
   });
 });

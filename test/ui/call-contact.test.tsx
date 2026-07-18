@@ -62,13 +62,13 @@ describe("app/components/call/CallContact.tsx", () => {
     const cells = Array.from(container.querySelectorAll("td"));
 
     expect(row.style.borderTop).toMatch(/^2px solid/i);
-    expect(row.style.background).toBe("rgb(241, 193, 193)");
+    expect(row.style.background).toBe("hsl(var(--primary) / 0.12)");
     expect(row.style.borderBottomLeftRadius).toBe("18px");
 
     expect(cells).toHaveLength(3);
     expect(cells[1].style.opacity).toBe("1");
     expect(cells[2].style.background).toContain("secondary");
-    expect(cells[2].style.color).toBe("rgb(51, 51, 51)");
+    expect(cells[2].style.color).toBe("hsl(var(--foreground))");
     expect(cells[2].style.borderBottomRightRadius).toBe("18px");
     expect(cells[2].getAttribute("rowspan")).toBe("2");
   });

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { TabsContent } from "@/components/ui/tabs";
 import { Link } from "react-router";
@@ -61,13 +62,14 @@ export function AdminSystemSettingsPanel({
                         <CardDescription>Configure global system settings</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <h3 className="text-sm font-medium">Default Credits for New Workspaces</h3>
-                            <div className="flex items-center gap-2">
-                                <Input type="number" defaultValue="100" className="max-w-xs" />
+                        <FormField htmlFor="admin-default-credits" label="Default Credits for New Workspaces">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <FormFieldControl>
+                                    <Input id="admin-default-credits" type="number" defaultValue="100" className="max-w-xs" />
+                                </FormFieldControl>
                                 <Button>Save</Button>
                             </div>
-                        </div>
+                        </FormField>
 
                         <div className="space-y-2">
                             <h3 className="text-sm font-medium">System Maintenance Mode</h3>

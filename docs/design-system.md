@@ -17,8 +17,10 @@ For a full inventory of components, static assets, icons, route surfaces, and kn
 ## Page structure
 
 - **Auth flows:** Use `AuthCard` from [app/components/shared/AuthCard.tsx](app/components/shared/AuthCard.tsx) for signin, signup, password reset, and invite acceptance. It provides a centered card with branded title and description slot.
-- **Settings and creation:** Use `Section` and `SectionHeader` from [app/components/shared/Section.tsx](app/components/shared/Section.tsx) for settings blocks and creation flows. Use `SectionHeader` for title + optional description + actions.
-- **Branded cards:** For creation wizards and settings blocks that need the Zilla Slab title and actions layout, use `BrandedCard`, `BrandedCardTitle`, `BrandedCardContent`, `BrandedCardActions` from [app/components/shared/BrandedCard.tsx](app/components/shared/BrandedCard.tsx) (or the re-exports via `CustomCard` for backward compatibility).
+- **Settings and creation:** Use `Section` and `SectionHeader` from [app/components/shared/Section.tsx](app/components/shared/Section.tsx) for settings blocks and creation flows. Use `SectionHeader` for title + optional description + actions. Inside the workspace panel, pass `variant="flat"` explicitly.
+- **In-panel creation:** Use `PageShell` (`maxWidth="narrow"`) + flat `Section`s for campaign/audience/script/audio creation nested under `/workspaces/:id`. Reserve `BrandedCard` for standalone flows outside the workspace panel (auth, invite, marketing).
+- **List empty states:** Use `WorkspaceResourceListShell` / `WorkspaceResourceEmptyState` — flat heading, description, illustration, and action with no Card chrome.
+- **Branded cards:** For standalone wizards that need the Zilla Slab title and actions layout outside the workspace panel, use `BrandedCard`, `BrandedCardTitle`, `BrandedCardContent`, `BrandedCardActions` from [app/components/shared/BrandedCard.tsx](app/components/shared/BrandedCard.tsx) (or the re-exports via `CustomCard` for backward compatibility).
 
 ## Tables and pagination
 
@@ -71,12 +73,17 @@ Reserve **slab typography and bold brand color** for chrome and moments of actio
 
 - **Full-bleed dashboards:** workspace shell ([`workspaces+/$id.tsx`](app/routes/workspaces+/$id.tsx)) uses `w-full` with `px-4 sm:px-6` only — no `max-w-[1500px]` on in-workspace routes
 - **One padding owner:** workspace content panel OR inner route content, not both (`container mx-auto p-6` inside the panel is wrong)
-- **One surface owner:** the workspace panel in [`workspaces+/$id.tsx`](app/routes/workspaces+/$id.tsx) is the card chrome for in-app routes. Inside it, use `Section variant="flat"` + `SectionHeader` (dividers, no nested `bg-card` borders). Reserve `Section` elevated, `ui/card`, and `BrandedCard` for standalone pages (auth, creation wizards) or overlays — not stacked inside the workspace panel.
+- **One surface owner:** the workspace panel in [`workspaces+/$id.tsx`](app/routes/workspaces+/$id.tsx) is the card chrome for in-app routes. Inside it, use `Section variant="flat"` + `SectionHeader` (dividers, no nested `bg-card` borders). Reserve elevated `Section`, `ui/card`, and `BrandedCard` for standalone pages (auth) or overlays — not stacked as page containers inside the workspace panel.
+- **Visual depth budget:**
+  - Depth 1: workspace panel + flat content — preferred
+  - Depth 2: one semantic entity card, metric tile, application pane, or choice surface — allowed
+  - Depth 3+: blocked unless a documented entity hierarchy requires it and a browser review approves it
+  - Input/control borders do not count as surfaces; grouped bordered containers do
 - **Progressive disclosure:** collapse secondary detail (credit rates, webhooks, call audio settings) with `Accordion` rather than showing everything at once.
 - **Page stack:** `space-y-6` between major sections
 - **Section gap:** `gap-4` for flex/grid siblings
 - **Card inset:** `p-4 sm:p-6` on workspace panel shell
-- **Creation wizards:** `max-w-2xl` centered section — forms stay readable on ultrawide screens
+- **Creation wizards (in-panel):** `PageShell maxWidth="narrow"` — forms stay readable on ultrawide screens
 
 ### Visual polish (restrained)
 
@@ -92,7 +99,8 @@ Reserve **slab typography and bold brand color** for chrome and moments of actio
 ### Page structure note
 
 - **`Section` + `SectionHeader`:** in-panel blocks use `variant="flat"`; elevated sections for standalone pages outside the workspace shell
-- **`BrandedCard`:** creation wizards and flows that need branded slab titles + `BrandedCardActions`
+- **`PageShell`:** in-panel titles/actions and narrow creation flows
+- **`BrandedCard`:** standalone flows outside the workspace shell that need branded slab titles + `BrandedCardActions`
 
 ### Call screen panels
 

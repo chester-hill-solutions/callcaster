@@ -9,5 +9,7 @@ export const action = defineAction(
   createCronEnqueueAction({
     type: "number_rental_billing",
     buildParams: (_body, workspaceId) => ({ workspaceId }),
+    // The enqueued worker job debits monthly number-rental credits.
+    extraSideEffects: ["credit"],
   }),
 );

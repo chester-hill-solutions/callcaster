@@ -41,8 +41,10 @@ describe("messaging onboarding helpers", () => {
     expect(state.selectedChannels).toEqual([]);
     expect(state.messagingService.desiredSendMode).toBe("messaging_service");
     expect(state.emergencyVoice.address.status).toBe("not_started");
-    expect(state.steps).toHaveLength(6);
+    expect(state.steps).toHaveLength(8);
+    expect(state.selectedGoal).toBeNull();
     expect(state.steps.some((step) => step.id === "first_number")).toBe(true);
+    expect(state.steps.some((step) => step.id === "audience")).toBe(true);
   });
 
   test("derives onboarding readiness for new workspaces and legacy workspaces", () => {
@@ -157,7 +159,12 @@ describe("messaging onboarding helpers", () => {
         },
       },
     );
-    const steps = buildOnboardingStepsForState(nextState, { hasFirstNumber: true });
+    const steps = buildOnboardingStepsForState(nextState, {
+      hasFirstNumber: true,
+      audienceCount: 1,
+      campaignCount: 1,
+      creditsBalance: 100,
+    });
     const readiness = deriveWorkspaceMessagingReadiness({
       onboarding: { ...nextState, steps },
       workspaceNumbers: [
@@ -198,7 +205,7 @@ describe("messaging onboarding helpers", () => {
 
     expect(malformed.status).toBe("not_started");
     expect(malformed.selectedChannels).toEqual(["rcs"]);
-    expect(malformed.steps).toHaveLength(6);
+    expect(malformed.steps).toHaveLength(8);
     expect(malformed.messagingService.desiredSendMode).toBe("from_number");
     expect(malformed.messagingService.stickySenderEnabled).toBe(true);
     expect(malformed.subaccountBootstrap.authMode).toBe("mixed");
@@ -326,27 +333,23 @@ describe("messaging onboarding helpers", () => {
     expect(adjusted.selectedChannels).toEqual(["a2p10dlc"]);
   });
 
-  test("provider provisioning ignores the RCS gate when RCS onboarding is disabled", () => {
-    const state = mergeWorkspaceMessagingOnboardingState(
+  test("goal checklist omits script for live call and keeps it for IVR", () => {
+    const liveCall = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-      {
-        selectedChannels: ["rcs"],
-        messagingService: {
-          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
-          serviceSid: "MG123",
-        },
-        rcs: {
-          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.rcs,
-          status: "not_started",
-        },
-      },
+      { selectedGoal: "live_call", selectedChannels: ["local_number", "voice_compliance"] },
+    );
+    const ivr = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      { selectedGoal: "ivr", selectedChannels: ["local_number"] },
     );
 
-    const steps = buildOnboardingStepsForState(state, { hasFirstNumber: true });
+    const liveSteps = buildOnboardingStepsForState(liveCall, { hasFirstNumber: true });
+    const ivrSteps = buildOnboardingStepsForState(ivr, { hasFirstNumber: true });
 
-    expect(steps.find((step) => step.id === "provider_provisioning")?.status).toBe(
-      "complete",
-    );
+    expect(liveSteps.find((step) => step.id === "script")).toBeUndefined();
+    expect(ivrSteps.find((step) => step.id === "script")?.status).toBe("in_progress");
+    expect(liveSteps).toHaveLength(7);
+    expect(ivrSteps).toHaveLength(8);
   });
 
   test("marks first_number complete when hasFirstNumber is true", () => {
@@ -380,10 +383,11 @@ describe("messaging onboarding helpers", () => {
       steps: legacySteps,
     });
 
-    expect(normalized.steps).toHaveLength(6);
+    expect(normalized.steps).toHaveLength(8);
     expect(normalized.steps.find((step) => step.id === "first_number")?.label).toBe(
-      "Your first number",
+      "Phone number",
     );
+    expect(normalized.selectedGoal).toBeNull();
   });
 
   test("get/update workspace onboarding propagate Postgres errors", async () => {

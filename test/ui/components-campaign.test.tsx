@@ -35,7 +35,9 @@ describe("app/components/campaign/CampaignEmptyState.tsx", () => {
         <CampaignEmptyState hasAccess type="campaign" />
       </SmokeRouter>,
     );
-    expect(screen.getAllByText(/Get started/i)[0]).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Get started/i)[0],
+    ).toBeInTheDocument();
     rerender(
       <SmokeRouter>
         <CampaignEmptyState hasAccess={false} type="number" />
@@ -177,16 +179,6 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
     fireEvent.click(screen.getByRole("button", { name: "Apply Calling Hours" }));
     const [field] = onChange.mock.calls.at(-1)!;
     expect(field).toBe("schedule");
-  });
-});
-
-describe("app/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus.tsx", () => {
-  test("status select", async () => {
-    const SelectStatus = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus")).default;
-    render(
-      <SelectStatus handleInputChange={handleInputChange} campaignData={{ status: "draft" }} />,
-    );
-    expect(screen.getByText("Campaign Status")).toBeInTheDocument();
   });
 });
 

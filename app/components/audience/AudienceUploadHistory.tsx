@@ -43,9 +43,9 @@ export default function AudienceUploadHistory({
 
   if (uploads.length === 0) {
     return (
-      <div className="p-6 text-center border border-border rounded-md bg-muted">
-        <p className="text-muted-foreground">No upload history found for this audience</p>
-      </div>
+      <p className="py-8 text-center text-muted-foreground">
+        No upload history found for this audience
+      </p>
     );
   }
 
@@ -70,7 +70,7 @@ export default function AudienceUploadHistory({
   }
 
   return (
-    <div className="mt-4 bg-card rounded-md border border-border overflow-hidden">
+    <div className="overflow-hidden rounded-md border border-border">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-muted">

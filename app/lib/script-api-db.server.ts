@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { script as scriptTable } from "@/db/schema";
 import type { Json } from "@/lib/db-types";
+import { persistWorkspaceScript } from "@/lib/script-persistence.server";
 import { createTenantDb } from "@/server/tenant-db";
 
 type ScriptRow = typeof scriptTable.$inferSelect;
@@ -11,14 +12,15 @@ export async function insertScriptForWorkspace(args: {
   steps: unknown;
   updatedBy: string;
 }): Promise<ScriptRow | null> {
-  const tdb = createTenantDb(args.workspaceId);
-  const [row] = await tdb.script.insert({
-    name: args.name,
-    steps: args.steps as Json,
-    updated_at: new Date().toISOString(),
-    updated_by: args.updatedBy,
+  return persistWorkspaceScript({
+    mode: "create",
+    workspaceId: args.workspaceId,
+    actorId: args.updatedBy,
+    content: {
+      name: args.name,
+      steps: args.steps,
+    },
   });
-  return row ?? null;
 }
 
 export async function updateScriptForWorkspace(args: {
@@ -28,17 +30,16 @@ export async function updateScriptForWorkspace(args: {
   steps: unknown;
   updatedBy: string;
 }): Promise<ScriptRow | null> {
-  const tdb = createTenantDb(args.workspaceId);
-  const [row] = await tdb.script.update({
-    set: {
+  return persistWorkspaceScript({
+    mode: "update",
+    workspaceId: args.workspaceId,
+    actorId: args.updatedBy,
+    scriptId: args.scriptId,
+    content: {
       name: args.name,
-      steps: args.steps as Json,
-      updated_at: new Date().toISOString(),
-      updated_by: args.updatedBy,
+      steps: args.steps,
     },
-    where: eq(scriptTable.id, args.scriptId),
   });
-  return row ?? null;
 }
 
 export async function createWorkspaceScript(args: {

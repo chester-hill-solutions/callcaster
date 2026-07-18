@@ -1,4 +1,4 @@
-import { data as routeData, type ActionFunctionArgs } from "react-router";
+import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { triggerTwilioOpenSync } from "@/lib/twilio-open-sync.server";
 
@@ -29,9 +29,14 @@ import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
-import { getAdminRouteContext } from "@/lib/admin-route.server";
-export const action = async ({ request, context, params }: ActionFunctionArgs) => {
-    const { user, userData } = getAdminRouteContext(context);
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineAction } from "@/lib/handler.server";
+
+export const action = defineAction({
+  auth: adminRouteAuth,
+  sideEffects: ["db-write", "twilio", "external"],
+  handler: async ({ request, params, auth }) => {
+    const { user, userData } = auth;
 
     const workspaceId = params.workspaceId;
     if (!workspaceId) {
@@ -322,4 +327,5 @@ export const action = async ({ request, context, params }: ActionFunctionArgs) =
             { status: 500 },
         );
     }
-};
+  },
+});

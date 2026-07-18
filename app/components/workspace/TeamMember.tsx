@@ -17,6 +17,10 @@ import { MdCancel } from "react-icons/md";
 import { User } from "@/lib/types";
 
 import { MemberRole } from "@/lib/member-role";
+import {
+  getWorkspaceRoleDisplayName,
+  isWorkspaceMemberRole,
+} from "@/lib/workspace-role-display";
 export { MemberRole };
 
 export const handleIconStyles = (memberRole: MemberRole): string =>
@@ -57,6 +61,9 @@ export default function TeamMember({
 
   const iconStyles = handleIconStyles(memberRole as MemberRole);
   const roleTextStyles = handleRoleTextStyles(memberRole as MemberRole);
+  const roleDisplayName = isWorkspaceMemberRole(memberRole)
+    ? getWorkspaceRoleDisplayName(memberRole)
+    : capitalize(memberRole);
 
   const { theme } = useTheme();
   const memberIsOwner = memberRole === MemberRole.Owner;
@@ -67,7 +74,7 @@ export default function TeamMember({
         <p className="pr-4 font-semibold">{member.username}</p>
       </div>
       <div className="flex items-center gap-2">
-        <p className={roleTextStyles}>{capitalize(memberRole)}</p>
+        <p className={roleTextStyles}>{roleDisplayName}</p>
         {!memberIsOwner && (
           <Sheet>
             {userRole !== MemberRole.Caller && memberRole !== "invited" && (
@@ -158,7 +165,7 @@ export default function TeamMember({
                               value={role.valueOf()}
                               className=""
                             >
-                              {capitalize(role.valueOf())}
+                              {getWorkspaceRoleDisplayName(role)}
                             </option>
                           );
                         })}

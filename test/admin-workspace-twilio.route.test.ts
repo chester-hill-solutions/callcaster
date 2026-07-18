@@ -249,18 +249,20 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     vi.useRealTimers();
   });
 
-  test("action throws when admin context is missing", async () => {
+  test("action returns 500 when admin context is missing", async () => {
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();
     formData.set("_action", "update_twilio_portal");
     const context = await createRouteContextProvider({});
-    await expect(
+    const res = await asRouteResponse(
       mod.action({
         request: new Request("http://x", { method: "POST", body: formData }),
         params: { workspaceId: "w1" },
         context,
       } as any),
-    ).rejects.toThrow("Admin context missing");
+    );
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "Admin context missing" });
   });
 
   test("action updates Twilio portal settings", async () => {

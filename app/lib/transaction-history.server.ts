@@ -5,6 +5,7 @@ import {
   getTransactionDisplayDescription,
   type TransactionType,
 } from "@/lib/transaction-history-display";
+import { emitTransactionHistoryInsertEvent } from "@/lib/workspace-events.server";
 import { db } from "@/server/db";
 
 export type { TransactionType } from "@/lib/transaction-history-display";
@@ -87,6 +88,27 @@ export async function insertTransactionHistoryIdempotent(
         idempotencyKey,
       }),
     });
+
+    // Post-write, non-fatal: ledger integrity outranks UI freshness. Emission
+    // failure must not convert a committed billing write into a reported error.
+    if (row.inserted) {
+      try {
+        await emitTransactionHistoryInsertEvent(args.workspaceId, {
+          id: row.id,
+          workspace: row.workspace,
+          type: row.type,
+          amount: row.amount,
+          idempotency_key: row.idempotency_key,
+        });
+      } catch (emitError) {
+        logger.error("transaction_history event emission failed", {
+          workspaceId: args.workspaceId,
+          ledgerId: row.id,
+          idempotencyKey,
+          error: emitError,
+        });
+      }
+    }
 
     return { inserted: row.inserted, existingId: row.id };
   } catch (e) {

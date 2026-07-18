@@ -51,8 +51,10 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 border-b border-border/60 sm:flex-row sm:items-start sm:justify-between",
-        compact ? "mb-4 pb-3" : "mb-6 pb-4",
+        "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+        // Compact headers live inside flat Sections, which already draw the
+        // divider between sections — a header border there doubles the lines.
+        compact ? "mb-4" : "mb-6 border-b border-border/60 pb-4",
         className,
       )}
       {...props}

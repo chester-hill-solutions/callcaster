@@ -78,6 +78,10 @@ export function mergeWorkspaceMessagingOnboardingState(
     },
     selectedChannels:
       updates.selectedChannels ?? currentState.selectedChannels,
+    selectedGoal:
+      updates.selectedGoal !== undefined
+        ? updates.selectedGoal
+        : currentState.selectedGoal,
   });
 }
 

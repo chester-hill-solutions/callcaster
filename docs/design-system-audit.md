@@ -1,29 +1,49 @@
 # Design System Audit (Visual Asset Ledger)
 
-Canonical **inventory** of visual surfaces in Callcaster. For usage rules, see [design-system.md](design-system.md).
+Canonical **inventory** of visual surfaces in CallCaster. Usage rules: [design-system.md](design-system.md). Component-audit method: [`.cursor/skills/component-audit/SKILL.md`](../.cursor/skills/component-audit/SKILL.md).
 
-**Row format** (used throughout): Name | Type | Source | Classes/variants | Attached to | Status
+**Row format:** Name | Type | Source | Classes/variants | Attached to | Status
+
+**Audit date:** 2026-07-17 (refreshed PR 10 closeout)  
+**Scope:** Whole app (`app/components/**` 158 TSX; UI routes under `app/routes/**` excluding pure API leaves)  
+**Evidence:** Source inventory + component-surface remediation PRs 1–10 + live IDE-browser spot-checks on `http://localhost:3001` (workspace Testing `3e021cac-…`) at 375 / 1280 / 1920, light theme. Dark theme matrix deferred to browser checklist.
 
 ---
 
 ## Executive Summary
 
-The repo has a solid primitive layer in [`app/components/ui/`](app/components/ui/) (27 files), composition components in [`app/components/shared/`](app/components/shared/), and tokenized theme foundations in [`app/tailwind.css`](app/tailwind.css) and [`tailwind.config.js`](tailwind.config.js).
+**Verdict:** Nested surfaces + Chrome misplacement (app-wide). Local conforming pockets exist (billing flat Sections, calls log, archive campaigns, analytics flat Sections, AuthCard auth flows).
 
-**Implemented since the original audit:**
+| Count | Inventory |
+|------:|-----------|
+| 158 | `app/components/**/*.tsx` |
+| 30 | `ui/` primitives |
+| 11 | `shared/` compositions |
+| 101 | Non-API route TSX modules |
+| 22 | Feature domains under `app/components/` |
 
-| Capability | Source | Status |
-|------------|--------|--------|
-| `Heading` / `Text` | [`typography.tsx`](app/components/ui/typography.tsx) | canonical |
-| `FormField` | [`form-field.tsx`](app/components/ui/form-field.tsx) | canonical |
-| `AuthCard` | [`AuthCard.tsx`](app/components/shared/AuthCard.tsx) | canonical (signin, signup, reset) |
-| `Section` / `SectionHeader` | [`Section.tsx`](app/components/shared/Section.tsx) | canonical |
-| `BrandedCard*` | [`BrandedCard.tsx`](app/components/shared/BrandedCard.tsx) | canonical (wraps `ui/card` + `Heading`) |
-| `Skeleton` | [`skeleton.tsx`](app/components/ui/skeleton.tsx) | canonical; used by DataTable |
-| Single `<Toaster />` | [`root.tsx`](app/root.tsx) L110 | canonical |
-| `forms/Inputs` in production | — | **dead code** (test-only via re-export) |
+**Implemented since prior ledger:** `Heading`/`Text`, `FormField`, `AuthCard`, `Section`/`SectionHeader`, `BrandedCard`, `PageShell`, `WorkspaceResourceListShell`, `DataTable`, single Toaster, `OnboardingProgressStrip` as route chrome, `WorkspaceToday`, `PeopleHubLayout`, `NumberSummaryList`, `BillingActivityTable`, `OperatorColumn`, regrouped `WorkspaceNav`.
 
-**Remaining problem:** uneven adoption — creation routes, list shells, raw tables, dual icon libraries, and ad hoc Tailwind bypass the components above.
+**Remaining systemic problems (post-remediation):**
+
+1. Uneven primitive adoption in low-traffic surfaces: raw `<select>`/`<table>`/`textarea` in chat/uploader pockets, dual icon libraries (`react-icons` remnants), raw palette classes vs semantic tokens in queue/TeamMember pockets.
+2. ChatHeader bespoke menus and ChatImages keyboard/touch gaps (PR 8 partial).
+3. Credit chrome revalidation: `transaction_history` emission landed in PR 2; continue regression coverage on purchase/debit flows.
+
+**Resolved in component-surface remediation (PRs 1–10):** Workspace picker + credits projection; onboarding flat `Section` steps + ProgressStrip sole chrome; numbers route Panel removal + flat empty states; Softphone/AgentDesktop flattening; campaign settings/creation flat sections; audience detail tab flattening; contact detail + RecentContacts accordion; WorkspaceToday flat typography; IVR EditModal → `Dialog`; admin index/outlet split + `AdminDefinitionGrid` / `AdminTableOverflow`; public services list semantics + pricing row structure; confirmed orphan deletions (see R10).
+
+**Resolved since prior ledger:** Navbar desktop picker + mobile workspace list; `OnboardingOverviewCard` removed; `WorkspaceResourceListShell` empty state flat; `HandsetCallPanel`, `CustomCard`, `CallScreen.TopBar`, `ContactTable`/`AudienceContactRow`, class `ErrorBoundary`, legacy campaign controls (`VoxTypeSelector`, `SelectStatus`, script question blocks, sync `ExportButton`) removed after import scan.
+
+---
+
+## Verdict calibration
+
+| Verdict | Meaning |
+|---------|---------|
+| Clean | One surface owner, flat content, chrome in the right place |
+| Minor issues | Token/typography drift, avoidable inset border, small padding duplication |
+| Nested surfaces | Card-in-Card or visual depth ≥3 |
+| Chrome misplacement | Persistent context (progress, credits, selection) in content cards, or chrome lacking data/revalidation |
 
 ---
 
@@ -33,24 +53,24 @@ The repo has a solid primitive layer in [`app/components/ui/`](app/components/ui
 
 | Name | Type | Source | Attached to | Status |
 |------|------|--------|-------------|--------|
-| `Hero-1.png` | static PNG | `public/Hero-1.png` | [`signin.tsx`](app/routes/signin.tsx), [`CampaignEmptyState.tsx`](app/components/campaign/CampaignEmptyState.tsx) via [`TransparentBGImage.tsx`](app/components/shared/TransparentBGImage.tsx) | canonical |
-| `favicon.ico` | favicon | `public/favicon.ico` | implicit `/favicon.ico` | canonical (explicit `<link>` added in root) |
-| Tabac Slab OTF (3 faces) | font | `public/fonts/Tabac Slab*.otf` | `@font-face` in tailwind.css; `font-Tabac-Slab` | canonical |
-| Other font files (~34) | font | `public/fonts/*` | unwired variants (Big Slab weights, etc.) | unused on disk |
+| `Hero-1.png` | static PNG | `public/Hero-1.png` | signin, `CampaignEmptyState` via `TransparentBGImage` | canonical |
+| `favicon.ico` | favicon | `public/favicon.ico` | root `<link>` | canonical |
+| Tabac Slab OTF | font | `public/fonts/Tabac Slab*.otf` | `@font-face`; `font-Tabac-Slab` | canonical |
+| Other font files | font | `public/fonts/*` | unwired variants | unused on disk |
 
-### External / runtime (not in repo)
+### External / runtime
 
 | Name | Type | Attached to | Status |
 |------|------|-------------|--------|
-| `person-calling.png` | CDN PNG | [`_index/index.tsx`](app/routes/_index/index.tsx) (Supabase storage) | runtime |
-| MMS / campaign media | storage URLs | [`ChatMessages.tsx`](app/components/sms-ui/ChatMessages.tsx), [`MessageSettings.tsx`](app/components/campaign/settings/MessageSettings.tsx) | runtime |
-| RCS logos | user URLs | onboarding / admin Twilio panels | runtime |
+| Marketing hero image | CDN PNG | `_index/index.tsx` | runtime |
+| MMS / campaign media | storage URLs | chats, message settings | runtime |
+| RCS logos | user URLs | onboarding / admin Twilio | runtime |
 
 ### Brand mark
 
 | Name | Type | Source | Classes | Status |
 |------|------|--------|---------|--------|
-| CallCaster wordmark | typography | [`Navbar.tsx`](app/components/layout/Navbar.tsx) | `font-Tabac-Slab text-brand-primary` | canonical — no logo image file |
+| CallCaster wordmark | typography | `Navbar.tsx` | `font-Tabac-Slab text-brand-primary` | canonical — no logo image |
 
 ---
 
@@ -60,216 +80,374 @@ The repo has a solid primitive layer in [`app/components/ui/`](app/components/ui
 
 | Name | Type | Source | Status |
 |------|------|--------|--------|
-| shadcn config | config | [`components.json`](components.json) | canonical |
-| Tailwind theme | config | [`tailwind.config.js`](tailwind.config.js) | canonical |
-| CSS variables | tokens | [`app/tailwind.css`](app/tailwind.css) | canonical |
-| `cn()` | utility | [`app/lib/utils.ts`](app/lib/utils.ts) | canonical |
-| `handleNavlinkStyles()` | utility | [`app/lib/utils.ts`](app/lib/utils.ts) | canonical nav styling |
+| shadcn config | config | `components.json` | canonical |
+| Tailwind theme | config | `tailwind.config.js` | canonical |
+| CSS variables | tokens | `app/tailwind.css` | canonical |
+| `cn()` | utility | `app/lib/utils.ts` | canonical |
 
-### Semantic tokens
+### Typography tiers (policy)
 
-`--background`, `--foreground`, `--primary`, `--muted`, `--border`, `--ring`, `--radius`, `--card`, `--destructive`, etc.
+| Use | Component |
+|-----|-----------|
+| Navbar wordmark | `font-Tabac-Slab text-brand-primary` |
+| Button / CTA labels | `Button` (Zilla via `button.tsx`) |
+| Auth / marketing hero | `AuthCard` → `Heading branded` |
+| In-app page title | `Heading as="h1" level={2} branded={false}` |
+| Section title | `SectionHeader branded={false}` |
+| Wizard card title | `BrandedCardTitle` (standalone/creation only) |
+| Body / metadata | `Text` |
 
-### Brand tokens
+### Anti-pattern register (tokens/type)
 
-`--brand-primary`, `--brand-secondary`, `--brand-tertiary`, `--brand-bronze`, `--brand-silver`, `--brand-gold`
-
-### Font families
-
-| Name | Tailwind class | Source | Usage | Status |
-|------|----------------|--------|-------|--------|
-| Zilla Slab | `font-Zilla-Slab` | Google Fonts via root | ~50+ files | **primary brand type** |
-| Tabac Slab | `font-Tabac-Slab` | local OTF | Navbar, wordmark | canonical |
-| Tabac Big Slab | `font-Tabac-Big-Slab` | local OTF | 0 | removed from CSS |
-| Josefin Sans | `font-Josefin-Sans` | local TTF | 0 | removed from CSS |
-| Lilita One | `font-Lilita-One` | local TTF | 0 | removed from CSS |
-| Sarabun | `font-Sarabun` | local TTF (16 files) | 0 | removed from CSS |
-
-### Anti-pattern register
-
-| Pattern | Files (sample) | Canonical replacement |
-|---------|----------------|----------------------|
-| `border-gray-300` | creation routes, survey responses, contact forms | `border-border` + `Input`/`Select` |
-| `dark:bg-zinc-800` | creation routes | `bg-background` / `Input` |
-| Hex literals | [`pricing.tsx`](app/routes/pricing.tsx) | semantic brand/primary tokens |
-| Raw `font-Zilla-Slab text-*` on routes | list pages, auth links | `Heading` / `Text` with `branded` |
+| Pattern | Example files | Replacement |
+|---------|---------------|-------------|
+| Raw palette (`amber-*`, `emerald-*`, `green-*`, `gray-*`, hex) | `$id.tsx` onboarding banner, `WorkspaceNav` status pills, `HeldCallsList`, `SoftphoneAudioControls`, `CallContact`, results metrics, TeamMember | semantic `success`/`warning`/`destructive` / muted |
+| Slab on work surfaces | `WorkspaceToday`, `WorkspaceNav` links, call ContactStrip, many routes | `Heading`/`Text` `branded={false}`; slab on CTAs/chrome |
+| `container mx-auto p-6` inside panel | Softphone/Agent empty states, campaign results | drop; panel owns padding |
+| Transparent Card | `ConversationList` empty | semantic layout element |
+| Ad hoc Panel (`bg-brand-secondary`) | `settings/numbers.route.tsx` | shared panel classes or flat Section |
 
 ---
 
-## Section 3 — UI Primitives (`app/components/ui/`)
+## Section 3 — UI Primitives (`app/components/ui/`) — 30 files
 
-27 files. All use `cn()` from `@/lib/utils` unless noted.
+All use `cn()` unless noted.
 
-| Name | Type | Source | Basis / variants | Status |
+| Name | Type | Source | Variants / notes | Status |
 |------|------|--------|------------------|--------|
-| `Button`, `buttonVariants` | primitive | `button.tsx` | Radix Slot + cva: default, destructive, outline, secondary, ghost, link; sizes sm/default/lg/icon | canonical |
-| `Input` | primitive | `input.tsx` | native input + semantic tokens | canonical |
-| `Textarea` | primitive | `textarea.tsx` | native textarea | canonical |
-| `Label`, `labelVariants` | primitive | `label.tsx` | Radix Label + cva | canonical |
-| `Checkbox` | primitive | `checkbox.tsx` | Radix + Lucide Check | canonical |
-| `Switch` | primitive | `switch.tsx` | Radix | canonical |
-| `Select` + subcomponents | primitive | `select.tsx` | Radix + Lucide | canonical |
-| `FormField` | composition | `form-field.tsx` | label + description + error wrapper | canonical |
-| `Heading`, `Text` | typography | `typography.tsx` | cva levels + `branded` | canonical |
-| `Card` + subcomponents | primitive | `card.tsx` | plain divs | canonical |
-| `Table` + subcomponents | primitive | `table.tsx` | plain table elements | canonical |
-| `Dialog`, `Sheet`, `Popover`, `Tooltip` | primitive | respective files | Radix | canonical |
-| `DropdownMenu`, `Command` | primitive | respective files | Radix + cmdk | canonical |
-| `Tabs`, `Accordion` | primitive | respective files | Radix | canonical |
-| `Alert`, `Badge` | primitive | respective files | cva variants | canonical |
-| `Progress`, `Spinner`, `Skeleton` | primitive | respective files | Radix / custom / pulse | canonical |
-| `Pagination` + subcomponents | primitive | `pagination.tsx` | Lucide chevrons | canonical |
-| `Calendar` | primitive | `calendar.tsx` | react-day-picker + buttonVariants | canonical |
-| `DateTimePicker`, `TimePicker` | composition | `datetime.tsx` | calendar + select + input | canonical |
+| `Button` | primitive | `button.tsx` | default/destructive/outline/secondary/ghost/link; sm/default/lg/icon | canonical |
+| `Input` / `Textarea` / `Label` | primitive | respective | semantic tokens | canonical |
+| `Checkbox` / `Switch` | primitive | respective | Switch still has hard `#333` thumb — token fix | canonical API |
+| `Select` + parts | primitive | `select.tsx` | Radix | canonical; under-adopted (uploader/chat/onboarding) |
+| `FormField` / `FormFieldControl` | composition | `form-field.tsx` | a11y wiring needs `FormFieldControl` | canonical; incomplete adoption |
+| `Heading` / `Text` | typography | `typography.tsx` | levels + branded | canonical; uneven adoption |
+| `Card` + parts | primitive | `card.tsx` | one elevated variant | overused as page shell |
+| `Table` + parts | primitive | `table.tsx` | own overflow wrapper | prefer DataTable for grids |
+| `Dialog` / `Sheet` / `Popover` / `Tooltip` | overlay | respective | Radix | canonical |
+| `DropdownMenu` / `Command` | overlay | respective | Radix + cmdk | ChatHeader duplicates menus |
+| `Tabs` / `Accordion` | primitive | respective | Radix | canonical |
+| `Alert` / `Badge` / `StatusBadge` | status | respective | success/warning/destructive | StatusBadge under-adopted in queue |
+| `Progress` / `Spinner` / `Skeleton` | feedback | respective | | canonical |
+| `Pagination` | primitive | `pagination.tsx` | base; lists use TablePagination | canonical |
+| `Calendar` / `DateTimePicker` | composition | `calendar.tsx`, `datetime.tsx` | | canonical |
+| `PageShell` | layout | `page-shell.tsx` | full/content/narrow | canonical flat wrapper |
+| `CatalogPickerShell` | composition | `catalog-picker-shell.tsx` | API key / webhook pickers | canonical specialized |
 
-**Route adoption:** ~70 route files import `@/components/ui/*`. Most-used: `Button`, `FormField`, `Input`, `Card`, `Table`.
-
-**Still missing (low priority):** avatar, radio group.
+**Still missing (low priority):** avatar, radio-group primitive (native radios used in creation/onboarding).
 
 ---
 
-## Section 4 — Composition & Layout Components
+## Section 4 — Shared compositions (`app/components/shared/`) — 11 files
 
-| Name | Type | Source | Role | Status |
-|------|------|--------|------|--------|
-| `AuthCard` | layout shell | `shared/AuthCard.tsx` | centered auth card | canonical |
-| `Section`, `SectionHeader` | layout shell | `shared/Section.tsx` | settings / creation blocks | canonical |
-| `BrandedCard*` | composition | `shared/BrandedCard.tsx` | branded card on `ui/card` | canonical |
-| `CustomCard` exports | alias | `shared/CustomCard.tsx` | re-exports BrandedCard as `Card`, `CardTitle`, … | legacy import path |
-| `DataTable` | composition | `workspace/tables/DataTable.tsx` | TanStack + skeleton, toolbar, pagination | canonical |
-| `TablePagination` | composition | `shared/TablePagination.tsx` | pagination UI | canonical |
-| `QueueTablePagination` | composition | `queue/QueueTablePagination.tsx` | thin wrapper over TablePagination | OK |
-| `WorkspaceResourceListShell` | layout shell | `workspace/WorkspaceResourceListShell.tsx` | list page header + error + empty | canonical |
-| `ContactsPage` | page | `contacts/ContactsPage.tsx` | richest list pattern (search, pagination) | canonical |
-| `workspacePanelHeight*Class` | token | `workspace-panel-classes.ts` | panel height constants | canonical |
-| `Navbar`, `NavbarMobileMenu` | layout | `layout/` | app chrome | canonical |
-| `WorkspaceNav` | layout | `workspace/WorkspaceNav.tsx` | workspace sidebar | canonical |
-| `ThemeProvider`, `ModeToggle` | infra | `shared/` | dark mode | canonical |
-| `SaveBar`, `InfoPopover`, `QueryParamBanner` | composition | `shared/` | ancillary UI | canonical |
-| `TransparentBGImage` | static helper | `shared/TransparentBGImage.tsx` | background image wrapper | canonical |
-| `ErrorBoundary`, `RouteErrorBoundary` | infra | `shared/` | error UI | canonical |
-
-### Legacy alias note
-
-`CustomCard` is **not** a third card system — it re-exports `BrandedCard`. Migrate imports to `BrandedCard` directly.
+| Name | Type | Role | Status |
+|------|------|------|--------|
+| `AuthCard` | layout shell | centered auth | canonical |
+| `Section` / `SectionHeader` | layout shell | elevated \| flat | flat = in-panel; default elevated is a nesting hazard |
+| `BrandedCard*` | composition | creation wizards | canonical outside panel; reduced in-panel use post-remediation |
+| `DataTable` | composition | TanStack grids | in `workspace/tables/` — canonical |
+| `TablePagination` | composition | list pagination | canonical |
+| `SaveBar` | ancillary | dirty/save + Cmd+S | sticky z conflict risk |
+| `QueryParamBanner` | notice | URL-driven Alert | canonical |
+| `InfoPopover` | ancillary | tooltip helper | add `type="button"` in forms |
+| `RouteErrorBoundary` | infra | route errors | canonical — sole route error boundary |
+| `ThemeProvider` / `ModeToggle` | infra | dark mode | canonical |
+| `TransparentBGImage` | helper | BG image | overlay should be `pointer-events-none` / `aria-hidden` |
 
 ---
 
-## Section 5 — Feature Components by Domain
+## Section 5 — Feature components by domain
 
-~155 files under `app/components/` (excluding `ui/`). Skip `archive/`.
+~139 non-ui files. Skip `archive/`.
 
-| Domain | ~Files | DS adoption | Notable gaps |
-|--------|--------|-------------|--------------|
-| `campaign/` | 36 | mixed | script builder, settings, results |
-| `call/`, `calls/` | 17 | medium | overlays were hand-rolled (now `Dialog` on Header); status colors on semantic tokens |
-| `workspace/` | 8 | high | — |
-| `sms-ui/` | 6 | mixed | ChatHeader bespoke menus |
-| `phone-numbers/` | 10 | medium | NumbersTable raw `<table>` |
-| `queue/`, `audience/`, `contact/` | 17 | medium-high | — |
-| `script/` | 6 | medium | — |
-| Root duplicates | 10 | legacy | QuestionCard.* vs nested campaign copies |
+| Domain | Files | DS adoption | Notable gaps |
+|--------|------:|-------------|--------------|
+| `campaign/` | 35 | high | Flat `Section` settings; `AsyncExportButton` canonical; SetupGuide chrome |
+| `call/` | 10 | high | call-panel-classes OK; token pass on Household/CallContact |
+| `calls/` | 7 | high | Softphone flattened; semantic tokens on held/audio controls |
+| `workspace/` | 12 | high | Today flat; ResourceListShell empty flat; Nav credits box |
+| `phone-numbers/` | 11 | high | numbers route flat Sections; NumberSummaryList entity cards |
+| `queue/` | 6 | medium | QueueTable ≠ DataTable; dense controls; raw palette pockets |
+| `sms-ui/` | 5 | mixed | ChatHeader bespoke menus; ChatInput raw controls |
+| `audience/` | 4 | high | Flat tabs + uploader; DataTable on contacts |
+| `contact/` + `contacts/` | 5 | high | Flat detail; RecentContacts accordion; orphan table chain removed |
+| `invite/` | 7 | medium | AuthCard OK; fields not FormField; `ErrorAlert` unused |
+| `file-assets/` | 3 | high | Recorder/editor semantic panes OK |
+| `layout/` | 2 | chrome | Workspace picker + credits in Navbar |
+| `people/` | 1 | good | Tab rail light surface |
+| `analytics/` | 1 | high | Flat Sections |
+| `agent/` / `handset/` | 1+0 | high | AgentDesktop = Softphone stack; HandsetCallPanel removed |
+| `question/` | 1 | high | EditModal uses `Dialog` |
+| `other-services/` | 1 | high | ServiceCard `article` inside single `<li>` owner |
+| `admin/` | 3 | high | `AdminDashboardPage`, `AdminDefinitionGrid`, `AdminTableOverflow` |
+| Root | 0 | — | `CallScreen.TopBar` removed; `AudienceContactRow` removed |
 
 ### High-visibility components
 
-| Name | Domain | Route / parent | Uses ui/* + FormField? |
-|------|--------|----------------|------------------------|
-| `CampaignSettings` | campaign | campaign settings route | partial |
-| `CampaignHomeScreen` | campaign | campaign home | partial |
-| `CallScreen.*` | call | call route | low |
-| `SoftphonePanel` | calls | calls route | `BrandedCard` (was CustomCard) |
-| `NumbersTable` | phone-numbers | settings/numbers | raw table |
-| `QueueTable` | queue | queue route | DataTable-like custom |
-| `ContactsPage` | contact | contacts route | high |
-| `ChatMessages`, `ChatHeader` | sms-ui | chats route | mixed |
-
-### Dead code (removed)
-
-| Name | Source | Status |
-|------|--------|--------|
-| `forms/Inputs` exports | `forms/Inputs.tsx` | deleted — was test-only |
-| Root `Icons.tsx` | `components/Icons.tsx` | deleted |
-| `shared/Icons.tsx` | `shared/Icons.tsx` | deleted — unused in production |
-
-Feature-specific `forms/` components remain: `AudioSelector`, `InputSelector`, `OutputSelector`.
+| Name | Domain | Route / parent | Surfaces | Verdict |
+|------|--------|----------------|----------|---------|
+| `WorkspaceToday` | workspace | `$id` root | flat Section + `Heading branded={false}` | **Clean** (remediated) |
+| `PeopleHubLayout` | people | audiences/contacts | tab `border bg-card` | Minor |
+| `NumberSummaryList` | phone-numbers | settings/numbers | per-number entity card + flat empty | Clean / Minor |
+| `BillingActivityTable` | workspace | billing | flat Table + muted Accordion | Clean |
+| `OperatorColumn` | call | call route | layout-only | Clean |
+| `CampaignSettings` | campaign | settings route | flat `Section` sections | **Clean** (remediated) |
+| `CallScreen.*` | call | call route | call-panel-classes + TopChrome | Minor |
+| Softphone / AgentDesktop | calls/agent | handset | flat section stack | **Clean** (remediated) |
+| `ContactsPage` | contacts | contacts | DataTable; flat empty | Clean |
+| `ChatHeader` / `ChatInput` | sms-ui | chats | bespoke + raw controls | Should fix |
 
 ---
 
-## Section 6 — Icon Inventory
+## Section 6 — Route surface map
 
-| System | File count | Status |
-|--------|------------|--------|
-| **lucide-react** | 65 app files | **canonical for new code** |
-| **react-icons** (md, fa, fc) | 41 app files | legacy — migrate opportunistically |
-| **Result.IconMap** | 1 map file, 45 Md names | domain exception — keep |
+**Workspace surface owner:** [`app/routes/workspaces+/$id.tsx`](../app/routes/workspaces+/$id.tsx) — `rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6`.
 
-### lucide-react (sample exports by area)
+**Onboarding chrome:** `OnboardingProgressStrip` mounts under Navbar when onboarding match has strip data. `OnboardingOverviewCard` removed; goal-step tests import ProgressStrip.
 
-Primitives: `Check`, `ChevronDown`, `X`, `Calendar` icons in `ui/*`. Features: `Search`, `Trash2`, `ArrowUp`, `Plus` in admin, campaign, queue, contacts.
+### Workspace child routes (panel context)
 
-### react-icons (sample)
+| URL area | Layout | Surface stack | Depth | Verdict |
+|----------|--------|---------------|------:|---------|
+| `/workspaces/:id` (Today) | panel | flat Today content | 1 | **Clean** (remediated) |
+| `…/billing` | flat Sections + Alert + Accordion | panel → flat | 1 | **Clean** |
+| `…/settings` | flat Sections | panel → flat | 1 | Clean / TeamMember border drift |
+| `…/settings/numbers` | flat Sections + NumberSummaryList | panel → flat → entity card | 2 | **Clean** (remediated) |
+| `…/audiences`, `…/contacts` | PeopleHub + list shell | panel → hub → flat list | 1–2 | Clean |
+| `…/audiences/new` | PeopleHub + flat Section | panel → flat | 1–2 | **Clean** (remediated) |
+| `…/audiences/:id` | Tabs + flat tables/uploader | panel → tabs → content | 2 | **Clean** (remediated) |
+| `…/onboarding` | ProgressStrip + flat step Sections | strip (chrome) + panel → flat | 1–2 | **Clean** (remediated) |
+| `…/campaigns/new` | flat Section + goal fieldset | panel → flat | 1–2 | **Clean** (remediated) |
+| `…/campaigns/:id/settings` | CampaignSettings flat Sections | panel → flat sections | 1–2 | **Clean** (remediated) |
+| `…/campaigns/:id` (home) | flat + result insets | panel → metrics/borders | 2 | Minor |
+| `…/campaigns/archive` | flat list | panel → flat | 1 | Clean |
+| `…/campaigns/:id/queue` | QueueTable border | panel → table pane | 2 | Minor (OK app pane) |
+| `…/campaigns/:id/call` | OperatorColumn + call panels | panel → callPanelShell (2) | 2 | Minor |
+| `…/calls` | Heading + DataTable | panel → flat | 1 | Clean |
+| `…/handset` | AgentDesktop → Softphone | panel → flat section | 1–2 | **Clean** (remediated) |
+| `…/chats` | two Chat Cards | panel → sidebar Card + thread Card | 2 | Semantic panes OK; controls open |
+| `…/analytics` | flat Sections | panel → flat | 1 | Clean |
+| `…/voicemails/setup` | flat Sections | panel → flat | 1 | **Clean** (remediated) |
+| `…/surveys/new\|edit` | PageShell + flat Sections | panel → flat → question groups | 2 | Minor (entity hierarchy) |
+| `…/scripts/new`, `…/audios/new` | flat Section | panel → flat | 1 | **Clean** (remediated) |
+| `…/exports` | Table | panel → table | 1–2 | Minor |
 
-`MdEdit`, `MdAdd`, `MdDialpad` in campaign script, workspace nav, signup OAuth, contacts table.
+### Standalone / auth / marketing
 
-### Domain exception
+| URL area | Layout | Depth | Verdict |
+|----------|--------|------:|---------|
+| `/`, `/pricing`, `/services` | marketing | 1–2 | Clean / Minor token drift |
+| `/signin`, `/signup`, `/reset*`, `/two-factor`, `/accept-invite` | AuthCard | 1 | Clean (signup fluid width remediated) |
+| `/account` | PageShell + elevated Section | 1 | OK standalone |
+| `/account.security` | AuthCard | 1 | Minor token drift |
+| `/workspaces` index | elevated Section / empty Card | 1 | OK standalone |
+| `/docs` | Scalar shell | 1 | Minor |
+| `/admin/*` | index dashboard OR child outlet only | 1–2 | **Clean** (remediated outlet split) |
 
-[`Result.IconMap.tsx`](app/components/call-list/records/participant/Result.IconMap.tsx) maps call disposition names to Material Design icons for script options — intentional exception documented in design-system.md.
+### Global chrome
+
+| Surface | Source | Notes |
+|---------|--------|-------|
+| Navbar | `layout/Navbar.tsx` | Wordmark, Docs, workspace picker (`navbar-workspace-picker`), Admin+ credits, account, theme |
+| Mobile Sheet | `Navbar.MobileMenu.tsx` | Workspace list + optional credits; user inset Card-like |
+| WorkspaceNav | `WorkspaceNav.tsx` | Sibling elevated shell; Admin+ credits footer box |
+| OnboardingProgressStrip | onboarding | Route chrome under Navbar — **conforming placement** |
+| Credit banners | `$id.tsx` | Above panel; prefer `Alert`; raw amber on onboarding banner |
+| Toaster | `root.tsx` | Single sonner root — conforming |
 
 ---
 
-## Section 7 — UI Route Surface Map & Redundancy Register
+## Section 7 — Surface-combination matrix
 
-**Scope:** UI routes from [`route-tree.txt`](scripts/baselines/route-tree.txt), excluding `api/*` leaves.
+Every distinct stacking pattern observed:
 
-### Surface map (representative)
+| ID | Pattern | Depth | Examples | Class |
+|----|---------|------:|----------|-------|
+| S0 | Panel only + flat content | 1 | billing, archive, calls log, analytics, settings flat | Conforming |
+| S1 | Panel → semantic app pane (call-panel / chat Card / table border) | 2 | CallArea, QueueTable, chats panes | Conforming if semantic |
+| S2 | Panel → container-only Card / BrandedCard | 2 | legacy creation pockets | **Remediated** — prefer flat Section |
+| S3 | Panel → Card → bordered form groups | 3 | legacy onboarding/campaign | **Remediated** — flat fieldsets |
+| S4 | Panel → Card → Card / metric tiles | 3 | legacy CostPanel/Softphone | **Remediated** except surveys entity hierarchy |
+| S5 | Panel → ad hoc brand Panel → Card | 3+ | legacy numbers | **Remediated** |
+| S6 | Panel → tab white shadow shell → bordered uploader | 3–4 | legacy audience detail | **Remediated** |
+| S7 | Admin Card → `rounded-lg border` metric insets | 2 | Twilio panels | **Remediated** — `AdminDefinitionGrid` |
+| S8 | Standalone AuthCard / elevated Section | 1 | auth, account | Conforming |
+| S9 | Transparent Card | 1 smell | ConversationList empty | Should fix |
+| S10 | Absolute Card “modal” | overlay smell | QuestionCard EditModal | **Remediated** → Dialog |
+| S11 | ProgressStrip (chrome) + panel step Card | chrome+2 | onboarding | **Remediated** — flat steps |
 
-| URL area | Layout | ui/* | Card | Table | Feedback | Notes |
-|----------|--------|------|------|-------|----------|-------|
-| `/signin`, `/signup`, `/reset-password` | AuthCard | yes | ui/card via AuthCard | — | useActionFeedback | canonical auth |
-| `/accept-invite` | AuthCard | partial | AuthCard | — | useActionFeedback | migrated |
-| `/workspaces` | Section | yes | ui/card | — | toast | workspace index |
-| `…/audiences`, `…/audios`, `…/scripts`, `…/voicemails` | list shell | yes | — | DataTable | inline error | WorkspaceResourceListShell |
-| `…/contacts` | ContactsPage | yes | panel | DataTable | inline error | canonical list |
-| `…/campaigns/new`, `…/scripts/new`, etc. | BrandedCard | partial | BrandedCard | — | inline | FormField migration |
-| `…/billing` | panel | partial | ui/card | raw `<table>` | URL banner | Phase E |
-| `…/surveys/…/responses` | panel | yes | ui/card | raw `<table>` | mixed | Phase E |
-| `…/settings/numbers` | Section | yes | — | NumbersTable raw | — | Phase E |
-| `/admin/*` | panel | yes | ui/card | manual ui/table | toast | evaluate DataTable |
-| `/pricing` | marketing | no | ad hoc | — | — | hex literals |
+---
 
-### Redundancy register
+## Section 8 — Chrome & data placement
+
+| Concern | Current | Gap / recommendation |
+|---------|---------|----------------------|
+| Workspace picker | Root `listUserWorkspaceSummaries` → `{id,name,role,credits|null}`; desktop DropdownMenu + mobile list | **Implemented.** Keep root-only `/workspaces/:id` destinations; cover truncation/RBAC in tests |
+| Credits in chrome | Navbar Admin+ readout + WorkspaceNav footer + ProgressStrip + layout banners | Keep server Admin+ nulling; consolidate revalidation (see credit event wave) |
+| Credit revalidation | Navbar owns a credit EventSource; `$id.tsx` owns campaign; producer missing | Emit `transaction_history` from ledger write; consolidate multi-table subscription |
+| Onboarding progress | ProgressStrip under Navbar | **Conforming.** OverviewCard removed; goal-step tests import ProgressStrip |
+| Never hide as auth | Nav role filters are presentation | Server gates remain source of truth |
+
+**Target chrome composition:**
+
+```text
+Navbar: wordmark | compact workspace picker | Docs | account | theme | [Admin+ credits]
+Route chrome: OnboardingProgressStrip when onboarding
+Workspace panel: flat step / page content only
+```
+
+---
+
+## Section 9 — Icon inventory
+
+| System | Approx. adoption | Status |
+|--------|------------------|--------|
+| **lucide-react** | majority of new UI | canonical for new code |
+| **react-icons** | campaign script, chats ConversationList, signup/oauth remnants, Result.IconMap | migrate opportunistically |
+| **Result.IconMap** | disposition → Md icons | documented domain exception — keep |
+
+---
+
+## Section 10 — Redundancy / anti-pattern register
 
 | ID | Problem | Files | Canonical replacement |
 |----|---------|-------|----------------------|
-| R1 | Duplicated raw input class | `campaigns/new`, `scripts/new`, `audiences/new`, `audios/new`, campaign audiences new | `FormField` + `Input`/`Select` inside `BrandedCard` |
-| R2 | List page shell duplicated | audiences, audios, scripts, voicemails routes | `WorkspaceResourceListShell` |
-| R3 | Ad hoc auth layout | accept-invite | `AuthCard` |
-| R4 | Table strategy split | billing, survey responses, NumbersTable | `DataTable` + `ui/table` |
-| R5 | Dual icon libraries | Navbar, campaign script, signup | lucide-react (keep Result.IconMap) |
-| R6 | Dead code | forms/Inputs, Icons.tsx | removed |
-| R7 | Unused font registrations | tailwind.css (Josefin, Lilita, Sarabun, Big Slab) | deregistered |
-| R8 | Inline hex colors | CallScreen.CallArea | semantic tokens |
-| R9 | CustomCard import paths | 8 production files | `BrandedCard` direct imports |
-| R10 | Inline error headings | list routes, billing | `useActionFeedback` + `ui/alert` / `Text destructive` |
+| R1 | Container Card / BrandedCard inside panel | Today, onboarding steps, creation routes, voicemail setup, Softphone | `PageShell` / `Section variant="flat"` + FormField |
+| R2 | Nested bordered form groups | OnboardingBusinessBasics, CampaignSettings, MessageSettings | muted insets / fieldsets |
+| R3 | Ad hoc Panel / brand chrome | numbers.route `Panel`, audience detail tab shell | shared panel classes or flat Section |
+| R4 | Empty-state Card in panel | NumbersTable, NumberSummaryList, ContactsPage (ResourceListShell flattened) | adopt `WorkspaceResourceEmptyState` |
+| R5 | Table strategy split | QueueTable, AudienceUploadHistory, NumbersTable, admin tables | DataTable + ui/table; specialize only filters |
+| R6 | Dual icon libraries | Navbar migrated; chats/campaign remnants | lucide-react |
+| R7 | Transparent / disabled Card chrome | ConversationList | `div`/`section` |
+| R8 | Absolute Card as modal | Question EditModal | `Dialog` — **removed** |
+| R9 | Invalid list nesting | `services.tsx` + `ServiceCard` both `<li>` | one list item owner — **fixed** |
+| R10 | Orphan / inactive UI | legacy aliases and campaign controls | **removed** PR 10 |
+| R11 | Admin parent always shows dashboard above Outlet | `admin+/route.tsx` | index-only dashboard — **fixed** |
+| R12 | Softphone padding + Card | SoftphonePanel / AgentDesktop | flat section; drop `container p-6` |
+| R13 | Campaign setup progress in content Card | CampaignSetupGuide | route chrome under Navbar / settings header strip |
+| R14 | Raw controls | NumberSummaryList, ChatInput, AudienceUploader, onboarding country select | `Select` / `FormField` / `Textarea` |
+| R15 | Credit SSE gap | `$id.tsx` | `transaction_history` revalidation |
 
 ---
 
-## Root Causes
+## Section 11 — Must fix (prioritized, post-remediation)
 
-1. Migration from legacy patterns stopped mid-way — composition exists but routes weren't updated.
-2. List/table patterns were copy-pasted per feature instead of extracting from ContactsPage / DataTable.
-3. Brand styling remains in route class strings instead of Heading/Text/components.
-4. Base CSS styles native inputs, reducing pressure to use `Input`.
+1. **Chat primitive/a11y migration** — ChatHeader DropdownMenu parity; ChatImages keyboard/touch remove.
+2. **QueueTable token pass** — semantic status tokens; optional DataTable chrome alignment.
+3. **Credit event regression coverage** — purchase/debit browser smoke after PR 2 emitter.
+4. **Surveys builder** — review remaining Card hierarchy for entity vs container misuse.
+5. **ConversationList empty transparent Card** — replace with semantic layout element.
+
+**Addressed in PRs 1–10:** onboarding flattening; numbers Panel removal; Softphone flattening; CampaignSettings; audience/contact detail; WorkspaceToday; IVR Dialog; admin outlet/tables; public services list; orphan deletions.
 
 ---
 
-## Recommended Implementation Sequence
+## Section 12 — Should fix
 
-1. ~~Refresh this audit (ledger PR)~~ — done
-2. Phase A: dead code, fonts, favicon, accept-invite AuthCard
-3. Phase B: WorkspaceResourceListShell + creation route FormField migration
-4. Phase C: semantic tokens, BrandedCard imports, feedback standardization
-5. Phase D: lucide migration in nav/campaign hot paths
-6. Phase E: billing, survey responses, NumbersTable → DataTable pattern
+- Typography pass on remaining low-traffic routes: slab only on chrome/CTAs.
+- Replace raw palette with semantic tokens across Nav status, TeamMember, results metrics, queue.
+- Label gaps: MessageSettings textarea, admin filter inputs.
+- Household → call-panel-classes; CallContact hex → tokens.
+- FormFieldControl adoption so description/error ids attach to controls.
+- `react-icons` → `lucide-react` opportunistically in chats/campaign remnants.
+
+---
+
+## Section 13 — Conforming patterns (keep)
+
+- Workspace panel as single in-app surface owner + skip link to `#workspace-main-content`.
+- Billing: flat Sections, Alert variants, Accordion rates, BillingActivityTable muted inset.
+- OnboardingProgressStrip placement under Navbar.
+- call-panel-classes on CallArea / QueueList / Questionnaire; OperatorColumn layout-only.
+- Calls log: Heading + DataTable.
+- Analytics + settings ApiKeys: `Section variant="flat"`.
+- AuthCard auth flows; single root Toaster.
+- PeopleHub as light tab chrome (not a page Card).
+- Dialog/Sheet overlays for advanced number settings, campaign dialogs, purchase confirms.
+
+---
+
+## Section 14 — Test coupling
+
+Relocate deliberately if redesigning shells:
+
+| Selector / contract | Where |
+|---------------------|-------|
+| `onboarding-step` | ProgressStrip (sole owner) |
+| `skipped-first-number-notice` | OnboardingWizard Alert |
+| `campaign-goals` / `campaign-goal-*` | campaigns/new |
+| `campaign-launch-review` / `campaign-readiness` | CampaignSettings / BasicInfo |
+| `campaign-queue-table` | QueueTable |
+| `call-screen-dial` / `call-screen-disposition` | CallArea; e2e CallScreenPage |
+| `credits-error-banner` | CallScreen.Layout; e2e rbac/dial-modes |
+| `chats-unread-badge` | WorkspaceNav |
+| `audience-upload-step` / `audience-next-upload` | audiences/new |
+| `api-key-*` | ApiKeysSection e2e |
+| `navbar-user-menu` / `logout-button` | Navbar |
+| Campaign-only revalidation | `workspace-realtime-revalidation.test.tsx` — will change with R15 |
+
+UI test clusters: `test/ui/workspace-*`, `call-screen-*`, `number-summary-list`, `billing-activity-table`, `audience-*`, `campaign-*`, `onboarding-*`, `components-workspace-nav`, e2e under `e2e/specs/`.
+
+---
+
+## Section 15 — Verification appendix
+
+### Live evidence (2026-07-17, light)
+
+| Route | Result |
+|-------|--------|
+| `/workspaces/:id/onboarding?step=business_profile` | ProgressStrip + Business basics Card + nested `rounded-lg border p-4` groups; no OverviewCard in DOM source |
+| Same @ 375 | No horizontal overflow; Browse Workspace Sheet pattern; strip/content readable |
+| Same @ 1280 | main/panel ~949px; no overflow |
+| Same @ 1920 | main/panel ~1589px; full-bleed OK |
+| `/workspaces/:id/billing` | Flat Credits page + Stripe test Alert — conforming |
+| `/workspaces/:id/settings/numbers` | Snapshot saw Phone numbers + empty Card + verify/purchase; intermittent error-boundary on some navigations |
+| `/workspaces/:id/audiences` | Hard error page this session — **unverified live**; source audited |
+| `/` | Marketing structure present; screenshot blanked once — treat as flaky capture |
+
+### Unverified live
+
+- Dark mode all routes
+- Admin portal, chats with conversations, call screen with live Twilio, survey builder, Softphone connected state
+- Authenticated ultrawide interaction beyond width metrics
+
+### Source audit agents (this pass)
+
+Domain inventories were produced in parallel and reconciled against live/source checks. PRs 1–10 remediation merged on `sai-flow`; PR 10 removed confirmed orphans and refreshed this ledger.
+
+### Remediation coverage matrix (PR 10 status)
+
+| Surface | Baseline (pre-plan) | Post-remediation | Browser matrix |
+|---------|---------------------|------------------|----------------|
+| Billing | OK | Preserved | to verify |
+| Settings (general/API/webhook) | OK / minor | Preserved | to verify |
+| Calls log | OK | Preserved | to verify |
+| Analytics | OK | Preserved | to verify |
+| Campaign archive | OK | Preserved | to verify |
+| Onboarding | Nested Cards | **Addressed** — flat Sections + ProgressStrip | to verify |
+| Settings/numbers | Depth 3+ Panel | **Addressed** — flat Sections | to verify |
+| Handset/softphone | Depth 3–4 | **Addressed** — flat stack | to verify |
+| Campaign settings | Depth 3–4 | **Addressed** — flat Sections | to verify |
+| Audience detail/upload | Depth 3–4 | **Addressed** — flat tabs | to verify |
+| Contacts/detail | Card stack | **Addressed** — flat + accordion | to verify |
+| Workspace Today | Card + slab title | **Addressed** — flat typography | to verify |
+| Creation routes | Nested BrandedCard | **Addressed** — flat Section | to verify |
+| Surveys | Card hierarchy | Minor — entity hierarchy retained | to verify |
+| Chats | Semantic panes | Partial — controls open | to verify |
+| Call screen | Mostly OK | Preserved | to verify |
+| Admin | Stacked outlet | **Addressed** — index/outlet split | to verify |
+| Public/auth | Minor defects | **Addressed** — services list, pricing, signup width | to verify |
+| Dead/legacy components | Open | **Addressed** — PR 10 deletions | N/A |
+
+---
+
+## Section 16 — Ordered next actions
+
+Post-remediation follow-ups:
+
+1. Run full browser matrix (light/dark × 375/1280/1920) — see [`docs/remediation/component-surface-browser-checklist-2026-07-17.md`](remediation/component-surface-browser-checklist-2026-07-17.md).
+2. Chat primitive/a11y migration (ChatHeader, ChatImages).
+3. QueueTable token pass and optional DataTable chrome alignment.
+4. Credit purchase/debit browser smoke after ledger emitter.
+5. Expand UI tests for analytics, audio recorder, admin tables overflow.
 
 See [design-system.md](design-system.md) for canonical usage rules.

@@ -44,6 +44,8 @@ import { deriveAndPersistWorkspaceThroughput } from "@/lib/database/workspace-tw
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace-twilio-sync.server";
 import type { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import type { z } from "zod";
+import type { InboundRoutingPresetApplication } from "../../shared/inbound-routing-presets";
+import { applyRoutingPresetWithTenantDb } from "@/lib/routing-preset-write.server";
 
 type PatchNumberInput = z.infer<typeof patchNumberBodySchema>;
 
@@ -387,6 +389,39 @@ export async function patchWorkspaceNumber(
   }
 
   return { ok: true as const, number };
+}
+
+/**
+ * Applies a canonical inbound routing preset in one tenant-scoped update.
+ * Building the complete patch before touching the database guarantees that
+ * validation failures cannot leave a partially-updated route.
+ */
+export async function applyWorkspaceNumberRoutingPreset(
+  userId: string,
+  workspaceId: string,
+  numberId: string,
+  application: InboundRoutingPresetApplication,
+) {
+  const access = await requireNumbersManager(userId, workspaceId);
+  if (!access.ok) {
+    return access;
+  }
+
+  try {
+    const tdb = createTenantDb(workspaceId);
+    return await applyRoutingPresetWithTenantDb(
+      tdb,
+      numberId,
+      application,
+    );
+  } catch (error) {
+    logger.error("applyWorkspaceNumberRoutingPreset error", error);
+    return {
+      ok: false as const,
+      error: "Failed to apply routing preset",
+      status: 500,
+    };
+  }
 }
 
 export async function deleteWorkspaceNumber(

@@ -1,6 +1,12 @@
-import type { WorkspaceMessagingOnboardingState , WorkspaceOperatingCountry , WorkspaceOnboardingChannel } from "@/lib/types";
+import type {
+  WorkspaceMessagingOnboardingState,
+  WorkspaceOperatingCountry,
+  WorkspaceOnboardingChannel,
+  WorkspaceOnboardingGoal,
+} from "@/lib/types";
 import {
   WORKSPACE_ONBOARDING_CHANNEL_VALUES,
+  WORKSPACE_ONBOARDING_GOAL_VALUES,
   WORKSPACE_ONBOARDING_STATUS_VALUES,
   WORKSPACE_OPERATING_COUNTRY_VALUES,
 } from "@/lib/types";
@@ -39,6 +45,7 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
   currentStep: "business_profile",
   operatingCountry: "CA",
   selectedChannels: [],
+  selectedGoal: null,
   steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   businessProfile: {
     legalBusinessName: "",
@@ -173,6 +180,13 @@ export function normalizeWorkspaceMessagingOnboardingState(
       ),
   );
 
+  const selectedGoalRaw = parseOptionalString(value.selectedGoal);
+  const selectedGoal: WorkspaceOnboardingGoal | null =
+    selectedGoalRaw &&
+    WORKSPACE_ONBOARDING_GOAL_VALUES.includes(selectedGoalRaw as WorkspaceOnboardingGoal)
+      ? (selectedGoalRaw as WorkspaceOnboardingGoal)
+      : null;
+
   const businessProfile = normalizeBusinessProfile(
     value.businessProfile,
     DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.businessProfile,
@@ -225,6 +239,7 @@ export function normalizeWorkspaceMessagingOnboardingState(
       selectedChannels.length > 0
         ? selectedChannels
         : DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.selectedChannels,
+    selectedGoal,
     businessProfile,
     messagingService,
     subaccountBootstrap,

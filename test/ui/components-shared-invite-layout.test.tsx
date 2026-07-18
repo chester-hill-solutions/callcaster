@@ -44,30 +44,6 @@ describe("app/components/shared/BrandedCard.tsx", () => {
   });
 });
 
-describe("app/components/shared/ErrorBoundary.tsx", () => {
-  test("renders children when no error", async () => {
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    render(
-      <ErrorBoundary>
-        <span>ok</span>
-      </ErrorBoundary>,
-    );
-    expect(screen.getByText("ok")).toBeInTheDocument();
-  });
-
-  test("shows fallback on child error", async () => {
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    const boundary = new ErrorBoundary({
-      children: <span>ok</span>,
-      fallback: <div>fallback</div>,
-    });
-    boundary.state = ErrorBoundary.getDerivedStateFromError(new Error("boom"));
-
-    render(<>{boundary.render()}</>);
-    expect(screen.getByText("fallback")).toBeInTheDocument();
-  });
-});
-
 describe("app/components/shared/InfoPopover.tsx", () => {
   test("renders trigger and content", async () => {
     const InfoPopover = (await import("@/components/shared/InfoPopover")).default;
@@ -228,7 +204,7 @@ describe("app/components/layout/Navbar.tsx", () => {
         />
       </SmokeRouter>,
     );
-    expect(screen.getByText(/Home|WS|user/i)).toBeTruthy();
+    expect(screen.getAllByText(/Home|WS|user/i).length).toBeGreaterThan(0);
   });
 
   test("signed-out navbar", async () => {
@@ -273,6 +249,9 @@ describe("app/components/layout/Navbar.MobileMenu.tsx", () => {
               } as never
             }
             handleSignOut={async () => ({ success: null, error: null })}
+            workspaces={null}
+            activeWorkspaceId={undefined}
+            creditWorkspace={null}
           />
         </SmokeRouter>
       );

@@ -34,10 +34,18 @@ import {
   Phone,
   Monitor,
   Plus,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CampaignHeaderProps {
   className?: string;
+  settingsOnly?: boolean;
   campaign: {
     title: string;
   };
@@ -87,6 +95,7 @@ const deviceSelectClass =
 
 export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   className,
+  settingsOnly = false,
   campaign,
   count,
   completed,
@@ -121,51 +130,66 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
 
   return (
     <div className={cn("flex w-full flex-col gap-4 p-4", className)}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Heading as="h1" level={2} branded={false}>
-            {campaign.title}
-          </Heading>
-          <Text variant="muted" className="mt-1">
-            {count - completed} of {count} remaining
-          </Text>
-          {hasAccess ? (
-            <Text variant="muted" className="mt-1 flex flex-wrap items-center gap-2">
-              {availableCredits} credits remaining
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-sm font-medium",
-                  creditBadgeClass[creditState],
-                )}
-              >
-                {creditLabel[creditState]}
-              </span>
+      {!settingsOnly ? (
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading as="h1" level={2} branded={false}>
+              {campaign.title}
+            </Heading>
+            <Text variant="muted" className="mt-1">
+              {count - completed} of {count} remaining
             </Text>
-          ) : null}
+            {hasAccess ? (
+              <Text
+                variant="muted"
+                className="mt-1 flex flex-wrap items-center gap-2"
+              >
+                {availableCredits} credits remaining
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-sm font-medium",
+                    creditBadgeClass[creditState],
+                  )}
+                >
+                  {creditLabel[creditState]}
+                </span>
+              </Text>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="destructive"
+              onClick={onLeaveCampaign}
+              className="flex items-center gap-2"
+            >
+              <PhoneOff size={16} />
+              Leave Campaign
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onReportError}
+              className="flex items-center gap-2"
+            >
+              <AlertTriangle size={16} />
+              Report Issue
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="destructive"
-            onClick={onLeaveCampaign}
-            className="flex items-center gap-2"
-          >
-            <PhoneOff size={16} />
-            Leave Campaign
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onReportError}
-            className="flex items-center gap-2"
-          >
-            <AlertTriangle size={16} />
-            Report Issue
-          </Button>
-        </div>
-      </div>
+      ) : null}
 
-      <Accordion type="single" collapsible className="w-full">
+      <Accordion
+        type="single"
+        collapsible
+        defaultValue={settingsOnly ? "devices" : undefined}
+        className="w-full"
+      >
         <AccordionItem value="devices" className="border-border/60">
-          <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+          <AccordionTrigger
+            className={cn(
+              "py-2 text-sm font-medium hover:no-underline",
+              settingsOnly && "sr-only",
+            )}
+          >
             Audio & phone settings
           </AccordionTrigger>
           <AccordionContent className="space-y-4">
@@ -202,7 +226,10 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                       </SelectItem>
                     ))}
                     {availableMicrophones.length === 0 ? (
-                      <SelectItem value={AUDIO_DEVICE_UNAVAILABLE_VALUE} disabled>
+                      <SelectItem
+                        value={AUDIO_DEVICE_UNAVAILABLE_VALUE}
+                        disabled
+                      >
                         Microphone unavailable
                       </SelectItem>
                     ) : null}
@@ -242,7 +269,10 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                       </SelectItem>
                     ))}
                     {availableSpeakers.length === 0 ? (
-                      <SelectItem value={AUDIO_DEVICE_UNAVAILABLE_VALUE} disabled>
+                      <SelectItem
+                        value={AUDIO_DEVICE_UNAVAILABLE_VALUE}
+                        disabled
+                      >
                         Speaker unavailable
                       </SelectItem>
                     ) : null}
@@ -264,10 +294,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
 
             <div className="flex flex-wrap items-center gap-4">
               <div className="relative inline-block">
-                <Select
-                  value={selectedDevice}
-                  onValueChange={onDeviceSelect}
-                >
+                <Select value={selectedDevice} onValueChange={onDeviceSelect}>
                   <SelectTrigger
                     className={cn(deviceSelectClass, "cursor-pointer pr-8")}
                   >
@@ -290,9 +317,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                   )}
                 </div>
                 {phoneStatus === "connecting" ? (
-                  <span className="ml-2 text-warning">
-                    Connecting...
-                  </span>
+                  <span className="ml-2 text-warning">Connecting...</span>
                 ) : null}
               </div>
 
@@ -331,10 +356,18 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
             />
             <DialogFooter>
-              <Button type="button" className="flex-1" onClick={onVerifyNewNumber}>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={onVerifyNewNumber}
+              >
                 Verify Number
               </Button>
-              <Button type="button" variant="outline" onClick={onAddNumberCancel}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onAddNumberCancel}
+              >
                 Cancel
               </Button>
             </DialogFooter>
@@ -355,3 +388,87 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
     </div>
   );
 };
+
+interface TopChromeProps {
+  campaign: { title: string };
+  count: number;
+  completed: number;
+  availableCredits: number;
+  creditState: CampaignHeaderProps["creditState"];
+  hasAccess: boolean;
+  predictive: boolean;
+  onLeaveCampaign: () => void;
+  onReportError: () => void;
+  children?: React.ReactNode;
+}
+
+export function TopChrome({
+  campaign,
+  count,
+  completed,
+  availableCredits,
+  creditState,
+  hasAccess,
+  predictive,
+  onLeaveCampaign,
+  onReportError,
+  children,
+}: TopChromeProps) {
+  return (
+    <header className="sticky top-0 z-20 rounded-xl border bg-background/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <Heading as="h1" level={3} branded={false} className="truncate">
+            {campaign.title}
+          </Heading>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {count - completed} of {count} remaining
+            </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
+              {predictive ? "Power dialing" : "Manual dialing"}
+            </span>
+            {hasAccess ? (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 font-medium",
+                  creditBadgeClass[creditState],
+                )}
+              >
+                {availableCredits} credits
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {children}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Campaign actions"
+              >
+                <MoreHorizontal className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onReportError}>
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Report Issue
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={onLeaveCampaign}
+                className="text-destructive focus:text-destructive"
+              >
+                <PhoneOff className="mr-2 h-4 w-4" />
+                Leave Campaign
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </header>
+  );
+}

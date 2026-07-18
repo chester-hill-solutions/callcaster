@@ -2,9 +2,9 @@ import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
 import { Form, Link } from "react-router";
 import { useState, useCallback } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
+import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader } from "@/components/ui/card";
-import { Heading, Text } from "@/components/ui/typography";
+import { Heading } from "@/components/ui/typography";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -29,6 +29,7 @@ export const NumbersTable = ({
   mediaNames = [],
   queues = [],
   scripts = [],
+  forwardingNumbers,
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
@@ -46,6 +47,7 @@ export const NumbersTable = ({
   mediaNames: { id: number | string; name: string }[];
   queues?: { id: number; name: string }[];
   scripts?: { id: number; name: string }[];
+  forwardingNumbers?: WorkspaceNumbers[];
   onIncomingActivityChange: (id: number, value: string) => void;
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
@@ -138,9 +140,9 @@ export const NumbersTable = ({
     [onNumberRemoval],
   );
 
-  const verifiedNumbers = numbers.filter(
-    (number) => number?.type === "caller_id",
-  );
+  const verifiedNumbers =
+    forwardingNumbers ??
+    numbers.filter((number) => number?.type === "caller_id");
 
   return (
       <>
@@ -148,24 +150,17 @@ export const NumbersTable = ({
       {title}
     </Heading><div className="flex flex-col py-4">
         {numbers.length === 0 ? (
-          hideEmptyState ? null :
-          <div className="flex items-center justify-center py-8">
-            <Card className="w-full max-w-md">
-              <CardHeader className="items-center gap-2 text-center">
-                <Heading as="h2" level={3} branded={false}>
-                  No phone numbers yet
-                </Heading>
-                <Text variant="muted" className="max-w-sm">
-                  Rent a number or verify a caller ID to start calling.
-                </Text>
-                <div className="flex justify-center pt-2">
-                  <Button asChild>
-                    <Link to="./purchase">Rent a Number</Link>
-                  </Button>
-                </div>
-              </CardHeader>
-            </Card>
-          </div>
+          hideEmptyState ? null : (
+            <WorkspaceResourceEmptyState
+              emptyMessage="No phone numbers yet"
+              emptyDescription="Rent a number or verify a caller ID to start calling."
+              addAction={
+                <Button asChild>
+                  <Link to="./purchase">Rent a Number</Link>
+                </Button>
+              }
+            />
+          )
         ) : (
         <Table>
           <TableHeader>

@@ -22,11 +22,10 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-import {
-  handleRoleTextStyles,
-  MemberRole,
-} from "@/components/workspace/TeamMember";
+import { handleRoleTextStyles } from "@/components/workspace/TeamMember";
 import { Section, SectionHeader } from "@/components/shared/Section";
+import { MemberRole } from "@/lib/member-role";
+import { getWorkspaceRoleDisplayName } from "@/lib/workspace-role-display";
 import {
   Dialog,
   DialogClose,
@@ -64,8 +63,8 @@ const WorkspaceCard = React.memo(
         <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold text-brand-primary dark:text-white">
           {workspace.name}
         </h5>
-        <p className={`text-xl capitalize ${handleRoleTextStyles(role)}`}>
-          {role}
+        <p className={`text-xl ${handleRoleTextStyles(role)}`}>
+          {getWorkspaceRoleDisplayName(role)}
         </p>
       </NavLink>
     );

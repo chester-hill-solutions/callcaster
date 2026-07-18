@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { authUser } from "@/db/auth-schema";
 import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
@@ -566,6 +567,11 @@ export async function listUserWorkspaceSummaries(userId: string) {
   return rows.map((row) => ({
     id: row.workspace.id,
     name: row.workspace.name,
+    role: row.role,
+    // Credit balances surface in global chrome for Admin+ members only.
+    credits: hasMinRole(row.role, MemberRole.Admin)
+      ? Number(row.workspace.credits ?? 0)
+      : null,
   }));
 }
 

@@ -453,45 +453,38 @@ export default function ChatHeader({
               </div>
             )}
             {!existingConversation && allContacts.length > 0 && (
-              <div
-                className="relative inline-block w-full text-left sm:w-auto"
-                ref={dropdownRef as React.RefObject<HTMLDivElement>}
+              <DropdownMenu
+                open={isContactMenuOpen}
+                onOpenChange={(open) => {
+                  if (open !== isContactMenuOpen) toggleContactMenu();
+                }}
               >
-                <button
-                  type="button"
-                  className="inline-flex w-full justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:w-auto"
-                  onClick={toggleContactMenu}
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto">
+                    {selectedContact
+                      ? `${selectedContact.firstname} ${selectedContact.surname}`
+                      : "Select Contact"}
+                    <MdExpandMore
+                      className="ml-2 h-5 w-5"
+                      aria-hidden="true"
+                    />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="max-h-60 w-full overflow-auto sm:w-56"
                 >
-                  {selectedContact
-                    ? `${selectedContact.firstname} ${selectedContact.surname}`
-                    : "Select Contact"}
-                  <MdExpandMore
-                    className="-mr-1 ml-2 h-5 w-5"
-                    aria-hidden="true"
-                  />
-                </button>
-                {isContactMenuOpen && (
-                  <div className="absolute right-0 z-10 mt-2 max-h-60 w-full origin-top-right overflow-auto rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-zinc-800 sm:w-56">
-                    <div
-                      className="py-1"
-                      role="menu"
-                      aria-orientation="vertical"
-                      aria-labelledby="options-menu"
+                  {allContacts.map((contactItem) => (
+                    <DropdownMenuItem
+                      key={contactItem.id}
+                      onSelect={() => handleContactSelect(contactItem)}
                     >
-                      {allContacts.map((contact) => (
-                        <button
-                          key={contact.id}
-                          className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                          onClick={() => handleContactSelect(contact)}
-                        >
-                          {contact.firstname} {contact.surname} -{" "}
-                          {contact.phone}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                      {contactItem.firstname} {contactItem.surname} -{" "}
+                      {contactItem.phone}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         )}

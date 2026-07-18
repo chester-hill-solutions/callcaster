@@ -2,7 +2,6 @@
  * Campaign-related database functions
  */
 import { eq, inArray } from "drizzle-orm";
-import type { Database, Json } from "@/lib/db-types";
 import {
   Campaign,
   CampaignSchedule,
@@ -11,10 +10,15 @@ import {
 } from "../types";
 import { logger } from "../logger.server";
 import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
-import { campaign as campaignTable, script as scriptTable } from "@/db/schema";
+import { campaign as campaignTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { db, type Database } from "@/server/db";
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import {
+  persistCampaignScript,
+  persistCampaignScriptWithTenantDb,
+} from "@/lib/script-persistence.server";
 
 export type CampaignType =
   | "live_call"
@@ -310,9 +314,6 @@ type ScriptUpdateProps = {
   campaignData: Campaign;
   created_by: string;
   created_at: string;
-  tdb?: TenantDb;
-  /** @deprecated ignored */
-  client?: never;
 };
 
 export type SplitMessageCampaignResult = {
@@ -436,47 +437,97 @@ export async function updateOrCopyScript({
   campaignData,
   created_by,
   created_at,
-  tdb: tdbIn,
 }: ScriptUpdateProps) {
-  const tdb = tdbIn ?? createTenantDb(workspaceId);
-  const { id, ...updateData } = scriptData;
-
-  let originalScript: Script | null = null;
-  if (id) {
-    originalScript = (await tdb.script.findFirst({
-      where: eq(scriptTable.id, id),
-    })) as Script | null;
+  const campaignId = Number(
+    (campaignData as Campaign & { campaign_id?: string | number }).campaign_id ??
+      campaignData.id,
+  );
+  if (!Number.isFinite(campaignId)) {
+    throw new Error("Campaign ID is required");
   }
-
-  const upsertData: Partial<Script> = {
-    ...scriptData,
-    name:
-      saveAsCopy && originalScript?.name === updateData.name
-        ? `${updateData.name} (Copy)`
-        : updateData.name,
-    ...(saveAsCopy || !id
-      ? { updated_by: created_by, updated_at: created_at }
-      : { created_by, created_at }),
-  };
-
   try {
-    if (saveAsCopy || !id) {
-      const { id: _unusedId, ...insertData } = upsertData;
-      const [inserted] = await tdb.script.insert(insertData);
-      return inserted;
-    }
-
-    const [updated] = await tdb.script.update({
-      set: upsertData,
-      where: eq(scriptTable.id, id!),
+    return await persistCampaignScript({
+      workspaceId,
+      campaignId,
+      scriptId: scriptData.id,
+      content: {
+        name: scriptData.name,
+        steps: scriptData.steps,
+        type: scriptData.type,
+      },
+      actorId: created_by,
+      saveAsCopy,
+      timestamp: created_at,
     });
-    return updated;
   } catch (error: unknown) {
     const pgError = error as { code?: string; message?: string };
     if (pgError.code === "23505") {
       logger.error("Duplicate script conflict", error);
       throw new Error(
-        `A script with this name (${upsertData.name}) already exists in the workspace`,
+        `A script with this name (${scriptData.name}) already exists in the workspace`,
+      );
+    }
+    throw error;
+  }
+}
+
+export async function updateCampaignWithScript(args: {
+  workspaceId: string;
+  campaignData: CampaignData;
+  campaignDetails: CampaignDetails;
+  scriptData: Script;
+  saveAsCopy: boolean;
+  actorId: string;
+  timestamp?: string;
+  dbInstance?: Database;
+}) {
+  const campaignId = Number(args.campaignData.campaign_id ?? args.campaignData.id);
+  if (!Number.isFinite(campaignId)) {
+    throw new Error("Campaign ID is required");
+  }
+  const database = args.dbInstance ?? db;
+
+  try {
+    return await database.transaction(
+      async (txRaw) => {
+        const tdb = createTenantDb(
+          args.workspaceId,
+          txRaw as unknown as Database,
+        );
+        const script = await persistCampaignScriptWithTenantDb({
+          workspaceId: args.workspaceId,
+          campaignId,
+          scriptId: args.scriptData.id,
+          content: {
+            name: args.scriptData.name,
+            steps: args.scriptData.steps,
+            type: args.scriptData.type,
+          },
+          actorId: args.actorId,
+          saveAsCopy: args.saveAsCopy,
+          timestamp: args.timestamp,
+          tdb,
+        });
+        const campaignData = {
+          ...args.campaignData,
+          workspace: args.workspaceId,
+          script_id: script.id,
+        };
+        const updated = await updateCampaign({
+          campaignData,
+          campaignDetails: args.campaignDetails,
+          tdb,
+        });
+        return { ...updated, scriptId: script.id, script };
+      },
+      { isolationLevel: "serializable" },
+    );
+  } catch (error: unknown) {
+    const pgError = error as { code?: string };
+    if (pgError.code === "23505") {
+      logger.error("Duplicate script conflict", error);
+      throw new Error(
+        `A script with this name (${args.scriptData.name}) already exists in the workspace`,
       );
     }
     throw error;

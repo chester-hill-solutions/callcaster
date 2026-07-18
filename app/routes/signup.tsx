@@ -14,7 +14,7 @@ import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
-import { FormField } from "@/components/ui/form-field";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Text , Heading } from "@/components/ui/typography";
@@ -147,12 +147,12 @@ interface ContactFormProps {
 }
 
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">
+  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-md font-Zilla-Slab">
     <div className="flex flex-wrap gap-8">
       <AuthCard
         title="Request Access"
         description="Registration is currently available by invitation. Contact us to let us know you're interested."
-        className="min-w-[400px] flex-initial bg-secondary py-2"
+        className="w-full bg-secondary py-2"
         headingAs="h2"
       >
         <fetcher.Form
@@ -163,31 +163,37 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
         >
           <input type="hidden" value={"signup"} id="signup" name="signup" />
           <FormField htmlFor="name" label="Name">
-            <Input
-              type="text"
-              id="name"
-              name="name"
-              required
-              className="bg-background text-foreground"
-            />
+            <FormFieldControl>
+              <Input
+                type="text"
+                id="name"
+                name="name"
+                required
+                className="bg-background text-foreground"
+              />
+            </FormFieldControl>
           </FormField>
           <FormField htmlFor="contact-email" label="Email">
-            <Input
-              type="email"
-              id="contact-email"
-              name="email"
-              required
-              className="bg-background text-foreground"
-            />
+            <FormFieldControl>
+              <Input
+                type="email"
+                id="contact-email"
+                name="email"
+                required
+                className="bg-background text-foreground"
+              />
+            </FormFieldControl>
           </FormField>
           <FormField htmlFor="message" label="Message">
-            <Textarea
-              id="message"
-              name="message"
-              rows={4}
-              required
-              className="border-input bg-background text-foreground"
-            />
+            <FormFieldControl>
+              <Textarea
+                id="message"
+                name="message"
+                rows={4}
+                required
+                className="border-input bg-background text-foreground"
+              />
+            </FormFieldControl>
           </FormField>
           <Button
             disabled={isBusy}

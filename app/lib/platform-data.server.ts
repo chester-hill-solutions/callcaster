@@ -886,6 +886,7 @@ export async function getAudienceDetailApi(
   });
   const sortKey = searchParams.get("sort_key") || "id";
   const sortDirection = searchParams.get("sort_direction") === "desc" ? "desc" : "asc";
+  const searchQuery = (searchParams.get("q") ?? "").trim().replaceAll(",", " ");
   const audienceIdNum = Number(audienceId);
   const sortColumn = audienceContactSortColumn(sortKey);
   const tdb = createTenantDb(workspaceId);
@@ -901,6 +902,7 @@ export async function getAudienceDetailApi(
     const audienceContactFilter = and(
       eq(contactAudienceTable.audience_id, audienceIdNum),
       eq(contactTable.workspace, workspaceId),
+      searchQuery ? buildContactSearchWhere(searchQuery) : undefined,
     );
 
     const [contactRows, countRows, latestUpload] = await Promise.all([
@@ -933,6 +935,7 @@ export async function getAudienceDetailApi(
         total_count: countRows[0]?.value ?? 0,
       } satisfies PaginationMeta,
       sorting: { sort_key: sortKey, sort_direction: sortDirection },
+      search_query: searchQuery || null,
       latest_upload: latestUpload
         ? {
             id: latestUpload.id,

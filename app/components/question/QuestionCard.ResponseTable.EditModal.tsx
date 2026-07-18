@@ -1,6 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/form-field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface EditResponseModalProps {
   isOpen: boolean;
@@ -10,65 +24,109 @@ interface EditResponseModalProps {
   initialNextAction?: string;
 }
 
-export const EditResponseModal = ({ isOpen, onClose, onSave, initialInput, initialNextAction = 'hangup' }: EditResponseModalProps) => {
-  const [input, setInput] = useState(initialInput || '');
+const INPUT_OPTIONS = [...Array(10).keys(), "Voice - Any"] as const;
+
+const NEXT_ACTION_OPTIONS = [
+  { value: "hangup", label: "Hangup" },
+  { value: "next", label: "Next Question" },
+  { value: "voicemail", label: "Voicemail" },
+] as const;
+
+export const EditResponseModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialInput,
+  initialNextAction = "hangup",
+}: EditResponseModalProps) => {
+  const [input, setInput] = useState(initialInput || "");
   const [nextAction, setNextAction] = useState(initialNextAction);
+
+  /**
+   * @effect Reset the edit form to the row being edited whenever the dialog opens or its seed values change.
+   * @effect-deps isOpen (only reset while open); initialInput / initialNextAction (row values from the parent table)
+   * @effect-side-effects none — local controlled-input state only
+   * @effect-why-not-loader Dialog draft state is ephemeral UI; loaders cannot seed per-open modal drafts.
+   */
+  useEffect(() => {
+    if (!isOpen) return;
+    setInput(initialInput || "");
+    setNextAction(initialNextAction);
+  }, [initialInput, initialNextAction, isOpen]);
 
   const handleSave = () => {
     onSave(input, nextAction);
   };
 
-  const inputOptions = [...Array(10).keys(), 'Voice - Any'];
-
-  if (!isOpen) return null;
+  const handleOpenChange = (open: boolean) => {
+    if (!open) onClose();
+  };
 
   return (
-    <Card className="absolute z-20 transform translate-y-10 w-[280px] bg-background">
-      <CardHeader>
-        <CardTitle>Response</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4">
-          <h3 className="font-medium mb-2">Input</h3>
-          <div className="flex flex-wrap gap-2">
-            {inputOptions.map((option) => (
-              <Button
-                key={option}
-                variant="outline"
-                size="sm"
-                onClick={() => setInput(option === 'Voice - Any' ? 'vx-any' : option.toString())}
-                className={`h-[50px] min-w-[50px] rounded-full px-4 ${
-                  input === (option === 'Voice - Any' ? 'vx-any' : option.toString())
-                    ? 'bg-primary text-primary-foreground'
-                    : ''
-                }`}
-              >
-                {option}
-              </Button>
-            ))}
-          </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="sm:max-w-md"
+        data-testid="ivr-edit-response-dialog"
+      >
+        <DialogHeader>
+          <DialogTitle>Response</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <FormField label="Input" htmlFor="ivr-response-input">
+            <div
+              id="ivr-response-input"
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label="Input"
+            >
+              {INPUT_OPTIONS.map((option) => {
+                const optionValue =
+                  option === "Voice - Any" ? "vx-any" : option.toString();
+                const isSelected = input === optionValue;
+
+                return (
+                  <Button
+                    key={option}
+                    type="button"
+                    variant={isSelected ? "default" : "outline"}
+                    size="sm"
+                    aria-pressed={isSelected}
+                    onClick={() => setInput(optionValue)}
+                    className="h-[50px] min-w-[50px] rounded-full px-4"
+                  >
+                    {option}
+                  </Button>
+                );
+              })}
+            </div>
+          </FormField>
+
+          <FormField label="Next Action" htmlFor="ivr-response-next-action">
+            <Select value={nextAction} onValueChange={setNextAction}>
+              <SelectTrigger id="ivr-response-next-action">
+                <SelectValue placeholder="Select next action" />
+              </SelectTrigger>
+              <SelectContent>
+                {NEXT_ACTION_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
         </div>
-        <div className="mb-4">
-          <h3 className="font-medium mb-2">Next Action</h3>
-          <select 
-            value={nextAction} 
-            onChange={(e) => setNextAction(e.target.value)}
-            className="w-full p-2 border rounded-md"
-          >
-            <option value="hangup">Hangup</option>
-            <option value="next">Next Question</option>
-            <option value="voicemail">Voicemail</option>
-          </select>
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-end space-x-2">
-        <Button variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave}>
-          Save
-        </Button>
-      </CardFooter>
-    </Card>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSave}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

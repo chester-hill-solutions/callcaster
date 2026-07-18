@@ -31,9 +31,10 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 0);
     const callScreen = new CallScreenPage(page);
     await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
-    await expect(page.getByTestId("credits-error-banner")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/No Credits Remaining/i)).toBeVisible();
-    await expect(page.getByText(/Purchase more credits/i)).toBeVisible();
+    const banner = page.getByTestId("credits-error-banner");
+    await expect(banner).toBeVisible({ timeout: 30_000 });
+    await expect(banner.getByText(/Credit balance depleted/i)).toBeVisible();
+    await expect(banner.getByRole("link", { name: /Add credits/i })).toBeVisible();
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
   });
 });

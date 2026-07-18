@@ -510,6 +510,8 @@ export default function CampaignSettingsRoute() {
         setupGuideCurrentStepNumber={setupGuideState.currentStepNumber}
         setupGuideTotalSteps={setupGuideState.totalSteps}
         setupGuideAllComplete={setupGuideState.allComplete}
+        setupGuideTitle={setupGuideState.guideTitle}
+        setupGuideLaunchActionLabel={setupGuideState.launchActionLabel}
         onDismissSetupGuide={handleDismissSetupGuide}
         campaignBilling={campaignBilling as CampaignBillingSummary | null}
       />

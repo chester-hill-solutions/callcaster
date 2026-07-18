@@ -39,7 +39,8 @@ export const action = defineAction({
 
     return { params, callSid: callSidRaw };
   },
-  sideEffects: ["db-write"],
+  // Sync upsert skips billing; the enqueued worker job debits terminal calls.
+  sideEffects: ["db-write", "credit"],
   handler: async ({ auth }) => {
     const { params, callSid: callSidRaw } = auth;
     if (!callSidRaw) {

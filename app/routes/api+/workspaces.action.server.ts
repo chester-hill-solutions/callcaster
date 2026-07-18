@@ -25,7 +25,8 @@ export const loader = defineLoader({
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
-  sideEffects: ["db-write", "twilio", "external"],
+  // Workspace creation applies the welcome-credits ledger grant.
+  sideEffects: ["db-write", "credit", "twilio", "external"],
   handler: async ({ request, auth }) => {
     if (request.method !== "POST") {
       return jsonError("Method not allowed", 405);

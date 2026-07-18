@@ -1,10 +1,4 @@
 import React, { useState, useCallback, useImperativeHandle, useMemo } from "react";
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { FaEdit } from "react-icons/fa";
@@ -176,86 +170,82 @@ const ContactDetails = React.forwardRef<
   }, []);
 
   return (
-    <Card className="mx-auto w-full max-w-4xl">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <Heading level={3}>Contact Details</Heading>
-          {isDirty && (
-            <span className="text-sm text-warning font-medium">
-              Unsaved changes
-            </span>
-          )}
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        <ContactFields
-          contact={effectiveContact}
-          editMode={editMode}
-          onInputChange={handleInputChange}
-        />
-        
-        <div className="my-6">
-          <Heading level={4} className="mb-4">Audiences</Heading>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {audiences.map((audience) => (
-              <div key={audience.id} className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  value={audience.id}
-                  checked={isContactInAudience(audience.id)}
-                  name={getAudienceName(audience)}
-                  id={`audience-${audience.id}`}
-                  onChange={handleAudienceChange}
-                  disabled={!editMode}
-                  className="rounded border-input"
-                />
-                <label 
-                  htmlFor={`audience-${audience.id}`}
-                  className="text-sm font-medium text-foreground"
-                >
-                  {getAudienceName(audience)}
-                </label>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div className="mx-auto w-full max-w-4xl space-y-6">
+      <div className="flex items-center justify-between border-b border-border pb-4">
+        <Heading level={3}>Contact Details</Heading>
+        {isDirty && (
+          <span className="text-sm font-medium text-warning">
+            Unsaved changes
+          </span>
+        )}
+      </div>
 
-        <OtherDataFields
-          otherData={(() => {
-            try {
-              const parsed = JSON.parse(contact?.other_data ?? '[]') as Json[];
-              return Array.isArray(parsed) ? parsed : [];
-            } catch {
-              return [];
-            }
-          })()}
-          editMode={editMode}
-          setContact={(data: ContactUpdateData) => {
-            try {
-              // Handle other data changes
-              setHasChanges(true);
-              onChangesChange?.(true);
-            } catch (error) {
-              logger.error('Error updating other data:', error);
-            }
-          }}
-        />
-        
-        <RecentContacts contact={contact} />
-      </CardContent>
+      <ContactFields
+        contact={effectiveContact}
+        editMode={editMode}
+        onInputChange={handleInputChange}
+      />
+
+      <div className="border-t border-border pt-6">
+        <Heading level={4} className="mb-4">Audiences</Heading>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {audiences.map((audience) => (
+            <div key={audience.id} className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                value={audience.id}
+                checked={isContactInAudience(audience.id)}
+                name={getAudienceName(audience)}
+                id={`audience-${audience.id}`}
+                onChange={handleAudienceChange}
+                disabled={!editMode}
+                className="rounded border-input"
+              />
+              <label
+                htmlFor={`audience-${audience.id}`}
+                className="text-sm font-medium text-foreground"
+              >
+                {getAudienceName(audience)}
+              </label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <OtherDataFields
+        otherData={(() => {
+          try {
+            const parsed = JSON.parse(contact?.other_data ?? '[]') as Json[];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        })()}
+        editMode={editMode}
+        setContact={(data: ContactUpdateData) => {
+          try {
+            // Handle other data changes
+            setHasChanges(true);
+            onChangesChange?.(true);
+          } catch (error) {
+            logger.error('Error updating other data:', error);
+          }
+        }}
+      />
+
+      <RecentContacts contact={contact} />
 
       {/* There is only one working Save action (the page header's, which
           submits to the server) — this footer's only job is the Edit gate
           for existing contacts. New contacts start editable and skip it. */}
       {!editMode && (
-        <CardFooter className="flex justify-end space-x-2">
+        <div className="flex justify-end border-t border-border pt-4">
           <Button onClick={handleEdit}>
             <FaEdit className="mr-2" /> Edit
           </Button>
-        </CardFooter>
+        </div>
       )}
-    </Card>
+    </div>
   );
 });
 

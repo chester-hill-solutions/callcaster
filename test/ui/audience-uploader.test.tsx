@@ -172,7 +172,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     // mapping select changes
     const rows = screen.getAllByRole("row");
     const weirdRow = rows.find((r) =>
-      (r as HTMLElement).textContent?.includes("weird"),
+      (r as HTMLElement).textContent?.toLowerCase().includes("weird"),
     ) as HTMLElement;
     const sel = weirdRow.querySelector("select") as HTMLSelectElement;
     fireEvent.change(sel, { target: { value: "city" } });
@@ -221,7 +221,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(
       screen.getByLabelText("Split into First/Last Name"),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("full name").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Full Name").length).toBeGreaterThanOrEqual(1);
   });
 
   test("file selection with empty file contents is a no-op", async () => {
@@ -245,6 +245,36 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     expect(screen.queryByText("empty.csv")).toBeNull();
     expect(screen.queryByText("Map CSV Headers")).toBeNull();
+  });
+
+  test("blocks confirmation until one phone column has a unique target", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    const { container } = render(
+      <AudienceUploader client={makeDbClient()} audienceName="A1" />,
+    );
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
+    const csv = "Email,Mobile,Telephone\na@example.com,4165551234,6475551234";
+    const file = new File([csv], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => csv;
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+
+    expect(screen.getByText("Phone number is assigned to more than one CSV column.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm Mapping" })).toBeDisabled();
+
+    const telephoneRow = screen
+      .getAllByRole("row")
+      .find((row) => row.textContent?.includes("Telephone"));
+    fireEvent.change(within(telephoneRow as HTMLElement).getByRole("combobox"), {
+      target: { value: "other_data" },
+    });
+
+    expect(screen.getByRole("button", { name: "Confirm Mapping" })).toBeEnabled();
   });
 
   test("upload flow: submits to /api/audience-upload, enables polling, and completes via polling (calls onUploadComplete)", async () => {
@@ -283,7 +313,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       }
       if (String(url).includes("/api/audience-upload")) {
         const body = init?.body as FormData;
-        expect(body.get("split_name_column")).toBe("name");
+        expect(body.get("split_name_column")).toBe("Name");
         return {
           ok: true,
           async json() {

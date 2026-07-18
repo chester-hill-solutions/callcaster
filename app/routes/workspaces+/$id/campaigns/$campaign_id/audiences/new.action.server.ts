@@ -31,7 +31,6 @@ export const action = defineAction({
 
     const formData = await request.formData();
     const formAction = formData.get("formAction") as string;
-    const contactsFile = formData.get("contacts") as File;
 
     if (!formData.get("audience-name")) {
       return routeData(
@@ -48,7 +47,6 @@ export const action = defineAction({
           formData,
           workspaceId,
           headers,
-          contactsFile,
           campaignId,
           userId: user.id,
         });

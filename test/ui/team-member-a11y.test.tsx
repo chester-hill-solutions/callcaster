@@ -52,6 +52,7 @@ describe("app/components/workspace/TeamMember.tsx", () => {
     expect(
       screen.getByRole("button", { name: "Manage ana.hernandez" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Coordinator")).toBeInTheDocument();
   });
 
   test("the cancel-invite button has an accessible name", () => {
@@ -66,5 +67,6 @@ describe("app/components/workspace/TeamMember.tsx", () => {
     expect(
       screen.getByRole("button", { name: "Cancel invite for sam.chen" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Invited")).toBeInTheDocument();
   });
 });

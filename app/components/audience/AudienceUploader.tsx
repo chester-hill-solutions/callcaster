@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { parse } from "csv-parse/sync";
 import { MdAdd, MdClose, MdCheck } from "react-icons/md";
@@ -12,8 +12,16 @@ import { logger } from "@/lib/logger.client";
 import type { Database } from "@/lib/db-types";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { useTimeoutFn } from "@/hooks/utils/useTimeoutFn";
+import {
+  CONTACT_IMPORT_LABELS,
+  CONTACT_IMPORT_TARGETS,
+  suggestContactImportMapping,
+  validateContactImportMapping,
+} from "../../../shared/contact-import-headers";
 
-export const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
+export const VALID_HEADERS = CONTACT_IMPORT_TARGETS.filter(
+  (target) => target !== "name",
+);
 
 // Parse CSV with columns option for better mapping
 export const parseCSV = (csvString: string) => {
@@ -132,7 +140,7 @@ export const parseCSVAsync = async (
       }
     }
 
-    const headers = parseCSVHeaders(Object.keys(records[0] || {}));
+    const headers = (rawHeaderRow ?? []).map((header) => header.trim());
     const contacts = parseCSVData(records, headers);
     return { headers, contacts };
   } catch (error) {
@@ -144,12 +152,16 @@ export const parseCSVAsync = async (
 type AudienceUploaderProps = {
   audienceName?: string;
   existingAudienceId?: string;
+  campaignId?: string;
+  returnTo?: string | null;
   onUploadComplete?: (audienceId: string) => void;
 };
 
 export default function AudienceUploader({ 
   audienceName = "", 
   existingAudienceId,
+  campaignId,
+  returnTo,
     onUploadComplete 
 }: AudienceUploaderProps) {
   const params = useParams();
@@ -178,6 +190,11 @@ export default function AudienceUploader({
   // Add new state for status polling
   const [statusPollingEnabled, setStatusPollingEnabled] = useState(false);
   const [currentUploadId, setCurrentUploadId] = useState<number | null>(null);
+  const mappingIssues = useMemo(
+    () => validateContactImportMapping(headerMapping),
+    [headerMapping],
+  );
+  const hasBlockingMappingIssue = mappingIssues.some((issue) => issue.blocking);
 
   const scheduleRedirect = useTimeoutFn();
 
@@ -240,7 +257,10 @@ export default function AudienceUploader({
         if (completedAudienceId) {
           // Wait a moment to show the completion state before redirecting
           scheduleRedirect(2000, () => {
-            navigate(`/workspaces/${workspaceId}/audiences/${completedAudienceId}`);
+            navigate(
+              returnTo ??
+                `/workspaces/${workspaceId}/audiences/${completedAudienceId}`,
+            );
           });
         }
       }
@@ -282,7 +302,7 @@ export default function AudienceUploader({
           `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspaceId}`
         );
 
-        let data: {
+        type UploadStatusResponse = {
           error?: string;
           status?: string;
           total_contacts?: number;
@@ -290,9 +310,10 @@ export default function AudienceUploader({
           error_message?: string;
           audience_id?: string | number;
           stage?: string;
-        } | null = null;
+        };
+        let data: UploadStatusResponse | null = null;
         try {
-          data = (await response.json()) as typeof data;
+          data = (await response.json()) as UploadStatusResponse;
         } catch (parseError) {
           logger.error("Error parsing upload status response:", parseError);
           registerPollFailure();
@@ -340,22 +361,11 @@ export default function AudienceUploader({
       return cleanContact;
     });
 
-    const nameColumnHeader = headers.find(h =>
-      h.toLowerCase() === 'name' || h.toLowerCase() === 'full name'
+    const initialMapping = suggestContactImportMapping(headers);
+    const nameColumnHeader = headers.find(
+      (header) => initialMapping[header] === "name",
     );
-
-    const initialMapping = headers.reduce((acc, header) => {
-      const normalizedHeader = header.toLowerCase().trim();
-      if (nameColumnHeader && header === nameColumnHeader) {
-        setSplitNameColumn(header);
-        acc[header] = "name";
-      } else if (VALID_HEADERS.includes(normalizedHeader)) {
-        acc[header] = normalizedHeader;
-      } else {
-        acc[header] = "other_data";
-      }
-      return acc;
-    }, {} as Record<string, string>);
+    setSplitNameColumn(nameColumnHeader ?? null);
 
     setHeaderMapping(initialMapping);
     setPendingFileName(file.name);
@@ -369,6 +379,11 @@ export default function AudienceUploader({
       ...prev,
       [originalHeader]: newMapping
     }));
+    if (newMapping === "name") {
+      setSplitNameColumn(originalHeader);
+    } else if (splitNameColumn === originalHeader) {
+      setSplitNameColumn(null);
+    }
   };
 
   const handleRemoveFile = () => {
@@ -380,6 +395,7 @@ export default function AudienceUploader({
   };
 
   const handleConfirmMapping = () => {
+    if (hasBlockingMappingIssue) return;
     setIsHeaderMappingConfirmed(true);
   };
 
@@ -406,6 +422,9 @@ export default function AudienceUploader({
       
       formData.append("contacts", selectedFile!);
       formData.append("header_mapping", JSON.stringify(headerMapping));
+      if (campaignId) {
+        formData.append("campaign_id", campaignId);
+      }
       if (splitNameColumn) {
         formData.append("split_name_column", splitNameColumn);
       }
@@ -481,12 +500,13 @@ export default function AudienceUploader({
       </div>
       
       {pendingFileName && (
-        <div className="rounded-lg border p-4 bg-zinc-100 dark:bg-zinc-900">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-zinc-900 dark:text-white">Map CSV Headers</h3>
+        <div className="rounded-md border bg-muted/40 p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-medium text-foreground">Map CSV Headers</h3>
             {!isHeaderMappingConfirmed ? (
               <Button
                 onClick={handleConfirmMapping}
+                disabled={hasBlockingMappingIssue}
                 className="bg-brand-primary text-white hover:bg-brand-secondary"
               >
                 Confirm Mapping
@@ -524,10 +544,10 @@ export default function AudienceUploader({
                         >
                           {VALID_HEADERS.map(validHeader => (
                             <option key={validHeader} value={validHeader}>
-                              {validHeader}
+                              {CONTACT_IMPORT_LABELS[validHeader]}
                             </option>
                           ))}
-                          <option value="name">name (will be split)</option>
+                          <option value="name">{CONTACT_IMPORT_LABELS.name} (split into names)</option>
                         </select>
                       </TableCell>
                       {splitNameColumn && header === splitNameColumn && (
@@ -549,9 +569,25 @@ export default function AudienceUploader({
                 </TableBody>
               </Table>
 
-              <div className="mt-4 rounded-lg border p-4">
-                <h3 className="mb-4 font-medium text-zinc-900 dark:text-white">Data Preview (First 5 rows)</h3>
-                <div className="overflow-x-auto">
+              {mappingIssues.length > 0 ? (
+                <div className="mt-4 space-y-2" aria-live="polite">
+                  {mappingIssues.map((issue) => (
+                    <Alert
+                      key={`${issue.code}-${issue.headers.join("-")}`}
+                      variant={issue.blocking ? "destructive" : "default"}
+                    >
+                      <AlertTitle>
+                        Mapping needs attention
+                      </AlertTitle>
+                      <AlertDescription>{issue.message}</AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-4 border-t border-border pt-4">
+                <h3 className="mb-4 font-medium text-foreground">Data Preview (First 5 rows)</h3>
+                <div className="overflow-x-auto rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -560,6 +596,11 @@ export default function AudienceUploader({
                             {header}
                             <div className="text-xs text-muted-foreground">
                               → {headerMapping[header]}
+                              {headerMapping[header]
+                                ? ` (${CONTACT_IMPORT_LABELS[
+                                    headerMapping[header] as keyof typeof CONTACT_IMPORT_LABELS
+                                  ]})`
+                                : ""}
                             </div>
                           </TableHead>
                         ))}
@@ -637,7 +678,7 @@ export default function AudienceUploader({
         <div className="flex justify-end">
           <Button
             onClick={handleUploadContacts}
-            disabled={!pendingFileName || !isHeaderMappingConfirmed}
+            disabled={!pendingFileName || !isHeaderMappingConfirmed || hasBlockingMappingIssue}
             className="bg-brand-primary text-white hover:bg-brand-secondary"
           >
             Start Upload

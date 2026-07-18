@@ -156,7 +156,9 @@ describe("app/components/audience/AudienceTable.tsx", () => {
       />,
     );
 
-    expect(screen.getByText("No contacts in this audience yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Add contacts to start building this Call list"),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /export csv/i }));
     expect(mocks.submit).not.toHaveBeenCalled();
@@ -183,7 +185,9 @@ describe("app/components/audience/AudienceTable.tsx", () => {
     fireEvent.change(screen.getByPlaceholderText("Search contacts..."), {
       target: { value: "nomatch" },
     });
-    expect(screen.getByText("No contacts found matching your search")).toBeInTheDocument();
+    expect(
+      screen.getByText("Contacts matching your search will appear here"),
+    ).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Search contacts..."), {
       target: { value: "bob" },
@@ -281,7 +285,9 @@ describe("app/components/audience/AudienceTable.tsx", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove Selected (2)" }));
     const [, opts] = mocks.submit.mock.calls.at(-1)!;
     expect(opts).toEqual({ action: "/api/contact-audience/bulk-delete", method: "DELETE" });
-    expect(screen.getByText("No contacts in this audience yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Add contacts to start building this Call list"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Remove Selected (2)")).toBeNull();
   });
 

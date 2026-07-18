@@ -8,7 +8,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { RootNavbarUser } from "@/root.loader.server";
+import type {
+  RootNavbarUser,
+  RootWorkspaceSummary,
+} from "@/root.loader.server";
 
 type MobileMenuProps = {
   open: boolean;
@@ -18,6 +21,9 @@ type MobileMenuProps = {
   handleSignOut: () => Promise<
     { success: string | null; error: string | null }
   >;
+  workspaces: RootWorkspaceSummary[] | null;
+  activeWorkspaceId: string | undefined;
+  creditWorkspace: (RootWorkspaceSummary & { credits: number }) | null;
 };
 
 export const MobileMenu = ({
@@ -26,6 +32,9 @@ export const MobileMenu = ({
   isSignedIn,
   user,
   handleSignOut,
+  workspaces,
+  activeWorkspaceId,
+  creditWorkspace,
 }: MobileMenuProps) => {
   const navLinkClass =
     "rounded-lg border border-transparent px-3 py-2 font-Zilla-Slab text-lg font-semibold text-foreground transition-colors hover:border-border hover:bg-muted";
@@ -57,19 +66,9 @@ export const MobileMenu = ({
             <NavLink to="/" onClick={close} className={navLinkClass}>
               Home
             </NavLink>
-            <NavLink to="/pricing" onClick={close} className={navLinkClass}>
-              Pricing
-            </NavLink>
             <NavLink to="/docs" onClick={close} className={navLinkClass}>
               Docs
             </NavLink>
-            <a
-              href="mailto:info@callcaster.ca"
-              onClick={close}
-              className={`block ${navLinkClass}`}
-            >
-              Support
-            </a>
             {!isSignedIn && (
               <>
                 <NavLink to="/signin" onClick={close} className={navLinkClass}>
@@ -81,6 +80,39 @@ export const MobileMenu = ({
               </>
             )}
           </div>
+
+          {user && workspaces && workspaces.length > 0 && (
+            <div className="space-y-1">
+              <p className="px-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                Your workspaces
+              </p>
+              {workspaces.map((workspace) => (
+                <NavLink
+                  key={workspace.id}
+                  to={`/workspaces/${workspace.id}`}
+                  onClick={close}
+                  className={`${navLinkClass} block truncate ${
+                    workspace.id === activeWorkspaceId ? "border-border bg-muted" : ""
+                  }`}
+                >
+                  {workspace.name}
+                </NavLink>
+              ))}
+              {creditWorkspace ? (
+                <Link
+                  to={`/workspaces/${creditWorkspace.id}/billing`}
+                  onClick={close}
+                  className="block px-3 py-1 text-sm text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Credits:{" "}
+                  <span className="tabular-nums font-medium text-foreground">
+                    {creditWorkspace.credits.toLocaleString()}
+                  </span>{" "}
+                  · Add credits
+                </Link>
+              ) : null}
+            </div>
+          )}
 
           {user && (
             <div className="space-y-3 rounded-xl border border-border/80 bg-card/70 p-3">

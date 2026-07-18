@@ -2,8 +2,9 @@ import { Link, useLoaderData, useNavigate, useFetcher, useOutletContext } from "
 import { useCallback, useRef, useState } from "react";
 import { BellOff } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { BrandedCard as Card } from "@/components/shared/BrandedCard";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   Select,
   SelectContent,
@@ -11,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Text } from "@/components/ui/typography";
 import { SoftphonePanel } from "@/components/calls/SoftphonePanel";
 import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { useAgentStatus } from "@/hooks/agent/useAgentStatus";
@@ -96,56 +98,49 @@ export default function AgentDesktop() {
 
   if (!handsetNumber) {
     return (
-      <div className="container mx-auto max-w-md p-6">
-        <Card className="p-6">
-          <h1 className="text-xl font-semibold">Agent Desktop</h1>
-          <p className="mt-2 text-muted-foreground">
-            No phone number is set up for this workspace. Add a number in
-            workspace settings and enable handset mode to receive calls here.
-          </p>
-          <Button asChild className="mt-4">
-            <Link to={`/workspaces/${workspaceId}/settings`}>
-              Workspace settings
-            </Link>
-          </Button>
-        </Card>
-      </div>
+      <PageShell title="Agent Desktop" maxWidth="narrow">
+        <Text variant="muted">
+          No phone number is set up for this workspace. Add a number in
+          workspace settings and enable handset mode to receive calls here.
+        </Text>
+        <Button asChild className="w-fit">
+          <Link to={`/workspaces/${workspaceId}/settings`}>
+            Workspace settings
+          </Link>
+        </Button>
+      </PageShell>
     );
   }
 
   if (tokenError || runtimeError) {
     return (
-      <div className="container mx-auto max-w-md p-6">
-        <Card className="p-6">
-          <h1 className="text-xl font-semibold">Agent Desktop</h1>
-          <StatusBar
-            currentStatus={effectiveStatus}
-            onSetStatus={handleSetStatus}
-            disabled={statusLoading}
-            error={tokenError ?? runtimeError ?? undefined}
-          />
-          <p className="mt-4 text-destructive">{tokenError ?? runtimeError}</p>
-          <Button asChild variant="outline" className="mt-4">
-            <Link to={`/workspaces/${workspaceId}`}>Back to workspace</Link>
-          </Button>
-        </Card>
-      </div>
+      <PageShell title="Agent Desktop" maxWidth="narrow">
+        <StatusBar
+          currentStatus={effectiveStatus}
+          onSetStatus={handleSetStatus}
+          disabled={statusLoading}
+          error={tokenError ?? runtimeError ?? undefined}
+        />
+        <Alert variant="destructive">
+          <AlertDescription>{tokenError ?? runtimeError}</AlertDescription>
+        </Alert>
+        <Button asChild variant="outline" className="w-fit">
+          <Link to={`/workspaces/${workspaceId}`}>Back to workspace</Link>
+        </Button>
+      </PageShell>
     );
   }
 
   if (!token) {
     return (
-      <div className="container mx-auto max-w-md p-6">
-        <Card className="p-6">
-          <h1 className="text-xl font-semibold">Agent Desktop</h1>
-          <StatusBar
-            currentStatus={effectiveStatus}
-            onSetStatus={handleSetStatus}
-            disabled={statusLoading}
-          />
-          <p className="mt-4 text-muted-foreground">Connecting...</p>
-        </Card>
-      </div>
+      <PageShell title="Agent Desktop" maxWidth="narrow">
+        <StatusBar
+          currentStatus={effectiveStatus}
+          onSetStatus={handleSetStatus}
+          disabled={statusLoading}
+        />
+        <Text variant="muted">Connecting...</Text>
+      </PageShell>
     );
   }
 
@@ -217,9 +212,9 @@ function AgentDesktopConnected({
   });
 
   const waitingContent = isAvailable ? (
-    <p className="mt-6 text-center text-muted-foreground">Waiting for calls...</p>
+    <p className="text-center text-muted-foreground">Waiting for calls...</p>
   ) : (
-    <div className="mt-6 flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2">
       <BellOff className="h-8 w-8 text-muted-foreground/50" />
       <p className="text-muted-foreground">
         You&apos;re currently {effectiveStatus?.status ?? "offline"}
@@ -247,14 +242,12 @@ function AgentDesktopConnected({
       waitingContent={waitingContent}
       onEndSession={controller.handleEndSession}
       headerExtra={
-        <div className="mt-2">
-          <StatusBar
-            currentStatus={effectiveStatus}
-            onSetStatus={onSetStatus}
-            disabled={statusLoading}
-            error={runtimeError ?? statusError ?? undefined}
-          />
-        </div>
+        <StatusBar
+          currentStatus={effectiveStatus}
+          onSetStatus={onSetStatus}
+          disabled={statusLoading}
+          error={runtimeError ?? statusError ?? undefined}
+        />
       }
     />
   );
@@ -352,7 +345,7 @@ function StatusBar({
       </div>
 
       {pendingStatus && (
-        <div className="flex items-center gap-2 rounded-lg border p-2">
+        <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2">
           <Select
             value={reason}
             onValueChange={(v) => {

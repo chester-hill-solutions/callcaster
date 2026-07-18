@@ -4,19 +4,26 @@ import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
+import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding/readiness.server";
 import {
   getWorkspaceInfoWithDetails,
   getWorkspacePhoneNumbers,
 } from "@/lib/database/workspace.server";
+import { getWorkspaceUnreadConversationCount } from "@/lib/database/workspace-conversations.server";
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { workspaceContext } from "@/lib/route-context.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
+import {
+  selectWorkspaceToday,
+  type WorkspaceTodaySelection,
+} from "@/lib/workspace-today.server";
 
 type LoaderData = {
   userRole: string | null | undefined;
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
+  today?: WorkspaceTodaySelection;
 };
 
 export const loader = defineLoader({
@@ -33,34 +40,62 @@ export const loader = defineLoader({
 
     try {
       const pathname = url.pathname;
-      const [onboarding, phoneNumbersResult, recentOutboundCount, workspaceData] =
-        await Promise.all([
+      const isExactWorkspaceRoot = pathname === `/workspaces/${workspaceId}`;
+      const [
+        onboarding,
+        phoneNumbersResult,
+        recentOutboundCount,
+        workspaceData,
+        unreadCount,
+      ] = await Promise.all([
           getWorkspaceMessagingOnboardingState({ workspaceId }),
           getWorkspacePhoneNumbers({ workspaceId }),
           getWorkspaceRecentOutboundMessageCount({ workspaceId }),
           getWorkspaceInfoWithDetails({ workspaceId, userId }),
+          isExactWorkspaceRoot
+            ? getWorkspaceUnreadConversationCount(workspaceId)
+            : Promise.resolve(0),
         ]);
+      const workspaceNumbers = (phoneNumbersResult.data ?? []).map((number) => ({
+        type: number?.type ?? null,
+        phone_number: number?.phone_number ?? null,
+        capabilities: number?.capabilities ?? null,
+      }));
       const readiness = deriveWorkspaceMessagingReadiness({
         onboarding,
-        workspaceNumbers: (phoneNumbersResult.data ?? []).map((number) => ({
-          type: number?.type ?? null,
-          phone_number: number?.phone_number ?? null,
-          capabilities: number?.capabilities ?? null,
-        })),
+        workspaceNumbers,
         recentOutboundCount,
       });
+      // Fresh workspaces (no legacy traffic) send admins straight to the
+      // onboarding wizard instead of showing setup errors on the root page.
       if (
-        pathname === `/workspaces/${workspaceId}` &&
+        isExactWorkspaceRoot &&
         (userRole === "owner" || userRole === "admin") &&
         readiness.shouldRedirectToOnboarding
       ) {
         throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
       }
+      const workspaceSummary = workspaceData.workspace as unknown as {
+        credits?: number | null;
+      };
+      const credits = Number(workspaceSummary.credits ?? 0);
+      const today = isExactWorkspaceRoot
+        ? selectWorkspaceToday({
+            workspaceId,
+            userRole,
+            credits: Number.isFinite(credits) ? credits : 0,
+            onboardingIncomplete: readiness.shouldShowOnboardingBanner,
+            hasWorkspaceNumber: workspaceHasFirstNumber(workspaceNumbers),
+            campaigns: workspaceData.campaigns,
+            unreadCount,
+          })
+        : undefined;
 
       return routeData({
         userRole,
         workspaceData,
         onboardingReadiness: readiness,
+        ...(today ? { today } : {}),
       } satisfies LoaderData, { headers });
     } catch (error) {
       if (

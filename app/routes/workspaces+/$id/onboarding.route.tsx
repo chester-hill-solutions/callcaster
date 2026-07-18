@@ -23,6 +23,8 @@ export default function WorkspaceMessagingOnboardingRoute() {
     mediaNames,
     inboundQueues,
     scripts,
+    audienceCount,
+    campaignCount,
   } = useLoaderData<OnboardingLoaderData>();
   const actionData = useActionData<OnboardingActionData>();
   const navigation = useNavigation();
@@ -54,6 +56,7 @@ export default function WorkspaceMessagingOnboardingRoute() {
   const pendingAction =
     navigation.state === "idle" ? null : String(navigation.formData?.get("_action") ?? "");
   const pending = {
+    isSavingWorkspaceName: pendingAction === "save_workspace_name",
     isSavingBusinessProfile: pendingAction === "save_business_profile",
     isSavingChannels: pendingAction === "save_channels",
     isProvisioningA2P: pendingAction === "provision_a2p",
@@ -81,10 +84,13 @@ export default function WorkspaceMessagingOnboardingRoute() {
       pending={pending}
       a2pBlockingIssues={a2pBlockingIssues}
       a2pErrors={a2pErrors}
+      actionError={actionData?.error}
       workspaceUsers={workspaceUsers}
       mediaNames={mediaNames}
       inboundQueues={inboundQueues}
       scripts={scripts}
+      audienceCount={audienceCount}
+      campaignCount={campaignCount}
     />
   );
 }

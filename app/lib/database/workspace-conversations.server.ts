@@ -8,8 +8,13 @@ import {
   type ChatSortOption,
   type ConversationSummary,
 } from "../chat-conversation-sort";
+import {
+  sumUnreadConversationCount,
+  UNREAD_CONVERSATION_PAGE_SIZE,
+} from "@/lib/chats/unread-count";
 
 type FetchConversationSummaryOptions = {
+  enrichContacts?: boolean;
   limit?: number;
   offset?: number;
   sort?: ChatSortOption;
@@ -357,6 +362,14 @@ export async function fetchConversationSummary(
     };
   });
 
+  if (options.enrichContacts === false) {
+    return {
+      chats,
+      chatsError: null,
+      hasMore,
+    };
+  }
+
   const contactsById = new Map<number, ContactNameRow>();
   if (contactIds.size > 0) {
     const batches = chunk(Array.from(contactIds), CONTACT_IDS_BATCH_SIZE);
@@ -464,6 +477,27 @@ export async function fetchConversationSummary(
     chatsError: null,
     hasMore,
   };
+}
+
+/**
+ * Uses the same newest-100-conversation window as the persistent navigation
+ * badge so the server-rendered Today action and client badge agree.
+ */
+export async function getWorkspaceUnreadConversationCount(
+  workspaceId: string,
+): Promise<number> {
+  const result = await fetchConversationSummary(workspaceId, null, {
+    enrichContacts: false,
+    limit: UNREAD_CONVERSATION_PAGE_SIZE,
+  });
+  if (result.chatsError) {
+    logger.error("Error loading unread conversation count", {
+      error: result.chatsError,
+      workspaceId,
+    });
+    return 0;
+  }
+  return sumUnreadConversationCount(result.chats);
 }
 
 // Exposed for the SQL/JS parity fixture test (test/workspace-conversations-sql-parity.test.ts).

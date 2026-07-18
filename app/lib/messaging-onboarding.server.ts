@@ -1,6 +1,7 @@
 export {
   WIZARD_ONBOARDING_STEP_IDS,
   isWizardOnboardingStepId,
+  resolvePersistedWizardStep,
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "@/lib/messaging-onboarding/defaults.server";

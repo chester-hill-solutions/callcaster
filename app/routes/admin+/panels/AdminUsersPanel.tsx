@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
+import { AdminTableOverflow } from "@/components/admin/AdminTableOverflow";
 import type { Tables } from "@/lib/db-types";
 
 import type { WorkspaceWithCampaigns } from "../admin.types";
@@ -84,7 +85,7 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-wrap gap-3 mb-4">
-                        <div className="flex-1 min-w-[200px]">
+                        <div className="min-w-0 flex-1 basis-full sm:min-w-[200px]">
                             <div className="relative">
                                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -95,7 +96,7 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
                                 />
                             </div>
                         </div>
-                        <div className="w-[150px]">
+                        <div className="w-full min-w-0 sm:w-[150px]">
                             <Select
                                 value={filter.accessLevel}
                                 onValueChange={(value) =>
@@ -123,6 +124,7 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
                         </Button>
                     </div>
 
+                    <AdminTableOverflow>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -236,6 +238,7 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
                             )}
                         </TableBody>
                     </Table>
+                    </AdminTableOverflow>
 
                     {filteredUsers.length > 0 && (
                         <div className="flex items-center justify-between mt-4">

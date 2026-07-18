@@ -13,6 +13,11 @@ import {
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
+import { parsePhoneNumber } from "@/lib/phone";
+import {
+  splitContactFullName,
+  validateContactImportMapping,
+} from "../../shared/contact-import-headers";
 
 interface CSVContact {
   [key: string]: string;
@@ -24,7 +29,7 @@ interface MappedContact {
   created_by: string;
   firstname?: string;
   surname?: string;
-  other_data?: Array<{ key: string; value: unknown }>; // JSONB array of key-value pairs
+  other_data?: Array<Record<string, unknown>>;
   [key: string]: unknown;
 }
 
@@ -205,6 +210,13 @@ export const processAudienceUpload = async (
     if (missingHeaders.length > 0) {
       throw new Error(`Missing headers in CSV: ${missingHeaders.join(', ')}`);
     }
+    const duplicateIssue = validateContactImportMapping(headerMapping).find(
+      (issue) => issue.blocking && issue.code === "duplicate-target",
+    );
+    if (duplicateIssue) {
+      throw new Error(duplicateIssue.message);
+    }
+    const hasPhoneMapping = Object.values(headerMapping).includes("phone");
 
     // Update total contacts count
     await tdb.audience_upload.update({
@@ -215,6 +227,8 @@ export const processAudienceUpload = async (
     // Process contacts in chunks
     const CHUNK_SIZE = 100;
     let processedCount = 0;
+    let importedCount = 0;
+    let skippedInvalidCount = 0;
     const importedAt = new Date().toISOString();
     const voterListStamp =
       voterListSource != null
@@ -228,7 +242,7 @@ export const processAudienceUpload = async (
       const chunk = parsedContacts.slice(i, i + CHUNK_SIZE);
 
       // Map the contacts according to the header mapping
-      const mappedContacts = chunk.map((contact: CSVContact) => {
+      const mappedContacts = chunk.flatMap((contact: CSVContact) => {
         logger.debug('Processing contact:', contact);
 
         const mappedContact: MappedContact = {
@@ -241,10 +255,9 @@ export const processAudienceUpload = async (
         if (splitNameColumn) {
           const actualHeader = headerLookup.get(splitNameColumn.toLowerCase());
           if (actualHeader) {
-            const fullName = contact[actualHeader] || '';
-            const [firstName, ...lastNameParts] = fullName.split(' ');
-            mappedContact.firstname = firstName || '';
-            mappedContact.surname = lastNameParts.join(' ') || '';
+            const splitName = splitContactFullName(contact[actualHeader]);
+            mappedContact.firstname = splitName.firstname;
+            mappedContact.surname = splitName.surname;
           }
         }
 
@@ -262,13 +275,14 @@ export const processAudienceUpload = async (
 
           if (dbField !== 'name') { // Skip the name field as it's handled above
             if (dbField === 'other_data') {
-              // Add to other_data array as a key-value pair
+              // Keep custom values in the same object-per-column shape used by
+              // the other canonical CSV contact parser.
               if (value !== undefined) {
-                mappedContact.other_data?.push({
-                  key: actualHeader,
-                  value: value
-                });
+                mappedContact.other_data?.push({ [actualHeader]: value });
               }
+            } else if (dbField === "phone") {
+              const normalizedPhone = parsePhoneNumber(value ?? null);
+              if (normalizedPhone) mappedContact.phone = normalizedPhone;
             } else {
               if (value !== undefined) {
                 mappedContact[dbField] = value;
@@ -288,8 +302,13 @@ export const processAudienceUpload = async (
           mappedContact.voter_list_imported_at = voterListStamp.voter_list_imported_at;
         }
 
+        if (hasPhoneMapping && !mappedContact.phone) {
+          skippedInvalidCount += 1;
+          return [];
+        }
+
         logger.debug('Final mapped contact:', mappedContact);
-        return mappedContact;
+        return [mappedContact];
       });
 
       // Log the first contact's transformation
@@ -303,28 +322,31 @@ export const processAudienceUpload = async (
       }
 
       // Insert contacts
-      const insertedContacts = await tdb.contact.insertMany(
-        mappedContacts.map((contact) => ({
-          ...contact,
-          other_data: contact.other_data ?? [],
-          created_at: new Date().toISOString(),
-        })) as Record<string, unknown>[],
-      );
+      if (mappedContacts.length > 0) {
+        const insertedContacts = await tdb.contact.insertMany(
+          mappedContacts.map((contact) => ({
+            ...contact,
+            other_data: contact.other_data ?? [],
+            created_at: new Date().toISOString(),
+          })) as Record<string, unknown>[],
+        );
 
-      if (insertedContacts.length === 0) {
-        throw new Error("Error inserting contacts: no rows returned");
+        if (insertedContacts.length === 0) {
+          throw new Error("Error inserting contacts: no rows returned");
+        }
+
+        importedCount += insertedContacts.length;
+        logger.debug('Inserted contacts sample:', insertedContacts[0]);
+
+        // Link contacts to audience
+        await db.insert(contactAudienceTable).values(
+          insertedContacts.map((contact) => ({
+            contact_id: contact.id,
+            audience_id: audienceId,
+            created_at: new Date().toISOString(),
+          })),
+        );
       }
-
-      logger.debug('Inserted contacts sample:', insertedContacts[0]);
-
-      // Link contacts to audience
-      await db.insert(contactAudienceTable).values(
-        insertedContacts.map((contact) => ({
-          contact_id: contact.id,
-          audience_id: audienceId,
-          created_at: new Date().toISOString(),
-        })),
-      );
 
       // Update progress
       processedCount += chunk.length;
@@ -333,7 +355,8 @@ export const processAudienceUpload = async (
       await writeAudienceUploadStatus(workspaceId, uploadId, {
         ...statusData,
         progress,
-        stage: `Processing contacts (${processedCount}/${parsedContacts.length})`,
+        stage: `Processing contacts (${processedCount}/${parsedContacts.length}; ${skippedInvalidCount} skipped)`,
+        skipped_invalid_contacts: skippedInvalidCount,
       });
 
       // Update upload record
@@ -356,7 +379,7 @@ export const processAudienceUpload = async (
     await tdb.audience.update({
       set: {
         status: "completed",
-        total_contacts: processedCount,
+        total_contacts: importedCount,
       },
       where: eq(audienceTable.id, audienceId),
     });
@@ -373,7 +396,8 @@ export const processAudienceUpload = async (
       ...statusData,
       status: "completed",
       progress: 100,
-      stage: "Upload completed",
+      stage: `Upload completed (${importedCount} imported; ${skippedInvalidCount} skipped)`,
+      skipped_invalid_contacts: skippedInvalidCount,
     });
 
   } catch (error) {

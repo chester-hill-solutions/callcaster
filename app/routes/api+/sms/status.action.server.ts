@@ -60,7 +60,8 @@ export const action = defineAction({
       return { preflight: "failed" };
     }
   },
-  sideEffects: ["db-write"],
+  // Enqueues the worker billing job that debits per-segment SMS credits.
+  sideEffects: ["db-write", "credit"],
   handler: async ({ auth }) => {
     if (auth.preflight === "failed") {
       return routeData({ error: "An unexpected error occurred" }, { status: 500 });

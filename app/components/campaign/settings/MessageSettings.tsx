@@ -4,6 +4,7 @@ import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { useFetcherOnIdle } from "@/hooks/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -65,7 +66,7 @@ function getErrorMessage(error: MessageMediaActionData["error"]) {
 export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: MessageSettingsProps) => {
     const displayText = details?.body_text || '';
     const [eraseVisible, setEraseVisible] = useState<Record<string, boolean>>({});
-    const [showTemplateTags, setShowTemplateTags] = useState(false);
+    const [tagsMenuOpen, setTagsMenuOpen] = useState(false);
     const [resolvedMediaLinks, setResolvedMediaLinks] = useState<string[]>(mediaLinks);
     const [prevMediaLinks, setPrevMediaLinks] = useState(mediaLinks);
     if (prevMediaLinks !== mediaLinks) {
@@ -188,7 +189,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
             textarea.setSelectionRange(start + tag.length, start + tag.length);
         }, 0);
 
-        setShowTemplateTags(false);
+        setTagsMenuOpen(false);
     };
 
     const insertFunctionExample = (example: string) => {
@@ -203,7 +204,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
             textarea.focus();
             textarea.setSelectionRange(start + example.length, start + example.length);
         }, 0);
-        setShowTemplateTags(false);
+        setTagsMenuOpen(false);
     };
 
     const insertSurveyFunction = (surveyId: string, _surveyTitle: string) => {
@@ -219,7 +220,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
             textarea.focus();
             textarea.setSelectionRange(start + surveyFunction.length, start + surveyFunction.length);
         }, 0);
-        setShowTemplateTags(false);
+        setTagsMenuOpen(false);
     };
 
     const renderMediaContent = () => {
@@ -270,7 +271,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                 </div>
             </div>
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
-            <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-secondary/40 p-4 shadow-md">
+            <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg border bg-secondary/40 p-4">
                 <div className="flex flex-col">
                         {renderMediaContent()}
                         <div>
@@ -322,73 +323,91 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                {/* Template Tags Button */}
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowTemplateTags(!showTemplateTags)}
-                                        className="text-muted-foreground cursor-pointer p-1 rounded hover:bg-muted transition-colors"
-                                        title="Insert template tags"
+                                <Popover open={tagsMenuOpen} onOpenChange={setTagsMenuOpen}>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className="cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-muted"
+                                            title="Insert template tags"
+                                        >
+                                            <MdTag size={20} />
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        side="top"
+                                        align="end"
+                                        className="w-80 max-h-96 overflow-y-auto p-0"
                                     >
-                                        <MdTag size={20} />
-                                    </button>
-
-                                    {/* Template Tags Dropdown */}
-                                    {showTemplateTags && (
-                                        <div className="absolute bottom-full right-0 mb-2 w-80 bg-popover border border-border rounded-lg shadow-lg z-10 max-h-96 overflow-y-auto z-50">
-                                            <div className="p-2 border-b border-border">
-                                                <h4 className="text-sm font-semibold text-foreground">Template Tags</h4>
-                                                <p className="text-xs text-muted-foreground mb-1">Click to insert contact field placeholders.</p>
-                                                <p className="text-xs text-muted-foreground mb-1">
-                                                    You can combine tags, text, and functions. Try <span className="font-mono">btoa(&#123;&#123;phone&#125;&#125;:&#123;&#123;external_id&#125;&#125;)</span> or <span className="font-mono">survey(&#123;&#123;contact_id&#125;&#125;, "survey-name")</span>!
-                                                </p>
+                                        <div className="border-b border-border p-2">
+                                            <h4 className="text-sm font-semibold text-foreground">Template Tags</h4>
+                                            <p className="mb-1 text-xs text-muted-foreground">
+                                                Click to insert contact field placeholders.
+                                            </p>
+                                            <p className="mb-1 text-xs text-muted-foreground">
+                                                You can combine tags, text, and functions. Try{" "}
+                                                <span className="font-mono">
+                                                    btoa(&#123;&#123;phone&#125;&#125;:&#123;&#123;external_id&#125;&#125;)
+                                                </span>{" "}
+                                                or{" "}
+                                                <span className="font-mono">
+                                                    survey(&#123;&#123;contact_id&#125;&#125;, &quot;survey-name&quot;)
+                                                </span>
+                                                !
+                                            </p>
+                                        </div>
+                                        <div className="p-1">
+                                            {TEMPLATE_TAGS.map((tag) => (
+                                                <button
+                                                    key={tag.key}
+                                                    type="button"
+                                                    onClick={() => insertTemplateTag(tag.key)}
+                                                    className="w-full rounded p-2 text-left text-sm transition-colors hover:bg-muted"
+                                                >
+                                                    <div className="font-mono text-primary">{tag.key}</div>
+                                                    <div className="text-foreground">{tag.label}</div>
+                                                    <div className="text-xs text-muted-foreground">{tag.description}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="mt-2 border-t border-border px-2 pt-2">
+                                            <div className="mb-1 text-xs font-semibold text-foreground">
+                                                Function Examples
                                             </div>
-                                            <div className="p-1">
-                                                {TEMPLATE_TAGS.map((tag) => (
+                                            <div className="flex flex-col gap-1">
+                                                {FUNCTION_EXAMPLES.map((ex) => (
                                                     <button
-                                                        key={tag.key}
+                                                        key={ex.example}
                                                         type="button"
-                                                        onClick={() => insertTemplateTag(tag.key)}
-                                                        className="w-full text-left p-2 hover:bg-muted rounded text-sm transition-colors"
+                                                        onClick={() => {
+                                                            if ("surveyId" in ex) {
+                                                                insertSurveyFunction(
+                                                                    (ex as { surveyId: string }).surveyId,
+                                                                    (ex as { surveyTitle?: string }).surveyTitle || "",
+                                                                );
+                                                            } else {
+                                                                insertFunctionExample(ex.example);
+                                                            }
+                                                        }}
+                                                        className="mb-1 w-full rounded border border-secondary/60 p-2 text-left text-xs transition-colors hover:bg-secondary/40"
                                                     >
-                                                        <div className="font-mono text-primary">{tag.key}</div>
-                                                        <div className="text-foreground">{tag.label}</div>
-                                                        <div className="text-xs text-muted-foreground">{tag.description}</div>
+                                                        <div className="font-mono text-primary">{ex.example}</div>
+                                                        <div className="text-foreground">{ex.label}</div>
+                                                        <div className="text-muted-foreground">{ex.description}</div>
                                                     </button>
                                                 ))}
                                             </div>
-                                            <div className="border-t border-border mt-2 pt-2 px-2">
-                                                <div className="text-xs font-semibold text-foreground mb-1">Function Examples</div>
-                                                <div className="flex flex-col gap-1">
-                                                    {FUNCTION_EXAMPLES.map((ex) => (
-                                                        <button
-                                                            key={ex.example}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if ("surveyId" in ex) {
-                                                                    insertSurveyFunction((ex as { surveyId: string }).surveyId, (ex as { surveyTitle?: string }).surveyTitle || "");
-                                                                } else {
-                                                                    insertFunctionExample(ex.example);
-                                                                }
-                                                            }}
-                                                            className="w-full text-left p-2 hover:bg-secondary/40 rounded text-xs transition-colors border border-secondary/60 mb-1"
-                                                        >
-                                                            <div className="font-mono text-primary">{ex.example}</div>
-                                                            <div className="text-foreground">{ex.label}</div>
-                                                            <div className="text-muted-foreground">{ex.description}</div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground mt-2">
-                                                    <span className="font-semibold">Tip:</span> You can use <span className="font-mono">btoa(...)</span> to base64-encode any combination of tags and text, or <span className="font-mono">survey(...)</span> to generate personalized survey links.
-                                                </div>
+                                            <div className="mt-2 text-xs text-muted-foreground">
+                                                <span className="font-semibold">Tip:</span> You can use{" "}
+                                                <span className="font-mono">btoa(...)</span> to base64-encode any
+                                                combination of tags and text, or{" "}
+                                                <span className="font-mono">survey(...)</span> to generate
+                                                personalized survey links.
                                             </div>
                                         </div>
-                                    )}
-                                </div>
+                                    </PopoverContent>
+                                </Popover>
 
-                                {/* Media Upload Button */}
-                                <label htmlFor="add-image" className="text-muted-foreground cursor-pointer">
+                                <label htmlFor="add-image" className="cursor-pointer text-muted-foreground">
                                     <MdAddAPhoto size={24} />
                                 </label>
                                 <input

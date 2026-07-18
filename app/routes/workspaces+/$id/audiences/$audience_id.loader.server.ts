@@ -44,6 +44,8 @@ export const loader = defineLoader({
     apiSearchParams.set("page_size", String(pageSize));
     apiSearchParams.set("sort_key", sortKey);
     apiSearchParams.set("sort_direction", sortDirection);
+    const query = url.searchParams.get("q")?.trim();
+    if (query) apiSearchParams.set("q", query);
 
     const detailResult = await getAudienceDetailApi(
       workspace_id,

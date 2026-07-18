@@ -1,12 +1,9 @@
-import { data as routeData } from "react-router";
 import { defineAction } from "@/lib/handler.server";
+import { retiredEndpoint } from "@/lib/redirect-route.server";
 
 export const action = defineAction({
   sideEffects: ["none"],
-  handler: async () => {
-    return routeData(
-      { error: "Audio PIN verification has been retired. Use call-in verification instead." },
-      { status: 410 },
-    );
-  },
+  handler: retiredEndpoint(
+    "Audio PIN verification has been retired. Use call-in verification instead.",
+  ),
 });

@@ -73,13 +73,15 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     creditsState.credits = 10;
   });
 
-  test("throws when required form data missing", async () => {
+  test("returns 500 when required form data missing", async () => {
     const mod = await import("../app/routes/api+/ivr");
     const fd = new FormData();
     fd.set("to_number", "+1");
-    await expect(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any)).rejects.toThrow(
-      "Missing required form data",
+    const res = await asRouteResponse(
+      mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any),
     );
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "Missing required form data" });
   });
 
   test("returns 402 creditsError when workspace balance is <= 0", async () => {

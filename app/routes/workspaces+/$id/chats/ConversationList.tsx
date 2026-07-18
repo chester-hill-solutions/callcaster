@@ -1,8 +1,7 @@
 import { MdChat } from "react-icons/md";
 import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import type { ConversationSummary } from "@/lib/chat-conversation-sort";
-import { Card, CardHeader } from "@/components/ui/card";
-import { Heading, Text } from "@/components/ui/typography";
+import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceResourceListShell";
 
 function getConversationDisplayName(chat: ConversationSummary): string {
   const fullName = [chat.contact_firstname, chat.contact_surname]
@@ -50,19 +49,11 @@ export function ConversationList({
 
   if (shapedChats.length === 0) {
     return (
-      <div className="flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm border-none bg-transparent shadow-none">
-          <CardHeader className="items-center gap-2 text-center">
-            <Heading as="h2" level={4} branded={false}>
-              No conversations yet
-            </Heading>
-            <Text variant="muted">
-              Use the New Chat button above to pick a contact and start
-              texting.
-            </Text>
-          </CardHeader>
-        </Card>
-      </div>
+      <WorkspaceResourceEmptyState
+        emptyMessage="No conversations yet"
+        emptyDescription="Use the New Chat button above to pick a contact and start texting."
+        emptyIcon={<MdChat className="h-7 w-7" aria-hidden="true" />}
+      />
     );
   }
 

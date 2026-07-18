@@ -4,11 +4,11 @@ import { Search, X } from "lucide-react";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
+import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceResourceListShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Heading, Text } from "@/components/ui/typography";
+import { Heading } from "@/components/ui/typography";
 import type { ContactsLoaderData } from "@/lib/contacts-loader.types";
 import { formatDateToLocale } from "@/lib/utils";
 
@@ -154,42 +154,24 @@ export default function ContactsPage() {
             </Alert>
           )}
           {isWorkspaceEmpty && (
-            <div className="flex items-center justify-center py-16">
-              <Card className="w-full max-w-md">
-                <CardHeader className="items-center gap-2 text-center">
-                  <Heading as="h2" level={3} branded={false}>
-                    Add Your Own Contacts to this Workspace!
-                  </Heading>
-                  <Text variant="muted" className="max-w-sm">
-                    Contacts are the people you call and text. Add one
-                    manually or import an audience CSV.
-                  </Text>
-                  <div className="flex justify-center pt-2">
-                    <Button
-                      asChild
-                      className="font-Zilla-Slab text-base font-semibold"
-                    >
-                      <Link to={`./new`}>Add Contact</Link>
-                    </Button>
-                  </div>
-                </CardHeader>
-              </Card>
-            </div>
+            <WorkspaceResourceEmptyState
+              emptyMessage="Add your first contact"
+              emptyDescription="Add contacts one at a time or import a CSV into a Call list."
+              addAction={
+                <Button
+                  asChild
+                  className="font-Zilla-Slab text-base font-semibold"
+                >
+                  <Link to={`./new`}>Add Contact</Link>
+                </Button>
+              }
+            />
           )}
       {isSearchEmpty && (
-        <div className="flex items-center justify-center py-16">
-          <Card className="w-full max-w-md">
-            <CardHeader className="items-center gap-2 text-center">
-              <Heading as="h2" level={3} branded={false}>
-                No contacts found
-              </Heading>
-              <Text variant="muted" className="max-w-sm">
-                No contacts match &quot;{searchTerm}&quot;. Try a different
-                search term.
-              </Text>
-            </CardHeader>
-          </Card>
-        </div>
+        <WorkspaceResourceEmptyState
+          emptyMessage="Try another search"
+          emptyDescription={`Contacts matching "${searchTerm}" will appear here.`}
+        />
       )}
 
       {(contacts?.length ?? 0) > 0 && (

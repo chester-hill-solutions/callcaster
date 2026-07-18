@@ -109,7 +109,7 @@ export const action = defineAction({
 
     return authResult;
   },
-  sideEffects: ["db-write", "credit", "twilio"],
+  sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth: authResult }) => {
   const parsed = await parseJsonBodyOrResponse(request, chatSmsBodySchema);
   if (parsed instanceof Response) {

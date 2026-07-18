@@ -18,9 +18,14 @@ import {
   isOnboardingActionName,
   readChannelInlineBusinessFields,
   readSelectedChannels,
+  readSelectedGoal,
   type OnboardingActionData,
   type OnboardingActionName,
 } from "@/lib/onboarding-actions.server";
+import {
+  channelsForOnboardingGoal,
+  nextWizardStep,
+} from "@/lib/messaging-onboarding/goals";
 import {
   businessProfileFieldRequiredMessage,
   findMissingBusinessProfileFields,
@@ -38,6 +43,7 @@ import {
 } from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { buildA2pBlockingIssues, provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 
 // Compliance channels that trigger the Twilio compliance provisioning job.
@@ -289,14 +295,64 @@ async function handleAdvanceStep(ctx: OnboardingActionContext): Promise<Onboardi
   return { kind: "redirect", step: targetStep };
 }
 
-async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
-  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
+async function handleSaveWorkspaceName(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
+  const formData = resolveOnboardingInput(ctx.input);
+  const name = String(
+    formData.get("workspaceName") ?? formData.get("workspace_name") ?? "",
+  ).trim();
+
+  if (!name) {
+    return {
+      kind: "payload",
+      data: { error: "Enter a workspace name to continue." },
+      status: 400,
+    };
+  }
+  if (name.length > 200) {
+    return {
+      kind: "payload",
+      data: { error: "Workspace name must be 200 characters or fewer." },
+      status: 400,
+    };
+  }
+
+  const result = await updateWorkspaceName(ctx.user.id, ctx.workspaceId, name);
+  if (!result.ok) {
+    return {
+      kind: "payload",
+      data: { error: result.error },
+      status: result.status,
+    };
+  }
+
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
-    updates: { currentStep: "provider_provisioning" },
+    updates: {
+      status: "collecting_business",
+      currentStep: "business_profile",
+    },
+  });
+
+  return { kind: "redirect", step: "business_profile" };
+}
+
+async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
+  const current = await getWorkspaceMessagingOnboardingState({
+    workspaceId: ctx.workspaceId,
+  });
+  const targetStep =
+    nextWizardStep("first_number", current.selectedGoal) ?? "script";
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
+    actorUserId: ctx.actorUserId,
+    updates: { currentStep: targetStep },
   });
   return {
     kind: "redirect",
-    step: "provider_provisioning",
+    step: targetStep,
     searchParams: { skipped: "first_number" },
   };
 }
@@ -329,11 +385,25 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
   const formData = resolveOnboardingInput(ctx.input);
   const current = await getWorkspaceMessagingOnboardingState({workspaceId: ctx.workspaceId,
   });
-  const selectedChannels = stripDisabledRcsChannel(readSelectedChannels(formData));
+  const selectedGoal = readSelectedGoal(formData) ?? current.selectedGoal;
+  const channelsFromForm = readSelectedChannels(formData);
+  const selectedChannels = stripDisabledRcsChannel(
+    channelsFromForm.length > 0
+      ? channelsFromForm
+      : selectedGoal
+        ? channelsForOnboardingGoal(selectedGoal, current.operatingCountry)
+        : [],
+  );
 
-  // The Channels step reveals channel-scoped inline inputs (toll-free
-  // verification fields, US A2P Trust Hub fields). Overlay any posted values onto
-  // the current business profile without wiping fields collected on other steps.
+  if (!selectedGoal && selectedChannels.length === 0) {
+    return {
+      kind: "payload",
+      data: { error: "Choose a goal to continue setup." },
+      status: 400,
+    };
+  }
+
+  // SMS goals still collect toll-free / A2P Trust Hub fields inline when shown.
   const businessProfile = readChannelInlineBusinessFields(
     formData,
     current.businessProfile,
@@ -341,7 +411,7 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
 
   // The Messaging Service is auto-provisioned at workspace create via
   // ensureWorkspaceTwilioBootstrap; there is no dedicated wizard step for it.
-  // Ensure it exists (idempotent) so the first-number step can attach senders.
+  // Ensure it exists (idempotent) so the number step can attach senders.
   if (!current.messagingService.serviceSid) {
     try {
       await ensureWorkspaceTwilioBootstrap({
@@ -349,10 +419,6 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
         actorUserId: ctx.user.id,
       });
     } catch (error) {
-      // Surface a friendly payload error rather than letting this throw:
-      // an uncaught throw here bubbles up as a 500, which trips the route's
-      // ErrorBoundary and strands the user on a blank page instead of the
-      // wizard showing a message and staying on the Channels step.
       return {
         kind: "payload",
         data: {
@@ -370,9 +436,10 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     actorUserId: ctx.actorUserId,
     updates: {
       selectedChannels,
+      selectedGoal,
       businessProfile,
       status: "collecting_business",
-      currentStep: "first_number",
+      currentStep: "audience",
     },
   });
 
@@ -387,7 +454,7 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     await enqueueWorkspaceComplianceJob(ctx.workspaceId, "channels_selected");
   }
 
-  return { kind: "redirect", step: "first_number" };
+  return { kind: "redirect", step: "audience" };
 }
 
 /**
@@ -654,6 +721,7 @@ async function handleAttachRcsSender(
 }
 
 const ONBOARDING_ACTION_HANDLERS = {
+  save_workspace_name: handleSaveWorkspaceName,
   advance_step: handleAdvanceStep,
   skip_first_number: handleSkipFirstNumber,
   verify_caller_id: handleVerifyCallerId,
