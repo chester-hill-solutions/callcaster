@@ -8,7 +8,8 @@ const baseInput: SelectWorkspaceTodayInput = {
   workspaceId: "workspace one",
   userRole: "admin",
   credits: 100,
-  onboardingIncomplete: false,
+  intakeIncomplete: false,
+  launchChecklistIncomplete: false,
   hasWorkspaceNumber: true,
   campaigns: [{ id: 9, status: "draft", type: "live_call" }],
   unreadCount: 0,
@@ -23,7 +24,7 @@ describe("selectWorkspaceToday", () => {
     expect(
       select({
         credits: 0,
-        onboardingIncomplete: true,
+        intakeIncomplete: true,
         hasWorkspaceNumber: false,
         campaigns: [],
         unreadCount: 4,
@@ -31,12 +32,24 @@ describe("selectWorkspaceToday", () => {
     ).toBe("add_credits");
     expect(
       select({
-        onboardingIncomplete: true,
+        intakeIncomplete: true,
         hasWorkspaceNumber: false,
         campaigns: [],
         unreadCount: 4,
       }).kind,
     ).toBe("continue_setup");
+    expect(
+      select({
+        launchChecklistIncomplete: true,
+        hasWorkspaceNumber: false,
+        campaigns: [],
+        unreadCount: 4,
+        selectedGoal: "live_call",
+      }),
+    ).toMatchObject({
+      kind: "continue_setup",
+      href: "/workspaces/workspace%20one/onboarding",
+    });
     expect(
       select({
         hasWorkspaceNumber: false,
@@ -54,7 +67,7 @@ describe("selectWorkspaceToday", () => {
       select({
         userRole: "caller",
         credits: 0,
-        onboardingIncomplete: true,
+        intakeIncomplete: true,
         hasWorkspaceNumber: false,
         campaigns: [],
         unreadCount: 2,
@@ -68,7 +81,7 @@ describe("selectWorkspaceToday", () => {
       select({
         userRole: "caller",
         credits: 0,
-        onboardingIncomplete: true,
+        intakeIncomplete: true,
         hasWorkspaceNumber: false,
         campaigns: [],
       }).kind,
@@ -110,7 +123,7 @@ describe("selectWorkspaceToday", () => {
       select({
         userRole: "member",
         credits: 0,
-        onboardingIncomplete: true,
+        intakeIncomplete: true,
         hasWorkspaceNumber: false,
         campaigns: [],
       }).kind,

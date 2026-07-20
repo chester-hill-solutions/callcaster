@@ -1,13 +1,25 @@
 # Design System Usage
 
-This project uses a single canonical design system. Follow these conventions so UI stays consistent and maintainable.
+This project uses the Callcaster-branded **`@chester-hill-solutions/shad-cc`** design system (React Aria Components + Tailwind v4), with thin Radix-compat adapters under [`app/components/ui/`](app/components/ui/).
 
 For a full inventory of components, static assets, icons, route surfaces, and known redundancies, see [design-system-audit.md](design-system-audit.md).
 
+## Package source
+
+| Layer | Location |
+|-------|----------|
+| Published package | `@chester-hill-solutions/shad-cc` (CHS monorepo `packages/shad-cc`) |
+| Vendored in-app | [`vendor/chester-hill-solutions/shad-cc`](../vendor/chester-hill-solutions/shad-cc) |
+| Theme tokens | `@chester-hill-solutions/shad-cc/theme.css` (imported from [`app/tailwind.css`](../app/tailwind.css)) |
+| Design workbench | `componentLiib/shad-cc` (catalog + axe tests) |
+
+Neutral CHS apps that own their own theme should use [`@chester-hill-solutions/ui-kit`](https://github.com/chester-hill-solutions/chester-hill-solutions/tree/main/packages/ui-kit) instead.
+
 ## Primitives
 
-- **Use [app/components/ui/](app/components/ui/) as the only primitive layer.** Prefer `Input`, `Select`, `Textarea`, `Label`, `Checkbox`, `Switch`, `Button`, `Card`, `Table`, `Badge`, `Alert`, `Dialog`, `Sheet`, `Tabs`, `Pagination`, etc. from `ui/`.
-- **Typography:** Use `Heading` and `Text` from [app/components/ui/typography.tsx](app/components/ui/typography.tsx) for titles and body copy. Use the `branded` variant where the app’s Zilla Slab look is desired.
+- **Import from [`app/components/ui/`](app/components/ui/).** Most files re-export or adapt `@chester-hill-solutions/shad-cc/*`. Prefer `Input`, `Select`, `Textarea`, `Label`, `Checkbox`, `Switch`, `Button`, `Card`, `Table`, `Badge`, `Alert`, `Dialog`, `Sheet`, `Tabs`, `Pagination`, etc.
+- **Compatibility:** Call sites may keep Radix-shaped props (`disabled`, `checked`, `value`/`onValueChange`, `asChild`). Adapters map these onto React Aria (`isDisabled`, `isSelected`, `selectedKey`, etc.).
+- **Typography:** Use `Heading` and `Text` from [app/components/ui/typography.tsx](app/components/ui/typography.tsx) for titles and body copy. Use the `branded` variant where the app’s Zilla Slab look is desired. Legacy classes `font-Zilla-Slab` / `font-Tabac-Slab` still resolve via `@theme` aliases to `font-heading` / `font-brand`.
 - **Loading:** Use `Skeleton` from [app/components/ui/skeleton.tsx](app/components/ui/skeleton.tsx) for table rows, cards, and form placeholders while data loads.
 
 ## Form layout
@@ -45,8 +57,9 @@ For a full inventory of components, static assets, icons, route surfaces, and kn
 
 ## Tokens
 
-- Prefer semantic tokens: `text-foreground`, `text-muted-foreground`, `bg-card`, `border-border`, etc. Use `Heading`/`Text` and shared components so brand colors and type scales live in one place rather than in ad hoc route classes.
-- **Status tokens:** `success` / `warning` semantic tokens are defined in [`tailwind.css`](app/tailwind.css) (light + dark) and mapped in [`tailwind.config.js`](tailwind.config.js). `Badge` (`success`, `warning` variants) and `Alert` (`success`, `warning` variants) consume them. Use these for success/warning status indicators instead of raw `emerald`/`amber`/`green` Tailwind palette classes. `destructive` covers error states.
+- Prefer semantic tokens: `text-foreground`, `text-muted-foreground`, `bg-card`, `border-border`, `bg-brand-primary`, etc. Token source of truth is `@chester-hill-solutions/shad-cc/theme.css` (full `hsl(...)` values — use `var(--token)`, not `hsl(var(--token))`).
+- **Status tokens:** `success` / `warning` / `info` / `destructive` are defined in the shad-cc theme. `Badge` and `Alert` consume them.
+- **Tailwind:** v4 via `@tailwindcss/vite`. Entry stylesheet is [`app/tailwind.css`](../app/tailwind.css).
 
 ## Design north star
 

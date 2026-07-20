@@ -55,10 +55,38 @@ describe("messaging onboarding helpers", () => {
       workspaceNumbers: [],
       recentOutboundCount: 0,
     });
+    // Fresh workspaces without business basics + goal redirect into onboarding.
     expect(newWorkspaceReadiness.shouldRedirectToOnboarding).toBe(true);
     expect(newWorkspaceReadiness.legacyMode).toBe(false);
     expect(newWorkspaceReadiness.sendMode).toBe("from_number");
     expect(newWorkspaceReadiness.warnings).toContain("No phone number yet.");
+
+    const intakeCompleteState = mergeWorkspaceMessagingOnboardingState(state, {
+      status: "collecting_business",
+      selectedGoal: "live_call",
+      selectedChannels: ["local_number", "voice_compliance"],
+      businessProfile: {
+        ...state.businessProfile,
+        legalBusinessName: "Acme Health",
+        websiteUrl: "https://acme.example",
+        useCaseSummary: "Appointment reminders for patients.",
+        sampleMessages: ["Your appointment is tomorrow."],
+      },
+    });
+    const afterIntake = deriveWorkspaceMessagingReadiness({
+      onboarding: intakeCompleteState,
+      workspaceNumbers: [],
+      recentOutboundCount: 0,
+      launchContext: {
+        audienceCount: 0,
+        scriptCount: 0,
+        campaignCount: 0,
+        creditsBalance: 0,
+      },
+    });
+    // Missing number no longer force-redirects after business + goal.
+    expect(afterIntake.shouldRedirectToOnboarding).toBe(false);
+    expect(afterIntake.shouldShowOnboardingBanner).toBe(true);
 
     const legacyWorkspaceReadiness = deriveWorkspaceMessagingReadiness({
       onboarding: state,
@@ -223,7 +251,7 @@ describe("messaging onboarding helpers", () => {
       "bad" as any,
     );
 
-    expect(fromNull.currentStep).toBe("business_profile");
+    expect(fromNull.currentStep).toBe("business_identity");
     expect(fromPrimitive.selectedChannels).toEqual([]);
   });
 
@@ -300,7 +328,7 @@ describe("messaging onboarding helpers", () => {
     const loaded = await getWorkspaceMessagingOnboardingState({
       workspaceId: "w1",
     });
-    expect(loaded.currentStep).toBe("business_profile");
+    expect(loaded.currentStep).toBe("business_identity");
 
     const updated = await updateWorkspaceMessagingOnboardingState({
       workspaceId: "w1",

@@ -3,6 +3,7 @@ import { data as routeData, redirect } from "react-router";
 import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
+  isWorkspaceIntakeComplete,
 } from "@/lib/messaging-onboarding.server";
 import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding/readiness.server";
 import {
@@ -18,12 +19,22 @@ import {
   selectWorkspaceToday,
   type WorkspaceTodaySelection,
 } from "@/lib/workspace-today.server";
+import {
+  buildWorkspaceLaunchChecklist,
+  launchChecklistProgress,
+} from "@/lib/workspace-launch-checklist";
+import { buildA2pBlockingIssues } from "@/lib/twilio-a2p.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 type LoaderData = {
   userRole: string | null | undefined;
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
+  complianceOnboarding?: Awaited<
+    ReturnType<typeof getWorkspaceMessagingOnboardingState>
+  >;
+  a2pBlockingIssues?: string[];
 };
 
 export const loader = defineLoader({
@@ -41,33 +52,50 @@ export const loader = defineLoader({
     try {
       const pathname = url.pathname;
       const isExactWorkspaceRoot = pathname === `/workspaces/${workspaceId}`;
+      const tdb = createTenantDb(workspaceId);
       const [
         onboarding,
         phoneNumbersResult,
         recentOutboundCount,
         workspaceData,
         unreadCount,
+        audienceCount,
+        scriptCount,
       ] = await Promise.all([
-          getWorkspaceMessagingOnboardingState({ workspaceId }),
-          getWorkspacePhoneNumbers({ workspaceId }),
-          getWorkspaceRecentOutboundMessageCount({ workspaceId }),
-          getWorkspaceInfoWithDetails({ workspaceId, userId }),
-          isExactWorkspaceRoot
-            ? getWorkspaceUnreadConversationCount(workspaceId)
-            : Promise.resolve(0),
-        ]);
+        getWorkspaceMessagingOnboardingState({ workspaceId }),
+        getWorkspacePhoneNumbers({ workspaceId }),
+        getWorkspaceRecentOutboundMessageCount({ workspaceId }),
+        getWorkspaceInfoWithDetails({ workspaceId, userId }),
+        isExactWorkspaceRoot
+          ? getWorkspaceUnreadConversationCount(workspaceId)
+          : Promise.resolve(0),
+        isExactWorkspaceRoot ? tdb.audience.count() : Promise.resolve(0),
+        isExactWorkspaceRoot
+          ? tdb.script.count()
+          : Promise.resolve(0),
+      ]);
       const workspaceNumbers = (phoneNumbersResult.data ?? []).map((number) => ({
         type: number?.type ?? null,
         phone_number: number?.phone_number ?? null,
         capabilities: number?.capabilities ?? null,
       }));
+      const workspaceSummary = workspaceData.workspace as unknown as {
+        credits?: number | null;
+      };
+      const credits = Number(workspaceSummary.credits ?? 0);
+      const creditsSafe = Number.isFinite(credits) ? credits : 0;
       const readiness = deriveWorkspaceMessagingReadiness({
         onboarding,
         workspaceNumbers,
         recentOutboundCount,
+        launchContext: {
+          audienceCount,
+          scriptCount,
+          campaignCount: workspaceData.campaigns.length,
+          creditsBalance: creditsSafe,
+        },
       });
-      // Fresh workspaces (no legacy traffic) send admins straight to the
-      // onboarding wizard instead of showing setup errors on the root page.
+      // Fresh workspaces without business basics + goal go to the onboarding wizard.
       if (
         isExactWorkspaceRoot &&
         (userRole === "owner" || userRole === "admin") &&
@@ -75,19 +103,36 @@ export const loader = defineLoader({
       ) {
         throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
       }
-      const workspaceSummary = workspaceData.workspace as unknown as {
-        credits?: number | null;
-      };
-      const credits = Number(workspaceSummary.credits ?? 0);
+
+      const intakeIncomplete = !isWorkspaceIntakeComplete(onboarding);
+      const launchChecklist = buildWorkspaceLaunchChecklist({
+        workspaceId,
+        onboarding,
+        audienceCount,
+        scriptCount,
+        campaignCount: workspaceData.campaigns.length,
+        creditsBalance: creditsSafe,
+        workspaceNumbers,
+        draftCampaignId: workspaceData.campaigns[0]?.id ?? null,
+      });
+      const launchChecklistIncomplete =
+        !intakeIncomplete &&
+        launchChecklistProgress(launchChecklist).hasIncompleteCurrentlyDue;
+
       const today = isExactWorkspaceRoot
         ? selectWorkspaceToday({
             workspaceId,
             userRole,
-            credits: Number.isFinite(credits) ? credits : 0,
-            onboardingIncomplete: readiness.shouldShowOnboardingBanner,
+            credits: creditsSafe,
+            intakeIncomplete,
+            launchChecklistIncomplete,
             hasWorkspaceNumber: workspaceHasFirstNumber(workspaceNumbers),
             campaigns: workspaceData.campaigns,
             unreadCount,
+            selectedGoal: onboarding.selectedGoal,
+            audienceCount,
+            scriptCount,
+            launchChecklist,
           })
         : undefined;
 
@@ -96,6 +141,12 @@ export const loader = defineLoader({
         workspaceData,
         onboardingReadiness: readiness,
         ...(today ? { today } : {}),
+        ...(isExactWorkspaceRoot && !intakeIncomplete
+          ? {
+              complianceOnboarding: onboarding,
+              a2pBlockingIssues: buildA2pBlockingIssues(onboarding),
+            }
+          : {}),
       } satisfies LoaderData, { headers });
     } catch (error) {
       if (

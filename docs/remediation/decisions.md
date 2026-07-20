@@ -55,18 +55,17 @@ Decisions captured during the grilling session that shape the implementation pla
 - New remediation docs in `docs/remediation/`.
 - Update existing docs only after a fix is shipped.
 
-## Business onboarding (2026-07-17)
+## Business onboarding (2026-07-17, corrected 2026-07-18)
 
 Locked in [`business-onboarding-simplification-plan-2026-07-17.md`](./business-onboarding-simplification-plan-2026-07-17.md):
 
-- **Direction:** Option 1 (launch home + contextual gates) with campaign-first bias.
-- **Intake only:** workspace name, goal, operating country — then Workspace Today checklist.
-- **Hard redirect / sidebar lock:** intake-incomplete only; not missing number or emergency address.
-- **currently_due for launch-ready:** audience, phone number, script (IVR/SMS), campaign, campaign readiness at go-live.
+- **Always-required prefix:** workspace name → **business basics** (legal name, website, use-case, samples, operating country, …) → goal selection (with SMS TFV/A2P when the goal needs it).
+- **Path wizard after goal:** audience → first number → script (IVR/SMS) → campaign → credits → launch — stays in `/onboarding`, goal-scoped.
+- **Hard redirect / sidebar lock:** until business baseline + goal are complete; not for missing number/address alone after that.
+- **Workspace Today:** soft handoff + checklist that deep-links back into wizard steps; capability gates (service address, SMS compliance) remain at number/SMS boundaries.
 - **eventually_due / warning:** credits (Today may still prioritize billing at balance ≤ 0).
-- **Emergency address:** collect at voice number rental, not in intake.
-- **TFV / A2P / messaging profile fields:** collect at SMS capability gates.
-- **Primary CTA after intake:** next missing launch dependency; prefer create/open campaign.
+- **Emergency address:** collect at voice number rental when required.
+- **Rejected:** short intake (name → goal only) that exits to Today as the primary path setup surface.
 
 ## Credit facet ratchet (2026-07-17)
 

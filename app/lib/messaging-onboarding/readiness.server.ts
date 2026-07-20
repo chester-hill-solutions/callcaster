@@ -5,6 +5,7 @@ import type {
 } from "@/lib/types";
 import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
 import { DEFAULT_WORKSPACE_ONBOARDING_STEPS } from "@/lib/messaging-onboarding/defaults.server";
+import { isWorkspaceIntakeComplete } from "@/lib/messaging-onboarding/intake";
 import {
   type WorkspaceReadinessContext,
   type ReadinessResult,
@@ -20,6 +21,10 @@ import {
   countVerifiedCallerIdNumbers,
   isVerifiedCallerIdNumber,
 } from "@/lib/messaging-onboarding/predicates";
+import {
+  buildWorkspaceLaunchChecklist,
+  launchChecklistProgress,
+} from "@/lib/workspace-launch-checklist";
 
 export {
   countRentedWorkspaceNumbers,
@@ -70,6 +75,8 @@ function buildReadinessContext(
 }
 
 function isBusinessBasicsComplete(ctx: WorkspaceReadinessContext): boolean {
+  // Baseline profile fields only. Service address is collected at number rental
+  // (ServiceAddressGate), not as part of the business prefix milestone.
   for (const field of BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc) {
     const value = ctx.onboarding.businessProfile[field];
     if (Array.isArray(value)) {
@@ -78,9 +85,7 @@ function isBusinessBasicsComplete(ctx: WorkspaceReadinessContext): boolean {
       return false;
     }
   }
-  // Emergency service address is required in Business basics before a first
-  // number can be rented (voice is always-on).
-  return predicatePassed("emergency_address_present", ctx);
+  return true;
 }
 
 function isEmergencyReady(
@@ -174,10 +179,18 @@ export function buildOnboardingStepsForState(
   return steps;
 }
 
+export type DeriveWorkspaceMessagingReadinessLaunchContext = {
+  audienceCount?: number;
+  scriptCount?: number;
+  campaignCount?: number;
+  creditsBalance?: number;
+};
+
 export function deriveWorkspaceMessagingReadiness({
   onboarding,
   workspaceNumbers,
   recentOutboundCount,
+  launchContext,
 }: {
   onboarding: WorkspaceMessagingOnboardingState;
   workspaceNumbers: Array<{
@@ -186,6 +199,8 @@ export function deriveWorkspaceMessagingReadiness({
     capabilities?: unknown;
   }>;
   recentOutboundCount: number;
+  /** When provided, soft banner uses the launch checklist instead of redirect predicates. */
+  launchContext?: DeriveWorkspaceMessagingReadinessLaunchContext;
 }): WorkspaceMessagingReadiness {
   const numbers = workspaceNumbers.filter(Boolean);
   const hasLegacyTraffic = recentOutboundCount > 0 || numbers.length > 0;
@@ -206,11 +221,34 @@ export function deriveWorkspaceMessagingReadiness({
   const warnings = results.map((result) => result.message);
   const messagingReady = predicatePassed("messaging_service_provisioned", ctx);
   const voiceReady = predicatePassed("voice_ready", ctx);
-  const shouldRedirectToOnboarding = !hasLegacyTraffic && results.length > 0;
+  const coreSetupComplete = isWorkspaceIntakeComplete(onboarding);
+  // Fresh workspaces stay in onboarding until business basics + goal are done.
+  // Path steps (audience, number, script, …) continue in the wizard; missing
+  // number/address still surface as banners after core setup.
+  const shouldRedirectToOnboarding = !hasLegacyTraffic && !coreSetupComplete;
+
+  let shouldShowOnboardingBanner = false;
+  if (!coreSetupComplete) {
+    shouldShowOnboardingBanner = true;
+  } else if (results.length > 0) {
+    shouldShowOnboardingBanner = true;
+  } else if (launchContext) {
+    const checklist = buildWorkspaceLaunchChecklist({
+      workspaceId: "workspace",
+      onboarding,
+      audienceCount: launchContext.audienceCount ?? 0,
+      scriptCount: launchContext.scriptCount ?? 0,
+      campaignCount: launchContext.campaignCount ?? 0,
+      creditsBalance: launchContext.creditsBalance ?? 0,
+      workspaceNumbers: numbers,
+    });
+    shouldShowOnboardingBanner =
+      launchChecklistProgress(checklist).hasIncompleteCurrentlyDue;
+  }
 
   return {
     shouldRedirectToOnboarding,
-    shouldShowOnboardingBanner: results.length > 0,
+    shouldShowOnboardingBanner,
     messagingReady,
     voiceReady,
     legacyMode: hasLegacyTraffic,

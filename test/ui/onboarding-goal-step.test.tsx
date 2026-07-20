@@ -236,7 +236,11 @@ describe("goal-based onboarding UI", () => {
 
     expect(screen.getByTestId("onboarding-step")).toBeInTheDocument();
     expect(screen.getByText("Setup: Acme")).toBeInTheDocument();
-    expect(screen.getByText(/Step 3 of \d+ — Audience/)).toBeInTheDocument();
+    expect(screen.getByText(/Step 4 of \d+ — Audience/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /4\. Audience/i })).toHaveAttribute(
+      "href",
+      expect.stringContaining("step=audience"),
+    );
     expect(screen.getByText(/Credits:/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Add credits/i })).toBeInTheDocument();
     expect(screen.queryByText(/Add credits before renting a number/i)).toBeNull();

@@ -106,13 +106,8 @@ export type PlatformResult<T> =
 
 function emptyQueueFilters(): QueueSearchFilters {
   return {
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    audiences: "",
-    disposition: "",
-    queueStatus: "",
+    name: "", phone: "", email: "", address: "",
+    audiences: "", disposition: "", queueStatus: "",
   };
 }
 

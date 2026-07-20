@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**102** documented / **102** total effects (0 grandfathered, ratcheting to 0).
+**103** documented / **103** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -109,5 +109,6 @@
 | `app/hooks/utils/useUnsavedChangesGuard.ts` | Warn on tab close/refresh via beforeunload while there are unsaved changes. | isChanged (only subscribes while there's something to lose) | dom (window 'beforeunload' listener; removed on cleanup/when isChanged flips) | Not data fetching — beforeunload is a browser-native tab-close guard that |
 | `app/hooks/workspace/useApiKeys.ts` | CANDIDATE-REMOVE Fetches from the API keys resource route (external system) on mount | workspaceId, hasAccess, initialKeys.length. `listFetcher` is intentionally omitted | fetch (listFetcher.load against /api/workspace-api-keys) | Fallback fetch for data the route loader is expected to provide — if the |
 | `app/routes/docs.tsx` | Dynamically import and imperatively mount the Scalar API-reference widget into containerRef for the active spec. | config.url — remounts the widget against the newly selected spec (public vs. complete) when it changes. | dom (imperative third-party widget mount) + dynamic import; instance destroyed on cleanup/re-run. | Scalar's `createApiReference` is an imperative DOM-mounting API from a lazily-loaded client bundle, not data a loader could hand to a component tree. |
+| `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx` | Open the verification-code dialog when the route action returns a validationRequest | validationRequest from useActionData via the parent route | setState for dialog open + retained request payload | Action data arrives after the mutation; opening a modal is client-only. |
 | `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx` | Keep the `?step=` search param aligned with the resolved active wizard step after goal-driven step lists change. | activeStep (canonical step after goal/visibility resolution); urlStep (current query); showIntro (skip while intro is showing); navigate (replace navigation) | navigation — `navigate(..., { replace: true })` updates the URL without adding history entries | Step resolution depends on client-only intro state and goal-derived visibility; a loader cannot replace the query mid-wizard without a client redirect. |
 | `app/routes/workspaces+/index.tsx` | Reopen the create-workspace dialog when the action comes back with an | actionError (the action's error, per submission) | none (local setState) | The error is already action data — this only drives |

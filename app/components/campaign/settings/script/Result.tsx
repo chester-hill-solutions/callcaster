@@ -112,8 +112,8 @@ const Result = ({
           size="20px"
           color={
             result === option.value
-              ? "hsl(var(--brand-primary))"
-              : "hsl(var(--muted-foreground))"
+              ? "var(--brand-primary)"
+              : "var(--muted-foreground)"
           }
         />
         <div
@@ -121,7 +121,7 @@ const Result = ({
           style={{
             fontSize: "10px",
             textAlign: "center",
-            color: result === option.value ? "hsl(var(--primary))" : "#333",
+            color: result === option.value ? "var(--primary)" : "#333",
           }}
         >
           {option.content}

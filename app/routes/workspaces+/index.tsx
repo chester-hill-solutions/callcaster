@@ -94,14 +94,14 @@ const NewWorkspaceDialog = ({
           aria-label="Add new workspace"
           disabled={isBusy}
         >
-          <FaPlus size="72px" className="text-black dark:text-white" />
+          <FaPlus size="72px" className="size-[72px] text-black dark:text-white" />
         </Button>
       )}
     </DialogTrigger>
-    <DialogContent className="bg-card">
+    <DialogContent className="bg-card sm:max-w-xl">
       <DialogHeader>
         <DialogTitle asChild>
-          <h3 className="text-center font-Zilla-Slab text-4xl font-black text-brand-primary dark:text-white">
+          <h3 className="pr-8 text-center font-Zilla-Slab text-4xl font-black text-brand-primary dark:text-white">
             Add a New Workspace
           </h3>
         </DialogTitle>
@@ -136,10 +136,10 @@ const NewWorkspaceDialog = ({
             aria-invalid={Boolean(error) || undefined}
           />
         </FormField>
-        <div className="flex gap-4">
+        <div className="flex w-full flex-col gap-3 sm:flex-row">
           <Button
             variant="default"
-            className="w-full text-xl"
+            className="flex-1 text-xl"
             type="submit"
             disabled={isBusy}
           >
@@ -148,7 +148,7 @@ const NewWorkspaceDialog = ({
           <DialogClose asChild>
             <Button
               variant="ghost"
-              className="w-full text-xl"
+              className="flex-1 text-xl"
               type="button"
               disabled={isBusy}
             >

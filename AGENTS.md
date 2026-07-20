@@ -9,7 +9,7 @@
 
 ## Design System
 
-- Prefer [app/components/ui/](app/components/ui/) primitives; use `FormField` for form layout, `Section`/`AuthCard` for page structure, `DataTable`/`TablePagination` for tables, and `toast()` from sonner (single root Toaster). See [docs/design-system.md](docs/design-system.md).
+- Prefer [app/components/ui/](app/components/ui/) primitives (backed by `@chester-hill-solutions/shad-cc`); use `FormField` for form layout, `Section`/`AuthCard` for page structure, `DataTable`/`TablePagination` for tables, and `toast()` from sonner (single root Toaster). See [docs/design-system.md](docs/design-system.md).
 
 ## Routes (React Router 8)
 

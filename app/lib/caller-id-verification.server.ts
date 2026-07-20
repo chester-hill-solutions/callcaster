@@ -4,6 +4,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { createTenantDb } from "@/server/tenant-db";
+import { INBOUND_RING_COUNT_DEFAULT } from "../../shared/inbound-rings";
 
 export type CallerIdValidationRequest = {
   accountSid: string;
@@ -79,15 +80,28 @@ export async function startWorkspaceCallerIdVerification({
         ...upsertValues,
         created_at: now,
         handset_enabled: false,
-        inbound_ring_count: 0,
+        // DB check: inbound_ring_count BETWEEN 1 AND 10.
+        inbound_ring_count: INBOUND_RING_COUNT_DEFAULT,
       });
 
   if (!numberRequest[0]) {
     throw new Error("Error inserting workspace number");
   }
 
+  // Plain POJO for action/fetcher JSON — Twilio SDK instances are unreliable once
+  // serialized. Prefer the submitted number when the API omits phone_number.
+  const plainValidationRequest: CallerIdValidationRequest = {
+    accountSid: String(validationRequest.accountSid ?? ""),
+    callSid: String(validationRequest.callSid ?? ""),
+    friendlyName: String(validationRequest.friendlyName ?? friendlyName),
+    phoneNumber: String(
+      validationRequest.phoneNumber || normalizedPhoneNumber || phoneNumber,
+    ),
+    validationCode: String(validationRequest.validationCode ?? ""),
+  };
+
   return {
-    validationRequest: validationRequest as CallerIdValidationRequest,
+    validationRequest: plainValidationRequest,
     numberRequest: numberRequest as StartWorkspaceCallerIdVerificationResult["numberRequest"],
   };
 }

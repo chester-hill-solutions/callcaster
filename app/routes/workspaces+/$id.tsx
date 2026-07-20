@@ -17,9 +17,11 @@ import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import WorkspaceToday from "@/components/workspace/WorkspaceToday";
+import { ComplianceStatusPanel } from "@/components/workspace/ComplianceStatusPanel";
 import {
   Campaign,
   ContextType,
+  type WorkspaceMessagingOnboardingState,
   type WorkspaceMessagingReadiness,
 } from "@/lib/types";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
@@ -31,6 +33,8 @@ type LoaderData = {
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
+  complianceOnboarding?: WorkspaceMessagingOnboardingState;
+  a2pBlockingIssues?: string[];
 };
 
 type OnboardingStripData = Pick<
@@ -66,6 +70,8 @@ function WorkspaceResolvedView({
   onboardingReadiness,
   today,
   showSidebar,
+  complianceOnboarding,
+  a2pBlockingIssues,
 }: {
   resolvedData: WorkspaceInfoWithDetails;
   userRole: string | null | undefined;
@@ -74,6 +80,8 @@ function WorkspaceResolvedView({
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
   showSidebar: boolean;
+  complianceOnboarding?: WorkspaceMessagingOnboardingState;
+  a2pBlockingIssues?: string[];
 }) {
   const normalizedWorkspace = resolvedData.workspace as unknown as {
     id: string;
@@ -165,14 +173,25 @@ function WorkspaceResolvedView({
           {!outlet ? (
             <div className="space-y-4">
               {onboardingReadiness.shouldShowOnboardingBanner ? (
-                <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
+                <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
                   <div className="font-medium">
-                    Messaging onboarding still has required steps.
+                    Continue workspace setup
                   </div>
-                  <p className="mt-1">{onboardingReadiness.warnings.join(" ")}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {onboardingReadiness.warnings.length > 0
+                      ? onboardingReadiness.warnings.join(" ")
+                      : "Finish business details and the guided steps for your campaign path."}
+                  </p>
                 </div>
               ) : null}
               {today ? <WorkspaceToday today={today} /> : null}
+              {complianceOnboarding ? (
+                <ComplianceStatusPanel
+                  workspaceId={workspace.id}
+                  onboarding={complianceOnboarding}
+                  a2pBlockingIssues={a2pBlockingIssues}
+                />
+              ) : null}
             </div>
           ) : (
             <Outlet
@@ -193,14 +212,20 @@ function WorkspaceResolvedView({
 }
 
 export default function Workspace() {
-  const { workspaceData, userRole, onboardingReadiness, today } =
+  const {
+    workspaceData,
+    userRole,
+    onboardingReadiness,
+    today,
+    complianceOnboarding,
+    a2pBlockingIssues,
+  } =
     useLoaderData<LoaderData>();
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
   const onboardingStrip = findOnboardingStripData(useMatches());
-  // The sidebar stays hidden until onboarding is complete: while the wizard
-  // route is active, and on any workspace page while the workspace is still
-  // fresh enough that the root loader would bounce it into the wizard.
+  // Sidebar stays visible after short intake. Hide only while the intake
+  // route is active or the root loader would still bounce into intake.
   const showSidebar =
     !onboardingStrip && !onboardingReadiness.shouldRedirectToOnboarding;
 
@@ -227,6 +252,8 @@ export default function Workspace() {
           onboardingReadiness={onboardingReadiness}
           today={today}
           showSidebar={showSidebar}
+          complianceOnboarding={complianceOnboarding}
+          a2pBlockingIssues={a2pBlockingIssues}
         />
       </div>
     </>

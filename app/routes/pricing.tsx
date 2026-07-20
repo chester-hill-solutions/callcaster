@@ -46,7 +46,13 @@ const PricingRow = ({ icon, service, type, rates }: PricingRowProps) => (
         <p className="font-Zilla-Slab text-lg text-muted-foreground">{type}</p>
       </div>
     </header>
-    <dl className="divide-y divide-border p-4 sm:grid sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-border sm:p-0">
+    <dl
+      className={
+        rates.length === 1
+          ? "divide-y divide-border p-4 sm:p-0"
+          : "divide-y divide-border p-4 sm:grid sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-border sm:p-0"
+      }
+    >
       {rates.map((rate) => (
         <div
           key={`${service}-${rate.name}`}

@@ -1,4 +1,7 @@
 import { MemberRole } from "@/lib/member-role";
+import { productGoalForOnboardingGoal } from "@/lib/campaign-goals";
+import type { WorkspaceOnboardingGoal } from "@/lib/types";
+import type { LaunchChecklistItem } from "@/lib/workspace-launch-checklist";
 
 export type WorkspaceTodayKind =
   | "add_credits"
@@ -8,13 +11,17 @@ export type WorkspaceTodayKind =
   | "read_messages"
   | "open_running_campaign"
   | "open_handset"
-  | "review_campaigns";
+  | "review_campaigns"
+  | "launch_checklist";
 
 export type WorkspaceTodaySelection = {
   kind: WorkspaceTodayKind;
   href: string;
   unreadCount: number;
   runningCampaignTitle: string | null;
+  /** Present when intake is done and the launch checklist should render. */
+  launchChecklist?: LaunchChecklistItem[];
+  selectedGoal?: WorkspaceOnboardingGoal | null;
 };
 
 export type WorkspaceTodayCampaign = {
@@ -28,10 +35,17 @@ export type SelectWorkspaceTodayInput = {
   workspaceId: string;
   userRole: string | null | undefined;
   credits: number;
-  onboardingIncomplete: boolean;
+  /** True while short intake (goal) is incomplete. */
+  intakeIncomplete: boolean;
+  /** True while currently_due launch items remain after intake. */
+  launchChecklistIncomplete: boolean;
   hasWorkspaceNumber: boolean;
   campaigns: WorkspaceTodayCampaign[];
   unreadCount: number;
+  selectedGoal?: WorkspaceOnboardingGoal | null;
+  audienceCount?: number;
+  scriptCount?: number;
+  launchChecklist?: LaunchChecklistItem[];
 };
 
 function campaignIdCompare(
@@ -51,12 +65,14 @@ function selection(
   href: string,
   input: SelectWorkspaceTodayInput,
   runningCampaignTitle: string | null = null,
+  extras: Partial<WorkspaceTodaySelection> = {},
 ): WorkspaceTodaySelection {
   return {
     kind,
     href,
     unreadCount: Math.max(0, input.unreadCount),
     runningCampaignTitle,
+    ...extras,
   };
 }
 
@@ -72,20 +88,29 @@ export function selectWorkspaceToday(
     return selection("add_credits", `${baseUrl}/billing`, input);
   }
 
-  if (canAdminister && input.onboardingIncomplete) {
-    return selection("continue_setup", `${baseUrl}/onboarding`, input);
+  // Core business+goal missing, or path wizard still incomplete → back to wizard.
+  if (canAdminister && (input.intakeIncomplete || input.launchChecklistIncomplete)) {
+    return selection("continue_setup", `${baseUrl}/onboarding`, input, null, {
+      launchChecklist: input.launchChecklist,
+      selectedGoal: input.selectedGoal ?? null,
+    });
   }
 
   if (canAdminister && !input.hasWorkspaceNumber) {
     return selection(
       "get_number",
-      `${baseUrl}/settings/numbers/purchase`,
+      `${baseUrl}/settings/numbers`,
       input,
     );
   }
 
   if (canAdminister && input.campaigns.length === 0) {
-    return selection("create_campaign", `${baseUrl}/campaigns/new`, input);
+    const goal = input.selectedGoal;
+    const href =
+      goal != null
+        ? `${baseUrl}/campaigns/new?goal=${encodeURIComponent(productGoalForOnboardingGoal(goal))}`
+        : `${baseUrl}/campaigns/new`;
+    return selection("create_campaign", href, input);
   }
 
   if (input.unreadCount > 0) {
@@ -114,3 +139,6 @@ export function selectWorkspaceToday(
 
   return selection("review_campaigns", `${baseUrl}/campaigns`, input);
 }
+
+/** @deprecated Prefer intakeIncomplete / launchChecklistIncomplete. */
+export type { SelectWorkspaceTodayInput as WorkspaceTodayInput };

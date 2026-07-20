@@ -68,11 +68,11 @@ export function addressRequirementUserMessage(
   const country = numberIsoCountry.trim().toUpperCase() || "the number's country";
   switch (requirement) {
     case "local":
-      return `This number requires a validated ${country} address on file. Add one in workspace onboarding, then retry.`;
+      return `This number requires a validated ${country} address on file. Add one in Numbers settings, then retry.`;
     case "foreign":
-      return `This number requires a validated address outside ${country}. Add one in workspace onboarding, then retry.`;
+      return `This number requires a validated address outside ${country}. Add one in Numbers settings, then retry.`;
     case "any":
-      return "This number requires a validated address on file. Add one in workspace onboarding, then retry.";
+      return "This number requires a validated address on file. Add one in Numbers settings, then retry.";
     default: {
       const _exhaustive: never = requirement;
       return _exhaustive;

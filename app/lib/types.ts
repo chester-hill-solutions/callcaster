@@ -1,5 +1,10 @@
 import type { Database, Tables } from "@/lib/db-types";
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
+import type { WorkspaceOnboardingGoal } from "@/lib/workspace-onboarding-goals";
+export {
+  WORKSPACE_ONBOARDING_GOAL_VALUES,
+  type WorkspaceOnboardingGoal,
+} from "@/lib/workspace-onboarding-goals";
 
 export type ENV = {
   BASE_URL: string | undefined;
@@ -14,11 +19,10 @@ export type FileObject = {
   created_at: string;
   updated_at?: string;
   signedUrl?: string | null;
-  /** From the workspace_audio sidecar. Absent for objects predating it, so
-   * every consumer must treat null as "unknown", not as zero. */
+  /** workspace_audio sidecar duration; null means unknown (not zero). */
   durationMs?: number | null;
   sizeBytes?: number | null;
-  /** Set when this object was cut from another library file. */
+  /** Present when this object was cut from another library file. */
   sourceFileName?: string | null;
 };
 
@@ -290,12 +294,6 @@ export const WORKSPACE_ONBOARDING_CHANNEL_VALUES = [
   "local_number",
 ] as const;
 
-export const WORKSPACE_ONBOARDING_GOAL_VALUES = [
-  "live_call",
-  "ivr",
-  "sms_blast",
-] as const;
-
 export const WORKSPACE_OPERATING_COUNTRY_VALUES = [
   "CA",
   "US",
@@ -335,8 +333,6 @@ export const WORKSPACE_TWILIO_AUTH_MODE_VALUES = [
 
 export type WorkspaceOnboardingChannel =
   (typeof WORKSPACE_ONBOARDING_CHANNEL_VALUES)[number];
-export type WorkspaceOnboardingGoal =
-  (typeof WORKSPACE_ONBOARDING_GOAL_VALUES)[number];
 export type WorkspaceOperatingCountry =
   (typeof WORKSPACE_OPERATING_COUNTRY_VALUES)[number];
 export type WorkspaceOnboardingStatus =
@@ -482,9 +478,8 @@ export interface WorkspaceMessagingOnboardingState {
   currentStep: string;
   operatingCountry: WorkspaceOperatingCountry;
   selectedChannels: WorkspaceOnboardingChannel[];
-  /** Product goal chosen during onboarding; drives checklist steps. */
   selectedGoal: WorkspaceOnboardingGoal | null;
-  /** Computed at read time via `buildOnboardingStepsForState`; not persisted. */
+  /** Read-time via `buildOnboardingStepsForState`; not persisted. */
   steps: WorkspaceOnboardingStepState[];
   businessProfile: WorkspaceMessagingBusinessProfile;
   messagingService: WorkspaceMessagingServiceState;
@@ -584,13 +579,7 @@ export type IVROption = {
 
 export type Block = {
   id: string;
-  /**
-   * `select`/`dropdown` and `checkbox`/`multi` are synonyms: the first of each
-   * pair is the documented vocabulary (docs/script-json-format.md) and what the
-   * builder writes for new blocks, the second is legacy. Result.tsx renders each
-   * pair identically; existing blocks keep the type they were written with (see
-   * toWireType in the scriptkit core migrate module).
-   */
+  /** select/dropdown and checkbox/multi are synonyms (docs/script-json-format.md); Result.tsx treats each pair the same. */
   type: "radio" | "dropdown" | "select" | "boolean" | "multi" | "checkbox"
     | "textarea" | "textblock" | "audio";
   title: string;

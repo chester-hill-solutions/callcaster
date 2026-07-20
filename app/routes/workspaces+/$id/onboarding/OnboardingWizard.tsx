@@ -9,14 +9,15 @@ import {
 } from "@/lib/messaging-onboarding/goals";
 import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingLoaderData } from "../onboarding.loader.server";
-import { OnboardingBusinessBasicsStep } from "./OnboardingBusinessBasicsStep";
+import type { OnboardingActionData } from "../onboarding.action.server";
+import { OnboardingBusinessIdentityStep } from "./OnboardingBusinessIdentityStep";
+import { OnboardingBusinessProgramStep } from "./OnboardingBusinessProgramStep";
 import { OnboardingChecklistLinkStep } from "./OnboardingChecklistLinkStep";
 import { OnboardingCreditsStep } from "./OnboardingCreditsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
 import { OnboardingGoalStep } from "./OnboardingGoalStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
 import { OnboardingLaunchStep } from "./OnboardingLaunchStep";
-import { hasVoiceCapability } from "./utils";
 import { readWizardStep } from "./wizard-step-resolution";
 import type { OnboardingPendingActions } from "./types";
 
@@ -25,7 +26,12 @@ type OnboardingWizardProps = OnboardingLoaderData & {
   a2pBlockingIssues: string[];
   a2pErrors: string[];
   actionError?: string | null;
+  actionData?: OnboardingActionData;
 };
+
+function isBusinessPrefixStep(step: string | null): boolean {
+  return step === "business_identity" || step === "business_program";
+}
 
 export function OnboardingWizard({
   workspaceId,
@@ -43,6 +49,7 @@ export function OnboardingWizard({
   audienceCount,
   campaignCount,
   actionError,
+  actionData,
 }: OnboardingWizardProps) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -50,7 +57,7 @@ export function OnboardingWizard({
   const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const urlStep = searchParams.get("step");
   const [showIntro, setShowIntro] = useState(
-    () => onboarding.status === "not_started" && urlStep !== "business_profile",
+    () => onboarding.status === "not_started" && !isBusinessPrefixStep(urlStep),
   );
   const goal = onboarding.selectedGoal;
   const visibleSteps = wizardStepsForGoal(goal);
@@ -81,14 +88,6 @@ export function OnboardingWizard({
     activeStep && stepIndex > 0 ? previousWizardStep(activeStep, goal) : null;
   const continueTarget = activeStep ? nextWizardStep(activeStep, goal) : null;
 
-  const emergencyEligibleNumbers = new Set(
-    onboarding.emergencyVoice.emergencyEligiblePhoneNumbers,
-  );
-  const voiceCapableWorkspaceNumbers = (phoneNumbers ?? []).filter(
-    (number) =>
-      number?.phone_number && number.type === "rented" && hasVoiceCapability(number.capabilities),
-  );
-
   const goToPreviousIntro = () => {
     setShowIntro(true);
     navigate(`/workspaces/${workspaceId}/onboarding`, { replace: true });
@@ -99,11 +98,22 @@ export function OnboardingWizard({
       return null;
     }
     switch (activeStep) {
-      case "business_profile":
+      case "business_identity":
         return (
           <Button
             type="submit"
-            form="onboarding-business-form"
+            form="onboarding-business-identity-form"
+            disabled={pending.isSavingBusinessProfile}
+            aria-busy={pending.isSavingBusinessProfile}
+          >
+            {pending.isSavingBusinessProfile ? "Saving…" : "Save & continue"}
+          </Button>
+        );
+      case "business_program":
+        return (
+          <Button
+            type="submit"
+            form="onboarding-business-program-form"
             disabled={pending.isSavingBusinessProfile}
             aria-busy={pending.isSavingBusinessProfile}
           >
@@ -175,14 +185,21 @@ export function OnboardingWizard({
         />
       ) : null}
 
-      {!showIntro && activeStep === "business_profile" ? (
-        <OnboardingBusinessBasicsStep
-          formId="onboarding-business-form"
+      {!showIntro && activeStep === "business_identity" ? (
+        <OnboardingBusinessIdentityStep
+          formId="onboarding-business-identity-form"
           onboarding={onboarding}
           isReadOnly={isReadOnly}
           pending={pending}
-          voiceCapableWorkspaceNumbers={voiceCapableWorkspaceNumbers}
-          emergencyEligibleNumbers={emergencyEligibleNumbers}
+        />
+      ) : null}
+
+      {!showIntro && activeStep === "business_program" ? (
+        <OnboardingBusinessProgramStep
+          formId="onboarding-business-program-form"
+          onboarding={onboarding}
+          isReadOnly={isReadOnly}
+          pending={pending}
         />
       ) : null}
 
@@ -222,6 +239,8 @@ export function OnboardingWizard({
           mediaNames={mediaNames}
           inboundQueues={inboundQueues}
           scripts={scripts}
+          pending={pending}
+          validationRequest={actionData?.validationRequest}
         />
       ) : null}
 

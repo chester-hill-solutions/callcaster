@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 /**
- * JOURNEY-NITPICK-04: the Business basics step (wizard step 1) must not advance
- * to `path_selection` when the baseline required business-profile fields are
- * blank. The wizard advances purely because `save_business_profile` returns a
- * redirect result, so "does not advance" is asserted as "does not return a
- * redirect" — plus proof that nothing was persisted.
+ * Business profile save must not advance when required fields for the active
+ * wizard screen (or the full baseline for API/capability posts) are blank.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -82,6 +79,7 @@ import {
   runOnboardingAction,
 } from "../app/lib/platform-onboarding.server";
 import { BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS } from "../app/lib/messaging-onboarding/predicates";
+import { resolvePersistedWizardStep } from "../app/lib/messaging-onboarding/wizard-steps";
 
 const WORKSPACE_ID = "workspace-1";
 const USER_ID = "user-1";
@@ -111,12 +109,13 @@ const EMPTY_BUSINESS_PROFILE = {
   authorizedRepTitle: "",
 };
 
-function onboardingState() {
+function onboardingState(overrides: Record<string, unknown> = {}) {
   return {
     status: "not_started",
-    currentStep: "business_profile",
+    currentStep: "business_identity",
     operatingCountry: "CA",
     selectedChannels: [] as string[],
+    selectedGoal: null,
     businessProfile: { ...EMPTY_BUSINESS_PROFILE },
     emergencyVoice: {
       enabled: false,
@@ -142,44 +141,52 @@ function onboardingState() {
     rcs: { status: "not_started", regions: [] as string[] },
     reviewState: { blockingIssues: [] as string[], lastError: null },
     steps: [],
+    ...overrides,
   };
 }
 
-/** An empty step-1 submit: every field present but blank, as the browser posts it. */
-function emptyBusinessBasicsForm(): FormData {
+function identityForm(overrides: Record<string, string> = {}): FormData {
   const formData = new FormData();
   formData.set("_action", "save_business_profile");
-  for (const field of [
-    "legalBusinessName",
-    "businessType",
-    "websiteUrl",
-    "privacyPolicyUrl",
-    "termsOfServiceUrl",
-    "supportEmail",
-    "supportPhone",
-    "useCaseSummary",
-    "optInWorkflow",
-    "optInKeywords",
-    "optOutKeywords",
-    "helpKeywords",
-    "sampleMessages",
-    "addressStreet",
-    "addressCity",
-    "addressRegion",
-    "addressPostalCode",
-  ]) {
-    formData.set(field, "");
-  }
+  formData.set("wizardStep", "business_identity");
+  formData.set("legalBusinessName", "");
+  formData.set("businessType", "");
+  formData.set("websiteUrl", "");
+  formData.set("privacyPolicyUrl", "");
+  formData.set("termsOfServiceUrl", "");
+  formData.set("supportEmail", "");
+  formData.set("supportPhone", "");
   formData.set("operatingCountry", "CA");
+  for (const [key, value] of Object.entries(overrides)) {
+    formData.set(key, value);
+  }
   return formData;
 }
 
-function completeBusinessBasicsForm(): FormData {
-  const formData = emptyBusinessBasicsForm();
+function programForm(overrides: Record<string, string> = {}): FormData {
+  const formData = new FormData();
+  formData.set("_action", "save_business_profile");
+  formData.set("wizardStep", "business_program");
+  formData.set("useCaseSummary", "");
+  formData.set("optInWorkflow", "");
+  formData.set("optInKeywords", "");
+  formData.set("optOutKeywords", "");
+  formData.set("helpKeywords", "");
+  formData.set("sampleMessages", "");
+  for (const [key, value] of Object.entries(overrides)) {
+    formData.set(key, value);
+  }
+  return formData;
+}
+
+function completeBaselineForm(): FormData {
+  const formData = new FormData();
+  formData.set("_action", "save_business_profile");
   formData.set("legalBusinessName", "Northgate Services Inc.");
   formData.set("websiteUrl", "https://www.northgateservices.example");
   formData.set("useCaseSummary", "Appointment reminders for booked clients.");
   formData.set("sampleMessages", "Northgate: your appointment is tomorrow at 9:30 AM.");
+  formData.set("operatingCountry", "CA");
   return formData;
 }
 
@@ -203,74 +210,132 @@ describe("save_business_profile validation", () => {
     ]);
   });
 
-  test("rejects an empty step-1 submit instead of advancing", async () => {
+  test("maps legacy business_profile persisted step to business_identity", () => {
+    expect(resolvePersistedWizardStep("business_profile")).toBe("business_identity");
+    expect(resolvePersistedWizardStep(null)).toBe("business_identity");
+  });
+
+  test("rejects an empty identity submit instead of advancing", async () => {
     const outcome = await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
       "save_business_profile",
-      emptyBusinessBasicsForm(),
+      identityForm(),
     );
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-
     expect(outcome.result.kind).toBe("payload");
     if (outcome.result.kind !== "payload") return;
-
     expect(outcome.result.status).toBe(400);
     expect(outcome.result.data.error).toContain("Legal business name is required.");
     expect(outcome.result.data.error).toContain("Website URL is required.");
-    expect(outcome.result.data.error).toContain("Use case summary is required.");
-    expect(outcome.result.data.error).toContain("At least one sample message is required.");
+    expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
   });
 
-  test("does not persist onboarding state for an empty step-1 submit", async () => {
+  test("advances identity save to business_program", async () => {
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      identityForm({
+        legalBusinessName: "Northgate Services Inc.",
+        websiteUrl: "https://www.northgateservices.example",
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "business_program" });
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({ currentStep: "business_program" }),
+      }),
+    );
+  });
+
+  test("identity save preserves previously saved program fields", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        businessProfile: {
+          ...EMPTY_BUSINESS_PROFILE,
+          useCaseSummary: "Existing use case.",
+          sampleMessages: ["Existing sample."],
+        },
+      }),
+    );
+
     await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
       "save_business_profile",
-      emptyBusinessBasicsForm(),
+      identityForm({
+        legalBusinessName: "Northgate Services Inc.",
+        websiteUrl: "https://www.northgateservices.example",
+      }),
     );
 
-    expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
-    expect(mocks.enqueueWorkspaceComplianceJob).not.toHaveBeenCalled();
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          businessProfile: expect.objectContaining({
+            legalBusinessName: "Northgate Services Inc.",
+            websiteUrl: "https://www.northgateservices.example",
+            useCaseSummary: "Existing use case.",
+            sampleMessages: ["Existing sample."],
+          }),
+        }),
+      }),
+    );
   });
 
-  test("does not redirect the wizard to path_selection on an empty submit", async () => {
+  test("rejects an empty program submit", async () => {
     const outcome = await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
       "save_business_profile",
-      emptyBusinessBasicsForm(),
-    );
-
-    expect(outcome.ok).toBe(true);
-    if (!outcome.ok) return;
-
-    const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
-    expect(mapped.kind).toBe("ui_payload");
-    expect(mapped.kind === "ui_payload" && mapped.status).toBe(400);
-  });
-
-  test("rejects a partial submit that is missing only sample messages", async () => {
-    const formData = completeBusinessBasicsForm();
-    formData.set("sampleMessages", "   ");
-
-    const outcome = await runOnboardingAction(
-      USER_ID,
-      WORKSPACE_ID,
-      "save_business_profile",
-      formData,
+      programForm(),
     );
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     expect(outcome.result.kind).toBe("payload");
     if (outcome.result.kind !== "payload") return;
-
     expect(outcome.result.status).toBe(400);
-    expect(outcome.result.data.error).toBe("At least one sample message is required.");
+    expect(outcome.result.data.error).toContain("Use case summary is required.");
+    expect(outcome.result.data.error).toContain("At least one sample message is required.");
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+  });
+
+  test("advances program save to path_selection", async () => {
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      programForm({
+        useCaseSummary: "Appointment reminders for booked clients.",
+        sampleMessages: "Northgate: your appointment is tomorrow at 9:30 AM.",
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "path_selection" });
+    const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
+    expect(mapped).toMatchObject({ kind: "ui_redirect", step: "path_selection" });
+  });
+
+  test("full baseline submit without wizardStep still advances to path_selection", async () => {
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      completeBaselineForm(),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "path_selection" });
   });
 
   test("rejects a JSON API submit with blank required fields", async () => {
@@ -287,23 +352,5 @@ describe("save_business_profile validation", () => {
     if (outcome.result.kind !== "payload") return;
     expect(outcome.result.status).toBe(400);
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
-  });
-
-  test("still advances to path_selection when the required fields are filled in", async () => {
-    const outcome = await runOnboardingAction(
-      USER_ID,
-      WORKSPACE_ID,
-      "save_business_profile",
-      completeBusinessBasicsForm(),
-    );
-
-    expect(outcome.ok).toBe(true);
-    if (!outcome.ok) return;
-
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "path_selection" });
-    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledTimes(1);
-
-    const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
-    expect(mapped).toMatchObject({ kind: "ui_redirect", step: "path_selection" });
   });
 });

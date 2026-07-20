@@ -27,6 +27,18 @@ function redirectToOnboardingStep(
   throw redirect(`/workspaces/${workspaceId}/onboarding?${params.toString()}`, { headers });
 }
 
+function redirectToWorkspacePath(
+  path: string,
+  headers: Headers,
+  searchParams?: Record<string, string>,
+): never {
+  if (!searchParams || Object.keys(searchParams).length === 0) {
+    throw redirect(path, { headers });
+  }
+  const params = new URLSearchParams(searchParams);
+  throw redirect(`${path}?${params.toString()}`, { headers });
+}
+
 async function runUiOnboardingAction(
   workspaceId: string,
   headers: Headers,
@@ -52,6 +64,9 @@ async function runUiOnboardingAction(
       headers,
       mapped.searchParams,
     );
+  }
+  if (mapped.kind === "ui_redirect_path") {
+    redirectToWorkspacePath(mapped.path, headers, mapped.searchParams);
   }
 
   if (mapped.kind !== "ui_payload") {

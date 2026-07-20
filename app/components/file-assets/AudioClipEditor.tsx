@@ -196,7 +196,7 @@ export function AudioClipEditor({
           drag: true,
           resize: true,
           // A DOM element can hold a live `var()`, so this tracks the theme itself.
-          color: "hsl(var(--primary) / 0.18)",
+          color: "color-mix(in srgb, var(--primary) 18%, transparent)",
           minLength: MIN_CLIP_DURATION_MS / 1000,
         });
         setDurationMs(Math.round(duration * 1000));

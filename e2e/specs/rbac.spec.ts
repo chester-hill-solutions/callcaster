@@ -49,7 +49,7 @@ test.describe("RBAC @rbac @security", () => {
 
   memberTest("RBAC-15 member onboarding banner without continue", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.onboarding.id));
-    await expect(page.getByText(/Messaging onboarding still has required steps/i)).toBeVisible();
+    await expect(page.getByText(/Continue workspace setup/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /continue onboarding/i })).toHaveCount(0);
   });
 

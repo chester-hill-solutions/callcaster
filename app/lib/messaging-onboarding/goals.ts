@@ -5,10 +5,9 @@
 
 import {
   WORKSPACE_ONBOARDING_GOAL_VALUES,
-  type WorkspaceOnboardingChannel,
   type WorkspaceOnboardingGoal,
-  type WorkspaceOperatingCountry,
-} from "@/lib/types";
+} from "@/lib/workspace-onboarding-goals";
+import type { WorkspaceOnboardingChannel, WorkspaceOperatingCountry } from "@/lib/types";
 import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
 
 export { WORKSPACE_ONBOARDING_GOAL_VALUES };
@@ -81,7 +80,12 @@ export function checklistStepsForGoal(
 export function wizardStepsForGoal(
   goal: WorkspaceOnboardingGoal | null,
 ): WizardOnboardingStepId[] {
-  return ["business_profile", "path_selection", ...checklistStepsForGoal(goal)];
+  return [
+    "business_identity",
+    "business_program",
+    "path_selection",
+    ...checklistStepsForGoal(goal),
+  ];
 }
 
 export function nextWizardStep(

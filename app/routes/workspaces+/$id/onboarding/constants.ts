@@ -20,7 +20,8 @@ export const WIZARD_STEP_META: Array<{
   label: string;
   shortLabel: string;
 }> = [
-  { id: "business_profile", label: "Business basics", shortLabel: "Business" },
+  { id: "business_identity", label: "Business identity", shortLabel: "Identity" },
+  { id: "business_program", label: "Program details", shortLabel: "Program" },
   { id: "path_selection", label: "Your goal", shortLabel: "Goal" },
   { id: "audience", label: "Audience", shortLabel: "Audience" },
   { id: "first_number", label: "Phone number", shortLabel: "Number" },

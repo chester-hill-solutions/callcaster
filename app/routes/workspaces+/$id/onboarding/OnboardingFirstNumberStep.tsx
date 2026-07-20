@@ -1,13 +1,15 @@
 import { Link, useFetcher, useRevalidator } from "react-router";
-import { useCallback, useState } from "react";
-import { useFetcherOnIdle } from "@/hooks/utils";
+import { useCallback, useEffect, useState } from "react";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 import {
   NumberSummaryList,
   type RoutingPresetSubmission,
 } from "@/components/phone-numbers/NumberSummaryList";
-import { CallerIdVerificationDialog } from "@/components/phone-numbers/CallerIdVerificationDialog";
+import {
+  CallerIdVerificationDialog,
+  type CallerIdValidationRequest,
+} from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { CallerIdVerificationForm } from "@/components/phone-numbers/CallerIdVerificationForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -24,7 +26,6 @@ import {
   isVerifiedCallerIdNumber,
   workspaceHasFirstNumber,
 } from "@/lib/messaging-onboarding/predicates";
-import type { OnboardingActionData } from "../onboarding.action.server";
 import type { OnboardingStepProps } from "./types";
 import type { InboundRoutingPresetId } from "../../../../../shared/inbound-routing-presets";
 import type { WorkspaceOnboardingGoal } from "@/lib/types";
@@ -39,8 +40,10 @@ type OnboardingFirstNumberStepProps = Pick<
   | "mediaNames"
   | "inboundQueues"
   | "scripts"
+  | "pending"
 > & {
   creditsBalance: number;
+  validationRequest?: CallerIdValidationRequest | null;
 };
 
 // Reuse the same patch-number action handlers the numbers settings page uses
@@ -79,30 +82,40 @@ export function OnboardingFirstNumberStep({
   mediaNames,
   inboundQueues,
   scripts,
+  pending,
+  validationRequest,
 }: OnboardingFirstNumberStepProps) {
   const purchaseFetcher = useFetcher<NumbersSearchFetcherData>();
-  const verifyFetcher = useFetcher<OnboardingActionData>();
   const routingFetcher = useFetcher();
   const revalidator = useRevalidator();
-  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
+  const [verificationDialogOpen, setVerificationDialogOpen] = useState(
+    () => Boolean(validationRequest),
+  );
+  const [activeValidationRequest, setActiveValidationRequest] =
+    useState<CallerIdValidationRequest | null>(validationRequest ?? null);
+
+  /**
+   * @effect Open the verification-code dialog when the route action returns a validationRequest
+   *   (document form submit, same pattern as Settings → Numbers).
+   * @effect-deps validationRequest from useActionData via the parent route
+   * @effect-side-effects setState for dialog open + retained request payload
+   * @effect-why-not-loader Action data arrives after the mutation; opening a modal is client-only.
+   */
+  useEffect(() => {
+    if (!validationRequest) return;
+    setActiveValidationRequest(validationRequest);
+    setVerificationDialogOpen(true);
+  }, [validationRequest]);
 
   const numbers = phoneNumbers ?? [];
   const rentedCount = countRentedWorkspaceNumbers(numbers);
   const rentedNumbers = numbers.filter((number) => number?.type === "rented");
   const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
   const hasFirstNumber = workspaceHasFirstNumber(numbers);
-  const pendingCallerIds = numbers.filter(
-    (number) =>
-      number.type === "caller_id" &&
-      !isVerifiedCallerIdNumber(number) &&
-      number.capabilities &&
-      typeof number.capabilities === "object" &&
-      !Array.isArray(number.capabilities) &&
-      (number.capabilities as Record<string, unknown>).verification_status === "pending",
-  );
   const messagingReady = Boolean(onboarding.messagingService.serviceSid);
   const isRoutingBusy = routingFetcher.state !== "idle";
   const actionPath = numbersSettingsActionPath(workspaceId);
+  const isVerifying = pending.isVerifyingCallerId;
 
   const handlePurchaseComplete = useCallback(() => {
     revalidator.revalidate();
@@ -195,13 +208,8 @@ export function OnboardingFirstNumberStep({
     [routingFetcher, actionPath],
   );
 
-  useFetcherOnIdle(verifyFetcher, (data) => {
-    if (data?.validationRequest) {
-      setVerificationDialogOpen(true);
-    }
-  });
-
   const smsGoal = goalNeedsSmsCompliance(onboarding.selectedGoal);
+  const callerIdNumbers = numbers.filter((number) => number?.type === "caller_id");
 
   if (!messagingReady) {
     return (
@@ -224,8 +232,11 @@ export function OnboardingFirstNumberStep({
     <>
       <CallerIdVerificationDialog
         isOpen={verificationDialogOpen}
-        onOpenChange={setVerificationDialogOpen}
-        validationRequest={verifyFetcher.data?.validationRequest}
+        onOpenChange={(open) => {
+          setVerificationDialogOpen(open);
+          if (!open) setActiveValidationRequest(null);
+        }}
+        validationRequest={activeValidationRequest}
       />
       <Section variant="flat">
         <SectionHeader
@@ -270,16 +281,6 @@ export function OnboardingFirstNumberStep({
             </Alert>
           ) : null}
 
-          {pendingCallerIds.length > 0 ? (
-            <Alert>
-              <AlertDescription>
-                {pendingCallerIds.length} number
-                {pendingCallerIds.length === 1 ? " is" : "s are"} awaiting verification. Complete
-                the phone call and enter the code, then refresh this page.
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
           <div className="grid gap-6 lg:grid-cols-2">
             <fieldset className="space-y-4 rounded-md bg-muted/40 p-3">
               <legend className="text-sm font-medium">Rent a Canadian number</legend>
@@ -305,10 +306,38 @@ export function OnboardingFirstNumberStep({
             <fieldset className="space-y-4 rounded-md bg-muted/40 p-3">
               <legend className="text-sm font-medium">Verify your own number</legend>
               <p className="text-sm text-muted-foreground">
-                Use a phone number you already own. Verified numbers work for outbound SMS and
-                calls, but not for inbound SMS or calls. Rent a number above if you need inbound
-                traffic.
+                Outbound SMS and calls only. Rent a number for inbound traffic.
               </p>
+              {callerIdNumbers.length > 0 ? (
+                <ul className="space-y-2" data-testid="onboarding-caller-id-list">
+                  {callerIdNumbers.map((number) => {
+                    const pendingStatus =
+                      !isVerifiedCallerIdNumber(number) &&
+                      number.capabilities &&
+                      typeof number.capabilities === "object" &&
+                      !Array.isArray(number.capabilities) &&
+                      (number.capabilities as Record<string, unknown>)
+                        .verification_status === "pending";
+                    return (
+                      <li
+                        key={number.id ?? number.phone_number}
+                        className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                      >
+                        <span className="font-mono">
+                          {number.phone_number ?? "Unknown number"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {isVerifiedCallerIdNumber(number)
+                            ? "Verified"
+                            : pendingStatus
+                              ? "Awaiting verification"
+                              : "Caller ID"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
               {isReadOnly ? (
                 <p className="text-sm text-muted-foreground">
                   Only workspace owners and admins can verify numbers. Ask an admin to complete this
@@ -318,9 +347,8 @@ export function OnboardingFirstNumberStep({
                 <CallerIdVerificationForm
                   formId="onboarding-caller-id-form"
                   actionName="verify_caller_id"
-                  disabled={verifyFetcher.state !== "idle"}
-                  isPending={verifyFetcher.state !== "idle"}
-                  fetcher={verifyFetcher}
+                  disabled={isVerifying}
+                  isPending={isVerifying}
                 />
               )}
             </fieldset>

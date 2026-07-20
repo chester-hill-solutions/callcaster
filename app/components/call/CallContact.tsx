@@ -23,11 +23,13 @@ const QueueContactImpl = ({
 }: QueueContactProps) => {
   const borderTop = grouped
     ? firstInHouse
-      ? "2px solid hsl(var(--border))"
-      : "2px solid hsl(var(--muted-foreground))"
+      ? "2px solid var(--border)"
+      : "2px solid var(--muted-foreground)"
     : "unset";
 
-  const background = selected ? "hsl(var(--primary) / 0.12)" : "unset";
+  const background = selected
+    ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+    : "unset";
   const borderBottomLeftRadius = isLast ? "18px" : "unset";
   const phoneOpacity = !household ? "1" : firstInHouse ? "1" : ".6";
 
@@ -37,12 +39,12 @@ const QueueContactImpl = ({
     background: !household
       ? "unset"
       : firstInHouse
-        ? "hsl(var(--secondary))"
+        ? "var(--secondary)"
         : "unset",
     color: !household
       ? "unset"
       : firstInHouse
-        ? "hsl(var(--foreground))"
+        ? "var(--foreground)"
         : "unset",
     borderBottomRightRadius: isLast ? "18px" : "unset",
   };

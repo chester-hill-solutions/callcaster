@@ -90,7 +90,7 @@ export async function provisionWorkspaceA2P({
   if (blockingIssues.length > 0) {
     const blockedState = mergeWorkspaceMessagingOnboardingState(onboarding, {
       status: "collecting_business",
-      currentStep: "business_profile",
+      currentStep: "business_identity",
       reviewState: {
         ...onboarding.reviewState,
         blockingIssues,

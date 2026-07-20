@@ -3,80 +3,66 @@
 **Date:** 2026-07-17  
 **Prepared from:** Research plan *Simplify CallCaster Business Onboarding*; current-state map of `/workspaces/:id/onboarding`; industry benchmark (Stripe, Shopify, Twilio, HubSpot, Square)  
 **Companion artifacts:** Cursor plan `simplify_business_onboarding_53c3a078`; research canvas `b2b-onboarding-patterns-2026.canvas.tsx`  
-**Status:** Open — decisions locked; ready for implementation  
-**Primary outcome:** Workspace is **launch-ready for the first campaign** with minimal upfront friction  
-**Execution boundary:** Onboarding UX/state, Workspace Today launch checklist, readiness gating, contextual compliance collection. Does not rewrite Twilio Trust Hub / A2P provisioning internals.
+**Status:** Corrected 2026-07-18 — short intake + Today-as-primary-path rejected; restore always-required business basics + path wizard  
+**Primary outcome:** Workspace completes business identity, picks a goal, then finishes a **goal-scoped wizard** through launch-ready  
+**Execution boundary:** Onboarding UX/state, Workspace Today soft handoff, readiness gating, contextual compliance at capability boundaries. Does not rewrite Twilio Trust Hub / A2P provisioning internals.
 
 ---
 
 ## 1. Locked product decisions
 
-These close the research plan’s open questions. Do not re-litigate during Wave 0–2 unless a hard technical blocker appears.
+### D1 — Direction: always-required core + path wizard
 
-### D1 — Direction: Option 1 + campaign-first bias
+**Chosen:** Keep the linear onboarding wizard for path setup. Do not replace path steps with Today-only checklist work.
 
-**Chosen:** Capability-based **launch home** (Option 1), with a **campaign-first** bias from Option 3.
+| Phase | What |
+|-------|------|
+| Always required | Workspace name → **Business basics** → Goal (+ SMS compliance fields when goal needs them) |
+| Path wizard (goal-scoped) | Audience → First number → Script (IVR/SMS) → Campaign → Credits → Launch |
+| Soft home | After business+goal, sidebar unlocks; Today can show a checklist that **returns to `/onboarding?step=…`** |
+| Capability gates | Service/emergency address at number rental; extra SMS gates as needed |
 
-| Decision | Choice |
-|----------|--------|
-| Primary path | Kill the linear wizard as the primary path |
-| Intake | Short: workspace name → goal → operating country |
-| Post-intake home | [`WorkspaceToday`](../../app/components/workspace/WorkspaceToday.tsx) shows a goal-scoped launch checklist |
-| Primary CTA | Next missing launch dependency; prefer `/campaigns/new` or the draft campaign’s settings once a campaign exists |
-| Navigation | Sidebar visible after intake; soft “Continue setup” chrome replaces hard redirect lockout |
-| Compliance | Contextual gates at capability boundaries (number rent, SMS path, go-live), not a mega-form before goal |
-
-**Rejected for v1:** Option 2 (compressed wizard) as the primary architecture — keep only as a temporary migration shell if needed. Pure Option 3 (campaign-only spine) deferred; campaign create absorbs blockers via readiness actions, but workspace Today remains the status home.
+**Rejected:** Short intake (name → goal → country) that exits to Workspace Today as the primary setup surface for audience/number/script/campaign.
 
 ### D2 — Hard gates (`currently_due` vs deferred)
 
-Model after Stripe’s `currently_due` / `eventually_due`.
-
 | Item | Classification | Behavior |
 |------|----------------|----------|
-| Workspace name | Intake required | Blocks leaving intake |
-| Goal (`live_call` / `ivr` / `sms_blast`) | Intake required | Drives checklist + channels |
-| Operating country | Intake required | Drives TFV vs A2P later |
-| Audience / contacts | **currently_due** for launch-ready | Checklist item; campaign readiness still enforces queue/contacts at go-live |
-| Phone number (rented or verified caller ID) | **currently_due** for launch-ready | Exploration allowed without it; **hard block** on campaign start / outbound send; soft banner while missing |
-| Script | **currently_due** for `ivr` and `sms_blast` only | Omitted from checklist for `live_call` |
-| Campaign record | **currently_due** for launch-ready | Create/settings is the preferred deep link once intake is done |
-| Campaign readiness codes clear | **currently_due** for go-live | Use [`campaign-readiness-actions.ts`](../../app/lib/campaign-readiness-actions.ts) |
-| Credits | **eventually_due** with warning | Checklist shows balance warning; Today may still prioritize `add_credits` when balance ≤ 0; do not force a wizard step |
-| Legal business name / website / use-case / samples | **eventually_due** until SMS capability | Collect when SMS path is chosen or before TFV/A2P submit |
-| TFV fields (DBA, BN, age-gated, samples) | **currently_due** when enabling toll-free bulk SMS | Gate at SMS capability / number type selection |
-| A2P fields (EIN, industry, authorized rep) | **currently_due** when enabling US A2P | Gate at SMS capability for US/BOTH |
-| Emergency / service address | **currently_due at number rental** for voice-capable rented numbers | **Not** collected in intake; validate before rent when voice emergency applies |
-| RCS sender package | Deferred / flag-gated | Only if RCS channel enabled and selected |
-| Compliance review (In review / Rejected) | Lifecycle surface | Visible status; does not freeze the whole workspace |
+| Workspace name | Required prefix | Blocks leaving intro |
+| Business profile baseline | Required prefix | Legal name, website, use-case, samples, operating country, shared contact fields — before goal |
+| Goal (`live_call` / `ivr` / `sms_blast`) | Required prefix | Unlocks path steps + channels |
+| TFV / A2P fields | Required when SMS goal needs them | Collected on goal step / SMS path before continuing |
+| Audience / contacts | Path wizard | Guided step; product surfaces linked from wizard |
+| Phone number | Path wizard | Guided step; rental blocked without service address when required |
+| Script | Path wizard for `ivr` / `sms_blast` | Omitted for `live_call` |
+| Campaign record | Path wizard | Create from wizard link-out |
+| Credits | Warning / eventually | Wizard step + Today may prioritize `add_credits` at ≤ 0 |
+| Emergency / service address | At number rental | Not a substitute for business basics |
 
 ### D3 — Redirect and sidebar policy
 
 | Phase | Redirect | Sidebar |
 |-------|----------|---------|
-| Intake incomplete (`status === not_started` or goal/country unset) | Soft redirect owners/admins to intake (Today or `/onboarding?intake=1`) | May hide or collapse during intake only |
-| Intake complete, launch checklist incomplete | **No** hard `shouldRedirectToOnboarding` lock | **Visible**; Today + soft banner |
-| Capability action missing data (rent number, start campaign, submit A2P) | Hard block that action with contextual form | Visible |
+| Core incomplete (business baseline or goal missing) | Hard redirect owners/admins to `/onboarding` | Locked / onboarding chrome |
+| Core complete, path wizard incomplete | **No** hard lock; soft banner + Today `continue_setup` → `/onboarding` | Visible |
+| Capability action missing data | Hard block that action with contextual form | Visible |
 
-Migration note: [`deriveWorkspaceMessagingReadiness`](../../app/lib/messaging-onboarding/readiness.server.ts) today sets `shouldRedirectToOnboarding = !hasLegacyTraffic && results.length > 0`. Change meaning to **intake incomplete** (or rename to `shouldRedirectToIntake`) so emergency-address / first-number warnings no longer imprison the workspace.
+### D4 — Primary CTA after core setup
 
-### D4 — Primary CTA after intake
-
-1. If no campaign: CTA → `/campaigns/new?goal=<productGoal>` (and checklist still lists audience/number/script).
-2. If campaign exists but not launch-ready: CTA → that campaign’s settings (or the next readiness corrective action).
-3. If launch-ready: CTA → campaign home / start flow.
-4. Credits ≤ 0 may still outrank as `add_credits` on Today (existing priority), with checklist warning retained.
+1. Prefer **Continue setup** → `/onboarding` (or next incomplete `?step=`).
+2. Today checklist items deep-link to matching wizard steps.
+3. Credits ≤ 0 may still outrank as `add_credits` on Today.
 
 ---
 
 ## 2. Commander's intent
 
-1. **Cut time-to-checklist under two minutes** — name, goal, country only before the launch home appears.
-2. **Treat onboarding as capability unlock** — ask for compliance when the user tries the capability that needs it.
-3. **Do real work in real surfaces** — checklist items open audiences, numbers, scripts, campaigns, billing; auto-complete from product state.
-4. **Keep the workspace usable** after intake — no full-app sidebar lock for missing number or address.
-5. **Reuse readiness sources of truth** — workspace predicates, campaign readiness actions, and Today selection; do not invent a parallel completion model.
-6. **Restore compliance visibility** without restoring the old provider wizard step — compact status on Today/settings.
+1. **Collect business identity up front** — every workspace gets baseline business data before path work.
+2. **Keep path setup guided** — IVR/SMS/live-call differences stay in the onboarding wizard, not only a Today checklist.
+3. **Do real work in real surfaces** — wizard link-outs open audiences, numbers, scripts, campaigns, billing; progress auto-completes from product state.
+4. **Unlock the workspace after business + goal** — missing number/address alone does not imprison navigation.
+5. **Reuse readiness sources of truth** — predicates, campaign readiness, Today selection.
+6. **Keep compliance visibility** — status on Today/settings plus contextual gates.
 
 This plan does not replace Trust Hub provisioning jobs, billing ledger rules, or the design-system surface remediation plan.
 

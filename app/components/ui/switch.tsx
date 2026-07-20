@@ -1,30 +1,43 @@
-import * as React from "react"
-import * as SwitchPrimitives from "@radix-ui/react-switch"
-import { cn } from "@/lib/utils"
+import type { SwitchProps as AriaSwitchProps } from "react-aria-components";
 
-const Switch = React.forwardRef<
-  React.ElementRef<typeof SwitchPrimitives.Root>,
-  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
->(({ className, ...props }, ref) => (
-  <SwitchPrimitives.Root
-    className={cn(
-      "peer inline-flex h-[24px] w-[44px] shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
-      "bg-[#333] data-[state=checked]:bg-primary", // Dark gray when unchecked, red when checked
-      "relative",
-      className
-    )}
-    {...props}
-    ref={ref}
-  >
-    <SwitchPrimitives.Thumb 
-      className={cn(
-        "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
-        "absolute left-0.5 top-0.5",
-        "data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
-      )}
+import { Switch as ShadSwitch } from "@chester-hill-solutions/shad-cc/switch";
+
+type SwitchProps = Omit<
+  AriaSwitchProps,
+  "isSelected" | "defaultSelected" | "onChange" | "isDisabled"
+> & {
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  isDisabled?: boolean;
+  isSelected?: boolean;
+  onChange?: AriaSwitchProps["onChange"];
+  size?: "sm" | "default";
+};
+
+function Switch({
+  checked,
+  defaultChecked,
+  onCheckedChange,
+  disabled,
+  isDisabled,
+  isSelected,
+  onChange,
+  ...props
+}: SwitchProps) {
+  return (
+    <ShadSwitch
+      isSelected={isSelected ?? checked}
+      defaultSelected={defaultChecked}
+      isDisabled={isDisabled ?? disabled}
+      onChange={(value) => {
+        onChange?.(value);
+        onCheckedChange?.(value);
+      }}
+      {...props}
     />
-  </SwitchPrimitives.Root>
-))
-Switch.displayName = SwitchPrimitives.Root.displayName
+  );
+}
 
-export { Switch }
+export { Switch };

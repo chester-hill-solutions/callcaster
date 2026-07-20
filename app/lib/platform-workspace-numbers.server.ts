@@ -141,6 +141,22 @@ export async function purchaseWorkspaceNumber(
       workspaceId,
     });
 
+    const address = onboarding.emergencyVoice.address;
+    const hasServiceAddress = Boolean(
+      address.street.trim() &&
+        address.city.trim() &&
+        address.region.trim() &&
+        address.postalCode.trim(),
+    );
+    if (!hasServiceAddress) {
+      return {
+        ok: false as const,
+        error:
+          "Add a service address in Numbers settings before renting a phone number.",
+        status: 400,
+      };
+    }
+
     const { data: workspaceInfo } = await getWorkspaceInfo({ workspaceId });
     const workspaceName = workspaceInfo?.name ?? workspaceId;
 
