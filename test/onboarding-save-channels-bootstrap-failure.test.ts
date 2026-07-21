@@ -84,6 +84,18 @@ vi.mock("@/lib/caller-id-verification.server", () => ({
   startWorkspaceCallerIdVerification: vi.fn(),
 }));
 
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    audience: { count: vi.fn().mockResolvedValue(0) },
+    campaign: { count: vi.fn().mockResolvedValue(0) },
+    script: { count: vi.fn().mockResolvedValue(0) },
+  }),
+}));
+
+vi.mock("@/lib/database/workspace-twilio-portal-snapshot.server", () => ({
+  getWorkspaceRecentOutboundMessageCount: vi.fn().mockResolvedValue(0),
+}));
+
 import {
   mapOnboardingHandlerResult,
   runOnboardingAction,

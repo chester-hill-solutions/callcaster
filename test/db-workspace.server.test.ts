@@ -367,7 +367,7 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("createNewWorkspace: happy path and failure cases", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const stripe = await import("../app/lib/database/stripe.server");
-    const mod = await import("../app/lib/database/workspace.server");
+    const mod = await import("../app/lib/database/workspace-provisioning.server");
 
     rpcMocks.rpcCreateNewWorkspace.mockResolvedValue("w_new");
 

@@ -36,7 +36,6 @@ import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
 import {
-  adaptRouteDataResult,
   redirectToReturnToOrPayload,
   resolveOnboardingInput,
   resolveOperatingCountryFromForm,
@@ -433,31 +432,23 @@ async function handleReviewEmergencyVoice(
     workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
   });
-  const adapted = adaptRouteDataResult(result);
-  if (adapted.kind !== "payload") {
-    return adapted;
-  }
 
-  const returnTo = String(
-    formData.get("returnTo") ?? formData.get("return_to") ?? "",
-  );
-  if (returnTo.startsWith(`/workspaces/${ctx.workspaceId}`)) {
-    if (adapted.data.error) {
-      return {
-        kind: "redirect_path",
-        path: returnTo,
-        searchParams: { warning: adapted.data.error },
-      };
-    }
+  if (!result.ok) {
     return redirectToReturnToOrPayload(
       formData,
       ctx.workspaceId,
       "emergency_voice",
-      adapted.data.success ?? "Service address validated.",
+      "",
+      { error: result.error, status: result.status },
     );
   }
 
-  return adapted;
+  return redirectToReturnToOrPayload(
+    formData,
+    ctx.workspaceId,
+    "emergency_voice",
+    result.success ?? "Service address validated.",
+  );
 }
 
 async function handleProvisionA2p(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {

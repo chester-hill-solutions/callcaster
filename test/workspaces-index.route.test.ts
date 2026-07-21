@@ -13,7 +13,7 @@ vi.mock("@/lib/auth.server", () => ({
   verifyAuth: mocks.verifyAuth,
 }));
 
-vi.mock("@/lib/database/workspace.server", () => ({
+vi.mock("@/lib/database/workspace-provisioning.server", () => ({
   createNewWorkspace: mocks.createNewWorkspace,
 }));
 

@@ -1,26 +1,15 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
-  applyOnboardingStepsWithWorkspaceNumbers,
-  applyWorkspaceOnboardingChannelPolicy,
-  deriveWorkspaceMessagingReadiness,
-  getWorkspaceMessagingOnboardingState,
   isWizardOnboardingStepId,
   resolvePersistedWizardStep,
 } from "@/lib/messaging-onboarding.server";
 import {
   getWorkspaceInfo,
-  getWorkspacePhoneNumbers,
   getWorkspaceUsers,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import {
-  getWorkspaceRcsBlockingIssues,
-  hydrateWorkspaceRcsOnboardingState,
-  isRcsOnboardingEnabled,
-} from "@/lib/rcs-onboarding.server";
+import { loadWorkspaceOnboardingView } from "@/lib/platform-onboarding-helpers.server";
 import { data as routeData, redirect } from "react-router";
-import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
-import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { listObjects } from "@/lib/object-storage.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
@@ -63,23 +52,15 @@ export const loader = defineLoader({
 
     const tdb = createTenantDb(workspaceId);
     const [
+      onboardingView,
       { data: workspaceInfo },
-      { data: phoneNumbers },
-      onboarding,
-      creditsBalance,
-      recentOutboundCount,
       { data: workspaceUsersData },
       mediaNames,
       inboundQueues,
       scripts,
-      audienceCount,
-      campaignCount,
     ] = await Promise.all([
+      loadWorkspaceOnboardingView(workspaceId),
       getWorkspaceInfo({ workspaceId }),
-      getWorkspacePhoneNumbers({ workspaceId }),
-      getWorkspaceMessagingOnboardingState({ workspaceId }),
-      getWorkspaceCredits(workspaceId),
-      getWorkspaceRecentOutboundMessageCount({ workspaceId }),
       getWorkspaceUsers({ workspaceId }),
       listObjects("workspaceAudio", workspaceId),
       tdb.inbound_queue.findMany({
@@ -90,33 +71,16 @@ export const loader = defineLoader({
         columns: { id: true, name: true },
         orderBy: (script, { asc: ascFn }) => [ascFn(script.name)],
       }),
-      tdb.audience.count(),
-      tdb.campaign.count(),
     ]);
-    const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
-      hydrateWorkspaceRcsOnboardingState(applyWorkspaceOnboardingChannelPolicy(onboarding)),
-      phoneNumbers ?? [],
-      {
-        audienceCount,
-        scriptCount: scripts.length,
-        campaignCount,
-        creditsBalance: creditsBalance ?? 0,
-      },
-    );
-    const rcsBlockingIssues =
-      isRcsOnboardingEnabled() && hydratedOnboarding.selectedChannels.includes("rcs")
-        ? getWorkspaceRcsBlockingIssues(hydratedOnboarding)
-        : [];
-
-    const readiness = deriveWorkspaceMessagingReadiness({
+    const {
       onboarding: hydratedOnboarding,
-      workspaceNumbers: (phoneNumbers ?? []).map((number) => ({
-        type: number?.type ?? null,
-        phone_number: number?.phone_number ?? null,
-        capabilities: number?.capabilities ?? null,
-      })),
-      recentOutboundCount,
-    });
+      readiness,
+      phoneNumbers,
+      creditsBalance,
+      rcsBlockingIssues,
+      audienceCount,
+      campaignCount,
+    } = onboardingView;
     const stepParam = url.searchParams.get("step");
     const serverStep = resolvePersistedWizardStep(hydratedOnboarding.currentStep);
 
@@ -139,7 +103,7 @@ export const loader = defineLoader({
         onboarding: hydratedOnboarding,
         readiness,
         phoneNumbers,
-        creditsBalance: creditsBalance ?? 0,
+        creditsBalance,
         rcsBlockingIssues,
         workspaceUsers: workspaceUsersData ?? [],
         mediaNames,

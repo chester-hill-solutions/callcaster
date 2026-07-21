@@ -12,6 +12,7 @@ import {
   useFetcherOnIdle,
   useSearchParamFlash,
 } from "@/hooks/utils";
+import { useWorkspaceNumberSettingsMutations } from "@/hooks/phone";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
@@ -28,7 +29,6 @@ import {
 import { useWorkspaceRealtime } from "@/hooks/realtime/useWorkspaceRealtime";
 import {
   NumberSummaryList,
-  type RoutingPresetSubmission,
 } from "@/components/phone-numbers/NumberSummaryList";
 import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
@@ -68,15 +68,6 @@ type CallerIDResponse = {
   error?: string;
 };
 
-interface FormData {
-  formName: string;
-  numberId?: string;
-  incomingActivity?: string;
-  incomingVoiceMessage?: string;
-  callerId?: string;
-  [key: string]: unknown;
-}
-
 type LoaderData = {
   phoneNumbers: WorkspaceNumbers;
   workspaceId: string;
@@ -110,7 +101,19 @@ const WorkspaceSettings = () => {
     !!actionData?.validationRequest,
   );
   const fetcher = useFetcher<NumbersSearchFetcherData>();
-  const updateFetcher = useFetcher();
+  const {
+    fetcher: updateFetcher,
+    isBusy,
+    onIncomingActivityChange,
+    onIncomingVoiceMessageChange,
+    onCallerIdChange,
+    onHandsetChange,
+    onInboundRingCountChange,
+    onInboundQueueChange,
+    onInboundScriptChange,
+    onApplyPreset,
+    onNumberRemoval,
+  } = useWorkspaceNumberSettingsMutations(workspaceId);
   const [numberPendingRemoval, setNumberPendingRemoval] = useState<
     number | null
   >(null);
@@ -185,100 +188,13 @@ const WorkspaceSettings = () => {
     },
   });
 
-  const handleIncomingActivityChange = (numberId: number, value: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-incoming-activity",
-        numberId: String(numberId),
-        incomingActivity: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleIncomingVoiceMessageChange = (
-    numberId: number,
-    value: string,
-  ) => {
-    updateFetcher.submit(
-      {
-        formName: "update-incoming-voice-message",
-        numberId: String(numberId),
-        incomingVoiceMessage: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleCallerIdChange = (numberId: number, value: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-caller-id",
-        numberId: String(numberId),
-        friendly_name: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleHandsetChange = (numberId: number, enabled: boolean) => {
-    updateFetcher.submit(
-      {
-        formName: "update-handset",
-        numberId: String(numberId),
-        handsetEnabled: String(enabled),
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleInboundRingCountChange = (numberId: number, value: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-inbound-ring-count",
-        numberId: String(numberId),
-        inboundRingCount: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleInboundQueueChange = (numberId: number, queueId: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-inbound-queue",
-        numberId: String(numberId),
-        inboundQueueId: queueId,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleInboundScriptChange = (numberId: number, scriptId: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-inbound-script",
-        numberId: String(numberId),
-        inboundScriptId: scriptId,
-      },
-      { method: "POST" },
-    );
-  };
-
   const handleNumberRemoval = (numberId: number) => {
     setNumberPendingRemoval(numberId);
   };
 
-  const handleApplyPreset = (submission: RoutingPresetSubmission) => {
-    updateFetcher.submit(submission, { method: "POST" });
-  };
-
   const confirmNumberRemoval = () => {
     if (numberPendingRemoval == null) return;
-    updateFetcher.submit(
-      { formName: "remove-number", numberId: String(numberPendingRemoval) },
-      { method: "POST" },
-    );
+    onNumberRemoval(numberPendingRemoval);
     setNumberPendingRemoval(null);
   };
 
@@ -314,7 +230,7 @@ const WorkspaceSettings = () => {
             <Button
               variant="destructive"
               onClick={confirmNumberRemoval}
-              disabled={updateFetcher.state !== "idle"}
+              disabled={isBusy}
             >
               Release number
             </Button>
@@ -327,7 +243,7 @@ const WorkspaceSettings = () => {
         actions={
           <Button
             asChild
-            disabled={updateFetcher.state !== "idle"}
+            disabled={isBusy}
             variant="outline"
             size="sm"
           >
@@ -352,16 +268,16 @@ const WorkspaceSettings = () => {
               mediaNames={mediaNames}
               queues={queues}
               scripts={scripts}
-              onIncomingActivityChange={handleIncomingActivityChange}
-              onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
-              onCallerIdChange={handleCallerIdChange}
-              onHandsetChange={handleHandsetChange}
-              onInboundRingCountChange={handleInboundRingCountChange}
-              onInboundQueueChange={handleInboundQueueChange}
-              onInboundScriptChange={handleInboundScriptChange}
+              onIncomingActivityChange={onIncomingActivityChange}
+              onIncomingVoiceMessageChange={onIncomingVoiceMessageChange}
+              onCallerIdChange={onCallerIdChange}
+              onHandsetChange={onHandsetChange}
+              onInboundRingCountChange={onInboundRingCountChange}
+              onInboundQueueChange={onInboundQueueChange}
+              onInboundScriptChange={onInboundScriptChange}
               onNumberRemoval={handleNumberRemoval}
-              onApplyPreset={handleApplyPreset}
-              isBusy={updateFetcher.state !== "idle"}
+              onApplyPreset={onApplyPreset}
+              isBusy={isBusy}
             />
           </Section>
           <div className="min-w-0 space-y-6">

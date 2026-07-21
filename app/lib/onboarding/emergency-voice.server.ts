@@ -8,14 +8,16 @@ import { isObject } from "@/lib/type-safety-utils";
 import { hasVoiceCapability } from "@/lib/onboarding/voice-capabilities";
 import type { Database } from "@/lib/db-types";
 import type Twilio from "twilio";
-import type { OnboardingActionData } from "@/lib/onboarding-actions.server";
-import { data as routeData } from "react-router";
 import { persistWorkspaceOnboardingState } from "@/lib/onboarding/onboarding-persist.server";
+
+export type ReviewWorkspaceEmergencyVoiceResult =
+  | { ok: true; success?: string }
+  | { ok: false; error: string; status?: number };
 
 export async function reviewWorkspaceEmergencyVoice(args: {
   workspaceId: string;
   actorUserId: string | null;
-}) {
+}): Promise<ReviewWorkspaceEmergencyVoiceResult> {
   const { workspaceId, actorUserId } = args;
 
   const [current, workspacePhoneNumbers] = await Promise.all([
@@ -39,10 +41,11 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     !address.postalCode.trim() ||
     !customerName
   ) {
-    return routeData<OnboardingActionData>(
-      { error: "Save a complete emergency service address before running voice review." },
-      { status: 400 },
-    );
+    return {
+      ok: false,
+      error: "Save a complete emergency service address before running voice review.",
+      status: 400,
+    };
   }
 
   try {
@@ -164,19 +167,21 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     });
 
     if (eligiblePhoneNumbers.length === 0) {
-      return routeData<OnboardingActionData>({
+      return {
+        ok: true,
         success:
           "Emergency address validated. Add or refresh a rented voice number to finish voice readiness.",
-      });
+      };
     }
 
     const ineligibleCount = ineligibleCallerIds.length;
-    return routeData<OnboardingActionData>({
+    return {
+      ok: true,
       success:
         ineligibleCount > 0
           ? `Emergency voice reviewed. ${eligiblePhoneNumbers.length} number(s) are ready and ${ineligibleCount} still need review.`
           : `Emergency voice reviewed. ${eligiblePhoneNumbers.length} number(s) are emergency-ready.`,
-    });
+    };
   } catch (error) {
     await persistWorkspaceOnboardingState({
       workspaceId,
@@ -198,12 +203,11 @@ export async function reviewWorkspaceEmergencyVoice(args: {
       },
     });
 
-    return routeData<OnboardingActionData>(
-      {
-        error:
-          error instanceof Error ? error.message : "Emergency address validation failed.",
-      },
-      { status: 500 },
-    );
+    return {
+      ok: false,
+      error:
+        error instanceof Error ? error.message : "Emergency address validation failed.",
+      status: 500,
+    };
   }
 }

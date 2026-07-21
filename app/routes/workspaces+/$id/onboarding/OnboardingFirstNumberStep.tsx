@@ -1,11 +1,9 @@
 import { Link, useFetcher, useRevalidator } from "react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
-import {
-  NumberSummaryList,
-  type RoutingPresetSubmission,
-} from "@/components/phone-numbers/NumberSummaryList";
+import { NumberSummaryList } from "@/components/phone-numbers/NumberSummaryList";
+import { useWorkspaceNumberSettingsMutations } from "@/hooks/phone";
 import {
   CallerIdVerificationDialog,
   type CallerIdValidationRequest,
@@ -50,13 +48,6 @@ type OnboardingFirstNumberStepProps = Pick<
   validationRequest?: CallerIdValidationRequest | null;
 };
 
-// Reuse the same patch-number action handlers the numbers settings page uses
-// (app/routes/workspaces+/$id/settings/numbers.action.server.ts) instead of
-// building a second inbound-routing/handset write path (Phase G, Q44-46/59).
-function numbersSettingsActionPath(workspaceId: string): string {
-  return `/workspaces/${workspaceId}/settings/numbers`;
-}
-
 function presetOrderForGoal(
   goal: WorkspaceOnboardingGoal | null,
 ): readonly InboundRoutingPresetId[] {
@@ -90,8 +81,19 @@ export function OnboardingFirstNumberStep({
   validationRequest,
 }: OnboardingFirstNumberStepProps) {
   const purchaseFetcher = useFetcher<NumbersSearchFetcherData>();
-  const routingFetcher = useFetcher();
   const revalidator = useRevalidator();
+  const {
+    isBusy: isRoutingBusy,
+    onIncomingActivityChange,
+    onIncomingVoiceMessageChange,
+    onHandsetChange,
+    onInboundRingCountChange,
+    onInboundQueueChange,
+    onInboundScriptChange,
+    onCallerIdChange,
+    onNumberRemoval,
+    onApplyPreset,
+  } = useWorkspaceNumberSettingsMutations(workspaceId);
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(
     () => Boolean(validationRequest),
   );
@@ -117,100 +119,11 @@ export function OnboardingFirstNumberStep({
   const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
   const hasFirstNumber = workspaceHasFirstNumber(numbers);
   const messagingReady = Boolean(onboarding.messagingService.serviceSid);
-  const isRoutingBusy = routingFetcher.state !== "idle";
-  const actionPath = numbersSettingsActionPath(workspaceId);
   const isVerifying = pending.isVerifyingCallerId;
 
-  const handlePurchaseComplete = useCallback(() => {
+  const handlePurchaseComplete = () => {
     revalidator.revalidate();
-  }, [revalidator]);
-
-  const handleIncomingActivityChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-incoming-activity", numberId: String(numberId), incomingActivity: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleIncomingVoiceMessageChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-incoming-voice-message", numberId: String(numberId), incomingVoiceMessage: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleHandsetChange = useCallback(
-    (numberId: number, enabled: boolean) => {
-      routingFetcher.submit(
-        { formName: "update-handset", numberId: String(numberId), handsetEnabled: String(enabled) },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleInboundRingCountChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-inbound-ring-count", numberId: String(numberId), inboundRingCount: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleInboundQueueChange = useCallback(
-    (numberId: number, queueId: string) => {
-      routingFetcher.submit(
-        { formName: "update-inbound-queue", numberId: String(numberId), inboundQueueId: queueId },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleInboundScriptChange = useCallback(
-    (numberId: number, scriptId: string) => {
-      routingFetcher.submit(
-        { formName: "update-inbound-script", numberId: String(numberId), inboundScriptId: scriptId },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleCallerIdChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-caller-id", numberId: String(numberId), friendly_name: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleNumberRemoval = useCallback(
-    (numberId: number) => {
-      routingFetcher.submit(
-        { formName: "remove-number", numberId: String(numberId) },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleApplyPreset = useCallback(
-    (submission: RoutingPresetSubmission) => {
-      routingFetcher.submit(submission, { method: "POST", action: actionPath });
-    },
-    [routingFetcher, actionPath],
-  );
+  };
 
   const smsGoal = goalNeedsSmsCompliance(onboarding.selectedGoal);
   const callerIdNumbers = numbers.filter((number) => number?.type === "caller_id");
@@ -390,15 +303,15 @@ export function OnboardingFirstNumberStep({
                 queues={inboundQueues}
                 scripts={scripts}
                 verifiedCallerIds={numbers}
-                onIncomingActivityChange={handleIncomingActivityChange}
-                onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
-                onCallerIdChange={handleCallerIdChange}
-                onHandsetChange={handleHandsetChange}
-                onInboundRingCountChange={handleInboundRingCountChange}
-                onInboundQueueChange={handleInboundQueueChange}
-                onInboundScriptChange={handleInboundScriptChange}
-                onNumberRemoval={handleNumberRemoval}
-                onApplyPreset={handleApplyPreset}
+                onIncomingActivityChange={onIncomingActivityChange}
+                onIncomingVoiceMessageChange={onIncomingVoiceMessageChange}
+                onCallerIdChange={onCallerIdChange}
+                onHandsetChange={onHandsetChange}
+                onInboundRingCountChange={onInboundRingCountChange}
+                onInboundQueueChange={onInboundQueueChange}
+                onInboundScriptChange={onInboundScriptChange}
+                onNumberRemoval={onNumberRemoval}
+                onApplyPreset={onApplyPreset}
                 presetOrder={presetOrderForGoal(onboarding.selectedGoal)}
                 isBusy={isRoutingBusy}
               />

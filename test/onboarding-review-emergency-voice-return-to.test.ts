@@ -88,6 +88,18 @@ vi.mock("@/lib/caller-id-verification.server", () => ({
   startWorkspaceCallerIdVerification: vi.fn(),
 }));
 
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    audience: { count: vi.fn().mockResolvedValue(0) },
+    campaign: { count: vi.fn().mockResolvedValue(0) },
+    script: { count: vi.fn().mockResolvedValue(0) },
+  }),
+}));
+
+vi.mock("@/lib/database/workspace-twilio-portal-snapshot.server", () => ({
+  getWorkspaceRecentOutboundMessageCount: vi.fn().mockResolvedValue(0),
+}));
+
 import {
   mapOnboardingHandlerResult,
   runOnboardingAction,
@@ -164,10 +176,9 @@ describe("review_emergency_voice returnTo", () => {
     mocks.persistWorkspaceOnboardingState.mockResolvedValue(undefined);
     mocks.getWorkspaceCredits.mockResolvedValue(0);
     mocks.reviewWorkspaceEmergencyVoice.mockResolvedValue({
-      data: {
-        success:
-          "Emergency address validated. Add or refresh a rented voice number to finish voice readiness.",
-      },
+      ok: true,
+      success:
+        "Emergency address validated. Add or refresh a rented voice number to finish voice readiness.",
     });
   });
 
@@ -214,8 +225,9 @@ describe("review_emergency_voice returnTo", () => {
 
   test("redirects validation errors back to returnTo instead of the wizard", async () => {
     mocks.reviewWorkspaceEmergencyVoice.mockResolvedValue({
-      data: { error: "Save a complete emergency service address before running voice review." },
-      init: { status: 400 },
+      ok: false,
+      error: "Save a complete emergency service address before running voice review.",
+      status: 400,
     });
 
     const formData = new FormData();
