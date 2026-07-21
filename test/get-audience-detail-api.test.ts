@@ -87,7 +87,7 @@ describe("getAudienceDetailApi", () => {
     );
 
     const { getAudienceDetailApi } = await import(
-      "../app/lib/platform-data.server"
+      "../app/lib/audience-detail.server"
     );
     const result = await getAudienceDetailApi(
       "ws-1",
@@ -106,7 +106,7 @@ describe("getAudienceDetailApi", () => {
     tdbMocks.audience.findFirst.mockResolvedValue(null);
 
     const { getAudienceDetailApi } = await import(
-      "../app/lib/platform-data.server"
+      "../app/lib/audience-detail.server"
     );
     const result = await getAudienceDetailApi(
       "ws-1",

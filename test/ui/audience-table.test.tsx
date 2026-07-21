@@ -28,9 +28,9 @@ vi.mock("@/hooks/utils/useOptimisticMutation", () => ({
 }));
 
 vi.mock("@/components/audience/AudienceForm", () => ({
-  AudienceForm: ({ audienceInfo, handleSaveAudience }: any) => (
+  AudienceForm: ({ name, handleSaveAudience }: any) => (
     <form onSubmit={handleSaveAudience}>
-      <div data-testid="audience-name">{audienceInfo?.name ?? ""}</div>
+      <div data-testid="audience-name">{name ?? ""}</div>
       <input name="name" defaultValue="New Name" />
       <button type="submit">Save Audience</button>
     </form>
@@ -150,7 +150,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={null}
         workspace_id="w1"
         selected_id={undefined}
-        audience={null}
+        name=""
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 0 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -174,7 +175,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         ]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 2 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -210,7 +212,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         ]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 2 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -234,7 +237,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1, { firstname: "First" }) }]}
         workspace_id="w1"
         selected_id={undefined}
-        audience={null}
+        name=""
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -251,7 +255,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1, { firstname: "First" }) }]}
         workspace_id="w1"
         selected_id={undefined}
-        audience={null}
+        name=""
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -272,7 +277,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1) }, { contact: makeContact(2) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 2 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -298,7 +304,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1, { firstname: "First" }) }, { contact: makeContact(2, { firstname: "Second" }) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 2 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -327,7 +334,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "surname", sortDirection: "desc" }}
       />,
@@ -348,7 +356,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -369,7 +378,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 2, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -394,7 +404,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 2, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "id", sortDirection: "desc" }}
       />,
@@ -412,7 +423,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
       contacts: [{ contact: makeContact(1) }],
       workspace_id: "w1",
       selected_id: "a1",
-      audience: { id: "a1", name: "Audience A" } as any,
+      name: "Audience A",
+      onNameChange: () => {},
       pagination: { currentPage: 1, pageSize: 10, totalCount: 1 },
     };
 
@@ -456,7 +468,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 2, pageSize: 10, totalCount: 30 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -491,7 +504,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1, { firstname: "Bob" }) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "surname", sortDirection: "desc" }}
       />,
@@ -531,7 +545,8 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[{ contact: makeContact(1) }]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 1 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
@@ -544,7 +559,7 @@ describe("app/components/audience/AudienceTable.tsx", () => {
     createElementSpy.mockRestore();
   });
 
-  test("save audience updates state on ok, logs on failure", async () => {
+  test("save audience PATCHes on ok and logs on failure", async () => {
     const { AudienceTable } = await import("@/components/audience/AudienceTable");
 
     const fetchMock = vi
@@ -564,14 +579,17 @@ describe("app/components/audience/AudienceTable.tsx", () => {
         contacts={[]}
         workspace_id="w1"
         selected_id="a1"
-        audience={{ id: "a1", name: "Audience A" } as any}
+        name="Audience A"
+        onNameChange={() => {}}
         pagination={{ currentPage: 1, pageSize: 10, totalCount: 0 }}
         sorting={{ sortKey: "id", sortDirection: "asc" }}
       />,
     );
 
     fireEvent.submit(screen.getByRole("button", { name: "Save Audience" }).closest("form") as HTMLFormElement);
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    // Name is owned by the page; table no longer mirrors PATCH JSON into local state.
+    expect(screen.getByTestId("audience-name")).toHaveTextContent("Audience A");
 
     fireEvent.submit(screen.getByRole("button", { name: "Save Audience" }).closest("form") as HTMLFormElement);
     await waitFor(() =>

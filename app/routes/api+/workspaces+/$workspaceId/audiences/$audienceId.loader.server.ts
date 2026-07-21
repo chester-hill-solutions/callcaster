@@ -1,7 +1,7 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import {
   getAudienceDetailApi,
-} from "@/lib/platform-data.server";
+} from "@/lib/audience-detail.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
@@ -35,6 +35,7 @@ export const loader = defineLoader({
         pagination: result.pagination,
         sorting: result.sorting,
         latest_upload: result.latest_upload,
+        contacts_error: result.contacts_error,
       },
       200,
     );

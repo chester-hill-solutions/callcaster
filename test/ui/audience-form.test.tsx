@@ -11,17 +11,19 @@ describe("app/components/audience/AudienceForm.tsx", () => {
     vi.resetModules();
   });
 
-  test("renders with initial name and disables save when empty; submits via handleSaveAudience", async () => {
+  test("renders controlled name, disables save when empty, and submits via handleSaveAudience", async () => {
     const { AudienceForm } = await import("@/components/audience/AudienceForm");
     const handleSaveAudience = vi.fn(async () => {});
+    const onNameChange = vi.fn();
 
-    const { unmount } = render(
+    const { rerender } = render(
       <AudienceForm
-        audienceInfo={null}
+        name=""
+        onNameChange={onNameChange}
         handleSaveAudience={handleSaveAudience}
         audience_id="a1"
         workspace_id="w1"
-      />
+      />,
     );
 
     const nameInput = screen.getByPlaceholderText("Audience Name") as HTMLInputElement;
@@ -29,26 +31,33 @@ describe("app/components/audience/AudienceForm.tsx", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
     fireEvent.change(nameInput, { target: { value: "My Audience" } });
+    expect(onNameChange).toHaveBeenCalledWith("My Audience");
+
+    rerender(
+      <AudienceForm
+        name="My Audience"
+        onNameChange={onNameChange}
+        handleSaveAudience={handleSaveAudience}
+        audience_id="a1"
+        workspace_id="w1"
+      />,
+    );
     expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
-    // cover value.length === 0 branch (does not clear error)
-    fireEvent.change(nameInput, { target: { value: "" } });
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-    fireEvent.change(nameInput, { target: { value: "My Audience" } });
 
     fireEvent.submit(nameInput.closest("form") as HTMLFormElement);
     expect(handleSaveAudience).toHaveBeenCalled();
 
-    // initial value from audienceInfo (fresh mount; component doesn't sync state on prop change)
-    unmount();
-    render(
+    rerender(
       <AudienceForm
-        audienceInfo={{ name: "Existing" } as any}
+        name="Existing"
+        onNameChange={onNameChange}
         handleSaveAudience={handleSaveAudience}
         audience_id="a1"
         workspace_id="w1"
-      />
+      />,
     );
-    expect((screen.getByPlaceholderText("Audience Name") as HTMLInputElement).value).toBe("Existing");
+    expect((screen.getByPlaceholderText("Audience Name") as HTMLInputElement).value).toBe(
+      "Existing",
+    );
   });
 });
-

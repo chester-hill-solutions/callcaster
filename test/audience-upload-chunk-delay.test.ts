@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 import {
   AUDIENCE_UPLOAD_CHUNK_DELAY_MS,
   AUDIENCE_UPLOAD_CHUNK_SIZE,
+  AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS,
   audienceUploadChunkDelayMs,
+  audienceUploadShouldWriteStatus,
 } from "../shared/audience-upload";
 
 describe("audienceUploadChunkDelayMs", () => {
@@ -22,5 +24,53 @@ describe("audienceUploadChunkDelayMs", () => {
       AUDIENCE_UPLOAD_CHUNK_DELAY_MS,
     );
     expect(audienceUploadChunkDelayMs(500)).toBe(AUDIENCE_UPLOAD_CHUNK_DELAY_MS);
+  });
+});
+
+describe("audienceUploadShouldWriteStatus", () => {
+  test("skips mid-flight sidecar writes for single-chunk uploads", () => {
+    expect(
+      audienceUploadShouldWriteStatus({
+        total: 1,
+        isLastChunk: true,
+        lastProgressAt: 0,
+        now: 10_000,
+      }),
+    ).toBe(false);
+    expect(
+      audienceUploadShouldWriteStatus({
+        total: 40,
+        isLastChunk: true,
+        lastProgressAt: 0,
+        now: 10_000,
+      }),
+    ).toBe(false);
+  });
+
+  test("writes on last chunk or after notify interval for multi-chunk", () => {
+    expect(
+      audienceUploadShouldWriteStatus({
+        total: 41,
+        isLastChunk: true,
+        lastProgressAt: 0,
+        now: 100,
+      }),
+    ).toBe(true);
+    expect(
+      audienceUploadShouldWriteStatus({
+        total: 80,
+        isLastChunk: false,
+        lastProgressAt: 0,
+        now: AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS,
+      }),
+    ).toBe(true);
+    expect(
+      audienceUploadShouldWriteStatus({
+        total: 80,
+        isLastChunk: false,
+        lastProgressAt: 1000,
+        now: 1000 + AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS - 1,
+      }),
+    ).toBe(false);
   });
 });

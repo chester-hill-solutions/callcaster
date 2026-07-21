@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { getAudienceDetailApi } from "@/lib/platform-data.server";
+import { getAudienceDetailApi } from "@/lib/audience-detail.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
@@ -25,6 +25,7 @@ export const loader = defineLoader({
           audience: null,
           audience_id,
           error: "Audience ID is required",
+          contactsError: null,
           pagination: {
             currentPage: page,
             pageSize,
@@ -61,6 +62,7 @@ export const loader = defineLoader({
           audience: null,
           audience_id,
           error: detailResult.error,
+          contactsError: null,
           pagination: {
             currentPage: page,
             pageSize,
@@ -78,7 +80,7 @@ export const loader = defineLoader({
 
     return routeData<AudienceDetailLoaderData>(
       {
-        contacts: detailResult.contacts as AudienceDetailLoaderData["contacts"],
+        contacts: detailResult.contacts,
         workspace_id,
         audience: detailResult.audience,
         audience_id,

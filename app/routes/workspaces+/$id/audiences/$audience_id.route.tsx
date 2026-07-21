@@ -2,7 +2,7 @@ export { loader } from "./$audience_id.loader.server";
 
 import { Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 import AudienceUploader from "@/components/audience/AudienceUploader";
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
+import { AUDIENCE_UPLOAD_PROCESSING_POLL_MS } from "../../../../../shared/audience-upload";
 
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 
@@ -32,17 +33,12 @@ export default function AudienceView() {
   useOutletContext<{ }>();
   const [activeTab, setActiveTab] = useState("contacts");
   const revalidator = useRevalidator();
-  const [displayName, setDisplayName] = useState(audience?.name ?? "");
-
-  /**
-   * @effect Keep the page title in sync when the loader revalidates with a new audience row.
-   * @effect-deps audience?.name from the detail loader
-   * @effect-side-effects setDisplayName
-   * @effect-why-not-loader Title also tracks in-progress form edits via onAudienceNameChange.
-   */
-  useEffect(() => {
-    setDisplayName(audience?.name ?? "");
-  }, [audience?.name]);
+  const [name, setName] = useState(audience?.name ?? "");
+  const [prevAudienceName, setPrevAudienceName] = useState(audience?.name ?? "");
+  if (prevAudienceName !== (audience?.name ?? "")) {
+    setPrevAudienceName(audience?.name ?? "");
+    setName(audience?.name ?? "");
+  }
 
   // Track current upload status
   const [currentUploadId, setCurrentUploadId] = useState<number | null>(
@@ -69,7 +65,7 @@ export default function AudienceView() {
         setCurrentUploadId(null);
       }
     },
-    currentUploadId ? 5000 : null
+    currentUploadId ? AUDIENCE_UPLOAD_PROCESSING_POLL_MS : null
   );
 
   const handleUploadComplete = (_uploadId: string) => {
@@ -79,8 +75,7 @@ export default function AudienceView() {
   };
 
   const title =
-    displayName.trim() ||
-    audience?.name?.trim() ||
+    name.trim() ||
     (audience_id ? `Unnamed Audience ${audience_id}` : "Unnamed Audience");
 
   return (
@@ -137,15 +132,13 @@ export default function AudienceView() {
 
         <TabsContent value="contacts">
           <AudienceTable
-            {...{
-              contacts,
-              workspace_id,
-              selected_id: audience_id,
-              audience,
-              pagination,
-              sorting,
-              onAudienceNameChange: setDisplayName,
-            }}
+            contacts={contacts}
+            workspace_id={workspace_id}
+            selected_id={audience_id}
+            pagination={pagination}
+            sorting={sorting}
+            name={name}
+            onNameChange={setName}
           />
         </TabsContent>
 
@@ -161,8 +154,8 @@ export default function AudienceView() {
 
         <TabsContent value="history">
           <AudienceUploadHistory
-            audienceId={audience_id}
-            workspaceId={workspace_id}
+            audienceId={Number(audience_id)}
+            workspaceId={workspace_id ?? ""}
           />
         </TabsContent>
       </Tabs>

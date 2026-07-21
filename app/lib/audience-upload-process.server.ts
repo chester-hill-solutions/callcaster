@@ -16,8 +16,8 @@ import { createTenantDb } from "@/server/tenant-db";
 import { parsePhoneNumber } from "@/lib/phone";
 import {
   AUDIENCE_UPLOAD_CHUNK_SIZE,
-  AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS,
   audienceUploadChunkDelayMs,
+  audienceUploadShouldWriteStatus,
 } from "../../shared/audience-upload";
 import {
   splitContactFullName,
@@ -231,7 +231,6 @@ export const processAudienceUpload = async (
 
     // Process contacts in chunks
     const CHUNK_SIZE = AUDIENCE_UPLOAD_CHUNK_SIZE;
-    const isMultiChunkUpload = parsedContacts.length > CHUNK_SIZE;
     let lastProgressAt = 0;
     let processedCount = 0;
     let importedCount = 0;
@@ -355,18 +354,28 @@ export const processAudienceUpload = async (
         );
       }
 
-      // Update progress
+      // Update progress — durable row every chunk; sidecar throttled (#1078).
       processedCount += chunk.length;
 
-      const isLastChunk = i + CHUNK_SIZE >= parsedContacts.length;
-      const shouldNotifyProgress =
-        isMultiChunkUpload &&
-        (isLastChunk ||
-          Date.now() - lastProgressAt >= AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS);
+      await tdb.audience_upload.update({
+        set: {
+          processed_contacts: processedCount,
+          status: "processing",
+        },
+        where: eq(audienceUploadTable.id, uploadId),
+      });
 
-      // Multi-chunk imports throttle mid-flight status writes; single-chunk
-      // uploads rely on finalization writes below (#1078).
-      if (shouldNotifyProgress) {
+      const isLastChunk = i + CHUNK_SIZE >= parsedContacts.length;
+      const now = Date.now();
+      if (
+        audienceUploadShouldWriteStatus({
+          total: parsedContacts.length,
+          chunkSize: CHUNK_SIZE,
+          isLastChunk,
+          lastProgressAt,
+          now,
+        })
+      ) {
         const progress = Math.round((processedCount / parsedContacts.length) * 100);
 
         await writeAudienceUploadStatus(workspaceId, uploadId, {
@@ -376,15 +385,7 @@ export const processAudienceUpload = async (
           skipped_invalid_contacts: skippedInvalidCount,
         });
 
-        await tdb.audience_upload.update({
-          set: {
-            processed_contacts: processedCount,
-            status: "processing",
-          },
-          where: eq(audienceUploadTable.id, uploadId),
-        });
-
-        lastProgressAt = Date.now();
+        lastProgressAt = now;
       }
 
       const chunkDelayMs = audienceUploadChunkDelayMs(parsedContacts.length);
@@ -408,6 +409,7 @@ export const processAudienceUpload = async (
     await tdb.audience_upload.update({
       set: {
         status: "completed",
+        processed_contacts: processedCount,
         processed_at: new Date().toISOString(),
       },
       where: eq(audienceUploadTable.id, uploadId),

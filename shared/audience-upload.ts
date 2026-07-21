@@ -17,8 +17,8 @@ export const AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS = 2500;
 /** Default contact batch size for audience CSV import. */
 export const AUDIENCE_UPLOAD_CHUNK_SIZE = 40;
 
-/** Row-level concurrency for future per-row work; bulk insertMany remains the default. */
-export const AUDIENCE_UPLOAD_ROW_CONCURRENCY = 6;
+/** Client/status poll interval while an upload is processing (QC-aligned). */
+export const AUDIENCE_UPLOAD_PROCESSING_POLL_MS = 5000;
 
 /**
  * Small uploads (single chunk) skip the artificial delay — a 1-row CSV
@@ -29,6 +29,27 @@ export function audienceUploadChunkDelayMs(
   chunkSize: number = AUDIENCE_UPLOAD_CHUNK_SIZE,
 ): number {
   return totalContacts <= chunkSize ? 0 : AUDIENCE_UPLOAD_CHUNK_DELAY_MS;
+}
+
+/**
+ * Throttle mid-flight status-sidecar writes for multi-chunk imports.
+ * Single-chunk uploads skip mid-flight sidecar writes (finalization covers them).
+ * Durable `processed_contacts` row updates are always written by the caller.
+ */
+export function audienceUploadShouldWriteStatus(args: {
+  total: number;
+  chunkSize?: number;
+  isLastChunk: boolean;
+  lastProgressAt: number;
+  now?: number;
+}): boolean {
+  const chunkSize = args.chunkSize ?? AUDIENCE_UPLOAD_CHUNK_SIZE;
+  if (args.total <= chunkSize) return false;
+  const now = args.now ?? Date.now();
+  return (
+    args.isLastChunk ||
+    now - args.lastProgressAt >= AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS
+  );
 }
 
 export interface AudienceUploadContact {

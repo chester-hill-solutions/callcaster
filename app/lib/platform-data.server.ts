@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import {
   requireJsonAuth,
   verifyApiKeyOrSession,
@@ -71,23 +71,7 @@ import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { downloadObject } from "@/lib/object-storage.server";
 
-const AUDIENCE_CONTACT_SORT_KEYS = [
-  "id",
-  "firstname",
-  "surname",
-  "phone",
-  "email",
-  "created_at",
-] as const;
-
-type AudienceContactSortKey = (typeof AUDIENCE_CONTACT_SORT_KEYS)[number];
-
-function audienceContactSortColumn(sortKey: string) {
-  if (AUDIENCE_CONTACT_SORT_KEYS.includes(sortKey as AudienceContactSortKey)) {
-    return contactTable[sortKey as AudienceContactSortKey];
-  }
-  return contactTable.id;
-}
+export { getAudienceDetailApi } from "./audience-detail.server";
 
 export type DataPlaneApiKeyAuth = {
   keyId: string;
@@ -869,142 +853,6 @@ export async function listWorkspaceAudiencesApi(
       status: 500,
     };
   }
-}
-
-export async function getAudienceDetailApi(
-  workspaceId: string,
-  audienceId: string,
-  searchParams: URLSearchParams,
-) {
-  const { page, pageSize, offset } = parsePagination(searchParams, {
-    defaultPageSize: 50,
-  });
-  const sortKey = searchParams.get("sort_key") || "id";
-  const sortDirection = searchParams.get("sort_direction") === "desc" ? "desc" : "asc";
-  const searchQuery = (searchParams.get("q") ?? "").trim().replaceAll(",", " ");
-  const audienceIdNum = Number(audienceId);
-  const sortColumn = audienceContactSortColumn(sortKey);
-  const tdb = createTenantDb(workspaceId);
-
-  let audience: typeof audienceTable.$inferSelect;
-  try {
-    const found = await tdb.audience.findFirst({
-      where: eq(audienceTable.id, audienceIdNum),
-    });
-    if (!found) {
-      return { ok: false as const, error: "Audience not found", status: 404 };
-    }
-    audience = found;
-  } catch (error) {
-    return {
-      ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to load audience",
-      status: 500,
-    };
-  }
-
-  // Contacts / upload metadata are best-effort after the audience row loads.
-  // A contact join failure must not wipe the audience name (#1080).
-  let contacts: Array<{ contact: Record<string, unknown> }> = [];
-  let totalCount = 0;
-  let contactsError: string | null = null;
-  let latestUpload:
-    | {
-        id: number;
-        status: string;
-        progress: number;
-        total_contacts: number;
-        processed_contacts: number;
-        error_message?: string | null;
-      }
-    | null = null;
-
-  const audienceContactFilter = and(
-    eq(contactAudienceTable.audience_id, audienceIdNum),
-    eq(contactTable.workspace, workspaceId),
-    searchQuery ? buildContactSearchWhere(searchQuery) : undefined,
-  );
-
-  try {
-    // Select only columns the detail table needs — avoids SELECT * failing when
-    // the review/prod DB lags schema (extra contact columns in Drizzle).
-    const [contactRows, countRows] = await Promise.all([
-      db
-        .select({
-          id: contactTable.id,
-          firstname: contactTable.firstname,
-          surname: contactTable.surname,
-          phone: contactTable.phone,
-          email: contactTable.email,
-          address: contactTable.address,
-          city: contactTable.city,
-          other_data: contactTable.other_data,
-          created_at: contactTable.created_at,
-        })
-        .from(contactAudienceTable)
-        .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
-        .where(audienceContactFilter)
-        .orderBy(sortDirection === "asc" ? asc(sortColumn) : desc(sortColumn))
-        .limit(pageSize)
-        .offset(offset),
-      db
-        .select({ value: count() })
-        .from(contactAudienceTable)
-        .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
-        .where(audienceContactFilter),
-    ]);
-    contacts = contactRows.map((row) => ({ contact: row }));
-    totalCount = countRows[0]?.value ?? 0;
-  } catch (error) {
-    contactsError =
-      error instanceof Error ? error.message : "Failed to load contacts";
-    logger.error("getAudienceDetailApi contacts query failed", {
-      workspaceId,
-      audienceId,
-      error: contactsError,
-    });
-  }
-
-  try {
-    const upload = await tdb.audience_upload.findFirst({
-      where: eq(audienceUploadTable.audience_id, audienceIdNum),
-      orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
-    });
-    if (upload) {
-      latestUpload = {
-        id: upload.id,
-        status: upload.status ?? "unknown",
-        progress:
-          upload.processed_contacts && upload.total_contacts
-            ? Math.round((upload.processed_contacts / upload.total_contacts) * 100)
-            : 0,
-        total_contacts: upload.total_contacts ?? 0,
-        processed_contacts: upload.processed_contacts ?? 0,
-        error_message: upload.error_message,
-      };
-    }
-  } catch (error) {
-    logger.warn("getAudienceDetailApi latest upload lookup failed", {
-      workspaceId,
-      audienceId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  return {
-    ok: true as const,
-    audience,
-    contacts,
-    pagination: {
-      page,
-      page_size: pageSize,
-      total_count: totalCount,
-    } satisfies PaginationMeta,
-    sorting: { sort_key: sortKey, sort_direction: sortDirection },
-    search_query: searchQuery || null,
-    latest_upload: latestUpload,
-    contacts_error: contactsError,
-  };
 }
 
 export async function listWorkspaceScriptsApi(
