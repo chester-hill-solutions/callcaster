@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import {
   requireJsonAuth,
   verifyApiKeyOrSession,
@@ -71,23 +71,7 @@ import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { downloadObject } from "@/lib/object-storage.server";
 
-const AUDIENCE_CONTACT_SORT_KEYS = [
-  "id",
-  "firstname",
-  "surname",
-  "phone",
-  "email",
-  "created_at",
-] as const;
-
-type AudienceContactSortKey = (typeof AUDIENCE_CONTACT_SORT_KEYS)[number];
-
-function audienceContactSortColumn(sortKey: string) {
-  if (AUDIENCE_CONTACT_SORT_KEYS.includes(sortKey as AudienceContactSortKey)) {
-    return contactTable[sortKey as AudienceContactSortKey];
-  }
-  return contactTable.id;
-}
+export { getAudienceDetailApi } from "./audience-detail.server";
 
 export type DataPlaneApiKeyAuth = {
   keyId: string;
@@ -866,91 +850,6 @@ export async function listWorkspaceAudiencesApi(
     return {
       ok: false as const,
       error: error instanceof Error ? error.message : "Failed to load audiences",
-      status: 500,
-    };
-  }
-}
-
-export async function getAudienceDetailApi(
-  workspaceId: string,
-  audienceId: string,
-  searchParams: URLSearchParams,
-) {
-  const { page, pageSize, offset } = parsePagination(searchParams, {
-    defaultPageSize: 50,
-  });
-  const sortKey = searchParams.get("sort_key") || "id";
-  const sortDirection = searchParams.get("sort_direction") === "desc" ? "desc" : "asc";
-  const searchQuery = (searchParams.get("q") ?? "").trim().replaceAll(",", " ");
-  const audienceIdNum = Number(audienceId);
-  const sortColumn = audienceContactSortColumn(sortKey);
-  const tdb = createTenantDb(workspaceId);
-
-  try {
-    const audience = await tdb.audience.findFirst({
-      where: eq(audienceTable.id, audienceIdNum),
-    });
-    if (!audience) {
-      return { ok: false as const, error: "Audience not found", status: 404 };
-    }
-
-    const audienceContactFilter = and(
-      eq(contactAudienceTable.audience_id, audienceIdNum),
-      eq(contactTable.workspace, workspaceId),
-      searchQuery ? buildContactSearchWhere(searchQuery) : undefined,
-    );
-
-    const [contactRows, countRows, latestUpload] = await Promise.all([
-      db
-        .select({ contact: contactTable })
-        .from(contactAudienceTable)
-        .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
-        .where(audienceContactFilter)
-        .orderBy(sortDirection === "asc" ? asc(sortColumn) : desc(sortColumn))
-        .limit(pageSize)
-        .offset(offset),
-      db
-        .select({ value: count() })
-        .from(contactAudienceTable)
-        .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
-        .where(audienceContactFilter),
-      tdb.audience_upload.findFirst({
-        where: eq(audienceUploadTable.audience_id, audienceIdNum),
-        orderBy: (upload, { desc: descFn }) => [descFn(upload.created_at)],
-      }),
-    ]);
-
-    return {
-      ok: true as const,
-      audience,
-      contacts: contactRows.map((row) => ({ contact: row.contact })),
-      pagination: {
-        page,
-        page_size: pageSize,
-        total_count: countRows[0]?.value ?? 0,
-      } satisfies PaginationMeta,
-      sorting: { sort_key: sortKey, sort_direction: sortDirection },
-      search_query: searchQuery || null,
-      latest_upload: latestUpload
-        ? {
-            id: latestUpload.id,
-            status: latestUpload.status ?? "unknown",
-            progress:
-              latestUpload.processed_contacts && latestUpload.total_contacts
-                ? Math.round(
-                    (latestUpload.processed_contacts / latestUpload.total_contacts) * 100,
-                  )
-                : 0,
-            total_contacts: latestUpload.total_contacts ?? 0,
-            processed_contacts: latestUpload.processed_contacts ?? 0,
-            error_message: latestUpload.error_message,
-          }
-        : null,
-    };
-  } catch (error) {
-    return {
-      ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to load audience",
       status: 500,
     };
   }

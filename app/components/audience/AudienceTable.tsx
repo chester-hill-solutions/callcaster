@@ -24,8 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Database } from "@/lib/db-types";
-import { Contact } from "@/lib/types";
+import type { ContactListRow } from "@/lib/contacts-loader.types";
 import {
   Select,
   SelectContent,
@@ -35,10 +34,9 @@ import {
 } from "@/components/ui/select";
 
 type AudienceTableProps = {
-  contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;
+  contacts: Array<{ contact: ContactListRow }> | null;
   workspace_id: string | undefined;
   selected_id: string | undefined;
-  audience: Database['public']['Tables']['audience']['Row'] | null;
   pagination: {
     currentPage: number;
     pageSize: number;
@@ -48,15 +46,19 @@ type AudienceTableProps = {
     sortKey: string;
     sortDirection: 'asc' | 'desc';
   };
+  /** Controlled name owned by the page (H1 sync). */
+  name: string;
+  onNameChange: (name: string) => void;
 };
 
 export function AudienceTable({
   contacts: initialContacts,
   workspace_id,
   selected_id: audience_id,
-  audience: initialAudience,
   pagination,
-  sorting
+  sorting,
+  name,
+  onNameChange,
 }: AudienceTableProps) {
   // Transform the contacts data to extract the nested contact info.
   // Memoized so this map only reruns when the loader actually hands us a new
@@ -65,8 +67,7 @@ export function AudienceTable({
     () => initialContacts?.map(item => item.contact) || [],
     [initialContacts],
   );
-  const [contacts, setContacts] = useState<Contact[]>(transformedContacts);
-  const [audienceInfo, setAudienceInfo] = useState(initialAudience);
+  const [contacts, setContacts] = useState<ContactListRow[]>(transformedContacts);
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") ?? "");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -86,12 +87,6 @@ export function AudienceTable({
     // `transformedContacts` is already recomputed for the new `initialContacts`
     // in this same render pass (useMemo above), so reuse it instead of re-mapping.
     setContacts(transformedContacts);
-  }
-
-  const [prevInitialAudience, setPrevInitialAudience] = useState(initialAudience);
-  if (prevInitialAudience !== initialAudience) {
-    setPrevInitialAudience(initialAudience);
-    setAudienceInfo(initialAudience);
   }
 
   const handlePageChange = (newPage: number) => {
@@ -134,9 +129,7 @@ export function AudienceTable({
     });
     const result = await response.json();
 
-    if (response.ok) {
-      setAudienceInfo(result);
-    } else {
+    if (!response.ok) {
       logger.error("Failed to save audience", result);
     }
   };
@@ -248,10 +241,11 @@ export function AudienceTable({
     <div className="w-full space-y-4">
       <div id="audience-settings" className="flex justify-between items-center">
         <AudienceForm
-          audienceInfo={audienceInfo}
           handleSaveAudience={handleSaveAudience}
           audience_id={audience_id}
           workspace_id={workspace_id}
+          name={name}
+          onNameChange={onNameChange}
         />
       </div>
       <div className="flex justify-between items-center mb-4">

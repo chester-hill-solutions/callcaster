@@ -18,6 +18,7 @@ import {
   suggestContactImportMapping,
   validateContactImportMapping,
 } from "../../../shared/contact-import-headers";
+import { AUDIENCE_UPLOAD_PROCESSING_POLL_MS } from "../../../shared/audience-upload";
 
 export const VALID_HEADERS = CONTACT_IMPORT_TARGETS.filter(
   (target) => target !== "name",
@@ -334,7 +335,7 @@ export default function AudienceUploader({
         registerPollFailure();
       }
     },
-    statusPollingEnabled ? 2000 : null // Poll every 2 seconds when enabled
+    statusPollingEnabled ? AUDIENCE_UPLOAD_PROCESSING_POLL_MS : null
   );
 
   const displayFileToUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

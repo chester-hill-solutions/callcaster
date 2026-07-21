@@ -40,6 +40,10 @@ const requireWorkspaceAccessMock = vi.hoisted(() => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
 
+const enqueueJobMock = vi.hoisted(() =>
+  vi.fn(async () => ({ enqueued: true, jobId: 1 })),
+);
+
 const processDbMocks = vi.hoisted(() => ({
   insertValues: vi.fn(async () => undefined),
 }));
@@ -59,6 +63,9 @@ vi.mock("@/lib/object-storage.server", () => ({
 vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: (...args: any[]) =>
     requireWorkspaceAccessMock.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger }));
@@ -97,6 +104,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     processTdbMocks.audience_upload.update.mockReset();
     processTdbMocks.audience.update.mockReset();
     processDbMocks.insertValues.mockReset();
+    enqueueJobMock.mockReset();
+    enqueueJobMock.mockResolvedValue({ enqueued: true, jobId: 1 });
     objectStorageMocks.uploads.length = 0;
     objectStorageMocks.uploadObject.mockReset();
     objectStorageMocks.uploadObject.mockImplementation(
@@ -182,10 +191,10 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     expect(res400c.status).toBe(400);
   }, 30000);
 
-  test("action: audienceId path validates audience, creates upload record, and starts background processing", async () => {
+  test("action: audienceId path validates audience, creates upload record, and enqueues processing job", async () => {
     const mod = await import("../app/routes/api+/audience-upload");
 
-    const processAudienceUpload = vi.fn(async () => {});
+    const enqueueJob = vi.fn(async () => ({ enqueued: true, jobId: 1 }));
     const verifyAuth = vi.fn(async () => ({
       null: {} as any,
       headers: new Headers(),
@@ -201,14 +210,28 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
 
     const res = await asRouteResponse(mod.action({
       request: makeReq(fd),
-      deps: { verifyAuth, processAudienceUpload },
+      deps: { verifyAuth, enqueueJob },
     } as any));
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ success: true, audience_id: 1, upload_id: 99 });
     expect(body.message).toContain("Processing in background");
-    expect(processAudienceUpload).toHaveBeenCalled();
+    expect(enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "audience_upload",
+        workspaceId: "w1",
+        userId: "u1",
+        dedupe: { kind: "idempotency", key: "audience_upload:99" },
+        params: expect.objectContaining({
+          uploadId: 99,
+          audienceId: 1,
+          workspaceId: "w1",
+          userId: "u1",
+          splitNameColumn: "Name",
+        }),
+      }),
+    );
   }, 30000);
 
   test("action: audienceId path returns 404 when audience missing", async () => {
@@ -292,13 +315,11 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     expect(r3.status).toBe(400);
   }, 30000);
 
-  test("action: create-audience success message and background .catch logging", async () => {
+  test("action: create-audience success message enqueues upload job", async () => {
     vi.resetModules();
     const mod = await import("../app/routes/api+/audience-upload");
 
-    const processAudienceUpload = vi.fn(async () => {
-      throw new Error("bg");
-    });
+    const enqueueJob = vi.fn(async () => ({ enqueued: true, jobId: 1 }));
     const verifyAuth = vi.fn(async () => ({
       null: {} as any,
       headers: new Headers(),
@@ -313,16 +334,18 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     // omit split_name_column to hit its null branch
     const res = await asRouteResponse(mod.action({
       request: makeReq(fd),
-      deps: { verifyAuth, processAudienceUpload },
+      deps: { verifyAuth, enqueueJob },
     } as any));
     const body = await res.json();
     expect(body.message).toContain("Audience created");
-
-    // let the background rejection propagate to the attached .catch
-    await Promise.resolve();
-    expect(logger.error).toHaveBeenCalledWith(
-      "Background processing error:",
-      expect.any(Error),
+    expect(enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "audience_upload",
+        params: expect.objectContaining({
+          uploadId: 99,
+          splitNameColumn: null,
+        }),
+      }),
     );
   }, 30000);
 

@@ -1,11 +1,14 @@
 import type { Database } from "@/lib/db-types";
+import type { ContactListRow } from "@/lib/contacts-loader.types";
 
 export type AudienceDetailLoaderData = {
-  contacts: Array<{ contact: Database["public"]["Tables"]["contact"]["Row"] }> | null;
+  contacts: Array<{ contact: ContactListRow }> | null;
   workspace_id: string | undefined;
   audience: Database["public"]["Tables"]["audience"]["Row"] | null;
   audience_id: string | undefined;
   error: string | null;
+  /** Present when the audience row loaded but the contacts join failed (#1080). */
+  contactsError: string | null;
   pagination: {
     currentPage: number;
     pageSize: number;

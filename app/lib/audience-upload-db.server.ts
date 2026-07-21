@@ -42,8 +42,9 @@ export async function createAudienceForUpload(
   name: string,
 ): Promise<AudienceRow | null> {
   const tdb = createTenantDb(workspaceId);
+  const trimmed = name.trim();
   const [row] = await tdb.audience.insert({
-    name,
+    name: trimmed.length > 0 ? trimmed : null,
     created_at: new Date().toISOString(),
     is_conditional: false,
     status: "pending",
