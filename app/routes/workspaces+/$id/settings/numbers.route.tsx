@@ -12,7 +12,11 @@ import {
   useFetcherOnIdle,
   useSearchParamFlash,
 } from "@/hooks/utils";
-import { useWorkspaceNumberSettingsMutations } from "@/hooks/phone";
+import {
+  flashSearchParamWarning,
+  flashServiceAddressSavedParam,
+  useWorkspaceNumberSettingsMutations,
+} from "@/hooks/phone";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
@@ -174,18 +178,8 @@ const WorkspaceSettings = () => {
   });
 
   useSearchParamFlash({
-    saved: (value) => {
-      if (value === "service_address") {
-        toast.success(
-          "Service address saved. Validate it before renting a voice-capable number.",
-        );
-      } else if (value === "emergency_voice") {
-        toast.success("Service address validated.");
-      }
-    },
-    warning: (value) => {
-      toast.warning(value);
-    },
+    saved: flashServiceAddressSavedParam,
+    warning: flashSearchParamWarning,
   });
 
   const handleNumberRemoval = (numberId: number) => {
