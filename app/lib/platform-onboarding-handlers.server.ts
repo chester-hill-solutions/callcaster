@@ -428,10 +428,36 @@ async function handleSaveServiceAddress(
 async function handleReviewEmergencyVoice(
   ctx: OnboardingActionContext,
 ): Promise<OnboardingHandlerResult> {
-  const result = await reviewWorkspaceEmergencyVoice({workspaceId: ctx.workspaceId,
+  const formData = resolveOnboardingInput(ctx.input);
+  const result = await reviewWorkspaceEmergencyVoice({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
   });
-  return adaptRouteDataResult(result);
+  const adapted = adaptRouteDataResult(result);
+  if (adapted.kind !== "payload") {
+    return adapted;
+  }
+
+  const returnTo = String(
+    formData.get("returnTo") ?? formData.get("return_to") ?? "",
+  );
+  if (returnTo.startsWith(`/workspaces/${ctx.workspaceId}`)) {
+    if (adapted.data.error) {
+      return {
+        kind: "redirect_path",
+        path: returnTo,
+        searchParams: { warning: adapted.data.error },
+      };
+    }
+    return redirectToReturnToOrPayload(
+      formData,
+      ctx.workspaceId,
+      "emergency_voice",
+      adapted.data.success ?? "Service address validated.",
+    );
+  }
+
+  return adapted;
 }
 
 async function handleProvisionA2p(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {

@@ -35,8 +35,12 @@ function redirectToWorkspacePath(
   if (!searchParams || Object.keys(searchParams).length === 0) {
     throw redirect(path, { headers });
   }
-  const params = new URLSearchParams(searchParams);
-  throw redirect(`${path}?${params.toString()}`, { headers });
+  // Merge flash params into any query already present on `path` (e.g. ?step=).
+  const url = new URL(path, "http://local.invalid");
+  for (const [key, value] of Object.entries(searchParams)) {
+    url.searchParams.set(key, value);
+  }
+  throw redirect(`${url.pathname}${url.search}`, { headers });
 }
 
 async function runUiOnboardingAction(

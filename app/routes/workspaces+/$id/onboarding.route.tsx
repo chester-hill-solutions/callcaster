@@ -40,6 +40,15 @@ export default function WorkspaceMessagingOnboardingRoute() {
         toast.success("Messaging Service is ready.");
       }
     },
+    saved: (value) => {
+      if (value === "service_address") {
+        toast.success(
+          "Service address saved. Validate it before renting a voice-capable number.",
+        );
+      } else if (value === "emergency_voice") {
+        toast.success("Service address validated.");
+      }
+    },
     warning: (value) => {
       toast.warning(value);
     },

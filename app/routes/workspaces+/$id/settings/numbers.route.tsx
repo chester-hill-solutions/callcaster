@@ -7,7 +7,11 @@ import { Link, useActionData, useFetcher, useLoaderData, useOutletContext } from
 import { useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { useActionFeedback, useFetcherOnIdle } from "@/hooks/utils";
+import {
+  useActionFeedback,
+  useFetcherOnIdle,
+  useSearchParamFlash,
+} from "@/hooks/utils";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
@@ -164,6 +168,21 @@ const WorkspaceSettings = () => {
     getSuccess: (data) => Boolean(data?.validationRequest),
     onSuccess: () => setDialog(true),
     successMessage: undefined,
+  });
+
+  useSearchParamFlash({
+    saved: (value) => {
+      if (value === "service_address") {
+        toast.success(
+          "Service address saved. Validate it before renting a voice-capable number.",
+        );
+      } else if (value === "emergency_voice") {
+        toast.success("Service address validated.");
+      }
+    },
+    warning: (value) => {
+      toast.warning(value);
+    },
   });
 
   const handleIncomingActivityChange = (numberId: number, value: string) => {

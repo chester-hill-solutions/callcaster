@@ -20,7 +20,15 @@ type ServiceAddressGateProps = {
   workspaceId: string;
   onboarding: WorkspaceMessagingOnboardingState;
   isReadOnly?: boolean;
+  /** Where save/validate should return; defaults to Numbers settings. */
+  returnTo?: string;
 };
+
+export function isServiceAddressComplete(
+  address: WorkspaceMessagingOnboardingState["emergencyVoice"]["address"],
+): boolean {
+  return addressComplete(address);
+}
 
 /**
  * Capability gate: collect the service / emergency address before renting.
@@ -30,6 +38,7 @@ export function ServiceAddressGate({
   workspaceId,
   onboarding,
   isReadOnly = false,
+  returnTo,
 }: ServiceAddressGateProps) {
   const navigation = useNavigation();
   const address = onboarding.emergencyVoice.address;
@@ -40,6 +49,8 @@ export function ServiceAddressGate({
       : String(navigation.formData?.get("_action") ?? "");
   const isSaving = pendingAction === "save_service_address";
   const isReviewing = pendingAction === "review_emergency_voice";
+  const returnPath =
+    returnTo ?? `/workspaces/${workspaceId}/settings/numbers`;
 
   return (
     <Section variant="flat" data-testid="service-address-gate">
@@ -58,11 +69,7 @@ export function ServiceAddressGate({
         className="grid gap-4 md:grid-cols-2"
       >
         <input type="hidden" name="_action" value="save_service_address" />
-        <input
-          type="hidden"
-          name="returnTo"
-          value={`/workspaces/${workspaceId}/settings/numbers`}
-        />
+        <input type="hidden" name="returnTo" value={returnPath} />
         <FormField
           className="md:col-span-2"
           htmlFor="addressStreet"
@@ -132,6 +139,7 @@ export function ServiceAddressGate({
           className="mt-4"
         >
           <input type="hidden" name="_action" value="review_emergency_voice" />
+          <input type="hidden" name="returnTo" value={returnPath} />
           <p className="mb-2 text-sm text-muted-foreground">
             Address status:{" "}
             <span className="font-medium text-foreground">

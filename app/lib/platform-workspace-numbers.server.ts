@@ -152,7 +152,7 @@ export async function purchaseWorkspaceNumber(
       return {
         ok: false as const,
         error:
-          "Add a service address in Numbers settings before renting a phone number.",
+          "Add a service address before renting a phone number.",
         status: 400,
       };
     }
