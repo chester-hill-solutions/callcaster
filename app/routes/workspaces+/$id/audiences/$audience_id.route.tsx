@@ -1,28 +1,48 @@
 export { loader } from "./$audience_id.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
+import { Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 import AudienceUploader from "@/components/audience/AudienceUploader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import type { Database } from "@/lib/db-types";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
 
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 
 export default function AudienceView() {
-  const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
-    useLoaderData<AudienceDetailLoaderData>();
+  const {
+    contacts,
+    audience,
+    error,
+    contactsError,
+    workspace_id,
+    audience_id,
+    pagination,
+    sorting,
+    latestUpload,
+  } = useLoaderData<AudienceDetailLoaderData>();
   const navigate = useNavigate();
   useOutletContext<{ }>();
   const [activeTab, setActiveTab] = useState("contacts");
   const revalidator = useRevalidator();
+  const [displayName, setDisplayName] = useState(audience?.name ?? "");
+
+  /**
+   * @effect Keep the page title in sync when the loader revalidates with a new audience row.
+   * @effect-deps audience?.name from the detail loader
+   * @effect-side-effects setDisplayName
+   * @effect-why-not-loader Title also tracks in-progress form edits via onAudienceNameChange.
+   */
+  useEffect(() => {
+    setDisplayName(audience?.name ?? "");
+  }, [audience?.name]);
 
   // Track current upload status
   const [currentUploadId, setCurrentUploadId] = useState<number | null>(
@@ -44,12 +64,12 @@ export default function AudienceView() {
           setCurrentUploadId(null);
           revalidator.revalidate();
         }
-      } catch (error) {
-        logger.error("Error polling status:", error);
+      } catch (pollError) {
+        logger.error("Error polling status:", pollError);
         setCurrentUploadId(null);
       }
     },
-    currentUploadId ? 2000 : null
+    currentUploadId ? 5000 : null
   );
 
   const handleUploadComplete = (_uploadId: string) => {
@@ -58,11 +78,16 @@ export default function AudienceView() {
     setActiveTab("contacts");
   };
 
+  const title =
+    displayName.trim() ||
+    audience?.name?.trim() ||
+    (audience_id ? `Unnamed Audience ${audience_id}` : "Unnamed Audience");
+
   return (
     <main className="flex h-full flex-col gap-4 text-foreground">
       <div className="flex items-center justify-between gap-4">
         <Heading as="h1" level={2} branded={false}>
-          {audience?.name || `Unnamed Audience ${audience_id}`}
+          {title}
         </Heading>
         <div className="flex gap-1">
           <Form
@@ -82,6 +107,19 @@ export default function AudienceView() {
           </Form>
         </div>
       </div>
+
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      {contactsError ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Contacts could not be loaded. The call list name and settings below are still available.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
@@ -105,14 +143,15 @@ export default function AudienceView() {
               selected_id: audience_id,
               audience,
               pagination,
-              sorting
+              sorting,
+              onAudienceNameChange: setDisplayName,
             }}
           />
         </TabsContent>
 
         <TabsContent value="upload" className="space-y-4">
           <Heading as="h2" level={3} branded={false}>
-            Upload Contacts to {audience?.name}
+            Upload Contacts to {title}
           </Heading>
           <AudienceUploader
             existingAudienceId={audience_id}
@@ -120,13 +159,10 @@ export default function AudienceView() {
           />
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
-          <Heading as="h2" level={3} branded={false}>
-            Upload History
-          </Heading>
+        <TabsContent value="history">
           <AudienceUploadHistory
-            audienceId={Number(audience_id)}
-            workspaceId={workspace_id ?? ""}
+            audienceId={audience_id}
+            workspaceId={workspace_id}
           />
         </TabsContent>
       </Tabs>

@@ -8,6 +8,29 @@ export interface AudienceUploadRequestBody {
   splitNameColumn: string | null;
 }
 
+/** Per-chunk yield used for large imports so the DB is not hammered. */
+export const AUDIENCE_UPLOAD_CHUNK_DELAY_MS = 100;
+
+/** Minimum interval between mid-flight progress status writes during import. */
+export const AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS = 2500;
+
+/** Default contact batch size for audience CSV import. */
+export const AUDIENCE_UPLOAD_CHUNK_SIZE = 40;
+
+/** Row-level concurrency for future per-row work; bulk insertMany remains the default. */
+export const AUDIENCE_UPLOAD_ROW_CONCURRENCY = 6;
+
+/**
+ * Small uploads (single chunk) skip the artificial delay — a 1-row CSV
+ * otherwise always waited at least 100ms after insert + dual status writes.
+ */
+export function audienceUploadChunkDelayMs(
+  totalContacts: number,
+  chunkSize: number = AUDIENCE_UPLOAD_CHUNK_SIZE,
+): number {
+  return totalContacts <= chunkSize ? 0 : AUDIENCE_UPLOAD_CHUNK_DELAY_MS;
+}
+
 export interface AudienceUploadContact {
   workspace: string;
   created_by: string;

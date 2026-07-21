@@ -334,7 +334,7 @@ export default function AudienceUploader({
         registerPollFailure();
       }
     },
-    statusPollingEnabled ? 2000 : null // Poll every 2 seconds when enabled
+    statusPollingEnabled ? 5000 : null // QC-style 5s poll fallback while processing (#1078)
   );
 
   const displayFileToUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -15,6 +15,11 @@ import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { parsePhoneNumber } from "@/lib/phone";
 import {
+  AUDIENCE_UPLOAD_CHUNK_SIZE,
+  AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS,
+  audienceUploadChunkDelayMs,
+} from "../../shared/audience-upload";
+import {
   splitContactFullName,
   validateContactImportMapping,
 } from "../../shared/contact-import-headers";
@@ -225,7 +230,9 @@ export const processAudienceUpload = async (
     });
 
     // Process contacts in chunks
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE = AUDIENCE_UPLOAD_CHUNK_SIZE;
+    const isMultiChunkUpload = parsedContacts.length > CHUNK_SIZE;
+    let lastProgressAt = 0;
     let processedCount = 0;
     let importedCount = 0;
     let skippedInvalidCount = 0;
@@ -350,26 +357,40 @@ export const processAudienceUpload = async (
 
       // Update progress
       processedCount += chunk.length;
-      const progress = Math.round((processedCount / parsedContacts.length) * 100);
 
-      await writeAudienceUploadStatus(workspaceId, uploadId, {
-        ...statusData,
-        progress,
-        stage: `Processing contacts (${processedCount}/${parsedContacts.length}; ${skippedInvalidCount} skipped)`,
-        skipped_invalid_contacts: skippedInvalidCount,
-      });
+      const isLastChunk = i + CHUNK_SIZE >= parsedContacts.length;
+      const shouldNotifyProgress =
+        isMultiChunkUpload &&
+        (isLastChunk ||
+          Date.now() - lastProgressAt >= AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS);
 
-      // Update upload record
-      await tdb.audience_upload.update({
-        set: {
-          processed_contacts: processedCount,
-          status: "processing",
-        },
-        where: eq(audienceUploadTable.id, uploadId),
-      });
+      // Multi-chunk imports throttle mid-flight status writes; single-chunk
+      // uploads rely on finalization writes below (#1078).
+      if (shouldNotifyProgress) {
+        const progress = Math.round((processedCount / parsedContacts.length) * 100);
 
-      // Small delay to prevent overwhelming the database
-      await new Promise(resolve => setTimeout(resolve, 100));
+        await writeAudienceUploadStatus(workspaceId, uploadId, {
+          ...statusData,
+          progress,
+          stage: `Processing contacts (${processedCount}/${parsedContacts.length}; ${skippedInvalidCount} skipped)`,
+          skipped_invalid_contacts: skippedInvalidCount,
+        });
+
+        await tdb.audience_upload.update({
+          set: {
+            processed_contacts: processedCount,
+            status: "processing",
+          },
+          where: eq(audienceUploadTable.id, uploadId),
+        });
+
+        lastProgressAt = Date.now();
+      }
+
+      const chunkDelayMs = audienceUploadChunkDelayMs(parsedContacts.length);
+      if (chunkDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, chunkDelayMs));
+      }
     }
 
     // Update audience status. audience_status enum is

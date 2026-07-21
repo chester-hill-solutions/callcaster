@@ -3,7 +3,6 @@ import { logger } from "@/lib/logger.server";
 import { parseCSV } from '@/lib/csv';
 import {
   normalizeVoterListSource,
-  processAudienceUpload,
   type VoterListSource,
 } from "@/lib/audience-upload-process.server";
 import { resolveDualAuthSession } from "@/lib/api-auth.server";
@@ -18,6 +17,7 @@ import {
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/db-types";
 import {
@@ -57,7 +57,7 @@ type AudienceUploadDeps = Partial<{
     headers: Headers;
     user: { id: string } | null;
   }>;
-  processAudienceUpload: typeof processAudienceUpload;
+  enqueueJob: typeof enqueueJob;
   requireWorkspaceAccess: (args: {
     user: { id: string };
     workspaceId: string;
@@ -73,7 +73,7 @@ export const action = defineAction({
 
   const d = {
     verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
-    processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
+    enqueueJob: deps?.enqueueJob ?? enqueueJob,
     requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
   };
   const { headers, user } = await d.verifyAuth(request);
@@ -226,19 +226,21 @@ export const action = defineAction({
 
     const uploadId = uploadData.id;
 
-    // Start background processing
-    d.processAudienceUpload(
-      uploadId,
-      finalAudienceId,
+    await d.enqueueJob({
+      type: "audience_upload",
       workspaceId,
-      user.id,
-      fileBase64,
-      parsedHeaderMapping,
-      splitNameColumn || null,
-      { parseCSV },
-      voterListSource,
-    ).catch(error => {
-      logger.error("Background processing error:", error);
+      userId: user.id,
+      params: {
+        uploadId,
+        audienceId: finalAudienceId,
+        workspaceId,
+        userId: user.id,
+        fileContent: fileBase64,
+        headerMapping: parsedHeaderMapping,
+        splitNameColumn: splitNameColumn || null,
+        voterListSource,
+      },
+      dedupe: { kind: "idempotency", key: `audience_upload:${uploadId}` },
     });
 
     // Return the audience ID and upload ID immediately

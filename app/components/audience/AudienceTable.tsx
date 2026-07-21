@@ -48,6 +48,7 @@ type AudienceTableProps = {
     sortKey: string;
     sortDirection: 'asc' | 'desc';
   };
+  onAudienceNameChange?: (name: string) => void;
 };
 
 export function AudienceTable({
@@ -56,7 +57,8 @@ export function AudienceTable({
   selected_id: audience_id,
   audience: initialAudience,
   pagination,
-  sorting
+  sorting,
+  onAudienceNameChange,
 }: AudienceTableProps) {
   // Transform the contacts data to extract the nested contact info.
   // Memoized so this map only reruns when the loader actually hands us a new
@@ -136,6 +138,10 @@ export function AudienceTable({
 
     if (response.ok) {
       setAudienceInfo(result);
+      if (result && typeof result === "object" && "name" in result) {
+        const savedName = typeof result.name === "string" ? result.name : "";
+        onAudienceNameChange?.(savedName);
+      }
     } else {
       logger.error("Failed to save audience", result);
     }
@@ -252,6 +258,7 @@ export function AudienceTable({
           handleSaveAudience={handleSaveAudience}
           audience_id={audience_id}
           workspace_id={workspace_id}
+          onNameChange={onAudienceNameChange}
         />
       </div>
       <div className="flex justify-between items-center mb-4">

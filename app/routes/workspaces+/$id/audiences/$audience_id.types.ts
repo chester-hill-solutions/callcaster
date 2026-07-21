@@ -6,6 +6,8 @@ export type AudienceDetailLoaderData = {
   audience: Database["public"]["Tables"]["audience"]["Row"] | null;
   audience_id: string | undefined;
   error: string | null;
+  /** Present when the audience row loaded but the contacts join failed (#1080). */
+  contactsError?: string | null;
   pagination: {
     currentPage: number;
     pageSize: number;

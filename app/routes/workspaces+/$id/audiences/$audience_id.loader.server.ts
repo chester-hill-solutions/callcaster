@@ -78,11 +78,12 @@ export const loader = defineLoader({
 
     return routeData<AudienceDetailLoaderData>(
       {
-        contacts: detailResult.contacts,
+        contacts: detailResult.contacts as AudienceDetailLoaderData["contacts"],
         workspace_id,
         audience: detailResult.audience,
         audience_id,
         error: null,
+        contactsError: detailResult.contacts_error,
         pagination: {
           currentPage: detailResult.pagination.page,
           pageSize: detailResult.pagination.page_size,
