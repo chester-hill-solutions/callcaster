@@ -5,9 +5,9 @@ import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.serve
 import { isTwoFactorRedirectResponse } from "@/lib/two-factor.server";
 import {
   acceptWorkspaceInvitations,
-  createNewWorkspace,
   getInvitesByUserId,
 } from "@/lib/database/workspace.server";
+import { createNewWorkspace } from "@/lib/database/workspace-provisioning.server";
 import {
   getUserById,
   listUserWorkspaceMembershipsForProfile,

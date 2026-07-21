@@ -91,7 +91,7 @@ describe("app/lib/seed/seed-workspace-sample-data.server.ts", () => {
   });
 });
 
-describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data seeding", () => {
+describe("app/lib/database/workspace-provisioning.server.ts createNewWorkspace + sample data seeding", () => {
   // createNewWorkspace rejects non-uuid auth user ids (legacy nanoid rows cannot be
   // mirrored into public.user / cast for the create_new_workspace RPC), so this
   // fixture must be a real uuid like Better Auth's generateId=crypto.randomUUID().
@@ -191,7 +191,7 @@ describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data 
       new Error("insert failed"),
     );
 
-    const mod = await import("../app/lib/database/workspace.server");
+    const mod = await import("../app/lib/database/workspace-provisioning.server");
     const result = await mod.createNewWorkspace({
       workspaceName: "W",
       user_id: AUTH_USER_ID,
@@ -212,7 +212,7 @@ describe("app/lib/database/workspace.server.ts createNewWorkspace + sample data 
       campaign: { id: 2 },
     });
 
-    const mod = await import("../app/lib/database/workspace.server");
+    const mod = await import("../app/lib/database/workspace-provisioning.server");
     const result = await mod.createNewWorkspace({
       workspaceName: "W",
       user_id: AUTH_USER_ID,

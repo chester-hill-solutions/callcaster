@@ -1,16 +1,18 @@
 import { Link, useFetcher, useRevalidator } from "react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
-import {
-  NumberSummaryList,
-  type RoutingPresetSubmission,
-} from "@/components/phone-numbers/NumberSummaryList";
+import { NumberSummaryList } from "@/components/phone-numbers/NumberSummaryList";
+import { useWorkspaceNumberSettingsMutations } from "@/hooks/phone";
 import {
   CallerIdVerificationDialog,
   type CallerIdValidationRequest,
 } from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { CallerIdVerificationForm } from "@/components/phone-numbers/CallerIdVerificationForm";
+import {
+  isServiceAddressComplete,
+  ServiceAddressGate,
+} from "@/components/phone-numbers/ServiceAddressGate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import {
@@ -46,13 +48,6 @@ type OnboardingFirstNumberStepProps = Pick<
   validationRequest?: CallerIdValidationRequest | null;
 };
 
-// Reuse the same patch-number action handlers the numbers settings page uses
-// (app/routes/workspaces+/$id/settings/numbers.action.server.ts) instead of
-// building a second inbound-routing/handset write path (Phase G, Q44-46/59).
-function numbersSettingsActionPath(workspaceId: string): string {
-  return `/workspaces/${workspaceId}/settings/numbers`;
-}
-
 function presetOrderForGoal(
   goal: WorkspaceOnboardingGoal | null,
 ): readonly InboundRoutingPresetId[] {
@@ -86,8 +81,19 @@ export function OnboardingFirstNumberStep({
   validationRequest,
 }: OnboardingFirstNumberStepProps) {
   const purchaseFetcher = useFetcher<NumbersSearchFetcherData>();
-  const routingFetcher = useFetcher();
   const revalidator = useRevalidator();
+  const {
+    isBusy: isRoutingBusy,
+    onIncomingActivityChange,
+    onIncomingVoiceMessageChange,
+    onHandsetChange,
+    onInboundRingCountChange,
+    onInboundQueueChange,
+    onInboundScriptChange,
+    onCallerIdChange,
+    onNumberRemoval,
+    onApplyPreset,
+  } = useWorkspaceNumberSettingsMutations(workspaceId);
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(
     () => Boolean(validationRequest),
   );
@@ -113,103 +119,18 @@ export function OnboardingFirstNumberStep({
   const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
   const hasFirstNumber = workspaceHasFirstNumber(numbers);
   const messagingReady = Boolean(onboarding.messagingService.serviceSid);
-  const isRoutingBusy = routingFetcher.state !== "idle";
-  const actionPath = numbersSettingsActionPath(workspaceId);
   const isVerifying = pending.isVerifyingCallerId;
 
-  const handlePurchaseComplete = useCallback(() => {
+  const handlePurchaseComplete = () => {
     revalidator.revalidate();
-  }, [revalidator]);
-
-  const handleIncomingActivityChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-incoming-activity", numberId: String(numberId), incomingActivity: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleIncomingVoiceMessageChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-incoming-voice-message", numberId: String(numberId), incomingVoiceMessage: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleHandsetChange = useCallback(
-    (numberId: number, enabled: boolean) => {
-      routingFetcher.submit(
-        { formName: "update-handset", numberId: String(numberId), handsetEnabled: String(enabled) },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleInboundRingCountChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-inbound-ring-count", numberId: String(numberId), inboundRingCount: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleInboundQueueChange = useCallback(
-    (numberId: number, queueId: string) => {
-      routingFetcher.submit(
-        { formName: "update-inbound-queue", numberId: String(numberId), inboundQueueId: queueId },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleInboundScriptChange = useCallback(
-    (numberId: number, scriptId: string) => {
-      routingFetcher.submit(
-        { formName: "update-inbound-script", numberId: String(numberId), inboundScriptId: scriptId },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleCallerIdChange = useCallback(
-    (numberId: number, value: string) => {
-      routingFetcher.submit(
-        { formName: "update-caller-id", numberId: String(numberId), friendly_name: value },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleNumberRemoval = useCallback(
-    (numberId: number) => {
-      routingFetcher.submit(
-        { formName: "remove-number", numberId: String(numberId) },
-        { method: "POST", action: actionPath },
-      );
-    },
-    [routingFetcher, actionPath],
-  );
-
-  const handleApplyPreset = useCallback(
-    (submission: RoutingPresetSubmission) => {
-      routingFetcher.submit(submission, { method: "POST", action: actionPath });
-    },
-    [routingFetcher, actionPath],
-  );
+  };
 
   const smsGoal = goalNeedsSmsCompliance(onboarding.selectedGoal);
   const callerIdNumbers = numbers.filter((number) => number?.type === "caller_id");
+  const hasServiceAddress = isServiceAddressComplete(
+    onboarding.emergencyVoice.address,
+  );
+  const firstNumberReturnTo = `/workspaces/${workspaceId}/onboarding?step=first_number`;
 
   if (!messagingReady) {
     return (
@@ -245,6 +166,12 @@ export function OnboardingFirstNumberStep({
           description="Rent a number for inbound and outbound traffic, or verify a number you already own for outbound calling and texting."
         />
         <div className="space-y-6">
+          <ServiceAddressGate
+            workspaceId={workspaceId}
+            onboarding={onboarding}
+            isReadOnly={isReadOnly}
+            returnTo={firstNumberReturnTo}
+          />
           {smsGoal ? (
             <TooltipProvider>
               <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
@@ -281,8 +208,8 @@ export function OnboardingFirstNumberStep({
             </Alert>
           ) : null}
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <fieldset className="space-y-4 rounded-md bg-muted/40 p-3">
+          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
+            <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-3">
               <legend className="text-sm font-medium">Rent a Canadian number</legend>
               <p className="text-sm text-muted-foreground">
                 Best for inbound SMS, inbound calls, and full two-way messaging.
@@ -292,6 +219,12 @@ export function OnboardingFirstNumberStep({
                   Only workspace owners and admins can rent numbers. Ask an admin to complete this
                   step.
                 </p>
+              ) : !hasServiceAddress ? (
+                <Alert>
+                  <AlertDescription>
+                    Save a service address above before searching for numbers to rent.
+                  </AlertDescription>
+                </Alert>
               ) : (
                 <NumberPurchase
                   fetcher={purchaseFetcher}
@@ -303,7 +236,7 @@ export function OnboardingFirstNumberStep({
               )}
             </fieldset>
 
-            <fieldset className="space-y-4 rounded-md bg-muted/40 p-3">
+            <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-3">
               <legend className="text-sm font-medium">Verify your own number</legend>
               <p className="text-sm text-muted-foreground">
                 Outbound SMS and calls only. Rent a number for inbound traffic.
@@ -321,12 +254,12 @@ export function OnboardingFirstNumberStep({
                     return (
                       <li
                         key={number.id ?? number.phone_number}
-                        className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                        className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
                       >
-                        <span className="font-mono">
+                        <span className="truncate font-mono">
                           {number.phone_number ?? "Unknown number"}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="shrink-0 text-xs text-muted-foreground">
                           {isVerifiedCallerIdNumber(number)
                             ? "Verified"
                             : pendingStatus
@@ -370,15 +303,15 @@ export function OnboardingFirstNumberStep({
                 queues={inboundQueues}
                 scripts={scripts}
                 verifiedCallerIds={numbers}
-                onIncomingActivityChange={handleIncomingActivityChange}
-                onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
-                onCallerIdChange={handleCallerIdChange}
-                onHandsetChange={handleHandsetChange}
-                onInboundRingCountChange={handleInboundRingCountChange}
-                onInboundQueueChange={handleInboundQueueChange}
-                onInboundScriptChange={handleInboundScriptChange}
-                onNumberRemoval={handleNumberRemoval}
-                onApplyPreset={handleApplyPreset}
+                onIncomingActivityChange={onIncomingActivityChange}
+                onIncomingVoiceMessageChange={onIncomingVoiceMessageChange}
+                onCallerIdChange={onCallerIdChange}
+                onHandsetChange={onHandsetChange}
+                onInboundRingCountChange={onInboundRingCountChange}
+                onInboundQueueChange={onInboundQueueChange}
+                onInboundScriptChange={onInboundScriptChange}
+                onNumberRemoval={onNumberRemoval}
+                onApplyPreset={onApplyPreset}
                 presetOrder={presetOrderForGoal(onboarding.selectedGoal)}
                 isBusy={isRoutingBusy}
               />

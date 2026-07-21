@@ -1,16 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 /**
- * Audit-C P1: the Channels step called `ensureWorkspaceTwilioBootstrap`
- * unconditionally when no Messaging Service SID exists yet, and let it throw
- * raw on failure (e.g. "Workspace is missing Twilio account credentials").
- * `runOnboardingAction`'s outer catch turns any thrown error into a 500,
- * which trips the onboarding route's ErrorBoundary and strands the wizard on
- * a blank page instead of showing an inline message and staying on the step.
- *
- * `handleSaveChannels` must instead catch that failure itself and return the
- * same `{ kind: "payload", data: { error }, status }` shape its sibling
- * handlers (e.g. `save_rcs`, `attach_rcs_sender`) already use.
+ * Validate-address from Numbers settings posts to the onboarding action.
+ * Without a returnTo redirect, React Router leaves the user on the wizard.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -19,9 +11,8 @@ const mocks = vi.hoisted(() => ({
   getWorkspacePhoneNumbers: vi.fn(),
   getWorkspaceMessagingOnboardingState: vi.fn(),
   persistWorkspaceOnboardingState: vi.fn(),
-  enqueueWorkspaceComplianceJob: vi.fn(),
   getWorkspaceCredits: vi.fn(),
-  ensureWorkspaceTwilioBootstrap: vi.fn(),
+  reviewWorkspaceEmergencyVoice: vi.fn(),
 }));
 
 vi.mock("@/lib/database/workspace.server", () => ({
@@ -36,7 +27,17 @@ vi.mock("@/lib/messaging-onboarding.server", () => ({
   applyOnboardingStepsWithWorkspaceNumbers: (state: unknown) => state,
   applyWorkspaceOnboardingChannelPolicy: (state: unknown) => state,
   deriveWorkspaceMessagingReadiness: () => ({ ready: false, blockingIssues: [] }),
-  isWizardOnboardingStepId: () => true,
+  isWizardOnboardingStepId: (value: string) =>
+    [
+      "business_identity",
+      "path_selection",
+      "audience",
+      "first_number",
+      "script",
+      "campaign_info",
+      "credits",
+      "launch_checks",
+    ].includes(value),
 }));
 
 vi.mock("@/lib/onboarding/onboarding-persist.server", () => ({
@@ -45,16 +46,20 @@ vi.mock("@/lib/onboarding/onboarding-persist.server", () => ({
 }));
 
 vi.mock("@/lib/onboarding/emergency-voice.server", () => ({
-  reviewWorkspaceEmergencyVoice: vi.fn(),
+  reviewWorkspaceEmergencyVoice: (...args: unknown[]) =>
+    mocks.reviewWorkspaceEmergencyVoice(...args),
 }));
 
 vi.mock("@/lib/worker/handlers.server", () => ({
-  enqueueWorkspaceComplianceJob: (...args: unknown[]) =>
-    mocks.enqueueWorkspaceComplianceJob(...args),
+  enqueueWorkspaceComplianceJob: vi.fn(),
 }));
 
 vi.mock("@/lib/workspace-members-db.server", () => ({
   getWorkspaceCredits: (...args: unknown[]) => mocks.getWorkspaceCredits(...args),
+}));
+
+vi.mock("@/lib/platform-workspace.server", () => ({
+  updateWorkspaceName: vi.fn(),
 }));
 
 vi.mock("@/lib/rcs-onboarding.server", () => ({
@@ -67,8 +72,7 @@ vi.mock("@/lib/rcs-onboarding.server", () => ({
 }));
 
 vi.mock("@/lib/twilio-bootstrap.server", () => ({
-  ensureWorkspaceTwilioBootstrap: (...args: unknown[]) =>
-    mocks.ensureWorkspaceTwilioBootstrap(...args),
+  ensureWorkspaceTwilioBootstrap: vi.fn(),
 }));
 
 vi.mock("@/lib/twilio-a2p.server", () => ({
@@ -107,32 +111,54 @@ const USER_ID = "user-1";
 function onboardingState() {
   return {
     status: "collecting_business",
-    currentStep: "channels",
+    currentStep: "first_number",
     operatingCountry: "CA",
     selectedChannels: [] as string[],
-    businessProfile: {},
+    selectedGoal: null,
+    businessProfile: {
+      legalBusinessName: "Acme",
+      businessType: "",
+      websiteUrl: "",
+      privacyPolicyUrl: "",
+      termsOfServiceUrl: "",
+      supportEmail: "",
+      supportPhone: "",
+      useCaseSummary: "",
+      optInWorkflow: "",
+      optInKeywords: "",
+      optOutKeywords: "",
+      helpKeywords: "",
+      sampleMessages: [] as string[],
+      doingBusinessAs: "",
+      businessRegistrationNumber: "",
+      ageGatedContent: false,
+      ein: "",
+      industry: "",
+      authorizedRepName: "",
+      authorizedRepEmail: "",
+      authorizedRepPhone: "",
+      authorizedRepTitle: "",
+    },
     emergencyVoice: {
       enabled: false,
-      status: "not_started",
+      status: "collecting_business",
       emergencyEligiblePhoneNumbers: [] as string[],
       ineligibleCallerIds: [] as string[],
       lastReviewedAt: null,
       address: {
-        customerName: "",
-        street: "",
-        city: "",
-        region: "",
-        postalCode: "",
+        customerName: "Acme",
+        street: "123 Main St",
+        city: "Toronto",
+        region: "ON",
+        postalCode: "M5V 2T6",
         countryCode: "CA",
         addressSid: null,
-        status: "not_started",
+        status: "pending_validation",
         validationError: null,
         lastValidatedAt: null,
       },
     },
-    // No Messaging Service SID yet — this is what makes handleSaveChannels
-    // call ensureWorkspaceTwilioBootstrap.
-    messagingService: { serviceSid: null, desiredSendMode: "messaging_service" },
+    messagingService: { serviceSid: "MG123", desiredSendMode: "messaging_service" },
     a2p10dlc: { status: "not_started" },
     rcs: { status: "not_started", regions: [] as string[] },
     reviewState: { blockingIssues: [] as string[], lastError: null },
@@ -140,16 +166,7 @@ function onboardingState() {
   };
 }
 
-function saveChannelsForm() {
-  const formData = new FormData();
-  formData.set("_action", "save_channels");
-  formData.set("selectedGoal", "live_call");
-  formData.append("selectedChannels", "local_number");
-  formData.append("selectedChannels", "voice_compliance");
-  return formData;
-}
-
-describe("save_channels bootstrap failure surfaces a friendly payload, not a throw", () => {
+describe("review_emergency_voice returnTo", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
@@ -158,77 +175,83 @@ describe("save_channels bootstrap failure surfaces a friendly payload, not a thr
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState());
     mocks.persistWorkspaceOnboardingState.mockResolvedValue(undefined);
     mocks.getWorkspaceCredits.mockResolvedValue(0);
+    mocks.reviewWorkspaceEmergencyVoice.mockResolvedValue({
+      ok: true,
+      success:
+        "Emergency address validated. Add or refresh a rented voice number to finish voice readiness.",
+    });
   });
 
-  test("runOnboardingAction resolves ok:true with a payload error (not ok:false/500) when bootstrap throws", async () => {
-    mocks.ensureWorkspaceTwilioBootstrap.mockRejectedValue(
-      new Error("Workspace is missing Twilio account credentials"),
-    );
+  test("redirects back to Numbers settings when returnTo is present", async () => {
+    const formData = new FormData();
+    formData.set("_action", "review_emergency_voice");
+    formData.set("returnTo", `/workspaces/${WORKSPACE_ID}/settings/numbers`);
 
     const outcome = await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
-      "save_channels",
-      saveChannelsForm(),
-    );
-
-    // Falsification target: before the fix, the throw propagates out of
-    // handleSaveChannels, runOnboardingAction's catch converts it to
-    // { ok: false, status: 500 }, and the UI action wraps that as a thrown
-    // Response that hits the route ErrorBoundary.
-    expect(outcome.ok).toBe(true);
-    if (!outcome.ok) return;
-
-    expect(outcome.result.kind).toBe("payload");
-    if (outcome.result.kind !== "payload") return;
-
-    expect(outcome.result.status).toBe(400);
-    expect(outcome.result.data.error).toContain("Twilio");
-  });
-
-  test("does not persist onboarding state or advance the wizard step on bootstrap failure", async () => {
-    mocks.ensureWorkspaceTwilioBootstrap.mockRejectedValue(
-      new Error("Workspace is missing Twilio account credentials"),
-    );
-
-    await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_channels", saveChannelsForm());
-
-    expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
-  });
-
-  test("maps to a ui_payload (stays on step), not a thrown 500", async () => {
-    mocks.ensureWorkspaceTwilioBootstrap.mockRejectedValue(
-      new Error("Workspace is missing Twilio account credentials"),
-    );
-
-    const outcome = await runOnboardingAction(
-      USER_ID,
-      WORKSPACE_ID,
-      "save_channels",
-      saveChannelsForm(),
+      "review_emergency_voice",
+      formData,
     );
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
 
     const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
-    expect(mapped.kind).toBe("ui_payload");
-    expect(mapped.kind === "ui_payload" && mapped.status).toBe(400);
+    expect(mapped).toEqual({
+      kind: "ui_redirect_path",
+      path: `/workspaces/${WORKSPACE_ID}/settings/numbers`,
+      searchParams: { saved: "emergency_voice" },
+    });
   });
 
-  test("still redirects to audience on the happy path (bootstrap succeeds)", async () => {
-    mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValue(undefined);
+  test("returns a success payload when returnTo is absent", async () => {
+    const formData = new FormData();
+    formData.set("_action", "review_emergency_voice");
 
     const outcome = await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
-      "save_channels",
-      saveChannelsForm(),
+      "review_emergency_voice",
+      formData,
     );
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
-    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledTimes(1);
+    expect(outcome.result.kind).toBe("payload");
+    if (outcome.result.kind !== "payload") return;
+    expect(outcome.result.data.success).toMatch(/validated/i);
+  });
+
+  test("redirects validation errors back to returnTo instead of the wizard", async () => {
+    mocks.reviewWorkspaceEmergencyVoice.mockResolvedValue({
+      ok: false,
+      error: "Save a complete emergency service address before running voice review.",
+      status: 400,
+    });
+
+    const formData = new FormData();
+    formData.set("_action", "review_emergency_voice");
+    formData.set("returnTo", `/workspaces/${WORKSPACE_ID}/settings/numbers`);
+
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "review_emergency_voice",
+      formData,
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
+    expect(mapped).toEqual({
+      kind: "ui_redirect_path",
+      path: `/workspaces/${WORKSPACE_ID}/settings/numbers`,
+      searchParams: {
+        warning:
+          "Save a complete emergency service address before running voice review.",
+      },
+    });
   });
 });

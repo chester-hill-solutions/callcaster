@@ -3,7 +3,6 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import {
-  deriveWorkspaceMessagingReadiness,
   isWizardOnboardingStepId,
 } from "@/lib/messaging-onboarding.server";
 import {
@@ -12,16 +11,10 @@ import {
   type OnboardingActionData,
 } from "@/lib/onboarding-actions.server";
 import { persistWorkspaceOnboardingState } from "@/lib/onboarding/onboarding-persist.server";
-import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
-import {
-  getWorkspaceRcsBlockingIssues,
-  isRcsOnboardingEnabled,
-  stripDisabledRcsChannel,
-} from "@/lib/rcs-onboarding.server";
-import { buildA2pBlockingIssues } from "@/lib/twilio-a2p.server";
+import { stripDisabledRcsChannel } from "@/lib/rcs-onboarding.server";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 import {
-  hydrateWorkspaceOnboarding,
+  loadWorkspaceOnboardingView,
   type OnboardingActionContext,
   type OnboardingHandlerResult,
   type WorkspaceOnboardingDetail,
@@ -74,35 +67,17 @@ export async function getWorkspaceOnboardingDetail(
     workspaceId,
   });
 
-  const [{ onboarding, phoneNumbers }, credits] = await Promise.all([
-    hydrateWorkspaceOnboarding(workspaceId),
-    getWorkspaceCredits(workspaceId),
-  ]);
-
-  const rcsBlockingIssues =
-    isRcsOnboardingEnabled() && onboarding.selectedChannels.includes("rcs")
-      ? getWorkspaceRcsBlockingIssues(onboarding)
-      : [];
-
-  const readiness = deriveWorkspaceMessagingReadiness({
-    onboarding,
-    workspaceNumbers: (phoneNumbers ?? []).map((number) => ({
-      type: number?.type ?? null,
-      phone_number: number?.phone_number ?? null,
-      capabilities: number?.capabilities ?? null,
-    })),
-    recentOutboundCount: 0,
-  });
+  const view = await loadWorkspaceOnboardingView(workspaceId);
 
   return {
     ok: true,
     detail: {
-      onboarding,
-      readiness,
-      a2p_blocking_issues: buildA2pBlockingIssues(onboarding),
-      rcs_blocking_issues: rcsBlockingIssues,
-      phone_numbers: phoneNumbers,
-      credits_balance: credits ?? 0,
+      onboarding: view.onboarding,
+      readiness: view.readiness,
+      a2p_blocking_issues: view.a2pBlockingIssues,
+      rcs_blocking_issues: view.rcsBlockingIssues,
+      phone_numbers: view.phoneNumbers,
+      credits_balance: view.creditsBalance,
     },
   };
 }

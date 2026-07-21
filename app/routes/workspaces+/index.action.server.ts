@@ -1,4 +1,4 @@
-import { createNewWorkspace } from "@/lib/database/workspace.server";
+import { createNewWorkspace } from "@/lib/database/workspace-provisioning.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData, redirect } from "react-router";
 import { getSession } from "@/lib/auth.server";

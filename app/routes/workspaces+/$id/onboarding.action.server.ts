@@ -1,8 +1,4 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
-import {
-  getUserRole,
-  requireWorkspaceAccess,
-} from "@/lib/database/workspace.server";
 import { data as routeData, redirect } from "react-router";
 import {
   isOnboardingActionName,
@@ -35,8 +31,12 @@ function redirectToWorkspacePath(
   if (!searchParams || Object.keys(searchParams).length === 0) {
     throw redirect(path, { headers });
   }
-  const params = new URLSearchParams(searchParams);
-  throw redirect(`${path}?${params.toString()}`, { headers });
+  // Merge flash params into any query already present on `path` (e.g. ?step=).
+  const url = new URL(path, "http://local.invalid");
+  for (const [key, value] of Object.entries(searchParams)) {
+    url.searchParams.set(key, value);
+  }
+  throw redirect(`${url.pathname}${url.search}`, { headers });
 }
 
 async function runUiOnboardingAction(
@@ -89,20 +89,6 @@ export const action = defineAction({
     const wsId = params.id;
     if (!wsId) {
       return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });
-    }
-
-    await requireWorkspaceAccess({
-      user,
-      workspaceId: wsId,
-    });
-
-    const role = (await getUserRole({ user, workspaceId: wsId }))?.role;
-
-    if (role !== "owner" && role !== "admin") {
-      return routeData<OnboardingActionData>(
-        { error: "Only workspace admins can change onboarding state." },
-        { status: 403 },
-      );
     }
 
     const formData = await request.formData();

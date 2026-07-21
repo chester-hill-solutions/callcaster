@@ -36,8 +36,11 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
 
 vi.mock("@/lib/database/workspace.server", () => ({
   acceptWorkspaceInvitations: vi.fn(async () => ({ errors: [] })),
-  createNewWorkspace: vi.fn(async () => ({ data: "w1", error: null })),
   getInvitesByUserId: vi.fn(async () => []),
+}));
+
+vi.mock("@/lib/database/workspace-provisioning.server", () => ({
+  createNewWorkspace: vi.fn(async () => ({ data: "w1", error: null })),
 }));
 
 describe("platform-auth.server.ts", () => {

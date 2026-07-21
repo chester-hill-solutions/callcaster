@@ -3,6 +3,10 @@ export { action } from "./onboarding.action.server";
 
 import { useActionData, useLoaderData, useNavigation } from "react-router";
 import { toast } from "sonner";
+import {
+  flashSearchParamWarning,
+  flashServiceAddressSavedParam,
+} from "@/hooks/phone";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { useSearchParamFlash } from "@/hooks/utils/useSearchParamFlash";
 import type { OnboardingActionData } from "./onboarding.action.server";
@@ -40,9 +44,8 @@ export default function WorkspaceMessagingOnboardingRoute() {
         toast.success("Messaging Service is ready.");
       }
     },
-    warning: (value) => {
-      toast.warning(value);
-    },
+    saved: flashServiceAddressSavedParam,
+    warning: flashSearchParamWarning,
   });
 
   useActionFeedback(actionData, {

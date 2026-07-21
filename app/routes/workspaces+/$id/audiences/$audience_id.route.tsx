@@ -59,7 +59,7 @@ export default function AudienceView() {
   };
 
   return (
-    <main className="flex h-full flex-col gap-4 text-white">
+    <main className="flex h-full flex-col gap-4 text-foreground">
       <div className="flex items-center justify-between gap-4">
         <Heading as="h1" level={2} branded={false}>
           {audience?.name || `Unnamed Audience ${audience_id}`}

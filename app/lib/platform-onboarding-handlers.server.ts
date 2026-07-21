@@ -36,7 +36,6 @@ import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
 import {
-  adaptRouteDataResult,
   redirectToReturnToOrPayload,
   resolveOnboardingInput,
   resolveOperatingCountryFromForm,
@@ -428,10 +427,28 @@ async function handleSaveServiceAddress(
 async function handleReviewEmergencyVoice(
   ctx: OnboardingActionContext,
 ): Promise<OnboardingHandlerResult> {
-  const result = await reviewWorkspaceEmergencyVoice({workspaceId: ctx.workspaceId,
+  const formData = resolveOnboardingInput(ctx.input);
+  const result = await reviewWorkspaceEmergencyVoice({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
   });
-  return adaptRouteDataResult(result);
+
+  if (!result.ok) {
+    return redirectToReturnToOrPayload(
+      formData,
+      ctx.workspaceId,
+      "emergency_voice",
+      "",
+      { error: result.error, status: result.status },
+    );
+  }
+
+  return redirectToReturnToOrPayload(
+    formData,
+    ctx.workspaceId,
+    "emergency_voice",
+    result.success ?? "Service address validated.",
+  );
 }
 
 async function handleProvisionA2p(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
