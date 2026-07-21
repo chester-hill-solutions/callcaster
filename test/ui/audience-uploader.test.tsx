@@ -333,7 +333,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.interval.ms).toBe(2000);
+      expect(mocks.interval.ms).toBe(5000);
     });
     await act(async () => {
       await mocks.interval.cb?.();
@@ -391,7 +391,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    expect(mocks.interval.ms).toBe(2000);
+    expect(mocks.interval.ms).toBe(5000);
 
     await act(async () => {
       await mocks.interval.cb?.();
@@ -480,7 +480,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         },
       } as any;
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
     await act(async () => {
       await mocks.interval.cb?.();
     });
@@ -773,7 +773,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
 
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
   });
 
   test("upload POST throws non-Error -> shows generic unexpected error", async () => {
@@ -857,7 +857,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
     await act(async () => {
       await mocks.interval.cb?.();
@@ -921,7 +921,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
     await act(async () => {
       await mocks.interval.cb?.();
@@ -980,7 +980,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
     await act(async () => {
       await mocks.interval.cb?.();
@@ -1041,7 +1041,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
     await act(async () => {
       await mocks.interval.cb?.();
@@ -1104,7 +1104,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
     expect(screen.getByText("0 / 1 contacts")).toBeInTheDocument();
 
@@ -1167,7 +1167,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
     for (let i = 0; i < 6; i++) {
       await act(async () => {
@@ -1185,7 +1185,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     ).toBeNull();
     expect(screen.getByText("Processing...")).toBeInTheDocument();
     // Polling stays enabled for transient refresh failures.
-    expect(mocks.interval.ms).toBe(2000);
+    expect(mocks.interval.ms).toBe(5000);
   });
 
   test("non-JSON status response is treated as a transient poll failure", async () => {
@@ -1237,7 +1237,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(2000));
+    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
     await act(async () => {
       await mocks.interval.cb?.();
@@ -1246,7 +1246,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(
       screen.getByText("Live progress is delayed. Retrying automatically..."),
     ).toBeInTheDocument();
-    expect(mocks.interval.ms).toBe(2000);
+    expect(mocks.interval.ms).toBe(5000);
     expect(screen.queryByText("Error")).toBeNull();
   });
 });
