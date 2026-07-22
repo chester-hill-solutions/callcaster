@@ -51,7 +51,7 @@ export default function NewAudience() {
             encType="multipart/form-data"
           >
             <input type="hidden" name="formAction" value="newAudience" />
-            <FormField htmlFor="audience-name" label="Audience Name">
+            <FormField htmlFor="audience-name" label="Call list name">
               <Input type="text" name="audience-name" id="audience-name" />
             </FormField>
             <div className="block text-sm font-medium text-foreground">

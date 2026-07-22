@@ -275,6 +275,24 @@ export default function SelectDates({
     };
   }
 
+  // A stored interval that spans the whole day (e.g. 00:00–23:59) still spans
+  // the whole day after the UTC→local shift; render it as "All day" instead of
+  // a wrapped range like "20:00 - 19:59".
+  const intervalCoversFullDay = (interval: ScheduleInterval) => {
+    const toMinutes = (time: string) => {
+      const parts = time.split(":");
+      const hours = Number(parts[0]);
+      const minutes = Number(parts[1]);
+      return Number.isFinite(hours) && Number.isFinite(minutes)
+        ? hours * 60 + minutes
+        : null;
+    };
+    const start = toMinutes(interval.start);
+    const end = toMinutes(interval.end);
+    if (start === null || end === null) return false;
+    return (end - start + 1440) % 1440 >= 1439;
+  };
+
   const getScheduleSummary = () => {
     const activeDays = DAYS_OF_WEEK
       .map(day => ({
@@ -285,7 +303,9 @@ export default function SelectDates({
       .map(({ day, schedule }) => ({
         day: day.charAt(0).toUpperCase() + day.slice(1),
         time: schedule?.intervals?.[0]
-          ? `${utcToLocal(schedule.intervals[0].start)} - ${utcToLocal(schedule.intervals[0].end)}`
+          ? intervalCoversFullDay(schedule.intervals[0])
+            ? "All day"
+            : `${utcToLocal(schedule.intervals[0].start)} - ${utcToLocal(schedule.intervals[0].end)}`
           : "All day",
       }));
 
@@ -358,6 +378,10 @@ export default function SelectDates({
         <div className="rounded-md bg-muted p-4">
           {getScheduleSummary()}
         </div>
+        <p className="text-xs text-muted-foreground">
+          Times are shown in your local time zone (
+          {Intl.DateTimeFormat().resolvedOptions().timeZone}).
+        </p>
 
         {showSchedule && (
           <div className="rounded-md border p-4 space-y-4">

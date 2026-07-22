@@ -76,7 +76,7 @@ export default function AudienceView() {
 
   const title =
     name.trim() ||
-    (audience_id ? `Unnamed Audience ${audience_id}` : "Unnamed Audience");
+    (audience_id ? `Unnamed Call list ${audience_id}` : "Unnamed Call list");
 
   return (
     <main className="flex h-full flex-col gap-4 text-foreground">
@@ -97,7 +97,7 @@ export default function AudienceView() {
               variant={"destructive"}
               className="font-Zilla-Slab"
             >
-              Delete Audience
+              Delete Call list
             </Button>
           </Form>
         </div>
