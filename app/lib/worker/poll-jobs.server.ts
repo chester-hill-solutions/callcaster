@@ -238,7 +238,9 @@ export async function runWorkerPollLoop(
       );
 
       if (signal.aborted) break;
-      await sleep(pollIntervalMs, signal);
+      // Drain the queue back-to-back: only the empty-queue branch above sleeps.
+      // Sleeping here throttled bursts to one job per poll interval and made
+      // even a 1-row audience upload wait out the interval (#1078).
     } catch (error) {
       captureException(error, { source: "worker.poll" });
       logger.error(

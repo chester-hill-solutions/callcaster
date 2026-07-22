@@ -23,6 +23,18 @@ const mocks = vi.hoisted(() => ({
   env: { BASE_URL: () => "https://app.example" },
 }));
 
+// The recipient calling window is wall-clock dependent; pin it open so these
+// tests are not time-of-day sensitive (window logic is covered in
+// test/recipient-calling-window.test.ts).
+vi.mock("@/lib/recipient-calling-window", () => ({
+  recipientCallingWindowStatus: vi.fn(() => ({
+    allowed: true,
+    timezone: "America/Toronto",
+    reason: "in_window",
+  })),
+  isWithinRecipientCallingWindow: vi.fn(() => true),
+}));
+
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: unknown[]) => mocks.verifyApiKeyOrSession(...args),
 }));

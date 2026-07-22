@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
   createWorkspaceTwilioInstance,
@@ -40,6 +41,23 @@ export const action = defineAction({
 
     try {
       await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+
+      // Recipient-local calling window (TCPA/CRTC 8am–9pm recipient time).
+      // Return without dequeuing so the row stays `queued` for a later,
+      // in-window run.
+      const windowStatus = recipientCallingWindowStatus(to_number);
+      if (!windowStatus.allowed) {
+        logger.info("ivr.recipient_window_skip", {
+          campaignId: campaign_id,
+          queueId: queue_id,
+          timezone: windowStatus.timezone,
+          reason: windowStatus.reason,
+        });
+        return routeData(
+          { skipped: true, reason: "outside_recipient_calling_window" },
+          { status: 200 },
+        );
+      }
 
       const credits = await getWorkspaceCreditsBalance(workspace_id);
       if (credits === null) {

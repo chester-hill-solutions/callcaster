@@ -7,7 +7,12 @@ import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
-import { outreach_attempt as outreachAttemptTable } from "@/db/schema";
+import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
+import { isDncDisposition } from "@/lib/outreach-disposition";
+import {
+  contact as contactTable,
+  outreach_attempt as outreachAttemptTable,
+} from "@/db/schema";
 import { and, eq, gte, desc } from "drizzle-orm";
 
 import type { Json } from "@/lib/db-types";
@@ -214,6 +219,26 @@ export const action = defineAction({
       },
       where: eq(outreachAttemptTable.id, outreachAttemptId),
     });
+
+    // "Do not call" side effects run AFTER the attempt is persisted: opt the
+    // contact out and pull them from every campaign queue in the workspace.
+    // Failures are logged but never fail the disposition save itself.
+    if (isDncDisposition(disposition)) {
+      try {
+        await tdb.contact.update({
+          set: { opt_out: true },
+          where: eq(contactTable.id, Number(contact_id)),
+        });
+        await dequeueCampaignQueueByContact({
+          contactId: Number(contact_id),
+          userId: user.id,
+          reason: "Do not call requested",
+          workspaceId: workspace,
+        });
+      } catch (error) {
+        logger.error("Do-not-call side effects failed after disposition save:", error);
+      }
+    }
 
     return routeData(finalUpdated, { headers });
   },

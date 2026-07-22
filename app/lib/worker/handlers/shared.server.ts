@@ -42,7 +42,16 @@ export function requireNumberParam(
   key: string,
 ): number | undefined {
   const value = params[key];
-  return typeof value === "number" ? value : undefined;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  // Tenant-db rows serialize serial/bigint ids as strings, and those ids get
+  // enqueued into jsonb job params verbatim. Rejecting "12" here dead-ended
+  // every audience upload job with "Missing required parameters" (#1078).
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    return Number(value.trim());
+  }
+  return undefined;
 }
 
 export function requireRecordParam(

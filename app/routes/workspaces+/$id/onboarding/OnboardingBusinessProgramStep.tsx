@@ -49,7 +49,7 @@ export function OnboardingBusinessProgramStep({
             <Textarea
               id="optInWorkflow"
               name="optInWorkflow"
-              placeholder="Unchecked consent box during online booking."
+              placeholder="Customer checks a consent box during online booking to receive calls and texts."
               defaultValue={onboarding.businessProfile.optInWorkflow}
               disabled={isReadOnly}
             />

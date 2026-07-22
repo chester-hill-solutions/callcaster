@@ -3,10 +3,8 @@ export { action } from "./new.action.server";
 import {
   useActionData,
   useNavigate,
-  useNavigation,
   useParams,
   useSearchParams,
-  useSubmit,
 } from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
@@ -25,11 +23,8 @@ export default function AudiencesNew() {
   const actionData = useActionData();
   const params = useParams();
   const workspaceId = params.id;
-  const submit = useSubmit();
   const navigate = useNavigate();
-  const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
-  
+
   const [searchParams] = useSearchParams();
   const initialStep = searchParams.get("step") === "upload" ? 2 : 1;
   const initialName = searchParams.get("name") ?? "";
@@ -45,24 +40,15 @@ export default function AudiencesNew() {
     null,
   );
   
-  const handleCreateAudience = (e: React.FormEvent) => {
+  // Single forward path (#1060): name the list, then upload. The audience row
+  // is created by the upload API once contacts are submitted, so an empty name
+  // can never reach the server (#1080).
+  const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!audienceName) {
-      return;
-    }
-    
-    const formData = new FormData();
-    formData.append("formAction", "createAudience");
-    formData.append("audience-name", audienceName);
-    if (campaignId) formData.append("campaign-id", campaignId);
-    if (returnTo) formData.append("return-to", returnTo);
-    
-    submit(formData, { method: "POST" });
-  };
-
-  const goToNextStep = () => {
-    setCurrentStep(prev => prev + 1);
+    const trimmed = audienceName.trim();
+    if (!trimmed) return;
+    setAudienceName(trimmed);
+    setCurrentStep(2);
   };
 
   const goToPreviousStep = () => {
@@ -105,52 +91,37 @@ export default function AudiencesNew() {
 
           {currentStep === 1 ? (
             <Section variant="flat" className="space-y-4">
-              <form onSubmit={handleCreateAudience} className="space-y-6">
+              <form onSubmit={handleNameSubmit} className="space-y-6">
                 <FormField htmlFor="audience-name" label="Call list name">
                   <Input
                     type="text"
                     name="audience-name"
                     id="audience-name"
                     aria-label="Call list name"
-                    defaultValue=""
+                    value={audienceName}
                     onChange={(e) => setAudienceName(e.target.value)}
                     required
                   />
                 </FormField>
 
-                <Button
-                  type="submit"
-                  disabled={!audienceName || isSubmitting}
-                  className="bg-brand-primary text-white hover:bg-brand-secondary"
-                >
-                  Create Call list
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => window.history.back()}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    data-testid="audience-next-upload"
+                    disabled={!audienceName.trim()}
+                    className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  >
+                    Next: Upload Contacts <MdArrowForward className="ml-2" />
+                  </Button>
+                </div>
               </form>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => window.history.back()}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  data-testid="audience-next-upload"
-                  onClick={() => {
-                    const input = document.getElementById(
-                      "audience-name",
-                    ) as HTMLInputElement | null;
-                    const trimmed = input?.value.trim();
-                    if (trimmed) setAudienceName(trimmed);
-                    goToNextStep();
-                  }}
-                  className="bg-brand-primary text-white hover:bg-brand-secondary"
-                >
-                  Next: Upload Contacts <MdArrowForward className="ml-2" />
-                </Button>
-              </div>
             </Section>
           ) : null}
 
@@ -202,7 +173,7 @@ export default function AudiencesNew() {
                     );
                   }}
                 >
-                  View Call list
+                  {returnTo ? "Continue setup" : "View Call list"}
                 </Button>
               </div>
             </Section>

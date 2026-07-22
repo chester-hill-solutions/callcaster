@@ -20,6 +20,10 @@ export type AudienceUploadServerSnapshot = {
   error_message?: string | null;
   audience_id?: string | number | null;
   stage?: string | null;
+  /** Rows dropped for invalid/unparseable phone numbers. */
+  skipped_invalid_contacts?: number | null;
+  /** Rows dropped as duplicates (within the file or already in the audience). */
+  skipped_duplicate_contacts?: number | null;
 };
 
 export type AudienceUploadProgressStatus =
@@ -28,35 +32,32 @@ export type AudienceUploadProgressStatus =
   | "completed"
   | "error";
 
+/** Contact counters shared by every in-flight/terminal upload variant. */
+type UploadCounters = {
+  totalContacts: number;
+  processedContacts: number;
+  progress: number;
+  /** Import-time skip counters from the server snapshot (absent until known). */
+  skippedInvalidContacts?: number | null;
+  skippedDuplicateContacts?: number | null;
+};
+
+type SubmittingFields = UploadCounters & { warning: string | null };
+
+type ProcessingFields = UploadCounters & {
+  uploadId: number;
+  audienceId: string | null;
+  warning: string | null;
+};
+
+type CompletedFields = UploadCounters & { audienceId: string };
+
 export type AudienceUploadProgressState =
   | { kind: "idle" }
-  | {
-      kind: "submitting";
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "processing";
-      uploadId: number;
-      audienceId: string | null;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "completed";
-      audienceId: string;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-    }
-  | {
-      kind: "error";
-      message: string;
-    };
+  | ({ kind: "submitting" } & SubmittingFields)
+  | ({ kind: "processing" } & ProcessingFields)
+  | ({ kind: "completed" } & CompletedFields)
+  | { kind: "error"; message: string };
 
 /**
  * Single UI phase derived from wizard step + upload progress.
@@ -66,36 +67,10 @@ export type AudienceUploadPhase =
   | { kind: "file" }
   | { kind: "map"; draft: AudienceUploadDraft }
   | { kind: "review"; draft: AudienceUploadDraft }
-  | {
-      kind: "submitting";
-      draft: AudienceUploadDraft;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "processing";
-      draft: AudienceUploadDraft;
-      uploadId: number;
-      audienceId: string | null;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "completed";
-      audienceId: string;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-    }
-  | {
-      kind: "error";
-      draft: AudienceUploadDraft;
-      message: string;
-    };
+  | ({ kind: "submitting"; draft: AudienceUploadDraft } & SubmittingFields)
+  | ({ kind: "processing"; draft: AudienceUploadDraft } & ProcessingFields)
+  | ({ kind: "completed" } & CompletedFields)
+  | { kind: "error"; draft: AudienceUploadDraft; message: string };
 
 export function resolveAudienceUploadPhase(args: {
   wizard: AudienceUploadWizardKind;
@@ -126,6 +101,8 @@ export function resolveAudienceUploadPhase(args: {
         processedContacts: progress.processedContacts,
         progress: progress.progress,
         warning: progress.warning,
+        skippedInvalidContacts: progress.skippedInvalidContacts,
+        skippedDuplicateContacts: progress.skippedDuplicateContacts,
       };
     case "completed":
       return {
@@ -134,6 +111,8 @@ export function resolveAudienceUploadPhase(args: {
         totalContacts: progress.totalContacts,
         processedContacts: progress.processedContacts,
         progress: progress.progress,
+        skippedInvalidContacts: progress.skippedInvalidContacts,
+        skippedDuplicateContacts: progress.skippedDuplicateContacts,
       };
     case "error":
       if (!draft) return { kind: "file" };

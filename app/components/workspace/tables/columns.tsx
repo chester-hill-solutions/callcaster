@@ -64,7 +64,7 @@ export const audienceColumns: ColumnDef<Audience>[] = [
     cell: ({ row }) => {
       return (
         <div className="flex flex-auto min-w-[250px]">
-          {row.original.name || `Unnamed audience`}
+          {row.original.name || `Unnamed Call list`}
         </div>
       );
     },

@@ -14,6 +14,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { uploadObject } from "@/lib/object-storage.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 
@@ -179,6 +180,23 @@ export const action = defineAction({
           set: { opt_out: true },
           where: inArray(contactTable.id, matchingContactIds),
         });
+        // Opted-out contacts must also leave every campaign queue in the
+        // workspace; log-don't-throw so the inbound message is still recorded.
+        try {
+          for (const contactId of matchingContactIds) {
+            await dequeueCampaignQueueByContact({
+              contactId,
+              userId: null,
+              reason: "Contact opted out via SMS",
+              workspaceId: workspaceNumber.workspace,
+            });
+          }
+        } catch (error) {
+          logger.error(
+            "Failed to dequeue opted-out contact from campaign queues:",
+            error,
+          );
+        }
       }
     } else if (body.toLowerCase() === "start" || body.toLowerCase() === '"start"') {
       // Onboarding only configures opt-out keywords today (no configurable

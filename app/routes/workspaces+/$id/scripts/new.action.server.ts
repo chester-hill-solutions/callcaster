@@ -4,6 +4,7 @@ import { updateCampaignScriptId } from "@/lib/campaign-ivr.server";
 import { createWorkspaceScript } from "@/lib/script-api-db.server";
 import { MemberRole } from "@/lib/member-role";
 import { defineAction } from "@/lib/handler.server";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -30,6 +31,10 @@ export const action = defineAction({
     const typeValue = formData.get("type");
     const stepsFileValue = formData.get("steps");
     const refValue = formData.get("ref");
+    const returnTo = validatePeopleReturnPath(
+      formData.get("return-to")?.toString(),
+      workspaceId,
+    );
 
     if (!nameValue || typeof nameValue !== "string") {
       return routeData(
@@ -92,6 +97,9 @@ export const action = defineAction({
       }
     }
 
-    return redirect(`../${createdScript.id}?created=1`, { headers });
+    return redirect(
+      returnTo ?? `../${createdScript.id}?created=1`,
+      { headers },
+    );
   },
 });

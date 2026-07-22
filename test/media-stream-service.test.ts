@@ -32,33 +32,68 @@ async function waitForPort(port: number, timeout = 5000): Promise<void> {
   throw new Error(`Service did not start on port ${port} within ${timeout}ms`);
 }
 
+/**
+ * Spawn the media-stream service on an OS-assigned port (MEDIA_STREAM_PORT=0;
+ * Bun.serve supports it) and read the actual binding from the startup log.
+ * A port picked from a fixed random range intermittently collided with busy
+ * CI ports.
+ */
+async function spawnMediaStreamService(
+  extraEnv: Record<string, string> = {},
+): Promise<{ service: ChildProcess; port: number }> {
+  const service = spawn("bun", ["run", "services/media-stream/index.ts"], {
+    env: {
+      ...process.env,
+      MEDIA_STREAM_PORT: "0",
+      MEDIA_STREAM_SECRET: "test-media-stream-secret",
+      NODE_ENV: "test",
+      ...extraEnv,
+    },
+    stdio: "pipe",
+  });
+
+  const boundPort = new Promise<number>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("Timed out waiting for media-stream listening log")),
+      10_000,
+    );
+    let buffered = "";
+    service.stdout?.on("data", (data) => {
+      // eslint-disable-next-line no-console
+      console.log(`[media-stream stdout] ${data}`);
+      buffered += String(data);
+      for (const line of buffered.split("\n")) {
+        if (!line.includes("Media-stream service listening")) continue;
+        const match = /"port":\s*(\d+)/.exec(line);
+        if (match) {
+          clearTimeout(timer);
+          resolve(Number(match[1]));
+          return;
+        }
+      }
+    });
+    service.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`media-stream exited before listening (code ${code})`));
+    });
+  });
+  service.stderr?.on("data", (data) => {
+    // eslint-disable-next-line no-console
+    console.error(`[media-stream stderr] ${data}`);
+  });
+
+  const port = await boundPort;
+  await waitForPort(port);
+  return { service, port };
+}
+
 describe("media-stream-service", () => {
   let service: ChildProcess;
   let port: number;
 
   beforeEach(async () => {
-    port = 43000 + Math.floor(Math.random() * 1000);
     process.env.MEDIA_STREAM_SECRET = "test-media-stream-secret";
-    service = spawn("bun", ["run", "services/media-stream/index.ts"], {
-      env: {
-        ...process.env,
-        MEDIA_STREAM_PORT: String(port),
-        MEDIA_STREAM_SECRET: "test-media-stream-secret",
-        NODE_ENV: "test",
-      },
-      stdio: "pipe",
-    });
-
-    service.stdout?.on("data", (data) => {
-      // eslint-disable-next-line no-console
-      console.log(`[media-stream stdout] ${data}`);
-    });
-    service.stderr?.on("data", (data) => {
-      // eslint-disable-next-line no-console
-      console.error(`[media-stream stderr] ${data}`);
-    });
-
-    await waitForPort(port);
+    ({ service, port } = await spawnMediaStreamService());
   });
 
   afterEach(async () => {
@@ -199,18 +234,11 @@ describe("media-stream-service", () => {
       await new Promise((resolve) => service.once("exit", resolve));
     }
 
-    const capPort = port + 1;
-    service = spawn("bun", ["run", "services/media-stream/index.ts"], {
-      env: {
-        ...process.env,
-        MEDIA_STREAM_PORT: String(capPort),
-        MEDIA_STREAM_MAX_PER_WORKSPACE: "1",
-        MEDIA_STREAM_SECRET: "test-media-stream-secret",
-        NODE_ENV: "test",
-      },
-      stdio: "pipe",
+    const spawned = await spawnMediaStreamService({
+      MEDIA_STREAM_MAX_PER_WORKSPACE: "1",
     });
-    await waitForPort(capPort);
+    service = spawned.service;
+    const capPort = spawned.port;
 
     const ws1 = new WebSocket(
       `ws://127.0.0.1:${capPort}/session-cap-1?token=${token("session-cap-1")}`,

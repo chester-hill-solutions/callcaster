@@ -32,6 +32,7 @@ import {
 } from "@/lib/throughput-config.server";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isWithinSendWindow, parseSendWindow } from "@/lib/campaign-send-window";
+import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createTenantDb } from "@/server/tenant-db";
@@ -349,6 +350,22 @@ export const action = defineAction({
       const batchResults = await Promise.all(
         batch.map(async member => {
           const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
+
+          // Recipient-local quiet hours (CASL/TCPA — 8am–9pm recipient
+          // time). Unlike opt-out/landline/duplicate below, this is
+          // temporary: leave the row queued (no dequeue) so a later
+          // in-window dispatch picks it up.
+          const windowStatus = recipientCallingWindowStatus(normalizedPhone);
+          if (!windowStatus.allowed) {
+            return {
+              [member.contact_id]: {
+                success: true,
+                skipped: true,
+                deferred: true,
+                reason: "Outside recipient quiet-hours window",
+              },
+            };
+          }
 
           if (member.contact?.opt_out) {
             await dequeueCampaignQueueById({

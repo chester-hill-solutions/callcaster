@@ -20,6 +20,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
+// Type-only import; the cycle with db-types (which type-imports this module)
+// is erased at compile time and carries no runtime modules.
+import type { Json } from "@/lib/db-types";
 
 export {
   transcript_segment,
@@ -280,7 +283,7 @@ export const contact = pgTable("contact", {
   line_type: text(),
   line_type_checked_at: timestamp({ withTimezone: true, mode: "string" }),
   opt_out: boolean(),
-  other_data: text().notNull(),
+  other_data: jsonb().$type<Json[]>().notNull().default([]),
   phone: text(),
   postal: text(),
   province: text(),
@@ -330,7 +333,9 @@ export const audience_upload = pgTable("audience_upload", {
 });
 
 export const households = pgTable("households", {
-  id: text().notNull().primaryKey(),
+  // DB column is `uuid DEFAULT gen_random_uuid()` (drizzle/0000_baseline.sql);
+  // modeling it as text() made inserts demand an id the DB generates itself.
+  id: uuid().defaultRandom().notNull().primaryKey(),
   household_key: text().notNull(),
   workspace_id: uuid(),
   address: text(),

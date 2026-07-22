@@ -30,14 +30,14 @@ const AudienceForm = ({
       <input name="id" hidden value={audience_id} readOnly />
       <input name="workspace" hidden value={workspace_id} readOnly />
       <Label htmlFor="name" className="text-foreground">
-        Audience Name
+        Call list name
       </Label>
       <div className="flex gap-2">
         <Input
           id="name"
           type="text"
           name="name"
-          placeholder="Audience Name"
+          placeholder="Call list name"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           className="text-foreground"

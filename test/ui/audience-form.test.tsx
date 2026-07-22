@@ -26,7 +26,7 @@ describe("app/components/audience/AudienceForm.tsx", () => {
       />,
     );
 
-    const nameInput = screen.getByPlaceholderText("Audience Name") as HTMLInputElement;
+    const nameInput = screen.getByPlaceholderText("Call list name") as HTMLInputElement;
     expect(nameInput.value).toBe("");
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
@@ -56,7 +56,7 @@ describe("app/components/audience/AudienceForm.tsx", () => {
         workspace_id="w1"
       />,
     );
-    expect((screen.getByPlaceholderText("Audience Name") as HTMLInputElement).value).toBe(
+    expect((screen.getByPlaceholderText("Call list name") as HTMLInputElement).value).toBe(
       "Existing",
     );
   });

@@ -48,6 +48,14 @@ export function useAudienceUploadProgress({
     progress.kind === "processing" ? progress.uploadId : null;
   const pollingEnabled = progress.kind === "processing";
 
+  /**
+   * @effect Hand a completed upload off to the caller's callback exactly once.
+   * @effect-deps progress (fires when the upload state machine reaches "completed")
+   * @effect-side-effects none (invokes caller-provided completion callbacks via refs)
+   * @effect-why-not-loader Completion arrives asynchronously via realtime/poll
+   * snapshots, not a route transition; the callbacks advance the wizard or
+   * schedule the standalone redirect.
+   */
   useEffect(() => {
     if (progress.kind !== "completed" || handedOffRef.current) return;
     handedOffRef.current = true;
@@ -94,6 +102,15 @@ export function useAudienceUploadProgress({
         audienceIdRef.current = nextAudienceId;
       }
 
+      const skippedInvalidContacts =
+        typeof snapshot.skipped_invalid_contacts === "number"
+          ? snapshot.skipped_invalid_contacts
+          : (prev.skippedInvalidContacts ?? null);
+      const skippedDuplicateContacts =
+        typeof snapshot.skipped_duplicate_contacts === "number"
+          ? snapshot.skipped_duplicate_contacts
+          : (prev.skippedDuplicateContacts ?? null);
+
       if (nextStatus === "completed") {
         const completedAudienceId = nextAudienceId ?? audienceIdRef.current;
         if (!completedAudienceId) return prev;
@@ -104,6 +121,8 @@ export function useAudienceUploadProgress({
           totalContacts,
           processedContacts: serverProcessed ?? totalContacts,
           progress: 100,
+          skippedInvalidContacts,
+          skippedDuplicateContacts,
         };
       }
 
@@ -142,6 +161,8 @@ export function useAudienceUploadProgress({
           : prev.kind === "processing"
             ? prev.warning
             : null,
+        skippedInvalidContacts,
+        skippedDuplicateContacts,
       };
     });
   };
@@ -156,13 +177,12 @@ export function useAudienceUploadProgress({
     },
   });
 
-  useInterval(
-    async () => {
-      if (!uploadId || !workspaceId) return;
+  const fetchStatusSnapshot = async (targetUploadId: number) => {
+      if (!targetUploadId || !workspaceId) return;
 
       try {
         const response = await fetch(
-          `/api/audience-upload-status?uploadId=${uploadId}&workspaceId=${workspaceId}`,
+          `/api/audience-upload-status?uploadId=${targetUploadId}&workspaceId=${workspaceId}`,
         );
 
         let data: (AudienceUploadServerSnapshot & { error?: string }) | null =
@@ -213,9 +233,12 @@ export function useAudienceUploadProgress({
             : prev,
         );
       }
-    },
-    pollingEnabled ? AUDIENCE_UPLOAD_PROCESSING_POLL_MS : null,
-  );
+  };
+
+  useInterval(async () => {
+    if (uploadId == null) return;
+    await fetchStatusSnapshot(uploadId);
+  }, pollingEnabled ? AUDIENCE_UPLOAD_PROCESSING_POLL_MS : null);
 
   const startSubmitting = (totalContacts: number) => {
     handedOffRef.current = false;
@@ -246,6 +269,9 @@ export function useAudienceUploadProgress({
       progress: 0,
       warning: null,
     });
+    // Small uploads often finish server-side before the first poll tick;
+    // check right away instead of waiting out the interval (#1078).
+    void fetchStatusSnapshot(args.uploadId);
   };
 
   const fail = (message: string) => {

@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/sheet";
 import { useUnreadConversationsCount } from "@/hooks/chats/useUnreadConversationsCount";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
-import { workspacePanelHeightClass } from "./workspace-panel-classes";
+import { workspaceSidebarHeightClass } from "./workspace-panel-classes";
 
 function formatUnreadBadgeCount(count: number): string {
   return count > 99 ? "99+" : String(count);
@@ -261,7 +261,11 @@ const WorkspaceNav = ({
                     isCampaignsItem
                       ? [
                           ...visibleStaticSubItems,
-                          ...campaigns.map((campaign) => ({
+                          // Archived campaigns live in the dedicated Archive
+                          // view; keep them out of the everyday nav (#1072).
+                          ...campaigns
+                            .filter((campaign) => campaign.status !== "archived")
+                            .map((campaign) => ({
                             name:
                               campaign.title?.trim() ||
                               `Campaign ${String(campaign.id)}`,
@@ -354,7 +358,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-        className={`hidden ${workspacePanelHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
+        className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>

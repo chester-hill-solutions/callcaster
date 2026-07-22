@@ -47,6 +47,15 @@ vi.mock("@/lib/workspace-events.server", () => ({
   emitChatMessageEvent: vi.fn(async () => undefined),
 }));
 
+const queueDbMocks = vi.hoisted(() => ({
+  dequeueCampaignQueueByContact: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueCampaignQueueByContact: (...args: unknown[]) =>
+    queueDbMocks.dequeueCampaignQueueByContact(...args),
+}));
+
 const onboardingMocks = vi.hoisted(() => ({
   getWorkspaceMessagingOnboardingState: vi.fn(),
 }));
@@ -274,6 +283,8 @@ describe("app/routes/api+/inbound-sms", () => {
     mocks.logger.info.mockReset();
     mocks.logger.warn.mockReset();
     mocks.fetch.mockReset();
+    queueDbMocks.dequeueCampaignQueueByContact.mockReset();
+    queueDbMocks.dequeueCampaignQueueByContact.mockResolvedValue([]);
     vi.stubGlobal("fetch", mocks.fetch);
     onboardingMocks.getWorkspaceMessagingOnboardingState.mockReset();
     onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
@@ -341,6 +352,48 @@ describe("app/routes/api+/inbound-sms", () => {
       );
     });
 
+    test("STOP also dequeues the contact from all campaign queues (workspace-scoped)", async () => {
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
+      expect(queueDbMocks.dequeueCampaignQueueByContact).toHaveBeenCalledWith({
+        contactId: 9,
+        userId: null,
+        reason: "Contact opted out via SMS",
+        workspaceId: "w1",
+      });
+    });
+
+    test("STOP dequeue failure is logged but the message is still recorded", async () => {
+      queueDbMocks.dequeueCampaignQueueByContact.mockRejectedValueOnce(
+        new Error("queue down"),
+      );
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        "Failed to dequeue opted-out contact from campaign queues:",
+        expect.any(Error),
+      );
+    });
+
     test("START re-subscribes regardless of configured opt-out keywords", async () => {
       onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
         businessProfile: { optOutKeywords: "QUIT" },
@@ -358,6 +411,8 @@ describe("app/routes/api+/inbound-sms", () => {
       expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
         expect.objectContaining({ set: { opt_out: false } }),
       );
+      // Re-subscribe must NOT touch campaign queues (no re-queueing).
+      expect(queueDbMocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
     });
   });
 

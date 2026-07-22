@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { callPanelShellClass } from "@/components/call/call-panel-classes";
+import { formatDispositionLabel } from "@/lib/outreach-disposition";
 
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
@@ -237,7 +238,10 @@ export function DispositionBar({
           <SelectItem value="idle">Select a disposition</SelectItem>
           {dispositionOptions?.map((option, index) => {
             const value = typeof option === "string" ? option : option.value;
-            const label = typeof option === "string" ? option : option.label;
+            const label =
+              typeof option === "string"
+                ? formatDispositionLabel(option)
+                : option.label;
             return (
               <SelectItem value={value} key={index}>
                 {label}

@@ -48,6 +48,9 @@ const steps = [
   "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql",
   "client/migrations/20260716130000_fix_remaining_queue_dial_rpcs.sql",
   "client/migrations/20260716140000_fix_dequeue_contact_bigint.sql",
+  "client/migrations/20260722100000_households_backfill.sql",
+  "client/migrations/20260722110000_contact_other_data_jsonb.sql",
+  "client/migrations/20260722120000_fix_stale_status_queue_rpcs.sql",
 ];
 
 /**

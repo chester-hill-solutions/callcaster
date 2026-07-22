@@ -10,6 +10,7 @@ import { logger } from "@/lib/logger.server";
 import { rpcGetCampaignQueue } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { isWithinRecipientCallingWindow } from "@/lib/recipient-calling-window";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
@@ -46,6 +47,12 @@ export const action = defineAction({
     for (let i = 0; i < (data?.length ?? 0); i++) {
       const contact = data[i];
       if (!contact) {
+        continue;
+      }
+      // Recipient-local calling window: leave out-of-window contacts queued
+      // for a later run instead of posting a call that /api/ivr would refuse
+      // anyway (it re-checks as the choke point).
+      if (!isWithinRecipientCallingWindow(contact.phone)) {
         continue;
       }
       const formData = new FormData();
