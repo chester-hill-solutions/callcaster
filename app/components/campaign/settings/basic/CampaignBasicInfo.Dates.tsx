@@ -380,7 +380,10 @@ export default function SelectDates({
         </div>
         <p className="text-xs text-muted-foreground">
           Times are shown in your local time zone (
-          {Intl.DateTimeFormat().resolvedOptions().timeZone}).
+          {Intl.DateTimeFormat().resolvedOptions().timeZone}). Regardless of
+          the hours set here, contacts are only dialed or messaged between
+          8:00&nbsp;a.m. and 9:00&nbsp;p.m. in their own time zone, based on
+          their phone number&apos;s area code.
         </p>
 
         {showSchedule && (

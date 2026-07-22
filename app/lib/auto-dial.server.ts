@@ -11,6 +11,7 @@ import {
   rpcDequeueContact,
 } from "@/lib/db-rpc.server";
 import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { db } from "@/server/db";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 
@@ -185,7 +186,35 @@ export async function runAutoDialerTurn(
   const tdb = createTenantDb(workspace_id);
 
   try {
-    const contactRecord = await getNextAutoDialQueueContact(campaign_id, user_id, tdb);
+    // Claim the next contact that is inside the recipient-local calling
+    // window (TCPA/CRTC 8am–9pm recipient time). Out-of-window claims are
+    // released back to `queued` so a later turn can dial them; seeing an
+    // already-released row again means every claimable contact is currently
+    // out of window, so the turn ends instead of spinning.
+    const MAX_WINDOW_SKIPS_PER_TURN = 25;
+    const releasedQueueIds = new Set<number>();
+    let contactRecord = await getNextAutoDialQueueContact(campaign_id, user_id, tdb);
+    while (contactRecord) {
+      const windowStatus = recipientCallingWindowStatus(
+        contactRecord.contact_phone,
+      );
+      if (windowStatus.allowed) break;
+      logger.info("auto_dial.recipient_window_skip", {
+        campaignId: campaign_id,
+        queueId: contactRecord.queue_id,
+        timezone: windowStatus.timezone,
+        reason: windowStatus.reason,
+      });
+      const alreadyReleased = releasedQueueIds.has(contactRecord.queue_id);
+      releasedQueueIds.add(contactRecord.queue_id);
+      await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
+      if (alreadyReleased || releasedQueueIds.size >= MAX_WINDOW_SKIPS_PER_TURN) {
+        contactRecord = null;
+        break;
+      }
+      contactRecord = await getNextAutoDialQueueContact(campaign_id, user_id, tdb);
+    }
+
     if (contactRecord) {
       logger.debug("Contact record:", contactRecord);
 
@@ -270,7 +299,13 @@ export async function runAutoDialerTurn(
     }
 
     await completeAllConferences(twilioClient, conferenceId);
-    return { success: true, message: "No queued contacts" };
+    return {
+      success: true,
+      message:
+        releasedQueueIds.size > 0
+          ? "No contacts within recipient calling hours"
+          : "No queued contacts",
+    };
   } catch (error) {
     logger.error("Error dialing number:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

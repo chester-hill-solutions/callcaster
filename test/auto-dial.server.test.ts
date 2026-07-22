@@ -10,19 +10,46 @@ const envMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/env.server", () => ({ env: envMock }));
 vi.mock("@/lib/logger.server", () => ({
-  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
 const rpcMocks = vi.hoisted(() => ({
   rpcCreateOutreachAttempt: vi.fn(),
+  rpcDequeueContact: vi.fn(),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => rpcMocks.rpcCreateOutreachAttempt(...args),
+  rpcDequeueContact: (...args: unknown[]) => rpcMocks.rpcDequeueContact(...args),
 }));
 
 const claimNextQueueContactMock = vi.hoisted(() => vi.fn());
+const requeueCampaignQueueByIdMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
+  requeueCampaignQueueById: (...args: unknown[]) =>
+    requeueCampaignQueueByIdMock(...args),
+}));
+
+const twilioMocks = vi.hoisted(() => ({
+  callsCreate: vi.fn(),
+  conferencesList: vi.fn(async () => []),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: vi.fn(async () => ({
+    calls: { create: (...args: unknown[]) => twilioMocks.callsCreate(...args) },
+    conferences: Object.assign(
+      () => ({ update: vi.fn(), participants: { list: vi.fn(async () => []) } }),
+      { list: (...args: unknown[]) => twilioMocks.conferencesList(...args) },
+    ),
+  })),
+}));
+
+const windowMock = vi.hoisted(() => ({
+  recipientCallingWindowStatus: vi.fn(),
+}));
+vi.mock("@/lib/recipient-calling-window", () => ({
+  recipientCallingWindowStatus: (...args: unknown[]) =>
+    windowMock.recipientCallingWindowStatus(...args),
 }));
 
 const tenantDbMocks = vi.hoisted(() => ({
@@ -49,6 +76,7 @@ import {
   createTwilioCall,
   getNextAutoDialQueueContact,
   normalizePhoneNumber,
+  runAutoDialerTurn,
   saveCallToDatabase,
 } from "../app/lib/auto-dial.server";
 
@@ -161,5 +189,87 @@ describe("auto-dial.server", () => {
     };
     await completeAllConferences(client as never, "user-1");
     expect(update).toHaveBeenCalledTimes(2);
+  });
+
+  describe("runAutoDialerTurn recipient calling window", () => {
+    const turnInput = {
+      user_id: "user-1",
+      workspace_id: "ws-1",
+      campaign_id: 5,
+      conference_id: "user-1",
+      selected_device: "",
+    };
+    const contactA = {
+      queue_id: 11,
+      contact_id: 101,
+      contact_phone: "+17095550100",
+      caller_id: "+15555501001",
+    };
+    const contactB = {
+      queue_id: 12,
+      contact_id: 102,
+      contact_phone: "+16045550100",
+      caller_id: "+15555501001",
+    };
+    const blocked = {
+      allowed: false,
+      timezone: "America/St_Johns",
+      reason: "outside_window",
+    };
+    const open = {
+      allowed: true,
+      timezone: "America/Vancouver",
+      reason: "in_window",
+    };
+
+    test("requeues out-of-window contacts and stops without dialing", async () => {
+      // The released row is claimable again immediately; seeing it a second
+      // time proves everything claimable is out of window.
+      claimNextQueueContactMock
+        .mockResolvedValueOnce(contactA)
+        .mockResolvedValueOnce(contactA);
+      windowMock.recipientCallingWindowStatus.mockReturnValue(blocked);
+
+      const result = await runAutoDialerTurn(turnInput);
+
+      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledTimes(2);
+      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(11, "ws-1");
+      expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
+      expect(rpcMocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        message: "No contacts within recipient calling hours",
+      });
+    });
+
+    test("skips a blocked contact and dials the next in-window one", async () => {
+      claimNextQueueContactMock
+        .mockResolvedValueOnce(contactA)
+        .mockResolvedValueOnce(contactB);
+      windowMock.recipientCallingWindowStatus
+        .mockReturnValueOnce(blocked)
+        .mockReturnValueOnce(open);
+      rpcMocks.rpcCreateOutreachAttempt.mockResolvedValue(77);
+      twilioMocks.callsCreate.mockResolvedValue({
+        sid: "CA123",
+        status: "queued",
+      });
+      tenantDbMocks.findFirst.mockResolvedValue(null);
+      tenantDbMocks.insert.mockResolvedValue([{ sid: "CA123" }]);
+
+      const result = await runAutoDialerTurn(turnInput);
+
+      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledTimes(1);
+      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(11, "ws-1");
+      expect(twilioMocks.callsCreate).toHaveBeenCalledTimes(1);
+      expect(twilioMocks.callsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "+16045550100" }),
+      );
+      expect(rpcMocks.rpcDequeueContact).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ contactId: 102 }),
+      );
+      expect(result).toEqual({ success: true });
+    });
   });
 });
