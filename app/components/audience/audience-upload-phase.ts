@@ -24,6 +24,46 @@ export type AudienceUploadServerSnapshot = {
   skipped_invalid_contacts?: number | null;
   /** Rows dropped as duplicates (within the file or already in the audience). */
   skipped_duplicate_contacts?: number | null;
+  uploadId?: number | null;
+  file_name?: string | null;
+  file_size?: number | null;
+};
+
+/**
+ * Discriminated poll/API contract: API failures never share a flat bag with
+ * a successful failed-upload snapshot (which uses status + error_message).
+ */
+export type AudienceUploadStatusSuccess = {
+  ok: true;
+  snapshot: AudienceUploadServerSnapshot;
+};
+
+export type AudienceUploadStatusFailure = {
+  ok: false;
+  error: string;
+};
+
+export type AudienceUploadStatusResponse =
+  | AudienceUploadStatusSuccess
+  | AudienceUploadStatusFailure;
+
+/**
+ * Object-storage progress blob. Uses `error_message` (DB column name) so it
+ * cannot collide with API `{ ok: false, error }` on the wire.
+ */
+export type AudienceUploadSidecar = {
+  status?: string;
+  progress?: number;
+  uploadId?: number;
+  audienceId?: number;
+  workspaceId?: string;
+  stage?: string;
+  error_message?: string;
+  created_at?: string;
+  updated_at?: string;
+  skipped_invalid_contacts?: number;
+  skipped_duplicate_contacts?: number;
+  [key: string]: unknown;
 };
 
 export type AudienceUploadProgressStatus =

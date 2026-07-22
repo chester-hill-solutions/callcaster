@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+
 import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import {
   queueDualAuthSession,
   setDualAuthSession,
   setDualAuthUnauthorized,
 } from "./helpers/route-auth-mock";
+
+vi.mock("@/server/db", () => ({ db: {}, dbDirect: {} }));
 
 let user: null | { id: string } = { id: "u1" };
 let downloadMode:
@@ -146,6 +151,10 @@ describe("api.audience-upload-status loader", () => {
       request: new Request("http://localhost/api.audience-upload-status"),
     } as any)));
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "Missing required parameters",
+    });
   });
 
   test("returns 400 when uploadId invalid", async () => {
@@ -156,6 +165,10 @@ describe("api.audience-upload-status loader", () => {
       ),
     } as any)));
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "Invalid upload ID",
+    });
   });
 
   test("returns DB-backed status when storage sidecar download errors", async () => {
@@ -170,14 +183,21 @@ describe("api.audience-upload-status loader", () => {
       ),
     } as any)));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({
-      uploadId: 1,
-      audience_id: 2,
-      status: "pending",
-      file_name: "f.csv",
-      total_contacts: 2,
-      processed_contacts: 1,
-      stage: "Processing contacts",
+    expect(await res.json()).toEqual({
+      ok: true,
+      snapshot: {
+        uploadId: 1,
+        audience_id: 2,
+        status: "pending",
+        file_name: "f.csv",
+        file_size: 1,
+        total_contacts: 2,
+        processed_contacts: 1,
+        error_message: null,
+        stage: "Processing contacts",
+        skipped_invalid_contacts: null,
+        skipped_duplicate_contacts: null,
+      },
     });
   });
 
@@ -194,11 +214,14 @@ describe("api.audience-upload-status loader", () => {
       ),
     } as any)));
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "db" });
+    expect(await res.json()).toEqual({ ok: false, error: "db" });
   });
 
   test("returns merged status + upload record fields on success", async () => {
-    downloadMode = { kind: "ok", statusJson: { state: "done", ok: true } };
+    downloadMode = {
+      kind: "ok",
+      statusJson: { stage: "Custom stage", skipped_invalid_contacts: 2 },
+    };
     uploadMode = {
       kind: "ok",
       row: {
@@ -225,17 +248,76 @@ describe("api.audience-upload-status loader", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
-      state: "done",
       ok: true,
-      stage: "Processing contacts",
-      uploadId: 2,
-      audience_id: 2,
-      status: "pending",
-      file_name: "a.csv",
-      file_size: 10,
-      total_contacts: 5,
-      processed_contacts: 5,
-      error_message: null,
+      snapshot: {
+        uploadId: 2,
+        audience_id: 2,
+        status: "pending",
+        file_name: "a.csv",
+        file_size: 10,
+        total_contacts: 5,
+        processed_contacts: 5,
+        error_message: null,
+        stage: "Custom stage",
+        skipped_invalid_contacts: 2,
+        skipped_duplicate_contacts: null,
+      },
+    });
+  });
+
+  test("maps sidecar failure into snapshot.error_message without top-level error", async () => {
+    downloadMode = {
+      kind: "ok",
+      statusJson: {
+        stage: "Upload failed",
+        error: "column support_level does not exist",
+        status: "error",
+      },
+    };
+    uploadMode = {
+      kind: "ok",
+      row: {
+        id: 3,
+        audience_id: 2,
+        status: "error",
+        file_name: "a.csv",
+        file_size: 10,
+        total_contacts: 5,
+        processed_contacts: 0,
+        error_message: "column support_level does not exist",
+      },
+    };
+    setDualAuthSession({
+      headers: new Headers({ "set-cookie": "x=y" }),
+      user: { id: "u1" },
+    });
+    const mod = await import("../app/routes/api+/audience-upload-status");
+    const res = await asRouteResponse(
+      mod.loader(
+        withRouteUrl({
+          request: new Request(
+            "http://localhost/api.audience-upload-status?uploadId=3&workspaceId=w1",
+          ),
+        } as any),
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      ok: true,
+      snapshot: {
+        uploadId: 3,
+        audience_id: 2,
+        status: "error",
+        file_name: "a.csv",
+        file_size: 10,
+        total_contacts: 5,
+        processed_contacts: 0,
+        error_message: "column support_level does not exist",
+        stage: "Upload failed",
+        skipped_invalid_contacts: null,
+        skipped_duplicate_contacts: null,
+      },
     });
   });
 
@@ -253,9 +335,12 @@ describe("api.audience-upload-status loader", () => {
     } as any)));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
-      uploadId: 1,
-      file_name: "f.csv",
-      processed_contacts: 1,
+      ok: true,
+      snapshot: {
+        uploadId: 1,
+        file_name: "f.csv",
+        processed_contacts: 1,
+      },
     });
   });
 
@@ -273,9 +358,12 @@ describe("api.audience-upload-status loader", () => {
     } as any)));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
-      uploadId: 1,
-      file_name: "f.csv",
-      processed_contacts: 1,
+      ok: true,
+      snapshot: {
+        uploadId: 1,
+        file_name: "f.csv",
+        processed_contacts: 1,
+      },
     });
   });
 
@@ -311,8 +399,13 @@ describe("api.audience-upload-status loader", () => {
       } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.status).toBe("error");
-      expect(body.error_message).toBe("Processing interrupted — please retry");
+      expect(body).toMatchObject({
+        ok: true,
+        snapshot: {
+          status: "error",
+          error_message: "Processing interrupted — please retry",
+        },
+      });
       expect(tenantAudienceUploadUpdateMock).toHaveBeenCalledTimes(1);
       expect(uploadObjectMock).toHaveBeenCalledTimes(1);
     });
@@ -348,7 +441,10 @@ describe("api.audience-upload-status loader", () => {
       } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.status).toBe("processing");
+      expect(body).toMatchObject({
+        ok: true,
+        snapshot: { status: "processing" },
+      });
       expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
       expect(uploadObjectMock).not.toHaveBeenCalled();
     });
@@ -384,7 +480,10 @@ describe("api.audience-upload-status loader", () => {
       } as any)));
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.status).toBe("completed");
+      expect(body).toMatchObject({
+        ok: true,
+        snapshot: { status: "completed" },
+      });
       expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
       expect(uploadObjectMock).not.toHaveBeenCalled();
     });
