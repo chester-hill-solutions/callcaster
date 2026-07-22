@@ -5,6 +5,7 @@ import {
   Link,
   useActionData,
   useOutletContext,
+  useParams,
   useSearchParams,
 } from "react-router";
 import type { MetaFunction } from "react-router";
@@ -21,6 +22,7 @@ import {
   type CampaignProductGoal,
 } from "@/lib/campaign-goals";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 export const meta: MetaFunction = () => [{ title: "New Campaign — CallCaster" }];
 
@@ -33,7 +35,12 @@ export default function CampaignsNew() {
   const canCreate = hasMinRole(userRole ?? undefined, MemberRole.Admin);
 
   const actionData = useActionData<{ error?: unknown }>();
+  const params = useParams();
   const [searchParams] = useSearchParams();
+  const workspaceId = params.id;
+  const returnTo = workspaceId
+    ? validatePeopleReturnPath(searchParams.get("returnTo"), workspaceId)
+    : null;
   const requestedGoal = searchParams.get("goal");
   const initialGoal = CAMPAIGN_PRODUCT_GOAL_VALUES.includes(
     requestedGoal as CampaignProductGoal,
@@ -80,6 +87,9 @@ export default function CampaignsNew() {
         <Form method="POST" className="space-y-6">
           <Section variant="flat" className="space-y-6">
             <input type="hidden" name="formAction" value="newCampaign" />
+            {returnTo ? (
+              <input type="hidden" name="return-to" value={returnTo} />
+            ) : null}
             <FormField
               htmlFor="campaign-name"
               label="Campaign Name"

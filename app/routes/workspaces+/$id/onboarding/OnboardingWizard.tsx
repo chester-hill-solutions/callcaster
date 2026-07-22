@@ -33,6 +33,17 @@ function isBusinessPrefixStep(step: string | null): boolean {
   return step === "business_identity" || step === "business_program";
 }
 
+function checklistCreateHref(
+  workspaceId: string,
+  resourcePath: "audiences/new" | "scripts/new" | "campaigns/new",
+  step: "audience" | "script" | "campaign_info",
+): string {
+  const returnTo = encodeURIComponent(
+    `/workspaces/${workspaceId}/onboarding?step=${step}`,
+  );
+  return `/workspaces/${workspaceId}/${resourcePath}?returnTo=${returnTo}`;
+}
+
 export function OnboardingWizard({
   workspaceId,
   workspaceName,
@@ -219,7 +230,7 @@ export function OnboardingWizard({
           complete={audienceCount > 0}
           completeLabel={`You have ${audienceCount} audience${audienceCount === 1 ? "" : "s"} ready.`}
           incompleteLabel="Create an audience and upload contacts, then return here to continue."
-          actionHref={`/workspaces/${workspaceId}/audiences/new`}
+          actionHref={checklistCreateHref(workspaceId, "audiences/new", "audience")}
           actionLabel={audienceCount > 0 ? "Manage audiences" : "Upload audience"}
           secondaryHref={`/workspaces/${workspaceId}/audiences`}
           secondaryLabel="View audiences"
@@ -255,7 +266,7 @@ export function OnboardingWizard({
           complete={scripts.length > 0}
           completeLabel={`You have ${scripts.length} script${scripts.length === 1 ? "" : "s"} ready.`}
           incompleteLabel="Create a script, then return here to continue."
-          actionHref={`/workspaces/${workspaceId}/scripts/new`}
+          actionHref={checklistCreateHref(workspaceId, "scripts/new", "script")}
           actionLabel={scripts.length > 0 ? "Manage scripts" : "Create script"}
           secondaryHref={`/workspaces/${workspaceId}/scripts`}
           secondaryLabel="View scripts"
@@ -271,7 +282,7 @@ export function OnboardingWizard({
           complete={campaignCount > 0}
           completeLabel={`You have ${campaignCount} campaign${campaignCount === 1 ? "" : "s"} ready.`}
           incompleteLabel="Create a campaign with a name and the assets you just set up."
-          actionHref={`/workspaces/${workspaceId}/campaigns/new`}
+          actionHref={checklistCreateHref(workspaceId, "campaigns/new", "campaign_info")}
           actionLabel={campaignCount > 0 ? "Manage campaigns" : "Create campaign"}
           secondaryHref={`/workspaces/${workspaceId}/campaigns`}
           secondaryLabel="View campaigns"

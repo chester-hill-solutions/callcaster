@@ -25,6 +25,7 @@ import {
   campaignTypeForProductGoal,
   type CampaignProductGoal,
 } from "@/lib/campaign-goals";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 type CampaignType =
   | "live_call"
@@ -293,7 +294,11 @@ export async function handleNewCampaign({formData,
     }
 
     return redirect(
-      `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
+      validatePeopleReturnPath(
+        formData.get("return-to")?.toString(),
+        workspaceId,
+      ) ??
+        `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
     );
   } catch (campaignError) {
     const code =

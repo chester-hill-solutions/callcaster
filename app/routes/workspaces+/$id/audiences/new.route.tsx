@@ -173,7 +173,7 @@ export default function AudiencesNew() {
                     );
                   }}
                 >
-                  View Call list
+                  {returnTo ? "Continue setup" : "View Call list"}
                 </Button>
               </div>
             </Section>

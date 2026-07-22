@@ -5,5 +5,10 @@ export function validatePeopleReturnPath(
   if (!value || value.includes("\\") || value.includes("//")) return null;
 
   const campaignRoot = `/workspaces/${workspaceId}/campaigns/`;
-  return value.startsWith(campaignRoot) ? value : null;
+  const onboardingRoot = `/workspaces/${workspaceId}/onboarding`;
+  if (value.startsWith(campaignRoot)) return value;
+  if (value === onboardingRoot || value.startsWith(`${onboardingRoot}?`)) {
+    return value;
+  }
+  return null;
 }

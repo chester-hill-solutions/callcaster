@@ -1,7 +1,14 @@
 export { loader } from "./new.loader.server";
 export { action } from "./new.action.server";
 
-import { Form, Link, useActionData, useLoaderData } from "react-router";
+import {
+  Form,
+  Link,
+  useActionData,
+  useLoaderData,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import React, { useState } from "react";
 
 import { MdAdd, MdClose } from "react-icons/md";
@@ -12,14 +19,21 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/ui/page-shell";
 import { Text } from "@/components/ui/typography";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 export default function NewScript() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
+  const params = useParams();
+  const [searchParams] = useSearchParams();
   const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const error = "error" in loaderData ? loaderData.error : null;
   const ref = "ref" in loaderData ? loaderData.ref : null;
   const campaignType = "campaignType" in loaderData ? loaderData.campaignType : undefined;
+  const workspaceId = params.id;
+  const returnTo = workspaceId
+    ? validatePeopleReturnPath(searchParams.get("returnTo"), workspaceId)
+    : null;
   const [pendingFileName, setPendingFileName] = useState("");
 
   useActionFeedback(actionData as { error?: unknown } | undefined, {
@@ -70,6 +84,9 @@ export default function NewScript() {
         <Form method="POST" className="space-y-6" encType="multipart/form-data">
           <Section variant="flat" className="space-y-6">
             <input hidden value={ref ?? ""} id="ref" name="ref" readOnly />
+            {returnTo ? (
+              <input type="hidden" name="return-to" value={returnTo} />
+            ) : null}
             <FormField htmlFor="script-name" label="Script Name">
               <Input type="text" name="script-name" id="script-name" required />
             </FormField>
