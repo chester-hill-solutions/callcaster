@@ -13,13 +13,12 @@ const mocks = vi.hoisted(() => {
   return {
     params: { id: "w1" } as Record<string, string>,
     navigate: vi.fn(),
-    fetcher: { state: "idle", data: undefined as any },
     realtimeOpts: null as any,
     interval: {
       cb: null as null | (() => Promise<void> | void),
       ms: null as any,
     },
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
     onUploadComplete: vi.fn(),
   };
 });
@@ -72,11 +71,12 @@ vi.mock("react-icons/md", () => ({
   MdAdd: () => <span>add</span>,
   MdClose: () => <span>close</span>,
   MdCheck: () => <span>check</span>,
+  MdUploadFile: () => <span>upload</span>,
 }));
 
-function makeDbClient() {
-  return {} as any;
-}
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children }: any) => <span>{children}</span>,
+}));
 
 function setFetchJsonOnce(data: any, ok = true) {
   (globalThis as any).fetch = vi.fn(async () => {
@@ -89,12 +89,76 @@ function setFetchJsonOnce(data: any, ok = true) {
   });
 }
 
+async function selectCsvFile(
+  container: HTMLElement,
+  csv: string,
+  fileName = "contacts.csv",
+) {
+  const fileInput = container.querySelector(
+    'input[type="file"]#contacts',
+  ) as HTMLInputElement;
+  const file = new File([csv], fileName, { type: "text/csv" });
+  (file as any).text = async () => csv;
+  await act(async () => {
+    fireEvent.change(fileInput, { target: { files: [file] } });
+  });
+  return fileInput;
+}
+
+async function goToReview(container: HTMLElement, csv: string, fileName?: string) {
+  await selectCsvFile(container, csv, fileName);
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+}
+
+/** Reach the processing phase with polling enabled. */
+async function startUpload(
+  container: HTMLElement,
+  csv = "Phone\n123",
+  uploadResponse: Record<string, unknown> = {
+    upload_id: 9,
+    audience_id: "a1",
+  },
+  statusHandler?: (url: string) => any,
+) {
+  await goToReview(container, csv);
+
+  (globalThis as any).fetch = vi.fn(async (url: string, init?: any) => {
+    if (String(url).includes("/api/audience-upload-status")) {
+      if (statusHandler) return statusHandler(url);
+      return {
+        ok: true,
+        async json() {
+          return { status: "processing" };
+        },
+      } as any;
+    }
+    if (String(url).includes("/api/audience-upload")) {
+      return {
+        ok: true,
+        async json() {
+          return uploadResponse;
+        },
+        _init: init,
+      } as any;
+    }
+    return {
+      ok: true,
+      async json() {
+        return {};
+      },
+    } as any;
+  });
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
+  });
+  await waitFor(() => expect(mocks.interval.ms).toBe(5000));
+}
+
 describe("app/components/audience/AudienceUploader.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.navigate.mockReset();
-    mocks.fetcher.state = "idle";
-    mocks.fetcher.data = undefined;
     mocks.realtimeOpts = null;
     mocks.interval.cb = null;
     mocks.interval.ms = null;
@@ -104,19 +168,30 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     (globalThis as any).fetch = undefined;
   });
 
-  test("renders with default audienceName", async () => {
+  test("renders file step with step strip in standalone mode", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} />);
+    render(<AudienceUploader />);
     expect(
-      screen.getByText("Upload contacts (.csv file):"),
+      screen.getByText("Drop or choose a CSV file"),
     ).toBeInTheDocument();
+    expect(screen.getByText("1. File")).toBeInTheDocument();
   });
 
-  test("realtime ignores non-UPDATE events and missing payload.new", async () => {
+  test("hides step strip when embedded (onUploadComplete)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
+    render(<AudienceUploader onUploadComplete={mocks.onUploadComplete} />);
+    expect(
+      screen.getByText("Drop or choose a CSV file"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("1. File")).toBeNull();
+  });
+
+  test("realtime ignores non-UPDATE events and idle snapshots", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -124,52 +199,41 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         new: { status: "completed", id: 1 },
       });
       mocks.realtimeOpts.onChange({ eventType: "UPDATE" });
+      mocks.realtimeOpts.onChange({
+        eventType: "UPDATE",
+        new: { status: "completed", audience_id: 1 },
+      });
     });
 
     expect(screen.queryByText("Completed!")).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Start Upload" }),
+      screen.getByText("Drop or choose a CSV file"),
     ).toBeInTheDocument();
   });
 
-  test("file selection parses CSV, shows mapping table + preview, supports mapping edits + split-name toggle, confirm/reset, and remove file", async () => {
+  test("file selection parses CSV, shows mapping table + preview, supports mapping edits + review split-name, and choose another file", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
     const fileInput = container.querySelector(
       'input[type="file"]#contacts',
     ) as HTMLInputElement;
     const csv = ["Name,Phone,Weird", "Alice,123,null", "Bob,,x"].join("\n");
-    const file = new File([csv], "contacts.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
 
-    // no file -> no-op
     fireEvent.change(fileInput, { target: { files: [] } });
 
-    // with file
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
+    await selectCsvFile(container, csv);
 
     expect(screen.getByText("contacts.csv")).toBeInTheDocument();
     expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Contacts need a valid phone number to dial or message/,
+      ),
+    ).toBeInTheDocument();
 
-    // splitNameColumn inferred from "Name" header -> options column appears + checkbox checked
-    expect(screen.getByText("Options")).toBeInTheDocument();
-    const split = screen.getByLabelText(
-      "Split into First/Last Name",
-    ) as HTMLInputElement;
-    expect(split.checked).toBe(true);
-    fireEvent.click(split);
-    expect(screen.queryByLabelText("Split into First/Last Name")).toBeNull();
-    expect(screen.queryByText("Options")).toBeNull();
-
-    // mapping select changes
     const rows = screen.getAllByRole("row");
     const weirdRow = rows.find((r) =>
       (r as HTMLElement).textContent?.toLowerCase().includes("weird"),
@@ -178,60 +242,44 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     fireEvent.change(sel, { target: { value: "city" } });
     expect(sel.value).toBe("city");
 
-    // preview shows first 5 rows and maps null -> empty string
     expect(screen.getByText("Data Preview (First 5 rows)")).toBeInTheDocument();
     expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.getAllByText("").length).toBeGreaterThanOrEqual(1);
 
-    // confirm mapping shows summary
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText(/contacts ready to upload/)).toBeInTheDocument();
+    const split = screen.getByLabelText(
+      "Split full name into first name and last name",
+    ) as HTMLInputElement;
+    expect(split.checked).toBe(true);
+    fireEvent.click(split);
+    expect(split.checked).toBe(false);
 
-    // reset mapping returns to mapping table
-    fireEvent.click(screen.getByRole("button", { name: "Reset Mapping" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("CSV Header")).toBeInTheDocument();
 
-    // remove file clears filename and input value
-    fireEvent.click(screen.getByRole("button", { name: "Remove selected file" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose another file" }));
     expect(screen.queryByText("contacts.csv")).toBeNull();
-    expect(fileInput.value).toBe("");
+    expect(screen.getByText("Drop or choose a CSV file")).toBeInTheDocument();
   });
 
   test("file selection infers split from 'Full Name' header", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Full Name,Phone", "Alice A,123"].join("\n");
-    const file = new File([csv], "contacts.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
+    await goToReview(container, ["Full Name,Phone", "Alice A,123"].join("\n"));
 
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-
-    expect(screen.getByText("Options")).toBeInTheDocument();
     expect(
-      screen.getByLabelText("Split into First/Last Name"),
+      screen.getByLabelText("Split full name into first name and last name"),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("Full Name").length).toBeGreaterThanOrEqual(1);
   });
 
   test("file selection with empty file contents is a no-op", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
     const fileInput = container.querySelector(
       'input[type="file"]#contacts',
@@ -247,61 +295,56 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.queryByText("Map CSV Headers")).toBeNull();
   });
 
-  test("blocks confirmation until one phone column has a unique target", async () => {
+  test("blocks continue until one phone column has a unique target", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const { container } = render(
-      <AudienceUploader client={makeDbClient()} audienceName="A1" />,
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+    await selectCsvFile(
+      container,
+      "Email,Mobile,Telephone\na@example.com,4165551234,6475551234",
     );
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = "Email,Mobile,Telephone\na@example.com,4165551234,6475551234";
-    const file = new File([csv], "contacts.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
 
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-
-    expect(screen.getByText("Phone number is assigned to more than one CSV column.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm Mapping" })).toBeDisabled();
+    expect(
+      screen.getByText("Phone number is assigned to more than one CSV column."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
 
     const telephoneRow = screen
       .getAllByRole("row")
-      .find((row) => row.textContent?.includes("Telephone"));
+      .find((row) => row.textContent?.toLowerCase().includes("telephone"));
     fireEvent.change(within(telephoneRow as HTMLElement).getByRole("combobox"), {
       target: { value: "other_data" },
     });
 
-    expect(screen.getByRole("button", { name: "Confirm Mapping" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
   });
 
-  test("upload flow: submits to /api/audience-upload, enables polling, and completes via polling (calls onUploadComplete)", async () => {
+  test("shows opt-out disclosure when opt_out is mapped", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+    await selectCsvFile(container, "Phone,Opt Out\n4165551234,yes");
+
+    expect(
+      screen.getByText(
+        /Opt-out status marks contacts who should not be contacted/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("upload flow: submits, polls, completes; embedded skips completion chrome", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
 
     const { container } = render(
       <AudienceUploader
-        client={client}
         audienceName="A1"
         onUploadComplete={mocks.onUploadComplete}
       />,
     );
 
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Name,Phone", "Alice,123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Name,Phone", "Alice,123"].join("\n"));
 
-    // upload success response + verify split_name_column is present
     (globalThis as any).fetch = vi.fn(async (url: string, init?: any) => {
       if (String(url).includes("/api/audience-upload-status")) {
         return {
@@ -313,7 +356,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       }
       if (String(url).includes("/api/audience-upload")) {
         const body = init?.body as FormData;
-        expect(body.get("split_name_column")).toBe("Name");
+        expect(body.get("split_name_column")).toBe("name");
         return {
           ok: true,
           async json() {
@@ -339,36 +382,25 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       await mocks.interval.cb?.();
     });
 
-    expect(screen.getByText("Completed!")).toBeInTheDocument();
+    expect(screen.queryByText("Completed!")).toBeNull();
+    expect(screen.queryByText("Redirecting to audience page...")).toBeNull();
     expect(mocks.onUploadComplete).toHaveBeenCalledWith("5");
   }, 15000);
 
-  test("polling completion without onUploadComplete triggers redirect after 2s", async () => {
+  test("polling completion without onUploadComplete shows chrome and redirects after 2s", async () => {
     vi.useFakeTimers();
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
         return {
           ok: true,
           async json() {
-            return { status: "completed", audienceId: 777 };
+            return { status: "completed" };
           },
         } as any;
       }
@@ -407,101 +439,17 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/workspaces/w1/audiences/777");
   }, 15000);
 
-  test("completed without onUploadComplete redirects after 2s", async () => {
-    vi.useFakeTimers();
+  test("realtime UPDATE during processing handles error and progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
-
-    render(
-      <AudienceUploader
-        client={client}
-        audienceName="A1"
-        existingAudienceId="777"
-      />,
-    );
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "UPDATE",
-        new: {
-          id: "777",
-          status: "completed",
-          total_contacts: 1,
-          processed_contacts: 1,
-        },
-      });
-    });
-
-    expect(
-      screen.getByText("Redirecting to audience page..."),
-    ).toBeInTheDocument();
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(mocks.navigate).toHaveBeenCalledWith("/workspaces/w1/audiences/777");
-  });
-
-  test("upload error response shows error, Try Again clears status/error, and polling error shows warning", async () => {
-    const { default: AudienceUploader } =
-      await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
     const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const file = new File(["Phone\n123"], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => "Phone\n123";
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
-
-    setFetchJsonOnce({ error: "bad" });
-    fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("bad")).toBeInTheDocument();
-    });
-    expect(screen.getByText("bad")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
-    expect(screen.queryByText("bad")).toBeNull();
-
-    // now simulate polling error payload
-    setFetchJsonOnce({ upload_id: 1, audience_id: "a1" });
-    fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
-    (globalThis as any).fetch = vi.fn(async () => {
-      return {
-        ok: true,
-        async json() {
-          return { error: "nope" };
-        },
-      } as any;
-    });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
-    await waitFor(() =>
-      expect(
-        screen.getByText("Live progress is delayed. Retrying automatically..."),
-      ).toBeInTheDocument(),
-    );
-  });
-
-  test("realtime UPDATE handles error status and progress calculation", async () => {
-    const { default: AudienceUploader } =
-      await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
-    render(
       <AudienceUploader
-        client={client}
         audienceName="A1"
         onUploadComplete={mocks.onUploadComplete}
       />,
     );
+
+    await startUpload(container);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -526,10 +474,12 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByText("x")).toBeInTheDocument();
   });
 
-  test("realtime UPDATE with missing status sets uploadStatus to null", async () => {
+  test("realtime UPDATE with missing status keeps processing view", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+
+    await startUpload(container);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -538,16 +488,15 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       });
     });
 
-    expect(screen.queryByText("Processing...")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Start Upload" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Processing...")).toBeInTheDocument();
   });
 
   test("realtime UPDATE error without error_message uses fallback", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+
+    await startUpload(container);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -564,7 +513,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE with total_contacts negative does not compute progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+
+    await startUpload(container);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -585,7 +536,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("realtime UPDATE with processed_contacts undefined does not compute progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+
+    await startUpload(container);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -599,17 +552,17 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByRole("progressbar").textContent).toBe("0");
   });
 
-  test("realtime UPDATE completed calls onUploadComplete", async () => {
+  test("realtime UPDATE completed calls onUploadComplete without chrome", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
-    render(
+    const { container } = render(
       <AudienceUploader
-        client={client}
         audienceName="A1"
         onUploadComplete={mocks.onUploadComplete}
       />,
     );
+
+    await startUpload(container);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -624,15 +577,16 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       });
     });
 
-    expect(screen.getByText("Completed!")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar").textContent).toBe("100");
+    expect(screen.queryByText("Completed!")).toBeNull();
     expect(mocks.onUploadComplete).toHaveBeenCalledWith("123");
   });
 
-  test("unknown uploadStatus renders as Preparing...", async () => {
+  test("pending server status maps to Processing label", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+
+    await startUpload(container);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
@@ -646,13 +600,14 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       });
     });
 
-    expect(screen.getByText("Preparing...")).toBeInTheDocument();
+    expect(screen.getByText("Processing...")).toBeInTheDocument();
+    expect(screen.queryByText("Preparing...")).toBeNull();
   });
 
   test("polling callback returns early when no uploadId", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
+    render(<AudienceUploader audienceName="A1" />);
 
     (globalThis as any).fetch = vi.fn(async () => {
       return {
@@ -670,84 +625,18 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect((globalThis as any).fetch).not.toHaveBeenCalled();
   });
 
-  test("fetcher state: submitting does not affect uploader state", async () => {
-    mocks.fetcher.state = "submitting";
-    mocks.fetcher.data = undefined;
-
-    const { default: AudienceUploader } =
-      await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
-
-    expect(
-      screen.getByRole("button", { name: "Start Upload" }),
-    ).toBeInTheDocument();
-  });
-
-  test("fetcher state: loading with error does not affect uploader state", async () => {
-    mocks.fetcher.state = "loading";
-    mocks.fetcher.data = { error: "boom" };
-
-    const { default: AudienceUploader } =
-      await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
-
-    expect(screen.queryByText("boom")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Start Upload" }),
-    ).toBeInTheDocument();
-  });
-
-  test("fetcher state: loading with audience_id does not affect uploader state", async () => {
-    mocks.fetcher.state = "loading";
-    mocks.fetcher.data = { audience_id: "55" };
-
-    const { default: AudienceUploader } =
-      await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
-
-    expect(
-      screen.getByRole("button", { name: "Start Upload" }),
-    ).toBeInTheDocument();
-    expect(mocks.realtimeOpts.filter).toBeUndefined();
-  });
-
-  test("fetcher state: loading with no error/audience_id keeps default state", async () => {
-    mocks.fetcher.state = "loading";
-    mocks.fetcher.data = { success: true };
-
-    const { default: AudienceUploader } =
-      await import("@/components/audience/AudienceUploader");
-    render(<AudienceUploader client={makeDbClient()} audienceName="A1" />);
-
-    expect(
-      screen.getByRole("button", { name: "Start Upload" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Error")).toBeNull();
-  });
-
   test("upload with existingAudienceId appends audience_id (not audience_name)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
 
     const { container } = render(
       <AudienceUploader
-        client={client}
         existingAudienceId="777"
         audienceName="ignored"
       />,
     );
 
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string, init?: any) => {
       if (String(url).includes("/api/audience-upload")) {
@@ -776,25 +665,31 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await waitFor(() => expect(mocks.interval.ms).toBe(5000));
   });
 
+  test("upload error response shows error, Try Again clears and returns to review", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+
+    await goToReview(container, "Phone\n123");
+
+    setFetchJsonOnce({ error: "bad" });
+    fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("bad")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
+    expect(screen.queryByText("bad")).toBeNull();
+    expect(screen.getByRole("button", { name: "Start Upload" })).toBeInTheDocument();
+  });
+
   test("upload POST throws non-Error -> shows generic unexpected error", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async () => {
       throw "nope";
@@ -817,22 +712,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling throws -> shows warning and logs error", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
@@ -872,22 +754,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling status=processing updates counts and progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
@@ -932,25 +801,12 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByRole("progressbar").textContent).toBe("40");
   });
 
-  test("polling status=error sets uploadStatus error + message and stops polling", async () => {
+  test("polling status=error sets error + message and stops polling", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
@@ -996,22 +852,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling status=error without error_message uses fallback", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
@@ -1055,22 +898,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("polling status=processing with total_contacts=0 keeps client-seeded total", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
@@ -1113,7 +943,6 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
 
     expect(screen.getByText("Processing...")).toBeInTheDocument();
-    // Client-seeded CSV count is kept while the server still reports 0.
     expect(screen.getByText("0 / 1 contacts")).toBeInTheDocument();
     expect(screen.getByRole("progressbar").textContent).toBe("0");
   });
@@ -1121,22 +950,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   test("repeated status poll failures keep polling with a warning (non-terminal)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
@@ -1178,35 +994,16 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(
       screen.getByText("Live progress is delayed. Retrying automatically..."),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText(
-        "We could not refresh upload progress right now. You can stay on this page or try again in a moment.",
-      ),
-    ).toBeNull();
     expect(screen.getByText("Processing...")).toBeInTheDocument();
-    // Polling stays enabled for transient refresh failures.
     expect(mocks.interval.ms).toBe(5000);
   });
 
   test("non-JSON status response is treated as a transient poll failure", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
-    const client = makeDbClient();
+    const { container } = render(<AudienceUploader audienceName="A1" />);
 
-    const { container } = render(
-      <AudienceUploader client={client} audienceName="A1" />,
-    );
-
-    const fileInput = container.querySelector(
-      'input[type="file"]#contacts',
-    ) as HTMLInputElement;
-    const csv = ["Phone", "123"].join("\n");
-    const file = new File([csv], "x.csv", { type: "text/csv" });
-    (file as any).text = async () => csv;
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm Mapping" }));
+    await goToReview(container, ["Phone", "123"].join("\n"));
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {

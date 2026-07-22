@@ -2,6 +2,7 @@ export { action } from "./new.action.server";
 
 import {
   useActionData,
+  useNavigate,
   useNavigation,
   useParams,
   useSearchParams,
@@ -25,6 +26,7 @@ export default function AudiencesNew() {
   const params = useParams();
   const workspaceId = params.id;
   const submit = useSubmit();
+  const navigate = useNavigate();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   
@@ -39,6 +41,9 @@ export default function AudiencesNew() {
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [audienceName, setAudienceName] = useState(initialName);
+  const [completedAudienceId, setCompletedAudienceId] = useState<string | null>(
+    null,
+  );
   
   const handleCreateAudience = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,16 +158,17 @@ export default function AudiencesNew() {
             <Section variant="flat" className="space-y-4">
               <div className="mb-4 text-center" data-testid="audience-upload-step">
                 <h3 className="text-lg font-medium">Upload Contacts</h3>
-                <Text variant="muted" className="text-center">
-                  Upload a CSV file with your contacts. You'll be able to map the columns in the next step.
-                </Text>
               </div>
               
               <div className="space-y-6">
-                <AudienceUploader 
+                <AudienceUploader
                   audienceName={audienceName}
                   campaignId={campaignId}
                   returnTo={returnTo}
+                  onUploadComplete={(audienceId) => {
+                    setCompletedAudienceId(audienceId);
+                    setCurrentStep(3);
+                  }}
                 />
                 
                 <div className="flex items-center justify-between gap-4">
@@ -180,11 +186,24 @@ export default function AudiencesNew() {
 
           {currentStep === 3 ? (
             <Section variant="flat" className="space-y-4">
-              <div className="text-center">
+              <div className="text-center space-y-4">
                 <h3 className="mb-2 text-lg font-medium">Upload Complete</h3>
                 <Text variant="muted">
                   Your Call list is ready and contacts are being processed.
                 </Text>
+                <Button
+                  type="button"
+                  className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  onClick={() => {
+                    if (!workspaceId || !completedAudienceId) return;
+                    navigate(
+                      returnTo ??
+                        `/workspaces/${workspaceId}/audiences/${completedAudienceId}`,
+                    );
+                  }}
+                >
+                  View Call list
+                </Button>
               </div>
             </Section>
           ) : null}
