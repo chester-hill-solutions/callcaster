@@ -28,35 +28,29 @@ export type AudienceUploadProgressStatus =
   | "completed"
   | "error";
 
+/** Contact counters shared by every in-flight/terminal upload variant. */
+type UploadCounters = {
+  totalContacts: number;
+  processedContacts: number;
+  progress: number;
+};
+
+type SubmittingFields = UploadCounters & { warning: string | null };
+
+type ProcessingFields = UploadCounters & {
+  uploadId: number;
+  audienceId: string | null;
+  warning: string | null;
+};
+
+type CompletedFields = UploadCounters & { audienceId: string };
+
 export type AudienceUploadProgressState =
   | { kind: "idle" }
-  | {
-      kind: "submitting";
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "processing";
-      uploadId: number;
-      audienceId: string | null;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "completed";
-      audienceId: string;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-    }
-  | {
-      kind: "error";
-      message: string;
-    };
+  | ({ kind: "submitting" } & SubmittingFields)
+  | ({ kind: "processing" } & ProcessingFields)
+  | ({ kind: "completed" } & CompletedFields)
+  | { kind: "error"; message: string };
 
 /**
  * Single UI phase derived from wizard step + upload progress.
@@ -66,36 +60,10 @@ export type AudienceUploadPhase =
   | { kind: "file" }
   | { kind: "map"; draft: AudienceUploadDraft }
   | { kind: "review"; draft: AudienceUploadDraft }
-  | {
-      kind: "submitting";
-      draft: AudienceUploadDraft;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "processing";
-      draft: AudienceUploadDraft;
-      uploadId: number;
-      audienceId: string | null;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-      warning: string | null;
-    }
-  | {
-      kind: "completed";
-      audienceId: string;
-      totalContacts: number;
-      processedContacts: number;
-      progress: number;
-    }
-  | {
-      kind: "error";
-      draft: AudienceUploadDraft;
-      message: string;
-    };
+  | ({ kind: "submitting"; draft: AudienceUploadDraft } & SubmittingFields)
+  | ({ kind: "processing"; draft: AudienceUploadDraft } & ProcessingFields)
+  | ({ kind: "completed" } & CompletedFields)
+  | { kind: "error"; draft: AudienceUploadDraft; message: string };
 
 export function resolveAudienceUploadPhase(args: {
   wizard: AudienceUploadWizardKind;
