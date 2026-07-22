@@ -90,6 +90,28 @@ describe("ContactDetails form values", () => {
             id: 5,
             firstname: "Original",
             surname: "Name",
+            // jsonb column: selects return a real array, not a JSON string.
+            other_data: [{ notes: "VIP" }],
+          } as any
+        }
+        audiences={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+    expect(
+      screen.getByRole("button", { name: "Remove notes field" }),
+    ).toBeInTheDocument();
+  });
+
+  test("tolerates legacy stringified other_data (pre-jsonb snapshots)", () => {
+    render(
+      <ContactDetails
+        contact={
+          {
+            id: 6,
+            firstname: "Legacy",
+            surname: "Row",
             other_data: JSON.stringify([{ notes: "VIP" }]),
           } as any
         }

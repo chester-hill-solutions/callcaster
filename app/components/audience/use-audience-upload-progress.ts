@@ -102,6 +102,15 @@ export function useAudienceUploadProgress({
         audienceIdRef.current = nextAudienceId;
       }
 
+      const skippedInvalidContacts =
+        typeof snapshot.skipped_invalid_contacts === "number"
+          ? snapshot.skipped_invalid_contacts
+          : (prev.skippedInvalidContacts ?? null);
+      const skippedDuplicateContacts =
+        typeof snapshot.skipped_duplicate_contacts === "number"
+          ? snapshot.skipped_duplicate_contacts
+          : (prev.skippedDuplicateContacts ?? null);
+
       if (nextStatus === "completed") {
         const completedAudienceId = nextAudienceId ?? audienceIdRef.current;
         if (!completedAudienceId) return prev;
@@ -112,6 +121,8 @@ export function useAudienceUploadProgress({
           totalContacts,
           processedContacts: serverProcessed ?? totalContacts,
           progress: 100,
+          skippedInvalidContacts,
+          skippedDuplicateContacts,
         };
       }
 
@@ -150,6 +161,8 @@ export function useAudienceUploadProgress({
           : prev.kind === "processing"
             ? prev.warning
             : null,
+        skippedInvalidContacts,
+        skippedDuplicateContacts,
       };
     });
   };

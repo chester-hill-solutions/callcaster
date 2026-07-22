@@ -214,12 +214,19 @@ const ContactDetails = React.forwardRef<
 
       <OtherDataFields
         otherData={(() => {
-          try {
-            const parsed = JSON.parse(contact?.other_data ?? '[]') as Json[];
-            return Array.isArray(parsed) ? parsed : [];
-          } catch {
-            return [];
+          // other_data is a jsonb array since 20260722110000; tolerate a
+          // legacy stringified value defensively (pre-migration snapshots).
+          const raw: unknown = contact?.other_data;
+          if (Array.isArray(raw)) return raw as Json[];
+          if (typeof raw === "string") {
+            try {
+              const parsed = JSON.parse(raw) as Json[];
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
           }
+          return [];
         })()}
         editMode={editMode}
         setContact={(data: ContactUpdateData) => {

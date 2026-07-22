@@ -14,10 +14,28 @@ export type AudienceUploadProgressPanelProps = {
   totalContacts: number;
   errorMessage?: string | null;
   warning?: string | null;
+  /** Rows dropped for invalid/unparseable phone numbers. */
+  skippedInvalidContacts?: number | null;
+  /** Rows dropped as duplicates (within the file or already in the audience). */
+  skippedDuplicateContacts?: number | null;
   /** When false (embedded), hide the terminal success chrome. */
   showCompletionChrome: boolean;
   onTryAgain: () => void;
 };
+
+function skippedSummary(
+  skippedDuplicateContacts: number,
+  skippedInvalidContacts: number,
+): string {
+  const parts: string[] = [];
+  if (skippedDuplicateContacts > 0) {
+    parts.push(`${skippedDuplicateContacts} duplicates skipped`);
+  }
+  if (skippedInvalidContacts > 0) {
+    parts.push(`${skippedInvalidContacts} invalid phone numbers skipped`);
+  }
+  return parts.join(" / ");
+}
 
 export function AudienceUploadProgressPanel({
   status,
@@ -26,9 +44,15 @@ export function AudienceUploadProgressPanel({
   totalContacts,
   errorMessage,
   warning,
+  skippedInvalidContacts,
+  skippedDuplicateContacts,
   showCompletionChrome,
   onTryAgain,
 }: AudienceUploadProgressPanelProps) {
+  const skippedLine = skippedSummary(
+    skippedDuplicateContacts ?? 0,
+    skippedInvalidContacts ?? 0,
+  );
   return (
     <div className="space-y-2">
       {errorMessage ? (
@@ -54,6 +78,10 @@ export function AudienceUploadProgressPanel({
         </span>
       </div>
       <Progress value={progress} className="h-2" />
+
+      {skippedLine ? (
+        <p className="text-xs text-muted-foreground">{skippedLine}</p>
+      ) : null}
 
       <div className="flex justify-center">
         {status === "completed" ? (

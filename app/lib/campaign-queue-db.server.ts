@@ -90,6 +90,8 @@ async function deleteCampaignQueueAndEmit(args: {
   return deleted;
 }
 
+const MAX_OPT_OUT_CLAIM_SKIPS = 10;
+
 /**
  * Atomically claim the next queued contact for a campaign.
  *
@@ -98,33 +100,59 @@ async function deleteCampaignQueueAndEmit(args: {
  * `FOR UPDATE SKIP LOCKED`. The row is updated to `status = 'assigned'` and
  * `assigned_to_user_id = userId` only if it is still queued. Returns the claimed
  * row only when the update succeeded.
+ *
+ * Claims whose contact has `opt_out = true` are dequeued and skipped (bounded
+ * by {@link MAX_OPT_OUT_CLAIM_SKIPS}); returns null when the bound is hit.
  */
 export async function claimNextQueueContact(
   tdb: TenantDb,
   campaignId: number,
   userId: string,
 ): Promise<ClaimedQueueContact | null> {
-  const rows = await tdb.execute(
-    sql`select * from claim_next_queue_contact(${campaignId}, ${userId}::uuid)`,
-  );
-  const row = rows[0] as ClaimedQueueContact | undefined;
-  if (!row || !row.queue_id) return null;
-
-  const [queueRow] = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(eq(campaignQueueTable.id, row.queue_id))
-    .limit(1);
-  if (queueRow) {
-    await emitQueueEvent(
-      queueRow.workspace,
-      "UPDATE",
-      queueRow as Record<string, unknown>,
-      null,
+  for (let attempt = 0; attempt < MAX_OPT_OUT_CLAIM_SKIPS; attempt++) {
+    const rows = await tdb.execute(
+      sql`select * from claim_next_queue_contact(${campaignId}, ${userId}::uuid)`,
     );
-  }
+    const row = rows[0] as ClaimedQueueContact | undefined;
+    if (!row || !row.queue_id) return null;
 
-  return row;
+    const [queueRow] = await db
+      .select()
+      .from(campaignQueueTable)
+      .where(eq(campaignQueueTable.id, row.queue_id))
+      .limit(1);
+    if (queueRow) {
+      await emitQueueEvent(
+        queueRow.workspace,
+        "UPDATE",
+        queueRow as Record<string, unknown>,
+        null,
+      );
+    }
+
+    // Belt-and-suspenders opt-out guard: `claim_next_queue_contact` does not
+    // filter on `contact.opt_out`, so a contact opted out by a writer that did
+    // not also dequeue their rows could still be claimed. Dequeue such claims
+    // and try again (bounded so a queue full of opted-out rows can't loop
+    // forever).
+    const [contactRow] = await db
+      .select({ opt_out: contactTable.opt_out })
+      .from(contactTable)
+      .where(eq(contactTable.id, row.contact_id))
+      .limit(1);
+    if (contactRow?.opt_out) {
+      await dequeueCampaignQueueById({
+        queueId: row.queue_id,
+        userId,
+        reason: "Contact opted out",
+        workspaceId: queueRow?.workspace,
+      });
+      continue;
+    }
+
+    return row;
+  }
+  return null;
 }
 
 export function buildQueueStatusUpdatePayload(status: string) {
@@ -421,11 +449,14 @@ export async function resolveContactWorkspaceIdFromQueue(
   return row?.workspace ?? null;
 }
 
-/** Dequeue campaign_queue rows for a contact (optionally scoped to one campaign). */
+/**
+ * Dequeue campaign_queue rows for a contact (optionally scoped to one campaign).
+ * `userId` may be null for system-initiated dequeues (e.g. inbound SMS STOP).
+ */
 export async function dequeueCampaignQueueByContact(args: {
   contactId: number;
   campaignId?: number | null;
-  userId: string;
+  userId: string | null;
   reason: string;
   workspaceId?: string;
 }) {

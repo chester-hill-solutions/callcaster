@@ -78,6 +78,8 @@ vi.mock("@/server/db", () => ({
   },
 }));
 vi.mock("@/lib/audience-upload-db.server", () => ({
+  // processAudienceUpload dedupes against phones already in the audience.
+  listAudiencePhones: vi.fn(async () => new Set<string>()),
   findAudienceInWorkspace: (...args: unknown[]) => dbMocks.findAudienceInWorkspace(...args),
   markAudienceUpdating: (...args: unknown[]) => dbMocks.markAudienceUpdating(...args),
   createAudienceForUpload: (...args: unknown[]) => dbMocks.createAudienceForUpload(...args),

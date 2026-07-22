@@ -7,9 +7,15 @@ import { Contact } from "../types";
 import { logger } from "../logger.server";
 import { rpcFindContactByPhone } from "@/lib/db-rpc.server";
 import { buildContactSearchWhere } from "@/lib/contacts/search.server";
-import { audience as audienceTable, contact as contactTable, contact_audience } from "@/db/schema";
+import {
+  audience as audienceTable,
+  contact as contactTable,
+  contact_audience,
+  households as householdsTable,
+} from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { householdKeyFor } from "@/lib/household-key";
 
 function dedupeContactsById(contacts: Contact[]): Contact[] {
   return Array.from(
@@ -286,6 +292,62 @@ async function findOrCreateDefaultChatAudience(
   return created?.id ?? null;
 }
 
+/**
+ * Find-or-create the household for a contact's address within a workspace.
+ *
+ * Returns the household id, or null when the address/postal pair doesn't
+ * normalize to a household key (see app/lib/household-key.ts). Concurrency-safe
+ * via the households_workspace_key_uniq unique index: the insert is
+ * ON CONFLICT DO NOTHING, and a lost race falls through to selecting the row
+ * the winner created. The tenant-db wrapper doesn't expose onConflict, so this
+ * uses the raw db client with an explicit workspace_id (matching the
+ * contact_audience insert below).
+ */
+async function findOrCreateHouseholdId(
+  workspaceId: string,
+  fields: {
+    address?: string | null;
+    city?: string | null;
+    province?: string | null;
+    postal?: string | null;
+  },
+): Promise<string | null> {
+  const householdKey = householdKeyFor(fields.address ?? null, fields.postal ?? null);
+  if (!householdKey) return null;
+
+  const nowIso = new Date().toISOString();
+  const [inserted] = await db
+    .insert(householdsTable)
+    .values({
+      workspace_id: workspaceId,
+      household_key: householdKey,
+      address: fields.address ?? null,
+      city: fields.city ?? null,
+      province: fields.province ?? null,
+      postal: fields.postal ?? null,
+      do_not_knock: false,
+      created_at: nowIso,
+      updated_at: nowIso,
+    })
+    .onConflictDoNothing({
+      target: [householdsTable.workspace_id, householdsTable.household_key],
+    })
+    .returning({ id: householdsTable.id });
+  if (inserted) return inserted.id;
+
+  const [existing] = await db
+    .select({ id: householdsTable.id })
+    .from(householdsTable)
+    .where(
+      and(
+        eq(householdsTable.workspace_id, workspaceId),
+        eq(householdsTable.household_key, householdKey),
+      ),
+    )
+    .limit(1);
+  return existing?.id ?? null;
+}
+
 export const createContact = async (
   contactData: Partial<Contact>,
   audience_id: string,
@@ -306,7 +368,15 @@ export const createContact = async (
   }
 
   const tenantDb = opts?.tdb ?? createTenantDb(contactData.workspace);
-  const { workspace, firstname, surname, phone, email, address } = contactData;
+  const { workspace, firstname, surname, phone, email, address, city, province, postal } =
+    contactData;
+
+  const household_id = await findOrCreateHouseholdId(workspace, {
+    address,
+    city,
+    province,
+    postal,
+  });
 
   const [inserted] = await tenantDb.contact.insert({
     firstname,
@@ -314,6 +384,13 @@ export const createContact = async (
     phone,
     email,
     address,
+    city,
+    province,
+    postal,
+    household_id,
+    // Explicit empty jsonb array (matches the DB default) so the insert type
+    // stays satisfied independent of the schema-level default.
+    other_data: [],
     created_by: user_id,
   });
 

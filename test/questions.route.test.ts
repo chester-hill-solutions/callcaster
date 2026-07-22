@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     safeParseJson: vi.fn(),
     rpcCreateOutreachAttempt: vi.fn(),
+    dequeueCampaignQueueByContact: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => {
 const tenantDbMocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   update: vi.fn(),
+  contactUpdate: vi.fn(),
 }));
 
 vi.mock("@/lib/auth.server", () => ({
@@ -35,11 +37,18 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: any[]) => mocks.rpcCreateOutreachAttempt(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueCampaignQueueByContact: (...args: any[]) =>
+    mocks.dequeueCampaignQueueByContact(...args),
+}));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => ({
     outreach_attempt: {
       findFirst: (...args: any[]) => tenantDbMocks.findFirst(...args),
       update: (...args: any[]) => tenantDbMocks.update(...args),
+    },
+    contact: {
+      update: (...args: any[]) => tenantDbMocks.contactUpdate(...args),
     },
   }),
 }));
@@ -71,9 +80,13 @@ describe("app/routes/api+/questions/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.rpcCreateOutreachAttempt.mockReset();
+    mocks.dequeueCampaignQueueByContact.mockReset();
     mocks.logger.error.mockReset();
     tenantDbMocks.findFirst.mockReset();
     tenantDbMocks.update.mockReset();
+    tenantDbMocks.contactUpdate.mockReset();
+    tenantDbMocks.contactUpdate.mockResolvedValue([{ id: 1, opt_out: true }]);
+    mocks.dequeueCampaignQueueByContact.mockResolvedValue([]);
 
     mocks.getSession.mockResolvedValue({ headers, user: { id: "u1" } });
     mocks.requireJsonAuth.mockResolvedValue({ user: { id: "u1" } });
@@ -187,5 +200,71 @@ describe("app/routes/api+/questions/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Failed to create or update outreach attempt" });
+  });
+
+  describe("do-not-call disposition side effects", () => {
+    test("do_not_call sets contact.opt_out and dequeues the contact from all campaigns", async () => {
+      mocks.safeParseJson.mockResolvedValueOnce({
+        ...defaultBody,
+        disposition: "do_not_call",
+      });
+      tenantDbMocks.update.mockResolvedValue([{ id: 7, disposition: "do_not_call" }]);
+      const mod = await import("../app/routes/api+/questions");
+      const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
+      expect(res.status).toBe(200);
+      expect(tenantDbMocks.contactUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
+      // All-campaigns dequeue: campaignId must be omitted.
+      expect(mocks.dequeueCampaignQueueByContact).toHaveBeenCalledWith({
+        contactId: 1,
+        userId: "u1",
+        reason: "Do not call requested",
+        workspaceId: "w1",
+      });
+    });
+
+    test("matches display-label and cased variants of do_not_call", async () => {
+      for (const variant of ["Do not call", "DO-NOT-CALL"]) {
+        tenantDbMocks.contactUpdate.mockClear();
+        mocks.dequeueCampaignQueueByContact.mockClear();
+        mocks.safeParseJson.mockResolvedValueOnce({
+          ...defaultBody,
+          disposition: variant,
+        });
+        const mod = await import("../app/routes/api+/questions");
+        const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
+        expect(res.status).toBe(200);
+        expect(tenantDbMocks.contactUpdate).toHaveBeenCalledTimes(1);
+        expect(mocks.dequeueCampaignQueueByContact).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    test("non-DNC dispositions do not touch contact.opt_out or the queue", async () => {
+      mocks.safeParseJson.mockResolvedValueOnce({
+        ...defaultBody,
+        disposition: "completed",
+      });
+      const mod = await import("../app/routes/api+/questions");
+      const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
+      expect(res.status).toBe(200);
+      expect(tenantDbMocks.contactUpdate).not.toHaveBeenCalled();
+      expect(mocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
+    });
+
+    test("side-effect failures are logged but do not fail the disposition save", async () => {
+      mocks.safeParseJson.mockResolvedValueOnce({
+        ...defaultBody,
+        disposition: "do_not_call",
+      });
+      tenantDbMocks.contactUpdate.mockRejectedValueOnce(new Error("opt-out failed"));
+      const mod = await import("../app/routes/api+/questions");
+      const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
+      expect(res.status).toBe(200);
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        "Do-not-call side effects failed after disposition save:",
+        expect.any(Error),
+      );
+    });
   });
 });

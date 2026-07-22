@@ -5,14 +5,17 @@ import {
   isProcessingStale,
   PROCESSING_INTERRUPTED_MESSAGE,
 } from "@/lib/processing-watchdog.server";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   audience as audienceTable,
   audience_upload as audienceUploadTable,
   contact_audience as contactAudienceTable,
+  households as householdsTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
+import { listAudiencePhones } from "@/lib/audience-upload-db.server";
+import { householdKeyFor } from "@/lib/household-key";
 import { parsePhoneNumber } from "@/lib/phone";
 import {
   AUDIENCE_UPLOAD_CHUNK_SIZE,
@@ -80,6 +83,92 @@ export function isOtherDataArray(
     'key' in item &&
     'value' in item
   );
+}
+
+/**
+ * Phone-based dedupe over the parsed CSV rows, run once before any chunking so
+ * `total_contacts` (the progress denominator) reflects only rows that will
+ * actually be processed.
+ *
+ * - Within-file duplicates: first occurrence wins; later rows with the same
+ *   normalized phone are dropped and counted.
+ * - Existing-audience duplicates: rows whose normalized phone is already in
+ *   `existingPhones` are dropped and counted.
+ * - Rows whose phone does not parse are NOT deduped here — they keep the
+ *   existing invalid-phone behavior downstream (skippedInvalidCount).
+ */
+export function dedupeParsedContacts(
+  rows: CSVContact[],
+  phoneHeader: string | null,
+  existingPhones: ReadonlySet<string>,
+): { rows: CSVContact[]; skippedDuplicateCount: number } {
+  if (!phoneHeader) {
+    return { rows, skippedDuplicateCount: 0 };
+  }
+
+  const seen = new Set<string>();
+  let skippedDuplicateCount = 0;
+  const deduped = rows.filter((row) => {
+    const normalized = parsePhoneNumber(row[phoneHeader] ?? null);
+    // Unparseable phones fall through to the invalid-phone skip downstream.
+    if (!normalized) return true;
+    if (seen.has(normalized) || existingPhones.has(normalized)) {
+      skippedDuplicateCount += 1;
+      return false;
+    }
+    seen.add(normalized);
+    return true;
+  });
+
+  return { rows: deduped, skippedDuplicateCount };
+}
+
+export type ChunkHouseholdPlanEntry = {
+  household_key: string;
+  address: string | null;
+  city: string | null;
+  province: string | null;
+  postal: string | null;
+};
+
+function asOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * Household stamping plan for one chunk of mapped contacts.
+ *
+ * `keys[i]` is the household key for `chunk[i]` (null when the row has no
+ * usable address+postal). `entries` holds the distinct keys in the chunk with
+ * address/city/province/postal populated from the FIRST row bearing each key —
+ * used to find-or-create `households` rows in a single batched insert.
+ */
+export function chunkHouseholdPlan(
+  // Loose record shape: reads address/city/province/postal when present.
+  chunk: ReadonlyArray<Record<string, unknown>>,
+): { entries: ChunkHouseholdPlanEntry[]; keys: Array<string | null> } {
+  const entries: ChunkHouseholdPlanEntry[] = [];
+  const seen = new Set<string>();
+
+  const keys = chunk.map((row) => {
+    const address = asOptionalString(row.address);
+    const postal = asOptionalString(row.postal);
+    const key = householdKeyFor(address, postal);
+    if (!key) return null;
+    if (!seen.has(key)) {
+      seen.add(key);
+      entries.push({
+        household_key: key,
+        address,
+        city: asOptionalString(row.city),
+        province: asOptionalString(row.province),
+        postal,
+      });
+    }
+    return key;
+  });
+
+  return { entries, keys };
 }
 
 // Generate a unique ID without using uuid package
@@ -223,9 +312,28 @@ export const processAudienceUpload = async (
     }
     const hasPhoneMapping = Object.values(headerMapping).includes("phone");
 
-    // Update total contacts count
+    // Resolve the actual CSV header (correct case) mapped to "phone".
+    const phoneMappingHeader =
+      Object.entries(headerMapping).find(([, target]) => target === "phone")?.[0] ??
+      null;
+    const phoneHeader = phoneMappingHeader
+      ? headerLookup.get(phoneMappingHeader.toLowerCase()) ?? null
+      : null;
+
+    // Phones already in this audience, for cross-upload dedupe. Only fetched
+    // when the upload maps a phone column (dedupe is phone-based).
+    const existingPhones: ReadonlySet<string> = phoneHeader
+      ? await listAudiencePhones(workspaceId, audienceId)
+      : new Set<string>();
+
+    // Drop within-file and already-in-audience duplicate phones up front.
+    const { rows: dedupedContacts, skippedDuplicateCount } =
+      dedupeParsedContacts(parsedContacts, phoneHeader, existingPhones);
+
+    // Update total contacts count. Duplicates are excluded from the
+    // denominator so progress percentages reflect rows actually processed.
     await tdb.audience_upload.update({
-      set: { total_contacts: parsedContacts.length },
+      set: { total_contacts: dedupedContacts.length },
       where: eq(audienceUploadTable.id, uploadId),
     });
 
@@ -244,8 +352,8 @@ export const processAudienceUpload = async (
           }
         : null;
 
-    for (let i = 0; i < parsedContacts.length; i += CHUNK_SIZE) {
-      const chunk = parsedContacts.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < dedupedContacts.length; i += CHUNK_SIZE) {
+      const chunk = dedupedContacts.slice(i, i + CHUNK_SIZE);
 
       // Map the contacts according to the header mapping
       const mappedContacts = chunk.flatMap((contact: CSVContact) => {
@@ -329,6 +437,59 @@ export const processAudienceUpload = async (
 
       // Insert contacts
       if (mappedContacts.length > 0) {
+        // Household stamping: find-or-create households for the chunk's
+        // distinct address|postal keys (max 2 queries per chunk, never
+        // per-row), then stamp household_id onto each mapped contact.
+        const { entries: householdEntries, keys: householdKeys } =
+          chunkHouseholdPlan(mappedContacts);
+        if (householdEntries.length > 0) {
+          const householdNowIso = new Date().toISOString();
+          await db
+            .insert(householdsTable)
+            .values(
+              householdEntries.map((entry) => ({
+                // id: uuid DEFAULT gen_random_uuid() — generated by the DB.
+                household_key: entry.household_key,
+                workspace_id: workspaceId,
+                address: entry.address,
+                city: entry.city,
+                province: entry.province,
+                postal: entry.postal,
+                do_not_knock: false,
+                created_at: householdNowIso,
+                updated_at: householdNowIso,
+              })),
+            )
+            .onConflictDoNothing({
+              target: [householdsTable.workspace_id, householdsTable.household_key],
+            });
+
+          const householdRows = await db
+            .select({
+              id: householdsTable.id,
+              household_key: householdsTable.household_key,
+            })
+            .from(householdsTable)
+            .where(
+              and(
+                eq(householdsTable.workspace_id, workspaceId),
+                inArray(
+                  householdsTable.household_key,
+                  householdEntries.map((entry) => entry.household_key),
+                ),
+              ),
+            );
+          const householdIdByKey = new Map(
+            householdRows.map((row) => [row.household_key, row.id]),
+          );
+          mappedContacts.forEach((mapped, index) => {
+            const key = householdKeys[index];
+            if (!key) return;
+            const householdId = householdIdByKey.get(key);
+            if (householdId) mapped.household_id = householdId;
+          });
+        }
+
         const insertedContacts = await tdb.contact.insertMany(
           mappedContacts.map((contact) => ({
             ...contact,
@@ -365,30 +526,31 @@ export const processAudienceUpload = async (
         where: eq(audienceUploadTable.id, uploadId),
       });
 
-      const isLastChunk = i + CHUNK_SIZE >= parsedContacts.length;
+      const isLastChunk = i + CHUNK_SIZE >= dedupedContacts.length;
       const now = Date.now();
       if (
         audienceUploadShouldWriteStatus({
-          total: parsedContacts.length,
+          total: dedupedContacts.length,
           chunkSize: CHUNK_SIZE,
           isLastChunk,
           lastProgressAt,
           now,
         })
       ) {
-        const progress = Math.round((processedCount / parsedContacts.length) * 100);
+        const progress = Math.round((processedCount / dedupedContacts.length) * 100);
 
         await writeAudienceUploadStatus(workspaceId, uploadId, {
           ...statusData,
           progress,
-          stage: `Processing contacts (${processedCount}/${parsedContacts.length}; ${skippedInvalidCount} skipped)`,
+          stage: `Processing contacts (${processedCount}/${dedupedContacts.length}; ${skippedInvalidCount} skipped)`,
           skipped_invalid_contacts: skippedInvalidCount,
+          skipped_duplicate_contacts: skippedDuplicateCount,
         });
 
         lastProgressAt = now;
       }
 
-      const chunkDelayMs = audienceUploadChunkDelayMs(parsedContacts.length);
+      const chunkDelayMs = audienceUploadChunkDelayMs(dedupedContacts.length);
       if (chunkDelayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, chunkDelayMs));
       }
@@ -419,8 +581,9 @@ export const processAudienceUpload = async (
       ...statusData,
       status: "completed",
       progress: 100,
-      stage: `Upload completed (${importedCount} imported; ${skippedInvalidCount} skipped)`,
+      stage: `Upload completed (${importedCount} imported; ${skippedInvalidCount} invalid skipped; ${skippedDuplicateCount} duplicates skipped)`,
       skipped_invalid_contacts: skippedInvalidCount,
+      skipped_duplicate_contacts: skippedDuplicateCount,
     });
 
   } catch (error) {

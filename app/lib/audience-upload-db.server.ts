@@ -1,11 +1,14 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   audience as audienceTable,
   audience_upload as audienceUploadTable,
   campaign as campaignTable,
   campaign_audience as campaignAudienceTable,
+  contact as contactTable,
+  contact_audience as contactAudienceTable,
 } from "@/db/schema";
 import type { Json } from "@/lib/db-types";
+import { parsePhoneNumber } from "@/lib/phone";
 import { createTenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 
@@ -76,6 +79,37 @@ export async function createAudienceUploadRecord(args: {
     split_name_column: args.splitNameColumn,
   });
   return row ?? null;
+}
+
+/**
+ * Normalized (E.164) phone numbers of every contact already linked to the
+ * audience. Used by the upload processor to skip rows that would duplicate an
+ * existing audience member. Contacts without a parseable phone are skipped.
+ */
+export async function listAudiencePhones(
+  workspaceId: string,
+  audienceId: number,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ phone: contactTable.phone })
+    .from(contactAudienceTable)
+    .innerJoin(
+      contactTable,
+      eq(contactAudienceTable.contact_id, contactTable.id),
+    )
+    .where(
+      and(
+        eq(contactAudienceTable.audience_id, audienceId),
+        eq(contactTable.workspace, workspaceId),
+      ),
+    );
+
+  const phones = new Set<string>();
+  for (const row of rows) {
+    const normalized = parsePhoneNumber(row.phone ?? null);
+    if (normalized) phones.add(normalized);
+  }
+  return phones;
 }
 
 export async function findCampaignForAudienceUpload(

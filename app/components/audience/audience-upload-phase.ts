@@ -20,6 +20,10 @@ export type AudienceUploadServerSnapshot = {
   error_message?: string | null;
   audience_id?: string | number | null;
   stage?: string | null;
+  /** Rows dropped for invalid/unparseable phone numbers. */
+  skipped_invalid_contacts?: number | null;
+  /** Rows dropped as duplicates (within the file or already in the audience). */
+  skipped_duplicate_contacts?: number | null;
 };
 
 export type AudienceUploadProgressStatus =
@@ -33,6 +37,9 @@ type UploadCounters = {
   totalContacts: number;
   processedContacts: number;
   progress: number;
+  /** Import-time skip counters from the server snapshot (absent until known). */
+  skippedInvalidContacts?: number | null;
+  skippedDuplicateContacts?: number | null;
 };
 
 type SubmittingFields = UploadCounters & { warning: string | null };
@@ -94,6 +101,8 @@ export function resolveAudienceUploadPhase(args: {
         processedContacts: progress.processedContacts,
         progress: progress.progress,
         warning: progress.warning,
+        skippedInvalidContacts: progress.skippedInvalidContacts,
+        skippedDuplicateContacts: progress.skippedDuplicateContacts,
       };
     case "completed":
       return {
@@ -102,6 +111,8 @@ export function resolveAudienceUploadPhase(args: {
         totalContacts: progress.totalContacts,
         processedContacts: progress.processedContacts,
         progress: progress.progress,
+        skippedInvalidContacts: progress.skippedInvalidContacts,
+        skippedDuplicateContacts: progress.skippedDuplicateContacts,
       };
     case "error":
       if (!draft) return { kind: "file" };

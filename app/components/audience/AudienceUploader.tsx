@@ -321,6 +321,8 @@ export default function AudienceUploader({
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
                 warning={phase.warning}
+                skippedInvalidContacts={phase.skippedInvalidContacts}
+                skippedDuplicateContacts={phase.skippedDuplicateContacts}
                 showCompletionChrome
                 onTryAgain={resetProgress}
               />
@@ -335,6 +337,8 @@ export default function AudienceUploader({
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
+                skippedInvalidContacts={phase.skippedInvalidContacts}
+                skippedDuplicateContacts={phase.skippedDuplicateContacts}
                 showCompletionChrome
                 onTryAgain={resetProgress}
               />

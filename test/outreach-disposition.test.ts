@@ -2,6 +2,9 @@ import { describe, expect, test } from "vitest";
 
 import {
   canTransitionOutreachDisposition,
+  DNC_DISPOSITION,
+  formatDispositionLabel,
+  isDncDisposition,
   normalizeDispositionOptions,
   shouldUpdateOutreachDisposition,
   TERMINAL_OUTREACH_DISPOSITIONS,
@@ -41,27 +44,58 @@ describe("outreach disposition helpers", () => {
     ).toBe(true);
   });
 
-  test("normalizeDispositionOptions returns [] for null/undefined jsonb", () => {
-    expect(normalizeDispositionOptions(null)).toEqual([]);
-    expect(normalizeDispositionOptions(undefined)).toEqual([]);
+  test("normalizeDispositionOptions yields only do_not_call for null/undefined jsonb", () => {
+    expect(normalizeDispositionOptions(null)).toEqual([DNC_DISPOSITION]);
+    expect(normalizeDispositionOptions(undefined)).toEqual([DNC_DISPOSITION]);
   });
 
-  test("normalizeDispositionOptions returns [] for non-array jsonb values", () => {
-    expect(normalizeDispositionOptions("answered")).toEqual([]);
-    expect(normalizeDispositionOptions(42)).toEqual([]);
-    expect(normalizeDispositionOptions({ answered: true })).toEqual([]);
+  test("normalizeDispositionOptions yields only do_not_call for non-array jsonb values", () => {
+    expect(normalizeDispositionOptions("answered")).toEqual([DNC_DISPOSITION]);
+    expect(normalizeDispositionOptions(42)).toEqual([DNC_DISPOSITION]);
+    expect(normalizeDispositionOptions({ answered: true })).toEqual([DNC_DISPOSITION]);
   });
 
-  test("normalizeDispositionOptions keeps only string entries", () => {
+  test("normalizeDispositionOptions keeps only string entries and appends do_not_call last", () => {
     expect(normalizeDispositionOptions(["answered", "no_answer"])).toEqual([
       "answered",
       "no_answer",
+      DNC_DISPOSITION,
     ]);
     expect(normalizeDispositionOptions(["answered", null, 3, { a: 1 }, "busy"])).toEqual([
       "answered",
       "busy",
+      DNC_DISPOSITION,
     ]);
-    expect(normalizeDispositionOptions([])).toEqual([]);
+    expect(normalizeDispositionOptions([])).toEqual([DNC_DISPOSITION]);
+  });
+
+  test("normalizeDispositionOptions does not duplicate campaign-defined DNC variants", () => {
+    expect(normalizeDispositionOptions(["answered", "do_not_call"])).toEqual([
+      "answered",
+      "do_not_call",
+    ]);
+    expect(normalizeDispositionOptions(["Do Not Call"])).toEqual(["Do Not Call"]);
+    expect(normalizeDispositionOptions(["do-not-call", "busy"])).toEqual([
+      "do-not-call",
+      "busy",
+    ]);
+  });
+
+  test("isDncDisposition matches raw value, label, and casing/separator variants", () => {
+    expect(isDncDisposition(DNC_DISPOSITION)).toBe(true);
+    expect(isDncDisposition("Do not call")).toBe(true);
+    expect(isDncDisposition("DO-NOT-CALL")).toBe(true);
+    expect(isDncDisposition(" do_not_call ")).toBe(true);
+    expect(isDncDisposition("completed")).toBe(false);
+    expect(isDncDisposition(null)).toBe(false);
+    expect(isDncDisposition(undefined)).toBe(false);
+    expect(isDncDisposition("")).toBe(false);
+  });
+
+  test("formatDispositionLabel maps do_not_call variants and passes other strings through", () => {
+    expect(formatDispositionLabel("do_not_call")).toBe("Do not call");
+    expect(formatDispositionLabel("Do Not Call")).toBe("Do not call");
+    expect(formatDispositionLabel("answered")).toBe("answered");
   });
 });
 
