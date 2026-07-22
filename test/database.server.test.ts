@@ -109,7 +109,7 @@ vi.mock("@/server/admin-db", () => ({
 }));
 
 vi.mock("@/lib/db-rpc.server", () => ({
-  rpcCancelOutreachAttemptsByCallIds: vi.fn(async () => ({})),
+  rpcCancelOutreachAttemptsByCallSids: vi.fn(async () => ({})),
   rpcCancelMessages: vi.fn(async () => ({})),
 }));
 

@@ -5,7 +5,7 @@
  * functions coordinate Twilio-side cancellation with the local database.
  */
 import type Twilio from "twilio";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
@@ -17,7 +17,7 @@ import {
 } from "@/lib/telephony-db.server";
 import {
   rpcCancelMessages,
-  rpcCancelOutreachAttemptsByCallIds,
+  rpcCancelOutreachAttemptsByCallSids,
 } from "@/lib/db-rpc.server";
 import { createWorkspaceTwilioInstance } from "./workspace.server";
 
@@ -92,20 +92,6 @@ async function fetchQueuedMessages(twilio: Twilio.Twilio, batchSize: number) {
   });
 }
 
-async function lookupCallIdBySid(sid: string): Promise<number | null> {
-  const rows = (await adminDb.execute(
-    sql`select id from call where sid = ${sid} limit 1`,
-  )) as { id: number }[];
-  return rows[0]?.id ?? null;
-}
-
-async function lookupMessageIdBySid(sid: string): Promise<string | null> {
-  const rows = (await adminDb.execute(
-    sql`select id from message where sid = ${sid} limit 1`,
-  )) as { id: string }[];
-  return rows[0]?.id ?? null;
-}
-
 async function cancelCallAndUpdateDB(
   twilio: Twilio.Twilio,
   call: { sid: string },
@@ -114,10 +100,7 @@ async function cancelCallAndUpdateDB(
     const canceledCall = await twilio
       .calls(call.sid)
       .update({ status: "canceled" });
-    const callId = await lookupCallIdBySid(canceledCall.sid);
-    if (callId != null) {
-      await rpcCancelOutreachAttemptsByCallIds(db, [callId]);
-    }
+    await rpcCancelOutreachAttemptsByCallSids(db, [canceledCall.sid]);
     return canceledCall.sid;
   } catch (error) {
     throw new Error(
@@ -134,10 +117,7 @@ async function cancelMessageAndUpdateDB(
     const cancelledMessage = await twilio
       .messages(message.sid)
       .update({ status: "canceled" });
-    const messageId = await lookupMessageIdBySid(cancelledMessage.sid);
-    if (messageId) {
-      await rpcCancelMessages(db, [messageId]);
-    }
+    await rpcCancelMessages(db, [cancelledMessage.sid]);
     return cancelledMessage.sid;
   } catch (error) {
     throw new Error(

@@ -213,25 +213,25 @@ export async function rpcResetCampaign(
   await execVoid(executor, sql`select reset_campaign(${campaignId})`);
 }
 
-export async function rpcCancelOutreachAttemptsByCallIds(
+export async function rpcCancelOutreachAttemptsByCallSids(
   executor: RpcExecutor,
-  callIds: number[],
+  callSids: string[],
 ): Promise<void> {
-  if (callIds.length === 0) return;
+  if (callSids.length === 0) return;
   await execVoid(
     executor,
-    sql`select cancel_outreach_attempts(${callIds}::bigint[])`,
+    sql`select cancel_outreach_attempts(${callSids}::text[])`,
   );
 }
 
 export async function rpcCancelMessages(
   executor: RpcExecutor,
-  messageIds: string[],
+  messageSids: string[],
 ): Promise<void> {
-  if (messageIds.length === 0) return;
+  if (messageSids.length === 0) return;
   await execVoid(
     executor,
-    sql`select cancel_messages(${messageIds}::uuid[])`,
+    sql`select cancel_messages(${messageSids}::text[])`,
   );
 }
 
