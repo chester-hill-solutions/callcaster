@@ -17,6 +17,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { listAudiencePhones } from "@/lib/audience-upload-db.server";
 import { householdKeyFor } from "@/lib/household-key";
 import { parsePhoneNumber } from "@/lib/phone";
+import type { AudienceUploadSidecar } from "@/components/audience/audience-upload-phase";
 import {
   AUDIENCE_UPLOAD_CHUNK_SIZE,
   audienceUploadChunkDelayMs,
@@ -181,7 +182,7 @@ export const generateUniqueId = () => {
 async function writeAudienceUploadStatus(
   workspaceId: string,
   uploadId: number,
-  status: Record<string, unknown>,
+  status: AudienceUploadSidecar,
 ): Promise<void> {
   // Stamp updated_at on every write (called once per processed chunk) so the
   // staleness watchdog in the status loader can tell a live upload from one
@@ -241,10 +242,10 @@ export async function markAudienceUploadInterruptedIfStale(args: {
     where: eq(audienceUploadTable.id, uploadId),
   });
 
-  const nextStatusFileData = {
+  const nextStatusFileData: AudienceUploadSidecar = {
     ...statusFileData,
     status: "error",
-    error: PROCESSING_INTERRUPTED_MESSAGE,
+    error_message: PROCESSING_INTERRUPTED_MESSAGE,
     stage: "Upload failed",
   };
   await writeAudienceUploadStatus(workspaceId, uploadId, nextStatusFileData);
@@ -609,7 +610,7 @@ export const processAudienceUpload = async (
     await writeAudienceUploadStatus(workspaceId, uploadId, {
       ...statusData,
       status: "error",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error_message: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };

@@ -6,6 +6,7 @@ import { AUDIENCE_UPLOAD_PROCESSING_POLL_MS } from "../../../shared/audience-upl
 import type {
   AudienceUploadProgressState,
   AudienceUploadServerSnapshot,
+  AudienceUploadStatusResponse,
 } from "./audience-upload-phase";
 
 type UseAudienceUploadProgressArgs = {
@@ -185,12 +186,9 @@ export function useAudienceUploadProgress({
           `/api/audience-upload-status?uploadId=${targetUploadId}&workspaceId=${workspaceId}`,
         );
 
-        let data: (AudienceUploadServerSnapshot & { error?: string }) | null =
-          null;
+        let data: AudienceUploadStatusResponse | null = null;
         try {
-          data = (await response.json()) as AudienceUploadServerSnapshot & {
-            error?: string;
-          };
+          data = (await response.json()) as AudienceUploadStatusResponse;
         } catch (parseError) {
           logger.error("Error parsing upload status response:", parseError);
           setProgress((prev) =>
@@ -205,7 +203,7 @@ export function useAudienceUploadProgress({
           return;
         }
 
-        if (!response.ok || data?.error) {
+        if (!response.ok || data == null || data.ok === false) {
           setProgress((prev) =>
             prev.kind === "processing"
               ? {
@@ -221,7 +219,7 @@ export function useAudienceUploadProgress({
         setProgress((prev) =>
           prev.kind === "processing" ? { ...prev, warning: null } : prev,
         );
-        applyServerSnapshot(data ?? {});
+        applyServerSnapshot(data.snapshot);
       } catch (error) {
         logger.error("Error polling status:", error);
         setProgress((prev) =>
