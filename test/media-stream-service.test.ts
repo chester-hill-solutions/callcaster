@@ -37,27 +37,54 @@ describe("media-stream-service", () => {
   let port: number;
 
   beforeEach(async () => {
-    port = 43000 + Math.floor(Math.random() * 1000);
     process.env.MEDIA_STREAM_SECRET = "test-media-stream-secret";
+    // MEDIA_STREAM_PORT=0 lets the OS assign a free port (Bun.serve supports
+    // it); the service logs the actual binding at startup. A port picked from
+    // a fixed random range intermittently collided with busy CI ports.
     service = spawn("bun", ["run", "services/media-stream/index.ts"], {
       env: {
         ...process.env,
-        MEDIA_STREAM_PORT: String(port),
+        MEDIA_STREAM_PORT: "0",
         MEDIA_STREAM_SECRET: "test-media-stream-secret",
         NODE_ENV: "test",
       },
       stdio: "pipe",
     });
 
-    service.stdout?.on("data", (data) => {
-      // eslint-disable-next-line no-console
-      console.log(`[media-stream stdout] ${data}`);
+    const boundPort = new Promise<number>((resolve, reject) => {
+      const timer = setTimeout(
+        () =>
+          reject(
+            new Error("Timed out waiting for media-stream listening log"),
+          ),
+        10_000,
+      );
+      let buffered = "";
+      service.stdout?.on("data", (data) => {
+        // eslint-disable-next-line no-console
+        console.log(`[media-stream stdout] ${data}`);
+        buffered += String(data);
+        for (const line of buffered.split("\n")) {
+          if (!line.includes("Media-stream service listening")) continue;
+          const match = /"port":\s*(\d+)/.exec(line);
+          if (match) {
+            clearTimeout(timer);
+            resolve(Number(match[1]));
+            return;
+          }
+        }
+      });
+      service.once("exit", (code) => {
+        clearTimeout(timer);
+        reject(new Error(`media-stream exited before listening (code ${code})`));
+      });
     });
     service.stderr?.on("data", (data) => {
       // eslint-disable-next-line no-console
       console.error(`[media-stream stderr] ${data}`);
     });
 
+    port = await boundPort;
     await waitForPort(port);
   });
 
