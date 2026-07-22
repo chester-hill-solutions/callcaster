@@ -1,4 +1,5 @@
-import { FetcherWithComponents, Form } from "react-router";
+import { useEffect } from "react";
+import { FetcherWithComponents, Form, useLocation } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,12 +12,10 @@ import {
 import {
   Audience,
   Campaign,
-  Contact,
   Flags,
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
-  QueueItem,
   Script,
   Survey,
   User,
@@ -27,15 +26,101 @@ import {
 } from "@/lib/types";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
+import { CampaignLaunchExtras } from "./detailed/CampaignLaunchExtras";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { CampaignSettingsQueue } from "./CampaignSettingsQueue";
-import { CampaignSetupGuide } from "./CampaignSetupGuide";
-import type { CampaignSetupStep } from "@/lib/campaign-setup-steps";
 import { CampaignCostPanel } from "./CampaignCostPanel";
 import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
-import { formatCredits, formatCurrency , CREDIT_PRICE_CAD } from "@/lib/billing-format";
+import {
+  formatCredits,
+  formatCurrency,
+  CREDIT_PRICE_CAD,
+} from "@/lib/billing-format";
+import { productGoalForCampaignType } from "@/lib/campaign-goals";
+import type { CampaignType } from "@/lib/db-types";
+import { AlertCircle } from "lucide-react";
 
+type CampaignState =
+  | "running"
+  | "paused"
+  | "archived"
+  | "draft"
+  | "pending"
+  | "scheduled"
+  | "complete";
+
+type ButtonState = "Active" | "Inactive" | "Disabled";
+
+function getButtonStates(
+  campaignState: CampaignState,
+  isPlayDisabled: boolean,
+): Record<"play" | "pause" | "archive" | "schedule", ButtonState> {
+  const states: Record<"play" | "pause" | "archive" | "schedule", ButtonState> = {
+    play: "Disabled",
+    pause: "Disabled",
+    archive: "Disabled",
+    schedule: "Disabled",
+  };
+
+  switch (campaignState) {
+    case "running":
+      states.pause = "Inactive";
+      states.play = "Active";
+      states.schedule = "Disabled";
+      states.archive = "Inactive";
+      break;
+    case "paused":
+      states.play = isPlayDisabled ? "Disabled" : "Inactive";
+      states.schedule = "Inactive";
+      states.archive = "Inactive";
+      states.pause = "Active";
+      break;
+    case "draft":
+    case "pending":
+      states.play = isPlayDisabled ? "Disabled" : "Inactive";
+      states.pause = "Inactive";
+      states.archive = "Inactive";
+      states.schedule = isPlayDisabled ? "Disabled" : "Inactive";
+      break;
+    case "scheduled":
+      states.play = isPlayDisabled ? "Disabled" : "Inactive";
+      states.pause = "Inactive";
+      states.archive = "Inactive";
+      states.schedule = "Active";
+      break;
+    case "complete":
+      states.archive = "Inactive";
+      break;
+    case "archived":
+      break;
+    default: {
+      const _exhaustive: never = campaignState;
+      return _exhaustive;
+    }
+  }
+
+  return states;
+}
+
+function launchActionLabel(type: Campaign["type"] | null | undefined): string {
+  if (!type) return "Start campaign";
+  const goal = productGoalForCampaignType(type as CampaignType);
+  switch (goal) {
+    case "live_calling":
+      return "Start calling";
+    case "text_campaign":
+      return "Start text campaign";
+    case "automated_phone_menu":
+      return "Start phone menu";
+    case null:
+      return "Start campaign";
+    default: {
+      const _exhaustive: never = goal;
+      return _exhaustive;
+    }
+  }
+}
 
 export type CampaignSettingsProps = {
   campaignData: Campaign;
@@ -59,7 +144,6 @@ export type CampaignSettingsProps = {
   user: User;
   startDisabledReason: string | null;
   readinessIssues: string[];
-  campaignQueue: QueueItem[];
   queueCount: number;
   dequeuedCount: number;
   totalCount: number;
@@ -84,15 +168,8 @@ export type CampaignSettingsProps = {
     defaultMessagingServiceSid: string | null;
     attachedSenderPhoneNumbers: string[];
   };
-  showSetupGuide?: boolean;
-  setupGuideSteps?: CampaignSetupStep[];
-  setupGuideCurrentStepNumber?: number;
-  setupGuideTotalSteps?: number;
-  setupGuideAllComplete?: boolean;
-  setupGuideTitle?: string;
-  setupGuideLaunchActionLabel?: string;
-  onDismissSetupGuide?: () => void;
   campaignBilling?: CampaignBillingSummary | null;
+  launchActionLabelOverride?: string;
 };
 
 export const CampaignSettings = ({
@@ -110,44 +187,37 @@ export const CampaignSettings = ({
   handleDuplicateButton,
   formFetcher,
   scripts,
-  mediaLinks,
   startDisabledReason,
   readinessIssues,
   flags,
-  campaignQueue,
   queueCount,
   dequeuedCount,
   totalCount,
-  handleNavigate,
   scheduleDisabled,
   handleConfirmStatus,
-  confirmStatus,  
+  confirmStatus,
   isBusy,
   isSaving,
   activeIntent,
   feedbackMessage,
   feedbackTone,
-  surveys,
   outboundEstimateInputs,
   smsSendContext,
-  showSetupGuide = false,
-  setupGuideSteps = [],
-  setupGuideCurrentStepNumber = 1,
-  setupGuideTotalSteps = 1,
-  setupGuideAllComplete = false,
-  setupGuideTitle,
-  setupGuideLaunchActionLabel,
-  onDismissSetupGuide,
   campaignBilling = null,
+  launchActionLabelOverride,
 }: CampaignSettingsProps) => {
+  const location = useLocation();
+  const startLabel =
+    launchActionLabelOverride ?? launchActionLabel(campaignData.type);
+
   const confirmActionLabel =
     confirmStatus === "play"
       ? activeIntent === "status" && isBusy
         ? "Starting..."
-        : setupGuideLaunchActionLabel ?? "Start campaign"
+        : startLabel
       : activeIntent === "status" && isBusy
         ? "Archiving..."
-        : "Archive Campaign";
+        : "Archive campaign";
 
   const selectedScriptId =
     campaignDetails && "script_id" in campaignDetails
@@ -207,6 +277,19 @@ export const CampaignSettings = ({
       : 0;
   const estimatedCredits = campaignBilling?.estimate.totalCredits ?? queueCount;
 
+  const buttonStates = getButtonStates(
+    campaignData.status as CampaignState,
+    Boolean(startDisabledReason),
+  );
+
+  useEffect(() => {
+    if (location.hash !== "#campaign-launch") return;
+    document.getElementById("campaign-launch")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [location.hash]);
+
   const startReview = (
     <div className="space-y-4" data-testid="campaign-launch-review">
       <dl className="grid gap-3 rounded-lg border bg-muted/30 p-4 sm:grid-cols-2">
@@ -227,7 +310,8 @@ export const CampaignSettings = ({
             Schedule
           </dt>
           <dd className="mt-1 text-sm">
-            {formatReviewDate(campaignData.start_date)}–{formatReviewDate(campaignData.end_date)}
+            {formatReviewDate(campaignData.start_date)}–
+            {formatReviewDate(campaignData.end_date)}
             {activeScheduleDays > 0
               ? ` · ${activeScheduleDays} active day${activeScheduleDays === 1 ? "" : "s"}`
               : ""}
@@ -280,8 +364,8 @@ export const CampaignSettings = ({
 
   return (
     <>
-      <Dialog 
-        open={confirmStatus !== "none"} 
+      <Dialog
+        open={confirmStatus !== "none"}
         onOpenChange={(open) => {
           if (!open) {
             handleConfirmStatus("none");
@@ -289,23 +373,26 @@ export const CampaignSettings = ({
         }}
       >
         <DialogContent className="bg-white dark:bg-slate-900">
-        <DialogHeader>
-          <DialogTitle>
-            {confirmStatus === "play" ? "Review campaign launch" : confirmStatus === "archive" ? "Archive Campaign" : ""}
-          </DialogTitle>
-          <DialogDescription>
-            {confirmStatus === "play"
-              ? "Confirm the campaign setup, audience, and estimated usage."
-              : "Archive this campaign and move it out of the active campaign list."}
-          </DialogDescription>
-        </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmStatus === "play"
+                ? "Review campaign launch"
+                : confirmStatus === "archive"
+                  ? "Archive campaign"
+                  : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmStatus === "play"
+                ? "Confirm the campaign setup, audience, and estimated usage."
+                : "Archive this campaign and move it out of the active campaign list."}
+            </DialogDescription>
+          </DialogHeader>
           {confirmStatus === "play" ? startReview : null}
           {confirmStatus === "archive" ? (
             <p className="text-sm text-muted-foreground">
               You can restore it later from the archived campaigns page.
             </p>
           ) : null}
-
           <DialogFooter>
             <Button
               onClick={() => handleConfirmStatus("none")}
@@ -326,13 +413,13 @@ export const CampaignSettings = ({
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog >
+      </Dialog>
 
       <div
         id="campaignSettingsContainer"
         className="flex h-full min-w-0 flex-col gap-8 p-4 sm:p-6"
         role="region"
-        aria-label="Campaign Settings"
+        aria-label="Campaign setup"
       >
         {handleSave && handleResetData && (
           <SaveBar
@@ -355,94 +442,170 @@ export const CampaignSettings = ({
             {feedbackMessage}
           </div>
         )}
-        {showSetupGuide && setupGuideSteps.length > 0 ? (
-          <CampaignSetupGuide
-            steps={setupGuideSteps}
-            currentStepNumber={setupGuideCurrentStepNumber}
-            totalSteps={setupGuideTotalSteps}
-            allComplete={setupGuideAllComplete}
-            title={setupGuideTitle}
-            launchActionLabel={setupGuideLaunchActionLabel}
-            onDismiss={() => onDismissSetupGuide?.()}
-            onStartCampaign={() => handleConfirmStatus("play")}
-          />
-        ) : null}
         <Form method="patch">
           <input
             type="hidden"
             name="campaignData"
-            value={JSON.stringify({ ...campaignData, is_active: campaignData?.is_active })}
+            value={JSON.stringify({
+              ...campaignData,
+              is_active: campaignData?.is_active,
+            })}
           />
           <input
             type="hidden"
             name="campaignDetails"
             value={JSON.stringify(campaignDetails)}
           />
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-8">
             <Section variant="flat">
-              <SectionHeader compact title="Campaign basics" />
+              <SectionHeader
+                compact
+                title="Setup"
+                description="Campaign type, outbound number, and schedule."
+              />
               <CampaignBasicInfo
                 campaignData={campaignData}
                 handleInputChange={handleInputChange}
-                handleButton={handleStatusButton}
-                handleConfirmStatus={handleConfirmStatus}
-                handleDuplicateButton={handleDuplicateButton}
                 phoneNumbers={phoneNumbers}
                 flags={flags}
-                startDisabledReason={startDisabledReason}
-                readinessIssues={readinessIssues}
-                scheduleDisabled={scheduleDisabled}
-                isBusy={isBusy}
                 callerIdOptional={
                   campaignData.type === "message" &&
                   campaignData.sms_send_mode === "messaging_service"
                 }
-                hideReadinessAlerts={showSetupGuide}
               />
-            </Section>
-            <Section variant="flat">
-              <SectionHeader compact title="Campaign details" />
-              <CampaignTypeSpecificSettings
-                campaignData={campaignData}
-                handleInputChange={handleInputChange}
-                mediaData={mediaData}
-                scripts={scripts}
-                handleActivateButton={handleStatusButton}
-                handleScheduleButton={handleScheduleButton}
-                details={campaignDetails!}
-                mediaLinks={mediaLinks}
-                isChanged={isChanged}
-                isBusy={formFetcher.state !== "idle"}
-                joinDisabled={startDisabledReason}
-                scheduleDisabled={scheduleDisabled}
-                readinessIssues={readinessIssues}
-                surveys={surveys}
-                handleNavigate={handleNavigate}
-                queueCount={queueCount}
-                phoneNumbers={phoneNumbers}
-                outboundEstimateInputs={outboundEstimateInputs}
-                smsSendContext={smsSendContext}
-                hideReadinessAlerts={showSetupGuide}
-              />
+              <div className="mt-6">
+                <CampaignTypeSpecificSettings
+                  campaignData={campaignData}
+                  handleInputChange={handleInputChange}
+                  scripts={scripts}
+                  details={campaignDetails!}
+                  isBusy={formFetcher.state !== "idle"}
+                  smsSendContext={smsSendContext}
+                />
+              </div>
             </Section>
 
             <Section variant="flat">
+              <SectionHeader compact title="Queue" />
               <CampaignSettingsQueue
-                campaignQueue={campaignQueue}
                 queueCount={queueCount}
                 dequeuedCount={dequeuedCount}
                 totalCount={totalCount}
-                setupGuideActive={showSetupGuide}
               />
             </Section>
 
-            {campaignBilling ? (
-              <CampaignCostPanel
-                billing={campaignBilling}
-                queuedCount={queueCount}
-                completedCount={dequeuedCount}
-              />
-            ) : null}
+            <Section variant="flat">
+              <div id="campaign-launch" className="scroll-mt-4 space-y-4">
+                <SectionHeader
+                  compact
+                  title="Launch"
+                  description="Start, pause, schedule, or archive this campaign."
+                />
+                <div
+                  className="flex flex-wrap gap-2"
+                  data-testid="campaign-readiness"
+                >
+                  <Button
+                    type="button"
+                    variant={
+                      buttonStates.play === "Active" ? "default" : "outline"
+                    }
+                    disabled={
+                      buttonStates.play === "Disabled" ||
+                      Boolean(startDisabledReason) ||
+                      isBusy
+                    }
+                    onClick={() => handleConfirmStatus("play")}
+                  >
+                    {campaignData.type === "message" ? "Send now" : startLabel}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={
+                      buttonStates.pause === "Active" ? "default" : "outline"
+                    }
+                    disabled={buttonStates.pause === "Disabled" || isBusy}
+                    onClick={() => handleStatusButton("pause")}
+                  >
+                    Pause
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={
+                      buttonStates.schedule === "Active" ? "default" : "outline"
+                    }
+                    disabled={
+                      Boolean(scheduleDisabled) ||
+                      buttonStates.schedule === "Disabled" ||
+                      isBusy
+                    }
+                    onClick={() => handleScheduleButton()}
+                  >
+                    {campaignData.status === "scheduled"
+                      ? "Scheduled"
+                      : "Schedule"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={buttonStates.archive === "Disabled" || isBusy}
+                    onClick={() => handleConfirmStatus("archive")}
+                  >
+                    Archive
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isBusy}
+                    onClick={() => handleDuplicateButton()}
+                  >
+                    Duplicate
+                  </Button>
+                </div>
+                {startDisabledReason ? (
+                  <p className="text-sm text-muted-foreground">{startDisabledReason}</p>
+                ) : null}
+                {readinessIssues.length > 0 ? (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                    <div className="mb-2 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="font-medium">
+                        Campaign needs attention before it can start
+                      </span>
+                    </div>
+                    <ul className="list-disc space-y-1 pl-5">
+                      {readinessIssues.map((issue) => (
+                        <li key={issue}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <CampaignLaunchExtras
+                  campaignData={campaignData}
+                  handleInputChange={handleInputChange}
+                  mediaData={mediaData}
+                  details={campaignDetails!}
+                  isBusy={formFetcher.state !== "idle"}
+                  queueCount={queueCount}
+                  phoneNumbers={phoneNumbers}
+                  outboundEstimateInputs={outboundEstimateInputs}
+                />
+                {campaignBilling ? (
+                  <details className="rounded-md border border-border/70 p-3">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      Campaign cost
+                    </summary>
+                    <div className="mt-3">
+                      <CampaignCostPanel
+                        billing={campaignBilling}
+                        queuedCount={queueCount}
+                        completedCount={dequeuedCount}
+                      />
+                    </div>
+                  </details>
+                ) : null}
+              </div>
+            </Section>
           </div>
         </Form>
       </div>

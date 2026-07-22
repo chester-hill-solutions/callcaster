@@ -3,6 +3,7 @@ import type { CampaignReadinessCode } from "@/lib/campaign-readiness";
 export const CAMPAIGN_READINESS_ROUTE_TEMPLATES = {
   campaigns: "/workspaces/:workspaceId/campaigns",
   campaignQueue: "/workspaces/:workspaceId/campaigns/:campaignId/queue",
+  campaignContent: "/workspaces/:workspaceId/campaigns/:campaignId/script/edit",
   onboarding: "/workspaces/:workspaceId/onboarding",
 } as const;
 
@@ -103,13 +104,13 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     label: "Set up a bulk sender",
   },
   script_required: {
-    type: "scroll",
-    targetId: "campaign-setup-content",
-    label: "Select a script",
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
+    label: "Edit content",
   },
   script_unavailable: {
-    type: "scroll",
-    targetId: "campaign-setup-content",
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
     label: "Replace script",
   },
   audio_unavailable: {
@@ -118,8 +119,8 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     label: "Replace audio",
   },
   message_content_required: {
-    type: "scroll",
-    targetId: "campaign-setup-content",
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
     label: "Add message content",
   },
 } as const satisfies Record<

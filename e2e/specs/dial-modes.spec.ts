@@ -11,6 +11,7 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
         `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/settings`,
       ),
     );
+    await page.getByText("Calling options").click();
     await expect(page.getByText("Dial Type:")).toBeVisible();
     await expect(page.locator("#dial_type")).toBeVisible();
   });

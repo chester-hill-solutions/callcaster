@@ -51,7 +51,6 @@ function renderLaunchReview(readinessIssues: string[] = []) {
     user: { id: "user-1" },
     startDisabledReason: readinessIssues[0] ?? null,
     readinessIssues,
-    campaignQueue: [],
     queueCount: 25,
     dequeuedCount: 0,
     totalCount: 25,
@@ -69,7 +68,7 @@ function renderLaunchReview(readinessIssues: string[] = []) {
       portalConfig: {},
       syncSnapshot: {},
     },
-    setupGuideLaunchActionLabel: "Start text campaign",
+    launchActionLabelOverride: "Start text campaign",
   } as never;
 
   const router = createMemoryRouter(
@@ -105,8 +104,8 @@ describe("campaign launch review", () => {
 
     expect(screen.getByText("Complete before launch")).toBeInTheDocument();
     expect(
-      screen.getByText("Message content or media is required"),
-    ).toBeInTheDocument();
+      screen.getAllByText("Message content or media is required").length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByRole("button", { name: "Start text campaign" }),
     ).toBeDisabled();

@@ -63,20 +63,31 @@ describe("app/components/campaign/CampaignList.tsx", () => {
   });
 });
 
-describe("app/components/campaign/home/CampaignHomeScreen/CampaignNav.tsx", () => {
-  test("navigation links", async () => {
-    const { NavigationLinks } = await import("@/components/campaign/home/CampaignHomeScreen/CampaignNav");
+describe("app/components/campaign/home/CampaignStatusRail.tsx", () => {
+  test("renders place-first rail labels", async () => {
+    const { CampaignStatusRail } = await import(
+      "@/components/campaign/home/CampaignStatusRail"
+    );
+    const { buildCampaignStatusRail } = await import("@/lib/campaign-status-rail");
+    const items = buildCampaignStatusRail({
+      workspaceId: "w1",
+      campaignId: 1,
+      campaignData: makeCampaign({ type: "live_call", status: "draft" }),
+      readinessIssues: [],
+      hasAccess: true,
+      pathname: "/workspaces/w1/campaigns/1/settings",
+      hash: "",
+      joinDisabled: null,
+    });
     render(
       <SmokeRouter>
-        <NavigationLinks hasAccess data={makeCampaign({ type: "live_call" })} joinDisabled={null} />
+        <CampaignStatusRail items={items} />
       </SmokeRouter>,
     );
-    expect(screen.getByText("Settings")).toBeInTheDocument();
-    render(
-      <SmokeRouter>
-        <NavigationLinks hasAccess={false} data={makeCampaign()} joinDisabled="busy" />
-      </SmokeRouter>,
-    );
+    expect(screen.getByTestId("campaign-status-rail")).toBeInTheDocument();
+    expect(screen.getAllByText("Setup").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Content").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Call").length).toBeGreaterThan(0);
   });
 });
 
@@ -208,57 +219,35 @@ describe("app/components/campaign/settings/detailed/CampaignDetailed.ActivateBut
 });
 
 describe("app/components/campaign/settings/detailed/CampaignDetailed.tsx", () => {
-  test("shows Send Now and Schedule Campaign blocker reasons", async () => {
+  test("message setup shows send mode and content link", async () => {
     const { CampaignTypeSpecificSettings } = await import(
       "@/components/campaign/settings/detailed/CampaignDetailed"
     );
     render(
-      <CampaignTypeSpecificSettings
-        campaignData={makeCampaign({
-          type: "message",
-          caller_id: "+15551234567",
-          sms_send_mode: "from_number",
-        })}
-        handleInputChange={vi.fn()}
-        mediaData={[]}
-        scripts={[]}
-        handleActivateButton={vi.fn()}
-        handleScheduleButton={vi.fn()}
-        details={{
-          workspace: "ws-1",
-          campaign_id: 1,
-          body_text: "",
-          message_media: [],
-        } as never}
-        mediaLinks={[]}
-        isChanged={false}
-        isBusy={false}
-        joinDisabled="Message content or media is required."
-        scheduleDisabled="Calling hours are required."
-        readinessIssues={["Message content or media is required."]}
-        surveys={[]}
-        queueCount={10}
-        phoneNumbers={[]}
-        outboundEstimateInputs={{
-          portalConfig: {
-            sendMode: "from_number",
-            messagingServiceSid: null,
-            smsSenderClass: "unknown",
-            trafficClass: "unknown",
-            throughputProduct: "none",
-            smsTargetMps: 1,
-            parallelDispatchEnabled: false,
-          } as never,
-          syncSnapshot: { phoneNumberCount: 0 } as never,
-        }}
-        handleNavigate={vi.fn()}
-      />,
+      <SmokeRouter>
+        <CampaignTypeSpecificSettings
+          campaignData={makeCampaign({
+            type: "message",
+            caller_id: "+15551234567",
+            sms_send_mode: "from_number",
+          })}
+          handleInputChange={vi.fn()}
+          scripts={[]}
+          details={{
+            workspace: "ws-1",
+            campaign_id: 1,
+            body_text: "",
+            message_media: [],
+          } as never}
+          isBusy={false}
+        />
+      </SmokeRouter>,
     );
 
-    expect(screen.getByRole("button", { name: "Send Now" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Schedule Campaign" })).toBeDisabled();
-    expect(screen.getByText("Message content or media is required.")).toBeVisible();
-    expect(screen.getByText("Calling hours are required.")).toBeVisible();
+    expect(screen.getByText("Send using")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Edit content/i }),
+    ).toBeInTheDocument();
   });
 });
 

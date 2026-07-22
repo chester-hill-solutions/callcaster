@@ -55,8 +55,8 @@ describe("app/lib/campaign-readiness-actions.ts", () => {
       targetId: "campaign-setup-schedule",
     });
     expect(getCampaignReadinessAction("script_unavailable")).toMatchObject({
-      type: "scroll",
-      targetId: "campaign-setup-content",
+      type: "route",
+      template: "/workspaces/:workspaceId/campaigns/:campaignId/script/edit",
     });
   });
 
@@ -74,12 +74,19 @@ describe("app/lib/campaign-readiness-actions.ts", () => {
         { workspaceId: "workspace one", campaignId: 42 },
       ),
     ).toBe("/workspaces/workspace%20one/onboarding");
+
+    expect(
+      resolveCampaignReadinessRoute(
+        getCampaignReadinessAction("message_content_required"),
+        { workspaceId: "workspace one", campaignId: 42 },
+      ),
+    ).toBe("/workspaces/workspace%20one/campaigns/42/script/edit");
   });
 
   test("returns null when resolving a scroll action as a route", () => {
     expect(
       resolveCampaignReadinessRoute(
-        getCampaignReadinessAction("message_content_required"),
+        getCampaignReadinessAction("campaign_type_required"),
         { workspaceId: "ws-1", campaignId: 42 },
       ),
     ).toBeNull();

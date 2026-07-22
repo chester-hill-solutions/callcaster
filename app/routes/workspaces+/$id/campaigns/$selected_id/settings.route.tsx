@@ -5,6 +5,7 @@ import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs, redirect , u
 
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
 import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
+import { useCampaignShellDirty } from "@/components/campaign/home/CampaignShellDirty";
 
 
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
@@ -24,7 +25,7 @@ import {
   TwilioAccountData,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFetcherOnIdle } from "@/hooks/utils";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import {
@@ -34,11 +35,6 @@ import {
 } from "@/lib/campaign-settings";
 import { deepEqual } from "@/lib/utils";
 import {
-  getCampaignSetupDismissKey,
-  getCampaignSetupSteps,
-  shouldShowCampaignSetupGuide,
-} from "@/lib/campaign-setup-steps";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -46,6 +42,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { productGoalForCampaignType } from "@/lib/campaign-goals";
+import type { CampaignType } from "@/lib/db-types";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -91,7 +89,7 @@ export default function CampaignSettingsRoute() {
   const {
     workspace_id,
     selected_id,
-    campaignQueue,
+    campaignQueue: _campaignQueue,
     queueCount,
     dequeuedCount,
     totalCount,
@@ -102,23 +100,14 @@ export default function CampaignSettingsRoute() {
     surveys,
     outboundEstimateInputs,
     smsSendContext,
-    isFirstDraftCampaign,
     campaignBilling,
     readiness,
   } = useLoaderData();
 
   const navigate = useNavigate();
   const fetcher = useFetcher<ActionData>();
+  const { setIsDirty } = useCampaignShellDirty();
   const [confirmStatus, setConfirmStatus] = useState<"play" | "archive" | "none">("none");
-  const [setupGuideDismissed, setSetupGuideDismissed] = useState(() => {
-    if (typeof window === "undefined" || !selected_id) {
-      return false;
-    }
-    return (
-      window.sessionStorage.getItem(getCampaignSetupDismissKey(selected_id)) ===
-      "1"
-    );
-  });
   const initialCampaignData = useMemo(() => {
     const normalized = normalizeCampaignData(campaignData);
     if (normalized.type !== "message") {
@@ -151,6 +140,11 @@ export default function CampaignSettingsRoute() {
   const isChanged =
     !deepEqual(draftCampaignData, savedCampaignData) ||
     !deepEqual(draftCampaignDetails, savedCampaignDetails);
+
+  useEffect(() => {
+    setIsDirty(isChanged);
+    return () => setIsDirty(false);
+  }, [isChanged, setIsDirty]);
 
   const [prevInitialCampaignData, setPrevInitialCampaignData] =
     useState(initialCampaignData);
@@ -232,46 +226,25 @@ export default function CampaignSettingsRoute() {
     ? ["Save your changes to refresh campaign readiness."]
     : readinessFromLoader.startIssues;
 
-  const setupGuideState = useMemo(
-    () =>
-      getCampaignSetupSteps({
-        campaignData: draftCampaignData,
-        campaignDetails: draftCampaignDetails,
-        phoneNumbers,
-        queueCount: queueCount ?? 0,
-        audienceCount: audiences?.length ?? 0,
-        scriptsCount: scripts?.length ?? 0,
-        workspaceId: workspace_id,
-        smsMessagingServiceSendersReady:
-          draftCampaignData.type === "message" &&
-          draftCampaignData.sms_send_mode === "messaging_service"
-            ? smsSendContext?.messagingServiceReady
-            : undefined,
-      }),
-    [
-      audiences?.length,
-      draftCampaignData,
-      draftCampaignDetails,
-      phoneNumbers,
-      queueCount,
-      scripts?.length,
-      smsSendContext?.messagingServiceReady,
-      workspace_id,
-    ],
-  );
-
-  const showSetupGuide = shouldShowCampaignSetupGuide({
-    isFirstDraftCampaign: Boolean(isFirstDraftCampaign),
-    dismissed: setupGuideDismissed,
-    allComplete: setupGuideState.allComplete,
-  });
-
-  const handleDismissSetupGuide = () => {
-    if (typeof window !== "undefined" && selected_id) {
-      window.sessionStorage.setItem(getCampaignSetupDismissKey(selected_id), "1");
+  const launchLabel = (() => {
+    const goal = draftCampaignData.type
+      ? productGoalForCampaignType(draftCampaignData.type as CampaignType)
+      : null;
+    switch (goal) {
+      case "live_calling":
+        return "Start calling";
+      case "text_campaign":
+        return "Start text campaign";
+      case "automated_phone_menu":
+        return "Start phone menu";
+      case null:
+        return "Start campaign";
+      default: {
+        const _exhaustive: never = goal;
+        return _exhaustive;
+      }
     }
-    setSetupGuideDismissed(true);
-  };
+  })();
 
   const handleDuplicate = () => {
     const { id, ...dataToDuplicate } = draftCampaignData;
@@ -482,7 +455,6 @@ export default function CampaignSettingsRoute() {
         user={user}
         startDisabledReason={startDisabledReason}
         readinessIssues={readinessIssues}
-        campaignQueue={campaignQueue}
         queueCount={queueCount || 0}
         dequeuedCount={dequeuedCount || 0}
         totalCount={totalCount || 0}
@@ -505,14 +477,7 @@ export default function CampaignSettingsRoute() {
         surveys={surveys || []}
         outboundEstimateInputs={outboundEstimateInputs}
         smsSendContext={smsSendContext}
-        showSetupGuide={showSetupGuide}
-        setupGuideSteps={setupGuideState.steps}
-        setupGuideCurrentStepNumber={setupGuideState.currentStepNumber}
-        setupGuideTotalSteps={setupGuideState.totalSteps}
-        setupGuideAllComplete={setupGuideState.allComplete}
-        setupGuideTitle={setupGuideState.guideTitle}
-        setupGuideLaunchActionLabel={setupGuideState.launchActionLabel}
-        onDismissSetupGuide={handleDismissSetupGuide}
+        launchActionLabelOverride={launchLabel}
         campaignBilling={campaignBilling as CampaignBillingSummary | null}
       />
     </>

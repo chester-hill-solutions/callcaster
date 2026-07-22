@@ -1,27 +1,23 @@
 export { loader } from "./$selected_id.loader.server";
 export { action } from "./$selected_id.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect , Await, Outlet, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
-import { Suspense, useRef } from "react";
-
+import { Outlet, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
+import { useMemo, useRef } from "react";
 
 import { MemberRole } from "@/components/workspace/TeamMember";
 import {
   ResultsDisplay,
   NoResultsYet,
   ErrorLoadingResults,
-  LoadingResults,
 } from "@/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay";
 import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
 import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
-import { NavigationLinks } from "@/components/campaign/home/CampaignHomeScreen/CampaignNav";
+import { CampaignStatusRail } from "@/components/campaign/home/CampaignStatusRail";
+import { CampaignShellDirtyProvider } from "@/components/campaign/home/CampaignShellDirty";
+import { buildCampaignStatusRail } from "@/lib/campaign-status-rail";
 import {
   Audience,
   Campaign,
-  IVRCampaign,
-  LiveCampaign,
-  MessageCampaign,
-  Schedule,
   WorkspaceData,
   WorkspaceNumbers,
 } from "@/lib/types";
@@ -72,6 +68,44 @@ export default function CampaignScreen() {
   };
   const campaignDetails = initialCampaignDetails;
 
+  const railItems = useMemo(() => {
+    if (!campaignData || !workspaceRouteId || !selected_id) {
+      return [];
+    }
+    const workspaceId =
+      typeof workspace === "object" && workspace && "id" in workspace
+        ? String((workspace as { id?: string }).id ?? workspaceRouteId)
+        : workspaceRouteId;
+
+    return buildCampaignStatusRail({
+      workspaceId,
+      campaignId: selected_id,
+      campaignData,
+      campaignDetails,
+      readinessIssues: readiness?.issues ?? [],
+      queueCount: safeQueueCounts.queuedCount,
+      hasAccess,
+      pathname: location.pathname,
+      hash: location.hash,
+      joinDisabled,
+      hasResults: results.length > 0 || ivrResponses.length > 0,
+    });
+  }, [
+    campaignData,
+    campaignDetails,
+    hasAccess,
+    ivrResponses.length,
+    joinDisabled,
+    location.hash,
+    location.pathname,
+    readiness?.issues,
+    results.length,
+    safeQueueCounts.queuedCount,
+    selected_id,
+    workspace,
+    workspaceRouteId,
+  ]);
+
   useWorkspaceEventSubscription({
     workspaceId: workspaceRouteId,
     table: [...CAMPAIGN_DASHBOARD_COUNT_TABLES],
@@ -85,69 +119,70 @@ export default function CampaignScreen() {
   });
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <CampaignHeader
-        title={campaignData?.title || ""}
-        status={(campaignData?.status as CampaignStatus) || "pending"}
-        isDesktop={false}
-      />
-      <div className="flex flex-col items-start justify-between gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center">
+    <CampaignShellDirtyProvider>
+      <div className="flex h-full w-full flex-col">
         <CampaignHeader
           title={campaignData?.title || ""}
-          isDesktop
           status={(campaignData?.status as CampaignStatus) || "pending"}
+          isDesktop={false}
         />
-        <NavigationLinks
-          hasAccess={hasAccess}
-          data={campaignData}
-          joinDisabled={joinDisabled}
-        />
+        <div className="border-b border-border/70 pb-4">
+          <CampaignHeader
+            title={campaignData?.title || ""}
+            isDesktop
+            status={(campaignData?.status as CampaignStatus) || "pending"}
+          />
+        </div>
+        {railItems.length > 0 ? (
+          <div className="pb-4">
+            <CampaignStatusRail items={railItems} />
+          </div>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          {hasAccess &&
+            isCampaignParentRoute &&
+            (!campaignData ? (
+              <ErrorLoadingResults />
+            ) : results.length < 1 && ivrResponses.length < 1 ? (
+              <NoResultsYet />
+            ) : (
+              <ResultsDisplay
+                results={results}
+                campaign={campaignData}
+                hasAccess={hasAccess}
+                queueCounts={safeQueueCounts}
+                ivrResponses={ivrResponses}
+              />
+            ))}
+          {isCampaignParentRoute &&
+            !hasAccess &&
+            campaignData &&
+            (campaignData.type === "live_call" || !campaignData.type) && (
+              <CampaignInstructions
+                campaignData={
+                  campaignData as {
+                    [key: string]: unknown;
+                    instructions?: { join?: string; script?: string };
+                  }
+                }
+                totalCalls={safeQueueCounts.queuedCount}
+                expectedTotal={safeQueueCounts.fullCount}
+                joinDisabled={joinDisabled}
+              />
+            )}
+          <Outlet
+            context={{
+              joinDisabled,
+              audiences,
+              campaignData,
+              campaignDetails,
+              scheduleDisabled,
+              phoneNumbers,
+              workspace,
+            }}
+          />
+        </div>
       </div>
-      {hasAccess &&
-        isCampaignParentRoute &&
-        (!campaignData ? (
-          <ErrorLoadingResults />
-        ) : results.length < 1 && ivrResponses.length < 1 ? (
-          // An IVR campaign can have recorded keypresses before any terminal
-          // status callback lands a disposition, so the empty state has to
-          // consider both sources.
-          <NoResultsYet />
-        ) : (
-          <ResultsDisplay
-            results={results}
-            campaign={campaignData}
-            hasAccess={hasAccess}
-            queueCounts={safeQueueCounts}
-            ivrResponses={ivrResponses}
-          />
-        ))}
-      {isCampaignParentRoute &&
-        !hasAccess &&
-        campaignData &&
-        (campaignData.type === "live_call" || !campaignData.type) && (
-          <CampaignInstructions
-            campaignData={
-              campaignData as {
-                [key: string]: unknown;
-                instructions?: { join?: string; script?: string };
-              }
-            }
-            totalCalls={safeQueueCounts.queuedCount}
-            expectedTotal={safeQueueCounts.fullCount}
-            joinDisabled={joinDisabled}
-          />
-        )}
-      <Outlet
-        context={{
-                    joinDisabled,
-          audiences,
-          campaignData,
-          campaignDetails,
-          scheduleDisabled,
-          phoneNumbers,
-          workspace,
-        }}
-      />
-    </div>
+    </CampaignShellDirtyProvider>
   );
 }

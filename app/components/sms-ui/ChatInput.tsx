@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MdImage, MdSend } from "react-icons/md";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ImageIcon, SendHorizontal } from "lucide-react";
 import ChatImages from "./ChatImages";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
@@ -119,6 +118,11 @@ export default function ChatInput({
   const hasNumberOptions = (workspaceNumbers?.length ?? 0) > 0;
   const hasSenderOptions = hasNumberOptions || messagingServiceReady;
   const usesMessagingService = selectedFrom === MESSAGING_SERVICE_SENDER_VALUE;
+  const scheduleHint = usesMessagingService
+    ? undefined
+    : messagingServiceReady
+      ? "Select Messaging Service to schedule"
+      : "Scheduling requires Messaging Service";
 
   /**
    * @effect KEEP: align the controlled From selection with available sender
@@ -214,52 +218,15 @@ export default function ChatInput({
     e.currentTarget.form?.requestSubmit();
   };
 
+  const segmentCount = Math.max(segmentInfo.segmentCount, 1);
+
   return (
     <div className="border-t border-border/70 bg-background/90 p-3 sm:p-4">
       <messageFetcher.Form
         method="POST"
-        className="flex flex-col space-y-2"
+        className="flex flex-col gap-3"
         onSubmit={handleFormSubmit}
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Label htmlFor="from" className="text-sm font-medium sm:w-[50px]">
-            From:
-          </Label>
-          <Select
-            value={selectedFrom || undefined}
-            onValueChange={(next) => {
-              setSelectedFrom(next);
-              if (next !== MESSAGING_SERVICE_SENDER_VALUE) {
-                setSendLater(false);
-                setSendAtLocal("");
-              }
-            }}
-            disabled={!hasSenderOptions}
-          >
-            <SelectTrigger id="from" className="sm:flex-grow">
-              <SelectValue
-                placeholder={
-                  hasSenderOptions
-                    ? "Select sender"
-                    : "No sending numbers available"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {messagingServiceReady ? (
-                <SelectItem value={MESSAGING_SERVICE_SENDER_VALUE}>
-                  Messaging Service (automatic sender)
-                </SelectItem>
-              ) : null}
-              {workspaceNumbers?.map((num) => (
-                <SelectItem key={num.id} value={num.phone_number}>
-                  {num.friendly_name || num.phone_number}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <input type="hidden" name="from" value={selectedFrom} />
-        </div>
         {!hasSenderOptions ? (
           <Alert variant="warning">
             <AlertTriangle className="h-4 w-4" aria-hidden="true" />
@@ -286,8 +253,57 @@ export default function ChatInput({
             </AlertDescription>
           </Alert>
         ) : null}
-        <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Label
+              htmlFor="from"
+              className="shrink-0 text-xs font-medium text-muted-foreground"
+            >
+              From
+            </Label>
+            <div className="min-w-0 flex-1">
+              <Select
+                value={selectedFrom || undefined}
+                onValueChange={(next) => {
+                  setSelectedFrom(next);
+                  if (next !== MESSAGING_SERVICE_SENDER_VALUE) {
+                    setSendLater(false);
+                    setSendAtLocal("");
+                  }
+                }}
+                disabled={!hasSenderOptions}
+              >
+                <SelectTrigger id="from" className="h-8 w-full">
+                  <SelectValue
+                    placeholder={
+                      hasSenderOptions
+                        ? "Select sender"
+                        : "No sending numbers available"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {messagingServiceReady ? (
+                    <SelectItem value={MESSAGING_SERVICE_SENDER_VALUE}>
+                      Messaging Service (automatic sender)
+                    </SelectItem>
+                  ) : null}
+                  {workspaceNumbers?.map((num) => (
+                    <SelectItem key={num.id} value={num.phone_number}>
+                      {num.friendly_name || num.phone_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <input type="hidden" name="from" value={selectedFrom} />
+          </div>
+
+          <div
+            className="flex shrink-0 items-center gap-2"
+            title={scheduleHint}
+          >
             <Checkbox
               id="send-later"
               checked={sendLater}
@@ -298,37 +314,56 @@ export default function ChatInput({
                 if (!enabled) setSendAtLocal("");
               }}
             />
-            <Label htmlFor="send-later" className="text-xs font-normal">
+            <Label
+              htmlFor="send-later"
+              className="text-xs font-normal text-muted-foreground"
+            >
               Send later
             </Label>
+            {scheduleHint ? (
+              <span className="sr-only">{scheduleHint}</span>
+            ) : null}
+            {sendLater ? (
+              <Input
+                type="datetime-local"
+                value={sendAtLocal}
+                min={minScheduleValue}
+                max={maxScheduleValue}
+                required
+                onChange={(e) => setSendAtLocal(e.target.value)}
+                className="h-8 w-auto px-2 py-1 text-xs"
+                aria-label="Send at"
+              />
+            ) : null}
           </div>
-          {!usesMessagingService && (
-            <span>
-              {messagingServiceReady
-                ? "Select Messaging Service to schedule"
-                : "Scheduling requires Messaging Service"}
-            </span>
-          )}
-          {sendLater ? (
-            <Input
-              type="datetime-local"
-              value={sendAtLocal}
-              min={minScheduleValue}
-              max={maxScheduleValue}
-              required
-              onChange={(e) => setSendAtLocal(e.target.value)}
-              className="h-8 w-auto px-2 py-1 text-xs"
-              aria-label="Send at"
-            />
-          ) : null}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex flex-1 items-start gap-2">
+
+        {selectedImages.filter(Boolean).length > 0 ? (
+          <ChatImages
+            selectedImages={selectedImages}
+            onRemove={handleImageRemove}
+          />
+        ) : null}
+
+        <div className="overflow-hidden rounded-lg border border-border/80 bg-background focus-within:border-ring">
+          <Textarea
+            required
+            placeholder="Type your message"
+            rows={3}
+            title="Enter to send · Shift+Enter for a new line"
+            className="min-h-[88px] resize-none rounded-none border-0 bg-transparent px-3 py-2.5 shadow-none focus-visible:ring-0"
+            name="body"
+            id="body"
+            onChange={(e) => setBodyValue(e.target.value)}
+            onKeyDown={handleBodyKeyDown}
+            aria-describedby="chat-input-meta"
+          />
+          <div className="flex items-center gap-2 border-t border-border/60 px-2 py-1.5">
             <label
               htmlFor="image"
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              <MdImage size={24} aria-hidden />
+              <ImageIcon className="h-4 w-4" aria-hidden />
               <span className="sr-only">Attach image</span>
             </label>
             <input
@@ -338,57 +373,39 @@ export default function ChatInput({
               accept="image/*"
               onChange={handleImageSelect}
             />
-            <div className="relative flex flex-1 flex-col gap-1">
-              <Textarea
-                required
-                placeholder="Type your message"
-                rows={3}
-                className="min-h-[96px] flex-grow resize-none"
-                name="body"
-                id="body"
-                onChange={(e) => setBodyValue(e.target.value)}
-                onKeyDown={handleBodyKeyDown}
-              />
-              <div
-                className="flex items-center justify-end gap-2 px-1 text-xs text-muted-foreground"
-                aria-live="polite"
-              >
-                <span className="mr-auto hidden sm:inline">
-                  Enter to send · Shift+Enter for a new line
-                </span>
-                <span>
-                  {segmentInfo.unitsUsedInCurrentSegment}/
-                  {segmentInfo.unitsPerSegment}
-                </span>
-                <span>
-                  {Math.max(segmentInfo.segmentCount, 1)} segment
-                  {Math.max(segmentInfo.segmentCount, 1) === 1 ? "" : "s"}
-                </span>
-                <span>({segmentInfo.encoding})</span>
-                <span className="font-medium text-foreground/80">
-                  ≈ {creditEstimate.credits} credit
-                  {creditEstimate.credits === 1 ? "" : "s"}
-                </span>
-              </div>
+            <div
+              id="chat-input-meta"
+              className="ml-auto flex min-w-0 items-center gap-1.5 truncate text-xs text-muted-foreground tabular-nums"
+              aria-live="polite"
+            >
+              <span>
+                {segmentInfo.unitsUsedInCurrentSegment}/
+                {segmentInfo.unitsPerSegment}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {segmentCount} segment{segmentCount === 1 ? "" : "s"}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>({segmentInfo.encoding})</span>
+              <span aria-hidden="true">·</span>
+              <span className="font-medium text-foreground/80">
+                ≈ {creditEstimate.credits} credit
+                {creditEstimate.credits === 1 ? "" : "s"}
+              </span>
             </div>
+            <Button
+              type="submit"
+              disabled={isSendDisabled}
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              aria-label="Send message"
+            >
+              <SendHorizontal className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
-          <Button
-            type="submit"
-            disabled={isSendDisabled}
-            size="icon"
-            className="h-10 w-full sm:w-10 sm:rounded-full"
-            aria-label="Send message"
-          >
-            <MdSend size={20} aria-hidden="true" />
-            <span className="text-sm font-medium sm:hidden">Send</span>
-          </Button>
         </div>
-        {selectedImages.filter(Boolean).length > 0 && (
-          <ChatImages
-            selectedImages={selectedImages}
-            onRemove={handleImageRemove}
-          />
-        )}
+
         {phoneNumber && isValid && (
           <input
             hidden

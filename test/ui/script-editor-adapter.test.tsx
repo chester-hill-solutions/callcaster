@@ -5,7 +5,8 @@ import CampaignSettingsScript from "@/components/campaign/settings/script/Campai
 import type { Script } from "@/lib/types";
 
 /**
- * Renders the editor through the real injected shadcn/Radix primitives.
+ * Renders the CallCaster script editor shell (pages rail + center page editor)
+ * through the real design-system primitives.
  *
  * The hook is unit-tested in the scriptkit package, but that runs headless and
  * cannot catch host-component contract breaks — e.g. Radix's Select throws on
@@ -57,8 +58,17 @@ describe("script editor — renders through the real design-system primitives", 
   test("renders without crashing and lists every page", () => {
     renderEditor();
 
+    expect(screen.getByLabelText("Script pages")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Intro/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Follow up/ })).toBeTruthy();
+  });
+
+  test("keeps the pages rail separate from the page editor", () => {
+    renderEditor();
+
+    expect(screen.getByLabelText("Script pages")).toBeTruthy();
+    expect(screen.getByLabelText("Page title")).toBeTruthy();
+    expect(screen.getByLabelText("Add block")).toBeTruthy();
   });
 
   test("marks the start page", () => {
@@ -70,8 +80,8 @@ describe("script editor — renders through the real design-system primitives", 
   test("offers page authoring controls", () => {
     renderEditor();
 
-    expect(screen.getByRole("button", { name: "Add page" })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Set as start" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Add page" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Set as start" })).toBeTruthy();
   });
 
   test("edits options as discrete rows, not one blob of text", () => {
@@ -86,7 +96,7 @@ describe("script editor — renders through the real design-system primitives", 
   test("adding a page reports the new document upward", () => {
     const { onPageDataChange } = renderEditor();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add page" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Add page" })[0]!);
 
     expect(onPageDataChange).toHaveBeenCalled();
     const next = onPageDataChange.mock.calls.at(-1)?.[0];
