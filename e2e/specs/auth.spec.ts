@@ -46,7 +46,10 @@ test.describe("Auth @smoke", () => {
       }
     });
     await page.goto("/");
-    await expect(page).toHaveURL(/\/\/127\.0\.0\.1:3100\/?$/);
+    // Signed out: stays on the marketing root instead of bouncing to
+    // /workspaces. Port-agnostic — the harness may run on a non-default
+    // E2E_PORT.
+    await expect(page).toHaveURL(/\/\/127\.0\.0\.1:\d+\/?$/);
   });
 
   test("AUTH-08 open signup UI when SIGNUP_OPEN is enabled", async ({ page }) => {

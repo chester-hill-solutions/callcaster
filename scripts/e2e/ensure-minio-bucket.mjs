@@ -11,6 +11,11 @@ import {
 const endpoint = process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000";
 const bucket = process.env.S3_BUCKET ?? "callcaster";
 
+// --keep-objects: only ensure the bucket exists, don't purge. Used by server
+// boot paths (start-e2e-server) where wiping seeded fixtures would be wrong;
+// the compose E2E orchestrator keeps the default purge for determinism.
+const keepObjects = process.argv.includes("--keep-objects");
+
 const client = new S3Client({
   endpoint,
   region: process.env.S3_REGION ?? "us-east-1",
@@ -77,7 +82,11 @@ let lastError;
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
   try {
     await ensureBucket();
-    await purgeBucket();
+    if (keepObjects) {
+      console.log(`[e2e-minio] keeping existing objects in ${bucket} (--keep-objects)`);
+    } else {
+      await purgeBucket();
+    }
     process.exit(0);
   } catch (error) {
     lastError = error;

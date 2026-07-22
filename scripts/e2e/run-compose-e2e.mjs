@@ -164,6 +164,17 @@ server.on("exit", (code, signal) => {
   }
 });
 
+// Queued jobs (audience_upload, exports, dispatch) only run if a worker is
+// polling. Without one, "processing" states never resolve and specs cannot
+// cover job completion — which is how the upload dead-letter bug shipped.
+console.log("[e2e-compose] starting job worker…");
+const worker = runAsync("bun", ["run", "./worker/index.ts"], serverEnv);
+worker.on("exit", (code, signal) => {
+  if (code != null && code !== 0) {
+    console.error(`[e2e-compose] worker exited early code=${code} signal=${signal ?? ""}`);
+  }
+});
+
 async function waitForReady(url, attempts = 120) {
   for (let i = 0; i < attempts; i += 1) {
     try {
@@ -194,6 +205,15 @@ try {
   console.error(error);
   exitCode = 1;
 } finally {
+  // SIGTERM first for graceful shutdown, but don't trust it — an ignored
+  // signal here orphans bun children that keep ports and stdio pipes open.
   server.kill("SIGTERM");
+  worker.kill("SIGTERM");
+  await new Promise((r) => setTimeout(r, 3000));
+  for (const child of [server, worker]) {
+    if (child.exitCode == null && child.signalCode == null) {
+      child.kill("SIGKILL");
+    }
+  }
   process.exit(exitCode);
 }

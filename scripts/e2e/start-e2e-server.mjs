@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint-env node */
 import "dotenv/config";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,7 +56,29 @@ async function waitForReady(readyUrl, attempts = 90) {
   throw new Error(`Server not ready at ${readyUrl}/readyz`);
 }
 
+// Best-effort: make sure the S3 bucket exists before anything enqueues an
+// upload — a missing bucket dead-letters audience_upload jobs. Non-fatal so
+// the server still boots for flows that never touch object storage.
+const bucketCheck = spawnSync(
+  "node",
+  ["scripts/e2e/ensure-minio-bucket.mjs", "--keep-objects"],
+  { cwd: rootDir, env, stdio: "inherit" },
+);
+if (bucketCheck.status !== 0) {
+  console.warn(
+    "[e2e-server] WARNING: could not ensure MinIO bucket — uploads will dead-letter until it exists",
+  );
+}
+
 const child = spawn("bun", ["run", "./server/bun.ts"], {
+  cwd: rootDir,
+  env,
+  stdio: "inherit",
+});
+
+// Queued jobs (audience_upload, exports, dispatch) need a polling worker or
+// they sit in "processing" forever — run one alongside the server.
+const workerChild = spawn("bun", ["run", "./worker/index.ts"], {
   cwd: rootDir,
   env,
   stdio: "inherit",
@@ -64,6 +86,7 @@ const child = spawn("bun", ["run", "./server/bun.ts"], {
 
 async function shutdown(code = 0) {
   child.kill("SIGTERM");
+  workerChild.kill("SIGTERM");
   process.exit(code);
 }
 
@@ -79,5 +102,14 @@ try {
 }
 
 child.on("exit", (code) => {
+  workerChild.kill("SIGTERM");
   process.exit(code ?? 0);
+});
+
+workerChild.on("exit", (code, signal) => {
+  if (code != null && code !== 0) {
+    console.error(
+      `[e2e-server] worker exited early code=${code} signal=${signal ?? ""} — queued jobs will not process`,
+    );
+  }
 });
