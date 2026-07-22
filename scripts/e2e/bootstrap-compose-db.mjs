@@ -70,6 +70,7 @@ const coveredByBaseline = new Set([
   "20260706120000_auth_two_factor.sql",
   "20260713150000_workspace_api_key_scopes.sql",
   "20260713180000_chs_workspace_membership.sql",
+  "20260722130000_contact_support_level_and_voter_list.sql",
 ]);
 
 /**
