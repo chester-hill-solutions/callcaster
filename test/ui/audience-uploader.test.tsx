@@ -830,12 +830,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
-
+    // The immediate post-submit status check surfaces the error without
+    // waiting for a poll tick (#1078); polling never starts for an error.
     expect(screen.getByText("poll-bad")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Try Again" }),
@@ -878,12 +875,8 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
-
+    // Error arrives from the immediate post-submit status check (#1078).
     expect(
       screen.getByText("An error occurred during upload"),
     ).toBeInTheDocument();
