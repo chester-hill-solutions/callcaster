@@ -255,7 +255,7 @@ export function ScriptEditorShell({
                             ? "border-primary"
                             : "border-border hover:border-muted-foreground/40",
                         )}
-                        onClick={() => editor.setActiveBlockId(blockId)}
+                        onFocusCapture={() => editor.setActiveBlockId(blockId)}
                       >
                         <ScriptBlockEditor
                           block={block}
@@ -314,14 +314,19 @@ function LabelledPageTitle({
   readOnly: boolean;
   onChange: (value: string) => void;
 }) {
+  const inputId = useId();
   return (
-    <label className="grid min-w-[12rem] flex-1 gap-2 font-normal">
-      <span className="text-sm font-medium">Page title</span>
+    <FormField
+      label="Page title"
+      htmlFor={inputId}
+      className="min-w-[12rem] flex-1"
+    >
       <Input
+        id={inputId}
         value={value}
         readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
       />
-    </label>
+    </FormField>
   );
 }

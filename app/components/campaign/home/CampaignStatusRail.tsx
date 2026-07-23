@@ -186,7 +186,12 @@ function scrollTabIntoTablist(
   const maxScroll = Math.max(0, tablist.scrollWidth - tablist.clientWidth);
   const nextLeft = Math.min(maxScroll, Math.max(0, target));
 
-  tablist.scrollTo({ left: nextLeft, behavior });
+  // jsdom (and some older engines) omit Element.scrollTo — assign scrollLeft instead.
+  if (typeof tablist.scrollTo === "function") {
+    tablist.scrollTo({ left: nextLeft, behavior });
+  } else {
+    tablist.scrollLeft = nextLeft;
+  }
 }
 
 /** Horizontal L→R status tabs. Full-width equal tabs on md+; scroll strip on mobile. */
