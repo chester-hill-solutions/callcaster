@@ -39,15 +39,80 @@ export const API_KEY = {
   prefix: "cc_e2e_tes",
 };
 
-export const ALL_DAY_SCHEDULE = {
-  sunday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
-  monday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
-  tuesday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
-  wednesday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
-  thursday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
-  friday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
-  saturday: { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
-};
+/** Matches `buildWeekdayCallingSchedule("America/Toronto")` in app/lib/campaign-setup-steps.ts */
+function wallClockToUtcHm(wallHm, timeZone, at = new Date()) {
+  const [wallHour, wallMinute] = wallHm.split(":").map(Number);
+  const dateParts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(at)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const year = Number(dateParts.year);
+  const month = Number(dateParts.month);
+  const day = Number(dateParts.day);
+
+  let utcMillis = Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0);
+  for (let i = 0; i < 2; i += 1) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+        .formatToParts(new Date(utcMillis))
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value]),
+    );
+    const asUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      parts.hour === "24" ? 0 : Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+    );
+    const offsetMillis = asUtc - utcMillis;
+    utcMillis =
+      Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0) - offsetMillis;
+  }
+
+  const corrected = new Date(utcMillis);
+  return `${String(corrected.getUTCHours()).padStart(2, "0")}:${String(
+    corrected.getUTCMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function buildWeekdayCallingSchedule(timeZone = "America/Toronto") {
+  const start = wallClockToUtcHm("09:00", timeZone);
+  const end = wallClockToUtcHm("17:00", timeZone);
+  const weekday = () => ({
+    active: true,
+    intervals: [{ start, end }],
+  });
+  const inactive = { active: false, intervals: [] };
+  return {
+    monday: weekday(),
+    tuesday: weekday(),
+    wednesday: weekday(),
+    thursday: weekday(),
+    friday: weekday(),
+    saturday: inactive,
+    sunday: inactive,
+  };
+}
+
+export const BUSINESS_HOURS_SCHEDULE = buildWeekdayCallingSchedule();
 
 export function readyTwilioData() {
   return {

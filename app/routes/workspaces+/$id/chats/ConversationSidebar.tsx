@@ -126,7 +126,7 @@ export function ConversationSidebar({
             }}
             placeholder="Search name, phone, or message"
             aria-label="Search conversations"
-            className="h-9 pl-9"
+            className="h-9 !pl-10"
           />
         </div>
         <div className="grid grid-cols-2 gap-2">

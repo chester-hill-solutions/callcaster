@@ -325,9 +325,17 @@ describe("WorkspaceSelectedNewUtils", () => {
     expect(tenantDbState.insertedCampaign).toMatchObject({
       caller_id: "+15555550100",
       schedule: expect.objectContaining({
-        monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
+        monday: expect.objectContaining({ active: true }),
+        saturday: expect.objectContaining({ active: false }),
+        sunday: expect.objectContaining({ active: false }),
       }),
     });
+    const mondayInterval =
+      tenantDbState.insertedCampaign?.schedule?.monday?.intervals?.[0];
+    expect(mondayInterval?.start).toMatch(/^\d{2}:\d{2}$/);
+    expect(mondayInterval?.end).toMatch(/^\d{2}:\d{2}$/);
+    // Must be local business hours converted to UTC, not the all-day sentinel.
+    expect(mondayInterval).not.toEqual({ start: "00:00", end: "23:59" });
     expect(tenantDbState.insertedCampaign?.start_date).toBeTruthy();
     expect(tenantDbState.insertedCampaign?.end_date).toBeTruthy();
   });

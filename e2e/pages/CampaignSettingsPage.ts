@@ -11,6 +11,10 @@ export class CampaignSettingsPage {
     await this.page.goto(`/workspaces/${workspaceId}/campaigns/${campaignId}/settings`);
   }
 
+  async gotoLaunch(workspaceId: string, campaignId: number | string): Promise<void> {
+    await this.page.goto(`/workspaces/${workspaceId}/campaigns/${campaignId}/launch`);
+  }
+
   readinessPanel() {
     return this.page.getByTestId("campaign-readiness");
   }

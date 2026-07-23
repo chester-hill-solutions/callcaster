@@ -2,14 +2,6 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -321,70 +313,66 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                 ) : null}
               </div>
 
-              <Button
-                variant="outline"
-                onClick={onAddNumberClick}
-                className="flex items-center gap-2"
-              >
-                <Plus size={16} />
-                Add Phone Number
-              </Button>
+              {!isAddingNumber && !verificationPhoneNumber ? (
+                <Button
+                  variant="outline"
+                  onClick={onAddNumberClick}
+                  className="flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  Add Phone Number
+                </Button>
+              ) : null}
             </div>
+
+            {isAddingNumber ? (
+              <div
+                className="mt-4 space-y-3 rounded-md border border-border bg-muted/30 p-4"
+                data-testid="add-phone-inline"
+              >
+                <div>
+                  <p className="text-sm font-medium">Add Phone Number</p>
+                  <p className="text-sm text-muted-foreground">
+                    Enter your phone number to verify it for making calls.
+                  </p>
+                </div>
+                <input
+                  type="tel"
+                  value={newPhoneNumber}
+                  onChange={(e) => onNewPhoneNumberChange(e.target.value)}
+                  placeholder="+1234567890"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={onVerifyNewNumber}>
+                    Verify Number
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onAddNumberCancel}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {verificationPhoneNumber ? (
+              <div
+                className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-4"
+                data-testid="verify-phone-inline"
+              >
+                <p className="text-sm font-medium">Verify by calling in</p>
+                <p className="text-sm text-muted-foreground">
+                  Call {verificationPhoneNumber} from {newPhoneNumber} within 10
+                  minutes. Your number will be verified when the call connects.
+                </p>
+              </div>
+            ) : null}
           </AccordionContent>
         </AccordionItem>
       </Accordion>
-
-      {isAddingNumber ? (
-        <Dialog
-          open={isAddingNumber}
-          onOpenChange={(open) => {
-            if (!open) onAddNumberCancel();
-          }}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add Phone Number</DialogTitle>
-              <DialogDescription>
-                Enter your phone number to verify it for making calls.
-              </DialogDescription>
-            </DialogHeader>
-            <input
-              type="tel"
-              value={newPhoneNumber}
-              onChange={(e) => onNewPhoneNumberChange(e.target.value)}
-              placeholder="+1234567890"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-            />
-            <DialogFooter>
-              <Button
-                type="button"
-                className="flex-1"
-                onClick={onVerifyNewNumber}
-              >
-                Verify Number
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onAddNumberCancel}
-              >
-                Cancel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-      {verificationPhoneNumber ? (
-        <Dialog open={Boolean(verificationPhoneNumber)}>
-          <DialogContent className="max-w-md">
-            <DialogTitle>Verify by calling in</DialogTitle>
-            <DialogDescription>
-              Call {verificationPhoneNumber} from {newPhoneNumber} within 10
-              minutes. Your number will be verified when the call connects.
-            </DialogDescription>
-          </DialogContent>
-        </Dialog>
-      ) : null}
     </div>
   );
 };

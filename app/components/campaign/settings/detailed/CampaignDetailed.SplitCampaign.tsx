@@ -6,16 +6,16 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useFetcherOnIdle } from "@/hooks/utils";
 import { isBulkSmsSenderMisaligned } from "@/lib/throughput-config";
 import type { TwilioSmsSenderClass } from "@/lib/types";
@@ -118,18 +118,18 @@ export function SplitCampaignPrompt({
         </Button>
       </AlertDescription>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Split this campaign</DialogTitle>
-            <DialogDescription>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Split this campaign</SheetTitle>
+            <SheetDescription>
               Clone this campaign into evenly-sized segments and distribute the
               queued contacts across them. Vary the copy per segment so carriers
               don&apos;t flag the batches as identical bulk traffic.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-4">
             <div className="space-y-1.5">
               <Label htmlFor="split-segment-count">Number of segments</Label>
               <Input
@@ -178,7 +178,7 @@ export function SplitCampaignPrompt({
             </div>
           </div>
 
-          <DialogFooter>
+          <SheetFooter className="gap-2 sm:flex-row">
             <Button
               type="button"
               variant="ghost"
@@ -201,9 +201,9 @@ export function SplitCampaignPrompt({
                 ? "Splitting…"
                 : `Split into ${segmentCount} campaigns`}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </Alert>
   );
 }

@@ -1,5 +1,6 @@
 import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
 import {
   Select,
   SelectContent,
@@ -33,9 +34,11 @@ export default function SelectNumber({
 
   if (!phoneNumbers.length && !configuredCallerId) {
     return (
-      <Button variant="outline" asChild>
-        <NavLink to="../../../settings/numbers/purchase">Get a Number</NavLink>
-      </Button>
+      <FormField label="Outbound number">
+        <Button variant="outline" asChild>
+          <NavLink to="../../../settings/numbers/purchase">Get a Number</NavLink>
+        </Button>
+      </FormField>
     );
   }
 
@@ -47,32 +50,34 @@ export default function SelectNumber({
         : undefined;
 
   return (
-    <Select
-      value={selectValue}
-      onValueChange={(value) =>
-        handleInputChange("caller_id", value === NONE_VALUE ? null : value)
-      }
-    >
-      <SelectTrigger id="caller_id">
-        <SelectValue placeholder="Select a number" />
-      </SelectTrigger>
-      <SelectContent>
-        {configuredCallerId && !callerIdAvailable ? (
-          <SelectItem value={configuredCallerId} disabled>
-            {configuredCallerId} — unavailable
-          </SelectItem>
-        ) : null}
-        {callerIdOptional ? (
-          <SelectItem value={NONE_VALUE}>None (Messaging Service only)</SelectItem>
-        ) : null}
-        {phoneNumbers.map((number) =>
-          number?.phone_number ? (
-            <SelectItem key={number.phone_number} value={number.phone_number}>
-              {number.friendly_name || number.phone_number}
+    <FormField label="Outbound number" htmlFor="caller_id">
+      <Select
+        value={selectValue}
+        onValueChange={(value) =>
+          handleInputChange("caller_id", value === NONE_VALUE ? null : value)
+        }
+      >
+        <SelectTrigger id="caller_id">
+          <SelectValue placeholder="Select a number" />
+        </SelectTrigger>
+        <SelectContent>
+          {configuredCallerId && !callerIdAvailable ? (
+            <SelectItem value={configuredCallerId} disabled>
+              {configuredCallerId} — unavailable
             </SelectItem>
-          ) : null,
-        )}
-      </SelectContent>
-    </Select>
+          ) : null}
+          {callerIdOptional ? (
+            <SelectItem value={NONE_VALUE}>None (Messaging Service only)</SelectItem>
+          ) : null}
+          {phoneNumbers.map((number) =>
+            number?.phone_number ? (
+              <SelectItem key={number.phone_number} value={number.phone_number}>
+                {number.friendly_name || number.phone_number}
+              </SelectItem>
+            ) : null,
+          )}
+        </SelectContent>
+      </Select>
+    </FormField>
   );
 }

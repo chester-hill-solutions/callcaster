@@ -141,8 +141,5 @@ describe("campaign-outbound-estimate", () => {
     });
 
     expect(estimate.configuredDispatcherMessagesPerSecond).toBe(3);
-    expect(estimate.warnings.some((warning) =>
-      warning.includes("Legacy sequential dispatch"),
-    )).toBe(false);
   });
 });

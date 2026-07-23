@@ -2,16 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 
-import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
+import { CampaignLaunch } from "@/components/campaign/settings/CampaignLaunch";
 
-vi.mock("@/components/campaign/settings/basic/CampaignBasicInfo", () => ({
-  CampaignBasicInfo: () => null,
-}));
-vi.mock("@/components/campaign/settings/detailed/CampaignDetailed", () => ({
-  CampaignTypeSpecificSettings: () => null,
-}));
-vi.mock("@/components/campaign/settings/CampaignSettingsQueue", () => ({
-  CampaignSettingsQueue: () => null,
+vi.mock("@/components/campaign/settings/detailed/CampaignLaunchExtras", () => ({
+  CampaignLaunchExtras: () => null,
 }));
 vi.mock("@/components/campaign/settings/CampaignCostPanel", () => ({
   CampaignCostPanel: () => null,
@@ -34,13 +28,9 @@ function renderLaunchReview(readinessIssues: string[] = []) {
       body_text: "Hello from the campaign",
       message_media: [],
     },
-    flags: {},
     workspace: "ws-1",
-    isActive: false,
     scripts: [],
-    audiences: [],
     mediaData: [],
-    campaign_id: "9",
     isChanged: false,
     phoneNumbers: [],
     handleInputChange: vi.fn(),
@@ -48,15 +38,10 @@ function renderLaunchReview(readinessIssues: string[] = []) {
     handleStatusButton: vi.fn(),
     handleScheduleButton: vi.fn(),
     formFetcher: { state: "idle" },
-    user: { id: "user-1" },
     startDisabledReason: readinessIssues[0] ?? null,
     readinessIssues,
-    campaignQueue: [],
     queueCount: 25,
     dequeuedCount: 0,
-    totalCount: 25,
-    mediaLinks: [],
-    handleNavigate: vi.fn(),
     scheduleDisabled: false,
     handleConfirmStatus: vi.fn(),
     confirmStatus: "play",
@@ -64,16 +49,15 @@ function renderLaunchReview(readinessIssues: string[] = []) {
     isSaving: false,
     activeIntent: null,
     credits: 100,
-    surveys: [],
     outboundEstimateInputs: {
       portalConfig: {},
       syncSnapshot: {},
     },
-    setupGuideLaunchActionLabel: "Start text campaign",
+    launchActionLabelOverride: "Start text campaign",
   } as never;
 
   const router = createMemoryRouter(
-    [{ path: "/", element: <CampaignSettings {...props} /> }],
+    [{ path: "/", element: <CampaignLaunch {...props} /> }],
     { initialEntries: ["/"] },
   );
   render(<RouterProvider router={router} />);
@@ -105,8 +89,8 @@ describe("campaign launch review", () => {
 
     expect(screen.getByText("Complete before launch")).toBeInTheDocument();
     expect(
-      screen.getByText("Message content or media is required"),
-    ).toBeInTheDocument();
+      screen.getAllByText("Message content or media is required").length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByRole("button", { name: "Start text campaign" }),
     ).toBeDisabled();

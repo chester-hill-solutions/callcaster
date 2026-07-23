@@ -13,7 +13,6 @@ import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { buildNumberPurchaseColumns } from "./NumberPurchase.columns";
 import { NumberPurchaseConfirmDialog } from "./NumberPurchase.ConfirmDialog";
-import { NumberPurchaseSuccessDialog } from "./NumberPurchase.SuccessDialog";
 import { NumberRentalCreditsAlert } from "./NumberRentalCreditsAlert";
 import { NumberPurchaseSearchForm } from "./NumberPurchase.SearchForm";
 import type { NumberSearchMode } from "@/lib/numbers-search.server";
@@ -40,7 +39,6 @@ export const NumberPurchase = ({
   const [filterSms, setFilterSms] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(null);
   const [lastQuery, setLastQuery] = useState("");
-  const [purchasedNumber, setPurchasedNumber] = useState<string | null>(null);
 
   const canAfford = hasCreditsForNumberRental(creditsBalance);
   const isSearching = fetcher.state !== "idle";
@@ -65,15 +63,13 @@ export const NumberPurchase = ({
       getSuccess: (data) => Boolean(data?.newNumber),
       successMessage: (data) => {
         const purchased = data?.newNumber;
-        return `Number purchased: ${purchased?.friendly_name ?? purchased?.phone_number ?? "New number"}`;
+        const phone =
+          purchased?.phone_number ?? purchased?.friendly_name ?? "new number";
+        return `Your number is live — try calling ${phone}. Recordings land in Voicemails.`;
       },
       getError: (data) => data?.error,
-      onSuccess: (data) => {
+      onSuccess: () => {
         setSelectedNumber(null);
-        const newPhoneNumber = data?.newNumber?.phone_number;
-        if (newPhoneNumber) {
-          setPurchasedNumber(newPhoneNumber);
-        }
         onPurchaseComplete?.();
       },
     },
@@ -142,12 +138,6 @@ export const NumberPurchase = ({
         canAfford={canAfford}
         billingLink={billingLink}
         purchaseFetcher={purchaseFetcher}
-      />
-
-      <NumberPurchaseSuccessDialog
-        phoneNumber={purchasedNumber}
-        onClose={() => setPurchasedNumber(null)}
-        workspaceId={workspaceId}
       />
     </div>
   );
