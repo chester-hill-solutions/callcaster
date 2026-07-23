@@ -2,15 +2,31 @@ import { describe, expect, test } from "vitest";
 
 import {
   DEFAULT_WEEKDAY_CALLING_SCHEDULE,
+  buildWeekdayCallingSchedule,
   getCampaignSetupDismissKey,
   getCampaignSetupSteps,
   getDefaultCampaignDates,
   shouldShowCampaignSetupGuide,
+  wallClockToUtcHm,
 } from "../app/lib/campaign-setup-steps";
 
 const validSchedule = DEFAULT_WEEKDAY_CALLING_SCHEDULE;
 
 describe("app/lib/campaign-setup-steps.ts", () => {
+  test("buildWeekdayCallingSchedule stores America/Toronto 09:00–17:00 as UTC", () => {
+    const at = new Date("2026-07-22T15:00:00Z"); // EDT (UTC-4)
+    expect(wallClockToUtcHm("09:00", "America/Toronto", at)).toBe("13:00");
+    expect(wallClockToUtcHm("17:00", "America/Toronto", at)).toBe("21:00");
+
+    const schedule = buildWeekdayCallingSchedule("America/Toronto", at);
+    expect(schedule.monday).toEqual({
+      active: true,
+      intervals: [{ start: "13:00", end: "21:00" }],
+    });
+    expect(schedule.saturday.active).toBe(false);
+    expect(schedule.sunday.active).toBe(false);
+  });
+
   test("shouldShowCampaignSetupGuide respects first draft, dismiss, and completion", () => {
     expect(
       shouldShowCampaignSetupGuide({

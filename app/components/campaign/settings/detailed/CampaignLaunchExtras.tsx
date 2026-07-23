@@ -1,5 +1,8 @@
+import { useState } from "react";
+import { AlertCircle, Plus } from "lucide-react";
+import { AddAudioSheet } from "../AddAudioSheet";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import SelectVoicemail from "./CampaignDetailed.Voicemail";
 import SelectVoiceDrop from "./live/CampaignDetailed.Live.SelectVoiceDrop";
 import { SplitCampaignPrompt } from "./CampaignDetailed.SplitCampaign";
@@ -22,7 +25,7 @@ import {
   estimateMessageCampaignOutbound,
 } from "@/lib/campaign-outbound-estimate";
 
-type CampaignDetails = LiveCampaign | MessageCampaign | IVRCampaign;
+type CampaignDetails = NonNullable<LiveCampaign | MessageCampaign | IVRCampaign>;
 
 type OutboundEstimateInputs = {
   portalConfig: WorkspaceTwilioOpsConfig;
@@ -122,6 +125,7 @@ export function CampaignLaunchExtras({
   queueCount,
   phoneNumbers,
   outboundEstimateInputs,
+  workspaceId,
 }: {
   campaignData: NonNullable<Campaign>;
   handleInputChange: (name: string, value: unknown) => void;
@@ -131,7 +135,9 @@ export function CampaignLaunchExtras({
   queueCount: number;
   phoneNumbers: WorkspaceNumbers[];
   outboundEstimateInputs: OutboundEstimateInputs;
+  workspaceId: string;
 }) {
+  const [addAudioOpen, setAddAudioOpen] = useState(false);
   const isIvrCampaign =
     campaignData.type === "robocall" ||
     campaignData.type === "simple_ivr" ||
@@ -207,15 +213,27 @@ export function CampaignLaunchExtras({
           </summary>
           <div className="mt-3 flex flex-col gap-3">
             {campaignData.type !== "message" ? (
-              <SelectVoicemail
-                handleInputChange={handleInputChange}
-                mediaData={mediaData}
-                campaignData={{
-                  ...(campaignData.voicemail_file && {
-                    voicemail_file: campaignData.voicemail_file,
-                  }),
-                }}
-              />
+              <div className="flex flex-wrap items-end gap-3">
+                <SelectVoicemail
+                  handleInputChange={handleInputChange}
+                  mediaData={mediaData}
+                  campaignData={{
+                    ...(campaignData.voicemail_file && {
+                      voicemail_file: campaignData.voicemail_file,
+                    }),
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => setAddAudioOpen(true)}
+                >
+                  <Plus className="h-4 w-4" aria-hidden />
+                  Add audio
+                </Button>
+              </div>
             ) : null}
             {campaignData.type === "live_call" ? (
               <div className="flex flex-wrap gap-2">
@@ -246,6 +264,11 @@ export function CampaignLaunchExtras({
               </div>
             ) : null}
           </div>
+          <AddAudioSheet
+            workspaceId={workspaceId}
+            open={addAudioOpen}
+            onOpenChange={setAddAudioOpen}
+          />
         </details>
       ) : null}
 

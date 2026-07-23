@@ -4,7 +4,7 @@ import { parseCSV } from "@/lib/utils";
 import { bulkCreateContacts } from "@/lib/database/contact.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import {
-  DEFAULT_WEEKDAY_CALLING_SCHEDULE,
+  buildWeekdayCallingSchedule,
   getDefaultCampaignDates,
 } from "@/lib/campaign-setup-steps";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
@@ -273,7 +273,7 @@ export async function handleNewCampaign({formData,
       type: newCampaignType,
       start_date,
       end_date,
-      schedule: DEFAULT_WEEKDAY_CALLING_SCHEDULE,
+      schedule: buildWeekdayCallingSchedule(),
       caller_id,
       created_at: new Date().toISOString(),
       dial_ratio: 1,

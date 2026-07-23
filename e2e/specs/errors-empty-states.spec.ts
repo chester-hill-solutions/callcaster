@@ -18,7 +18,7 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
   ownerTest("ERR-05 readiness queue empty blocks start", async ({ page }) => {
     await setCampaignReadinessGap(E2E_CAMPAIGNS.message.id, "queue_empty");
     const settings = new CampaignSettingsPage(page);
-    await settings.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.message.id);
+    await settings.gotoLaunch(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.message.id);
     await expect(settings.readinessPanel()).toBeVisible();
     await expect(page.getByText(/contact|queue|add at least one/i).first()).toBeVisible();
   });
@@ -55,7 +55,10 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
       workspacePath(E2E_WORKSPACES.ready.id, `campaigns/${E2E_CAMPAIGNS.liveCall.id}`),
     );
 
-    await expect(page.getByText("Your Campaign Results Will Show Here")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Call Campaign Results" })).toBeVisible();
+    await expect(
+      page.getByText("Disposition breakdowns appear here as outreach completes."),
+    ).toBeVisible();
     await expect(page.getByText("Loading results...")).toHaveCount(0);
 
     // #419 = "the server did not finish this Suspense boundary".

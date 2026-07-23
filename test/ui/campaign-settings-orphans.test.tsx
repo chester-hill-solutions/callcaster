@@ -40,6 +40,33 @@ describe("campaign settings orphan values", () => {
     expect(document.querySelector("#advanced-ivr-type")).toHaveTextContent("Complex IVR");
   });
 
+  test("hides Advanced IVR for live calling and text campaigns", () => {
+    const { rerender } = render(
+      <SelectType
+        campaignData={{ type: "live_call" } as never}
+        handleInputChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Advanced IVR")).not.toBeInTheDocument();
+
+    rerender(
+      <SelectType
+        campaignData={{ type: "message" } as never}
+        handleInputChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText("Advanced IVR")).not.toBeInTheDocument();
+
+    rerender(
+      <SelectType
+        campaignData={{ type: "robocall" } as never}
+        handleInputChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Advanced IVR")).toBeInTheDocument();
+  });
+
   test("shows unavailable caller ID and script values", () => {
     const { container, unmount } = render(
       <SelectNumber

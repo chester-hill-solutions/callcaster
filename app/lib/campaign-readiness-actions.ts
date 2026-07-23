@@ -16,7 +16,6 @@ export type CampaignReadinessCorrectiveAction =
       targetId:
         | "type"
         | "campaign-setup-number"
-        | "campaign-setup-content"
         | "campaign-setup-schedule"
         | "sms_send_mode";
       label: string;
@@ -114,8 +113,8 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     label: "Replace script",
   },
   audio_unavailable: {
-    type: "scroll",
-    targetId: "campaign-setup-content",
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
     label: "Replace audio",
   },
   message_content_required: {

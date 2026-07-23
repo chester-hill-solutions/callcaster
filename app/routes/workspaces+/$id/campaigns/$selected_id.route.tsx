@@ -144,7 +144,10 @@ export default function CampaignScreen() {
             (!campaignData ? (
               <ErrorLoadingResults />
             ) : results.length < 1 && ivrResponses.length < 1 ? (
-              <NoResultsYet />
+              <NoResultsYet
+                expectedTotal={safeQueueCounts.fullCount}
+                campaignType={campaignData.type}
+              />
             ) : (
               <ResultsDisplay
                 results={results}

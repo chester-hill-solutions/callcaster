@@ -269,11 +269,6 @@ export function estimateMessageCampaignOutbound(
       "Configured SMS dispatch rate exceeds the estimated Twilio sender limit.",
     );
   }
-  if (!input.portalConfig.parallelDispatchEnabled) {
-    warnings.push(
-      "Legacy sequential dispatch is still enabled (~2 MPS). Enable parallel dispatch after Twilio limits are confirmed.",
-    );
-  }
 
   return {
     pipelineMessagesPerSecond,

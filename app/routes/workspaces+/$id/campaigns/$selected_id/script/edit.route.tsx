@@ -1,11 +1,13 @@
 export { loader } from "./edit.loader.server";
 export { action } from "./edit.action.server";
 
-import { data as routeData, redirect, useLoaderData } from "react-router";
+import { useLoaderData } from "react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
+import SelectScript from "@/components/campaign/settings/detailed/CampaignDetailed.SelectScript";
+import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
 import { Button } from "@/components/ui/button";
 import { useHasChanges } from "@/hooks/utils/useHasChanges";
 import { useUnsavedChangesGuard } from "@/hooks/utils/useUnsavedChangesGuard";
@@ -20,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { Script } from "@/lib/types";
 import type { ScriptEditLoaderData } from "./edit.types";
 import { logger as loggerClient } from "@/lib/logger.client";
 import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
@@ -27,12 +30,20 @@ import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 type LoaderData = ScriptEditLoaderData;
 type PageData = LoaderData["data"];
 
+function isVoiceCampaignType(type: PageData["type"]): boolean {
+  return (
+    type === "live_call" ||
+    type === "robocall" ||
+    type === "simple_ivr" ||
+    type === "complex_ivr"
+  );
+}
+
 export default function ScriptEditor() {
   const {
-    workspace_id,
-    selected_id,
     mediaNames = [],
     data,
+    scripts = [],
   } = useLoaderData<LoaderData>();
   const [initData, setInitData] = useState<PageData>(data);
   const [pageData, setPageData] = useState<PageData>(data);
@@ -107,8 +118,34 @@ export default function ScriptEditor() {
     setPageData(newPageData);
   };
 
-  const renderCampaignSettingsScript = (mediaNames: string[] = []) => {
-    if (!pageData.campaignDetails.script) return null;
+  const handleScriptAssignment = (name: string, value: string | number | boolean | null) => {
+    if (name !== "script_id") return;
+
+    const nextScriptId =
+      value === "" || value == null ? null : Number(value);
+    const nextScript: Script | undefined =
+      nextScriptId == null
+        ? undefined
+        : scripts.find((script) => String(script.id) === String(nextScriptId));
+
+    handlePageDataChange({
+      ...pageData,
+      campaignDetails: {
+        ...pageData.campaignDetails,
+        script_id: nextScriptId,
+        script: nextScript,
+      },
+    });
+  };
+
+  const renderCampaignSettingsScript = (scriptMediaNames: string[] = []) => {
+    if (!pageData.campaignDetails.script) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          Select a script above to edit it here.
+        </p>
+      );
+    }
 
     const scriptPageData = {
       campaignDetails: {
@@ -129,10 +166,13 @@ export default function ScriptEditor() {
             },
           });
         }}
-        mediaNames={mediaNames}
+        mediaNames={scriptMediaNames}
       />
     );
   };
+
+  const selectedScriptId = pageData.campaignDetails.script_id ?? null;
+  const isScriptMissing = isVoiceCampaignType(pageData.type) && !selectedScriptId;
 
   return (
     <>
@@ -143,34 +183,47 @@ export default function ScriptEditor() {
           onSave={() => setShowSaveModal(true)}
           onReset={handleReset}
         />
-        <div className="h-full flex-grow p-4">
+        <div className="flex h-full flex-grow flex-col gap-4 p-4">
+          {isVoiceCampaignType(pageData.type) ? (
+            <div id="campaign-setup-content" className="space-y-3">
+              <SelectScript
+                handleInputChange={handleScriptAssignment}
+                selectedScript={selectedScriptId}
+                scripts={scripts}
+                invalid={isScriptMissing}
+              />
+            </div>
+          ) : null}
           {pageData.type === "live_call" && renderCampaignSettingsScript([])}
           {(pageData.type === "robocall" ||
             pageData.type === "simple_ivr" ||
             pageData.type === "complex_ivr") &&
             renderCampaignSettingsScript(mediaNames)}
           {pageData.type === "message" && (
-            <MessageSettings
-              mediaLinks={
-                Array.isArray(pageData.campaignDetails.mediaLinks)
-                  ? pageData.campaignDetails.mediaLinks.filter(
-                      (link): link is string => typeof link === "string",
-                    )
-                  : []
-              }
-              details={pageData.campaignDetails}
-              onChange={(field, value) => {
-                handlePageDataChange({
-                  ...pageData,
-                  campaignDetails: {
-                    ...pageData.campaignDetails,
-                    [field]: value,
-                  },
-                });
-              }}
-              surveys={[]}
-            />
+            <div id="campaign-setup-content">
+              <MessageSettings
+                mediaLinks={
+                  Array.isArray(pageData.campaignDetails.mediaLinks)
+                    ? pageData.campaignDetails.mediaLinks.filter(
+                        (link): link is string => typeof link === "string",
+                      )
+                    : []
+                }
+                details={pageData.campaignDetails}
+                onChange={(field, value) => {
+                  handlePageDataChange({
+                    ...pageData,
+                    campaignDetails: {
+                      ...pageData.campaignDetails,
+                      [field]: value,
+                    },
+                  });
+                }}
+                surveys={[]}
+              />
+            </div>
           )}
+          <CampaignPlaceNav current="content" />
         </div>
       </div>
       <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>

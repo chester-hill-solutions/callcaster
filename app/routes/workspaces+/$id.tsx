@@ -168,7 +168,7 @@ function WorkspaceResolvedView({
           </div>
         ) : null}
         <div
-          className={`min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6 ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
+          className={`min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
         >
           {!outlet ? (
             <div className="space-y-4">

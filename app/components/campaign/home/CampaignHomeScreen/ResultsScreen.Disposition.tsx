@@ -55,17 +55,26 @@ export const DispositionBreakdown = ({
   totalsByDisposition: Record<string, number> | null;
   totalOfAllResults: number;
 }) => {
-  return(
-  <div className="mb-8">
-    <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
-    {results?.map((result) => (
-      <DispositionBar
-        key={result.disposition}
-        {...result}
-        dispositionCount={totalsByDisposition?.[result.disposition] || 0}
-        totalOfAllResults={totalOfAllResults}
-        averageCallDuration={result?.average_call_duration || "00:00:00"}
-      />
-    ))}
-  </div>
-)};
+  const hasResults = Array.isArray(results) && results.length > 0;
+
+  return (
+    <div className="mb-8">
+      <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
+      {hasResults ? (
+        results.map((result) => (
+          <DispositionBar
+            key={result.disposition}
+            {...result}
+            dispositionCount={totalsByDisposition?.[result.disposition] || 0}
+            totalOfAllResults={totalOfAllResults}
+            averageCallDuration={result?.average_call_duration || "00:00:00"}
+          />
+        ))
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Disposition breakdowns appear here as outreach completes.
+        </p>
+      )}
+    </div>
+  );
+};

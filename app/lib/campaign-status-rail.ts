@@ -109,9 +109,8 @@ function firstIssueMessage(
 
 export function resolveCampaignRailPlace(
   pathname: string,
-  hash = "",
+  _hash = "",
 ): CampaignRailPlace {
-  const normalizedHash = hash.startsWith("#") ? hash.slice(1) : hash;
   if (/\/call\/?$/.test(pathname) || pathname.endsWith("/call")) {
     return "call";
   }
@@ -121,8 +120,11 @@ export function resolveCampaignRailPlace(
   if (/\/queue\/?$/.test(pathname) || pathname.endsWith("/queue")) {
     return "queue";
   }
+  if (/\/launch\/?$/.test(pathname) || pathname.endsWith("/launch")) {
+    return "launch";
+  }
   if (/\/settings\/?$/.test(pathname) || pathname.endsWith("/settings")) {
-    return normalizedHash === "campaign-launch" ? "launch" : "setup";
+    return "setup";
   }
   // Parent campaign path: /workspaces/:id/campaigns/:id (no trailing segment)
   return "results";
@@ -188,6 +190,97 @@ function resultsStatus(opts: {
 
 function campaignBasePath(workspaceId: string, campaignId: string | number): string {
   return `/workspaces/${encodeURIComponent(workspaceId)}/campaigns/${encodeURIComponent(String(campaignId))}`;
+}
+
+/** Setup flow places that get Back/Next footers (Results is Next from Launch only). */
+export type CampaignSetupFlowPlace = "setup" | "content" | "queue" | "launch";
+
+const SETUP_FLOW_PLACES: readonly CampaignSetupFlowPlace[] = [
+  "setup",
+  "content",
+  "queue",
+  "launch",
+] as const;
+
+const SETUP_FLOW_LABELS: Record<CampaignSetupFlowPlace | "results", string> = {
+  setup: "Setup",
+  content: "Content",
+  queue: "Queue",
+  launch: "Launch",
+  results: "Results",
+};
+
+export type CampaignPlaceNavLink = {
+  place: CampaignSetupFlowPlace | "results";
+  label: string;
+  href: string;
+};
+
+export type CampaignPlaceNavResult = {
+  back: CampaignPlaceNavLink | null;
+  next: CampaignPlaceNavLink | null;
+};
+
+function placeHref(
+  base: string,
+  place: CampaignSetupFlowPlace | "results",
+): string {
+  switch (place) {
+    case "setup":
+      return `${base}/settings`;
+    case "content":
+      return `${base}/script/edit`;
+    case "queue":
+      return `${base}/queue`;
+    case "launch":
+      return `${base}/launch`;
+    case "results":
+      return base;
+    default: {
+      const _exhaustive: never = place;
+      return _exhaustive;
+    }
+  }
+}
+
+/**
+ * Adjacent Back/Next for the Setup → Content → Queue → Launch flow.
+ * Launch's Next goes to Results; Setup has no Back.
+ */
+export function getCampaignPlaceNav(
+  workspaceId: string,
+  campaignId: string | number,
+  current: CampaignSetupFlowPlace,
+): CampaignPlaceNavResult {
+  const base = campaignBasePath(workspaceId, campaignId);
+  const index = SETUP_FLOW_PLACES.indexOf(current);
+  if (index < 0) {
+    return { back: null, next: null };
+  }
+
+  const prevPlace = index > 0 ? SETUP_FLOW_PLACES[index - 1]! : null;
+  const nextPlace =
+    index < SETUP_FLOW_PLACES.length - 1
+      ? SETUP_FLOW_PLACES[index + 1]!
+      : ("results" as const);
+
+  return {
+    back: prevPlace
+      ? {
+          place: prevPlace,
+          label: `Back to ${SETUP_FLOW_LABELS[prevPlace]}`,
+          href: placeHref(base, prevPlace),
+        }
+      : null,
+    next: {
+      place: nextPlace,
+      label:
+        nextPlace === "results"
+          ? "View Results"
+          : `Next: ${SETUP_FLOW_LABELS[nextPlace]}`,
+      href: placeHref(base, nextPlace),
+    },
+  };
 }
 
 /**
@@ -297,7 +390,7 @@ export function buildCampaignStatusRail(
     {
       id: "launch",
       label: "Launch",
-      href: `${base}/settings#campaign-launch`,
+      href: `${base}/launch`,
       isCurrent: currentPlace === "launch",
       navigable: true,
       health: startReady ? "ready" : "needs_attention",

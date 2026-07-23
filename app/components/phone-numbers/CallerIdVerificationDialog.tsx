@@ -1,9 +1,10 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 export type CallerIdValidationRequest = {
   accountSid: string;
@@ -26,12 +27,18 @@ export function CallerIdVerificationDialog({
   const code = validationRequest?.validationCode?.trim() ?? "";
 
   return (
-    <Dialog open={isOpen && Boolean(validationRequest)} onOpenChange={onOpenChange}>
-      <DialogContent className="flex w-full max-w-md flex-col items-center">
-        <DialogHeader>
-          <DialogTitle className="text-center">Your verification code</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 text-center">
+    <Sheet
+      open={isOpen && Boolean(validationRequest)}
+      onOpenChange={onOpenChange}
+    >
+      <SheetContent className="flex w-full flex-col sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Your verification code</SheetTitle>
+          <SheetDescription>
+            Enter this code when prompted on the verification call.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 py-4 text-center">
           <p className="text-sm text-muted-foreground">
             {phoneNumber
               ? `You will receive a call at ${phoneNumber}.`
@@ -46,9 +53,8 @@ export function CallerIdVerificationDialog({
               Check the verification call for your code.
             </p>
           )}
-          <p className="text-sm text-muted-foreground">Enter this code when prompted.</p>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

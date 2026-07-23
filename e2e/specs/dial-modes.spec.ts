@@ -8,7 +8,7 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
     await page.goto(
       workspacePath(
         E2E_WORKSPACES.ready.id,
-        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/settings`,
+        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/launch`,
       ),
     );
     await page.getByText("Calling options").click();

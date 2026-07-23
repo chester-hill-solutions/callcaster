@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useState } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
@@ -75,6 +83,9 @@ export default function QueueSettings() {
   const removeMemberFetcher = useFetcher<QueueActionResult>({ key: "queue-remove-member" });
   const [editing, setEditing] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [queuePendingDelete, setQueuePendingDelete] = useState<Queue | null>(
+    null,
+  );
 
   useActionFeedback(createFetcher.data, {
     getError: getQueueActionError,
@@ -212,18 +223,7 @@ export default function QueueSettings() {
                       variant="destructive"
                       size="sm"
                       disabled={deleteFetcher.state !== "idle"}
-                      onClick={() => {
-                        if (confirm("Delete queue?")) {
-                          deleteFetcher.submit(
-                            {
-                              _action: "delete-queue",
-                              id: String(queue.id),
-                              workspace_id: workspaceId,
-                            },
-                            { method: "DELETE", encType: "application/json" },
-                          );
-                        }
-                      }}
+                      onClick={() => setQueuePendingDelete(queue)}
                     >
                       Delete
                     </Button>
@@ -348,6 +348,52 @@ export default function QueueSettings() {
           </Button>
         )}
       </div>
+
+      <Dialog
+        open={queuePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setQueuePendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete queue?</DialogTitle>
+            <DialogDescription>
+              {queuePendingDelete
+                ? `Delete “${queuePendingDelete.name}” and remove its memberships.`
+                : "Delete this queue."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQueuePendingDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteFetcher.state !== "idle"}
+              onClick={() => {
+                if (!queuePendingDelete) return;
+                deleteFetcher.submit(
+                  {
+                    _action: "delete-queue",
+                    id: String(queuePendingDelete.id),
+                    workspace_id: workspaceId,
+                  },
+                  { method: "DELETE", encType: "application/json" },
+                );
+                setQueuePendingDelete(null);
+              }}
+            >
+              Delete queue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

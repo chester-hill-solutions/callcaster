@@ -159,7 +159,7 @@ describe("app/components/queue/QueueTable.tsx", () => {
 });
 
 describe("app/components/queue/ContactSearchDialog.tsx", () => {
-  test("opens dialog", async () => {
+  test("renders inline search panel when open", async () => {
     const { ContactSearchDialog } = await import("@/components/queue/ContactSearchDialog");
     render(
       <ContactSearchDialog
@@ -172,5 +172,6 @@ describe("app/components/queue/ContactSearchDialog.tsx", () => {
       />,
     );
     expect(screen.getByText("Search Contacts")).toBeInTheDocument();
+    expect(screen.getByTestId("contact-search-panel")).toBeInTheDocument();
   });
 });

@@ -1,8 +1,7 @@
 import { useNavigation } from "react-router";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
-import { Heading } from "@/components/ui/typography";
-import type { CampaignState } from "@/lib/campaign-home.types";
+import { Text } from "@/components/ui/typography";
 import {
   campaignTypeCollectsIvrResponses,
   type IvrQuestionResults,
@@ -125,13 +124,47 @@ export const ResultsDisplay = ({
   );
 };
 
-export const NoResultsYet = () => (
-  <div className="flex flex-auto items-center justify-center gap-2 pb-20 sm:flex-col">
-    <Heading level={1} branded className="text-center">
-      Your Campaign Results Will Show Here
-    </Heading>
-  </div>
-);
+/**
+ * Empty campaign results: same chrome as {@link ResultsDisplay}, with a quiet
+ * work-surface note instead of a branded billboard heading.
+ */
+export const NoResultsYet = ({
+  expectedTotal = 0,
+  campaignType,
+}: {
+  expectedTotal?: number;
+  campaignType?: Campaign["type"] | null;
+}) => {
+  const isMessage = campaignType === "message";
+  const title = isMessage ? "Message Campaign Results" : "Call Campaign Results";
+  const totalLabel = isMessage ? "Total Messages" : "Total Calls";
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="mb-6 text-3xl font-bold">{title}</h1>
+      <div className="mb-4 rounded px-8 pb-8 pt-6">
+        <div className="mb-8 flex flex-col">
+          <h2 className="mb-0 text-2xl font-semibold">
+            {totalLabel}: 0
+          </h2>
+          <h3 className="mb-4 text-xl font-light">of {expectedTotal}</h3>
+        </div>
+        <div className="mb-8">
+          <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
+          <Text variant="muted">
+            Disposition breakdowns appear here as outreach completes.
+          </Text>
+        </div>
+        <div className="mt-8">
+          <h3 className="mb-4 text-xl font-semibold">Key Metrics</h3>
+          <Text variant="muted">
+            Key rates fill in once contacts are reached.
+          </Text>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const ErrorLoadingResults = () => (
   <div>Error loading results. Please try again.</div>

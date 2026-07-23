@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Audience, QueueItem, Contact, Campaign, IVRCampaign, MessageCampaign, LiveCampaign } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
+import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
 import type { AppError } from "@/lib/errors.server";
 
 interface QueueResponse {
@@ -215,6 +216,9 @@ function QueueResolvedContent({
                 removeContactsFromQueue={queueActions.handleRemoveContactsFromQueue}
                 queueFetcher={queueActions.queueFetcher}
             />
+            <div className="px-4 pb-6">
+                <CampaignPlaceNav current="queue" />
+            </div>
         </>
     );
 }

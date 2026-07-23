@@ -147,12 +147,12 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
     expect(screen.getByText("Calling Hours")).toBeInTheDocument();
     expect(screen.getByText("No calling hours set")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Set Calling Hours" }),
+      screen.getByRole("button", { name: "Edit Calling Hours" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Send Window")).not.toBeInTheDocument();
   });
 
-  test("message campaign Apply persists sms_send_window, not schedule", async () => {
+  test("message campaign weekday preset persists sms_send_window, not schedule", async () => {
     const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
     const onChange = vi.fn();
     render(
@@ -161,11 +161,10 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
         handleInputChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Set Send Window" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Send Window" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Apply Send Window" }));
     expect(onChange).toHaveBeenCalled();
     const [field, value] = onChange.mock.calls.at(-1)!;
     expect(field).toBe("sms_send_window");
@@ -174,7 +173,7 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
     expect(parsed.monday.active).toBe(true);
   });
 
-  test("call campaign Apply persists schedule", async () => {
+  test("call campaign weekday preset persists schedule", async () => {
     const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
     const onChange = vi.fn();
     render(
@@ -183,13 +182,34 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
         handleInputChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Set Calling Hours" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Calling Hours" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Apply Calling Hours" }));
     const [field] = onChange.mock.calls.at(-1)!;
     expect(field).toBe("schedule");
+  });
+
+  test("enabling a day defaults to local business hours", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    const onChange = vi.fn();
+    render(
+      <SelectDates
+        campaignData={makeCampaign({ type: "live_call", schedule: null })}
+        handleInputChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit Calling Hours" }));
+    fireEvent.click(screen.getByLabelText("Monday active"));
+    const [, value] = onChange.mock.calls.at(-1)!;
+    const parsed = JSON.parse(String(value));
+    expect(parsed.monday.active).toBe(true);
+    expect(parsed.monday.intervals).toHaveLength(1);
+    // Stored as UTC; local 09:00–17:00 must not be the all-day sentinel.
+    expect(parsed.monday.intervals[0]).not.toEqual({
+      start: expect.stringMatching(/^00:00/),
+      end: expect.stringMatching(/^23:59/),
+    });
   });
 });
 
@@ -232,13 +252,6 @@ describe("app/components/campaign/settings/detailed/CampaignDetailed.tsx", () =>
             sms_send_mode: "from_number",
           })}
           handleInputChange={vi.fn()}
-          scripts={[]}
-          details={{
-            workspace: "ws-1",
-            campaign_id: 1,
-            body_text: "",
-            message_media: [],
-          } as never}
           isBusy={false}
         />
       </SmokeRouter>,

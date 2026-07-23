@@ -101,23 +101,39 @@ function parseSchedule(schedule: Campaign["schedule"]): Record<DayName, Schedule
 const SCHEDULE_COPY = {
   call: {
     label: "Calling Hours",
-    show: "Set Calling Hours",
-    hide: "Hide Calling Hours",
-    apply: "Apply Calling Hours",
+    show: "Edit",
+    hide: "Hide",
     empty: "No calling hours set",
     endTooltip: "The latest time to begin dialing.",
     field: "schedule" as const,
   },
   message: {
     label: "Send Window",
-    show: "Set Send Window",
-    hide: "Hide Send Window",
-    apply: "Apply Send Window",
+    show: "Edit",
+    hide: "Hide",
     empty: "No send window set",
     endTooltip: "The latest time to send messages.",
     field: "sms_send_window" as const,
   },
 } as const;
+
+function cleanScheduleForPersist(
+  schedule: Record<DayName, ScheduleDay>,
+): Record<DayName, ScheduleDay> {
+  return DAYS_OF_WEEK.reduce(
+    (acc, day) => ({
+      ...acc,
+      [day]: {
+        active: schedule[day].active,
+        intervals: schedule[day].intervals.map((interval: ScheduleInterval) => ({
+          start: interval.start,
+          end: interval.end,
+        })),
+      },
+    }),
+    {} as Record<DayName, ScheduleDay>,
+  );
+}
 
 function scheduleSourceForCampaign(campaignData: Campaign): unknown {
   return campaignData.type === "message"
@@ -164,46 +180,47 @@ export default function SelectDates({
     return date.toUTCString().slice(17, 22);
   };
 
+  const commitSchedule = (next: Record<DayName, ScheduleDay>) => {
+    const cleaned = cleanScheduleForPersist(next);
+    setCurrentSchedule(cleaned);
+    handleInputChange(copy.field, JSON.stringify(cleaned));
+  };
+
   const applyScheduleToAll = (schedule: { start: string; end: string }) => {
-    setCurrentSchedule((prev) => {
-      const newSchedule: Record<DayName, ScheduleDay> = { ...prev };
-      DAYS_OF_WEEK.forEach((day) => {
-        newSchedule[day] = {
-          active: true,
-          intervals: [schedule],
-        };
-      });
-      return newSchedule;
+    const newSchedule: Record<DayName, ScheduleDay> = { ...currentSchedule };
+    DAYS_OF_WEEK.forEach((day) => {
+      newSchedule[day] = {
+        active: true,
+        intervals: [schedule],
+      };
     });
+    commitSchedule(newSchedule);
   };
 
   const applyScheduleToWeekdays = (schedule: { start: string; end: string }) => {
-    setCurrentSchedule((prev) => {
-      const newSchedule: Record<DayName, ScheduleDay> = { ...prev };
-      WEEKDAYS.forEach((day) => {
-        newSchedule[day] = {
-          active: true,
-          intervals: [schedule],
-        };
-      });
-      return newSchedule;
+    const newSchedule: Record<DayName, ScheduleDay> = { ...currentSchedule };
+    WEEKDAYS.forEach((day) => {
+      newSchedule[day] = {
+        active: true,
+        intervals: [schedule],
+      };
     });
+    commitSchedule(newSchedule);
   };
 
   const handleCheckboxChange = (day: DayName) => {
-    const localMidnightUTC = localToUTC("00:00");
-    const localEndOfDayUTC = localToUTC("23:59");
-    const schedule = { start: localMidnightUTC, end: localEndOfDayUTC };
+    // Newly enabled days default to weekday business hours (local 09:00–17:00).
+    const businessHours = {
+      start: localToUTC("09:00"),
+      end: localToUTC("17:00"),
+    };
 
-    setCurrentSchedule((prev) => {
-      const newSchedule: Record<DayName, ScheduleDay> = {
-        ...prev,
-        [day]: {
-          active: !prev[day]?.active,
-          intervals: prev[day]?.active ? [] : [schedule],
-        },
-      };
-      return newSchedule;
+    commitSchedule({
+      ...currentSchedule,
+      [day]: {
+        active: !currentSchedule[day]?.active,
+        intervals: currentSchedule[day]?.active ? [] : [businessHours],
+      },
     });
   };
 
@@ -214,42 +231,29 @@ export default function SelectDates({
     index = 0
   ) => {
     const utcValue = localToUTC(localValue);
-    setCurrentSchedule((prev) => {
-      const daySchedule: ScheduleDay = prev[day] || { active: true, intervals: [{ start: "00:00", end: "23:59" }] };
-      
-      const intervals = daySchedule.intervals.length === 0 
-        ? [{ start: "00:00", end: "23:59" }]
+    const businessHours = {
+      start: localToUTC("09:00"),
+      end: localToUTC("17:00"),
+    };
+    const daySchedule: ScheduleDay = currentSchedule[day] || {
+      active: true,
+      intervals: [businessHours],
+    };
+
+    const intervals =
+      daySchedule.intervals.length === 0
+        ? [businessHours]
         : daySchedule.intervals;
 
-      const newSchedule: Record<DayName, ScheduleDay> = {
-        ...prev,
-        [day]: {
-          ...daySchedule,
-          intervals: intervals.map((interval: ScheduleInterval, i: number) =>
-            i === index ? { ...interval, [field]: utcValue } : interval
-          ),
-        },
-      };
-      return newSchedule;
-    });
-  };
-
-  const handleSave = () => {
-    // Remove any extra properties that might have been added
-    const cleanSchedule = DAYS_OF_WEEK.reduce((acc, day) => ({
-      ...acc,
+    commitSchedule({
+      ...currentSchedule,
       [day]: {
-        active: currentSchedule[day].active,
-        intervals: currentSchedule[day].intervals.map((interval: ScheduleInterval) => ({
-          start: interval.start,
-          end: interval.end
-        }))
-      }
-    }), {} as Record<DayName, ScheduleDay>);
-    
-    // Convert to a JSONB-compatible string for Postgres
-    handleInputChange(copy.field, JSON.stringify(cleanSchedule));
-    setShowSchedule(false);
+        ...daySchedule,
+        intervals: intervals.map((interval: ScheduleInterval, i: number) =>
+          i === index ? { ...interval, [field]: utcValue } : interval
+        ),
+      },
+    });
   };
 
   const scheduleForDisplay: Record<DayName, ScheduleDay> = {
@@ -326,8 +330,8 @@ export default function SelectDates({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="min-w-0 space-y-2">
           <Label>Start Date & Time</Label>
           <DateTimePicker
             value={
@@ -339,9 +343,10 @@ export default function SelectDates({
               handleInputChange("start_date", date ? date.toISOString() : null)
             }
             hourCycle={24}
+            showIcon={false}
           />
         </div>
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label>End Date & Time</Label>
           <DateTimePicker
             value={
@@ -353,6 +358,7 @@ export default function SelectDates({
               handleInputChange("end_date", date ? date.toISOString() : null)
             }
             hourCycle={24}
+            showIcon={false}
           />
         </div>
       </div>
@@ -370,14 +376,18 @@ export default function SelectDates({
               setShowSchedule(!showSchedule)
             }}
             size="sm"
+            aria-label={showSchedule ? `Hide ${copy.label}` : `Edit ${copy.label}`}
+            aria-expanded={showSchedule}
           >
             {showSchedule ? copy.hide : copy.show}
           </Button>
         </div>
 
-        <div className="rounded-md bg-muted p-4">
-          {getScheduleSummary()}
-        </div>
+        {!showSchedule && (
+          <div className="rounded-md bg-brand-secondary/40 p-4 dark:bg-brand-secondary/15">
+            {getScheduleSummary()}
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
           Times are shown in your local time zone (
           {Intl.DateTimeFormat().resolvedOptions().timeZone}). Regardless of
@@ -416,9 +426,6 @@ export default function SelectDates({
               handleTimeChange={handleTimeChange}
               endTooltip={copy.endTooltip}
             />
-            <div className="flex justify-end">
-              <Button onClick={handleSave}>{copy.apply}</Button>
-            </div>
           </div>
         )}
       </div>

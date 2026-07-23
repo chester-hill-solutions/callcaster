@@ -4,6 +4,14 @@ import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { useFetcherOnIdle } from "@/hooks/utils/useFetcherOnIdle";
 import { useApiKeys, type ApiKeyRecord } from "@/hooks/workspace/useApiKeys";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -36,6 +44,9 @@ export default function ApiKeysSection({
 
   const [showCreateForm, setShowCreateForm] = useState(defaultShowCreateForm);
   const [newKeyReveal, setNewKeyReveal] = useState<string | null>(null);
+  const [keyPendingRevoke, setKeyPendingRevoke] = useState<ApiKeyRecord | null>(
+    null,
+  );
   const revealedKey = newKeyReveal;
 
   const { keys, isLoading, error: listError, refresh } = useApiKeys({
@@ -74,16 +85,21 @@ export default function ApiKeysSection({
       Boolean(data && "success" in data && data.success),
   });
 
-  const handleRevoke = (id: string) => {
-    if (!confirm("Revoke this API key? It will stop working immediately.")) return;
+  const handleRevoke = (key: ApiKeyRecord) => {
+    setKeyPendingRevoke(key);
+  };
+
+  const confirmRevoke = () => {
+    if (!keyPendingRevoke) return;
     mutateFetcher.submit(
-      JSON.stringify({ id, workspace_id: workspaceId }),
+      JSON.stringify({ id: keyPendingRevoke.id, workspace_id: workspaceId }),
       {
         method: "DELETE",
         action: "/api/workspace-api-keys",
         encType: "application/json",
-      }
+      },
     );
+    setKeyPendingRevoke(null);
   };
 
   const copyKey = () => {
@@ -150,7 +166,7 @@ export default function ApiKeysSection({
                   type="button"
                   variant="destructive"
                   size="sm"
-                  onClick={() => handleRevoke(key.id)}
+                  onClick={() => handleRevoke(key)}
                   disabled={mutateFetcher.state === "submitting"}
                 >
                   Revoke
@@ -230,6 +246,41 @@ export default function ApiKeysSection({
           </Button>
         )}
       </div>
+
+      <Dialog
+        open={keyPendingRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open) setKeyPendingRevoke(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke this API key?</DialogTitle>
+            <DialogDescription>
+              {keyPendingRevoke
+                ? `“${keyPendingRevoke.name}” will stop working immediately.`
+                : "This key will stop working immediately."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setKeyPendingRevoke(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={mutateFetcher.state === "submitting"}
+              onClick={confirmRevoke}
+            >
+              Revoke key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Section>
   );
 }

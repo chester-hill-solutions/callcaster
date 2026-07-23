@@ -4,6 +4,7 @@ import type {
   LiveCampaign,
   MessageCampaign,
   Schedule,
+  ScheduleDay,
   WorkspaceNumbers,
 } from "@/lib/types";
 import type { CampaignType } from "@/lib/db-types";
@@ -21,15 +22,111 @@ import {
   type CampaignProductGoal,
 } from "@/lib/campaign-goals";
 
-export const DEFAULT_WEEKDAY_CALLING_SCHEDULE: Schedule = {
-  monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  tuesday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  wednesday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  thursday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  friday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  saturday: { active: false, intervals: [] },
-  sunday: { active: false, intervals: [] },
-};
+/** Product default for new-campaign calling hours (CASL / Eastern Canada). */
+export const DEFAULT_CALLING_HOURS_TIMEZONE = "America/Toronto";
+
+/**
+ * Convert a wall-clock HH:mm in `timeZone` to a UTC HH:mm string for storage
+ * in `campaign.schedule` (evaluated in UTC by `checkSchedule`).
+ */
+export function wallClockToUtcHm(
+  wallHm: string,
+  timeZone: string,
+  at: Date = new Date(),
+): string {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(wallHm.trim());
+  if (!match) {
+    throw new Error(`Invalid wall-clock time: ${wallHm}`);
+  }
+  const wallHour = Number(match[1]);
+  const wallMinute = Number(match[2]);
+
+  const dateParts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(at)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+
+  const year = Number(dateParts.year);
+  const month = Number(dateParts.month);
+  const day = Number(dateParts.day);
+
+  // Interpret the desired wall time as if it were UTC, then correct by the
+  // zone's offset at that instant (iterate once for DST boundaries).
+  let utcMillis = Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0);
+  for (let i = 0; i < 2; i += 1) {
+    const offsetMillis = timezoneOffsetMillis(timeZone, new Date(utcMillis));
+    utcMillis =
+      Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0) - offsetMillis;
+  }
+
+  const corrected = new Date(utcMillis);
+  return `${String(corrected.getUTCHours()).padStart(2, "0")}:${String(
+    corrected.getUTCMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function timezoneOffsetMillis(timeZone: string, date: Date): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    parts.hour === "24" ? 0 : Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return asUtc - date.getTime();
+}
+
+/** Mon–Fri 09:00–17:00 in `timeZone`, stored as UTC clock times. */
+export function buildWeekdayCallingSchedule(
+  timeZone: string = DEFAULT_CALLING_HOURS_TIMEZONE,
+  at: Date = new Date(),
+): Schedule {
+  const start = wallClockToUtcHm("09:00", timeZone, at);
+  const end = wallClockToUtcHm("17:00", timeZone, at);
+  const weekday = (): ScheduleDay => ({
+    active: true,
+    intervals: [{ start, end }],
+  });
+  const inactive: ScheduleDay = { active: false, intervals: [] };
+
+  return {
+    monday: weekday(),
+    tuesday: weekday(),
+    wednesday: weekday(),
+    thursday: weekday(),
+    friday: weekday(),
+    saturday: inactive,
+    sunday: inactive,
+  };
+}
+
+/** Snapshot at module load; prefer {@link buildWeekdayCallingSchedule} at insert time. */
+export const DEFAULT_WEEKDAY_CALLING_SCHEDULE: Schedule =
+  buildWeekdayCallingSchedule();
 
 export type CampaignSetupStepId =
   | "phone_number"
@@ -206,15 +303,18 @@ function buildContentStep(
   campaignData: Campaign,
   workspaceId: string,
   scriptsCount: number,
+  campaignId: string | number,
 ): Pick<CampaignSetupStep, "label" | "description" | "action"> {
+  const contentHref = `/workspaces/${workspaceId}/campaigns/${campaignId}/script/edit`;
+
   if (campaignData.type === "message") {
     return {
       label: "Message content",
       description:
         "Write the SMS body or attach media that contacts will receive when this campaign runs.",
       action: {
-        type: "scroll",
-        targetId: "campaign-setup-content",
+        type: "link",
+        href: contentHref,
         label: "Add message content",
       },
     };
@@ -229,8 +329,8 @@ function buildContentStep(
     action:
       scriptsCount > 0
         ? {
-            type: "scroll",
-            targetId: "campaign-setup-content",
+            type: "link",
+            href: contentHref,
             label: "Select a script",
           }
         : {
@@ -349,7 +449,12 @@ export function getCampaignSetupSteps(
     });
   }
 
-  const contentMeta = buildContentStep(campaignData, workspaceId, scriptsCount);
+  const contentMeta = buildContentStep(
+    campaignData,
+    workspaceId,
+    scriptsCount,
+    campaignData.id,
+  );
   const contentStep = {
     id: "content",
     label:

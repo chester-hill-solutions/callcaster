@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   buildCampaignStatusRail,
+  getCampaignPlaceNav,
   resolveCampaignRailPlace,
 } from "../app/lib/campaign-status-rail";
 import { DEFAULT_WEEKDAY_CALLING_SCHEDULE } from "../app/lib/campaign-setup-steps";
@@ -18,11 +19,13 @@ const baseCampaign = {
 };
 
 describe("app/lib/campaign-status-rail.ts", () => {
-  test("resolveCampaignRailPlace uses hash for Setup vs Launch", () => {
+  test("resolveCampaignRailPlace maps Setup and Launch as sibling routes", () => {
     const settings = "/workspaces/ws/campaigns/12/settings";
     expect(resolveCampaignRailPlace(settings, "")).toBe("setup");
-    expect(resolveCampaignRailPlace(settings, "#campaign-launch")).toBe("launch");
-    expect(resolveCampaignRailPlace(settings, "campaign-launch")).toBe("launch");
+    expect(resolveCampaignRailPlace(settings, "#campaign-launch")).toBe("setup");
+    expect(resolveCampaignRailPlace("/workspaces/ws/campaigns/12/launch")).toBe(
+      "launch",
+    );
     expect(resolveCampaignRailPlace(`${settings}/`, "#other")).toBe("setup");
   });
 
@@ -132,12 +135,14 @@ describe("app/lib/campaign-status-rail.ts", () => {
       campaignData: { ...baseCampaign, status: "running" } as any,
       readinessIssues: [],
       hasAccess: true,
-      pathname: "/workspaces/ws/campaigns/12/settings",
-      hash: "#campaign-launch",
+      pathname: "/workspaces/ws/campaigns/12/launch",
     });
     expect(running.find((item) => item.id === "launch")?.isCurrent).toBe(true);
     expect(running.find((item) => item.id === "launch")?.launchLifecycle).toBe(
       "running",
+    );
+    expect(running.find((item) => item.id === "launch")?.href).toBe(
+      "/workspaces/ws/campaigns/12/launch",
     );
   });
 
@@ -169,5 +174,36 @@ describe("app/lib/campaign-status-rail.ts", () => {
       pathname: "/workspaces/ws/campaigns/12/settings",
     });
     expect(items.map((item) => item.id)).not.toContain("call");
+  });
+
+  test("getCampaignPlaceNav walks Setup → Content → Queue → Launch → Results", () => {
+    expect(getCampaignPlaceNav("ws", 12, "setup")).toEqual({
+      back: null,
+      next: {
+        place: "content",
+        label: "Next: Content",
+        href: "/workspaces/ws/campaigns/12/script/edit",
+      },
+    });
+    expect(getCampaignPlaceNav("ws", 12, "content").back).toMatchObject({
+      place: "setup",
+      href: "/workspaces/ws/campaigns/12/settings",
+    });
+    expect(getCampaignPlaceNav("ws", 12, "queue").next).toMatchObject({
+      place: "launch",
+      href: "/workspaces/ws/campaigns/12/launch",
+    });
+    expect(getCampaignPlaceNav("ws", 12, "launch")).toEqual({
+      back: {
+        place: "queue",
+        label: "Back to Queue",
+        href: "/workspaces/ws/campaigns/12/queue",
+      },
+      next: {
+        place: "results",
+        label: "View Results",
+        href: "/workspaces/ws/campaigns/12",
+      },
+    });
   });
 });

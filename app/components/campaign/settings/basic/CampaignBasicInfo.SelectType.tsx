@@ -1,3 +1,4 @@
+import { FormField } from "@/components/ui/form-field";
 import {
   Select,
   SelectContent,
@@ -36,55 +37,65 @@ export default function SelectType({
     selectedType.length > 0 &&
     !CAMPAIGN_TYPE_OPTIONS.some((option) => option.value === selectedType) &&
     !isAdvancedIvr;
+  // IVR variants only apply to automated phone menus (and legacy types that
+  // still need an escape hatch into Advanced IVR). Hide for live/text.
+  const showAdvancedIvr =
+    isAdvancedIvr || selectedType === "robocall" || isLegacyType;
 
   return (
     <div className="space-y-3">
-      <Select
-        value={isAdvancedIvr ? "" : selectedType}
-        onValueChange={(value) => handleInputChange("type", value)}
-      >
-        <SelectTrigger id="type">
-          <SelectValue placeholder={isAdvancedIvr ? "Advanced IVR" : "Select campaign goal"} />
-        </SelectTrigger>
-        <SelectContent>
-          {isLegacyType ? (
-            <SelectItem value={selectedType} disabled>
-              {selectedType} · Legacy campaign
-            </SelectItem>
-          ) : null}
-          {CAMPAIGN_TYPE_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FormField label="Campaign type" htmlFor="type">
+        <Select
+          value={isAdvancedIvr ? "" : selectedType}
+          onValueChange={(value) => handleInputChange("type", value)}
+        >
+          <SelectTrigger id="type">
+            <SelectValue placeholder={isAdvancedIvr ? "Advanced IVR" : "Select campaign goal"} />
+          </SelectTrigger>
+          <SelectContent>
+            {isLegacyType ? (
+              <SelectItem value={selectedType} disabled>
+                {selectedType} · Legacy campaign
+              </SelectItem>
+            ) : null}
+            {CAMPAIGN_TYPE_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FormField>
 
-      <details
-        className="rounded-md border bg-muted/20 px-3 py-2"
-        open={isAdvancedIvr || undefined}
-      >
-        <summary className="cursor-pointer text-sm font-medium">
-          Advanced IVR
-        </summary>
-        <div className="pt-3">
-          <Select
-            value={isAdvancedIvr ? selectedType : ""}
-            onValueChange={(value) => handleInputChange("type", value)}
-          >
-            <SelectTrigger id="advanced-ivr-type" aria-label="Advanced IVR type">
-              <SelectValue placeholder="Select an IVR type" />
-            </SelectTrigger>
-            <SelectContent>
-              {ADVANCED_IVR_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </details>
+      {showAdvancedIvr ? (
+        <details
+          className="rounded-md border bg-muted/20 px-3 py-2"
+          open={isAdvancedIvr || undefined}
+        >
+          <summary className="cursor-pointer text-sm font-medium">
+            Advanced IVR
+          </summary>
+          <div className="pt-3">
+            <FormField label="Advanced IVR type" htmlFor="advanced-ivr-type">
+              <Select
+                value={isAdvancedIvr ? selectedType : ""}
+                onValueChange={(value) => handleInputChange("type", value)}
+              >
+                <SelectTrigger id="advanced-ivr-type">
+                  <SelectValue placeholder="Select an IVR type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADVANCED_IVR_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

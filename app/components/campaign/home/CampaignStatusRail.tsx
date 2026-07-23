@@ -170,17 +170,33 @@ function TabItem({ item }: { item: CampaignRailItem }) {
   return link;
 }
 
+/** Scroll `el` into horizontal center of its nearest overflow-x ancestor only. */
+function scrollTabIntoTablist(
+  el: HTMLElement | null,
+  behavior: ScrollBehavior = "smooth",
+) {
+  if (!el) return;
+  const tablist = el.closest('[role="tablist"]');
+  if (!(tablist instanceof HTMLElement)) return;
+
+  const elLeft = el.offsetLeft;
+  const elWidth = el.offsetWidth;
+  const target =
+    elLeft - (tablist.clientWidth - elWidth) / 2;
+  const maxScroll = Math.max(0, tablist.scrollWidth - tablist.clientWidth);
+  const nextLeft = Math.min(maxScroll, Math.max(0, target));
+
+  tablist.scrollTo({ left: nextLeft, behavior });
+}
+
 /** Horizontal L→R status tabs. Full-width equal tabs on md+; scroll strip on mobile. */
 export function CampaignStatusRail({ items }: { items: CampaignRailItem[] }) {
   const location = useLocation();
   const currentSlotRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    currentSlotRef.current?.scrollIntoView({
-      behavior: "smooth",
-      inline: "center",
-      block: "nearest",
-    });
+    // Scope scroll to the tablist only — document scrollIntoView shifts the page.
+    scrollTabIntoTablist(currentSlotRef.current);
   }, [location.pathname, location.hash, items]);
 
   return (

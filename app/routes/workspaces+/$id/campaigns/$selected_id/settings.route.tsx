@@ -1,39 +1,11 @@
 export { loader } from "./settings.loader.server";
 export { action } from "./settings.action.server";
 
-import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs, redirect , useFetcher, useLoaderData, useNavigate, useOutletContext } from "react-router";
-
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
-import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
-import { useCampaignShellDirty } from "@/components/campaign/home/CampaignShellDirty";
-
-
-import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
-
-import {
-  Audience,
-  Campaign,
-  Script,
-  WorkspaceNumbers,
-  Schedule,
-  WorkspaceData,
-  QueueItem,
-  LiveCampaign,
-  MessageCampaign,
-  IVRCampaign,
-  Survey,
-  TwilioAccountData,
-} from "@/lib/types";
+import { useCampaignSettingsController } from "@/components/campaign/settings/useCampaignSettingsController";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
-import { useFetcherOnIdle } from "@/hooks/utils";
-import { normalizeSchedule } from "@/lib/workspace-members";
-import {
-  buildCampaignDetailsForType,
-  DETAIL_FIELDS,
-  normalizeCampaignData,
-} from "@/lib/campaign-settings";
-import { deepEqual } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -42,348 +14,38 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { productGoalForCampaignType } from "@/lib/campaign-goals";
-import type { CampaignType } from "@/lib/db-types";
-
-type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
-
-type CampaignWithAudiences = Campaign & {
-  audiences?: Audience[];
-  schedule?: Schedule;
-};
-
-type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
-  script?: Script;
-  mediaLinks?: string[];
-};
-
-type Context = {
-  joinDisabled: string | null;
-  audiences: Audience[];
-  campaignData: CampaignWithAudiences;
-  campaignDetails: CampaignDetails;
-  scheduleDisabled: string | boolean;
-  phoneNumbers: WorkspaceNumbers[];
-  workspace: WorkspaceData; 
-};
-
-type ActionData = {
-  success?: boolean;
-  error?: string;
-  campaign?: CampaignWithAudiences;
-  campaignDetails?: CampaignDetails;
-  actionType?: "save" | "status" | "duplicate";
-  status?: string;
-};
 
 export default function CampaignSettingsRoute() {
-  const {
-    audiences,
-    campaignData,
-    campaignDetails,
-    phoneNumbers,
-    workspace,
-  } = useOutletContext<Context>();
-  const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
-
-  const {
-    workspace_id,
-    selected_id,
-    campaignQueue: _campaignQueue,
-    queueCount,
-    dequeuedCount,
-    totalCount,
-    scripts,
-    mediaData,
-    user,
-    mediaLinks,
-    surveys,
-    outboundEstimateInputs,
-    smsSendContext,
-    campaignBilling,
-    readiness,
-  } = useLoaderData();
-
   const navigate = useNavigate();
-  const fetcher = useFetcher<ActionData>();
-  const { setIsDirty } = useCampaignShellDirty();
-  const [confirmStatus, setConfirmStatus] = useState<"play" | "archive" | "none">("none");
-  const initialCampaignData = useMemo(() => {
-    const normalized = normalizeCampaignData(campaignData);
-    if (normalized.type !== "message") {
-      return normalized;
-    }
-    if (normalized.sms_send_mode != null) {
-      return normalized;
-    }
-    if (
-      smsSendContext?.messagingServiceReady &&
-      smsSendContext.defaultMessagingServiceSid
-    ) {
-      return {
-        ...normalized,
-        sms_send_mode: "messaging_service" as const,
-        sms_messaging_service_sid: smsSendContext.defaultMessagingServiceSid,
-      };
-    }
-    return {
-      ...normalized,
-      sms_send_mode: "from_number" as const,
-      sms_messaging_service_sid: null,
-    };
-  }, [campaignData, smsSendContext]);
-  const [savedCampaignData, setSavedCampaignData] = useState(initialCampaignData);
-  const [savedCampaignDetails, setSavedCampaignDetails] = useState(campaignDetails);
-  const [draftCampaignData, setDraftCampaignData] = useState(initialCampaignData);
-  const [draftCampaignDetails, setDraftCampaignDetails] = useState(campaignDetails);
-  const [pendingCampaignType, setPendingCampaignType] = useState<Campaign["type"] | null>(null);
-  const isChanged =
-    !deepEqual(draftCampaignData, savedCampaignData) ||
-    !deepEqual(draftCampaignDetails, savedCampaignDetails);
+  const location = useLocation();
+  const {
+    phoneNumbers,
+    user,
+    draftCampaignData,
+    draftCampaignDetails,
+    pendingCampaignType,
+    setPendingCampaignType,
+    isChanged,
+    fetcher,
+    isSaving,
+    feedbackMessage,
+    feedbackTone,
+    smsSendContext,
+    handleInputChange,
+    handleSave,
+    handleResetData,
+    handleConfirmTypeChange,
+    resetCampaign,
+  } = useCampaignSettingsController();
 
   useEffect(() => {
-    setIsDirty(isChanged);
-    return () => setIsDirty(false);
-  }, [isChanged, setIsDirty]);
-
-  const [prevInitialCampaignData, setPrevInitialCampaignData] =
-    useState(initialCampaignData);
-  const [prevCampaignDetails, setPrevCampaignDetails] = useState(campaignDetails);
-  if (
-    prevInitialCampaignData !== initialCampaignData ||
-    prevCampaignDetails !== campaignDetails
-  ) {
-    const previousStatus = prevInitialCampaignData.status;
-    setPrevInitialCampaignData(initialCampaignData);
-    setPrevCampaignDetails(campaignDetails);
-    if (!isChanged) {
-      setSavedCampaignData(initialCampaignData);
-      setSavedCampaignDetails(campaignDetails);
-      setDraftCampaignData(initialCampaignData);
-      setDraftCampaignDetails(campaignDetails);
-    } else if (initialCampaignData.status !== previousStatus) {
-      const nextStatus = initialCampaignData.status as CampaignStatus;
-      setDraftCampaignData((current) => ({ ...current, status: nextStatus }));
-      setSavedCampaignData((current) => ({ ...current, status: nextStatus }));
+    const hash = location.hash.startsWith("#")
+      ? location.hash.slice(1)
+      : location.hash;
+    if (hash === "campaign-launch") {
+      navigate(`../launch${location.search}`, { replace: true, relative: "path" });
     }
-  }
-
-  useFetcherOnIdle(fetcher, (data) => {
-    if (!data?.success) {
-      return;
-    }
-
-    if (data.actionType === "save" && data.campaign && data.campaignDetails) {
-      const nextCampaignData = normalizeCampaignData(
-        data.campaign as CampaignWithAudiences,
-      );
-
-      setSavedCampaignData(nextCampaignData);
-      setSavedCampaignDetails(data.campaignDetails);
-      setDraftCampaignData(nextCampaignData);
-      setDraftCampaignDetails(data.campaignDetails);
-      return;
-    }
-
-    if (data.actionType === "status") {
-      setConfirmStatus("none");
-      const newStatus = data.status;
-      if (newStatus) {
-        setDraftCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
-        setSavedCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
-      }
-    }
-  });
-
-  const activeIntent = fetcher.formData ? String(fetcher.formData.get("intent") ?? "") : null;
-  const isBusy = fetcher.state !== "idle";
-  const isSaving = isBusy && activeIntent === "save";
-  const feedbackMessage = fetcher.data?.error
-    ? fetcher.data.error
-    : fetcher.state === "idle" && fetcher.data?.success
-      ? fetcher.data.actionType === "save"
-        ? "Campaign changes saved."
-        : fetcher.data.actionType === "status"
-          ? "Campaign status updated."
-          : fetcher.data.actionType === "duplicate"
-            ? "Campaign duplicated."
-            : null
-      : null;
-  const feedbackTone = fetcher.data?.error
-    ? "error"
-    : feedbackMessage
-      ? "success"
-      : null;
-
-  const readinessFromLoader = readiness;
-  const startDisabledReason = isChanged
-    ? "Save your changes before starting this campaign"
-    : readinessFromLoader.startDisabledReason;
-  const scheduleDisabledReason = isChanged
-    ? "Save your changes before scheduling this campaign"
-    : readinessFromLoader.scheduleDisabledReason;
-  const readinessIssues = isChanged
-    ? ["Save your changes to refresh campaign readiness."]
-    : readinessFromLoader.startIssues;
-
-  const launchLabel = (() => {
-    const goal = draftCampaignData.type
-      ? productGoalForCampaignType(draftCampaignData.type as CampaignType)
-      : null;
-    switch (goal) {
-      case "live_calling":
-        return "Start calling";
-      case "text_campaign":
-        return "Start text campaign";
-      case "automated_phone_menu":
-        return "Start phone menu";
-      case null:
-        return "Start campaign";
-      default: {
-        const _exhaustive: never = goal;
-        return _exhaustive;
-      }
-    }
-  })();
-
-  const handleDuplicate = () => {
-    const { id, ...dataToDuplicate } = draftCampaignData;
-    fetcher.submit(
-      {
-        intent: "duplicate",
-        campaignData: JSON.stringify(dataToDuplicate)
-      },
-      { method: "post" }
-    );
-  };
-
-  const handleStatusChange = (status: CampaignStatus) => {
-    const formData: { intent: string; status: CampaignStatus; is_active?: boolean } = { intent: "status", status };
-
-    if (status === "running") formData.is_active = true;
-    if (status === "paused") formData.is_active = false;
-
-    fetcher.submit(
-      formData,
-      { method: "post" }
-    );
-  };
-
-  const handleConfirmStatus = (status: "play" | "archive" | "none") => {
-    if (status === "none") {
-      if (!isBusy) {
-        setConfirmStatus("none");
-      }
-      return;
-    }
-
-    if (status === "play") {
-      if (confirmStatus === "play") {
-        handleStatusChange("running");
-        return;
-      }
-
-      setConfirmStatus("play");
-      return;
-    }
-
-    if (status === "archive") {
-      if (confirmStatus === "archive") {
-        handleStatusChange("archived");
-        return;
-      } 
-    }
-
-    setConfirmStatus("archive");
-  };
-
-  const handleInputChange = (name: string, value: unknown) => {
-    if (name === "type") {
-      const nextType = String(value) as Campaign["type"];
-
-      if (nextType !== draftCampaignData.type) {
-        setPendingCampaignType(nextType);
-      }
-
-      return;
-    }
-
-    const normalizedValue =
-      name === "script_id"
-        ? value === "" || value == null
-          ? null
-          : Number(value)
-        : name === "schedule" || name === "sms_send_window"
-          ? normalizeSchedule(value)
-          : value;
-
-    if (DETAIL_FIELDS.has(name)) {
-      setDraftCampaignDetails((currentDetails) => ({
-        ...currentDetails,
-        [name]: normalizedValue,
-      }));
-      setDraftCampaignData((currentCampaignData) => ({
-        ...currentCampaignData,
-        [name]: normalizedValue,
-      }));
-      return;
-    }
-
-    setDraftCampaignData((currentCampaignData) => ({
-      ...currentCampaignData,
-      [name]: normalizedValue,
-    }));
-  };
-
-  const handleSave = () => {
-    fetcher.submit(
-      {
-        intent: "save",
-        campaignData: JSON.stringify(draftCampaignData),
-        campaignDetails: JSON.stringify(draftCampaignDetails),
-      },
-      { method: "post" },
-    );
-  };
-
-  const handleResetData = () => {
-    setDraftCampaignData(savedCampaignData);
-    setDraftCampaignDetails(savedCampaignDetails);
-    setPendingCampaignType(null);
-  };
-
-  const handleConfirmTypeChange = () => {
-    if (!pendingCampaignType) {
-      return;
-    }
-
-    const nextDetails = buildCampaignDetailsForType(
-      pendingCampaignType,
-      draftCampaignDetails,
-      Number(selected_id),
-      workspace_id,
-    );
-
-    setDraftCampaignDetails(nextDetails);
-    setDraftCampaignData((currentCampaignData) => ({
-      ...currentCampaignData,
-      type: pendingCampaignType,
-      script_id: "script_id" in nextDetails ? nextDetails.script_id ?? null : null,
-      body_text: "body_text" in nextDetails ? nextDetails.body_text ?? "" : null,
-      message_media: "message_media" in nextDetails ? nextDetails.message_media ?? [] : null,
-      voicedrop_audio: "voicedrop_audio" in nextDetails ? nextDetails.voicedrop_audio ?? null : null,
-    }));
-    setPendingCampaignType(null);
-  };
-
-  const resetCampaign = () => {
-    const formData = new FormData();
-    formData.append("campaign_id", selected_id);
-    fetcher.submit(formData, {
-      method: 'POST',
-      action: "/api/reset_campaign"
-    })
-  }
+  }, [location.hash, location.search, navigate]);
 
   return (
     <>
@@ -415,70 +77,24 @@ export default function CampaignSettingsRoute() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {(user.id === "a656121d-17af-414c-97c7-71f2008f8f14" || user.id === "60c86cc8-b9fc-4995-b81e-f49e88ec208c") &&
-        <Button onClick={() => resetCampaign()}>
-          Reset Campaign
-        </Button>}
+      {(user?.id === "a656121d-17af-414c-97c7-71f2008f8f14" ||
+        user?.id === "60c86cc8-b9fc-4995-b81e-f49e88ec208c") && (
+        <Button onClick={() => resetCampaign()}>Reset Campaign</Button>
+      )}
       <CampaignSettings
-        workspace={workspace_id}
         campaignData={draftCampaignData}
-        campaignDetails={draftCampaignDetails as any}
-        credits={Number((workspaceRecord as { credits?: number })?.credits ?? 0)}
-        isActive={draftCampaignData?.status === "running" || false}
-        scripts={scripts}
-        audiences={audiences}
-        mediaData={mediaData || []}
-        campaign_id={selected_id}
+        campaignDetails={draftCampaignDetails as never}
         phoneNumbers={phoneNumbers}
         handleInputChange={handleInputChange}
-        handleDuplicateButton={handleDuplicate}
-        handleStatusButton={(type) => {
-          if (type === "play" || type === "archive") {
-            setConfirmStatus(type);
-          } else if (type === "pause") {
-            setDraftCampaignData((current) => ({ ...current, status: "paused" }));
-            setSavedCampaignData((current) => ({ ...current, status: "paused" }));
-            handleStatusChange("paused");
-          } else if (type === "schedule") {
-            setDraftCampaignData((current) => ({ ...current, status: "scheduled" }));
-            setSavedCampaignData((current) => ({ ...current, status: "scheduled" }));
-            handleStatusChange("scheduled");
-          }
-        }}
-        handleConfirmStatus={handleConfirmStatus}
-        handleScheduleButton={() => {
-          setDraftCampaignData((current) => ({ ...current, status: "scheduled" }));
-          setSavedCampaignData((current) => ({ ...current, status: "scheduled" }));
-          handleStatusChange("scheduled");
-        }}
         formFetcher={fetcher}
-        user={user}
-        startDisabledReason={startDisabledReason}
-        readinessIssues={readinessIssues}
-        queueCount={queueCount || 0}
-        dequeuedCount={dequeuedCount || 0}
-        totalCount={totalCount || 0}
-        mediaLinks={mediaLinks}
-        isBusy={isBusy}
-        isSaving={isSaving}
-        activeIntent={activeIntent}
-        feedbackMessage={feedbackMessage}
-        feedbackTone={feedbackTone}
-        handleNavigate={(e) => {
-          e.preventDefault();
-          navigate(e.currentTarget.value);
-        }}
-        scheduleDisabled={scheduleDisabledReason || false}
-        confirmStatus={confirmStatus}
         flags={{}}
         isChanged={isChanged}
         handleSave={handleSave}
         handleResetData={handleResetData}
-        surveys={surveys || []}
-        outboundEstimateInputs={outboundEstimateInputs}
+        isSaving={isSaving}
+        feedbackMessage={feedbackMessage}
+        feedbackTone={feedbackTone}
         smsSendContext={smsSendContext}
-        launchActionLabelOverride={launchLabel}
-        campaignBilling={campaignBilling as CampaignBillingSummary | null}
       />
     </>
   );
