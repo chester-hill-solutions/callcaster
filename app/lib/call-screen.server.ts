@@ -10,6 +10,7 @@ import {
   fetchActiveCampaignQueueWithContacts,
 } from "@/lib/campaign-queue-search.server";
 import {
+  getAssignedUserId,
   isAssignedToUser,
   isQueued,
 } from "@/lib/queue-status";
@@ -117,7 +118,21 @@ export async function getQueueByDialType(
     return queueItems.filter((item) => isQueued(item)).slice(0, 50);
   }
   if (dialType === "call") {
-    return queueItems.filter((item) => isAssignedToUser(item, userId)).slice(0, 50);
+    // Manual dialing works off a shared queue. Enqueue (rpcHandleCampaignQueueEntry)
+    // never assigns a user, so rows land unassigned + queued. Filtering to only
+    // rows already assigned to this operator left `nextRecipient` null for every
+    // fresh manual campaign — the header showed "N remaining" but the Dial button
+    // stayed disabled (#1099). Include unassigned queued rows so the operator has
+    // a next contact to dial; keep this operator's own assigned rows so an
+    // in-progress row is never dropped. Rows assigned to another operator are
+    // excluded to avoid two operators dialing the same contact.
+    return queueItems
+      .filter(
+        (item) =>
+          isAssignedToUser(item, userId) ||
+          (getAssignedUserId(item) === null && isQueued(item)),
+      )
+      .slice(0, 50);
   }
   throw new Error("Invalid dial type");
 }
