@@ -182,9 +182,33 @@ describe("call-screen.server", () => {
   });
 
   test("getQueueByDialType throws for invalid dial type", async () => {
-    await expect(getQueueByDialType({} as never, "1", "invalid", "user-1")).rejects.toThrow(
+    await expect(getQueueByDialType("1", "invalid", "user-1")).rejects.toThrow(
       "Invalid dial type",
     );
+  });
+
+  test("getQueueByDialType (call) includes unassigned queued rows and this operator's own rows, but not other operators' (#1099)", async () => {
+    // Manual enqueue never assigns a user, so a fresh manual campaign has only
+    // unassigned queued rows. Those must be dialable, or the Dial button is
+    // permanently disabled while the header still shows contacts remaining.
+    queueSearchMocks.fetchActiveCampaignQueueWithContacts.mockResolvedValue([
+      { id: 1, queue_state: "queued", assigned_to_user_id: null, dequeued_at: null },
+      { id: 2, queue_state: "queued", assigned_to_user_id: "user-1", dequeued_at: null },
+      { id: 3, queue_state: "queued", assigned_to_user_id: "user-2", dequeued_at: null },
+    ] as never);
+
+    const queue = await getQueueByDialType("1", "call", "user-1");
+    expect(queue.map((row) => (row as { id: number }).id)).toEqual([1, 2]);
+  });
+
+  test("getQueueByDialType (call) excludes unassigned rows that are not queued", async () => {
+    queueSearchMocks.fetchActiveCampaignQueueWithContacts.mockResolvedValue([
+      { id: 1, queue_state: "assigned", assigned_to_user_id: null, dequeued_at: null },
+      { id: 2, queue_state: "queued", assigned_to_user_id: null, dequeued_at: null },
+    ] as never);
+
+    const queue = await getQueueByDialType("1", "call", "user-1");
+    expect(queue.map((row) => (row as { id: number }).id)).toEqual([2]);
   });
 
   test("getCallScreenData throws when any query errors", async () => {
