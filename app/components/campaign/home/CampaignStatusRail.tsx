@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router";
 import { CheckCircle2, CircleAlert, Phone } from "lucide-react";
 import type { CampaignRailItem } from "@/lib/campaign-status-rail";
@@ -75,7 +76,7 @@ function TabStatusMark({ item }: { item: CampaignRailItem }) {
     return (
       <CheckCircle2
         className={cn(
-          "h-3.5 w-3.5 shrink-0",
+          "hidden h-3.5 w-3.5 shrink-0 sm:inline",
           item.isCurrent ? "text-white/90" : "text-emerald-600",
         )}
         aria-hidden
@@ -90,7 +91,7 @@ function TabItem({ item }: { item: CampaignRailItem }) {
   const hint = statusHint(item);
 
   const tabClass = cn(
-    "inline-flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors",
+    "inline-flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors",
     item.isCurrent
       ? "bg-brand-primary text-white"
       : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -112,7 +113,11 @@ function TabItem({ item }: { item: CampaignRailItem }) {
 
   if (!item.navigable) {
     const blocked = (
-      <span className={tabClass} aria-disabled="true" title={item.tooltip ?? undefined}>
+      <span
+        className={tabClass}
+        aria-disabled="true"
+        title={item.tooltip ?? undefined}
+      >
         {label}
       </span>
     );
@@ -165,9 +170,18 @@ function TabItem({ item }: { item: CampaignRailItem }) {
   return link;
 }
 
-/** Horizontal L→R status tabs for campaign places. */
+/** Horizontal L→R status tabs. Full-width equal tabs on md+; scroll strip on mobile. */
 export function CampaignStatusRail({ items }: { items: CampaignRailItem[] }) {
   const location = useLocation();
+  const currentSlotRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    currentSlotRef.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [location.pathname, location.hash, items]);
 
   return (
     <nav
@@ -179,10 +193,23 @@ export function CampaignStatusRail({ items }: { items: CampaignRailItem[] }) {
       <div
         role="tablist"
         aria-orientation="horizontal"
-        className="flex w-full gap-1 overflow-x-auto rounded-lg border bg-card p-1"
+        className={cn(
+          "flex w-full gap-1 rounded-lg border bg-card p-1",
+          "overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-mandatory",
+          "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+        )}
       >
         {items.map((item) => (
-          <div key={item.id} className="min-w-0 flex-1">
+          <div
+            key={item.id}
+            ref={item.isCurrent ? currentSlotRef : undefined}
+            className={cn(
+              "snap-center",
+              // Mobile: readable width + peek of next tab; desktop: share evenly
+              "w-[30%] max-w-[9rem] shrink-0 grow-0 sm:w-[24%]",
+              "md:w-auto md:max-w-none md:min-w-0 md:shrink md:grow md:basis-0",
+            )}
+          >
             <TabItem item={item} />
           </div>
         ))}
