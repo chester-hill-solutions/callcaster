@@ -1,6 +1,7 @@
 import { and, asc, eq, gt , sql } from "drizzle-orm";
 import { workspace_events } from "@/db/schema";
 import type { PostgresChangePayload } from "@/lib/workspace-events.shared";
+import { logger } from "@/lib/logger.server";
 import { dbDirect } from "@/server/db";
 
 export const WORKSPACE_EVENTS_NOTIFY_CHANNEL = "workspace_events";
@@ -51,14 +52,28 @@ export async function insertWorkspaceEvent(
 export async function emitPostgresChangeEvent(
   workspaceId: string,
   change: PostgresChangePayload,
-): Promise<WorkspaceEventRow> {
-  return insertWorkspaceEvent(workspaceId, "postgres_change", {
-    eventType: change.eventType,
-    table: change.table,
-    schema: change.schema ?? "public",
-    new: change.new,
-    old: change.old,
-  });
+): Promise<WorkspaceEventRow | null> {
+  // Best-effort realtime notification. A failed workspace_events insert must
+  // never convert an already-committed mutation (campaign status, queue, chat)
+  // into a user-facing error — realtime freshness is secondary to the write
+  // that already landed. Log loudly so a broken SSE channel is still visible.
+  try {
+    return await insertWorkspaceEvent(workspaceId, "postgres_change", {
+      eventType: change.eventType,
+      table: change.table,
+      schema: change.schema ?? "public",
+      new: change.new,
+      old: change.old,
+    });
+  } catch (error) {
+    logger.error("workspace postgres_change emission failed", {
+      workspaceId,
+      table: change.table,
+      eventType: change.eventType,
+      error,
+    });
+    return null;
+  }
 }
 
 type RealtimeRow = Record<string, unknown>;
@@ -81,7 +96,7 @@ export async function emitChatMessageEvent(
   eventType: "INSERT" | "UPDATE" | "DELETE",
   newRow: RealtimeRow | null,
   oldRow?: RealtimeRow | null,
-): Promise<WorkspaceEventRow> {
+): Promise<WorkspaceEventRow | null> {
   return emitPostgresChangeEvent(workspaceId, {
     eventType,
     table: "message",
@@ -96,7 +111,7 @@ export async function emitQueueEvent(
   eventType: "INSERT" | "UPDATE" | "DELETE",
   newRow: RealtimeRow | null,
   oldRow?: RealtimeRow | null,
-): Promise<WorkspaceEventRow> {
+): Promise<WorkspaceEventRow | null> {
   return emitPostgresChangeEvent(workspaceId, {
     eventType,
     table: "campaign_queue",
@@ -110,7 +125,7 @@ export async function emitCampaignStatusEvent(
   workspaceId: string,
   newRow: RealtimeRow,
   oldRow?: RealtimeRow | null,
-): Promise<WorkspaceEventRow> {
+): Promise<WorkspaceEventRow | null> {
   return emitPostgresChangeEvent(workspaceId, {
     eventType: "UPDATE",
     table: "campaign",
@@ -127,7 +142,7 @@ export async function emitCampaignStatusEvent(
 export async function emitTransactionHistoryInsertEvent(
   workspaceId: string,
   newRow: RealtimeRow,
-): Promise<WorkspaceEventRow> {
+): Promise<WorkspaceEventRow | null> {
   return emitPostgresChangeEvent(workspaceId, {
     eventType: "INSERT",
     table: "transaction_history",
@@ -140,8 +155,19 @@ export async function emitTransactionHistoryInsertEvent(
 export async function emitPredictiveBroadcast(
   workspaceId: string,
   payload: { contact_id: number | null; status: string },
-): Promise<WorkspaceEventRow> {
-  return insertWorkspaceEvent(workspaceId, "predictive_broadcast", payload);
+): Promise<WorkspaceEventRow | null> {
+  // Best-effort: a failed broadcast must not break the committed call/webhook
+  // side-effect that triggered it.
+  try {
+    return await insertWorkspaceEvent(workspaceId, "predictive_broadcast", payload);
+  } catch (error) {
+    logger.error("workspace predictive_broadcast emission failed", {
+      workspaceId,
+      contactId: payload.contact_id,
+      error,
+    });
+    return null;
+  }
 }
 
 export async function fetchWorkspaceEventsAfter(
