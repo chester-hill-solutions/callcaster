@@ -38,6 +38,12 @@ export default function CampaignSettingsRoute() {
     resetCampaign,
   } = useCampaignSettingsController();
 
+  /**
+   * @effect Redirect legacy #campaign-launch hash deep-links to the dedicated launch route.
+   * @effect-deps location.hash, location.search, navigate
+   * @effect-side-effects navigate (client redirect)
+   * @effect-why-not-loader Hash fragments are not available to loaders; this preserves old bookmarks.
+   */
   useEffect(() => {
     const hash = location.hash.startsWith("#")
       ? location.hash.slice(1)

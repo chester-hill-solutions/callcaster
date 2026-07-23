@@ -166,6 +166,12 @@ export function useCampaignSettingsController() {
     !deepEqual(draftCampaignData, savedCampaignData) ||
     !deepEqual(draftCampaignDetails, savedCampaignDetails);
 
+  /**
+   * @effect Mirror local draft dirty state into CampaignShellDirty for rail navigation guards.
+   * @effect-deps isChanged (draft vs saved), setIsDirty from shell context
+   * @effect-side-effects context setter; clears dirty on unmount
+   * @effect-why-not-loader Dirty state is client edit chrome shared across sibling routes.
+   */
   useEffect(() => {
     setIsDirty(isChanged);
     return () => setIsDirty(false);

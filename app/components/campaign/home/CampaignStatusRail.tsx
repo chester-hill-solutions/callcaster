@@ -199,6 +199,12 @@ export function CampaignStatusRail({ items }: { items: CampaignRailItem[] }) {
   const location = useLocation();
   const currentSlotRef = useRef<HTMLDivElement | null>(null);
 
+  /**
+   * @effect Keep the active place tab scrolled into view in the horizontal rail.
+   * @effect-deps location.pathname, location.hash, items (active slot changes with route/hash)
+   * @effect-side-effects dom (tablist scrollLeft/scrollTo)
+   * @effect-why-not-loader Scroll position is viewport chrome, not request data.
+   */
   useEffect(() => {
     // Scope scroll to the tablist only — document scrollIntoView shifts the page.
     scrollTabIntoTablist(currentSlotRef.current);
