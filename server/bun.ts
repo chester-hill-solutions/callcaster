@@ -318,6 +318,20 @@ export async function createServer(options: CreateServerOptions = {}) {
     })());
 
   if (!options.skipDbHealthCheck) {
+    // Opt-in, self-guarding: on a fresh (e.g. PR-preview) database this applies
+    // the client/migrations the db-health guard below requires. No-op unless
+    // RUN_CLIENT_MIGRATIONS_ON_BOOT is set, and it refuses on legacy databases.
+    try {
+      const { applyClientMigrationsOnBoot } = await import(
+        "../app/server/bootstrap-migrations.server.ts"
+      );
+      await applyClientMigrationsOnBoot({ rootDir: ROOT_DIR });
+    } catch (error) {
+      log("error", "client-migration bootstrap errored", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     try {
       const { assertRequiredDbFunctions } = await import(
         "../app/server/db-health.server.ts"
