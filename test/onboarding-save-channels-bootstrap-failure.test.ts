@@ -216,7 +216,7 @@ describe("save_channels bootstrap failure surfaces a friendly payload, not a thr
     expect(mapped.kind === "ui_payload" && mapped.status).toBe(400);
   });
 
-  test("still redirects to audience on the happy path (bootstrap succeeds)", async () => {
+  test("still redirects to business_identity on the happy path (bootstrap succeeds)", async () => {
     mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValue(undefined);
 
     const outcome = await runOnboardingAction(
@@ -228,7 +228,10 @@ describe("save_channels bootstrap failure surfaces a friendly payload, not a thr
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
+    expect(outcome.result).toMatchObject({
+      kind: "redirect",
+      step: "business_identity",
+    });
     expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledTimes(1);
   });
 });
