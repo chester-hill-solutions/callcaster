@@ -11,8 +11,8 @@ import path from "node:path";
 // grew to fit the wide table instead of the table scrolling in place.
 //
 // After SURF-NUM-01 the route-local brand Panel was replaced with PageShell
-// + flat Sections. The shrink contract is now on the responsive grid and
-// Section/side wrappers (still min-w-0), not Panel classNames.
+// + flat Sections. Rent sits below Your numbers (stacked), with min-w-0 on
+// wrappers so wide number tables still scroll in place.
 //
 // jsdom doesn't compute layout, so this can't assert "no horizontal
 // overflow at 390px" directly. This asserts the structural shrink fix.
@@ -25,17 +25,20 @@ describe("app/routes/workspaces+/$id/settings/numbers.route.tsx responsive layou
     "utf-8",
   );
 
-  test("the responsive grid and list section allow shrinking below content width", () => {
-    expect(source).toMatch(
-      /grid min-w-0 gap-0 lg:grid-cols-\[2fr_1fr\] lg:gap-8/,
-    );
+  test("sections stack vertically and allow shrinking below content width", () => {
+    expect(source).toMatch(/flex min-w-0 flex-col/);
     expect(source).toMatch(/Section variant="flat" className="min-w-0"/);
     expect(source).toContain("PageShell");
     expect(source).not.toMatch(/\bPanel\b/);
+    expect(source).not.toMatch(/lg:grid-cols-/);
   });
 
-  test("the caller-id and purchase side column also allows shrinking", () => {
-    expect(source).toMatch(/className="min-w-0 space-y-\d+"/);
+  test("rent section sits below your numbers with a 300px floor", () => {
+    const yourNumbersIdx = source.indexOf('title="Your numbers"');
+    const rentIdx = source.indexOf('title="Rent a number"');
+    expect(yourNumbersIdx).toBeGreaterThan(-1);
+    expect(rentIdx).toBeGreaterThan(yourNumbersIdx);
+    expect(source).toMatch(/Section variant="flat" className="min-w-\[300px\]"/);
     expect(source).toContain("<NumberCallerId");
     expect(source).toContain("<NumberPurchase");
   });

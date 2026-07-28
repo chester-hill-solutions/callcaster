@@ -119,7 +119,7 @@ export const campaignColumns: ColumnDef<Campaign>[] = [
       const progress = (row.getValue("progress") as number) * 100;
       return (
         <div className="flex flex-col items-center gap-1">
-          <p className="font-Zilla-Slab font-bold">{progress}%</p>
+          <p className="font-bold tabular-nums">{progress}%</p>
           <Progress value={progress} />
         </div>
       );

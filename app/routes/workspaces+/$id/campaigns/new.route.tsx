@@ -53,7 +53,7 @@ export default function CampaignsNew() {
 
   if (!canCreate) {
     return (
-      <section id="form" className="px-4 pb-8 pt-6 sm:px-6">
+      <section id="form">
         <PageShell title="Create campaign" maxWidth="narrow">
           <Section variant="flat">
             <Text variant="muted">
@@ -73,7 +73,7 @@ export default function CampaignsNew() {
   }
 
   return (
-    <section id="form" className="px-4 pb-8 pt-6 sm:px-6">
+    <section id="form">
       <PageShell title="Create campaign" maxWidth="narrow">
         {actionData?.error != null ? (
           <Text className="text-center text-destructive">

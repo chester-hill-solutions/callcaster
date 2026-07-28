@@ -88,7 +88,7 @@ export function OnboardingLaunchStep({
               : "Campaign pending"}
           </Badge>
           <Badge variant={creditsBalance > 0 ? "secondary" : "outline"}>
-            {creditsBalance.toLocaleString()} credits
+            {creditsBalance > 0 ? "Credits ready" : "Credits pending"}
           </Badge>
         </div>
         {readiness.warnings.length > 0 ? (

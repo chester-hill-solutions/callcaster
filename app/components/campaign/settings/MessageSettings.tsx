@@ -270,7 +270,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                     <div className="h-[40px]"></div>
                 </div>
             </div>
-            <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
+            <h3 className="text-2xl font-semibold">Your Campaign Message.</h3>
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg border bg-secondary/40 p-4">
                 <div className="flex flex-col">
                         {renderMediaContent()}

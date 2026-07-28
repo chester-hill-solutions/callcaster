@@ -118,7 +118,7 @@ export function ServiceAddressGate({
         <Form
           method="post"
           action={`/workspaces/${workspaceId}/onboarding`}
-          className="grid max-w-xl gap-3"
+          className="@container grid max-w-xl gap-3"
         >
           <input type="hidden" name="_action" value="save_service_address" />
           <input type="hidden" name="returnTo" value={returnPath} />
@@ -142,7 +142,7 @@ export function ServiceAddressGate({
               placeholder="Toronto"
             />
           </FormField>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 @min-[360px]:grid-cols-2">
             <FormField htmlFor="addressRegion" label="Province or region" required>
               <Input
                 id="addressRegion"

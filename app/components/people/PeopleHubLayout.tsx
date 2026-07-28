@@ -26,7 +26,7 @@ export function PeopleHubLayout({ children }: { children: ReactNode }) {
         </div>
         <nav
           aria-label="People sections"
-          className="flex w-fit gap-1 rounded-lg border bg-card p-1"
+          className="flex w-fit gap-1 rounded-lg bg-muted/40 p-1"
         >
           <NavLink to={`${baseUrl}/audiences`} className={tabClassName}>
             <Users className="h-4 w-4" />

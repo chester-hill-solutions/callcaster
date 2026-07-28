@@ -242,7 +242,7 @@ export default function VoicemailSetupPage() {
               <FormField
                 htmlFor="notify-email"
                 label="Who should get the voicemails?"
-                description="Recordings are emailed to this workspace member. Voicemail can't be answered without a recipient, so this is required."
+                description="Recordings are emailed to this workspace member. Choose a recipient to enable voicemail."
               >
                 {members.length > 0 ? (
                   <select

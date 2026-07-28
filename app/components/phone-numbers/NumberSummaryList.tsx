@@ -111,7 +111,7 @@ function PresetFields({
   switch (presetId) {
     case "agent":
       return (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @min-[360px]:grid-cols-2">
           <Input
             name="fallbackEmail"
             type="email"
@@ -170,7 +170,7 @@ function PresetFields({
       );
     case "voicemail":
       return (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @min-[360px]:grid-cols-2">
           <Input
             name="notificationEmail"
             type="email"
@@ -327,7 +327,7 @@ function NumberSummaryRow({
           ) : null}
         </div>
         <form
-          className="space-y-3 rounded-md border bg-muted/20 p-3"
+          className="@container space-y-3"
           onSubmit={(event) => {
             event.preventDefault();
             const values = Object.fromEntries(

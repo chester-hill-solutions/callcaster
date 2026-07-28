@@ -69,7 +69,7 @@ export default function NewScript() {
   }
 
   return (
-    <section id="form" className="px-4 pb-8 pt-6 sm:px-6">
+    <section id="form">
       <PageShell title="Add Script" maxWidth="narrow">
         {actionData?.error != null ? (
           <Text className="text-center text-destructive">

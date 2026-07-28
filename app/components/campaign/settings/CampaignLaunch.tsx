@@ -1,4 +1,4 @@
-import { FetcherWithComponents, Form } from "react-router";
+import { FetcherWithComponents, Form, Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -230,7 +230,18 @@ export const CampaignLaunch = ({
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Credits
           </dt>
-          <dd className="mt-1 text-sm">{formatCredits(credits || 0)} available</dd>
+          <dd className="mt-1 text-sm">
+            {credits > 0 ? (
+              "Credits ready"
+            ) : (
+              <Link
+                to="../../billing"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Add credits to launch
+              </Link>
+            )}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
