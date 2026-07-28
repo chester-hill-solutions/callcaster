@@ -42,4 +42,19 @@ describe("app/routes/workspaces+/$id/settings/numbers.route.tsx responsive layou
     expect(source).toContain("<NumberCallerId");
     expect(source).toContain("<NumberPurchase");
   });
+
+  test("address and compliance gates stay on the primary path above rent", () => {
+    const addressIdx = source.indexOf("<ServiceAddressGate");
+    const complianceIdx = source.indexOf("<SmsComplianceGate");
+    const rentIdx = source.indexOf('title="Rent a number"');
+    const accordionIdx = source.indexOf("<Accordion");
+    expect(addressIdx).toBeGreaterThan(-1);
+    expect(complianceIdx).toBeGreaterThan(-1);
+    expect(addressIdx).toBeLessThan(rentIdx);
+    expect(complianceIdx).toBeLessThan(rentIdx);
+    // Caller ID alone may stay behind progressive disclosure.
+    expect(accordionIdx).toBeGreaterThan(rentIdx);
+    expect(source).toContain("Caller ID verification");
+    expect(source).not.toContain("Address, compliance, and caller ID");
+  });
 });

@@ -12,6 +12,7 @@ const dbState = vi.hoisted(() => ({
   inserted: [] as string[],
   simpleApplied: [] as string[],
   factoryCalls: 0,
+  failSimpleOnce: false,
 }));
 
 vi.mock("postgres", () => {
@@ -32,6 +33,11 @@ vi.mock("postgres", () => {
   ) => {
     const p = Promise.resolve([]) as Promise<unknown[]> & { simple: () => Promise<unknown[]> };
     p.simple = () => {
+      if (dbState.failSimpleOnce && s !== "ROLLBACK") {
+        dbState.failSimpleOnce = false;
+        dbState.simpleApplied.push(s);
+        return Promise.reject(new Error("relation \"cron.job\" does not exist"));
+      }
       dbState.simpleApplied.push(s);
       return Promise.resolve([]);
     };
@@ -62,6 +68,7 @@ describe("bootstrap-migrations.server", () => {
     dbState.inserted = [];
     dbState.simpleApplied = [];
     dbState.factoryCalls = 0;
+    dbState.failSimpleOnce = false;
   });
 
   test("bootstrapEnabled only true for explicit opt-in", () => {
@@ -141,5 +148,20 @@ describe("bootstrap-migrations.server", () => {
     expect(result.skipped).toContain(firstApplied);
     expect(result.applied).not.toContain(firstApplied);
     expect(dbState.inserted).not.toContain(firstApplied);
+  });
+
+  test("rolls back an aborted transaction so later files can still apply", async () => {
+    dbState.failSimpleOnce = true;
+    const result = await applyClientMigrationsOnBoot({
+      env: { RUN_CLIENT_MIGRATIONS_ON_BOOT: "1", DATABASE_URL: "postgres://x" },
+      rootDir: ROOT_DIR,
+    });
+    expect(result.ran).toBe(true);
+    if (!result.ran) return;
+    expect(result.skipped.length).toBeGreaterThanOrEqual(1);
+    expect(result.applied.length).toBeGreaterThan(0);
+    expect(dbState.simpleApplied).toContain("ROLLBACK");
+    // First migration failed + rolled back; later files still recorded.
+    expect(dbState.inserted.length).toBe(result.applied.length);
   });
 });

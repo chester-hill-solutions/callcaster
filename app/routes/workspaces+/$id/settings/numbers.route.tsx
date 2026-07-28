@@ -281,6 +281,16 @@ const WorkspaceSettings = () => {
             />
           </Section>
           <div className="min-w-0 space-y-6">
+            <ServiceAddressGate
+              workspaceId={workspaceId ?? ""}
+              onboarding={onboarding}
+              isReadOnly={isReadOnly}
+            />
+            <SmsComplianceGate
+              workspaceId={workspaceId ?? ""}
+              onboarding={onboarding}
+              isReadOnly={isReadOnly}
+            />
             <Section variant="flat" className="min-w-[300px]">
               <SectionHeader branded={false} compact title="Rent a number" />
               <NumberPurchase
@@ -290,21 +300,11 @@ const WorkspaceSettings = () => {
               />
             </Section>
             <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="setup" className="border-border/60">
+              <AccordionItem value="caller-id" className="border-border/60">
                 <AccordionTrigger className="py-3 text-sm hover:no-underline">
-                  Address, compliance, and caller ID
+                  Caller ID verification
                 </AccordionTrigger>
-                <AccordionContent className="space-y-6">
-                  <ServiceAddressGate
-                    workspaceId={workspaceId ?? ""}
-                    onboarding={onboarding}
-                    isReadOnly={isReadOnly}
-                  />
-                  <SmsComplianceGate
-                    workspaceId={workspaceId ?? ""}
-                    onboarding={onboarding}
-                    isReadOnly={isReadOnly}
-                  />
+                <AccordionContent>
                   <NumberCallerId />
                 </AccordionContent>
               </AccordionItem>
