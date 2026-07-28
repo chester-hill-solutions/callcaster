@@ -232,10 +232,10 @@ export const CampaignLaunch = ({
           </dt>
           <dd className="mt-1 text-sm">
             {credits > 0 ? (
-              "Credits ready"
+              `${formatCredits(credits)} available`
             ) : (
               <Link
-                to="../../billing"
+                to={`/workspaces/${workspace}/billing`}
                 className="text-primary underline-offset-4 hover:underline"
               >
                 Add credits to launch
