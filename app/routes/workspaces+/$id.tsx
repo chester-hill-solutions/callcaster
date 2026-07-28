@@ -8,6 +8,7 @@ import {
   useOutlet,
   useOutletContext,
   useRevalidator,
+  useLocation,
 } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { OnboardingProgressStrip } from "./$id/onboarding/OnboardingProgressStrip";
@@ -121,6 +122,10 @@ function WorkspaceResolvedView({
 
   const liveCredits = workspace.credits;
   const canManageBilling = userRole === "admin" || userRole === "owner";
+  const location = useLocation();
+  // Credits page is where users top up — keep the low-credit banner off it (#1097).
+  const isBillingPage = /\/billing(?:\/|$)/.test(location.pathname);
+  const showLowCreditBanner = !isBillingPage && liveCredits < LOW_CREDIT_THRESHOLD;
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
@@ -138,7 +143,7 @@ function WorkspaceResolvedView({
         tabIndex={-1}
         className="flex min-w-0 flex-1 flex-col gap-4 focus:outline-none"
       >
-        {liveCredits <= 0 ? (
+        {showLowCreditBanner && liveCredits <= 0 ? (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
             <div className="font-medium">
               Credit balance is depleted. Add credits to resume campaigns and
@@ -152,7 +157,7 @@ function WorkspaceResolvedView({
               </Button>
             ) : null}
           </div>
-        ) : liveCredits < LOW_CREDIT_THRESHOLD ? (
+        ) : showLowCreditBanner ? (
           <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
             <div className="font-medium">
               Credits are running low ({liveCredits} left). Add credits to keep

@@ -85,6 +85,9 @@ export function productGoalForOnboardingGoal(
       return "text_campaign";
     case "ivr":
       return "automated_phone_menu";
+    case "rent_number":
+      // Number-only path; default new campaigns to live calling when they start one.
+      return "live_calling";
     default: {
       const _exhaustive: never = onboardingGoal;
       return _exhaustive;

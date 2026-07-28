@@ -38,6 +38,11 @@ export const ONBOARDING_GOAL_OPTIONS: Array<{
     label: "SMS blast",
     description: "Send a text outreach campaign to an uploaded audience.",
   },
+  {
+    id: "rent_number",
+    label: "Just rent a number",
+    description: "Get a workspace phone number first. Add campaigns later.",
+  },
 ];
 
 /**
@@ -52,6 +57,8 @@ export function channelsForOnboardingGoal(
     case "live_call":
       return ["local_number", "voice_compliance"];
     case "ivr":
+      return ["local_number"];
+    case "rent_number":
       return ["local_number"];
     case "sms_blast": {
       if (operatingCountry === "US") return ["a2p10dlc"];
@@ -69,6 +76,9 @@ export function channelsForOnboardingGoal(
 export function checklistStepsForGoal(
   goal: WorkspaceOnboardingGoal | null,
 ): WizardOnboardingStepId[] {
+  if (goal === "rent_number") {
+    return ["first_number", "credits", "launch_checks"];
+  }
   const shared: WizardOnboardingStepId[] = ["audience", "first_number"];
   if (goal === "live_call") {
     return [...shared, "campaign_info", "credits", "launch_checks"];
@@ -77,15 +87,18 @@ export function checklistStepsForGoal(
   return [...shared, "script", "campaign_info", "credits", "launch_checks"];
 }
 
+/**
+ * Goal first (#1104), then minimal identity, then program only when SMS
+ * compliance needs it (#1105/#1106), then the goal checklist.
+ */
 export function wizardStepsForGoal(
   goal: WorkspaceOnboardingGoal | null,
 ): WizardOnboardingStepId[] {
-  return [
-    "business_identity",
-    "business_program",
-    "path_selection",
-    ...checklistStepsForGoal(goal),
-  ];
+  const afterGoal: WizardOnboardingStepId[] = ["business_identity"];
+  if (goalNeedsSmsCompliance(goal)) {
+    afterGoal.push("business_program");
+  }
+  return ["path_selection", ...afterGoal, ...checklistStepsForGoal(goal)];
 }
 
 export function nextWizardStep(
@@ -109,7 +122,7 @@ export function previousWizardStep(
 }
 
 export function goalNeedsScript(goal: WorkspaceOnboardingGoal | null): boolean {
-  return goal !== "live_call";
+  return goal !== "live_call" && goal !== "rent_number";
 }
 
 export function goalNeedsSmsCompliance(goal: WorkspaceOnboardingGoal | null): boolean {

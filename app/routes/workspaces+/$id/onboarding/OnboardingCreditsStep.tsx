@@ -19,9 +19,9 @@ export function OnboardingCreditsStep({
       <SectionHeader
         compact
         title="Credits"
-        description="Credits power calls, texts, and phone number rental. Add some when you are ready to run outreach."
+        description="Credits power calls, texts, and number rental."
       />
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex max-w-md flex-wrap items-center justify-between gap-3 text-sm">
           <div>
             <div className="text-muted-foreground">Current balance</div>
@@ -33,9 +33,9 @@ export function OnboardingCreditsStep({
             <Link to={`/workspaces/${workspaceId}/billing`}>Add credits</Link>
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Number rental uses about {NUMBER_RENTAL_MONTHLY_CREDITS.toLocaleString()} credits per
-          30-day period. You can finish setup first and add credits before launching.
+        <p className="text-xs text-muted-foreground">
+          Number rental is about {NUMBER_RENTAL_MONTHLY_CREDITS.toLocaleString()} credits /
+          30 days. You can add credits before launch.
         </p>
         {!isReadOnly ? (
           <Form method="post">

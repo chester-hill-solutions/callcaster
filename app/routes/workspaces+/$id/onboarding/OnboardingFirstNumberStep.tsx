@@ -58,6 +58,8 @@ function presetOrderForGoal(
       return ["automated_menu", "voicemail", "queue", "agent", "forward", "webhook_only"];
     case "sms_blast":
       return ["voicemail", "agent", "queue", "automated_menu", "forward", "webhook_only"];
+    case "rent_number":
+      return ["agent", "queue", "voicemail", "automated_menu", "forward", "webhook_only"];
     case null:
       return ["agent", "queue", "automated_menu", "voicemail", "forward", "webhook_only"];
     default: {
@@ -163,9 +165,9 @@ export function OnboardingFirstNumberStep({
         <SectionHeader
           compact
           title="Phone number"
-          description="Rent a number for inbound and outbound traffic, or verify a number you already own for outbound calling and texting."
+          description="Set a service address, then rent a number or verify one you already own. Configure inbound routing after a number is on the workspace."
         />
-        <div className="space-y-6">
+        <div className="space-y-8">
           <ServiceAddressGate
             workspaceId={workspaceId}
             onboarding={onboarding}
@@ -176,8 +178,9 @@ export function OnboardingFirstNumberStep({
             <TooltipProvider>
               <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
                 <p>
-                  For SMS blasts, a toll-free number supports higher sending volume after
-                  verification. A local number works for lighter texting at a lower rate.
+                  Toll-free numbers support higher SMS volume after verification, and that
+                  path requires a Canadian business number (BN). A local number works for
+                  lighter texting without BN verification.
                 </p>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -186,8 +189,9 @@ export function OnboardingFirstNumberStep({
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    Pick toll-free when you expect higher daily volume. Pick local when you mainly
-                    need a regional presence and lighter sending.
+                    Choose toll-free when you have a BN ready for carrier verification and
+                    expect higher daily volume. Choose local for regional presence and lighter
+                    sending.
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -208,85 +212,90 @@ export function OnboardingFirstNumberStep({
             </Alert>
           ) : null}
 
-          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
-            <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-3">
-              <legend className="text-sm font-medium">Rent a Canadian number</legend>
-              <p className="text-sm text-muted-foreground">
-                Best for inbound SMS, inbound calls, and full two-way messaging.
-              </p>
-              {isReadOnly ? (
+          {/* Address first → then choose rent vs verify (#1114). */}
+          {hasServiceAddress ? (
+            <div className="grid min-w-0 grid-cols-1 gap-8">
+              <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-4">
+                <legend className="px-1 text-sm font-medium">Rent a Canadian number</legend>
                 <p className="text-sm text-muted-foreground">
-                  Only workspace owners and admins can rent numbers. Ask an admin to complete this
-                  step.
+                  Best for inbound SMS, inbound calls, and full two-way messaging.
                 </p>
-              ) : !hasServiceAddress ? (
-                <Alert>
-                  <AlertDescription>
-                    Save a service address above before searching for numbers to rent.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <NumberPurchase
-                  fetcher={purchaseFetcher}
-                  workspaceId={workspaceId}
-                  creditsBalance={creditsBalance}
-                  billingLink={`/workspaces/${workspaceId}/billing`}
-                  onPurchaseComplete={handlePurchaseComplete}
-                />
-              )}
-            </fieldset>
+                {isReadOnly ? (
+                  <p className="text-sm text-muted-foreground">
+                    Only workspace owners and admins can rent numbers. Ask an admin to complete this
+                    step.
+                  </p>
+                ) : (
+                  <NumberPurchase
+                    fetcher={purchaseFetcher}
+                    workspaceId={workspaceId}
+                    creditsBalance={creditsBalance}
+                    billingLink={`/workspaces/${workspaceId}/billing`}
+                    onPurchaseComplete={handlePurchaseComplete}
+                  />
+                )}
+              </fieldset>
 
-            <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-3">
-              <legend className="text-sm font-medium">Verify your own number</legend>
-              <p className="text-sm text-muted-foreground">
-                Outbound SMS and calls only. Rent a number for inbound traffic.
-              </p>
-              {callerIdNumbers.length > 0 ? (
-                <ul className="space-y-2" data-testid="onboarding-caller-id-list">
-                  {callerIdNumbers.map((number) => {
-                    const pendingStatus =
-                      !isVerifiedCallerIdNumber(number) &&
-                      number.capabilities &&
-                      typeof number.capabilities === "object" &&
-                      !Array.isArray(number.capabilities) &&
-                      (number.capabilities as Record<string, unknown>)
-                        .verification_status === "pending";
-                    return (
-                      <li
-                        key={number.id ?? number.phone_number}
-                        className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-                      >
-                        <span className="truncate font-mono">
-                          {number.phone_number ?? "Unknown number"}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {isVerifiedCallerIdNumber(number)
-                            ? "Verified"
-                            : pendingStatus
-                              ? "Awaiting verification"
-                              : "Caller ID"}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-              {isReadOnly ? (
+              <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-4">
+                <legend className="px-1 text-sm font-medium">Verify your own number</legend>
                 <p className="text-sm text-muted-foreground">
-                  Only workspace owners and admins can verify numbers. Ask an admin to complete this
-                  step.
+                  Outbound SMS and calls only. Rent a number for inbound traffic.
                 </p>
-              ) : (
-                <CallerIdVerificationForm
-                  formId="onboarding-caller-id-form"
-                  actionName="verify_caller_id"
-                  disabled={isVerifying}
-                  isPending={isVerifying}
-                />
-              )}
-            </fieldset>
-          </div>
+                {callerIdNumbers.length > 0 ? (
+                  <ul className="space-y-2" data-testid="onboarding-caller-id-list">
+                    {callerIdNumbers.map((number) => {
+                      const pendingStatus =
+                        !isVerifiedCallerIdNumber(number) &&
+                        number.capabilities &&
+                        typeof number.capabilities === "object" &&
+                        !Array.isArray(number.capabilities) &&
+                        (number.capabilities as Record<string, unknown>)
+                          .verification_status === "pending";
+                      return (
+                        <li
+                          key={number.id ?? number.phone_number}
+                          className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                        >
+                          <span className="truncate font-mono">
+                            {number.phone_number ?? "Unknown number"}
+                          </span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {isVerifiedCallerIdNumber(number)
+                              ? "Verified"
+                              : pendingStatus
+                                ? "Awaiting verification"
+                                : "Caller ID"}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+                {isReadOnly ? (
+                  <p className="text-sm text-muted-foreground">
+                    Only workspace owners and admins can verify numbers. Ask an admin to complete this
+                    step.
+                  </p>
+                ) : (
+                  <CallerIdVerificationForm
+                    formId="onboarding-caller-id-form"
+                    actionName="verify_caller_id"
+                    disabled={isVerifying}
+                    isPending={isVerifying}
+                  />
+                )}
+              </fieldset>
+            </div>
+          ) : (
+            <Alert>
+              <AlertDescription>
+                Save a service address above before searching for numbers to rent or verifying a
+                caller ID.
+              </AlertDescription>
+            </Alert>
+          )}
 
+          {/* Routing only after a rented number exists (#1114). */}
           {rentedNumbers.length > 0 && !isReadOnly ? (
             <div className="space-y-2 border-t border-border/60 pt-6">
               <div>

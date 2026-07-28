@@ -149,6 +149,19 @@ export default function CampaignsNew() {
                 })}
               </div>
             </fieldset>
+            {campaignGoal === "text_campaign" ? (
+              <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  Toll-free setup requires a Business Number (BN)
+                </p>
+                <p className="mt-1">
+                  To set up Canadian toll-free texting you need your CRA business number
+                  (e.g. 123456789RC0001). Add it in workspace onboarding or Settings → Business
+                  before you rent a toll-free number. Local numbers send at lower volume and
+                  skip BN verification.
+                </p>
+              </div>
+            ) : null}
           </Section>
           <div className="flex flex-col gap-2">
             <Button

@@ -102,6 +102,9 @@ export function SmsComplianceGate({
             <p className="md:col-span-2 text-sm font-medium">
               Toll-free verification
             </p>
+            <p className="md:col-span-2 text-sm text-muted-foreground">
+              Toll-free setup requires a Canadian business number (BN) for carrier approval.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="doingBusinessAs">Doing business as (DBA)</Label>
               <Input
@@ -113,14 +116,24 @@ export function SmsComplianceGate({
             </div>
             <div className="space-y-2">
               <Label htmlFor="businessRegistrationNumber">
-                Business registration number (BN)
+                Business registration number (BN){" "}
+                <span className="text-destructive" aria-hidden>
+                  *
+                </span>
               </Label>
               <Input
                 id="businessRegistrationNumber"
                 name="businessRegistrationNumber"
                 defaultValue={profile.businessRegistrationNumber}
                 disabled={isReadOnly}
+                required
+                aria-required
+                placeholder="123456789RC0001"
               />
+              <p className="text-xs text-muted-foreground">
+                Required to set up toll-free SMS. Your CRA business number (9 digits + RC +
+                account).
+              </p>
             </div>
           </div>
         ) : null}

@@ -117,31 +117,46 @@ export function OnboardingGoalStep({
                   <span className="mt-0.5 shrink-0">
                     <InfoPopover
                       size={16}
-                      tooltip="Carriers apply different sending limits by number type. Toll-free numbers support higher-volume outreach once verification finishes."
+                      tooltip="Toll-free SMS verification requires your CRA business number (BN). Local numbers skip that verification and send at lower volume."
                     />
                   </span>
                   <p>
-                    For texting at higher volume, a toll-free number is usually the smoother path.
-                    A local number can send texts too, at a lower throughput.
+                    Toll-free is the higher-volume path, and it requires a Canadian business
+                    number (BN) for carrier verification. A local number can send texts at lower
+                    throughput without a BN.
                   </p>
                 </div>
                 {offersTollFree ? (
-                  <div className="flex flex-wrap gap-2">
+                  <div
+                    className="flex flex-wrap gap-2"
+                    role="group"
+                    aria-label="SMS number path"
+                  >
                     <Button
                       type="button"
                       size="sm"
-                      variant={smsNumberPath === "toll_free" ? "default" : "outline"}
+                      variant="outline"
+                      aria-pressed={smsNumberPath === "toll_free"}
                       onClick={() => setSmsNumberPath("toll_free")}
                       disabled={isReadOnly}
+                      className={cn(
+                        smsNumberPath === "toll_free" &&
+                          "border-border bg-secondary font-semibold text-secondary-foreground shadow-[inset_0_1.5px_2px_0_rgb(0_0_0/0.1)]",
+                      )}
                     >
-                      Set Up Toll Free
+                      Set Up Toll Free (BN required)
                     </Button>
                     <Button
                       type="button"
                       size="sm"
-                      variant={smsNumberPath === "local" ? "default" : "outline"}
+                      variant="outline"
+                      aria-pressed={smsNumberPath === "local"}
                       onClick={() => setSmsNumberPath("local")}
                       disabled={isReadOnly}
+                      className={cn(
+                        smsNumberPath === "local" &&
+                          "border-border bg-secondary font-semibold text-secondary-foreground shadow-[inset_0_1.5px_2px_0_rgb(0_0_0/0.1)]",
+                      )}
                     >
                       Continue with Local Number
                     </Button>
@@ -154,7 +169,8 @@ export function OnboardingGoalStep({
             <fieldset className="space-y-4 border-t border-border/60 pt-4">
               <legend className="text-sm font-medium">Toll-free verification details</legend>
               <p className="text-sm text-muted-foreground">
-                These details help carriers approve higher-volume texting on a toll-free number.
+                Toll-free setup requires your CRA business number (BN). Carriers use it to
+                approve higher-volume texting on a toll-free number.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -169,7 +185,10 @@ export function OnboardingGoalStep({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="businessRegistrationNumber">
-                    Business registration number (BN)
+                    Business registration number (BN){" "}
+                    <span className="text-destructive" aria-hidden>
+                      *
+                    </span>
                   </Label>
                   <Input
                     id="businessRegistrationNumber"
@@ -177,7 +196,13 @@ export function OnboardingGoalStep({
                     placeholder="123456789RC0001"
                     defaultValue={profile.businessRegistrationNumber}
                     disabled={isReadOnly}
+                    required
+                    aria-required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Required to set up toll-free. Use your CRA business number (9 digits + RC +
+                    account), from your CRA documents.
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

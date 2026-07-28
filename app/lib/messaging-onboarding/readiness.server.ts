@@ -125,14 +125,14 @@ export function buildOnboardingStepsForState(
   const pathSelected =
     predicatePassed("path_selection_complete", ctx) || Boolean(onboarding.selectedGoal);
   const audienceComplete = audienceCount > 0;
-  const scriptComplete = scriptCount > 0 || onboarding.selectedGoal === "live_call";
+  const scriptComplete = scriptCount > 0 || onboarding.selectedGoal === "live_call" || onboarding.selectedGoal === "rent_number";
   const campaignComplete = campaignCount > 0;
   const creditsComplete = creditsBalance > 0;
+  const rentNumberOnly = onboarding.selectedGoal === "rent_number";
   const launchComplete =
     messagingProvisioned &&
     hasFirstNumber &&
-    audienceComplete &&
-    campaignComplete &&
+    (rentNumberOnly || (audienceComplete && campaignComplete)) &&
     (!onboarding.selectedChannels.includes("voice_compliance") || emergencyReady);
 
   const steps: WorkspaceOnboardingStepState[] = [
@@ -144,28 +144,35 @@ export function buildOnboardingStepsForState(
       ...pathSelectionStep,
       status: pathSelected ? "complete" : "in_progress",
     },
-    {
-      ...audienceStep,
-      status: audienceComplete ? "complete" : "in_progress",
-    },
-    {
-      ...firstNumberStep,
-      status: hasFirstNumber ? "complete" : "in_progress",
-    },
   ];
 
-  if (onboarding.selectedGoal !== "live_call") {
+  if (!rentNumberOnly) {
+    steps.push({
+      ...audienceStep,
+      status: audienceComplete ? "complete" : "in_progress",
+    });
+  }
+
+  steps.push({
+    ...firstNumberStep,
+    status: hasFirstNumber ? "complete" : "in_progress",
+  });
+
+  if (onboarding.selectedGoal !== "live_call" && !rentNumberOnly) {
     steps.push({
       ...scriptStep,
       status: scriptComplete ? "complete" : "in_progress",
     });
   }
 
-  steps.push(
-    {
+  if (!rentNumberOnly) {
+    steps.push({
       ...campaignInfoStep,
       status: campaignComplete ? "complete" : "in_progress",
-    },
+    });
+  }
+
+  steps.push(
     {
       ...creditsStep,
       status: creditsComplete ? "complete" : "in_progress",

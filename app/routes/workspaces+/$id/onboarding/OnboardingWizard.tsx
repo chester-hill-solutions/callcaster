@@ -29,10 +29,6 @@ type OnboardingWizardProps = OnboardingLoaderData & {
   actionData?: OnboardingActionData;
 };
 
-function isBusinessPrefixStep(step: string | null): boolean {
-  return step === "business_identity" || step === "business_program";
-}
-
 function checklistCreateHref(
   workspaceId: string,
   resourcePath: "audiences/new" | "scripts/new" | "campaigns/new",
@@ -67,9 +63,18 @@ export function OnboardingWizard({
   const navigation = useNavigation();
   const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const urlStep = searchParams.get("step");
+  // Intro is only the pre-wizard name screen. Any explicit ?step= (including
+  // path_selection / goal-first) should show the wizard, not the name form.
   const [showIntro, setShowIntro] = useState(
-    () => onboarding.status === "not_started" && !isBusinessPrefixStep(urlStep),
+    () => onboarding.status === "not_started" && !urlStep,
   );
+
+  useEffect(() => {
+    if (onboarding.status !== "not_started" || urlStep) {
+      setShowIntro(false);
+    }
+  }, [onboarding.status, urlStep]);
+
   const goal = onboarding.selectedGoal;
   const visibleSteps = wizardStepsForGoal(goal);
   const activeStep = showIntro
@@ -226,14 +231,14 @@ export function OnboardingWizard({
       {!showIntro && activeStep === "audience" && continueTarget ? (
         <OnboardingChecklistLinkStep
           title="Audience"
-          description="Upload the contacts you want to reach. Every live call, IVR, and SMS campaign uses an audience."
+          description="Upload the contacts you want to reach. Every live call, IVR, and SMS campaign uses a call list."
           complete={audienceCount > 0}
-          completeLabel={`You have ${audienceCount} audience${audienceCount === 1 ? "" : "s"} ready.`}
-          incompleteLabel="Create an audience and upload contacts, then return here to continue."
+          completeLabel={`You have ${audienceCount} call list${audienceCount === 1 ? "" : "s"} ready.`}
+          incompleteLabel="Create a call list and upload contacts, then return here to continue."
           actionHref={checklistCreateHref(workspaceId, "audiences/new", "audience")}
-          actionLabel={audienceCount > 0 ? "Manage audiences" : "Upload audience"}
+          actionLabel={audienceCount > 0 ? "Add another call list" : "Upload call list"}
           secondaryHref={`/workspaces/${workspaceId}/audiences`}
-          secondaryLabel="View audiences"
+          secondaryLabel="View call lists"
           nextStep={continueTarget}
           isReadOnly={isReadOnly}
         />

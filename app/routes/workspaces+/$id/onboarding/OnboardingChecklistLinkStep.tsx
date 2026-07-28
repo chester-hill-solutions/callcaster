@@ -50,7 +50,7 @@ export function OnboardingChecklistLinkStep({
         {helperText ? (
           <p className="text-sm text-muted-foreground">{helperText}</p>
         ) : null}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Button asChild>
             <Link to={actionHref}>{actionLabel}</Link>
           </Button>
@@ -63,7 +63,7 @@ export function OnboardingChecklistLinkStep({
             <Form method="post">
               <input type="hidden" name="_action" value="advance_step" />
               <input type="hidden" name="targetStep" value={nextStep} />
-              <Button type="submit" variant="ghost">
+              <Button type="submit" variant={complete ? "default" : "ghost"}>
                 {complete ? "Continue" : skipLabel}
               </Button>
             </Form>

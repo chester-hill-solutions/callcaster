@@ -59,8 +59,19 @@ export default function ScriptEditor() {
   const handleSaveUpdate = async (saveScriptAsCopy: boolean) => {
     setIsSaving(true);
     try {
+      // Message edits live on campaignDetails; flatten onto the campaign row
+      // payload so PATCH does not persist an empty top-level body_text (#1115).
+      const campaignPayload =
+        pageData.type === "message"
+          ? {
+              ...pageData,
+              body_text: pageData.campaignDetails.body_text ?? "",
+              message_media: pageData.campaignDetails.message_media ?? [],
+            }
+          : pageData;
+
       const formData = new FormData();
-      formData.append("campaignData", JSON.stringify(pageData));
+      formData.append("campaignData", JSON.stringify(campaignPayload));
       formData.append(
         "campaignDetails",
         JSON.stringify(pageData.campaignDetails),
@@ -101,10 +112,16 @@ export default function ScriptEditor() {
       setPageData(savedPageData);
       setInitData(savedPageData);
       setShowSaveModal(false);
-      toast.success("Script saved");
+      toast.success(
+        pageData.type === "message" ? "Message saved" : "Script saved",
+      );
     } catch (error) {
       loggerClient.error("Error saving update:", error);
-      toast.error("Couldn't save the script. Please try again.");
+      toast.error(
+        pageData.type === "message"
+          ? "Couldn't save the message. Please try again."
+          : "Couldn't save the script. Please try again.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -180,7 +197,14 @@ export default function ScriptEditor() {
         <SaveBar
           isChanged={isChanged}
           isSaving={isSaving}
-          onSave={() => setShowSaveModal(true)}
+          onSave={() => {
+            // Message campaigns have no script copy flow — save directly (#1115).
+            if (pageData.type === "message") {
+              void handleSaveUpdate(false);
+              return;
+            }
+            setShowSaveModal(true);
+          }}
           onReset={handleReset}
         />
         <div className="flex h-full flex-grow flex-col gap-4 p-4">

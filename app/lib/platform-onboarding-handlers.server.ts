@@ -103,11 +103,11 @@ async function handleSaveWorkspaceName(
     actorUserId: ctx.actorUserId,
     updates: {
       status: "collecting_business",
-      currentStep: "business_identity",
+      currentStep: "path_selection",
     },
   });
 
-  return { kind: "redirect", step: "business_identity" };
+  return { kind: "redirect", step: "path_selection" };
 }
 
 async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
@@ -217,6 +217,9 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     channelsFromForm.length > 0 ? selectedChannels : channelsForGoal,
   );
 
+  const nextStep =
+    nextWizardStep("path_selection", selectedGoal) ?? "business_identity";
+
   await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: {
@@ -225,7 +228,7 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
       operatingCountry,
       businessProfile,
       status: "collecting_business",
-      currentStep: "audience",
+      currentStep: nextStep,
     },
   });
 
@@ -240,7 +243,7 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     await enqueueWorkspaceComplianceJob(ctx.workspaceId, "channels_selected");
   }
 
-  return { kind: "redirect", step: "audience" };
+  return { kind: "redirect", step: nextStep };
 }
 
 /**
@@ -308,12 +311,11 @@ async function handleSaveBusinessProfile(
     current.operatingCountry,
   );
 
+  // Goal is chosen first; identity/program advance along wizardStepsForGoal (#1104).
   const nextStep =
-    wizardStep === "business_identity"
-      ? "business_program"
-      : wizardStep === "business_program"
-        ? "path_selection"
-        : "path_selection";
+    wizardStep === "business_identity" || wizardStep === "business_program"
+      ? (nextWizardStep(wizardStep, current.selectedGoal) ?? "audience")
+      : (nextWizardStep("business_identity", current.selectedGoal) ?? "audience");
 
   await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,

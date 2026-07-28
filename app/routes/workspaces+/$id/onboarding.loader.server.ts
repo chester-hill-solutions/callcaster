@@ -62,7 +62,7 @@ export const loader = defineLoader({
       loadWorkspaceOnboardingView(workspaceId),
       getWorkspaceInfo({ workspaceId }),
       getWorkspaceUsers({ workspaceId }),
-      listObjects("workspaceAudio", workspaceId),
+      listObjects("workspaceAudio", workspaceId).catch(() => [] as { id: number | string; name: string }[]),
       tdb.inbound_queue.findMany({
         columns: { id: true, name: true },
         orderBy: (queue, { asc: ascFn }) => [ascFn(queue.name)],

@@ -51,10 +51,6 @@ export default function AudiencesNew() {
     setCurrentStep(2);
   };
 
-  const goToPreviousStep = () => {
-    setCurrentStep(prev => prev - 1);
-  };
-
   return (
     <section id="form" className="px-4 pb-8 pt-6 sm:px-6">
       <PageShell title="Add a Call list" maxWidth="narrow">
@@ -141,16 +137,6 @@ export default function AudiencesNew() {
                     setCurrentStep(3);
                   }}
                 />
-                
-                <div className="flex items-center justify-between gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={goToPreviousStep}
-                  >
-                    Back
-                  </Button>
-                </div>
               </div>
             </Section>
           ) : null}

@@ -4,15 +4,15 @@ import { Button as Button$1, Link } from 'react-aria-components';
 import { jsx } from 'react/jsx-runtime';
 
 var buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding font-heading text-sm font-semibold whitespace-nowrap transition-colors duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding font-heading text-sm font-semibold whitespace-nowrap transition-[color,background-color,box-shadow,transform] duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 active:not-aria-[haspopup]:translate-y-px data-pressed:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.2)] hover:bg-primary/90 active:shadow-none",
-        outline: "border-border bg-background hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:bg-transparent dark:hover:bg-accent",
-        secondary: "bg-secondary text-secondary-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.08)] hover:bg-secondary/80 active:shadow-none aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost: "hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:hover:bg-accent/70",
-        destructive: "bg-destructive text-destructive-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.2)] hover:bg-destructive/90 active:shadow-none focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
+        default: "bg-primary text-primary-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.2)] hover:bg-primary/90 active:bg-primary/80 active:shadow-none data-pressed:bg-primary/80 data-pressed:shadow-none",
+        outline: "border-border bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent data-pressed:bg-accent aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:bg-transparent dark:hover:bg-accent",
+        secondary: "bg-secondary text-secondary-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.08)] hover:bg-secondary/80 active:bg-secondary/70 active:shadow-none data-pressed:bg-secondary/70 data-pressed:shadow-none aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+        ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent data-pressed:bg-accent aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:hover:bg-accent/70",
+        destructive: "bg-destructive text-destructive-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.2)] hover:bg-destructive/90 active:bg-destructive/80 active:shadow-none data-pressed:bg-destructive/80 data-pressed:shadow-none focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
         link: "font-sans font-medium text-primary underline-offset-4 hover:underline"
       },
       size: {

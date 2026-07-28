@@ -12,7 +12,7 @@ export const AudienceUploadFileStep = forwardRef<
   return (
     <label
       htmlFor="contacts"
-      className="flex min-h-[11rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-muted/30 px-6 py-16 text-center transition-colors hover:border-border hover:bg-muted/50"
+      className="flex min-h-[8rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-muted/30 px-6 py-8 text-center transition-colors hover:border-border hover:bg-muted/50"
     >
       <span className="inline-flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <MdUploadFile className="size-5" aria-hidden />
