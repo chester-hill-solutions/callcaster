@@ -43,6 +43,8 @@ COPY --from=builder --chown=bun:bun /app/public ./public
 COPY --from=builder --chown=bun:bun /app/server ./server
 COPY --from=builder --chown=bun:bun /app/app ./app
 COPY --from=builder --chown=bun:bun /app/shared ./shared
+# Needed when RUN_CLIENT_MIGRATIONS_ON_BOOT=true (ephemeral PR DBs).
+COPY --from=builder --chown=bun:bun /app/client/migrations ./client/migrations
 COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=builder --chown=bun:bun /app/package.json ./package.json
 # Bun resolves the "@/*" import alias from tsconfig paths at runtime
