@@ -139,10 +139,6 @@ export function OnboardingGoalStep({
                       aria-pressed={smsNumberPath === "toll_free"}
                       onClick={() => setSmsNumberPath("toll_free")}
                       disabled={isReadOnly}
-                      className={cn(
-                        smsNumberPath === "toll_free" &&
-                          "border-border bg-secondary font-semibold text-secondary-foreground shadow-[inset_0_1.5px_2px_0_rgb(0_0_0/0.1)]",
-                      )}
                     >
                       Set Up Toll Free (BN required)
                     </Button>
@@ -153,10 +149,6 @@ export function OnboardingGoalStep({
                       aria-pressed={smsNumberPath === "local"}
                       onClick={() => setSmsNumberPath("local")}
                       disabled={isReadOnly}
-                      className={cn(
-                        smsNumberPath === "local" &&
-                          "border-border bg-secondary font-semibold text-secondary-foreground shadow-[inset_0_1.5px_2px_0_rgb(0_0_0/0.1)]",
-                      )}
                     >
                       Continue with Local Number
                     </Button>

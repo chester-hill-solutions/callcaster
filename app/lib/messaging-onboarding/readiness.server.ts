@@ -5,6 +5,10 @@ import type {
 } from "@/lib/types";
 import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
 import { DEFAULT_WORKSPACE_ONBOARDING_STEPS } from "@/lib/messaging-onboarding/defaults.server";
+import {
+  checklistStepsForGoal,
+  goalIncludesChecklistStep,
+} from "@/lib/messaging-onboarding/goals";
 import { isWorkspaceIntakeComplete } from "@/lib/messaging-onboarding/intake";
 import {
   type WorkspaceReadinessContext,
@@ -21,6 +25,7 @@ import {
   countVerifiedCallerIdNumbers,
   isVerifiedCallerIdNumber,
 } from "@/lib/messaging-onboarding/predicates";
+import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
 import {
   buildWorkspaceLaunchChecklist,
   launchChecklistProgress,
@@ -110,78 +115,70 @@ export function buildOnboardingStepsForState(
   const stepById = Object.fromEntries(
     DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => [step.id, step]),
   ) as Record<string, WorkspaceOnboardingStepState>;
-  const businessProfileStep = stepById.business_profile!;
-  const pathSelectionStep = stepById.path_selection!;
-  const audienceStep = stepById.audience!;
-  const firstNumberStep = stepById.first_number!;
-  const scriptStep = stepById.script!;
-  const campaignInfoStep = stepById.campaign_info!;
-  const creditsStep = stepById.credits!;
-  const launchChecksStep = stepById.launch_checks!;
+  const goal = onboarding.selectedGoal;
 
   const businessBasicsComplete = isBusinessBasicsComplete(ctx);
   const emergencyReady = isEmergencyReady(onboarding);
   const messagingProvisioned = predicatePassed("messaging_service_provisioned", ctx);
   const pathSelected =
-    predicatePassed("path_selection_complete", ctx) || Boolean(onboarding.selectedGoal);
+    predicatePassed("path_selection_complete", ctx) || Boolean(goal);
   const audienceComplete = audienceCount > 0;
-  const scriptComplete = scriptCount > 0 || onboarding.selectedGoal === "live_call" || onboarding.selectedGoal === "rent_number";
   const campaignComplete = campaignCount > 0;
-  const creditsComplete = creditsBalance > 0;
-  const rentNumberOnly = onboarding.selectedGoal === "rent_number";
+  const needsAudience = goalIncludesChecklistStep(goal, "audience");
+  const needsCampaign = goalIncludesChecklistStep(goal, "campaign_info");
   const launchComplete =
     messagingProvisioned &&
     hasFirstNumber &&
-    (rentNumberOnly || (audienceComplete && campaignComplete)) &&
+    (!needsAudience || audienceComplete) &&
+    (!needsCampaign || campaignComplete) &&
     (!onboarding.selectedChannels.includes("voice_compliance") || emergencyReady);
+
+  const checklistStatus = (
+    stepId: WizardOnboardingStepId,
+  ): WorkspaceOnboardingStepState["status"] => {
+    switch (stepId) {
+      case "audience":
+        return audienceComplete ? "complete" : "in_progress";
+      case "first_number":
+        return hasFirstNumber ? "complete" : "in_progress";
+      case "script":
+        return scriptCount > 0 ? "complete" : "in_progress";
+      case "campaign_info":
+        return campaignComplete ? "complete" : "in_progress";
+      case "credits":
+        return creditsBalance > 0 ? "complete" : "in_progress";
+      case "launch_checks":
+        return launchComplete ? "complete" : "pending";
+      case "business_identity":
+      case "business_program":
+      case "path_selection":
+        return "pending";
+      default: {
+        const _exhaustive: never = stepId;
+        return _exhaustive;
+      }
+    }
+  };
 
   const steps: WorkspaceOnboardingStepState[] = [
     {
-      ...businessProfileStep,
+      ...stepById.business_profile!,
       status: businessBasicsComplete ? "complete" : "in_progress",
     },
     {
-      ...pathSelectionStep,
+      ...stepById.path_selection!,
       status: pathSelected ? "complete" : "in_progress",
     },
   ];
 
-  if (!rentNumberOnly) {
+  for (const stepId of checklistStepsForGoal(goal)) {
+    const template = stepById[stepId];
+    if (!template) continue;
     steps.push({
-      ...audienceStep,
-      status: audienceComplete ? "complete" : "in_progress",
+      ...template,
+      status: checklistStatus(stepId),
     });
   }
-
-  steps.push({
-    ...firstNumberStep,
-    status: hasFirstNumber ? "complete" : "in_progress",
-  });
-
-  if (onboarding.selectedGoal !== "live_call" && !rentNumberOnly) {
-    steps.push({
-      ...scriptStep,
-      status: scriptComplete ? "complete" : "in_progress",
-    });
-  }
-
-  if (!rentNumberOnly) {
-    steps.push({
-      ...campaignInfoStep,
-      status: campaignComplete ? "complete" : "in_progress",
-    });
-  }
-
-  steps.push(
-    {
-      ...creditsStep,
-      status: creditsComplete ? "complete" : "in_progress",
-    },
-    {
-      ...launchChecksStep,
-      status: launchComplete ? "complete" : "pending",
-    },
-  );
 
   return steps;
 }

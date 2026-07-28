@@ -63,17 +63,20 @@ export function OnboardingWizard({
   const navigation = useNavigation();
   const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const urlStep = searchParams.get("step");
-  // Intro is only the pre-wizard name screen. Any explicit ?step= (including
-  // path_selection / goal-first) should show the wizard, not the name form.
-  const [showIntro, setShowIntro] = useState(
-    () => onboarding.status === "not_started" && !urlStep,
-  );
-
-  useEffect(() => {
-    if (onboarding.status !== "not_started" || urlStep) {
-      setShowIntro(false);
-    }
-  }, [onboarding.status, urlStep]);
+  // Intro is the pre-wizard name screen. Explicit ?step= or a session override
+  // wins over status; avoid syncing showIntro from props via an effect.
+  const autoShowIntro = onboarding.status === "not_started" && !urlStep;
+  const [introSession, setIntroSession] = useState<
+    "auto" | "force_show" | "force_hide"
+  >("auto");
+  const showIntro =
+    introSession === "force_hide"
+      ? false
+      : urlStep
+        ? false
+        : introSession === "force_show"
+          ? true
+          : autoShowIntro;
 
   const goal = onboarding.selectedGoal;
   const visibleSteps = wizardStepsForGoal(goal);
@@ -105,7 +108,7 @@ export function OnboardingWizard({
   const continueTarget = activeStep ? nextWizardStep(activeStep, goal) : null;
 
   const goToPreviousIntro = () => {
-    setShowIntro(true);
+    setIntroSession("force_show");
     navigate(`/workspaces/${workspaceId}/onboarding`, { replace: true });
   };
 
@@ -198,6 +201,7 @@ export function OnboardingWizard({
           isReadOnly={isReadOnly}
           isSaving={pending.isSavingWorkspaceName}
           error={actionError}
+          onContinue={() => setIntroSession("force_hide")}
         />
       ) : null}
 

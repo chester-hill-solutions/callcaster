@@ -53,13 +53,12 @@ function presetOrderForGoal(
 ): readonly InboundRoutingPresetId[] {
   switch (goal) {
     case "live_call":
+    case "rent_number":
       return ["agent", "queue", "voicemail", "automated_menu", "forward", "webhook_only"];
     case "ivr":
       return ["automated_menu", "voicemail", "queue", "agent", "forward", "webhook_only"];
     case "sms_blast":
       return ["voicemail", "agent", "queue", "automated_menu", "forward", "webhook_only"];
-    case "rent_number":
-      return ["agent", "queue", "voicemail", "automated_menu", "forward", "webhook_only"];
     case null:
       return ["agent", "queue", "automated_menu", "voicemail", "forward", "webhook_only"];
     default: {

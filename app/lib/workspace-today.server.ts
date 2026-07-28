@@ -106,9 +106,10 @@ export function selectWorkspaceToday(
 
   if (canAdminister && input.campaigns.length === 0) {
     const goal = input.selectedGoal;
+    const productGoal = goal != null ? productGoalForOnboardingGoal(goal) : null;
     const href =
-      goal != null
-        ? `${baseUrl}/campaigns/new?goal=${encodeURIComponent(productGoalForOnboardingGoal(goal))}`
+      productGoal != null
+        ? `${baseUrl}/campaigns/new?goal=${encodeURIComponent(productGoal)}`
         : `${baseUrl}/campaigns/new`;
     return selection("create_campaign", href, input);
   }

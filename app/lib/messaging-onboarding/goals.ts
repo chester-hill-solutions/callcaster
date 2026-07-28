@@ -121,8 +121,16 @@ export function previousWizardStep(
   return steps[index - 1]!;
 }
 
+/** Whether the goal checklist includes a given post-goal step. */
+export function goalIncludesChecklistStep(
+  goal: WorkspaceOnboardingGoal | null,
+  stepId: WizardOnboardingStepId,
+): boolean {
+  return checklistStepsForGoal(goal).includes(stepId);
+}
+
 export function goalNeedsScript(goal: WorkspaceOnboardingGoal | null): boolean {
-  return goal !== "live_call" && goal !== "rent_number";
+  return goalIncludesChecklistStep(goal, "script");
 }
 
 export function goalNeedsSmsCompliance(goal: WorkspaceOnboardingGoal | null): boolean {

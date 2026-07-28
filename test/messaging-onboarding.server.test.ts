@@ -380,6 +380,39 @@ describe("messaging onboarding helpers", () => {
     expect(ivrSteps).toHaveLength(8);
   });
 
+  test("rent_number checklist omits audience/script/campaign and launch ignores them", () => {
+    const rentNumber = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        selectedGoal: "rent_number",
+        selectedChannels: ["local_number"],
+        messagingService: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
+          serviceSid: "MG123",
+        },
+      },
+    );
+
+    const steps = buildOnboardingStepsForState(rentNumber, {
+      hasFirstNumber: true,
+      audienceCount: 0,
+      campaignCount: 0,
+      creditsBalance: 10,
+    });
+
+    expect(steps.find((step) => step.id === "audience")).toBeUndefined();
+    expect(steps.find((step) => step.id === "script")).toBeUndefined();
+    expect(steps.find((step) => step.id === "campaign_info")).toBeUndefined();
+    expect(steps.map((step) => step.id)).toEqual([
+      "business_profile",
+      "path_selection",
+      "first_number",
+      "credits",
+      "launch_checks",
+    ]);
+    expect(steps.find((step) => step.id === "launch_checks")?.status).toBe("complete");
+  });
+
   test("marks first_number complete when hasFirstNumber is true", () => {
     const state = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,

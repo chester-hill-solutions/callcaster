@@ -10,6 +10,7 @@ type OnboardingIntroStepProps = {
   isReadOnly: boolean;
   isSaving: boolean;
   error?: string | null;
+  onContinue?: () => void;
 };
 
 export function OnboardingIntroStep({
@@ -17,6 +18,7 @@ export function OnboardingIntroStep({
   isReadOnly,
   isSaving,
   error,
+  onContinue,
 }: OnboardingIntroStepProps) {
   return (
     <Section variant="flat">
@@ -31,7 +33,11 @@ export function OnboardingIntroStep({
             Workspace name: <span className="font-medium text-foreground">{workspaceName}</span>
           </p>
         ) : (
-          <Form method="post" className="space-y-6">
+          <Form
+            method="post"
+            className="space-y-6"
+            onSubmit={() => onContinue?.()}
+          >
             <input type="hidden" name="_action" value="save_workspace_name" />
             {error ? (
               <Alert variant="destructive" role="alert">
