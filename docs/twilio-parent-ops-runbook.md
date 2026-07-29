@@ -11,24 +11,28 @@ new workspace to production, and before flipping a workspace from A2P/Trust Hub
 CallCaster onboarding supports `operatingCountry: "CA" | "US" | "BOTH"`
 (`WORKSPACE_OPERATING_COUNTRY_VALUES` in `app/lib/types.ts`). Twilio subaccounts do
 not always inherit the parent account's **Geographic Permissions** the same way for
-every product:
+every product. **Since 2026-07-29, two of the three checks are automated**
+(`app/lib/twilio-geo-permissions.server.ts`, run at workspace provisioning and on
+every `workspace_twilio_compliance` job pass, including `admin_retry`):
 
-- **Voice**: Console → *Voice* → *Settings* → *Geo Permissions* — confirm Canada is
-  enabled for the subaccount (or the parent, if the subaccount defers to it) before
-  a CA workspace can dial or receive calls from Canadian numbers. A workspace with
-  `operatingCountry` including `"CA"` but no CA voice geo-permission will see calls
-  fail silently at the carrier level — this does not show up as a webhook drift or
-  an onboarding-state error, so it must be checked manually per new workspace.
-- **SMS**: Console → *Messaging* → *Settings* → *Geo Permissions* — same check for
-  SMS to/from Canadian numbers.
-- **Number provisioning**: purchasing a Canadian number
-  (`app/lib/platform-workspace-numbers.server.ts`) requires the subaccount to already
-  have CA number-purchasing enabled; this is a separate toggle from the geo
-  permissions above.
+- **Voice** — *automated*. `ensureVoiceGeoPermissions` enables CA/US low-risk
+  dialing on the subaccount via the Voice DialingPermissions API. Failures show as
+  a provisioning warning and a rate-limited "geographic permissions blocked" ops
+  email; re-running the compliance job retries it.
+- **Number provisioning** — *automatically detected*. `preflightNumberPurchase`
+  runs an AvailablePhoneNumbers search per operating country on every compliance
+  pass; a permissions/regulatory failure produces an actionable ops email instead
+  of a mysterious failure at first purchase.
+- **SMS** — *manual toggle, automated detection*. Twilio exposes **no public API**
+  for Messaging geo-permissions, so enabling stays a Console step: switch into the
+  subaccount → *Messaging* → *Settings* → *Geo Permissions* → enable Canada. If a
+  send fails with error **21408**, the worker raises a rate-limited ops email
+  naming this exact toggle (one per workspace per 6h window).
 
-**Ops step**: before marking any CA/BOTH workspace's onboarding as `live`, verify all
-three toggles in Twilio Console for that workspace's subaccount SID (found in
-`workspace.twilio_data.sid` / the admin Twilio portal's Subaccount panel).
+**Remaining ops step**: on the first CA/BOTH workspace(s), confirm the SMS geo
+toggle in Console (subaccount SID is in `workspace.twilio_data.sid` / the admin
+Twilio portal's Subaccount panel) — or simply respond to the 21408 alert when it
+fires. Voice and number-purchase no longer need a Console visit.
 
 ## 2. Primary Customer Profile (Trust Hub)
 

@@ -23,6 +23,11 @@ import { ensureTrustHubCustomerProfile } from "@/lib/twilio-trusthub.server";
 import { provisionTollFreeVerification } from "@/lib/twilio-toll-free-provision.server";
 import { provisionA2pRegistration } from "@/lib/twilio-a2p-provision.server";
 import { sendComplianceOpsAlert } from "@/lib/twilio-compliance-notify.server";
+import {
+  alertGeoReadinessBlocked,
+  ensureVoiceGeoPermissions,
+  preflightNumberPurchase,
+} from "@/lib/twilio-geo-permissions.server";
 import { presentTwilioError } from "@/lib/twilio-errors";
 import type {
   ComplianceStepResult,
@@ -93,6 +98,32 @@ export async function runWorkspaceTwilioComplianceJob(args: {
   }
 
   const onboarding = await loadOnboarding(workspaceId);
+
+  // Geo readiness (runbook §1 automated where Twilio allows). Runs on every
+  // compliance pass — including voice-only workspaces that skip the channel
+  // provisioning below — so admin_retry heals older subaccounts too. Issues
+  // are alerted (rate-limited) but never block channel provisioning: voice
+  // permissions and number purchase are orthogonal to Trust Hub review.
+  const voiceGeo = await ensureVoiceGeoPermissions({ workspaceId });
+  const numberPreflights = await preflightNumberPurchase({
+    workspaceId,
+    operatingCountry: onboarding.operatingCountry,
+  });
+  const geoIssues = [
+    ...(voiceGeo.ok
+      ? []
+      : [`Voice geographic-permissions update failed: ${voiceGeo.error}`]),
+    ...numberPreflights.flatMap((p) => (p.ok || !p.issue ? [] : [p.issue])),
+  ];
+  if (geoIssues.length > 0) {
+    logger.warn("twilio.compliance.job.geo_blocked", {
+      workspaceId,
+      reason,
+      geoIssues,
+    });
+    await alertGeoReadinessBlocked({ workspaceId, issues: geoIssues });
+  }
+
   const runTollFree = (onboarding.selectedChannels as string[]).includes(
     TOLL_FREE_BULK_SMS_CHANNEL,
   );

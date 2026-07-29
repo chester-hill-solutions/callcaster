@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   emitPredictiveBroadcast: vi.fn(),
   findMessageBySid: vi.fn(),
   insertTransactionHistoryIdempotent: vi.fn(),
+  alertSmsGeoPermissionBlocked: vi.fn(async () => undefined),
   sendWorkspaceWebhookNotification: vi.fn(async () => ({ success: true })),
   updateCallBySid: vi.fn(),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -70,6 +71,11 @@ vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => ({
     campaign: { findFirst: vi.fn(async () => null) },
   })),
+}));
+
+vi.mock("@/lib/twilio-geo-permissions.server", () => ({
+  alertSmsGeoPermissionBlocked: (...args: unknown[]) =>
+    mocks.alertSmsGeoPermissionBlocked(...args),
 }));
 
 vi.mock("@/lib/twilio-lookup.server", () => ({
@@ -153,6 +159,44 @@ describe("webhook side-effect handlers", () => {
       }),
     );
     expect(mocks.sendWorkspaceWebhookNotification).toHaveBeenCalled();
+  });
+
+  test("runSmsStatusSideEffects raises the geo-permission alert on Twilio 21408", async () => {
+    mocks.findMessageBySid.mockResolvedValue({
+      sid: "SM2",
+      workspace: "w1",
+      status: "failed",
+      to: "+16045550100",
+      num_segments: "1",
+      num_media: "0",
+    });
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM2",
+      twilioParams: { SmsSid: "SM2", SmsStatus: "failed", ErrorCode: "21408" },
+    });
+
+    expect(mocks.alertSmsGeoPermissionBlocked).toHaveBeenCalledWith({
+      workspaceId: "w1",
+      messageSid: "SM2",
+      to: "+16045550100",
+    });
+  });
+
+  test("runSmsStatusSideEffects does not raise the geo alert for other error codes", async () => {
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM1",
+      twilioParams: { SmsSid: "SM1", SmsStatus: "delivered" },
+    });
+
+    expect(mocks.alertSmsGeoPermissionBlocked).not.toHaveBeenCalled();
   });
 
   test("runRecordingSideEffects enriches recording metadata", async () => {

@@ -10,13 +10,19 @@ import { Resend } from "resend";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
-export type ComplianceAlertReason = "action_needed" | "job_failed";
+export type ComplianceAlertReason = "action_needed" | "job_failed" | "geo_blocked";
 
 export type ComplianceAlertInput = {
   workspaceId: string;
   reason: ComplianceAlertReason;
   /** Which compliance path triggered the alert. */
-  path: "toll_free_bulk_sms" | "a2p10dlc" | "trusthub" | "job";
+  path:
+    | "toll_free_bulk_sms"
+    | "a2p10dlc"
+    | "trusthub"
+    | "job"
+    | "geo_permissions"
+    | "messaging_geo";
   blockingIssues?: string[];
   errorDetail?: string | null;
 };
@@ -26,7 +32,9 @@ function buildComplianceAlertEmail(input: ComplianceAlertInput) {
   const heading =
     input.reason === "action_needed"
       ? "Twilio compliance action needed"
-      : "Twilio compliance job failed";
+      : input.reason === "geo_blocked"
+        ? "Twilio geographic permissions blocked"
+        : "Twilio compliance job failed";
   const issues =
     input.blockingIssues && input.blockingIssues.length > 0
       ? `<ul>${input.blockingIssues

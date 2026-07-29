@@ -4,6 +4,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { markContactLineType } from "@/lib/twilio-lookup.server";
+import { alertSmsGeoPermissionBlocked } from "@/lib/twilio-geo-permissions.server";
 import {
   isTerminalSmsStatus,
   normalizeSmsStatus,
@@ -89,6 +90,18 @@ export async function runSmsStatusSideEffects(args: {
       workspaceId: messageData.workspace,
       contactId: messageData.contact_id,
       lineType: "landline",
+    });
+  }
+
+  // 21408 = destination region not enabled for messaging on this subaccount.
+  // SMS geo-permissions have no public API, so the toggle is Console-only —
+  // raise a (rate-limited) ops alert naming the fix instead of letting sends
+  // fail one by one.
+  if (errorCode === 21408) {
+    await alertSmsGeoPermissionBlocked({
+      workspaceId: messageData.workspace,
+      messageSid: sid,
+      to: messageData.to,
     });
   }
 

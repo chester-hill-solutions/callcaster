@@ -106,6 +106,12 @@ const transactionHistoryMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/transaction-history.server", () => transactionHistoryMocks);
 
+const geoPermissionMocks = vi.hoisted(() => ({
+  ensureVoiceGeoPermissions: vi.fn(async () => ({ ok: true as const })),
+}));
+
+vi.mock("@/lib/twilio-geo-permissions.server", () => geoPermissionMocks);
+
 /**
  * fetchConversationSummary now aggregates conversations via a single raw SQL
  * query (tdb.execute) instead of paging tdb.message.findMany and grouping in
@@ -382,6 +388,9 @@ describe("app/lib/database/workspace.server.ts", () => {
       provisioningWarning: "Twilio bootstrap is still running",
     });
     expect(stripe.createStripeContact).toHaveBeenCalled();
+    expect(geoPermissionMocks.ensureVoiceGeoPermissions).toHaveBeenCalledWith({
+      workspaceId: "w_new",
+    });
     expect(
       transactionHistoryMocks.insertTransactionHistoryIdempotent,
     ).toHaveBeenCalledWith({

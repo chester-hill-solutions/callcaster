@@ -18,6 +18,7 @@ import { invalidateWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data
 import { seedWorkspaceSampleData } from "@/lib/seed/seed-workspace-sample-data.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
+import { ensureVoiceGeoPermissions } from "@/lib/twilio-geo-permissions.server";
 import { addUserToWorkspace } from "@/lib/workspace-membership.server";
 import { adminDb } from "@/server/admin-db";
 import { createStripeContact } from "./stripe.server";
@@ -207,6 +208,19 @@ export async function createNewWorkspace({
           bootstrapError,
         );
         provisioningWarnings.push("Twilio bootstrap is still running");
+      }
+
+      // Voice geographic permissions are the one runbook §1 toggle Twilio
+      // exposes an API for — enable CA/US on the new subaccount here so no
+      // Console visit is needed. Never fatal; the compliance job re-runs
+      // this on every retry, so a transient failure self-heals.
+      const geoResult = await ensureVoiceGeoPermissions({
+        workspaceId: createdWorkspaceId,
+      });
+      if (!geoResult.ok) {
+        provisioningWarnings.push(
+          "Voice geographic permissions could not be enabled automatically",
+        );
       }
     }
 
