@@ -194,6 +194,24 @@ async function waitForReady(url, attempts = 120) {
 let exitCode = 0;
 try {
   await waitForReady(baseURL);
+
+  // Surface contract probe: asserts every inventoried endpoint is actually
+  // routed (unit tests import handlers directly and cannot catch a routing
+  // failure) and that no-credential requests match the declared authClass.
+  // Provider-auth stays relaxed here because this harness sets
+  // TWILIO_VALIDATE_WEBHOOKS=false; deployed environments run it with
+  // --strict-provider-auth. Uses spawnSync + throw rather than run(), whose
+  // process.exit would skip the finally block and orphan bun children.
+  console.log("[e2e-compose] probing surface contracts…");
+  const probe = spawnSync(
+    "npx",
+    ["tsx", "--tsconfig", "tsconfig.json", "scripts/probe-surfaces.mjs", "--base-url", baseURL],
+    { cwd: rootDir, stdio: "inherit", env: { ...process.env, DATABASE_URL: databaseUrl } },
+  );
+  if (probe.status !== 0) {
+    throw new Error("surface contract probe failed");
+  }
+
   console.log("[e2e-compose] running Playwright…");
   run("npx", ["playwright", "install", "chromium"], { env: process.env });
   run("npm", ["run", "test:e2e"], {

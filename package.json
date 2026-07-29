@@ -16,6 +16,7 @@
     "db:studio": "drizzle-kit studio",
     "db:ledger:check": "node scripts/db/check-migration-ledger.mjs",
     "db:bootstrap:fresh": "node scripts/db/bootstrap-fresh-db.mjs",
+    "probe:surfaces": "tsx --tsconfig tsconfig.json scripts/probe-surfaces.mjs",
     "tools:check-file-size": "node scripts/check-app-file-size.mjs",
     "tools:routes:flat-id-to-path": "node scripts/lib/route-flat-id-to-path.mjs --print",
     "tools:routes:folderize": "node scripts/folderize-routes.mjs",
