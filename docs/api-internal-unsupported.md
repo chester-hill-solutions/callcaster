@@ -1,47 +1,35 @@
 # Internal & Unsupported API Routes
 
-Routes that are callable over HTTP but **not supported for external integrators**. Some are internal telephony helpers; others are documented **security gaps** pending hardening.
+Routes that are callable over HTTP but **not supported for external integrators**. Some are internal telephony helpers; the historical "security gaps" in this doc were closed by the Wave 1 hard-cuts (#1039) and the 2026-07-29 pre-ship pass — the tables below reflect verified current state.
 
-Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tags: **Internal Trusted**, **Security Gap**, **Public Form**)
+Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tags: **Internal Trusted**, **Public Form**)
 
 ## Internal trusted (service role / flow trust)
 
-| Method | Path | Risk / notes |
+| Method | Path | Auth / notes |
 | --- | --- | --- |
-| POST | `/api/auto-dial/dialer` | No user auth; trusts `workspace_id` / `user_id` in JSON |
-| POST | `/api/call` | Twilio Voice URL; handset cookie lookup; no Twilio signature |
-| POST | `/api/inbound-verification` | Call-in verification TwiML; service role; no Twilio signature |
-| POST | `/api/verify-pin-input` | Retired audio PIN flow; returns 410 |
+| POST | `/api/call` | Twilio Voice URL; `requireTwilioSignature` + handset session lookup |
+| POST | `/api/inbound-verification` | Call-in verification TwiML; Twilio signature validated (SEC-06) |
+| POST | `/api/twilio/a2p/events` | Event Streams sink (JSON); gated by `TWILIO_EVENTS_SINK_SECRET` (`?token=…` on the sink URL) |
 
-## Security gaps (weak / unknown auth)
+## Formerly documented security gaps — all closed
 
-| Method | Path | Risk / notes |
+| Method | Path | Current state |
 | --- | --- | --- |
-| POST | `/api/dial/:number` | TwiML sub-route without Twilio signature validation |
-| POST | `/api/disconnect` | Twilio Device disconnect; account credentials only |
-| POST | `/api/queues` | Session client without mandatory user check on all paths |
-| POST | `/api/outreach_attempts/:id` | Duplicate legacy routes; weak session client (×2 modules) |
-| GET/POST | `/api/verify-audio-session` | Retired audio PIN flow; returns 410 |
-
-**Remediation:** add signature validation or session checks before promoting any of these to supported APIs.
+| POST | `/api/dial/:number` | `requireTwilioSignature` in the action's `auth` (validated against the call's workspace subaccount) |
+| POST | `/api/disconnect` | **Deleted** (SEC-05). Replacement: `POST /api/workspaces/:workspaceId/calls/:callSid/disconnect` with `calls.control` capability |
+| POST | `/api/auto-dial/dialer` | **Deleted** (SEC-02). Replacement: `POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` (authenticated) |
+| POST | `/api/queues` | `requireJsonAuth` + `requireWorkspaceAccess` on every branch; workspace resolved server-side |
+| POST | `/api/outreach_attempts/:id` | `requireJsonAuth` + workspace check via `authForOutreachAttempt`; the legacy duplicate flat-route module no longer exists |
+| GET/POST | `/api/verify-audio-session`, `/api/verify-pin-input`, `/api/verify-audio-pin/:pin` | Retired; return 410 |
 
 ## Public unauthenticated forms (not SDK)
 
-| Method | Path | Purpose |
+| Method | Path | Purpose / protections |
 | --- | --- | --- |
-| POST | `/api/contact-form` | Marketing contact form email |
-| POST | `/api/survey-answer` | Public survey respondent |
-| POST | `/api/survey-complete` | Public survey completion |
-| GET | `/api/verify-audio-pin/:pin` | Retired audio PIN flow; returns 410 |
-
-## Legacy duplicate
-
-Two modules register **`POST /api/outreach_attempts/:id`**:
-
-1. `app/routes/api+/outreach_attempts/$id.route.tsx`
-2. `app/routes/api.outreach_attempts.$id.js` (legacy; typo table name)
-
-Prefer **`POST /api/outreach-attempts`** for new work.
+| POST | `/api/contact-form` | Marketing contact email; honeypot + DB-backed rate limit (5/min/IP) |
+| POST | `/api/survey-answer` | Public survey respondent; rate limit + honeypot + signed respondent token |
+| POST | `/api/survey-complete` | Public survey completion; rate limit + honeypot + signed respondent token |
 
 ## Unsupported exposure class
 

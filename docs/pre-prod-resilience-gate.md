@@ -1,5 +1,14 @@
 # Pre-prod resilience gate — 2026-07-14
 
+> **2026-07-29 addendum.** The v2 production ship plan supersedes the KR2/KR8
+> blockers' framing: KR2 (deployed-env Twilio smoke) moves to the ship plan's
+> WS-D verification gate, to run against the new production stack once WS-B
+> provisioning (secrets + worker + fresh DB) lands. The 2026-07-29 pre-ship
+> code pass additionally closed: A2P events sink auth, sign-in/OTP/contact-form
+> rate limits, predictive-dialer ambiguous-dial parking, ACD complete/abandon
+> lifecycle, open-sync terminal billing recovery (TEL-04), rental-cycle
+> catch-up (BILL-02), and the message-status terminal guard.
+
 ## Key results
 
 | KR | Criterion | Status |

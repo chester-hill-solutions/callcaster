@@ -10,10 +10,8 @@ import {
   integratorOpenApiComponents,
   integratorPathOverrides,
 } from "@/lib/openapi-integrator";
-import {
-  platformOpenApiComponents,
-  platformPathOverrides,
-} from "@/lib/openapi-platform";
+import { platformOpenApiComponents } from "@/lib/openapi-platform-components";
+import { platformPathOverrides } from "@/lib/openapi-platform";
 
 const broadObjectSchema = {
   type: "object" as const,

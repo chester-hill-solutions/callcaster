@@ -2,6 +2,25 @@
 
 **Generated:** 2026-07-13
 
+> **2026-07-29 status addendum (code-verified pre-ship pass).** This manifest
+> predates the Wave 1 hard-cuts and has drifted; verified deltas:
+> SEC-01/02/05/06 hard-cuts landed (`/api/auto-dial/dialer` and
+> `/api/disconnect` deleted with authenticated workspace replacements;
+> inbound-verification signed). SURVEY-01 respondent POSTs are hardened
+> (DB rate limit + honeypot + signed respondent token); the GET loader remains
+> public by design. Sign-in/2FA/verify-email/reset-password/contact-form are
+> now rate-limited. The A2P Event Streams sink is gated by
+> `TWILIO_EVENTS_SINK_SECRET`. TEL-01 call-side guard is atomic in
+> `updateCallBySid` and messages now have the same terminal guard
+> (`updateMessageBySid`); TEL-04 open-sync recovers lost terminal billing;
+> BILL-02 rental billing catches up missed cycles. TEL-02 is fixed on the
+> predictive-dialer path (intent-park on ambiguous dial); TEL-03
+> complete/abandon now resolves entries by CallSid and releases agents on
+> dial failure. Data cutover scope is void: ship decision (2026-07-29) is a
+> fresh production database — no Supabase data migration. See
+> `docs/api-internal-unsupported.md` and the ship plan for the current gate
+> list.
+
 Each feature classified for the low-traffic Postgres cutover window. **Proved** = safe on target with current code path. **Disabled** = must turn off if not fixed before cutover. **Deferred** = explicitly post-cutover.
 
 ## Security & auth

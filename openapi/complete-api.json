@@ -37,10 +37,6 @@
       "description": "Public Form endpoints."
     },
     {
-      "name": "Security Gap",
-      "description": "Security Gap endpoints."
-    },
-    {
       "name": "User API",
       "description": "User API endpoints."
     },
@@ -2377,15 +2373,15 @@
       "post": {
         "operationId": "postDial_number",
         "summary": "POST /api/dial/:number",
-        "description": "Returns TwiML.\n\n**Security:** Twilio TwiML sub-route without signature validation.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Twilio TwiML sub-route; requires a valid Twilio signature. Returns TwiML.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
-          "Security Gap",
+          "Provider Webhook",
           "telephony"
         ],
         "x-callcaster-supported": false,
-        "x-callcaster-exposure": "internalOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
         "security": [],
         "requestBody": {
           "required": true,
@@ -6104,7 +6100,7 @@
       "post": {
         "operationId": "postTwilio_a2p_events",
         "summary": "POST /api/twilio/a2p/events",
-        "description": "Parses A2P brand/campaign lifecycle events and reconciles workspace onboarding status.\n\n**Security:** A2P Event Streams sink receiver (JSON body); sink-secret validation lands in Phase D.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "A2P Event Streams sink receiver (JSON body), gated by the TWILIO_EVENTS_SINK_SECRET shared secret (?token=… on the sink URL). Parses brand/campaign lifecycle events and reconciles workspace onboarding status.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
           "Internal Trusted",
           "messaging"

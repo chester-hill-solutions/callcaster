@@ -19,10 +19,8 @@ const EXEMPT = new Set(["lib/database.types.ts"]);
  * Do not raise these limits — only lower or delete entries as files shrink.
  */
 const BASELINE_ALLOWLIST = {
-  "lib/openapi-platform.ts": 1209,
   "lib/platform-data.server.ts": 1181,
   "lib/database/workspace.server.ts": 1059,
-  "lib/api-surface.ts": 1020,
   "lib/survey-db.server.ts": 928,
 };
 

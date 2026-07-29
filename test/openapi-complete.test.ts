@@ -13,6 +13,13 @@ describe("complete openapi json export contract", () => {
     const tags = completeOpenApiSpec.tags.map((t) => t.name);
     expect(tags).toContain("Provider Webhook");
     expect(tags).toContain("User API");
-    expect(tags).toContain("Security Gap");
+  });
+
+  test("has no Security Gap surfaces (weakUnknown authClass is banned)", () => {
+    // The last weakUnknown entry (dial/:number) was fixed 2026-07-29; this
+    // locks the inventory in the gap-free state — a reappearing tag means a
+    // new route shipped with weak/unknown auth.
+    const tags = completeOpenApiSpec.tags.map((t) => t.name);
+    expect(tags).not.toContain("Security Gap");
   });
 });
