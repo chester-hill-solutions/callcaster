@@ -18,6 +18,11 @@ const tenantDbMocks = vi.hoisted(() => ({
   contact: { findFirst: vi.fn(async () => null) },
 }));
 
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+}));
+
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: unknown[]) => mocks.verifyApiKeyOrSession(...args),
 }));

@@ -43,6 +43,11 @@ vi.mock("@/lib/platform-workspace-numbers.server", () => ({
     mocks.deleteWorkspaceNumber(...args),
 }));
 
+vi.mock("@/lib/database/workspace.server", () => ({
+  getUserRole: vi.fn(async () => ({ role: "member" })),
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/lib/workspace-events.server", () => ({
   WORKSPACE_EVENTS_NOTIFY_CHANNEL: "workspace_events",
   fetchWorkspaceEventsAfter: (...args: unknown[]) =>
@@ -50,6 +55,7 @@ vi.mock("@/lib/workspace-events.server", () => ({
 }));
 
 vi.mock("@/server/db", () => ({
+  db: {},
   directPool: {
     listen: (...args: unknown[]) => mocks.listen(...args),
   },

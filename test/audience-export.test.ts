@@ -8,7 +8,9 @@ vi.mock("@/lib/env.server", () => {
   return { env: new Proxy({}, handler) };
 });
 
-const requireWorkspaceAccess = vi.fn(async () => undefined);
+const requireWorkspaceAccess = vi.hoisted(() =>
+  vi.fn(async () => undefined),
+);
 
 const audienceExportMocks = vi.hoisted(() => ({
   findAudienceWorkspaceById: vi.fn(async () => "w1"),
@@ -23,12 +25,19 @@ const audienceExportMocks = vi.hoisted(() => ({
   ]),
 }));
 
-vi.mock("@/lib/database/workspace.server", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/database/workspace.server")
-  >("@/lib/database/workspace.server");
-  return { ...actual, requireWorkspaceAccess };
-});
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    requireWorkspaceAccess(...args),
+}));
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+  requireDataPlaneRouteCapability: async (
+    _context: unknown,
+    workspaceId: string,
+  ) => ({ workspaceId, auth: { workspaceId, userId: "u1" } }),
+}));
 
 vi.mock("@/lib/audience-upload-db.server", () => ({
   findAudienceWorkspaceById: (...args: any[]) =>
