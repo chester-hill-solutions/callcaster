@@ -65,7 +65,11 @@ function rawHandlers(src) {
       new RegExp(`export\\s+async\\s+function\\s+${kw}\\b`).test(src) ||
       new RegExp(`export\\s+function\\s+${kw}\\b`).test(src);
     if (!exported) continue;
-    const governed = new RegExp(`export\\s+const\\s+${kw}\\s*=\\s*define(Action|Loader)\\b`).test(src);
+    const governed =
+      new RegExp(`export\\s+const\\s+${kw}\\s*=\\s*define(Action|Loader)\\b`).test(src) ||
+      new RegExp(
+        `export\\s+const\\s+${kw}\\s*=\\s*defineDataPlaneListLoader\\b`,
+      ).test(src);
     if (!governed) raw.push(kw);
   }
   return raw;
