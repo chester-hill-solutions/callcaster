@@ -14,7 +14,7 @@ import {
   type SessionAuthResult,
 } from "@/lib/api-auth.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
-import { requireDualAuthCapability } from "@/lib/capability-guard.server";
+import { requireAudienceWorkspaceAccess } from "@/lib/audience-api-auth.server";
 import { AppError } from "@/lib/errors.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
@@ -49,49 +49,6 @@ const AUDIENCE_CONTACT_SORT_KEYS = new Set([
   "country",
   "created_at",
 ]);
-
-async function requireAudienceWorkspaceAccess(args: {
-  auth?:
-    | ApiKeyAuthResult
-    | BearerSessionAuthResult
-    | SessionAuthResult
-    | { authType: string; workspaceId?: string };
-  user?: { id: string };
-  workspaceId: string;
-  requireWorkspaceAccess: AudiencesDeps["requireWorkspaceAccess"];
-}) {
-  if (args.auth?.authType === "api_key") {
-    if (args.auth.workspaceId !== args.workspaceId) {
-      throw new AppError("Unauthorized", 403);
-    }
-  } else if (!args.user) {
-    throw new AppError("Unauthorized", 401);
-  } else {
-    await args.requireWorkspaceAccess({
-      user: args.user,
-      workspaceId: args.workspaceId,
-    });
-  }
-
-  if (
-    args.auth &&
-    (args.auth.authType === "api_key" ||
-      args.auth.authType === "session" ||
-      args.auth.authType === "bearer")
-  ) {
-    const gated = await requireDualAuthCapability({
-      auth: args.auth as
-        | ApiKeyAuthResult
-        | BearerSessionAuthResult
-        | SessionAuthResult,
-      workspaceId: args.workspaceId,
-      capability: "campaigns.read",
-    });
-    if (gated instanceof Response) {
-      throw gated;
-    }
-  }
-}
 
 function flattenAudienceExportRows(rawData: Array<Record<string, unknown>>) {
   return rawData.map((row) => {
@@ -159,6 +116,7 @@ export const loader = defineLoader({
           auth,
           user,
           workspaceId: audienceWorkspace,
+          capability: "campaigns.read",
           requireWorkspaceAccess: d.requireWorkspaceAccess,
         });
 
@@ -216,6 +174,7 @@ export const loader = defineLoader({
         auth,
         user,
         workspaceId: resolvedWorkspaceId,
+        capability: "campaigns.read",
         requireWorkspaceAccess: d.requireWorkspaceAccess,
       });
 

@@ -3,28 +3,12 @@ import { fetchLatestMessageForPhone } from "@/lib/message-db.server";
 import {
   getConversationMessagesApi,
 } from "@/lib/platform-data.server";
-import { requireDataPlaneRouteCapability } from "@/lib/capability-guard.server";
+import { dataPlaneCapabilityAuthWithParam } from "@/lib/capability-guard.server";
 import { defineLoader } from "@/lib/handler.server";
-import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = defineLoader({
-  auth: async ({
-    params,
-    context,
-  }: Pick<LoaderFunctionArgs, "params" | "context">) => {
-    const workspaceId = params.workspaceId;
-    const contactNumber = params.contactNumber;
-    if (!workspaceId || !contactNumber) {
-      return jsonError("workspaceId and contactNumber are required", 400);
-    }
-    const gated = await requireDataPlaneRouteCapability(
-      context,
-      workspaceId,
-      "campaigns.read",
-    );
-    if (gated instanceof Response) return gated;
-    return { ...gated, contactNumber };
-  },
+  auth: (args) =>
+    dataPlaneCapabilityAuthWithParam("campaigns.read", "contactNumber")(args),
   sideEffects: ["db-read"],
   handler: async ({ auth, url }) => {
     const { workspaceId, contactNumber } = auth;
