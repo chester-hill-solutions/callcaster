@@ -3,11 +3,11 @@ import { findContactsByPhone } from "@/lib/database/contact.server";
 import {
   listWorkspaceContactsApi,
 } from "@/lib/platform-data.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { requireDataPlaneRouteCapability } from "@/lib/capability-guard.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-function requireWorkspaceDataPlane({
+async function requireWorkspaceDataPlane({
   params,
   context,
 }: Pick<LoaderFunctionArgs, "params" | "context">) {
@@ -15,8 +15,7 @@ function requireWorkspaceDataPlane({
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
-  getDataPlaneRouteContext(context, workspaceId);
-  return { workspaceId };
+  return requireDataPlaneRouteCapability(context, workspaceId, "campaigns.read");
 }
 
 export const loader = defineLoader({

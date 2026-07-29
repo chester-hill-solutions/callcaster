@@ -33,6 +33,12 @@ const tenantDbMocks = vi.hoisted(() => ({
   },
 }));
 
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+}));
+
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: any[]) => mocks.verifyApiKeyOrSession(...args),
 }));
@@ -521,7 +527,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("action api_key rejects workspace mismatch", async () => {
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, keyId: "k1", scopes: ["messages.send"], client: {} });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "15551234567",
       workspace_id: TEST_WORKSPACE_ID_ALT,
@@ -537,7 +543,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action returns 402 with creditsError when workspace balance is depleted", async () => {
     mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(0);
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, keyId: "k1", scopes: ["messages.send"], client: {} });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -557,7 +563,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action returns 402 with creditsError when workspace balance is unknown (fail closed)", async () => {
     mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(null);
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, keyId: "k1", scopes: ["messages.send"], client: {} });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -574,7 +580,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action api_key success path uses authResult.client and user null; covers '+' not at start normalization", async () => {
     const client = makeDbClientStub({ webhookRows: [] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {}, keyId: "k1", scopes: ["messages.send"]});
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "1+5551234567",
       workspace_id: TEST_WORKSPACE_ID,
@@ -759,6 +765,8 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
       client: {},
+      keyId: "k1",
+      scopes: ["messages.send"],
     });
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(

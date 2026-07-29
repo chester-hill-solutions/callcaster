@@ -72,6 +72,12 @@ vi.mock("@/lib/recipient-calling-window", () => ({
   isWithinRecipientCallingWindow: vi.fn(() => true),
 }));
 
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+}));
+
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: any[]) => mocks.verifyApiKeyOrSession(...args),
 }));
@@ -284,6 +290,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue(defaultPortalConfig);
     mocks.rpcCreateOutreachAttempt.mockResolvedValue("oa1");
@@ -870,6 +878,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
@@ -890,6 +900,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(

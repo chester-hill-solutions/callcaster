@@ -1389,11 +1389,12 @@
       "post": {
         "operationId": "createCampaignWithScript",
         "summary": "Create campaign with script and phone number (one-shot)",
-        "description": "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both.",
+        "description": "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both. Requires the campaigns.write capability for API keys.",
         "tags": [
           "Integrator API",
           "Campaigns"
         ],
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -1505,11 +1506,12 @@
       "post": {
         "operationId": "sendChatSms",
         "summary": "Send a single SMS",
-        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body.",
+        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
         ],
+        "x-callcaster-capability": "messages.send",
         "security": [
           {
             "sessionCookie": []
@@ -3489,11 +3491,12 @@
       "post": {
         "operationId": "dispatchCampaignSms",
         "summary": "Dispatch SMS to queued campaign contacts",
-        "description": "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.",
+        "description": "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user. Requires the campaigns.dispatch capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
         ],
+        "x-callcaster-capability": "campaigns.dispatch",
         "security": [
           {
             "sessionCookie": []
@@ -5222,6 +5225,7 @@
           "Platform API",
           "Workspace"
         ],
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -5230,7 +5234,7 @@
             "apiKey": []
           }
         ],
-        "description": "Returns workspace metadata for an authorized session member or workspace API key scoped to the route workspace.",
+        "description": "Returns workspace metadata for an authorized session member or workspace API key with campaigns.read scoped to the route workspace.",
         "responses": {
           "200": {
             "description": "Workspace details",
@@ -6327,9 +6331,12 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
-        "description": "Session-only trust-root route. Privileged role assignment may require MFA enrollment.",
+        "description": "Invite a member with a session (role subordination rules apply) or an API key with members.invite (admin-equivalent role assignment: member/caller only). Privileged session role assignment may require MFA enrollment.",
         "requestBody": {
           "required": true,
           "content": {
@@ -6728,9 +6735,12 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
-        "description": "Cursor-paginated immutable audit log for privileged workspace actions. Owner session only until API key scopes ship in SEC-07.",
+        "description": "Cursor-paginated immutable audit log for privileged workspace actions. Requires owner session or an API key with the audit.read capability.",
         "parameters": [
           {
             "name": "cursor",
@@ -6810,6 +6820,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -6877,6 +6888,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -6931,6 +6943,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -6999,6 +7012,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7053,6 +7067,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -7292,6 +7307,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7359,6 +7375,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7413,6 +7430,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -7469,6 +7487,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7536,6 +7555,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7603,6 +7623,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7670,6 +7691,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7737,6 +7759,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7793,6 +7816,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7860,6 +7884,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7916,6 +7941,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -8025,6 +8051,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -8092,6 +8119,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9684,6 +9712,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -10466,17 +10495,32 @@
           "caller"
         ]
       },
+      "ProductCapabilityId": {
+        "type": "string",
+        "enum": [
+          "campaigns.read",
+          "campaigns.write",
+          "campaigns.dispatch",
+          "calls.start",
+          "calls.control",
+          "messages.send",
+          "members.invite",
+          "audit.read"
+        ],
+        "description": "Stable product capability ID used as an API-key scope."
+      },
       "ApiKeySummary": {
         "type": "object",
         "required": [
           "id",
           "name",
           "key_prefix",
-          "created_at"
+          "created_at",
+          "scopes"
         ],
         "properties": {
           "id": {
-            "type": "integer"
+            "type": "string"
           },
           "name": {
             "type": "string"
@@ -10492,6 +10536,18 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductCapabilityId"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "ISO-8601 expiry; null only for pre-SEC-07 legacy keys."
           }
         }
       },
@@ -10512,13 +10568,28 @@
       "CreateApiKeyRequest": {
         "type": "object",
         "required": [
-          "name"
+          "name",
+          "scopes"
         ],
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ProductCapabilityId"
+            },
+            "description": "At least one capability scope is required."
+          },
+          "expires_in_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "Key TTL in days (default 90, max 365)."
           }
         }
       },
@@ -10529,7 +10600,8 @@
           "id",
           "name",
           "key_prefix",
-          "created_at"
+          "created_at",
+          "scopes"
         ],
         "properties": {
           "key": {
@@ -10548,6 +10620,17 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductCapabilityId"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },

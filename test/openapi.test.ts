@@ -187,16 +187,40 @@ describe("openapi spec", () => {
     ).toContain("DialerStartResponse");
   });
 
-  test("audit events route is owner-session documented with audit.read capability", () => {
+  test("audit events route documents dual auth with audit.read capability", () => {
     const audit =
       openApiSpec.paths["/api/workspaces/{workspaceId}/audit-events"].get;
 
     expect(audit?.operationId).toBe("listWorkspaceAuditEvents");
-    expect(audit?.security).toEqual([{ sessionCookie: [] }]);
+    expect(audit?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
     expect(audit?.["x-callcaster-capability"]).toBe("audit.read");
     expect(
       audit?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
     ).toContain("WorkspaceAuditEventListResponse");
+  });
+
+  test("CreateApiKeyRequest requires scopes and documents expiry", () => {
+    const schema = openApiSpec.components.schemas.CreateApiKeyRequest;
+    expect(schema.required).toEqual(expect.arrayContaining(["name", "scopes"]));
+    expect(schema.properties.scopes.minItems).toBe(1);
+    expect(schema.properties.expires_in_days.maximum).toBe(365);
+    expect(
+      openApiSpec.components.schemas.ProductCapabilityId.enum,
+    ).toContain("campaigns.read");
+  });
+
+  test("integrator operations declare required capabilities", () => {
+    expect(
+      openApiSpec.paths["/api/campaigns/create-with-script"].post?.[
+        "x-callcaster-capability"
+      ],
+    ).toBe("campaigns.write");
+    expect(
+      openApiSpec.paths["/api/chat_sms"].post?.["x-callcaster-capability"],
+    ).toBe("messages.send");
+    expect(openApiSpec.paths["/api/sms"].post?.["x-callcaster-capability"]).toBe(
+      "campaigns.dispatch",
+    );
   });
 
   test("workspace scoped routes have stable operationIds and mixed auth", () => {
@@ -239,13 +263,20 @@ describe("openapi spec", () => {
         ?.operationId,
     ).toBe("patchWorkspaceNumber");
 
-    for (const pathItem of [apiKeys, members, webhook, numbers]) {
+    for (const pathItem of [apiKeys, webhook, numbers]) {
       for (const op of Object.values(pathItem)) {
         if (op && typeof op === "object" && "security" in op) {
           expect(op.security).toEqual([{ sessionCookie: [] }]);
         }
       }
     }
+    expect(members.get?.security).toEqual([{ sessionCookie: [] }]);
+    expect(members.post?.security).toEqual([
+      { sessionCookie: [] },
+      { apiKey: [] },
+    ]);
+    expect(members.patch?.security).toEqual([{ sessionCookie: [] }]);
+    expect(members.delete?.security).toEqual([{ sessionCookie: [] }]);
     expect(transfer?.security).toEqual([{ sessionCookie: [] }]);
   });
 });

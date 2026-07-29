@@ -80,14 +80,30 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ## API keys (automation)
 
+Keys require at least one capability scope. Optional `expires_in_days` defaults to 90 (max 365).
+
 ```bash
 curl -X POST "$BASE_URL/api/workspaces/$WORKSPACE_ID/api-keys" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"production agent"}'
+  -d '{
+    "name": "production agent",
+    "scopes": ["campaigns.read", "campaigns.write", "messages.send", "campaigns.dispatch"],
+    "expires_in_days": 90
+  }'
 ```
 
-Use `X-API-Key: cc_live_...` or `Authorization: Bearer cc_live_...` for integrator routes (`/api/sms`, `/api/chat_sms`, `/api/campaigns/create-with-script`) and dual-auth data routes.
+Use `X-API-Key: cc_live_...` or `Authorization: Bearer cc_live_...` for integrator routes (`/api/sms`, `/api/chat_sms`, `/api/campaigns/create-with-script`) and dual-auth data routes. Missing scopes return `403` with a `capability_denied:*` error code.
+
+| Capability | Unlocks |
+| --- | --- |
+| `campaigns.read` | Campaigns, queue, contacts, audiences, scripts, surveys, conversations, workspace metadata |
+| `campaigns.write` | Create/update campaigns, queue mutations, contact deletes |
+| `campaigns.dispatch` | Campaign SMS batch (`POST /api/sms`) |
+| `messages.send` | Direct chat SMS (`POST /api/chat_sms`) |
+| `calls.start` / `calls.control` | Dialer start / live call disconnect |
+| `members.invite` | Invite members (`POST .../members`) |
+| `audit.read` | Workspace audit events |
 
 ## Campaign operations
 
@@ -98,9 +114,11 @@ See [Data plane API](./api-data-plane.md) for campaigns, contacts, audiences, sc
 | Route class | API key | Bearer JWT | Cookie |
 | --- | --- | --- | --- |
 | Platform auth (register/token) | — | — | — |
-| Workspace admin (billing, onboarding, members) | — | yes | yes |
-| Data / campaigns / exports | yes | yes | yes |
-| Dialer / handset / agent-status | — | yes | yes |
+| Workspace admin (billing, onboarding) | — | yes | yes |
+| Member invite (`members.invite`) | yes | yes | yes |
+| Data / campaigns / exports | yes (scoped) | yes | yes |
+| Dialer start / call disconnect | yes (scoped) | yes | yes |
+| Handset / agent-status | — | yes | yes |
 
 ## Related guides
 

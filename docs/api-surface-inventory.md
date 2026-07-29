@@ -114,7 +114,7 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/webhook` | GET, PUT, POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 | `/api/workspaces/:workspaceId/members` | GET, POST, PATCH, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/members.route.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspaces/:workspaceId/api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/api-keys.route.tsx` | `docs/api-workspace-admin.md` |  |
-| `/api/workspaces/:workspaceId/audit-events` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audit-events.route.tsx` | `docs/api-workspace-admin.md` | Owner-only session access until SEC-07 audit.read scopes land for API keys. |
+| `/api/workspaces/:workspaceId/audit-events` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audit-events.route.tsx` | `docs/api-workspace-admin.md` | Requires owner session or API key with `audit.read`. |
 | `/api/workspaces/:workspaceId/campaigns` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/campaigns.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/campaigns/:campaignId` | GET, POST | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/campaigns/:campaignId/queue` | GET, PATCH | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId/queue.route.tsx` | `docs/api-data-plane.md` |  |

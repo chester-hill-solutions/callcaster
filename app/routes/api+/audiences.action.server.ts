@@ -2,7 +2,13 @@ import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { resolveDualAuthSession } from "@/lib/api-auth.server";
+import {
+  resolveDualAuthSession,
+  type ApiKeyAuthResult,
+  type BearerSessionAuthResult,
+  type SessionAuthResult,
+} from "@/lib/api-auth.server";
+import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import {
@@ -20,7 +26,11 @@ type AudiencesDeps = {
   verifyAuth: (
     request: Request,
   ) => Promise<{
-    auth?: { authType: string; workspaceId?: string };
+    auth?:
+      | ApiKeyAuthResult
+      | BearerSessionAuthResult
+      | SessionAuthResult
+      | { authType: string; workspaceId?: string };
     headers: Headers;
     user?: { id: string };
   }>;
@@ -32,7 +42,11 @@ type AudiencesDeps = {
 };
 
 async function requireAudienceWorkspaceAccess(args: {
-  auth?: { authType: string; workspaceId?: string };
+  auth?:
+    | ApiKeyAuthResult
+    | BearerSessionAuthResult
+    | SessionAuthResult
+    | { authType: string; workspaceId?: string };
   user?: { id: string };
   workspaceId: string;
   requireWorkspaceAccess: AudiencesDeps["requireWorkspaceAccess"];
@@ -41,15 +55,33 @@ async function requireAudienceWorkspaceAccess(args: {
     if (args.auth.workspaceId !== args.workspaceId) {
       throw new AppError("Unauthorized", 403);
     }
-    return;
-  }
-  if (!args.user) {
+  } else if (!args.user) {
     throw new AppError("Unauthorized", 401);
+  } else {
+    await args.requireWorkspaceAccess({
+      user: args.user,
+      workspaceId: args.workspaceId,
+    });
   }
-  await args.requireWorkspaceAccess({
-    user: args.user,
-    workspaceId: args.workspaceId,
-  });
+
+  if (
+    args.auth &&
+    (args.auth.authType === "api_key" ||
+      args.auth.authType === "session" ||
+      args.auth.authType === "bearer")
+  ) {
+    const gated = await requireDualAuthCapability({
+      auth: args.auth as
+        | ApiKeyAuthResult
+        | BearerSessionAuthResult
+        | SessionAuthResult,
+      workspaceId: args.workspaceId,
+      capability: "campaigns.write",
+    });
+    if (gated instanceof Response) {
+      throw gated;
+    }
+  }
 }
 
 export const action = defineAction({
@@ -134,6 +166,9 @@ export const action = defineAction({
       response = { success: true };
     }
   } catch (error) {
+    if (error instanceof Response) {
+      return error;
+    }
     if (error instanceof AppError) {
       return routeData({ error: error.message }, { status: error.statusCode, headers });
     }

@@ -7,14 +7,17 @@ import {
 import {
   cancelWorkspaceInvite,
   inviteWorkspaceMember,
+  inviteWorkspaceMemberAsApiKey,
   listWorkspaceMembers,
   removeWorkspaceMember,
   updateWorkspaceMemberRole,
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import type { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
 function requireWorkspaceUser({
   params,
@@ -31,15 +34,17 @@ function requireWorkspaceUser({
   return { workspaceId, userId };
 }
 
+type MembersActionAuth =
+  | { mode: "invite"; workspaceId: string; auth: DataPlaneAuthContextValue }
+  | { mode: "session"; workspaceId: string; userId: string };
+
 export const loader = defineLoader({
   auth: requireWorkspaceUser,
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const { workspaceId, userId } = auth;
 
-    const result = await listWorkspaceMembers(    userId,
-      workspaceId,
-    );
+    const result = await listWorkspaceMembers(userId, workspaceId);
 
     if (!result.ok) {
       return jsonError(result.error, result.status);
@@ -56,21 +61,54 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: requireWorkspaceUser,
-  sideEffects: ["db-write", "email"],
-  handler: async ({ request, auth }) => {
-    const { workspaceId, userId } = auth;
+  auth: async ({
+    request,
+    params,
+    context,
+  }: ActionFunctionArgs): Promise<MembersActionAuth | Response> => {
+    const workspaceId = params.workspaceId;
+    if (!workspaceId) {
+      return jsonError("workspaceId is required", 400);
+    }
+    const auth = getDataPlaneRouteContext(context, workspaceId);
 
     if (request.method === "POST") {
+      const capability = await requireDataPlaneCapability(auth, "members.invite");
+      if (capability instanceof Response) {
+        return capability;
+      }
+      if (!auth.userId && !auth.apiKey) {
+        return jsonError("Unauthorized", 401);
+      }
+      return { mode: "invite", workspaceId, auth };
+    }
+
+    if (!auth.userId) {
+      return jsonError("Unauthorized", 401);
+    }
+    return { mode: "session", workspaceId, userId: auth.userId };
+  },
+  sideEffects: ["db-write", "email"],
+  handler: async ({ request, auth }) => {
+    const { workspaceId } = auth;
+
+    if (request.method === "POST" && auth.mode === "invite") {
       const parsed = await parseJsonBodyOrResponse(request, inviteMemberBodySchema);
       if (parsed instanceof Response) return parsed;
 
-      const result = await inviteWorkspaceMember(
-        userId,
-        workspaceId,
-        parsed.email,
-        parsed.role,
-      );
+      const result =
+        auth.auth.userId != null
+          ? await inviteWorkspaceMember(
+              auth.auth.userId,
+              workspaceId,
+              parsed.email,
+              parsed.role,
+            )
+          : await inviteWorkspaceMemberAsApiKey(
+              workspaceId,
+              parsed.email,
+              parsed.role,
+            );
 
       if (!result.ok) {
         return jsonError(result.error, result.status);
@@ -85,6 +123,11 @@ export const action = defineAction({
         201,
       );
     }
+
+    if (auth.mode !== "session") {
+      return jsonError("Unauthorized", 401);
+    }
+    const { userId } = auth;
 
     if (request.method === "PATCH") {
       const parsed = await parseJsonBodyOrResponse(request, updateMemberBodySchema);

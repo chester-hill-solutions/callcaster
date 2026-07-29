@@ -196,16 +196,13 @@ export async function listWorkspaceMembers(
   }
 }
 
-export async function inviteWorkspaceMember(
-  userId: string,
+async function inviteWorkspaceMemberWithActorRole(
+  actorRole: string,
   workspaceId: string,
   email: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  const access = await requireMemberManager(userId, workspaceId);
-  if (!access.ok) return access;
-
-  const escalation = assertNoRoleEscalation(access.actorRole, role);
+  const escalation = assertNoRoleEscalation(actorRole, role);
   if (!escalation.ok) return escalation;
 
   const cleanedEmail = email.toLowerCase().trim();
@@ -244,6 +241,35 @@ export async function inviteWorkspaceMember(
   }
 
   return { ok: true as const, invite: result.invite };
+}
+
+export async function inviteWorkspaceMember(
+  userId: string,
+  workspaceId: string,
+  email: string,
+  role: "owner" | "admin" | "member" | "caller",
+) {
+  const access = await requireMemberManager(userId, workspaceId);
+  if (!access.ok) return access;
+
+  return inviteWorkspaceMemberWithActorRole(
+    access.actorRole,
+    workspaceId,
+    email,
+    role,
+  );
+}
+
+/**
+ * Invite via API key with `members.invite`. Role assignment follows the admin
+ * subordination policy (member/caller only) until members.assign.* scopes exist.
+ */
+export async function inviteWorkspaceMemberAsApiKey(
+  workspaceId: string,
+  email: string,
+  role: "owner" | "admin" | "member" | "caller",
+) {
+  return inviteWorkspaceMemberWithActorRole("admin", workspaceId, email, role);
 }
 
 export async function updateWorkspaceMemberRole(

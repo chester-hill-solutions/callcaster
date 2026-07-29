@@ -5,11 +5,13 @@ import {
   type AuthorizationActor,
 } from "@chester-hill-solutions/auth";
 import { createRequireCapability } from "@chester-hill-solutions/auth-react-router";
+import type { RouterContextProvider } from "react-router";
 import {
   apiKeyActorFromScopes,
   sessionActorFromMembership,
 } from "@/lib/capability-actor.server";
 import type { ProductCapabilityId } from "@/lib/capabilities";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { jsonError } from "@/lib/platform-api.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
@@ -83,6 +85,23 @@ export async function requireDataPlaneCapability(
     }
     throw error;
   }
+}
+
+/**
+ * Resolve data-plane auth context and require a product capability.
+ * Returns `{ workspaceId, auth }` or a 403/404 Response.
+ */
+export async function requireDataPlaneRouteCapability(
+  context: Readonly<RouterContextProvider>,
+  workspaceId: string,
+  capability: ProductCapabilityId,
+): Promise<{ workspaceId: string; auth: DataPlaneAuthContextValue } | Response> {
+  const auth = getDataPlaneRouteContext(context, workspaceId);
+  const gated = await requireDataPlaneCapability(auth, capability);
+  if (gated instanceof Response) {
+    return gated;
+  }
+  return { workspaceId, auth };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { getSession } from "@/lib/auth.server";
+import { requireDataPlaneRouteCapability } from "@/lib/capability-guard.server";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { updateWorkspaceBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -11,7 +12,7 @@ import {
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-function resolveDataPlaneWorkspaceAuth({
+async function resolveDataPlaneWorkspaceAuth({
   params,
   context,
 }: Pick<LoaderFunctionArgs, "params" | "context">) {
@@ -20,21 +21,21 @@ function resolveDataPlaneWorkspaceAuth({
     return jsonError("workspaceId is required", 400);
   }
 
-  const auth = getDataPlaneRouteContext(context, workspaceId);
-  return { workspaceId, auth };
+  return requireDataPlaneRouteCapability(context, workspaceId, "campaigns.read");
 }
 
 function requireSessionUser(
   args: Pick<ActionFunctionArgs, "params" | "context">,
 ) {
-  const resolved = resolveDataPlaneWorkspaceAuth(args);
-  if (resolved instanceof Response) {
-    return resolved;
+  const workspaceId = args.params.workspaceId;
+  if (!workspaceId) {
+    return jsonError("workspaceId is required", 400);
   }
-  if (!resolved.auth.userId) {
+  const auth = getDataPlaneRouteContext(args.context, workspaceId);
+  if (!auth.userId) {
     return jsonError("Unauthorized", 401);
   }
-  return { workspaceId: resolved.workspaceId, userId: resolved.auth.userId };
+  return { workspaceId, userId: auth.userId };
 }
 
 export const loader = defineLoader({

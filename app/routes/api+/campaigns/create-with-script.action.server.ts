@@ -7,6 +7,7 @@ import {
 import { logger } from "@/lib/logger.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { defineAction } from "@/lib/handler.server";
 import {
   createWithScriptBodySchema,
@@ -82,6 +83,15 @@ export const action = defineAction({
       workspaceId: bodyWorkspaceId,
     });
     workspaceId = bodyWorkspaceId;
+  }
+
+  const capability = await requireDualAuthCapability({
+    auth: authResult,
+    workspaceId,
+    capability: "campaigns.write",
+  });
+  if (capability instanceof Response) {
+    return capability;
   }
 
   const preflight = await validateCreateWithScriptPreflight({

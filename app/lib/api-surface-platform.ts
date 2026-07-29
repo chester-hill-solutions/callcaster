@@ -4,6 +4,7 @@ type Op = {
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   handler: "loader" | "action";
   bodyType: "json" | "query" | "form" | "multipart" | "twiml" | "rawWebhook";
+  capability?: string;
 };
 
 type PlatformSeed = {
@@ -157,12 +158,17 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     docsGuide: GUIDE.platform,
     workspaceScoped: true,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
     notes:
-      "Child index under data-plane layout middleware. GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session.",
+      "Child index under data-plane layout middleware. GET supports session or API key with campaigns.read; PATCH requires admin+ session; DELETE requires owner session.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId",
@@ -295,10 +301,17 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     workspaceScoped: true,
     operations: [
       { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "json" },
+      {
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "members.invite",
+      },
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+    notes:
+      "GET/PATCH/DELETE are session-only. POST invite accepts session or API key with members.invite.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/api-keys",
@@ -317,13 +330,21 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId/audit-events",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/audit-events.route.tsx",
-    authClass: "workspaceAdmin",
+    authClass: "apiKeyOrSession",
     ownerArea: "workspace",
     exposure: "sessionOnly",
     docsGuide: GUIDE.workspace,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-    notes: "Owner-only session access until SEC-07 audit.read scopes land for API keys.",
+    operations: [
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "audit.read",
+      },
+    ],
+    notes:
+      "Requires owner session (via role matrix) or an API key with audit.read.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/campaigns",
@@ -333,7 +354,14 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+    ],
   }),
   platformSeed({
     path: "/api/campaigns/:campaignId",
@@ -343,8 +371,18 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "json" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+      {
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "campaigns.write",
+      },
     ],
   }),
   platformSeed({
@@ -355,8 +393,18 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "PATCH", handler: "action", bodyType: "json" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+      {
+        method: "PATCH",
+        handler: "action",
+        bodyType: "json",
+        capability: "campaigns.write",
+      },
     ],
   }),
   platformSeed({
@@ -395,7 +443,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/contacts/:contactId",
@@ -405,8 +458,18 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "DELETE", handler: "action", bodyType: "json" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+      {
+        method: "DELETE",
+        handler: "action",
+        bodyType: "json",
+        capability: "campaigns.write",
+      },
     ],
   }),
   platformSeed({
@@ -417,7 +480,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/audiences/:audienceId",
@@ -428,7 +496,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/audience-uploads/:uploadId",
@@ -439,7 +512,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/scripts",
@@ -449,7 +527,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/scripts/:scriptId",
@@ -458,7 +541,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     ownerArea: "scripts",
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/surveys",
@@ -468,7 +556,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/surveys/:surveyId",
@@ -477,7 +570,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     ownerArea: "surveys",
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/surveys/:surveyId/responses",
@@ -486,7 +584,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     ownerArea: "surveys",
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/surveys/:surveyId/responses/export",
@@ -507,7 +610,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/conversations/:contactNumber",
@@ -518,7 +626,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/audios",
@@ -599,7 +712,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.telephony,
     workspaceScoped: true,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    operations: [{
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "calls.control",
+      }],
     notes: "Workspace-scoped call disconnect using workspace Twilio credentials. Capability: calls.control.",
   }),
   platformSeed({
@@ -611,7 +729,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.telephony,
     workspaceScoped: true,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    operations: [{
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "calls.start",
+      }],
     notes: "Start predictive/manual auto-dial conference for authenticated caller+ agent. Capability: calls.start.",
   }),
   platformSeed({
@@ -734,7 +857,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/events",

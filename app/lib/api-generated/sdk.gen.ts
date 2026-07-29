@@ -20,7 +20,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 /**
  * Create campaign with script and phone number (one-shot)
- * Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both.
+ * Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both. Requires the campaigns.write capability for API keys.
  */
 export const createCampaignWithScript = <ThrowOnError extends boolean = false>(options: Options<CreateCampaignWithScriptData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<CreateCampaignWithScriptResponse2, CreateCampaignWithScriptError, ThrowOnError>({
@@ -46,7 +46,7 @@ export const createCampaignWithScript = <ThrowOnError extends boolean = false>(o
 
 /**
  * Send a single SMS
- * Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body.
+ * Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.
  */
 export const sendChatSms = <ThrowOnError extends boolean = false>(options: Options<SendChatSmsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<SendChatSmsResponse, SendChatSmsError, ThrowOnError>({
@@ -72,7 +72,7 @@ export const sendChatSms = <ThrowOnError extends boolean = false>(options: Optio
 
 /**
  * Dispatch SMS to queued campaign contacts
- * Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.
+ * Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user. Requires the campaigns.dispatch capability for API keys.
  */
 export const dispatchCampaignSms = <ThrowOnError extends boolean = false>(options: Options<DispatchCampaignSmsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<DispatchCampaignSmsResponse, DispatchCampaignSmsError, ThrowOnError>({

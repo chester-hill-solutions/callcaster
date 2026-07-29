@@ -26,6 +26,15 @@ describe("ApiKeyCapabilityPicker", () => {
     expect(screen.queryByText("campaigns.read")).toBeNull();
   });
 
+  test("capability descriptions cover data-plane resources", () => {
+    render(<ApiKeyCapabilityPicker />);
+    expect(
+      screen.getByText(/contacts, audiences, scripts, surveys, conversations/i),
+    ).toBeTruthy();
+    expect(screen.getByText(/Dispatch campaign SMS batches/i)).toBeTruthy();
+    expect(screen.getByText(/direct chat SMS/i)).toBeTruthy();
+  });
+
   test("checking a capability emits a hidden scopes field and selected count", () => {
     const { container } = render(<ApiKeyCapabilityPicker />);
     fireEvent.click(container.querySelector('input[data-scope-value="messages.send"]')!);

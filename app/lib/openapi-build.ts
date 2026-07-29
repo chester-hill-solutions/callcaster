@@ -243,6 +243,9 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
         "x-callcaster-exposure": entry.exposure,
         "x-callcaster-auth-class": entry.authClass,
         "x-callcaster-docs-guide": entry.docsGuide,
+        ...(op.capability
+          ? { "x-callcaster-capability": op.capability }
+          : {}),
         security: securityForAuth(entry.authClass),
         ...(entry.workspaceScoped && op.method === "GET"
           ? {

@@ -230,15 +230,39 @@ export const platformOpenApiComponents = {
       type: "string" as const,
       enum: ["owner", "admin", "member", "caller"] as const,
     },
+    ProductCapabilityId: {
+      type: "string" as const,
+      enum: [
+        "campaigns.read",
+        "campaigns.write",
+        "campaigns.dispatch",
+        "calls.start",
+        "calls.control",
+        "messages.send",
+        "members.invite",
+        "audit.read",
+      ] as const,
+      description: "Stable product capability ID used as an API-key scope.",
+    },
     ApiKeySummary: {
       type: "object" as const,
-      required: ["id", "name", "key_prefix", "created_at"] as const,
+      required: ["id", "name", "key_prefix", "created_at", "scopes"] as const,
       properties: {
-        id: { type: "integer" as const },
+        id: { type: "string" as const },
         name: { type: "string" as const },
         key_prefix: { type: "string" as const },
         created_at: { type: "string" as const, format: "date-time" },
         last_used_at: { type: "string" as const, format: "date-time", nullable: true },
+        scopes: {
+          type: "array" as const,
+          items: { $ref: "#/components/schemas/ProductCapabilityId" },
+        },
+        expires_at: {
+          type: "string" as const,
+          format: "date-time",
+          nullable: true,
+          description: "ISO-8601 expiry; null only for pre-SEC-07 legacy keys.",
+        },
       },
     },
     ApiKeyListResponse: {
@@ -253,14 +277,33 @@ export const platformOpenApiComponents = {
     },
     CreateApiKeyRequest: {
       type: "object" as const,
-      required: ["name"] as const,
+      required: ["name", "scopes"] as const,
       properties: {
         name: { type: "string" as const, minLength: 1, maxLength: 200 },
+        scopes: {
+          type: "array" as const,
+          minItems: 1,
+          items: { $ref: "#/components/schemas/ProductCapabilityId" },
+          description: "At least one capability scope is required.",
+        },
+        expires_in_days: {
+          type: "integer" as const,
+          minimum: 1,
+          maximum: 365,
+          description: "Key TTL in days (default 90, max 365).",
+        },
       },
     },
     CreateApiKeyResponse: {
       type: "object" as const,
-      required: ["key", "id", "name", "key_prefix", "created_at"] as const,
+      required: [
+        "key",
+        "id",
+        "name",
+        "key_prefix",
+        "created_at",
+        "scopes",
+      ] as const,
       properties: {
         key: {
           type: "string" as const,
@@ -270,6 +313,15 @@ export const platformOpenApiComponents = {
         name: { type: "string" as const },
         key_prefix: { type: "string" as const },
         created_at: { type: "string" as const, format: "date-time" },
+        scopes: {
+          type: "array" as const,
+          items: { $ref: "#/components/schemas/ProductCapabilityId" },
+        },
+        expires_at: {
+          type: "string" as const,
+          format: "date-time",
+          nullable: true,
+        },
       },
     },
     DeleteApiKeyRequest: {
@@ -647,9 +699,10 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "getWorkspace",
       summary: "Get workspace details",
       tags: ["Platform API", "Workspace"],
+      "x-callcaster-capability": "campaigns.read",
       security: cutoverDataPlaneSecurity,
       description:
-        "Returns workspace metadata for an authorized session member or workspace API key scoped to the route workspace.",
+        "Returns workspace metadata for an authorized session member or workspace API key with campaigns.read scoped to the route workspace.",
       responses: {
         "200": {
           description: "Workspace details",
@@ -777,9 +830,9 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "List workspace audit events",
       tags: ["Platform API", "Workspace"],
       "x-callcaster-capability": "audit.read",
-      security: [{ sessionCookie: [] }],
+      security: cutoverDataPlaneSecurity,
       description:
-        "Cursor-paginated immutable audit log for privileged workspace actions. Owner session only until API key scopes ship in SEC-07.",
+        "Cursor-paginated immutable audit log for privileged workspace actions. Requires owner session or an API key with the audit.read capability.",
       parameters: [
         {
           name: "cursor",
@@ -912,9 +965,9 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "Invite a workspace member",
       tags: ["Platform API", "Workspace"],
       "x-callcaster-capability": "members.invite",
-      security: sessionOnlySecurity,
+      security: cutoverDataPlaneSecurity,
       description:
-        "Session-only trust-root route. Privileged role assignment may require MFA enrollment.",
+        "Invite a member with a session (role subordination rules apply) or an API key with members.invite (admin-equivalent role assignment: member/caller only). Privileged session role assignment may require MFA enrollment.",
       requestBody: {
         required: true,
         content: {

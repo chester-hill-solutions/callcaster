@@ -10,7 +10,9 @@ type VerifyError = { error: string; status: number };
 type VerifyApiKey = {
   authType: "api_key";
   workspaceId: string;
-  client: any;
+  keyId?: string;
+  scopes?: readonly string[];
+  client?: any;
 };
 type VerifySession = {
   authType: "session";
@@ -38,6 +40,12 @@ vi.mock("@/lib/create-with-script.server", () => ({
     mocks.validateCreateWithScriptPreflight(...args),
   createScriptForCampaign: (...args: unknown[]) => mocks.createScriptForCampaign(...args),
   linkAudiencesToNewCampaign: (...args: unknown[]) => mocks.linkAudiencesToNewCampaign(...args),
+}));
+
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
 }));
 
 vi.mock("@/lib/api-auth.server", () => ({
@@ -183,7 +191,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("returns 400 on invalid JSON body", async () => {
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {} } as any);
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, keyId: "k1", scopes: ["campaigns.write"], client: {} } as any);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
@@ -218,7 +226,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("api_key auth rejects mismatched workspace_id", async () => {
     const client = makeDbClientForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {}, keyId: "k1", scopes: ["campaigns.write"]});
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID_ALT,
       title: "t",
@@ -234,7 +242,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("validates title/type/caller_id/script requirements", async () => {
     const client = makeDbClientForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client });
+    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {}, keyId: "k1", scopes: ["campaigns.write"]});
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
         "@/lib/api-parse.server",
@@ -304,6 +312,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -328,6 +338,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -351,6 +363,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -376,6 +390,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -397,6 +413,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -420,6 +438,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -447,6 +467,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -474,6 +496,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
       ok: false,
@@ -498,6 +522,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.createScriptForCampaign.mockResolvedValueOnce({
       ok: false,
@@ -519,6 +545,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.createScriptForCampaign.mockResolvedValueOnce({
       ok: false,
@@ -542,6 +570,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.createScriptForCampaign.mockResolvedValueOnce({
       ok: true,
@@ -582,6 +612,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
@@ -599,6 +631,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
@@ -666,6 +700,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       authType: "api_key",
       workspaceId,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: workspaceId,
