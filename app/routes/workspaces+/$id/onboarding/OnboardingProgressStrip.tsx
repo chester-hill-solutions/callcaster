@@ -10,7 +10,6 @@ import { readWizardStep } from "./wizard-step-resolution";
 
 export type OnboardingProgressStripProps = {
   onboarding: WorkspaceMessagingOnboardingState;
-  workspaceId: string;
   workspaceName: string;
 };
 
@@ -22,7 +21,6 @@ export type OnboardingProgressStripProps = {
  */
 export function OnboardingProgressStrip({
   onboarding,
-  workspaceId: _workspaceId,
   workspaceName,
 }: OnboardingProgressStripProps) {
   const [searchParams] = useSearchParams();

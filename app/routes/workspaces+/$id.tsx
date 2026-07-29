@@ -40,7 +40,7 @@ type LoaderData = {
 
 type OnboardingStripData = Pick<
   OnboardingLoaderData,
-  "onboarding" | "workspaceId" | "workspaceName"
+  "onboarding" | "workspaceName"
 >;
 
 /** Loader data of the onboarding child route, when it is the active match. */
@@ -53,13 +53,11 @@ function findOnboardingStripData(
       data &&
       typeof data === "object" &&
       "onboarding" in data &&
-      "workspaceId" in data &&
       "workspaceName" in data
     ) {
       const strip = data as OnboardingStripData;
       return {
         onboarding: strip.onboarding,
-        workspaceId: strip.workspaceId,
         workspaceName: strip.workspaceName,
       };
     }

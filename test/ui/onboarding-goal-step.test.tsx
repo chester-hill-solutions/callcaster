@@ -228,7 +228,6 @@ describe("goal-based onboarding UI", () => {
           ],
         }),
         workspaceName: "Acme",
-        workspaceId: "w1",
       }),
       "/?step=audience",
     );
@@ -250,7 +249,6 @@ describe("goal-based onboarding UI", () => {
       createElement(OnboardingProgressStrip, {
         onboarding: minimalOnboarding(),
         workspaceName: "Acme",
-        workspaceId: "w1",
       }),
     );
 
