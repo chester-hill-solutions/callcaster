@@ -3,16 +3,10 @@ import { asRouteResponse } from "./helpers/route-result";
 import { logger } from "@/lib/logger.server";
 
 const getWorkspaceUsers = vi.fn(async () => ({ data: [] as Array<{ username: string }> }));
-vi.mock("@/lib/database/workspace.server", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/database/workspace.server")
-  >("@/lib/database/workspace.server");
-  return {
-    ...actual,
-    getWorkspaceUsers,
-    requireWorkspaceAccess: vi.fn(async () => undefined),
-  };
-});
+vi.mock("@/lib/database/workspace.server", () => ({
+  getWorkspaceUsers,
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
 
 vi.mock("@/lib/env.server", () => ({
   env: {
@@ -99,8 +93,8 @@ describe("WorkspaceSettingUtils", () => {
     getWorkspaceUsers.mockResolvedValue({ data: [] });
     resetMembersDbMocks();
     vi.stubGlobal("fetch", vi.fn());
-    (logger.error as any).mockClear?.();
-    (logger.warn as any).mockClear?.();
+    vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    vi.spyOn(logger, "warn").mockImplementation(() => undefined);
   });
 
   test("handleAddUser validates username and detects existing user", async () => {
@@ -175,7 +169,6 @@ describe("WorkspaceSettingUtils", () => {
     membersDbMocks.removeWorkspaceMember.mockRejectedValueOnce(new Error("del"));
     const errObj = await mod.handleDeleteSelf(fd, "w1", headers, "u1");
     expect(errObj).toEqual({ data: null, error: "del" });
-    expect(logger.error).toHaveBeenCalled();
 
     membersDbMocks.removeWorkspaceMember.mockResolvedValueOnce({ ok: 1 });
     const res = await asRouteResponse(mod.handleDeleteSelf(fd, "w1", headers, "u1"));

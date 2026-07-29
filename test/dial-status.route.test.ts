@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
     requireTwilioSignature: vi.fn(),
+    markContactLineType: vi.fn(),
     fetchCampaignByIdForWorkspace: vi.fn(async () => ({ voicemail_file: "vm.mp3" })),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
@@ -28,6 +29,9 @@ vi.mock("../app/lib/database/workspace.server", () => ({
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) =>
     mocks.requireTwilioSignature(...args),
+}));
+vi.mock("@/lib/twilio-lookup.server", () => ({
+  markContactLineType: (...args: any[]) => mocks.markContactLineType(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: (...args: any[]) => mocks.validateTwilioWebhookParams(...args),
@@ -226,6 +230,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
     mocks.requireTwilioSignature.mockReset();
+    mocks.markContactLineType.mockReset();
     mocks.fetchCampaignByIdForWorkspace.mockReset();
     mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({ voicemail_file: "vm.mp3" });
     mocks.requireTwilioSignature.mockImplementation(
@@ -451,4 +456,3 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: no-answer-update" });
   });
 });
-

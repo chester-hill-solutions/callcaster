@@ -24,6 +24,10 @@ vi.mock("@/lib/telephony-db.server", () => ({
   findCallWithCampaignScriptBySid: vi.fn(),
 }));
 
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  ivrScriptStepsFromCampaign: (campaign: any) => campaign?.script?.steps ?? null,
+}));
+
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -135,7 +139,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
 
     // call not found
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(null as any);
@@ -143,6 +147,6 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
   });
 });

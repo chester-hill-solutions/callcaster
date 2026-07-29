@@ -10,9 +10,67 @@ describe("root hooks", () => {
   const multiKeys = ["a", "b"] as Array<"a" | "b">;
   const multiStorageOptions = {};
 
+  const createMemoryStorage = (): Storage => {
+    const store = new Map<string, string>();
+    return {
+      get length() {
+        return store.size;
+      },
+      clear() {
+        store.clear();
+      },
+      getItem(key) {
+        return store.has(key) ? store.get(key)! : null;
+      },
+      key(index) {
+        return Array.from(store.keys())[index] ?? null;
+      },
+      removeItem(key) {
+        store.delete(key);
+      },
+      setItem(key, value) {
+        store.set(key, value);
+      },
+    };
+  };
+
+  const ensureStorage = (name: "localStorage" | "sessionStorage") => {
+    const storage = globalThis[name] as Partial<Storage> | undefined;
+    if (
+      storage &&
+      typeof storage.getItem === "function" &&
+      typeof storage.setItem === "function" &&
+      typeof storage.removeItem === "function"
+    ) {
+      return storage as Storage;
+    }
+
+    const shim = createMemoryStorage();
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      writable: true,
+      value: shim,
+    });
+    return shim;
+  };
+
+  const resetStorage = (storage: Storage & { clear?: (() => void) | undefined }) => {
+    if (typeof storage.clear === "function") {
+      storage.clear();
+      return;
+    }
+
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key) {
+        storage.removeItem(key);
+      }
+    }
+  };
+
   beforeEach(() => {
-    localStorage.clear();
-    sessionStorage.clear();
+    resetStorage(ensureStorage("localStorage"));
+    resetStorage(ensureStorage("sessionStorage"));
   });
 
   afterEach(() => {

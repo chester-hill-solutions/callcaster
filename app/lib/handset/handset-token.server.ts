@@ -1,5 +1,3 @@
-import twilio from "twilio";
-
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
@@ -41,11 +39,13 @@ export async function createHandsetAccessToken({
   }
 
   try {
-    const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
+    const accessTokenModule = await import("twilio/lib/jwt/AccessToken.js");
+    const AccessToken = accessTokenModule.default ?? accessTokenModule;
+    const voiceGrant = new AccessToken.VoiceGrant({
       outgoingApplicationSid: env.TWILIO_APP_SID(),
       incomingAllow: true,
     });
-    const token = new twilio.jwt.AccessToken(
+    const token = new AccessToken(
       twilioAccountSid,
       twilioApiKey,
       twilioApiSecret,

@@ -1,4 +1,4 @@
-import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import {
   isOnboardingActionName,
@@ -9,6 +9,7 @@ import {
   mapOnboardingHandlerResult,
   runOnboardingAction,
 } from "@/lib/platform-onboarding.server";
+import { MemberRole } from "@/lib/member-role";
 import { defineAction } from "@/lib/handler.server";
 
 export type { OnboardingActionData } from "@/lib/onboarding-actions.server";
@@ -85,10 +86,14 @@ export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, params, auth }) => {
-    const { headers, user } = auth;
+    const { headers, user, userRole } = auth;
     const wsId = params.id;
     if (!wsId) {
       return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });
+    }
+
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData<OnboardingActionData>({ error: "Not authorized" }, { headers, status: 403 });
     }
 
     const formData = await request.formData();

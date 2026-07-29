@@ -645,7 +645,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("message.sid falsy uses failed-* fallback", async () => {
-    vi.spyOn(Date, "now").mockReturnValueOnce(123);
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(123);
     currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
@@ -666,7 +666,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(tenantDbStubState.messageInsertCalls[0]?.sid).toBe("failed-+15551234567-123");
-    (Date.now as any).mockRestore?.();
+    dateNowSpy.mockRestore();
   });
 
   test("uses messaging service and explicit message intent overrides", async () => {
@@ -933,4 +933,3 @@ describe("app/routes/api+/sms/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });
 });
-

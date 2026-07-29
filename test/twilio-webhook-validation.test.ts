@@ -20,17 +20,18 @@ const twilioMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("twilio", () => {
+vi.mock("twilio/lib/rest/Twilio.js", () => {
   class TwilioClientMock {
     messages = { create: twilioMocks.messagesCreate };
   }
   return {
-    default: {
-      validateRequest: twilioMocks.validateRequest,
-      Twilio: TwilioClientMock,
-    },
+    default: TwilioClientMock,
   };
 });
+
+vi.mock("twilio/lib/webhooks/webhooks.js", () => ({
+  validateRequest: twilioMocks.validateRequest,
+}));
 
 import { singleton, validateTwilioWebhook, validateTwilioWebhookParams } from "@/twilio.server";
 
@@ -117,4 +118,3 @@ describe("Twilio webhook validation", () => {
     expect(factory).toHaveBeenCalledTimes(1);
   });
 });
-

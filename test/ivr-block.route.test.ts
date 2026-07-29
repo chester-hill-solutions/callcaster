@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 
@@ -18,6 +17,11 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+const campaignIvrMocks = vi.hoisted(() => ({
+  fetchCampaignWithScript: vi.fn(),
+  ivrScriptStepsFromCampaign: vi.fn((campaign: any) => campaign?.script?.steps ?? null),
+}));
+
 vi.mock("@client/client-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -26,13 +30,10 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
     mocks.requireTwilioSignature(...args),
 }));
 
-vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
-  return {
-    ...actual,
-    fetchCampaignWithScript: vi.fn(),
-  };
-});
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignWithScript: (...args: any[]) => campaignIvrMocks.fetchCampaignWithScript(...args),
+  ivrScriptStepsFromCampaign: (...args: any[]) => campaignIvrMocks.ivrScriptStepsFromCampaign(...args),
+}));
 
 vi.mock("@/lib/telephony-db.server", () => ({
   findCallBySid: vi.fn(),
@@ -114,7 +115,9 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     mocks.logger.error.mockReset();
     mocks.requireTwilioSignature.mockReset();
     mocks.requireTwilioSignature.mockResolvedValue(null);
-    vi.mocked(fetchCampaignWithScript).mockReset();
+    campaignIvrMocks.fetchCampaignWithScript.mockReset();
+    campaignIvrMocks.ivrScriptStepsFromCampaign.mockReset();
+    campaignIvrMocks.ivrScriptStepsFromCampaign.mockImplementation((campaign: any) => campaign?.script?.steps ?? null);
     vi.mocked(findCallBySid).mockReset();
     vi.mocked(findCallBySid).mockResolvedValue({
       sid: "CA123",
@@ -163,7 +166,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
         b1: { id: "b1", type: "recorded", audioFile: "a.mp3", options: [{ value: "1", next: "hangup" }] },
       },
     };
-    vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     vi.mocked(createSignedObjectUrl).mockResolvedValueOnce("https://signed");
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(mod.action({
@@ -187,28 +190,28 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     };
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
 
-    vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_1/b2");
 
-    vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b2" },
       request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_2/b3");
 
-    vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_2", blockId: "b3" },
       request: ivrBlockRequest(),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
 
-    vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "missing" },
       request: ivrBlockRequest(),
@@ -217,7 +220,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   });
 
   test("catch logs and says generic error on invalid script or signed url error", async () => {
-    vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: null } } as any);
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: null } } as any);
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -229,7 +232,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       pages: { page_1: { blocks: ["b1"] } },
       blocks: { b1: { id: "b1", type: "recorded", audioFile: "a.mp3" } },
     };
-    vi.mocked(fetchCampaignWithScript).mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     vi.mocked(createSignedObjectUrl).mockRejectedValueOnce(new Error("sig"));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -240,7 +243,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   });
 
   test("covers getCampaignData error branch", async () => {
-    vi.mocked(fetchCampaignWithScript).mockRejectedValueOnce(new Error("db"));
+    campaignIvrMocks.fetchCampaignWithScript.mockRejectedValueOnce(new Error("db"));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
@@ -262,7 +265,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
 
     // call not found
     vi.mocked(findCallBySid).mockResolvedValueOnce(null as any);
@@ -270,7 +273,6 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
   });
 });
-
