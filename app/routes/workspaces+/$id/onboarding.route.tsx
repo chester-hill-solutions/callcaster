@@ -72,10 +72,10 @@ export default function WorkspaceMessagingOnboardingRoute() {
     isReviewingEmergencyVoice: pendingAction === "review_emergency_voice",
     isVerifyingCallerId: pendingAction === "verify_caller_id",
   };
-  const a2pBlockingIssues = onboarding.reviewState.blockingIssues;
+  const a2pBlockingIssues = onboarding.reviewState?.blockingIssues ?? [];
   const a2pErrors = [
-    onboarding.a2p10dlc.rejectionReason,
-    onboarding.reviewState.lastError,
+    onboarding.a2p10dlc?.rejectionReason,
+    onboarding.reviewState?.lastError,
   ].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
 
   return (

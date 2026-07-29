@@ -18,6 +18,12 @@ import {
   useWorkspaceNumberSettingsMutations,
 } from "@/hooks/phone";
 import { Section, SectionHeader } from "@/components/shared/Section";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
 import {
@@ -248,7 +254,7 @@ const WorkspaceSettings = () => {
           </Button>
         }
       >
-        <div className="grid min-w-0 gap-0 lg:grid-cols-[2fr_1fr] lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-0">
           <Section variant="flat" className="min-w-0">
             <SectionHeader
               branded={false}
@@ -285,10 +291,7 @@ const WorkspaceSettings = () => {
               onboarding={onboarding}
               isReadOnly={isReadOnly}
             />
-            <Section variant="flat">
-              <NumberCallerId />
-            </Section>
-            <Section variant="flat">
+            <Section variant="flat" className="min-w-[300px]">
               <SectionHeader branded={false} compact title="Rent a number" />
               <NumberPurchase
                 fetcher={fetcher}
@@ -296,6 +299,16 @@ const WorkspaceSettings = () => {
                 creditsBalance={creditsBalance}
               />
             </Section>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="caller-id" className="border-border/60">
+                <AccordionTrigger className="py-3 text-sm hover:no-underline">
+                  Caller ID verification
+                </AccordionTrigger>
+                <AccordionContent>
+                  <NumberCallerId />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         </div>
       </PageShell>

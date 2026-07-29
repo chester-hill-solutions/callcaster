@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Section, SectionHeader } from "@/components/shared/Section";
+import { formatCredits } from "@/lib/billing-format";
 import {
   countRentedWorkspaceNumbers,
   countVerifiedCallerIdNumbers,
@@ -88,7 +89,9 @@ export function OnboardingLaunchStep({
               : "Campaign pending"}
           </Badge>
           <Badge variant={creditsBalance > 0 ? "secondary" : "outline"}>
-            {creditsBalance.toLocaleString()} credits
+            {creditsBalance > 0
+              ? `${formatCredits(creditsBalance)} credits`
+              : "0 credits"}
           </Badge>
         </div>
         {readiness.warnings.length > 0 ? (

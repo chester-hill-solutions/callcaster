@@ -330,7 +330,7 @@ export default function SelectDates({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="min-w-0 space-y-2">
           <Label>Start Date & Time</Label>
           <DateTimePicker

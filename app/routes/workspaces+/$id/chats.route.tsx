@@ -3,7 +3,6 @@ export { action } from "./chats.action.server";
 
 import { Outlet, useRouteError } from "react-router";
 import type { MetaFunction } from "react-router";
-import { Card } from "@/components/ui/card";
 import { workspacePanelHeightClass } from "@/components/workspace/workspace-panel-classes";
 import {
   Sheet,
@@ -61,13 +60,13 @@ export default function ChatsList() {
 
   return (
     <main className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row">
-      <Card
-        className={`hidden ${workspacePanelHeightClass} flex-col overflow-hidden border-border/80 bg-card/80 md:flex md:max-w-[40%] md:basis-2/5`}
+      <div
+        className={`hidden ${workspacePanelHeightClass} flex-col overflow-hidden rounded-lg border border-border/80 md:flex md:max-w-[40%] md:basis-2/5`}
       >
         <ConversationSidebar {...sidebarProps} />
-      </Card>
+      </div>
 
-      <Card className="flex min-h-[68vh] w-full min-w-0 flex-1 flex-col overflow-hidden border-border/80 bg-card/80 md:basis-3/5">
+      <div className="flex min-h-[68vh] w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/80 md:basis-3/5">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
@@ -114,7 +113,7 @@ export default function ChatsList() {
           selectedContact={selectedContact}
           messageFetcher={messageFetcher}
         />
-      </Card>
+      </div>
       <Sheet
         open={isMobileConversationListOpen}
         onOpenChange={setIsMobileConversationListOpen}

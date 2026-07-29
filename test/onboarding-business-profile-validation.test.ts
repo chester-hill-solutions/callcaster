@@ -245,7 +245,11 @@ describe("save_business_profile validation", () => {
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
   });
 
-  test("advances identity save to business_program", async () => {
+  test("advances identity save to business_program for SMS goals", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({ selectedGoal: "sms_blast" }),
+    );
+
     const outcome = await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
@@ -264,6 +268,26 @@ describe("save_business_profile validation", () => {
         updates: expect.objectContaining({ currentStep: "business_program" }),
       }),
     );
+  });
+
+  test("advances identity save to audience when program is not required", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({ selectedGoal: "live_call" }),
+    );
+
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      identityForm({
+        legalBusinessName: "Northgate Services Inc.",
+        websiteUrl: "https://www.northgateservices.example",
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
   });
 
   test("identity save preserves previously saved program fields", async () => {
@@ -319,7 +343,11 @@ describe("save_business_profile validation", () => {
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
   });
 
-  test("advances program save to path_selection", async () => {
+  test("advances program save to audience for SMS goals", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({ selectedGoal: "sms_blast" }),
+    );
+
     const outcome = await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
@@ -332,12 +360,16 @@ describe("save_business_profile validation", () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "path_selection" });
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
     const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
-    expect(mapped).toMatchObject({ kind: "ui_redirect", step: "path_selection" });
+    expect(mapped).toMatchObject({ kind: "ui_redirect", step: "audience" });
   });
 
-  test("full baseline submit without wizardStep still advances to path_selection", async () => {
+  test("full baseline submit without wizardStep advances to audience", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({ selectedGoal: "live_call" }),
+    );
+
     const outcome = await runOnboardingAction(
       USER_ID,
       WORKSPACE_ID,
@@ -347,9 +379,8 @@ describe("save_business_profile validation", () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "path_selection" });
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
   });
-
   test("rejects a JSON API submit with blank required fields", async () => {
     const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", {
       legalBusinessName: "",

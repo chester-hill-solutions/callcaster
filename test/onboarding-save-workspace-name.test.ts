@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 /**
  * The first onboarding page collects the workspace name. Submitting a blank
  * name must stay on that page; a valid name updates the workspace and advances
- * to business_identity.
+ * to path_selection (goal-first onboarding).
  */
 
 const mocks = vi.hoisted(() => ({
@@ -227,7 +227,7 @@ describe("save_workspace_name", () => {
         workspaceId: WORKSPACE_ID,
         updates: expect.objectContaining({
           status: "collecting_business",
-          currentStep: "business_identity",
+          currentStep: "path_selection",
         }),
       }),
     );
@@ -235,7 +235,7 @@ describe("save_workspace_name", () => {
     const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
     expect(mapped).toEqual({
       kind: "ui_redirect",
-      step: "business_identity",
+      step: "path_selection",
       searchParams: undefined,
     });
   });

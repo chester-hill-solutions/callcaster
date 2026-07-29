@@ -77,7 +77,7 @@ export function productGoalForCampaignType(
 /** Translate the existing onboarding vocabulary into product-level goals. */
 export function productGoalForOnboardingGoal(
   onboardingGoal: WorkspaceOnboardingGoal,
-): CampaignProductGoal {
+): CampaignProductGoal | null {
   switch (onboardingGoal) {
     case "live_call":
       return "live_calling";
@@ -85,6 +85,9 @@ export function productGoalForOnboardingGoal(
       return "text_campaign";
     case "ivr":
       return "automated_phone_menu";
+    case "rent_number":
+      // Number-only path has no campaign product goal.
+      return null;
     default: {
       const _exhaustive: never = onboardingGoal;
       return _exhaustive;

@@ -181,7 +181,7 @@ describe("goal-based onboarding UI", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: /SMS blast/i }));
     expect(
-      screen.getByText(/For texting at higher volume, a toll-free number/i),
+      screen.getByText(/Toll-free is the higher-volume path/i),
     ).toBeInTheDocument();
   });
 
@@ -212,7 +212,7 @@ describe("goal-based onboarding UI", () => {
     expect(channelInputs).not.toContain("toll_free_bulk_sms");
   });
 
-  test("progress strip shows step position and a compact credits link", () => {
+  test("progress strip shows step position without a credits readout", () => {
     renderWithRouter(
       createElement(OnboardingProgressStrip, {
         onboarding: minimalOnboarding({
@@ -228,21 +228,19 @@ describe("goal-based onboarding UI", () => {
           ],
         }),
         workspaceName: "Acme",
-        workspaceId: "w1",
-        creditsBalance: 0,
       }),
       "/?step=audience",
     );
 
     expect(screen.getByTestId("onboarding-step")).toBeInTheDocument();
     expect(screen.getByText("Setup: Acme")).toBeInTheDocument();
-    expect(screen.getByText(/Step 4 of \d+ — Audience/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /4\. Audience/i })).toHaveAttribute(
+    expect(screen.getByText(/Step 4 of \d+ — Call list/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /4\. Call list/i })).toHaveAttribute(
       "href",
       expect.stringContaining("step=audience"),
     );
-    expect(screen.getByText(/Credits:/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Add credits/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Credits:/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: /Add credits/i })).toBeNull();
     expect(screen.queryByText(/Add credits before renting a number/i)).toBeNull();
   });
 
@@ -251,8 +249,6 @@ describe("goal-based onboarding UI", () => {
       createElement(OnboardingProgressStrip, {
         onboarding: minimalOnboarding(),
         workspaceName: "Acme",
-        workspaceId: "w1",
-        creditsBalance: 0,
       }),
     );
 

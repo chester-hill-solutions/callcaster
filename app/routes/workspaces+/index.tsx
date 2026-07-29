@@ -60,7 +60,7 @@ const WorkspaceCard = React.memo(
         to={`/workspaces/${workspace.id}`}
         className="flex h-full flex-col items-center justify-center rounded-lg border border-border bg-card p-4 text-center text-card-foreground shadow-sm transition-colors duration-150 hover:bg-accent hover:text-accent-foreground dark:hover:bg-zinc-800"
       >
-        <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold text-brand-primary dark:text-white">
+        <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis text-2xl font-semibold text-foreground">
           {workspace.name}
         </h5>
         <p className={`text-xl ${handleRoleTextStyles(role)}`}>
@@ -101,7 +101,7 @@ const NewWorkspaceDialog = ({
     <DialogContent className="bg-card sm:max-w-xl">
       <DialogHeader>
         <DialogTitle asChild>
-          <h3 className="pr-8 text-center font-Zilla-Slab text-4xl font-black text-brand-primary dark:text-white">
+          <h3 className="pr-8 text-center text-4xl font-bold text-foreground">
             Add a New Workspace
           </h3>
         </DialogTitle>
@@ -174,7 +174,7 @@ const ZeroWorkspaceIntro = ({
 }) => (
   <Card className="w-full max-w-3xl border-2 border-brand-primary/40 dark:border-white/40">
     <CardContent className="flex flex-col items-center gap-5 p-8 text-center">
-      <Heading level={3} branded>
+      <Heading level={3} branded={false}>
         Create your first workspace
       </Heading>
       <Text variant="muted" className="max-w-xl">
@@ -279,13 +279,13 @@ export default function Workspaces() {
           }}
         />
       </div>
-      <Heading level={1} className="text-center" branded>
+      <Heading level={1} className="text-center" branded={false}>
         Your Workspaces
       </Heading>
       {hasWorkspaces ? (
         <Section className="w-full">
           <SectionHeader
-            branded
+            branded={false}
             title="Workspace Directory"
             description="Choose an existing workspace or create a new one."
           />

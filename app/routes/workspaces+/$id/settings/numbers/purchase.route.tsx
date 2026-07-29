@@ -21,7 +21,7 @@ export default function PurchaseNumberPage() {
   const fetcher = useFetcher<NumbersSearchFetcherData>();
 
   return (
-    <Section>
+    <Section variant="flat">
       <SectionHeader title="Purchase a phone number" />
       <NumberPurchase
         fetcher={fetcher}

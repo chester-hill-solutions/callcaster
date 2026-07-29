@@ -1,6 +1,5 @@
 import { Link, useSearchParams } from "react-router";
 import { badgeVariants } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { wizardStepsForGoal } from "@/lib/messaging-onboarding/goals";
 import { isWizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
@@ -11,22 +10,18 @@ import { readWizardStep } from "./wizard-step-resolution";
 
 export type OnboardingProgressStripProps = {
   onboarding: WorkspaceMessagingOnboardingState;
-  workspaceId: string;
   workspaceName: string;
-  creditsBalance: number;
 };
 
 /**
- * Route-level chrome for the onboarding wizard: setup title, step progress,
- * and credits, rendered directly beneath the navbar by the workspace layout.
- * The intro (naming) screen carries no `?step=` param, so the strip stays
- * hidden until the wizard proper begins.
+ * Route-level chrome for the onboarding wizard: setup title and step progress,
+ * rendered directly beneath the navbar by the workspace layout.
+ * Live credit balance stays in Navbar chrome. The intro (naming) screen carries
+ * no `?step=` param, so the strip stays hidden until the wizard proper begins.
  */
 export function OnboardingProgressStrip({
   onboarding,
-  workspaceId,
   workspaceName,
-  creditsBalance,
 }: OnboardingProgressStripProps) {
   const [searchParams] = useSearchParams();
   const urlStep = searchParams.get("step");
@@ -76,17 +71,6 @@ export function OnboardingProgressStrip({
               </Link>
             );
           })}
-        </div>
-        <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
-          <span>
-            Credits:{" "}
-            <strong className="tabular-nums text-foreground">
-              {creditsBalance.toLocaleString()}
-            </strong>
-          </span>
-          <Button size="sm" variant="ghost" className="h-7 px-2" asChild>
-            <Link to={`/workspaces/${workspaceId}/billing`}>Add credits</Link>
-          </Button>
         </div>
       </div>
       <Progress value={progressValue} className="mt-2 h-1.5" />

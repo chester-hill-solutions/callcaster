@@ -32,7 +32,7 @@ export default function WorkspaceCallLogPage() {
       </div>
 
       {error ? (
-        <p className="text-center font-Zilla-Slab text-lg font-semibold text-destructive">
+        <p className="text-center text-lg font-semibold text-destructive">
           {error}
         </p>
       ) : (

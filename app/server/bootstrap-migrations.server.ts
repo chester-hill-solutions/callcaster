@@ -23,8 +23,10 @@ import { logger } from "@/lib/logger.server";
  *      (or any banned legacy trigger) is present, this is not a v2 database and
  *      we abort without running anything.
  *   3. Per-file isolation. Each file runs on its own; a failure is logged and
- *      skipped, never left half-applied across files, and the downstream
- *      `assertRequiredDbFunctions` guard remains the hard gate on readiness.
+ *      skipped (with ROLLBACK so an aborted BEGIN from that file does not
+ *      poison the shared connection), never left half-applied across files,
+ *      and the downstream `assertRequiredDbFunctions` guard remains the hard
+ *      gate on readiness.
  */
 
 const MIGRATIONS_DIRNAME = path.join("client", "migrations");
@@ -138,6 +140,14 @@ export async function applyClientMigrationsOnBoot(options: {
         applied.push(file);
         logger.info("client-migration bootstrap applied", { file });
       } catch (error) {
+        // Migration SQL often opens its own BEGIN. A mid-file error leaves this
+        // shared connection (max: 1) in "aborted transaction" until ROLLBACK —
+        // without that, every later file fails with 25P02.
+        try {
+          await sql.unsafe("ROLLBACK").simple();
+        } catch {
+          // No open transaction — connection already idle.
+        }
         // A file that conflicts with the drizzle baseline (already present) or
         // otherwise fails is logged and skipped, not recorded. The db-health
         // guard downstream is the hard gate on whether boot proceeds.

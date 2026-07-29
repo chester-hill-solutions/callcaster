@@ -1,6 +1,5 @@
 import { Form } from "react-router";
 import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import type { OnboardingStepProps } from "./types";
@@ -10,6 +9,10 @@ type Props = Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> 
   formId?: string;
 };
 
+/**
+ * SMS-only program details (#1106/#1076): strip to fields carriers need that
+ * lack a sensible default — use-case summary and sample messages.
+ */
 export function OnboardingBusinessProgramStep({
   formId = "onboarding-business-program-form",
   onboarding,
@@ -20,69 +23,31 @@ export function OnboardingBusinessProgramStep({
 
   return (
     <Section variant="flat">
-      <SectionHeader compact title="Program details" />
-      <Form id={formId} method="post" className="space-y-6">
+      <SectionHeader
+        compact
+        title="SMS program details"
+        description="Carriers review these when approving bulk texting. Keep them short and specific to how people opt in."
+      />
+      <Form id={formId} method="post" className="max-w-xl space-y-6">
         <input type="hidden" name="_action" value="save_business_profile" />
         <input type="hidden" name="wizardStep" value="business_program" />
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4">
           <FormField
-            className="md:col-span-2"
             htmlFor="useCaseSummary"
-            label="Use case summary"
+            label="What will you text about?"
             required
             error={requiredFieldError("useCaseSummary")}
           >
             <Textarea
               id="useCaseSummary"
               name="useCaseSummary"
-              placeholder="Appointment reminders for patients who opt in during booking."
+              placeholder="Example: Appointment reminders for patients who opt in when they book online."
               defaultValue={onboarding.businessProfile.useCaseSummary}
               disabled={isReadOnly}
               {...requiredFieldProps<HTMLTextAreaElement>("useCaseSummary")}
             />
           </FormField>
           <FormField
-            className="md:col-span-2"
-            htmlFor="optInWorkflow"
-            label="Opt-in workflow"
-          >
-            <Textarea
-              id="optInWorkflow"
-              name="optInWorkflow"
-              placeholder="Customer checks a consent box during online booking to receive calls and texts."
-              defaultValue={onboarding.businessProfile.optInWorkflow}
-              disabled={isReadOnly}
-            />
-          </FormField>
-          <FormField htmlFor="optInKeywords" label="Opt-in keywords">
-            <Input
-              id="optInKeywords"
-              name="optInKeywords"
-              placeholder="START, JOIN"
-              defaultValue={onboarding.businessProfile.optInKeywords}
-              disabled={isReadOnly}
-            />
-          </FormField>
-          <FormField htmlFor="optOutKeywords" label="Opt-out keywords">
-            <Input
-              id="optOutKeywords"
-              name="optOutKeywords"
-              placeholder="STOP, UNSUBSCRIBE"
-              defaultValue={onboarding.businessProfile.optOutKeywords}
-              disabled={isReadOnly}
-            />
-          </FormField>
-          <FormField htmlFor="helpKeywords" label="Help keywords">
-            <Input
-              id="helpKeywords"
-              name="helpKeywords"
-              placeholder="HELP"
-              defaultValue={onboarding.businessProfile.helpKeywords}
-              disabled={isReadOnly}
-            />
-          </FormField>
-          <FormField
-            className="md:col-span-2"
             htmlFor="sampleMessages"
             label="Sample messages"
             required
@@ -96,6 +61,9 @@ export function OnboardingBusinessProgramStep({
               disabled={isReadOnly}
               {...requiredFieldProps<HTMLTextAreaElement>("sampleMessages")}
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              One example per line. Include your business name and an opt-out line.
+            </p>
           </FormField>
         </div>
       </Form>

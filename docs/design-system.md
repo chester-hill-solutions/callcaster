@@ -63,12 +63,16 @@ Neutral CHS apps that own their own theme should use [`@chester-hill-solutions/u
 
 ## Design north star
 
+### Portable principles
+
+Product-agnostic work-surface rules (one surface owner, depth budget, character vs work, chrome ownership, progressive disclosure, positive copy) live in [`.agents/skills/work-surface-design/SKILL.md`](../.agents/skills/work-surface-design/SKILL.md). Use that skill for unrelated apps; the subsections below are CallCaster’s local mapping (workspace panel, `Section` flat, Tabac/Zilla, etc.).
+
 ### Character vs work surfaces
 
 Reserve **slab typography and bold brand color** for chrome and moments of action:
 
-- **Character zones:** navbar wordmark (`font-Tabac-Slab`), `Button` labels (`font-Zilla-Slab`), `AuthCard` heroes, `BrandedCardTitle` on creation wizards, primary CTAs
-- **Work surfaces:** in-app page titles, table chrome, settings sections — use `Heading` / `Text` with **`branded={false}`** and semantic tokens
+- **Character zones:** navbar wordmark (`font-Tabac-Slab`), `Button` labels (`font-Zilla-Slab`), `AuthCard` heroes, primary CTAs
+- **Work surfaces:** in-app page titles, table chrome, settings sections, in-panel creation titles — use `Heading` / `Text` with **`branded={false}`** and semantic tokens
 
 ### Typography tiers
 
@@ -79,7 +83,8 @@ Reserve **slab typography and bold brand color** for chrome and moments of actio
 | Auth / marketing hero | `AuthCard` → `Heading branded level={1}` |
 | In-app page title | `Heading as="h1" level={2} branded={false}` |
 | Section title | `SectionHeader branded={false}` or `Heading level={3}` |
-| Wizard card title | `BrandedCardTitle` (modest branded slab) |
+| In-panel creation title | `PageShell` title (work-surface type) + flat `Section` |
+| Standalone branded title | `BrandedCardTitle` outside the workspace shell only |
 | Body / metadata | `Text variant="body"` / `"muted"` |
 
 ### Layout and spacing
@@ -112,8 +117,9 @@ Reserve **slab typography and bold brand color** for chrome and moments of actio
 ### Page structure note
 
 - **`Section` + `SectionHeader`:** in-panel blocks use `variant="flat"`; elevated sections for standalone pages outside the workspace shell
-- **`PageShell`:** in-panel titles/actions and narrow creation flows
-- **`BrandedCard`:** standalone flows outside the workspace shell that need branded slab titles + `BrandedCardActions`
+- **`PageShell`:** in-panel titles/actions and narrow creation flows (`maxWidth="narrow"`) — preferred for all in-panel wizards
+- **`BrandedCard`:** standalone flows outside the workspace shell (auth, invite) that need branded slab titles + `BrandedCardActions` — not for in-panel creation
+- **Chats application panes:** [`chats.route.tsx`](app/routes/workspaces+/$id/chats.route.tsx) is a documented depth-2 application-pane split (list + conversation columns with one border each). Do not wrap those columns in `Card` / `bg-card` inside the workspace panel.
 
 ### Call screen panels
 

@@ -4,15 +4,12 @@ export { action } from "./new.action.server";
 import { Form, useActionData, useLoaderData } from "react-router";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { Section } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PageShell } from "@/components/ui/page-shell";
 import { Text } from "@/components/ui/typography";
-import {
-  BrandedCard,
-  BrandedCardContent,
-  BrandedCardTitle,
-} from "@/components/shared/BrandedCard";
 
 export default function NewAudience() {
   useLoaderData();
@@ -33,18 +30,14 @@ export default function NewAudience() {
   };
 
   return (
-    <section
-      id="form"
-      className="mx-auto w-full max-w-2xl px-2 py-6 sm:px-4"
-    >
-      <BrandedCard className="w-full" bgColor="bg-brand-secondary dark:bg-card">
-        <BrandedCardTitle as="h1">Add an Audience</BrandedCardTitle>
+    <section id="form">
+      <PageShell title="Add an Audience" maxWidth="narrow">
         {actionData?.error != null ? (
           <Text className="text-center text-destructive">
             Error: {String(actionData.error)}
           </Text>
         ) : null}
-        <BrandedCardContent>
+        <Section variant="flat" className="space-y-6">
           <Form
             method="POST"
             className="space-y-6"
@@ -97,15 +90,10 @@ export default function NewAudience() {
               </p>
             </div>
 
-            <Button
-              className="h-fit min-h-[48px] w-full bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white hover:bg-brand-secondary"
-              type="submit"
-            >
-              Add Audience
-            </Button>
+            <Button type="submit">Add Audience</Button>
           </Form>
-        </BrandedCardContent>
-      </BrandedCard>
+        </Section>
+      </PageShell>
     </section>
   );
 }

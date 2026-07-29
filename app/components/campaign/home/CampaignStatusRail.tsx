@@ -221,7 +221,7 @@ export function CampaignStatusRail({ items }: { items: CampaignRailItem[] }) {
         role="tablist"
         aria-orientation="horizontal"
         className={cn(
-          "flex w-full gap-1 rounded-lg border bg-card p-1",
+          "flex w-full gap-1 rounded-lg bg-muted/40 p-1",
           "overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-mandatory",
           "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
         )}

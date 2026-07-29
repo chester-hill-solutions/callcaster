@@ -210,7 +210,7 @@ export default function QueueSettings() {
             ) : (
               <>
                 <div className="flex items-center justify-between">
-                  <h3 className="font-Zilla-Slab text-xl font-bold">{queue.name}</h3>
+                  <h3 className="text-xl font-bold">{queue.name}</h3>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"

@@ -101,10 +101,16 @@ export default function ScriptEditor() {
       setPageData(savedPageData);
       setInitData(savedPageData);
       setShowSaveModal(false);
-      toast.success("Script saved");
+      toast.success(
+        pageData.type === "message" ? "Message saved" : "Script saved",
+      );
     } catch (error) {
       loggerClient.error("Error saving update:", error);
-      toast.error("Couldn't save the script. Please try again.");
+      toast.error(
+        pageData.type === "message"
+          ? "Couldn't save the message. Please try again."
+          : "Couldn't save the script. Please try again.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -180,7 +186,14 @@ export default function ScriptEditor() {
         <SaveBar
           isChanged={isChanged}
           isSaving={isSaving}
-          onSave={() => setShowSaveModal(true)}
+          onSave={() => {
+            // Message campaigns have no script copy flow — save directly (#1115).
+            if (pageData.type === "message") {
+              void handleSaveUpdate(false);
+              return;
+            }
+            setShowSaveModal(true);
+          }}
           onReset={handleReset}
         />
         <div className="flex h-full flex-grow flex-col gap-4 p-4">

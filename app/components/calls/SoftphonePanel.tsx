@@ -55,7 +55,7 @@ export function SoftphonePanel({
     >
       {headerExtra}
 
-      <div className="space-y-4 rounded-lg border border-border/80 p-4">
+      <div className="space-y-4">
         <div className="rounded-md bg-muted/50 px-3 py-2">
           <Text variant="muted" className="text-sm font-medium">
             {handsetNumberLabel}

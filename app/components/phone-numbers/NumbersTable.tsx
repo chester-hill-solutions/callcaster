@@ -146,7 +146,7 @@ export const NumbersTable = ({
 
   return (
       <>
-      <Heading as="h2" className="text-center" branded>
+      <Heading as="h2" className="text-center" branded={false}>
       {title}
     </Heading><div className="flex flex-col py-4">
         {numbers.length === 0 ? (

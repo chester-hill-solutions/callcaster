@@ -2,26 +2,23 @@ export { loader } from "./$surveyId.loader.server";
 
 import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
 
-import type { SurveyWithPages, ContextType } from "@/lib/types";
+import type { ContextType } from "@/lib/types";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/ui/page-shell";
+import { Text } from "@/components/ui/typography";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { 
-  Calendar, 
-  Users, 
-  CheckCircle, 
-  XCircle, 
-  Edit, 
-  Trash2, 
-  Copy,
+import {
+  Calendar,
+  Users,
+  CheckCircle,
+  XCircle,
+  Edit,
   ExternalLink,
-  MessageSquare
 } from "lucide-react";
 
-// Type-safe interfaces for survey data
 interface SurveyPage {
   id: number;
   page_id: string;
@@ -80,7 +77,7 @@ type LoaderData = {
 export default function SurveyDetailPage() {
   const outlet = useOutlet();
   const parentContext = useOutletContext<ContextType>();
-  const { survey, recentResponses, workspaceId, userRole, origin } =
+  const { survey, recentResponses, workspaceId, origin } =
     useLoaderData<LoaderData>();
 
   if (outlet) {
@@ -117,52 +114,39 @@ export default function SurveyDetailPage() {
         </>
       }
     >
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
-                <Badge variant={survey.is_active ? "default" : "secondary"}>
-                  {survey.is_active ? (
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                  ) : (
-                    <XCircle className="w-3 h-3 mr-1" />
-                  )}
-                  {survey.is_active ? "Active" : "Inactive"}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Responses</p>
-                <p className="text-2xl font-bold">
-                  {survey.survey_response?.[0]?.count || 0}
-                </p>
-              </div>
-              <Users className="w-8 h-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Created</p>
-                <p className="text-sm">
-                  {new Date(survey.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <Calendar className="w-8 h-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 border-b border-border/60 pb-6 md:grid-cols-3">
+        <div>
+          <Text variant="muted" className="text-sm font-medium">
+            Status
+          </Text>
+          <div className="mt-2">
+            <Badge variant={survey.is_active ? "default" : "secondary"}>
+              {survey.is_active ? (
+                <CheckCircle className="w-3 h-3 mr-1" />
+              ) : (
+                <XCircle className="w-3 h-3 mr-1" />
+              )}
+              {survey.is_active ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        </div>
+        <div>
+          <Text variant="muted" className="text-sm font-medium">
+            Responses
+          </Text>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
+            {survey.survey_response?.[0]?.count || 0}
+          </p>
+        </div>
+        <div>
+          <Text variant="muted" className="text-sm font-medium">
+            Created
+          </Text>
+          <p className="mt-1 flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            {new Date(survey.created_at).toLocaleDateString()}
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="structure" className="space-y-4">
@@ -173,29 +157,29 @@ export default function SurveyDetailPage() {
 
         <TabsContent value="structure" className="space-y-4">
           {survey.survey_page?.map((page: SurveyPage) => (
-            <Card key={page.id}>
-              <CardHeader>
-                <CardTitle className="text-lg">{page.title}</CardTitle>
-                <CardDescription>
-                  Page {page.page_order} • {page.survey_question?.length || 0} questions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Section key={page.id} variant="flat">
+              <SectionHeader
+                compact
+                branded={false}
+                title={page.title}
+                description={`Page ${page.page_order} • ${page.survey_question?.length || 0} questions`}
+              />
+              <div className="divide-y divide-border/60">
                 {page.survey_question?.map((question: SurveyQuestion) => (
-                  <div key={question.id} className="mb-4 p-4 border rounded-lg">
-                    <div className="flex justify-between items-start mb-2">
+                  <div key={question.id} className="py-4 first:pt-0 last:pb-0">
+                    <div className="mb-2 flex items-start justify-between gap-4">
                       <h4 className="font-medium">{question.question_text}</h4>
-                      <div className="flex gap-2">
+                      <div className="flex shrink-0 gap-2">
                         <Badge variant="outline">{question.question_type}</Badge>
-                        {question.is_required && (
+                        {question.is_required ? (
                           <Badge variant="destructive">Required</Badge>
-                        )}
+                        ) : null}
                       </div>
                     </div>
-                    {question.question_option && question.question_option.length > 0 && (
+                    {question.question_option && question.question_option.length > 0 ? (
                       <div className="mt-2">
-                        <p className="text-sm text-muted-foreground mb-1">Options:</p>
-                        <ul className="list-disc list-inside text-sm">
+                        <p className="mb-1 text-sm text-muted-foreground">Options:</p>
+                        <ul className="list-inside list-disc text-sm">
                           {question.question_option.map((option: SurveyQuestionOption) => (
                             <li key={option.id}>
                               {option.option_label} ({option.option_value})
@@ -203,55 +187,56 @@ export default function SurveyDetailPage() {
                           ))}
                         </ul>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </Section>
           ))}
         </TabsContent>
 
         <TabsContent value="responses" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Responses</CardTitle>
-              <CardDescription>
-                Latest survey responses
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {recentResponses.length === 0 ? (
-                <p className="text-muted-foreground">No responses yet</p>
-              ) : (
-                <div className="space-y-4">
-                  {recentResponses.map((response: SurveyResponse) => (
-                    <div key={response.id} className="flex justify-between items-center p-4 border rounded-lg">
-                      <div>
-                        <p className="font-medium">
-                          {response.contact?.firstname && response.contact?.surname
-                            ? `${response.contact.firstname} ${response.contact.surname}`
-                            : response.contact?.phone || "Anonymous"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(response.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant={response.completed_at ? "default" : "secondary"}>
-                          {response.completed_at ? "Completed" : "In Progress"}
-                        </Badge>
-                        {response.last_page_completed && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Page: {response.last_page_completed}
-                          </p>
-                        )}
-                      </div>
+          <Section variant="flat">
+            <SectionHeader
+              compact
+              branded={false}
+              title="Recent Responses"
+              description="Latest survey responses"
+            />
+            {recentResponses.length === 0 ? (
+              <p className="text-muted-foreground">No responses yet</p>
+            ) : (
+              <div className="divide-y divide-border/60">
+                {recentResponses.map((response: SurveyResponse) => (
+                  <div
+                    key={response.id}
+                    className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {response.contact?.firstname && response.contact?.surname
+                          ? `${response.contact.firstname} ${response.contact.surname}`
+                          : response.contact?.phone || "Anonymous"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(response.created_at).toLocaleString()}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <div className="text-right">
+                      <Badge variant={response.completed_at ? "default" : "secondary"}>
+                        {response.completed_at ? "Completed" : "In Progress"}
+                      </Badge>
+                      {response.last_page_completed ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Page: {response.last_page_completed}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
         </TabsContent>
       </Tabs>
     </PageShell>

@@ -138,6 +138,46 @@ describe("app/lib/database/campaign.server.ts", () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  test("updateCampaign keeps nested body_text when top-level body_text is empty", async () => {
+    const mod = await import("../app/lib/database/campaign.server");
+
+    tdbMocks.campaign.update.mockResolvedValueOnce([
+      {
+        id: 1,
+        type: "message",
+        script_id: null,
+        body_text: "Keep this SMS",
+        message_media: ["https://example.com/a.png"],
+      },
+    ]);
+
+    await mod.updateCampaign({
+      campaignData: {
+        campaign_id: "1",
+        workspace: "w1",
+        title: "T",
+        type: "message",
+        body_text: "",
+        message_media: [],
+        is_active: 1,
+      } as any,
+      campaignDetails: {
+        campaign_id: "1",
+        body_text: "Keep this SMS",
+        message_media: ["https://example.com/a.png"],
+      },
+    });
+
+    expect(tdbMocks.campaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({
+          body_text: "Keep this SMS",
+          message_media: ["https://example.com/a.png"],
+        }),
+      }),
+    );
+  });
+
   test("updateCampaign updates unified campaign row", async () => {
     const mod = await import("../app/lib/database/campaign.server");
 

@@ -58,6 +58,7 @@ describe("app/lib/campaign-goals.ts", () => {
       "live_call",
       "ivr",
       "sms_blast",
+      "rent_number",
     ];
 
     expect(
@@ -68,6 +69,7 @@ describe("app/lib/campaign-goals.ts", () => {
       live_call: "live_calling",
       ivr: "automated_phone_menu",
       sms_blast: "text_campaign",
+      rent_number: null,
     });
   });
 

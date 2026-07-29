@@ -88,6 +88,42 @@ function cleanObject<T extends object>(obj: T): Partial<T> {
   }, {} as Partial<T>);
 }
 
+/**
+ * Prefer a non-empty primary string; otherwise keep the nested details value.
+ * Callers often send top-level `body_text: ""` while the real content lives on
+ * `campaignDetails` (script/message editor), and `??` would keep the empty
+ * string and wipe the message (#1115).
+ */
+function coalesceCampaignText(
+  primary: string | null | undefined,
+  fallback: string | null | undefined,
+): string {
+  if (primary != null && primary.length > 0) return primary;
+  if (fallback != null) return fallback;
+  return primary ?? "";
+}
+
+function coalesceMessageMedia(
+  primary: string[] | null | undefined,
+  fallback: string[] | null | undefined,
+): string[] {
+  if (primary != null && primary.length > 0) return primary;
+  if (fallback != null && fallback.length > 0) return fallback;
+  return primary ?? fallback ?? [];
+}
+
+function asOptionalString(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return value;
+  return typeof value === "string" ? value : undefined;
+}
+
+function asOptionalStringArray(value: unknown): string[] | null | undefined {
+  if (value === null || value === undefined) return value;
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : undefined;
+}
+
 function buildUnifiedCampaignFields(
   campaignData: CampaignData,
   campaignDetails: CampaignDetails,
@@ -104,8 +140,14 @@ function buildUnifiedCampaignFields(
         : scriptId === undefined
           ? undefined
           : Number(scriptId),
-    body_text: campaignData.body_text ?? campaignDetails.body_text ?? "",
-    message_media: campaignData.message_media ?? campaignDetails.message_media ?? [],
+    body_text: coalesceCampaignText(
+      asOptionalString(campaignData.body_text),
+      asOptionalString(campaignDetails.body_text),
+    ),
+    message_media: coalesceMessageMedia(
+      asOptionalStringArray(campaignData.message_media),
+      asOptionalStringArray(campaignDetails.message_media),
+    ),
     voicedrop_audio: campaignData.voicedrop_audio ?? campaignDetails.voicedrop_audio ?? null,
     disposition_options: campaignDetails.disposition_options,
     live_questions: campaignDetails.questions ?? campaignDetails.live_questions,
@@ -182,16 +224,27 @@ export async function updateCampaign({
   if (!id) throw new Error("Campaign ID is required");
   if (!workspace) throw new Error("Workspace is required");
 
-  campaignDetails.script_id =
-    campaignData.script_id === null
-      ? null
-      : campaignData.script_id?.toString() ?? campaignDetails.script_id;
-  campaignDetails.body_text = campaignData.body_text || "";
-  campaignDetails.message_media = campaignData.message_media || [];
-  campaignDetails.voicedrop_audio = campaignData.voicedrop_audio || null;
+  // Resolve nested fields without mutating the caller's campaignDetails
+  // object; empty top-level placeholders must not wipe nested content (#1115).
+  const resolvedDetails: CampaignDetails = {
+    ...campaignDetails,
+    script_id:
+      campaignData.script_id === null
+        ? null
+        : campaignData.script_id?.toString() ?? campaignDetails.script_id,
+    body_text: coalesceCampaignText(
+      asOptionalString(campaignData.body_text),
+      asOptionalString(campaignDetails.body_text),
+    ),
+    message_media: coalesceMessageMedia(
+      asOptionalStringArray(campaignData.message_media),
+      asOptionalStringArray(campaignDetails.message_media),
+    ),
+    voicedrop_audio: campaignData.voicedrop_audio || null,
+  };
 
   const tdb = tdbIn ?? createTenantDb(workspace);
-  const unifiedFields = buildUnifiedCampaignFields(campaignData, campaignDetails);
+  const unifiedFields = buildUnifiedCampaignFields(campaignData, resolvedDetails);
   const cleanCampaignData = {
     ...stripCampaignMetaFields(restCampaignData as Record<string, unknown>),
     ...unifiedFields,

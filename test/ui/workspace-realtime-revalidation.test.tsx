@@ -51,6 +51,7 @@ vi.mock("react-router", async () => {
     // No onboarding child match in these bare renders, so the layout skips
     // the onboarding progress strip.
     useMatches: () => [],
+    useLocation: () => ({ pathname: "/workspaces/ws-1" }),
   };
 });
 

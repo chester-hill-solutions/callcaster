@@ -50,6 +50,7 @@ vi.mock("react-router", async () => {
     useRevalidator: () => ({ revalidate: mocks.revalidate }),
     useMatches: () => mocks.state.matches,
     useSearchParams: () => [new URLSearchParams()],
+    useLocation: () => ({ pathname: "/workspaces/ws-1" }),
   };
 });
 
