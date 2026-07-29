@@ -34,7 +34,8 @@ const TREES = [
   {
     name: "data-plane",
     prefix: "api+/workspaces+/$workspaceId/",
-    required: [/getDataPlaneRouteContext/],
+    // requireDataPlaneRouteCapability wraps getDataPlaneRouteContext + capability gate.
+    required: [/getDataPlaneRouteContext/, /requireDataPlaneRouteCapability/],
     forbidden: [
       { pattern: /\bresolveDataPlaneAuth\s*\(/, label: "resolveDataPlaneAuth()" },
       { pattern: /from\s+["']@\/lib\/platform-data\.server["'].*resolveDataPlaneAuth/, label: "resolveDataPlaneAuth import" },
