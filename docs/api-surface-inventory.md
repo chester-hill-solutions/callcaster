@@ -101,7 +101,7 @@ Interactive specs:
 | `/api/auth/invites` | GET, POST | User API | sessionOnly | yes | `routes/api+/auth/invites.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/me` | GET, PATCH | User API | sessionOnly | yes | `routes/api+/me.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces` | GET, POST | User API | sessionOnly | yes | `routes/api+/workspaces.route.tsx` | `docs/api-agent-quickstart.md` |  |
-| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/route.tsx` | `docs/api-agent-quickstart.md` | Child index under data-plane layout middleware. GET supports session or API key; PATCH requires admin+ session; DELETE requires owner session. |
+| `/api/workspaces/:workspaceId` | GET, PATCH, DELETE | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/route.tsx` | `docs/api-agent-quickstart.md` | Child index under data-plane layout middleware. GET supports session or API key with campaigns.read; PATCH requires admin+ session; DELETE requires owner session. |
 | `/api/workspaces/:workspaceId` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId.tsx` | `docs/api-agent-quickstart.md` | duplicate route; Middleware layout for nested workspace API routes; no direct handler. |
 | `/api/workspaces/:workspaceId/transfer-ownership` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/transfer-ownership.route.tsx` | `docs/api-workspace-admin.md` |  |
 | `/api/workspaces/:workspaceId/billing` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing.route.tsx` | `docs/api-agent-quickstart.md` |  |
@@ -112,9 +112,9 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/numbers` | GET, POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/numbers.route.tsx` | `docs/api-telephony-provisioning.md` |  |
 | `/api/workspaces/:workspaceId/numbers/:numberId` | PATCH, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/numbers/$numberId.route.tsx` | `docs/api-telephony-provisioning.md` |  |
 | `/api/workspaces/:workspaceId/webhook` | GET, PUT, POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
-| `/api/workspaces/:workspaceId/members` | GET, POST, PATCH, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/members.route.tsx` | `docs/api-workspace-admin.md` |  |
+| `/api/workspaces/:workspaceId/members` | GET, POST, PATCH, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/members.route.tsx` | `docs/api-workspace-admin.md` | GET/PATCH/DELETE are session-only. POST invite accepts session or API key with members.invite. |
 | `/api/workspaces/:workspaceId/api-keys` | GET, POST, DELETE | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/api-keys.route.tsx` | `docs/api-workspace-admin.md` |  |
-| `/api/workspaces/:workspaceId/audit-events` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audit-events.route.tsx` | `docs/api-workspace-admin.md` | Requires owner session or API key with `audit.read`. |
+| `/api/workspaces/:workspaceId/audit-events` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audit-events.route.tsx` | `docs/api-workspace-admin.md` | Requires owner session (via role matrix) or an API key with audit.read. |
 | `/api/workspaces/:workspaceId/campaigns` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/campaigns.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/campaigns/:campaignId` | GET, POST | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/campaigns/:campaignId/queue` | GET, PATCH | Integrator API | sessionOnly | yes | `routes/api+/campaigns/$campaignId/queue.route.tsx` | `docs/api-data-plane.md` |  |
