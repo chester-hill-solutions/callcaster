@@ -179,6 +179,10 @@ export async function dialAgent(args: {
       entryId: args.entryId,
       error: error instanceof Error ? error.message : String(error),
     });
+    // The agent call never existed, so the status callback that normally
+    // releases the offer will never fire — release the claim here or the
+    // agent stays claimed and the entry is never re-offered.
+    await releaseAgent(args.entryId, "timed_out");
   }
 }
 
@@ -476,29 +480,53 @@ async function handleComplete(
 ): Promise<Response> {
   const formData = await request.formData().catch(() => new FormData());
   const queueResult = String(formData.get("QueueResult") || "").toLowerCase();
-  const entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
+  const callSid = String(formData.get("CallSid") || "");
 
   const workspaceId = await resolveWorkspaceId(url, formData);
-  if (workspaceId) {
-    const isValid = await validateAcdSignature({
-      request,
-      pathSuffix,
-      formData,
-      workspaceId,
-    });
-    if (!isValid) return invalidSignature();
+  if (!workspaceId) return invalidSignature();
+  const isValid = await validateAcdSignature({
+    request,
+    pathSuffix,
+    formData,
+    workspaceId,
+  });
+  if (!isValid) return invalidSignature();
+
+  // The <Enqueue action> URL is rendered before any queue entry exists, so it
+  // cannot carry a real entry_id. Prefer an explicit entry_id when present
+  // (legacy URLs), otherwise resolve the live entry by CallSid + queue.
+  let entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
+  if (!entryId && callSid) {
+    const queueName =
+      url.searchParams.get("queue_name") ||
+      String(formData.get("queue_name") || "");
+    const queueId = parseQueueIdFromName(queueName);
+    if (queueId) {
+      const entry = await findExistingInboundQueueEntry({ queueId, callSid });
+      if (entry) entryId = entry.id;
+    }
   }
 
   if (entryId) {
     try {
       if (queueResult === "bridged" || queueResult === "completed") {
         await rpcCompleteInboundQueueEntry(db, entryId);
-      } else if (queueResult === "hangup" || queueResult === "leaving") {
+      } else if (
+        queueResult === "hangup" ||
+        queueResult === "leave" ||
+        queueResult === "leaving"
+      ) {
         await rpcAbandonInboundQueueEntry(db, entryId);
       }
-    } catch {
-      // best-effort
+    } catch (error) {
+      logger.error("acd complete/abandon RPC error", { entryId, queueResult, error });
     }
+  } else {
+    logger.warn("acd complete could not resolve a queue entry", {
+      callSid,
+      queueResult,
+      workspaceId,
+    });
   }
 
   return new Response("", { status: 200 });

@@ -96,6 +96,9 @@ describe("runNumberRentalBilling", () => {
       tdbMocks.workspace_number.findMany.mockResolvedValue([
         makeNumber({ created_at: `2026-04-${anchorDay}` }),
       ]);
+      // The April (creation) cycle was already billed; only the reminder for
+      // the upcoming May cycle should fire.
+      tdbMocks.transaction_history.findFirst.mockResolvedValue({ id: 7 });
 
       const result = await runNumberRentalBilling({
         workspaceId: "workspace-1",
@@ -172,6 +175,10 @@ describe("runNumberRentalBilling", () => {
     tdbMocks.workspace_number.findMany.mockResolvedValue([
       makeNumber({ created_at: "2026-04-01" }),
     ]);
+    // April (creation) cycle already billed; May is due today and unbilled.
+    tdbMocks.transaction_history.findFirst
+      .mockResolvedValueOnce({ id: 7 })
+      .mockResolvedValueOnce(null);
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
 
     const result = await runNumberRentalBilling({
@@ -190,9 +197,53 @@ describe("runNumberRentalBilling", () => {
       expect.objectContaining({
         workspaceId: "workspace-1",
         type: "DEBIT",
+        note: expect.stringContaining("2026-05"),
       }),
     );
     expect(resendMocks.send).not.toHaveBeenCalled();
+  });
+
+  test("catches up cycles missed while the worker was down (BILL-02)", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-10" }),
+    ]);
+    // Neither the April nor May cycle was ever billed; the sweep runs late.
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-12T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 2, unpaid: 0 });
+    const notes = transactionHistoryMocks.insertTransactionHistoryIdempotent.mock.calls.map(
+      ([args]) => (args as { note: string }).note,
+    );
+    expect(notes).toEqual([
+      expect.stringContaining("2026-04"),
+      expect.stringContaining("2026-05"),
+    ]);
+  });
+
+  test("stops catch-up for a number once a cycle is unaffordable", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-10" }),
+    ]);
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(40);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-12T00:00:00.000Z"),
+    });
+
+    // Two cycles are owed, but only one unpaid is recorded — later cycles are
+    // skipped rather than spamming the log for the same broke workspace.
+    expect(result).toMatchObject({ charged: 0, unpaid: 1 });
+    expect(
+      transactionHistoryMocks.insertTransactionHistoryIdempotent,
+    ).not.toHaveBeenCalled();
   });
 
   test("leaves the rental unpaid (no debit) when the workspace can't afford it", async () => {

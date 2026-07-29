@@ -1,27 +1,45 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, gte, inArray } from "drizzle-orm";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { call, message } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
+import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
+import { updateMessageBySid } from "@/lib/message-db.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
+import { isTerminalSmsStatus, normalizeSmsStatus } from "@/lib/sms-status";
 
-const OPEN_CALL_STATUSES = new Set([
+const OPEN_CALL_STATUSES = [
   "queued",
   "ringing",
   "in-progress",
   "initiated",
-]);
+] as const;
 
-const OPEN_MESSAGE_STATUSES = new Set([
+const OPEN_MESSAGE_STATUSES = [
   "accepted",
   "scheduled",
   "queued",
   "sending",
-]);
+] as const;
 
 /**
- * Backfill stale call/message statuses from Twilio REST for a workspace.
- * Fetches recent calls/messages with open (non-terminal) statuses from Twilio,
- * compares with local DB records, and updates any that have changed.
+ * Reconcile stale LOCAL call/message statuses against Twilio REST for a
+ * workspace.
+ *
+ * The sync is driven by local rows stuck in an open (non-terminal) status —
+ * the population left behind when a Twilio status callback was lost. Each
+ * such row is compared with Twilio's authoritative status and any change is
+ * routed through the same canonical processors as the webhooks:
+ *
+ * - Calls: `processCallStatusWebhook` (guarded status write + terminal-call
+ *   debit via the idempotent ledger insert).
+ * - Messages: `updateMessageBySid` + the `sms_status_side_effects` job, whose
+ *   handler owns the SMS debit (idempotent per message SID).
+ *
+ * A previous version filtered the Twilio result set to provider-OPEN
+ * statuses, which discarded exactly the calls/messages that had gone terminal
+ * without a webhook — leaving them unbilled forever (TEL-04).
  */
 export async function triggerTwilioOpenSync({
   workspaceId,
@@ -41,99 +59,135 @@ export async function triggerTwilioOpenSync({
 
     const tdb = createTenantDb(workspaceId);
     const since = new Date(Date.now() - maxAgeMinutes * 60_000);
+    const sinceIso = since.toISOString();
 
     // ─── Calls ─────────────────────────────────────────────
-    const twilioCalls = await twilio.calls.list({
-      limit: callLimit,
-      pageSize: callLimit,
-      startTime: since,
-    });
-
     let callsUpdated = 0;
+    let callsBilled = 0;
     let callsSkipped = 0;
 
-    const openTwilioCalls = twilioCalls.filter((c) =>
-      OPEN_CALL_STATUSES.has(c.status?.toLowerCase() ?? ""),
-    );
+    const localOpenCalls = await tdb.call.findMany({
+      where: and(
+        inArray(call.status, [...OPEN_CALL_STATUSES]),
+        gte(call.date_created, sinceIso),
+      ),
+      limit: callLimit,
+    });
 
-    if (openTwilioCalls.length > 0) {
-      const sids = openTwilioCalls.map((c) => c.sid);
-      const localRows = await tdb.call.findMany({
-        where: inArray(call.sid, sids),
+    if (localOpenCalls.length > 0) {
+      // One list request covers the common case; rows outside its window are
+      // fetched individually (bounded by callLimit).
+      const twilioCalls = await twilio.calls.list({
+        limit: callLimit,
+        pageSize: callLimit,
+        startTime: since,
       });
-      const localBySid = new Map(localRows.map((r) => [r.sid, r]));
+      const twilioBySid = new Map(twilioCalls.map((c) => [c.sid, c]));
 
-      for (const twilioCall of openTwilioCalls) {
-        const local = localBySid.get(twilioCall.sid);
-        if (!local) {
-          callsSkipped++;
-          continue;
+      for (const local of localOpenCalls) {
+        let remote = twilioBySid.get(local.sid);
+        if (!remote) {
+          try {
+            remote = await twilio.calls(local.sid).fetch();
+          } catch {
+            callsSkipped++;
+            continue;
+          }
         }
-        const twilioStatus = twilioCall.status?.toLowerCase();
-        if (twilioStatus && local.status !== twilioStatus) {
-          await tdb.call.update({
-            set: {
-              status: twilioStatus,
-              duration: String(twilioCall.duration ?? local.duration ?? ""),
-              end_time: twilioCall.endTime?.toISOString() ?? local.end_time,
-              date_updated: twilioCall.dateUpdated?.toISOString() ?? local.date_updated,
-            },
-            where: eq(call.sid, twilioCall.sid),
-          });
-          callsUpdated++;
-        }
+
+        const twilioStatus = remote.status?.toLowerCase();
+        if (!twilioStatus || twilioStatus === local.status) continue;
+
+        const { billingResult } = await processCallStatusWebhook(
+          {
+            sid: local.sid,
+            // Required insert columns; the row exists, so these are echoes.
+            date_created: local.date_created,
+            is_last: local.is_last,
+            status: twilioStatus,
+            duration:
+              remote.duration != null ? String(remote.duration) : undefined,
+            end_time: remote.endTime?.toISOString() ?? undefined,
+            date_updated: remote.dateUpdated?.toISOString() ?? undefined,
+          },
+          { workspaceId, note: `Call ${local.sid} (open-sync recovery)` },
+        );
+        callsUpdated++;
+        if (billingResult?.inserted) callsBilled++;
       }
     }
 
     // ─── Messages ──────────────────────────────────────────
-    const twilioMessages = await twilio.messages.list({
-      limit: messageLimit,
-      pageSize: messageLimit,
-      dateSentAfter: since,
-    });
-
     let messagesUpdated = 0;
     let messagesSkipped = 0;
 
-    const openTwilioMessages = twilioMessages.filter((m) =>
-      OPEN_MESSAGE_STATUSES.has(m.status?.toLowerCase() ?? ""),
-    );
+    const localOpenMessages = await tdb.message.findMany({
+      where: and(
+        inArray(message.status, [...OPEN_MESSAGE_STATUSES]),
+        gte(message.date_created, sinceIso),
+      ),
+      limit: messageLimit,
+    });
 
-    if (openTwilioMessages.length > 0) {
-      const sids = openTwilioMessages.map((m) => m.sid);
-      const localRows = await tdb.message.findMany({
-        where: inArray(message.sid, sids),
+    if (localOpenMessages.length > 0) {
+      const twilioMessages = await twilio.messages.list({
+        limit: messageLimit,
+        pageSize: messageLimit,
+        dateSentAfter: since,
       });
-      const localBySid = new Map(localRows.map((r) => [r.sid, r]));
+      const twilioBySid = new Map(twilioMessages.map((m) => [m.sid, m]));
 
-      for (const twilioMsg of openTwilioMessages) {
-        const local = localBySid.get(twilioMsg.sid);
-        if (!local) {
-          messagesSkipped++;
-          continue;
+      for (const local of localOpenMessages) {
+        let remote = twilioBySid.get(local.sid);
+        if (!remote) {
+          try {
+            remote = await twilio.messages(local.sid).fetch();
+          } catch {
+            messagesSkipped++;
+            continue;
+          }
         }
-        const twilioStatus = twilioMsg.status?.toLowerCase();
-        if (twilioStatus && local.status !== twilioStatus) {
-          await tdb.message.update({
-            set: {
-              status: twilioStatus,
-              date_updated: twilioMsg.dateUpdated?.toISOString() ?? local.date_updated,
-              error_code: twilioMsg.errorCode ? Number(twilioMsg.errorCode) : local.error_code,
+
+        const twilioStatus = remote.status?.toLowerCase();
+        if (!twilioStatus || twilioStatus === local.status) continue;
+
+        const errorCode = remote.errorCode ? Number(remote.errorCode) : null;
+        await updateMessageBySid(workspaceId, local.sid, {
+          status: twilioStatus,
+          date_updated:
+            remote.dateUpdated?.toISOString() ?? local.date_updated,
+          ...(errorCode != null ? { error_code: errorCode } : {}),
+        });
+        messagesUpdated++;
+
+        // Terminal discovery must also run the billing/side-effects path the
+        // lost webhook would have run. The job + ledger are both idempotent,
+        // so racing a late-arriving webhook cannot double-debit.
+        if (isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))) {
+          await enqueueJob({
+            type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
+            workspaceId,
+            idempotencyKey: `sms_status_side_effects:${local.sid}:${twilioStatus}`,
+            params: {
+              messageSid: local.sid,
+              twilioParams: {
+                MessageStatus: twilioStatus,
+                ...(errorCode != null ? { ErrorCode: String(errorCode) } : {}),
+              },
             },
-            where: eq(message.sid, twilioMsg.sid),
           });
-          messagesUpdated++;
         }
       }
     }
 
     const msg =
-      `Open sync complete: ${callsUpdated} calls updated, ${callsSkipped} calls not found in DB; ` +
-      `${messagesUpdated} messages updated, ${messagesSkipped} messages not found in DB.`;
+      `Open sync complete: ${callsUpdated} calls updated (${callsBilled} billed), ${callsSkipped} calls unresolvable at Twilio; ` +
+      `${messagesUpdated} messages updated, ${messagesSkipped} messages unresolvable at Twilio.`;
 
     logger.info("Twilio open sync complete", {
       workspaceId,
       callsUpdated,
+      callsBilled,
       callsSkipped,
       messagesUpdated,
       messagesSkipped,

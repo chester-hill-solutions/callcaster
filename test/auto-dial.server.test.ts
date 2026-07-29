@@ -272,4 +272,62 @@ describe("auto-dial.server", () => {
       expect(result).toEqual({ success: true });
     });
   });
+
+  describe("runAutoDialerTurn dial-failure handling", () => {
+    const turnInput = {
+      user_id: "user-1",
+      workspace_id: "ws-1",
+      campaign_id: 5,
+      conference_id: "user-1",
+      selected_device: "",
+    };
+    const contact = {
+      queue_id: 21,
+      contact_id: 201,
+      contact_phone: "+16045550100",
+      caller_id: "+15555501001",
+    };
+
+    beforeEach(() => {
+      claimNextQueueContactMock.mockResolvedValueOnce(contact);
+      windowMock.recipientCallingWindowStatus.mockReturnValue({
+        allowed: true,
+        timezone: "America/Vancouver",
+        reason: "in_window",
+      });
+      rpcMocks.rpcCreateOutreachAttempt.mockResolvedValue(88);
+    });
+
+    test("requeues when Twilio definitively rejected the create (REST error)", async () => {
+      const restError = Object.assign(new Error("Invalid phone number"), {
+        status: 400,
+        code: 21211,
+      });
+      twilioMocks.callsCreate.mockRejectedValueOnce(restError);
+
+      const result = await runAutoDialerTurn(turnInput);
+
+      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(21, "ws-1");
+      expect(rpcMocks.rpcDequeueContact).not.toHaveBeenCalled();
+      expect(result).toEqual({ success: false, error: "Invalid phone number" });
+    });
+
+    test("parks (dequeues with reason) on ambiguous network failure — never requeues", async () => {
+      twilioMocks.callsCreate.mockRejectedValueOnce(
+        new Error("socket hang up"),
+      );
+
+      const result = await runAutoDialerTurn(turnInput);
+
+      expect(requeueCampaignQueueByIdMock).not.toHaveBeenCalled();
+      expect(rpcMocks.rpcDequeueContact).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          contactId: 201,
+          dequeuedReasonText: expect.stringContaining("Ambiguous dial failure"),
+        }),
+      );
+      expect(result).toEqual({ success: false, error: "socket hang up" });
+    });
+  });
 });

@@ -2,6 +2,11 @@ import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import {
+  checkRateLimit,
+  clientRateLimitKey,
+  rateLimitResponse,
+} from "@/lib/platform-rate-limit.server";
 import { Resend } from "resend";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -10,9 +15,20 @@ const MAX_MESSAGE_LENGTH = 5000;
 
 const MAX_NAME_LENGTH = 200;
 
+/** Public unauthenticated form that sends email — keep the bucket small. */
+const CONTACT_FORM_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
+
 export const action = defineAction({
   sideEffects: ["email"],
   handler: async ({ request }) => {
+
+  const rateLimit = await checkRateLimit({
+    key: clientRateLimitKey(request, "contact-form"),
+    ...CONTACT_FORM_RATE_LIMIT,
+  });
+  if (!rateLimit.ok) {
+    return rateLimitResponse(rateLimit.retryAfterSeconds);
+  }
 
   const resend = new Resend(env.RESEND_API_KEY());
 

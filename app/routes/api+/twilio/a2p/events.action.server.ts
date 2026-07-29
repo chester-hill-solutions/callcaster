@@ -2,6 +2,7 @@ import { data as routeData } from "react-router";
 
 import { defineAction } from "@/lib/handler.server";
 import { logger } from "@/lib/logger.server";
+import { requireTwilioEventsSinkSecret } from "@/lib/twilio-webhook.server";
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { findWorkspaceIdByComplianceSid } from "@/lib/twilio-compliance-webhook.server";
 
@@ -13,9 +14,11 @@ import { findWorkspaceIdByComplianceSid } from "@/lib/twilio-compliance-webhook.
  * workspace by the brand/campaign SID, and reconciles onboarding status via
  * `syncWorkspaceA2pStatus`.
  *
- * NOTE: sink creation/subscription and sink-secret validation are Phase D. This
- * route is signature-agnostic because Event Streams JSON bodies are not
- * form-encoded and use a different auth model than `requireTwilioSignature`.
+ * Event Streams bodies are JSON (not form-encoded), so `requireTwilioSignature`
+ * does not apply. The route is gated by `TWILIO_EVENTS_SINK_SECRET` instead:
+ * configure the sink destination URL with `?token=<secret>`. Fail-closed when
+ * the secret is unset. Replace with real sink-signature validation when sink
+ * provisioning (Phase D) lands.
  */
 
 type EventStreamEvent = {
@@ -49,6 +52,7 @@ function readSid(event: EventStreamEvent): string | null {
 }
 
 export const action = defineAction({
+  auth: ({ request }) => requireTwilioEventsSinkSecret(request) ?? null,
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request }) => {
     try {

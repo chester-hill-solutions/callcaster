@@ -37,6 +37,8 @@ type EnvConfig = {
   TWILIO_TRUSTHUB_SECONDARY_POLICY_SID?: string;
   VERIFICATION_PHONE_NUMBER?: string;
   TWILIO_VALIDATE_WEBHOOKS?: string;
+  /** Shared secret required on /api/twilio/a2p/events (Event Streams webhook sink). */
+  TWILIO_EVENTS_SINK_SECRET?: string;
   /** Enables Twilio Lookup v2 line-type checks before first SMS to a contact. Off by default; costs $0.008/lookup. */
   TWILIO_LOOKUP_ENABLED?: string;
   /** Secret used to sign media-stream WebSocket tokens. */
@@ -55,6 +57,7 @@ const optionalEnvVars: (keyof EnvConfig)[] = [
   'TWILIO_COMPLIANCE_NOTIFY_EMAIL',
   'TWILIO_TRUSTHUB_SECONDARY_POLICY_SID',
   'TWILIO_LOOKUP_ENABLED',
+  'TWILIO_EVENTS_SINK_SECRET',
   'DATABASE_DIRECT_URL',
   'BETTER_AUTH_URL',
   'S3_BUCKET_AUDIO',
@@ -207,6 +210,8 @@ export const env = {
   TWILIO_VALIDATE_WEBHOOKS: () => getEnv('TWILIO_VALIDATE_WEBHOOKS'),
   /** When "true" or "1", enables Twilio Lookup v2 line-type checks (see twilio-lookup.server.ts). Off by default. */
   TWILIO_LOOKUP_ENABLED: () => getEnv('TWILIO_LOOKUP_ENABLED'),
+  /** Shared secret for the Event Streams sink route; unset = route rejects all requests when validation is on. */
+  TWILIO_EVENTS_SINK_SECRET: () => getEnv('TWILIO_EVENTS_SINK_SECRET'),
   /** Secret used to sign media-stream WebSocket tokens. Dev-only fallback; must be set in production. */
   MEDIA_STREAM_SECRET: () => {
     const value = getEnv('MEDIA_STREAM_SECRET');

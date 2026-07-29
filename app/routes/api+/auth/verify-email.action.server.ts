@@ -2,14 +2,15 @@ import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { verifyEmailBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { verifyEmailOtp } from "@/lib/platform-auth.server";
+import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
-  auth: ({ request }) => {
+  auth: async ({ request }) => {
     if (request.method !== "POST") {
       return jsonError("Method not allowed", 405);
     }
-    return undefined;
+    return (await enforceAuthRateLimit(request, "auth:verify-email")) ?? undefined;
   },
   sideEffects: ["db-write"],
   handler: async ({ request }) => {

@@ -589,9 +589,18 @@ export async function createWorkspaceApiKey(
     };
   } catch (error) {
     logger.error("createWorkspaceApiKey error", error);
+    // DrizzleQueryError message is only "Failed query: … params: …"; the Postgres
+    // detail (missing column, FK, unique) lives on `.cause`.
+    const cause =
+      error instanceof Error && error.cause instanceof Error
+        ? error.cause.message
+        : null;
+    const message =
+      cause ??
+      (error instanceof Error ? error.message : "Failed to create API key");
     return {
       ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to create API key",
+      error: message,
       status: 500,
     };
   }

@@ -6,6 +6,8 @@
  * workspace's `twilio_data`.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
 import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -273,6 +275,54 @@ export async function requireTwilioSignature(
       accountSid: accountSidFromParams(params) || null,
     });
     return twilioWebhookForbiddenHangup();
+  }
+
+  return null;
+}
+
+/**
+ * Shared-secret gate for the Event Streams webhook sink (`/api/twilio/a2p/events`).
+ *
+ * Event Streams delivers JSON CloudEvents, which the form-encoded
+ * `requireTwilioSignature` flow cannot validate. Until sink provisioning
+ * (Phase D) automates signature material, the sink URL must carry
+ * `?token=<TWILIO_EVENTS_SINK_SECRET>` (or send it as the
+ * `x-events-sink-secret` header). Fail-closed: when validation is on and the
+ * env secret is unset, every request is rejected.
+ *
+ * Returns a 403 JSON Response on failure, or `null` on success.
+ */
+export function requireTwilioEventsSinkSecret(request: Request): Response | null {
+  if (!shouldValidateTwilioWebhooks()) {
+    return null;
+  }
+
+  const expected = env.TWILIO_EVENTS_SINK_SECRET();
+  if (!expected) {
+    logWebhookAuthFailure("missing_credentials", {
+      url: new URL(request.url).pathname,
+      detail: "TWILIO_EVENTS_SINK_SECRET unset; events sink rejects all requests",
+    });
+    return twilioWebhookForbidden("Events sink secret not configured");
+  }
+
+  const provided =
+    request.headers.get("x-events-sink-secret") ??
+    new URL(request.url).searchParams.get("token") ??
+    "";
+
+  const expectedBytes = new TextEncoder().encode(expected);
+  const providedBytes = new TextEncoder().encode(provided);
+  const matches =
+    expectedBytes.length === providedBytes.length &&
+    timingSafeEqual(expectedBytes, providedBytes);
+
+  if (!matches) {
+    logWebhookAuthFailure("invalid_signature", {
+      url: new URL(request.url).pathname,
+      detail: "events sink secret mismatch",
+    });
+    return twilioWebhookForbidden("Invalid events sink secret");
   }
 
   return null;

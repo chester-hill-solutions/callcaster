@@ -43,6 +43,32 @@ function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
+/** Safety bound on catch-up: no rented number should ever accrue this many cycles. */
+const MAX_CATCHUP_CYCLES = 36;
+
+/**
+ * Every rental due date from the anchor (inclusive — the creation-month cycle
+ * is due on the anchor day itself) through `today`. Billing from this list
+ * instead of "is today the anchor day?" means a run that was skipped (worker
+ * down, deploy gap) charges the missed cycle on the next run rather than
+ * leaving it unbilled forever.
+ */
+function elapsedDueDates(anchorDate: string, today: Date): Date[] {
+  const anchor = new Date(anchorDate);
+  anchor.setUTCHours(0, 0, 0, 0);
+  const dues: Date[] = [];
+  const cursor = new Date(
+    Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1),
+  );
+  while (dues.length < MAX_CATCHUP_CYCLES) {
+    const due = getDueDate(anchorDate, cursor);
+    if (due.getTime() > today.getTime()) break;
+    if (due.getTime() >= anchor.getTime()) dues.push(due);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return dues;
+}
+
 function daysBetween(a: Date, b: Date): number {
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.round((b.getTime() - a.getTime()) / msPerDay);
@@ -103,7 +129,8 @@ async function sendNumberRentalReminderEmail(args: {
 
 /**
  * Daily sweep for number rental billing.
- * Called by pg_cron or admin action.
+ * Runs as the self-scheduling `number_rental_billing` worker job (or via
+ * admin action / the CRON_SECRET-gated enqueue route).
  *
  * Note: automatic release of unpaid rented numbers is not implemented yet
  * (`released` is always `0` and `autoReleaseImplemented` is always `false`).
@@ -155,9 +182,8 @@ export async function runNumberRentalBilling(args: {
     const currentMonthDue = getDueDate(anchorDate, today);
     const phoneNumberLabel = number.phone_number ?? number.friendly_name ?? String(number.id);
 
-    // Check if today is the due date
+    // Reminder windows for the upcoming due date (independent of catch-up).
     if (!isSameDay(today, currentMonthDue)) {
-      // Handle reminder windows
       const daysUntilDue = daysBetween(today, currentMonthDue);
       if (REMINDER_WINDOWS_DAYS.includes(daysUntilDue)) {
         try {
@@ -187,26 +213,28 @@ export async function runNumberRentalBilling(args: {
           });
         }
       }
-      continue;
     }
 
-    // Today is the due date — charge or mark unpaid
-    const cycleKey = getCycleKey(today);
-    const idempotencyKey = numberRentalCycleKey(number.id, cycleKey);
+    // Charge every elapsed cycle that has no ledger row yet. This both bills
+    // today's cycle when the run lands on the due date AND catches up cycles
+    // missed while the worker wasn't running (previously a missed anchor day
+    // meant a permanently unbilled month). An unpaid cycle is retried on
+    // every subsequent daily run until the workspace can afford it.
+    for (const dueDate of elapsedDueDates(anchorDate, today)) {
+      const cycleKey = getCycleKey(dueDate);
+      const idempotencyKey = numberRentalCycleKey(number.id, cycleKey);
 
-    // Idempotency is authoritative: if this cycle was already billed on an
-    // earlier (at-least-once) cron run, take no action. Checking the balance
-    // first would be wrong — a re-run after the charge (or any other spend)
-    // dropped the balance below the rental cost would falsely re-mark a paid
-    // number as unpaid.
-    const alreadyBilled = await tdb.transaction_history.findFirst({
-      where: eq(transactionHistoryTable.idempotency_key, idempotencyKey),
-      columns: { id: true },
-    });
+      // Idempotency is authoritative: if this cycle was already billed on an
+      // earlier (at-least-once) run, take no action. Checking the balance
+      // first would be wrong — a re-run after the charge (or any other spend)
+      // dropped the balance below the rental cost would falsely re-mark a paid
+      // number as unpaid.
+      const alreadyBilled = await tdb.transaction_history.findFirst({
+        where: eq(transactionHistoryTable.idempotency_key, idempotencyKey),
+        columns: { id: true },
+      });
+      if (alreadyBilled) continue;
 
-    if (alreadyBilled) {
-      // No-op: already paid this cycle.
-    } else {
       // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
       // failed charge does NOT throw — it would silently drive the balance
       // negative and keep the number active for free. Check funds explicitly
@@ -219,33 +247,31 @@ export async function runNumberRentalBilling(args: {
           workspaceId: number.workspace,
           balance,
           required: NUMBER_RENTAL_MONTHLY_CREDITS,
+          cycleKey,
         });
-      } else {
-        try {
-          await insertTransactionHistoryIdempotent({
-            workspaceId: number.workspace,
-            type: "DEBIT",
-            amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
-            note: `Monthly rental for ${phoneNumberLabel}`,
-            idempotencyKey,
-          });
-          charged++;
-        } catch (error) {
-          unpaid++;
-          logger.error("Number rental charge failed", {
-            numberId: number.id,
-            workspaceId: number.workspace,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        // Later cycles for this number would also be unaffordable.
+        break;
+      }
+
+      try {
+        await insertTransactionHistoryIdempotent({
+          workspaceId: number.workspace,
+          type: "DEBIT",
+          amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
+          note: `Monthly rental for ${phoneNumberLabel} (cycle ${cycleKey})`,
+          idempotencyKey,
+        });
+        charged++;
+      } catch (error) {
+        unpaid++;
+        logger.error("Number rental charge failed", {
+          numberId: number.id,
+          workspaceId: number.workspace,
+          cycleKey,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
-
-    // Check if previous cycle is unpaid and past grace period (+30 days)
-    const previousMonthDue = new Date(currentMonthDue);
-    previousMonthDue.setUTCMonth(previousMonthDue.getUTCMonth() - 1);
-    const previousCycleKey = getCycleKey(previousMonthDue);
-    const previousIdempotencyKey = numberRentalCycleKey(number.id, previousCycleKey);
 
     // Auto-release of numbers with an unpaid previous cycle is not
     // implemented yet — see the `autoReleaseImplemented: false` flag on the

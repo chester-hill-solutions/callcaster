@@ -1,10 +1,25 @@
-import { and, desc, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitChatMessageEvent } from "@/lib/workspace-events.server";
+import { logger } from "@/lib/logger.server";
 
 type MessageRow = typeof messageTable.$inferSelect;
+
+/**
+ * Statuses a message must never regress out of: the outbound billable
+ * terminals plus the inbound terminals. Terminal→terminal transitions
+ * (delivered→read) stay allowed; terminal→non-terminal (a late `sent`
+ * callback overwriting `delivered`) is dropped. Mirrors the call-side guard
+ * in {@link updateCallBySid}. Safe to inline via `sql.raw`: fixed constant,
+ * never user input.
+ */
+const TERMINAL_MESSAGE_STATUSES_SQL = sql.raw(
+  `ARRAY[${["delivered", "failed", "undelivered", "received", "read"]
+    .map((status) => `'${status}'`)
+    .join(", ")}]`,
+);
 
 const DEFAULT_MESSAGE_PAGE_SIZE = 50;
 
@@ -195,10 +210,30 @@ export async function updateMessageBySid(
     limit: 1,
   })) as MessageRow[];
   const existing = existingRows[0] ?? null;
+
+  // Status-transition guard, enforced atomically inside the UPDATE (same
+  // shape as updateCallBySid): keep the row's current status when it is
+  // already terminal and the incoming status is not — out-of-order Twilio
+  // callbacks must not regress delivered/failed back to sent/sending.
+  const set =
+    update.status == null
+      ? update
+      : ({
+          ...update,
+          status: sql`CASE WHEN LOWER(${messageTable.status}) = ANY(${TERMINAL_MESSAGE_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_MESSAGE_STATUSES_SQL}) THEN ${messageTable.status} ELSE ${update.status} END`,
+        } as unknown as Partial<MessageRow>);
+
   const [row] = await tdb.message.update({
-    set: update,
+    set,
     where: eq(messageTable.sid, sid),
   });
+  if (row && update.status != null && row.status !== update.status) {
+    logger.debug("Skipped message status regression", {
+      sid,
+      current: row.status,
+      next: update.status,
+    });
+  }
   if (row) {
     await emitChatMessageEvent(
       workspaceId,

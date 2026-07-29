@@ -11,6 +11,7 @@ import {
   rpcDequeueContact,
 } from "@/lib/db-rpc.server";
 import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { updateCallBySid } from "@/lib/telephony-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { db } from "@/server/db";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
@@ -108,10 +109,15 @@ export async function saveCallToDatabase(
       where: eq(callTable.sid, callData.sid),
     });
     if (existing) {
-      await tdb.call.update({
-        set: row,
-        where: eq(callTable.sid, callData.sid),
-      });
+      // A status callback can land before this post-create write; route the
+      // update through the guarded helper so a terminal status is never
+      // regressed to the create-response status (e.g. `queued`).
+      await updateCallBySid(
+        workspaceId,
+        callData.sid,
+        row as Parameters<typeof updateCallBySid>[2],
+        { tdb },
+      );
       return;
     }
     await tdb.call.insert({
@@ -163,14 +169,13 @@ export type AutoDialerTurnResult =
  * for the campaign and places a call, or completes the conference if the
  * queue is empty.
  *
- * This is the core logic behind the `/api/auto-dial/dialer` route. It is
- * exported here so callers that need to trigger the next dialer turn can
- * invoke it in-process rather than issuing an HTTP self-fetch back to
- * `/api/auto-dial/dialer` — that path matches the Twilio webhook prefix
- * `/api/auto-dial`, so an unsigned self-fetch is rejected with 403 by
- * `requireTwilioSignature` whenever signature validation is enabled (always
- * in production). See app/routes/api+/auto-dial/dialer.action.server.ts and
- * server/twilio-webhook.ts.
+ * Callers that need to trigger the next dialer turn invoke this in-process
+ * rather than issuing an HTTP self-fetch under `/api/auto-dial` — that path
+ * matches the Twilio webhook prefix, so an unsigned self-fetch is rejected
+ * with 403 by `requireTwilioSignature` whenever signature validation is
+ * enabled (always in production). The old public `/api/auto-dial/dialer`
+ * route was deleted in the SEC-02 hardening; the authenticated entry point is
+ * the workspace campaign `dialer/start` action. See server/twilio-webhook.ts.
  */
 export async function runAutoDialerTurn(
   input: AutoDialerTurnInput,
@@ -225,7 +230,6 @@ export async function runAutoDialerTurn(
       // predictive dialer's queue for that contact.
       let toNumber: string;
       let outreach_attempt_id: number;
-      let call: Awaited<ReturnType<typeof createTwilioCall>>;
       try {
         toNumber = normalizePhoneNumber(contactRecord.contact_phone);
         outreach_attempt_id = await createOutreachAttempt(
@@ -234,6 +238,27 @@ export async function runAutoDialerTurn(
           workspace_id,
           user_id,
         );
+      } catch (prepError) {
+        try {
+          await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
+        } catch (revertError) {
+          logger.error(
+            "Failed to release claimed queue contact after auto-dial failure:",
+            revertError,
+          );
+        }
+        throw prepError;
+      }
+
+      // `calls.create` failures split two ways. A Twilio REST error (has a
+      // numeric HTTP `status`) means Twilio rejected the request and no call
+      // exists — requeue so a later turn can retry. Anything else (network
+      // failure, timeout) is AMBIGUOUS: the call may be live and untracked.
+      // Requeueing an ambiguous attempt makes the next dialer turn redial a
+      // contact who may already be on the phone, so park the entry by
+      // dequeueing it with an explicit reason for manual/open-sync review.
+      let call: Awaited<ReturnType<typeof createTwilioCall>>;
+      try {
         call = await createTwilioCall(
           twilioClient,
           toNumber,
@@ -242,8 +267,27 @@ export async function runAutoDialerTurn(
           selected_device ?? "",
         );
       } catch (dialError) {
+        const restStatus = (dialError as { status?: unknown }).status;
+        const callDefinitelyNotCreated =
+          typeof restStatus === "number" && restStatus >= 400;
         try {
-          await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
+          if (callDefinitelyNotCreated) {
+            await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
+          } else {
+            logger.error("auto_dial.ambiguous_dial_parked", {
+              campaignId: campaign_id,
+              queueId: contactRecord.queue_id,
+              contactId: contactRecord.contact_id,
+              outreachAttemptId: outreach_attempt_id,
+            });
+            await rpcDequeueContact(tdb, {
+              contactId: contactRecord.contact_id,
+              groupOnHousehold: false,
+              dequeuedById: user_id,
+              dequeuedReasonText:
+                "Ambiguous dial failure — call may exist at Twilio; parked for review, not redialed",
+            });
+          }
         } catch (revertError) {
           logger.error(
             "Failed to release claimed queue contact after auto-dial failure:",

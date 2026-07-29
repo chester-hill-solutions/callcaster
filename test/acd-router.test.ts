@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(),
   loadWorkspaceTwilioCredentialsForAcd: vi.fn(),
   rpcClaimInboundQueueEntry: vi.fn(),
+  rpcCompleteInboundQueueEntry: vi.fn(),
+  rpcAbandonInboundQueueEntry: vi.fn(),
   hangupTwiml: vi.fn(() => "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>"),
 }));
 
@@ -42,8 +44,10 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcClaimInboundQueueEntry: (...args: unknown[]) =>
     mocks.rpcClaimInboundQueueEntry(...args),
   rpcAcceptInboundOffer: vi.fn(),
-  rpcAbandonInboundQueueEntry: vi.fn(),
-  rpcCompleteInboundQueueEntry: vi.fn(),
+  rpcAbandonInboundQueueEntry: (...args: unknown[]) =>
+    mocks.rpcAbandonInboundQueueEntry(...args),
+  rpcCompleteInboundQueueEntry: (...args: unknown[]) =>
+    mocks.rpcCompleteInboundQueueEntry(...args),
   rpcReleaseInboundOffer: vi.fn(),
 }));
 
@@ -177,5 +181,107 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
         callerNumber: "+15551234567",
       },
     );
+  });
+});
+
+describe("app/lib/acd/acd-router.server handleComplete", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    mocks.adminDb.select.mockReset();
+    mocks.adminDb.execute.mockReset();
+    mocks.validateTwilioWebhookParams.mockReset().mockReturnValue(true);
+    mocks.rpcCompleteInboundQueueEntry.mockReset();
+    mocks.rpcAbandonInboundQueueEntry.mockReset();
+  });
+
+  function makeCompleteRequest(
+    search: Record<string, string>,
+    body: Record<string, string>,
+  ) {
+    const params = new URLSearchParams(search);
+    return new Request(
+      `https://base.example/api/acd-router/complete?${params.toString()}`,
+      {
+        method: "POST",
+        headers: { "x-twilio-signature": "sig" },
+        body: new URLSearchParams(body),
+      },
+    );
+  }
+
+  test("resolves the entry by CallSid + queue_name and completes it on bridged", async () => {
+    mockQueueLookup();
+    mocks.adminDb.execute.mockResolvedValueOnce([
+      {
+        id: 42,
+        queue_id: 1,
+        workspace_id: "w1",
+        call_sid: "CA1",
+        caller_number: "+15551234567",
+        status: "claimed",
+        offered_to_user_id: "agent-1",
+      },
+    ]);
+    const mod = await import("@/lib/acd/acd-router.server");
+
+    const request = makeCompleteRequest(
+      { queue_name: "inbound_q_1" },
+      { CallSid: "CA1", QueueResult: "bridged" },
+    );
+    const res = await asRouteResponse(
+      mod.handleAcdRouterRequest(request, "complete"),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.rpcCompleteInboundQueueEntry).toHaveBeenCalledWith(
+      expect.anything(),
+      42,
+    );
+    expect(mocks.rpcAbandonInboundQueueEntry).not.toHaveBeenCalled();
+  });
+
+  test("abandons the resolved entry on hangup", async () => {
+    mockQueueLookup();
+    mocks.adminDb.execute.mockResolvedValueOnce([
+      {
+        id: 43,
+        queue_id: 1,
+        workspace_id: "w1",
+        call_sid: "CA2",
+        caller_number: "+15551234567",
+        status: "waiting",
+        offered_to_user_id: null,
+      },
+    ]);
+    const mod = await import("@/lib/acd/acd-router.server");
+
+    const request = makeCompleteRequest(
+      { queue_name: "inbound_q_1" },
+      { CallSid: "CA2", QueueResult: "hangup" },
+    );
+    const res = await asRouteResponse(
+      mod.handleAcdRouterRequest(request, "complete"),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.rpcAbandonInboundQueueEntry).toHaveBeenCalledWith(
+      expect.anything(),
+      43,
+    );
+  });
+
+  test("fails closed with 403 when no workspace can be resolved", async () => {
+    mocks.adminDb.select.mockImplementation(() => ({
+      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+    }));
+    const mod = await import("@/lib/acd/acd-router.server");
+
+    const request = makeCompleteRequest(
+      { queue_name: "inbound_q_999" },
+      { CallSid: "CA3", QueueResult: "bridged" },
+    );
+    const res = await asRouteResponse(
+      mod.handleAcdRouterRequest(request, "complete"),
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.rpcCompleteInboundQueueEntry).not.toHaveBeenCalled();
   });
 });

@@ -465,7 +465,7 @@ CREATE FUNCTION public.call_edge_function() RETURNS void
     AS $$
 declare
   edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/dequeue_contacts';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+  api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
 begin
   perform net.http_post(
     url := edge_function_url,
@@ -488,7 +488,7 @@ CREATE FUNCTION public.call_outreach_webhook() RETURNS trigger
     AS $$DECLARE
   payload jsonb;
   edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/outreach-attempt-hook';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+  api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
   
 BEGIN
   payload := jsonb_build_object(
@@ -517,7 +517,7 @@ CREATE FUNCTION public.campaign_is_active_change() RETURNS trigger
     AS $$DECLARE
   payload jsonb;
   edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/handle_active_change';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+  api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
 BEGIN
     IF OLD.is_active IS DISTINCT FROM NEW.is_active THEN
       payload := jsonb_build_object(
@@ -3616,7 +3616,7 @@ CREATE FUNCTION public.notify_campaign_active() RETURNS trigger
 DECLARE
   payload jsonb;
   edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/handle_active_change';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+  api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
 BEGIN
   payload := jsonb_build_object(
     'type', TG_OP,
@@ -3648,7 +3648,7 @@ CREATE FUNCTION public.notify_schedule_change() RETURNS trigger
 DECLARE
   payload jsonb;
   edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/create_schedule_jobs';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+  api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
 BEGIN
   payload := jsonb_build_object(
     'type', TG_OP,
@@ -3706,7 +3706,7 @@ max_retries constant int := 3;
 visibility_timeout constant int := 60; -- 1 minute
 batch_size constant int := 10;
 edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1';
-api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
 retry_count int;
 has_more boolean := true;
 total_processed int := 0;
@@ -3840,7 +3840,7 @@ declare
   max_retries constant int := 3;
   visibility_timeout constant int := 300; -- 5 minutes
   edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/ivr-handler';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+  api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
   retry_count int;
   has_more boolean := true;
   total_processed int := 0;
@@ -3974,7 +3974,7 @@ declare
   max_retries constant int := 3;
   visibility_timeout constant int := 300; -- 5 minutes
   edge_function_url text := 'https://nolrdvpusfcsjihzhnlp.client.co/functions/v1/sms-handler';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbHJkdnB1c2Zjc2ppaHpobmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNTE4NDAwMCwiZXhwIjoyMDMwNzYwMDAwfQ.r346il-1piEsHSS8ji-Iy9gvtEk_IHZlj2oeqV23iaY';
+  api_key text := 'legacy-supabase-service-role-key-removed-and-rotated';
   retry_count int;
   has_more boolean := true;
   total_processed int := 0;

@@ -11,6 +11,7 @@ const API_DIR = join(ROOT, "app/routes/api+");
 
 const VALIDATION_PATTERNS = [
   /requireTwilioSignature/,
+  /requireTwilioEventsSinkSecret/,
   /validateTwilioWebhook/,
   /validateWorkspaceTwilioWebhook/,
   /requireWorkspaceAccess/,
@@ -60,6 +61,7 @@ const TWILIO_WEBHOOK_SUFFIXES = [
   "ivr/$campaignId/$pageId/$blockId.action.server.ts",
   "ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
   "twilio/trusthub/status.action.server.ts",
+  "twilio/a2p/events.action.server.ts",
 ];
 
 function collectActionFiles(dir, prefix = "") {

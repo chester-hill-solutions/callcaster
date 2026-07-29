@@ -8,7 +8,11 @@ export type AuthRateLimitScope =
   | "auth:register"
   | "auth:token"
   | "auth:refresh"
-  | "auth:forgot-password";
+  | "auth:forgot-password"
+  | "auth:sign-in"
+  | "auth:catch-all"
+  | "auth:reset-password"
+  | "auth:verify-email";
 
 const LIMITS: Record<
   AuthRateLimitScope,
@@ -18,6 +22,13 @@ const LIMITS: Record<
   "auth:token": { limit: 30, windowMs: 60_000 },
   "auth:refresh": { limit: 60, windowMs: 60_000 },
   "auth:forgot-password": { limit: 10, windowMs: 60_000 },
+  // Credential + TOTP guesses via the Better Auth handler.
+  "auth:sign-in": { limit: 10, windowMs: 60_000 },
+  // Remaining Better Auth POSTs (sign-out, session revoke, …).
+  "auth:catch-all": { limit: 30, windowMs: 60_000 },
+  "auth:reset-password": { limit: 10, windowMs: 60_000 },
+  // Unauthenticated OTP verification — 6-digit codes are guessable.
+  "auth:verify-email": { limit: 10, windowMs: 60_000 },
 };
 
 export async function enforceAuthRateLimit(

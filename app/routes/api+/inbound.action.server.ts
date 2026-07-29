@@ -230,9 +230,11 @@ async function handleInboundAction(
       CallSid: data.CallSid,
       queueId: number.inbound_queue_id,
     });
+    // The queue entry does not exist yet, so no entry_id can go in the action
+    // URL — /complete resolves the entry by CallSid + queue_name instead.
     const enqueue = twiml.enqueue({
       waitUrl: `${acdUrl}?queue_id=${number.inbound_queue_id}&CallSid=${data.CallSid}&From=${data.From || ""}`,
-      action: `${acdUrl}/complete?entry_id=0&queue_name=${queueName}`,
+      action: `${acdUrl}/complete?queue_name=${queueName}`,
     });
     enqueue.queue(queueName);
     return new Response(twiml.toString(), {
