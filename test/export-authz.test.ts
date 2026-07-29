@@ -8,7 +8,9 @@ vi.hoisted(() => {
 import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { setDualAuthSession } from "./helpers/route-auth-mock";
 
-const requireWorkspaceAccess = vi.fn(async () => undefined);
+const requireWorkspaceAccess = vi.hoisted(() =>
+  vi.fn(async () => undefined),
+);
 
 vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
@@ -46,12 +48,19 @@ vi.mock("@/lib/object-storage.server", () => ({
   downloadObject: vi.fn(async () => Buffer.from(JSON.stringify({ status: "processing" }))),
 }));
 
-vi.mock("@/lib/database/workspace.server", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/database/workspace.server")
-  >("@/lib/database/workspace.server");
-  return { ...actual, requireWorkspaceAccess };
-});
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    requireWorkspaceAccess(...args),
+}));
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+  requireDataPlaneRouteCapability: async (
+    _context: unknown,
+    workspaceId: string,
+  ) => ({ workspaceId, auth: { workspaceId, userId: "u1" } }),
+}));
 
 function buildMockDb() {
   const mockClient: any = {

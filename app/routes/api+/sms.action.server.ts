@@ -17,6 +17,7 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { campaignSmsDispatchBodySchema } from "@/lib/schemas/api/sms";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
@@ -264,6 +265,15 @@ export const action = defineAction({
       await requireWorkspaceAccess({user: authResult.user,
         workspaceId: workspace_id,
       });
+    }
+
+    const capability = await requireDualAuthCapability({
+      auth: authResult,
+      workspaceId: workspace_id,
+      capability: "campaigns.dispatch",
+    });
+    if (capability instanceof Response) {
+      return capability;
     }
 
     // Fail-closed credit gate: check once at entry for the whole batch

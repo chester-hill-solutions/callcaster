@@ -2,7 +2,13 @@ import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { resolveDualAuthSession } from "@/lib/api-auth.server";
+import {
+  resolveDualAuthSession,
+  type ApiKeyAuthResult,
+  type BearerSessionAuthResult,
+  type SessionAuthResult,
+} from "@/lib/api-auth.server";
+import { requireAudienceWorkspaceAccess } from "@/lib/audience-api-auth.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import {
@@ -20,7 +26,11 @@ type AudiencesDeps = {
   verifyAuth: (
     request: Request,
   ) => Promise<{
-    auth?: { authType: string; workspaceId?: string };
+    auth?:
+      | ApiKeyAuthResult
+      | BearerSessionAuthResult
+      | SessionAuthResult
+      | { authType: string; workspaceId?: string };
     headers: Headers;
     user?: { id: string };
   }>;
@@ -30,27 +40,6 @@ type AudiencesDeps = {
     workspaceId: string;
   }) => Promise<void>;
 };
-
-async function requireAudienceWorkspaceAccess(args: {
-  auth?: { authType: string; workspaceId?: string };
-  user?: { id: string };
-  workspaceId: string;
-  requireWorkspaceAccess: AudiencesDeps["requireWorkspaceAccess"];
-}) {
-  if (args.auth?.authType === "api_key") {
-    if (args.auth.workspaceId !== args.workspaceId) {
-      throw new AppError("Unauthorized", 403);
-    }
-    return;
-  }
-  if (!args.user) {
-    throw new AppError("Unauthorized", 401);
-  }
-  await args.requireWorkspaceAccess({
-    user: args.user,
-    workspaceId: args.workspaceId,
-  });
-}
 
 export const action = defineAction({
   sideEffects: ["db-write"],
@@ -94,6 +83,7 @@ export const action = defineAction({
         auth,
         user,
         workspaceId,
+        capability: "campaigns.write",
         requireWorkspaceAccess: d.requireWorkspaceAccess,
       });
 
@@ -124,6 +114,7 @@ export const action = defineAction({
         auth,
         user,
         workspaceId,
+        capability: "campaigns.write",
         requireWorkspaceAccess: d.requireWorkspaceAccess,
       });
 
@@ -134,6 +125,9 @@ export const action = defineAction({
       response = { success: true };
     }
   } catch (error) {
+    if (error instanceof Response) {
+      return error;
+    }
     if (error instanceof AppError) {
       return routeData({ error: error.message }, { status: error.statusCode, headers });
     }

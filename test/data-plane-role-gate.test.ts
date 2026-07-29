@@ -10,6 +10,7 @@ vi.hoisted(() => {
 const mocks = vi.hoisted(() => ({
   verifyApiKeyOrSession: vi.fn(),
   requireWorkspaceAccess: vi.fn(),
+  getUserRole: vi.fn(),
   deleteContactApi: vi.fn(),
   getContactDetailApi: vi.fn(),
   patchCampaignQueueApi: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: (...a: unknown[]) =>
     mocks.requireWorkspaceAccess(...a),
+  getUserRole: (...a: unknown[]) => mocks.getUserRole(...a),
   fetchConversationSummary: vi.fn(),
 }));
 
@@ -75,6 +77,8 @@ function forbidBelowMember() {
 
 function allowAccess() {
   mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
+  // Capability gate resolves session capabilities from role matrix.
+  mocks.getUserRole.mockResolvedValue({ role: "member" });
 }
 
 describe("data-plane mutation role gate (authForContact / authForCampaign)", () => {

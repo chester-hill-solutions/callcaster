@@ -9,6 +9,7 @@ import { parseOptionalString } from "@/lib/parse-utils.server";
 import { sendMessage } from "@/lib/chat-sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { chatSmsBodySchema } from "@/lib/schemas/api/chat-sms";
 import type { TwilioMessageIntent } from "@/lib/types";
 import { eq } from "drizzle-orm";
@@ -142,6 +143,15 @@ export const action = defineAction({
     await requireWorkspaceAccess({user: authResult.user,
       workspaceId: workspace_id,
     });
+  }
+
+  const capability = await requireDualAuthCapability({
+    auth: authResult,
+    workspaceId: workspace_id,
+    capability: "messages.send",
+  });
+  if (capability instanceof Response) {
+    return capability;
   }
 
   // Fail-closed credit gate: reject sends when the balance is unknown or

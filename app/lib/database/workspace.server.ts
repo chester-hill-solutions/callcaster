@@ -1,7 +1,7 @@
 /**
  * Workspace-related database functions
  */
-import Twilio from "twilio";
+import type Twilio from "twilio";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   audience,
@@ -13,7 +13,7 @@ import {
 } from "@/db/schema";
 import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
-import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
+import type { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
@@ -33,8 +33,6 @@ import {
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { data as routeData } from "react-router";
-import { auth } from "@/server/auth-instance";
-import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 import {
   addUserToWorkspace,
@@ -52,6 +50,11 @@ export {
 };
 
 type DbQueryError = { message: string; code?: string; details?: string };
+
+async function loadTwilioSdk() {
+  const { default: TwilioSdk } = await import("twilio");
+  return TwilioSdk;
+}
 
 function toDbError(error: unknown): DbQueryError {
   if (error instanceof Error) {
@@ -125,7 +128,8 @@ export async function createKeys({
   sid: string;
   token: string;
 }): Promise<NewKeyInstance> {
-  const twilio = new Twilio.Twilio(sid, token);
+  const TwilioSdk = await loadTwilioSdk();
+  const twilio = new TwilioSdk.Twilio(sid, token);
   try {
     const newKey = await twilio.newKeys.create({ friendlyName: workspace_id });
     return newKey;
@@ -140,7 +144,8 @@ export async function createSubaccount({
 }: {
   workspace_id: string;
 }) {
-  const twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
+  const TwilioSdk = await loadTwilioSdk();
+  const twilio = new TwilioSdk.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
   const account = await twilio.api.v2010.accounts
     .create({
       friendlyName: workspace_id,
@@ -386,11 +391,16 @@ export async function handleNewUserOTPVerification(
   type: "signup" | "invite" | "magiclink" | "recovery" | "email_change",
   headers: Headers,
 ) {
+  void type;
   if (!token_hash) {
     return routeData({ error: "Invalid invitation link" }, { headers });
   }
 
   try {
+    const [{ auth }, { mergeBetterAuthSetCookieHeaders }] = await Promise.all([
+      import("@/server/auth-instance"),
+      import("@/lib/better-auth-headers.server"),
+    ]);
     const result = (await auth.api.verifyEmail({
       query: { token: token_hash },
       headers: request.headers,
@@ -478,10 +488,11 @@ export async function createWorkspaceTwilioInstance({
   // Twilio SDK API-key auth: `new Twilio(apiKey, apiSecret, { accountSid })`.
   const apiKey = typeof data.key === "string" ? data.key.trim() : "";
   const apiSecret = typeof data.token === "string" ? data.token.trim() : "";
+  const TwilioSdk = await loadTwilioSdk();
   const twilio =
     apiKey && apiSecret
-      ? new Twilio.Twilio(apiKey, apiSecret, { accountSid: creds.sid })
-      : new Twilio.Twilio(creds.sid, creds.authToken);
+      ? new TwilioSdk.Twilio(apiKey, apiSecret, { accountSid: creds.sid })
+      : new TwilioSdk.Twilio(creds.sid, creds.authToken);
 
   workspaceTwilioClientCache.set(workspace_id, {
     client: twilio,

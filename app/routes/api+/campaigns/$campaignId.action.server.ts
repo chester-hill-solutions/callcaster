@@ -1,4 +1,5 @@
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import {
@@ -19,6 +20,9 @@ export const loader = defineLoader({
 
     const auth = await authForCampaign(request, campaignId);
     if (auth instanceof Response) return auth;
+
+    const capability = await requireDataPlaneCapability(auth, "campaigns.read");
+    if (capability instanceof Response) return capability;
 
     return { ...auth, campaignId };
   },
@@ -47,6 +51,9 @@ export const action = defineAction({
     // mutations: require at least `member`, blocking the `caller` role.
     const auth = await authForCampaign(request, campaignId, "member");
     if (auth instanceof Response) return auth;
+
+    const capability = await requireDataPlaneCapability(auth, "campaigns.write");
+    if (capability instanceof Response) return capability;
 
     return { ...auth, campaignId };
   },

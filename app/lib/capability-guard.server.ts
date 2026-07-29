@@ -5,13 +5,16 @@ import {
   type AuthorizationActor,
 } from "@chester-hill-solutions/auth";
 import { createRequireCapability } from "@chester-hill-solutions/auth-react-router";
+import type { RouterContextProvider, LoaderFunctionArgs } from "react-router";
 import {
   apiKeyActorFromScopes,
   sessionActorFromMembership,
 } from "@/lib/capability-actor.server";
 import type { ProductCapabilityId } from "@/lib/capabilities";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { getUserRole } from "@/lib/database/workspace.server";
-import { jsonError } from "@/lib/platform-api.server";
+import { defineLoader } from "@/lib/handler.server";
+import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
 import type {
   ApiKeyAuthResult,
@@ -83,6 +86,83 @@ export async function requireDataPlaneCapability(
     }
     throw error;
   }
+}
+
+/**
+ * Resolve data-plane auth context and require a product capability.
+ * Returns `{ workspaceId, auth }` or a 403/404 Response.
+ */
+export async function requireDataPlaneRouteCapability(
+  context: Readonly<RouterContextProvider>,
+  workspaceId: string,
+  capability: ProductCapabilityId,
+): Promise<{ workspaceId: string; auth: DataPlaneAuthContextValue } | Response> {
+  const auth = getDataPlaneRouteContext(context, workspaceId);
+  const gated = await requireDataPlaneCapability(auth, capability);
+  if (gated instanceof Response) {
+    return gated;
+  }
+  return { workspaceId, auth };
+}
+
+/**
+ * Handler-factory auth strategy for data-plane loaders/actions that only need
+ * `workspaceId` + a product capability. Prefer this over inlining the same
+ * workspaceId check + {@link requireDataPlaneRouteCapability} call.
+ */
+export function dataPlaneCapabilityAuth(capability: ProductCapabilityId) {
+  return async ({
+    params,
+    context,
+  }: Pick<LoaderFunctionArgs, "params" | "context">) => {
+    const workspaceId = params.workspaceId;
+    if (!workspaceId) {
+      return jsonError("workspaceId is required", 400);
+    }
+    return requireDataPlaneRouteCapability(context, workspaceId, capability);
+  };
+}
+
+/**
+ * Auth strategy that gates on a capability then attaches one extra route param.
+ */
+export function dataPlaneCapabilityAuthWithParam<P extends string>(
+  capability: ProductCapabilityId,
+  paramName: P,
+) {
+  const base = dataPlaneCapabilityAuth(capability);
+  return async (args: Pick<LoaderFunctionArgs, "params" | "context">) => {
+    const value = args.params[paramName];
+    if (!value) {
+      return jsonError(`workspaceId and ${paramName} are required`, 400);
+    }
+    const gated = await base(args);
+    if (gated instanceof Response) return gated;
+    return Object.assign(gated, { [paramName]: value } as Record<P, string>);
+  };
+}
+
+type ListFail = { ok: false; error: string; status: number };
+
+/** Shared defineLoader shape for workspace-scoped list endpoints. */
+export function defineDataPlaneListLoader<K extends string>(config: {
+  capability: ProductCapabilityId;
+  key: K;
+  list: (
+    workspaceId: string,
+  ) => Promise<({ ok: true } & Record<K, unknown>) | ListFail>;
+}) {
+  return defineLoader({
+    auth: dataPlaneCapabilityAuth(config.capability),
+    sideEffects: ["db-read"],
+    handler: async ({ auth }) => {
+      const result = await config.list(auth.workspaceId);
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+      return jsonResponse({ [config.key]: result[config.key] }, 200);
+    },
+  });
 }
 
 /**

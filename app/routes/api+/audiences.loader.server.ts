@@ -7,15 +7,25 @@ import {
   listAudienceContactsForExport,
   listAudienceContactsJson,
 } from "@/lib/database/contact-audience.server";
-import { resolveDualAuthSession } from "@/lib/api-auth.server";
+import {
+  resolveDualAuthSession,
+  type ApiKeyAuthResult,
+  type BearerSessionAuthResult,
+  type SessionAuthResult,
+} from "@/lib/api-auth.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
+import { requireAudienceWorkspaceAccess } from "@/lib/audience-api-auth.server";
 import { AppError } from "@/lib/errors.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 type AudiencesDeps = {
   verifyAuth: (request: Request) => Promise<{
-    auth?: { authType: string; workspaceId?: string };
+    auth?:
+      | ApiKeyAuthResult
+      | BearerSessionAuthResult
+      | SessionAuthResult
+      | { authType: string; workspaceId?: string };
     user?: { id: string };
     headers: Headers;
   }>;
@@ -39,27 +49,6 @@ const AUDIENCE_CONTACT_SORT_KEYS = new Set([
   "country",
   "created_at",
 ]);
-
-async function requireAudienceWorkspaceAccess(args: {
-  auth?: { authType: string; workspaceId?: string };
-  user?: { id: string };
-  workspaceId: string;
-  requireWorkspaceAccess: AudiencesDeps["requireWorkspaceAccess"];
-}) {
-  if (args.auth?.authType === "api_key") {
-    if (args.auth.workspaceId !== args.workspaceId) {
-      throw new AppError("Unauthorized", 403);
-    }
-    return;
-  }
-  if (!args.user) {
-    throw new AppError("Unauthorized", 401);
-  }
-  await args.requireWorkspaceAccess({
-    user: args.user,
-    workspaceId: args.workspaceId,
-  });
-}
 
 function flattenAudienceExportRows(rawData: Array<Record<string, unknown>>) {
   return rawData.map((row) => {
@@ -127,6 +116,7 @@ export const loader = defineLoader({
           auth,
           user,
           workspaceId: audienceWorkspace,
+          capability: "campaigns.read",
           requireWorkspaceAccess: d.requireWorkspaceAccess,
         });
 
@@ -184,12 +174,16 @@ export const loader = defineLoader({
         auth,
         user,
         workspaceId: resolvedWorkspaceId,
+        capability: "campaigns.read",
         requireWorkspaceAccess: d.requireWorkspaceAccess,
       });
 
       const data = await listAudienceContactsJson(parsedAudienceId);
       return routeData({ data }, { headers });
     } catch (error) {
+      if (error instanceof Response) {
+        return error;
+      }
       logger.error("Error fetching contact audience data:", error);
       if (error instanceof AppError) {
         return routeData({ error: error.message }, { status: error.statusCode, headers });

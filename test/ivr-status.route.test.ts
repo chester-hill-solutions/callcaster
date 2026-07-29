@@ -24,6 +24,7 @@ const telephonyDbMocks = vi.hoisted(() => ({
 
 const campaignIvrMocks = vi.hoisted(() => ({
   fetchCampaignWithScript: vi.fn(),
+  resolveCampaignScript: vi.fn((campaign: any) => campaign?.script ?? null),
 }));
 
 const callStatusMocks = vi.hoisted(() => ({
@@ -55,13 +56,10 @@ vi.mock("@/lib/telephony-db.server", () => ({
   updateOutreachAttemptForWorkspace: (...args: any[]) =>
     telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
 }));
-vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    fetchCampaignWithScript: (...args: any[]) => campaignIvrMocks.fetchCampaignWithScript(...args),
-  };
-});
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignWithScript: (...args: any[]) => campaignIvrMocks.fetchCampaignWithScript(...args),
+  resolveCampaignScript: (...args: any[]) => campaignIvrMocks.resolveCampaignScript(...args),
+}));
 vi.mock("@/lib/twilio-call-status.server", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
@@ -123,6 +121,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     telephonyDbMocks.upsertCallBySid.mockReset();
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
     campaignIvrMocks.fetchCampaignWithScript.mockReset();
+    campaignIvrMocks.resolveCampaignScript.mockReset();
     callStatusMocks.persistCallStatusFromParams.mockReset();
     objectStorageMocks.createSignedObjectUrl.mockReset();
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
@@ -132,6 +131,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       ...update,
     }));
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValue(makeCampaign({ type: "robocall" }));
+    campaignIvrMocks.resolveCampaignScript.mockImplementation((campaign: any) => campaign?.script ?? null);
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValue({});
     callStatusMocks.persistCallStatusFromParams.mockResolvedValue(undefined);
     objectStorageMocks.createSignedObjectUrl.mockResolvedValue("https://signed");

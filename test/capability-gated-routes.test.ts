@@ -34,6 +34,10 @@ vi.mock("@/lib/audit-event.server", () => ({
     mocks.safeRecordWorkspaceAuditEvent(...args),
 }));
 
+vi.mock("@/lib/twilio-twiml.server", () => ({
+  pauseTwiml: () => "<Response><Pause/></Response>",
+}));
+
 describe("capability-gated data-plane routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -171,5 +175,61 @@ describe("capability-gated data-plane routes", () => {
     );
 
     expect(res.status).toBe(200);
+  });
+
+  test("campaigns list rejects API key missing campaigns.read", async () => {
+    const mod = await import(
+      "../app/routes/api+/workspaces+/$workspaceId/campaigns.route"
+    );
+    const res = await asRouteResponse(
+      mod.loader(
+        await withDataPlaneRouteArgs(
+          {
+            request: new Request(
+              "http://localhost/api/workspaces/w1/campaigns",
+            ),
+            params: { workspaceId: "w1" },
+          },
+          {
+            userId: null,
+            apiKey: { keyId: "k1", scopes: ["messages.send"] },
+          },
+        ),
+      ),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  test("members invite rejects API key missing members.invite", async () => {
+    const mod = await import(
+      "../app/routes/api+/workspaces+/$workspaceId/members.route"
+    );
+    const res = await asRouteResponse(
+      mod.action(
+        await withDataPlaneRouteArgs(
+          {
+            request: new Request(
+              "http://localhost/api/workspaces/w1/members",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: "a@example.com",
+                  role: "caller",
+                }),
+              },
+            ),
+            params: { workspaceId: "w1" },
+          },
+          {
+            userId: null,
+            apiKey: { keyId: "k1", scopes: ["campaigns.read"] },
+          },
+        ),
+      ),
+    );
+
+    expect(res.status).toBe(403);
   });
 });

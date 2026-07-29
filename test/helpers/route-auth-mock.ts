@@ -38,6 +38,17 @@ function buildDualAuth(session: RouteAuthSessionInput) {
   return {
     authType: "api_key" as const,
     workspaceId: "w-test",
+    keyId: "k-test",
+    scopes: [
+      "campaigns.read",
+      "campaigns.write",
+      "campaigns.dispatch",
+      "messages.send",
+      "calls.start",
+      "calls.control",
+      "members.invite",
+      "audit.read",
+    ],
   };
 }
 

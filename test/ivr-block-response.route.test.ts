@@ -41,27 +41,24 @@ const ivrTestState = vi.hoisted(() => ({
   outreachError: null as Error | null,
 }));
 
-vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
-  return {
-    ...actual,
-    fetchCampaignWithScript: vi.fn(async () => {
-      if (ivrTestState.campaignError) {
-        throw ivrTestState.campaignError;
-      }
-      return (
-        ivrTestState.campaignData ?? {
-          script: {
-            steps: {
-              pages: { page_1: { blocks: ["block_1"] } },
-              blocks: { block_1: { id: "block_1", options: [] } },
-            },
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignWithScript: vi.fn(async () => {
+    if (ivrTestState.campaignError) {
+      throw ivrTestState.campaignError;
+    }
+    return (
+      ivrTestState.campaignData ?? {
+        script: {
+          steps: {
+            pages: { page_1: { blocks: ["block_1"] } },
+            blocks: { block_1: { id: "block_1", options: [] } },
           },
-        }
-      );
-    }),
-  };
-});
+        },
+      }
+    );
+  }),
+  ivrScriptStepsFromCampaign: (campaign: any) => campaign?.script?.steps ?? null,
+}));
 
 vi.mock("twilio", () => {
   class VoiceResponse {
@@ -218,7 +215,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", SpeechResult: "hello world" }),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
 
     // no match => nextLocation => page_: blockId path
     mocks.createClient.mockReturnValueOnce(
@@ -277,7 +274,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
 
     // missing stepsValue => say error message
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData: { script: { steps: null } } }));
@@ -322,7 +319,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_2", blockId: "b2" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
 
     // handleNextStep final else redirect (nextStep is block id)
     const script2 = {
@@ -401,7 +398,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
 
     // call not found
     mocks.createClient.mockReturnValueOnce(
@@ -411,7 +408,6 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("hangup");
+    expect(await res.text()).toMatch(/hangup/i);
   });
 });
-

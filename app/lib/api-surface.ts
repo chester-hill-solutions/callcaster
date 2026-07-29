@@ -45,6 +45,7 @@ type Op = {
   method: HttpMethod;
   handler: "loader" | "action";
   bodyType: BodyType;
+  capability?: string;
 };
 
 type Seed = {
@@ -331,7 +332,14 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "publicSdk",
     docsGuide: "docs/api-create-campaign-with-script.md",
     workspaceScoped: true,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    operations: [
+      {
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "campaigns.write",
+      },
+    ],
   }),
   seed({
     path: "/api/chat_sms",
@@ -341,7 +349,14 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "publicSdk",
     docsGuide: "docs/api-send-sms.md",
     workspaceScoped: true,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    operations: [
+      {
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "messages.send",
+      },
+    ],
   }),
   seed({
     path: "/api/connect-campaign-conference/:workspaceId/:campaignId",
@@ -807,7 +822,14 @@ export const API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "publicSdk",
     docsGuide: "docs/api-send-sms.md",
     workspaceScoped: true,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+    operations: [
+      {
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "campaigns.dispatch",
+      },
+    ],
   }),
   seed({
     path: "/api/sms/status",

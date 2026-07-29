@@ -12,6 +12,12 @@ const mocks = vi.hoisted(() => ({
   ensureWorkspaceTwilioBootstrap: vi.fn(),
   provisionWorkspaceA2P: vi.fn(),
   updateWorkspaceRcsOnboarding: vi.fn(),
+  triggerTwilioOpenSync: vi.fn(),
+  auditWorkspaceTwilioWebhooks: vi.fn(),
+  syncWorkspaceA2pStatus: vi.fn(),
+  attachWorkspaceRcsSenderToPool: vi.fn(),
+  verifyWorkspaceMessagingSenderPool: vi.fn(),
+  enqueueWorkspaceComplianceJob: vi.fn(),
   logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
 }));
 
@@ -42,6 +48,27 @@ vi.mock("../app/lib/twilio-bootstrap.server", () => ({
 
 vi.mock("../app/lib/twilio-a2p.server", () => ({
   provisionWorkspaceA2P: (...args: any[]) => mocks.provisionWorkspaceA2P(...args),
+}));
+
+vi.mock("../app/lib/twilio-open-sync.server", () => ({
+  triggerTwilioOpenSync: (...args: any[]) => mocks.triggerTwilioOpenSync(...args),
+}));
+
+vi.mock("../app/lib/twilio-webhook-audit.server", () => ({
+  auditWorkspaceTwilioWebhooks: (...args: any[]) => mocks.auditWorkspaceTwilioWebhooks(...args),
+}));
+
+vi.mock("../app/lib/twilio-a2p-status-sync.server", () => ({
+  syncWorkspaceA2pStatus: (...args: any[]) => mocks.syncWorkspaceA2pStatus(...args),
+}));
+
+vi.mock("../app/lib/twilio-sender-pool.server", () => ({
+  attachWorkspaceRcsSenderToPool: (...args: any[]) => mocks.attachWorkspaceRcsSenderToPool(...args),
+  verifyWorkspaceMessagingSenderPool: (...args: any[]) => mocks.verifyWorkspaceMessagingSenderPool(...args),
+}));
+
+vi.mock("../app/lib/worker/handlers.server", () => ({
+  enqueueWorkspaceComplianceJob: (...args: any[]) => mocks.enqueueWorkspaceComplianceJob(...args),
 }));
 
 vi.mock("../app/lib/rcs-onboarding.server", () => ({

@@ -33,8 +33,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("twilio", () => ({
-  default: { Twilio: twilioCtor },
+vi.mock("twilio/lib/rest/Twilio.js", () => ({
+  default: twilioCtor,
 }));
 vi.mock("@/lib/platform-workspace-numbers.server", () => ({
   purchaseWorkspaceNumber: (...args: unknown[]) =>

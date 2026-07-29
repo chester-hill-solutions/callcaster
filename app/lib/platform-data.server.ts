@@ -221,7 +221,8 @@ export async function authForCampaign(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getCampaignWorkspaceId(campaignId);
+  }
+  const workspaceId = await getCampaignWorkspaceId(campaignId);
   if (!workspaceId) {
     return jsonError("Campaign not found", 404);
   }
@@ -230,8 +231,7 @@ export async function authForCampaign(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Campaign not found", 404);
     }
-    // Workspace-scoped API keys retain full data-plane access; role gating
-    // applies to session (member) auth only. Capability gates are opt-in per route.
+    // Capability gates are applied by route handlers via requireDataPlaneCapability.
     return {
       userId: null,
       workspaceId,
@@ -252,7 +252,8 @@ export async function authForContact(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getContactWorkspaceId(contactId);
+  }
+  const workspaceId = await getContactWorkspaceId(contactId);
   if (!workspaceId) {
     return jsonError("Contact not found", 404);
   }
@@ -261,8 +262,7 @@ export async function authForContact(
     if (auth.workspaceId !== workspaceId) {
       return jsonError("Contact not found", 404);
     }
-    // Workspace-scoped API keys retain full data-plane access; role gating
-    // applies to session (member) auth only. Capability gates are opt-in per route.
+    // Capability gates are applied by route handlers via requireDataPlaneCapability.
     return {
       userId: null,
       workspaceId,
@@ -282,7 +282,8 @@ export async function authForScript(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getScriptWorkspaceId(scriptId);
+  }
+  const workspaceId = await getScriptWorkspaceId(scriptId);
   if (!workspaceId) {
     return jsonError("Script not found", 404);
   }
@@ -312,7 +313,8 @@ export async function authForSurvey(
   const auth = await verifyApiKeyOrSession(request);
   if ("error" in auth) {
     return jsonError(auth.error, auth.status);
-  }  const workspaceId = await getSurveyWorkspaceId(surveyId);
+  }
+  const workspaceId = await getSurveyWorkspaceId(surveyId);
   if (!workspaceId) {
     return jsonError("Survey not found", 404);
   }

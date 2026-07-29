@@ -10,6 +10,7 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   listWorkspaceAudiencesApi: vi.fn(),
+  getUserRole: vi.fn(),
 }));
 
 vi.mock("@/lib/platform-data.server", () => ({
@@ -17,9 +18,14 @@ vi.mock("@/lib/platform-data.server", () => ({
     mocks.listWorkspaceAudiencesApi(...args),
 }));
 
+vi.mock("@/lib/database/workspace.server", () => ({
+  getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
+}));
+
 describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getUserRole.mockResolvedValue({ role: "member" });
   });
 
   test("lists audiences for an authorized workspace", async () => {
@@ -60,7 +66,10 @@ describe("app/routes/api+/workspaces/$workspaceId/audiences/route.tsx", () => {
             request: new Request("http://localhost/api/workspaces/w1/audiences"),
             params: { workspaceId: "w1" },
           },
-          { userId: null },
+          {
+            userId: null,
+            apiKey: { keyId: "k1", scopes: ["campaigns.read"] },
+          },
         ),
       ),
     );

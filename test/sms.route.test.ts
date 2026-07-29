@@ -72,6 +72,12 @@ vi.mock("@/lib/recipient-calling-window", () => ({
   isWithinRecipientCallingWindow: vi.fn(() => true),
 }));
 
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+}));
+
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: any[]) => mocks.verifyApiKeyOrSession(...args),
 }));
@@ -284,6 +290,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue(defaultPortalConfig);
     mocks.rpcCreateOutreachAttempt.mockResolvedValue("oa1");
@@ -637,7 +645,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("message.sid falsy uses failed-* fallback", async () => {
-    vi.spyOn(Date, "now").mockReturnValueOnce(123);
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(123);
     currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
@@ -658,7 +666,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(tenantDbStubState.messageInsertCalls[0]?.sid).toBe("failed-+15551234567-123");
-    (Date.now as any).mockRestore?.();
+    dateNowSpy.mockRestore();
   });
 
   test("uses messaging service and explicit message intent overrides", async () => {
@@ -870,6 +878,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
@@ -890,6 +900,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
       client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
@@ -921,4 +933,3 @@ describe("app/routes/api+/sms/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });
 });
-

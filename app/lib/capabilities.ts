@@ -6,12 +6,14 @@
  * Keep this module free of server-only package imports — UI may import it.
  */
 export const PRODUCT_CAPABILITIES = {
-  "campaigns.read": "Read campaigns and queue state",
-  "campaigns.write": "Create and update campaigns",
-  "campaigns.dispatch": "Activate automated campaign dispatch",
+  "campaigns.read":
+    "Read campaigns, queue, contacts, audiences, scripts, surveys, conversations, and workspace metadata",
+  "campaigns.write":
+    "Create and update campaigns, mutate queues, and delete contacts",
+  "campaigns.dispatch": "Dispatch campaign SMS batches (/api/sms)",
   "calls.start": "Start dialer conferences and outbound call sessions",
   "calls.control": "Control live calls (disconnect, hold, transfer)",
-  "messages.send": "Send SMS and chat messages",
+  "messages.send": "Send direct chat SMS (/api/chat_sms)",
   "members.invite": "Invite and manage workspace members",
   "audit.read": "Read workspace audit events",
 } as const;

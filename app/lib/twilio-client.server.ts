@@ -1,4 +1,4 @@
-import Twilio from "twilio";
+import type Twilio from "twilio";
 import type { TollfreeVerificationListInstanceCreateOptions } from "twilio/lib/rest/messaging/v1/tollfreeVerification";
 import type { BrandRegistrationListInstanceCreateOptions } from "twilio/lib/rest/messaging/v1/brandRegistration";
 import type { UsAppToPersonListInstanceCreateOptions } from "twilio/lib/rest/messaging/v1/service/usAppToPerson";

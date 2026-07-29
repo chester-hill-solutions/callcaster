@@ -1,3 +1,4 @@
+import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { authForSurvey, getSurveyDetailApi } from "@/lib/platform-data.server";
 import { defineLoader } from "@/lib/handler.server";
@@ -12,6 +13,9 @@ export const loader = defineLoader({
 
     const auth = await authForSurvey(request, surveyId);
     if (auth instanceof Response) return auth;
+
+    const capability = await requireDataPlaneCapability(auth, "campaigns.read");
+    if (capability instanceof Response) return capability;
 
     return { ...auth, surveyId };
   },

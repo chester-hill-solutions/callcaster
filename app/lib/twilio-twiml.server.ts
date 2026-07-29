@@ -1,4 +1,4 @@
-import Twilio from "twilio";
+import VoiceResponse from "twilio/lib/twiml/VoiceResponse.js";
 
 /**
  * Typed TwiML builders for the inline `<Response>...</Response>` string sites.
@@ -12,21 +12,21 @@ import Twilio from "twilio";
 
 /** `<Response><Hangup/></Response>` */
 export function hangupTwiml(): string {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = new VoiceResponse();
   twiml.hangup();
   return twiml.toString();
 }
 
 /** `<Response><Pause length="{seconds}"/></Response>` */
 export function pauseTwiml(seconds = 1): string {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = new VoiceResponse();
   twiml.pause({ length: seconds });
   return twiml.toString();
 }
 
 /** `<Response><Pause length="1"/><Play>{url}</Play></Response>` */
 export function pausePlayTwiml(url: string, pauseSeconds = 1): string {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = new VoiceResponse();
   twiml.pause({ length: pauseSeconds });
   twiml.play(url);
   return twiml.toString();
@@ -34,7 +34,7 @@ export function pausePlayTwiml(url: string, pauseSeconds = 1): string {
 
 /** `<Response><Pause length="1"/><Say>{text}</Say></Response>` */
 export function pauseSayTwiml(text: string, pauseSeconds = 1): string {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = new VoiceResponse();
   twiml.pause({ length: pauseSeconds });
   twiml.say(text);
   return twiml.toString();
@@ -42,7 +42,7 @@ export function pauseSayTwiml(text: string, pauseSeconds = 1): string {
 
 /** `<Response><Play>{url}</Play></Response>` */
 export function playTwiml(url: string): string {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = new VoiceResponse();
   twiml.play(url);
   return twiml.toString();
 }

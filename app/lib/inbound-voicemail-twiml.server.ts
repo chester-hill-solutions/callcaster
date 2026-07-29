@@ -1,4 +1,4 @@
-import Twilio from "twilio";
+import type Twilio from "twilio";
 import { env } from "@/lib/env.server";
 import { createSignedObjectUrl, listObjects } from "@/lib/object-storage.server";
 

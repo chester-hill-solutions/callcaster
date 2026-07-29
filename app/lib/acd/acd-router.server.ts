@@ -1,5 +1,4 @@
 import { eq, sql } from "drizzle-orm";
-import Twilio from "twilio";
 import {
   buildAgentBridgeTwiml,
   buildHoldMusicTwiml,
@@ -155,7 +154,11 @@ export async function dialAgent(args: {
   baseUrl: string;
   callerNumber: string;
 }): Promise<void> {
-  const client = Twilio(args.twilioCredentials.accountSid, args.twilioCredentials.authToken);
+  const { default: TwilioRestClient } = await import("twilio/lib/rest/Twilio.js");
+  const client = new TwilioRestClient(
+    args.twilioCredentials.accountSid,
+    args.twilioCredentials.authToken,
+  );
   const queueName = makeQueueName(args.queueId);
   const agentBridgeUrl = `${args.baseUrl}/api/acd-router/agent-bridge?queue_name=${queueName}&entry_id=${args.entryId}`;
   const agentStatusUrl = `${args.baseUrl}/api/acd-router/agent-status?entry_id=${args.entryId}&queue_id=${args.queueId}`;

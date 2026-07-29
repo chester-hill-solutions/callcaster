@@ -55,6 +55,7 @@ vi.mock("@/lib/logger.server", () => ({ logger: loggerMock }));
 
 vi.mock("@/lib/database/workspace.server", () => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
+  getUserRole: vi.fn(async () => ({ role: "member" })),
 }));
 
 function makeQuery(result: any) {
@@ -268,6 +269,7 @@ describe("api.audiences route", () => {
     setDualAuthSession({ headers: new Headers(), user: { id: "u1" } });
     vi.doMock("@/lib/database/workspace.server", () => ({
       requireWorkspaceAccess,
+      getUserRole: vi.fn(async () => ({ role: "member" })),
     }));
     vi.doMock("@/lib/request-utils.server", () => ({ parseActionRequest }));
 
@@ -319,7 +321,12 @@ describe("api.audiences route", () => {
     contactAudienceMocks.findAudienceWorkspaceById.mockResolvedValue("w1");
     const mod = await import("../app/routes/api+/audiences");
     const verifyAuth = vi.fn(async () => ({
-      auth: { authType: "api_key", workspaceId: "w2" },
+      auth: {
+        authType: "api_key",
+        workspaceId: "w2",
+        keyId: "k1",
+        scopes: ["campaigns.read", "campaigns.write"],
+      },
       headers: new Headers(),
     }));
     const parseActionRequest = vi.fn(async () => ({ id: "1" }));
