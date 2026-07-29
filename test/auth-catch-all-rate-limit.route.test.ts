@@ -11,9 +11,7 @@ vi.mock("@/server/auth-instance", () => ({
 }));
 
 async function callAction(path: string, ip: string) {
-  const { action } = await import(
-    "../app/routes/api+/auth/[...all].loader.server"
-  );
+  const { action } = await import("../app/routes/api+/auth/$.loader.server");
   const request = new Request(`http://localhost${path}`, {
     method: "POST",
     headers: {

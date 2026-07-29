@@ -3,10 +3,21 @@ import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.serve
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
 
 export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, url }) => {
+    // Browser sign-in is the primary credential-guessing surface — same
+    // strict bucket as the API sign-in path, but with a form-friendly error.
+    const limited = await enforceAuthRateLimit(request, "auth:sign-in");
+    if (limited) {
+      return routeData(
+        { error: "Too many sign-in attempts. Wait a minute and try again." },
+        { status: 429 },
+      );
+    }
+
     const next = url.searchParams.get("next");
 
     const formData = await request.formData();
