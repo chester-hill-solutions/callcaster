@@ -11062,11 +11062,11 @@
         }
       }
     },
-    "/api/auth/...all": {
+    "/api/auth/*": {
       "get": {
-        "operationId": "getAuth_...all",
-        "summary": "GET /api/auth/...all",
-        "description": "Better Auth catch-all handler for OAuth callbacks and other auth flows.",
+        "operationId": "getAuth_*",
+        "summary": "GET /api/auth/*",
+        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
         "tags": [
           "Public Form",
           "auth"
@@ -11111,9 +11111,9 @@
         }
       },
       "post": {
-        "operationId": "postAuth_...all",
-        "summary": "POST /api/auth/...all",
-        "description": "Better Auth catch-all handler for OAuth callbacks and other auth flows.",
+        "operationId": "postAuth_*",
+        "summary": "POST /api/auth/*",
+        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
         "tags": [
           "Public Form",
           "auth"

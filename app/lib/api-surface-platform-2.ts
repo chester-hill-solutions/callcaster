@@ -355,8 +355,8 @@ export const PLATFORM_API_SURFACE_2: readonly ApiSurfaceEntry[] = [
     operations: [{ method: "POST", handler: "action", bodyType: "json" }],
   }),
   platformSeed({
-    path: "/api/auth/...all",
-    routeModule: "app/routes/api+/auth/[...all].route.tsx",
+    path: "/api/auth/*",
+    routeModule: "app/routes/api+/auth/$.route.tsx",
     authClass: "publicForm",
     ownerArea: "auth",
     exposure: "publicUnauthenticated",
@@ -365,7 +365,8 @@ export const PLATFORM_API_SURFACE_2: readonly ApiSurfaceEntry[] = [
       { method: "GET", handler: "loader", bodyType: "query" },
       { method: "POST", handler: "action", bodyType: "json" },
     ],
-    notes: "Better Auth catch-all handler for OAuth callbacks and other auth flows.",
+    notes:
+      "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
   }),
   platformSeed({
     path: "/api/acd-router",

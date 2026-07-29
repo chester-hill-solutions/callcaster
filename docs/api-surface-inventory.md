@@ -147,7 +147,7 @@ Interactive specs:
 | `/api/admin/users/:userId` | GET, PATCH | Internal Trusted | internalOnly | yes | `routes/api+/admin+/users+/$userId.route.tsx` | `docs/api-admin.md` |  |
 | `/api/admin/users/:userId/workspaces` | GET, POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/users+/$userId/workspaces.route.tsx` | `docs/api-admin.md` |  |
 | `/api/admin/workspaces/:workspaceId/twilio` | POST | Internal Trusted | internalOnly | yes | `routes/api+/admin+/workspaces+/$workspaceId/twilio.route.tsx` | `docs/api-admin.md` |  |
-| `/api/auth/...all` | GET, POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/[...all].route.tsx` | `docs/api-auth-matrix.md` | Better Auth catch-all handler for OAuth callbacks and other auth flows. |
+| `/api/auth/*` | GET, POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/$.route.tsx` | `docs/api-auth-matrix.md` | Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min. |
 | `/api/acd-router` | POST | Provider Webhook | internalOnly | yes | `routes/api+/acd-router.route.tsx` | `docs/api-live-operations.md` | Twilio ACD wait URL. |
 | `/api/acd-router/agent-bridge` | POST | Provider Webhook | internalOnly | yes | `routes/api+/acd-router/agent-bridge.route.tsx` | `docs/api-live-operations.md` |  |
 | `/api/acd-router/agent-status` | POST | Provider Webhook | internalOnly | yes | `routes/api+/acd-router/agent-status.route.tsx` | `docs/api-live-operations.md` |  |

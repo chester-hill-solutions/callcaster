@@ -66,6 +66,43 @@ describe("Better Auth catch-all rate limiting", () => {
     expect(status).toBe(429);
   });
 
+  test("E2E bypass flag is ignored on Railway production", async () => {
+    vi.stubEnv("E2E_DISABLE_AUTH_RATE_LIMIT", "1");
+    vi.stubEnv("RAILWAY_ENVIRONMENT_NAME", "production");
+    try {
+      let lastStatus = 0;
+      for (let i = 0; i < 11; i++) {
+        const response = await callAction(
+          "/api/auth/sign-in/email",
+          "10.0.0.9",
+        );
+        lastStatus = response.status;
+      }
+      // Bypass must not apply in production — the bucket still closes.
+      expect(lastStatus).toBe(429);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test("E2E bypass flag disables limiting outside production", async () => {
+    vi.stubEnv("E2E_DISABLE_AUTH_RATE_LIMIT", "1");
+    vi.stubEnv("RAILWAY_ENVIRONMENT_NAME", "dev");
+    try {
+      let lastStatus = 0;
+      for (let i = 0; i < 15; i++) {
+        const response = await callAction(
+          "/api/auth/sign-in/email",
+          "10.0.0.10",
+        );
+        lastStatus = response.status;
+      }
+      expect(lastStatus).not.toBe(429);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   test("clients on distinct IPs do not share buckets", async () => {
     for (let i = 0; i < 10; i++) {
       await callAction("/api/auth/sign-in/email", "10.0.0.4");

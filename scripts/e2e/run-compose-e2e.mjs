@@ -140,6 +140,9 @@ const serverEnv = {
   BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "e2e-better-auth-secret-min-32-chars!!",
   BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? baseURL,
   E2E_DISABLE_2FA_ENFORCEMENT: process.env.E2E_DISABLE_2FA_ENFORCEMENT ?? "1",
+  // The suite signs in far more often than a human would; the strict
+  // credential buckets are unit-tested instead (test/auth-*rate-limit*).
+  E2E_DISABLE_AUTH_RATE_LIMIT: process.env.E2E_DISABLE_AUTH_RATE_LIMIT ?? "1",
   ...e2eS3Env,
 };
 

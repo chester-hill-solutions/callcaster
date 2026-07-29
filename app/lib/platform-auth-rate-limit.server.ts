@@ -32,10 +32,34 @@ const LIMITS: Record<
   "auth:verify-email": { limit: 10, windowMs: 60_000 },
 };
 
+/**
+ * E2E suites sign in dozens of times from one address, which legitimately
+ * exhausts the strict credential buckets. Same contract as
+ * `isTwoFactorEnforcementDisabled`: honored only outside Railway production,
+ * and loudly ignored if it ever leaks into production config.
+ */
+function isAuthRateLimitDisabled(): boolean {
+  const flagSet =
+    process.env.E2E_DISABLE_AUTH_RATE_LIMIT === "1" ||
+    process.env.DISABLE_AUTH_RATE_LIMIT === "1";
+  if (!flagSet) return false;
+
+  if (process.env.RAILWAY_ENVIRONMENT_NAME === "production") {
+    console.error(
+      "DISABLE_AUTH_RATE_LIMIT is set on Railway production — ignoring; auth rate limiting remains active.",
+    );
+    return false;
+  }
+  return true;
+}
+
 export async function enforceAuthRateLimit(
   request: Request,
   scope: AuthRateLimitScope,
 ): Promise<Response | null> {
+  if (isAuthRateLimitDisabled()) {
+    return null;
+  }
   const config = LIMITS[scope];
   const result = await checkRateLimit({
     key: clientRateLimitKey(request, scope),
