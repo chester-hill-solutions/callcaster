@@ -2,17 +2,11 @@ import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { refreshBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { refreshTokens } from "@/lib/platform-auth.server";
-import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
+import { rateLimitedPostAuth } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
-import type { ActionFunctionArgs } from "react-router";
 
 export const action = defineAction({
-  auth: async ({ request }: ActionFunctionArgs) => {
-    if (request.method !== "POST") {
-      return jsonError("Method not allowed", 405);
-    }
-    return (await enforceAuthRateLimit(request, "auth:refresh")) ?? undefined;
-  },
+  auth: rateLimitedPostAuth("auth:refresh"),
   sideEffects: ["external"],
   handler: async ({ request }) => {
     const parsed = await parseJsonBodyOrResponse(request, refreshBodySchema);

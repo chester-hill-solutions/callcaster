@@ -2,17 +2,12 @@ import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { registerBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { registerUser } from "@/lib/platform-auth.server";
-import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
+import { rateLimitedPostAuth } from "@/lib/platform-auth-rate-limit.server";
 import { withIdempotency } from "@/lib/platform-idempotency.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
-  auth: async ({ request }) => {
-    if (request.method !== "POST") {
-      return jsonError("Method not allowed", 405);
-    }
-    return (await enforceAuthRateLimit(request, "auth:register")) ?? undefined;
-  },
+  auth: rateLimitedPostAuth("auth:register"),
   sideEffects: ["db-write", "email"],
   handler: async ({ request }) => {
     const parsed = await parseJsonBodyOrResponse(request, registerBodySchema);

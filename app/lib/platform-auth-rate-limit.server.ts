@@ -3,6 +3,7 @@ import {
   clientRateLimitKey,
   rateLimitResponse,
 } from "@/lib/platform-rate-limit.server";
+import { jsonError } from "@/lib/platform-api.server";
 
 export type AuthRateLimitScope =
   | "auth:register"
@@ -45,4 +46,23 @@ export async function enforceAuthRateLimit(
     return rateLimitResponse(result.retryAfterSeconds);
   }
   return null;
+}
+
+/**
+ * The shared `auth:` gate for POST-only rate-limited auth routes: rejects
+ * non-POST with 405, applies the scope's bucket, passes with `undefined`.
+ * Compose extra checks after it, e.g.:
+ *   auth: async (args) => (await rateLimitedPostAuth("auth:x")(args)) ?? requireJsonAuth(args.request)
+ */
+export function rateLimitedPostAuth(scope: AuthRateLimitScope) {
+  return async ({
+    request,
+  }: {
+    request: Request;
+  }): Promise<Response | undefined> => {
+    if (request.method !== "POST") {
+      return jsonError("Method not allowed", 405);
+    }
+    return (await enforceAuthRateLimit(request, scope)) ?? undefined;
+  };
 }

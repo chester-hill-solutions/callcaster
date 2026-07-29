@@ -1,16 +1,11 @@
 import { forgotPasswordBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { forgotPassword } from "@/lib/platform-auth.server";
-import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
+import { rateLimitedPostAuth } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
-  auth: async ({ request }) => {
-    if (request.method !== "POST") {
-      return jsonError("Method not allowed", 405);
-    }
-    return (await enforceAuthRateLimit(request, "auth:forgot-password")) ?? undefined;
-  },
+  auth: rateLimitedPostAuth("auth:forgot-password"),
   input: forgotPasswordBodySchema,
   sideEffects: ["email"],
   handler: async ({ request, input }) => {

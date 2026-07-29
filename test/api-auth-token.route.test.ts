@@ -13,6 +13,19 @@ vi.mock("@/lib/platform-auth.server", () => ({
 
 vi.mock("@/lib/platform-auth-rate-limit.server", () => ({
   enforceAuthRateLimit: (...args: unknown[]) => mocks.enforceAuthRateLimit(...args),
+  rateLimitedPostAuth:
+    (scope: string) =>
+    async ({ request }: { request: Request }) => {
+      if (request.method !== "POST") {
+        return new Response(JSON.stringify({ error: "Method not allowed" }), {
+          status: 405,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return (
+        (await mocks.enforceAuthRateLimit(request, scope)) ?? undefined
+      );
+    },
 }));
 
 describe("app/routes/api+/auth/token/route.tsx", () => {
