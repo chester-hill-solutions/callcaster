@@ -1,5 +1,7 @@
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { captureException } from "@/lib/sentry.server";
+import { recordServerError } from "@/lib/error-rate.server";
 import type { ErrorPayload } from "./type-safety-utils";
 
 /**
@@ -99,7 +101,25 @@ export function createErrorResponse(
     };
   }
 
-  logger.error("Error response:", errorResponse, error);
+  // Severity by status: a 404 or a validation 400 is not an application error,
+  // and logging every one of them at error level is why no meaningful error
+  // signal existed. Only 5xx counts as something broken.
+  const isServerError = errorResponse.statusCode >= 500;
+  const logAtLevel = isServerError ? logger.error : logger.warn;
+  logAtLevel("http.error_response", {
+    statusCode: errorResponse.statusCode,
+    code: errorResponse.code,
+    errorMessage: errorResponse.error,
+    ...(isServerError && error instanceof Error ? { err: error } : {}),
+  });
+
+  if (isServerError) {
+    captureException(error, {
+      statusCode: errorResponse.statusCode,
+      code: errorResponse.code,
+    });
+    recordServerError();
+  }
 
   return routeData(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
 }

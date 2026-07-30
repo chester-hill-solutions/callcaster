@@ -1,12 +1,18 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
-const loggerMock = vi.hoisted(() => ({ error: vi.fn() }));
+const loggerMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
 vi.mock("@/lib/logger.server", () => ({ logger: loggerMock }));
 
 describe("errors.server", () => {
   beforeEach(() => {
     loggerMock.error.mockReset();
+    loggerMock.warn.mockReset();
     vi.resetModules();
   });
 
@@ -49,7 +55,26 @@ describe("errors.server", () => {
       statusCode: 400,
       details: { field: "x" },
     });
-    expect(loggerMock.error).toHaveBeenCalled();
+    // A 4xx is a client problem, not an application error. Logging every 404
+    // and validation failure at error level is what made the error signal
+    // meaningless, so severity now follows status.
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      "http.error_response",
+      expect.objectContaining({ statusCode: 400 }),
+    );
+    expect(loggerMock.error).not.toHaveBeenCalled();
+  });
+
+  test("createErrorResponse logs 5xx at error level", async () => {
+    const mod = await import("../app/lib/errors.server");
+    const res = await asRouteResponse(
+      mod.createErrorResponse(new Error("kaboom"), "fallback", 500),
+    );
+    expect(res.status).toBe(500);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      "http.error_response",
+      expect.objectContaining({ statusCode: 500 }),
+    );
   });
 
   test("createErrorResponse handles Error", async () => {

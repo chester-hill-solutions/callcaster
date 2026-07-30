@@ -13,6 +13,8 @@ import type { AppLoadContext, EntryContext } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 import { logger } from "@/lib/logger.server";
+import { captureException } from "@/lib/sentry.server";
+import { recordServerError } from "@/lib/error-rate.server";
 
 /**
  * How long React Router's turbo-stream encoder waits for a deferred loader
@@ -101,4 +103,33 @@ export default async function handleRequest(
     clearTimeout(abortTimer);
     throw error;
   }
+}
+
+/**
+ * React Router's hook for unhandled loader/action/render errors.
+ *
+ * This was never exported, so RR used its own default and every such error was
+ * structurally invisible — no log line, no counter, nothing to alert on.
+ *
+ * Note this does NOT fire for errors that `withGuards` (app/lib/handler.server)
+ * already catches and converts into a `data(...)` response; those are counted
+ * at the other chokepoint, `createErrorResponse`.
+ */
+export function handleError(
+  error: unknown,
+  { request }: { request: Request },
+): void {
+  // A client that navigated away is not an application failure.
+  if (request.signal.aborted) {
+    return;
+  }
+
+  const url = new URL(request.url);
+  logger.error("router.unhandled_error", {
+    method: request.method,
+    path: url.pathname,
+    ...(error instanceof Error ? { err: error } : { thrown: String(error) }),
+  });
+  captureException(error, { method: request.method, path: url.pathname });
+  recordServerError();
 }

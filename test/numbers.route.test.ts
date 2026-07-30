@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => {
       TWILIO_SID: vi.fn(() => process.env.TWILIO_SID ?? "sid"),
       TWILIO_AUTH_TOKEN: vi.fn(() => process.env.TWILIO_AUTH_TOKEN ?? "token"),
     },
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
   };
 });
 
@@ -417,9 +417,8 @@ describe("app/routes/api+/numbers/route.tsx", () => {
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error response:",
-      expect.anything(),
-      expect.any(Error),
+      "http.error_response",
+      expect.objectContaining({ statusCode: 500 }),
     );
   });
 
@@ -466,9 +465,8 @@ describe("app/routes/api+/numbers/route.tsx", () => {
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error response:",
-      expect.anything(),
-      expect.any(Error),
+      "http.error_response",
+      expect.objectContaining({ statusCode: 500 }),
     );
   });
 
