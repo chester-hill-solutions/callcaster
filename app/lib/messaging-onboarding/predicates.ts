@@ -113,28 +113,6 @@ export const BUSINESS_PROFILE_REQUIRED_FIELDS: Record<
 
 export type BusinessProfileFieldKey = keyof WorkspaceMessagingBusinessProfile;
 
-const BUSINESS_PROFILE_REQUIRED_FIELD_CHANNELS = Object.keys(
-  BUSINESS_PROFILE_REQUIRED_FIELDS,
-) as (keyof typeof BUSINESS_PROFILE_REQUIRED_FIELDS)[];
-
-/**
- * The business-profile fields every messaging channel requires, derived as the
- * intersection of the per-channel lists above rather than restated as a second
- * list — so it can never drift from the source of truth.
- *
- * The Business basics step runs *before* channel selection, so the wizard cannot
- * know which channel's list applies when step 1 is submitted. This baseline is
- * what is safe to demand from every workspace regardless of the path it later
- * picks; the channel-specific extras stay with the readiness predicates, which
- * surface them once a channel is actually selected.
- */
-export const BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
-  BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc.filter((field) =>
-    BUSINESS_PROFILE_REQUIRED_FIELD_CHANNELS.every((channel) =>
-      BUSINESS_PROFILE_REQUIRED_FIELDS[channel].includes(field),
-    ),
-  );
-
 /** Required fields for the Identity wizard screen. */
 export const BUSINESS_IDENTITY_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
   ["legalBusinessName", "websiteUrl"];
@@ -142,6 +120,26 @@ export const BUSINESS_IDENTITY_REQUIRED_FIELDS: readonly BusinessProfileFieldKey
 /** Required fields for the Program details wizard screen. */
 export const BUSINESS_PROGRAM_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
   ["useCaseSummary", "sampleMessages"];
+
+/**
+ * The intake gate: what a workspace must supply before it can leave onboarding.
+ *
+ * This is deliberately EXACTLY what the Identity screen collects, because the
+ * gate and the screen must agree by construction.
+ *
+ * It was previously derived as the intersection of the per-channel lists, which
+ * also demanded `useCaseSummary` / `sampleMessages`. Those are only ever
+ * collected by the Program step, and `wizardStepsForGoal` (goals.ts) includes
+ * that step only when the goal needs SMS compliance — so every calling, IVR, and
+ * rent-a-number workspace could never satisfy the gate, and
+ * `shouldRedirectToOnboarding` bounced its owner back into the wizard forever.
+ *
+ * Channel-specific requirements are NOT weakened by this: they remain enforced
+ * by the per-channel readiness predicates below, which surface once a channel is
+ * actually selected.
+ */
+export const BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
+  BUSINESS_IDENTITY_REQUIRED_FIELDS;
 
 /**
  * Returns the baseline required fields that are still blank on `profile`.

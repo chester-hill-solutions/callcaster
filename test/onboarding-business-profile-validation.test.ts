@@ -90,7 +90,10 @@ import {
   mapOnboardingHandlerResult,
   runOnboardingAction,
 } from "../app/lib/platform-onboarding.server";
-import { BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS } from "../app/lib/messaging-onboarding/predicates";
+import {
+  BUSINESS_IDENTITY_REQUIRED_FIELDS,
+  BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS,
+} from "../app/lib/messaging-onboarding/predicates";
 import { resolvePersistedWizardStep } from "../app/lib/messaging-onboarding/wizard-steps";
 
 const WORKSPACE_ID = "workspace-1";
@@ -213,12 +216,16 @@ describe("save_business_profile validation", () => {
     mocks.getWorkspaceCredits.mockResolvedValue(0);
   });
 
-  test("baseline required fields are the intersection of the per-channel lists", () => {
+  // The intake gate must equal what the Identity screen collects. When it
+  // demanded the two Program fields as well, every non-SMS goal was trapped in
+  // onboarding forever (the Program step is only shown for sms_blast).
+  test("baseline required fields are exactly the Identity screen's fields", () => {
     expect([...BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS]).toEqual([
       "legalBusinessName",
       "websiteUrl",
-      "useCaseSummary",
-      "sampleMessages",
+    ]);
+    expect([...BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS]).toEqual([
+      ...BUSINESS_IDENTITY_REQUIRED_FIELDS,
     ]);
   });
 
