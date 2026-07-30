@@ -4,24 +4,27 @@ CallCaster is a contact-center platform for calling and SMS campaigns: campaign 
 
 ## Quickstart
 
-Prerequisites: **Node >= 20**, **Bun >= 1.2.15**, and Docker.
+Prerequisites: **Node 22.x** (the repo pins it and CI uses it; other majors
+produce test failures that don't reproduce in CI), **Bun >= 1.2.15**, **Docker**,
+and **psql**.
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Start local services (Postgres on :5433, MinIO on :9000, Inbucket mail on :9002)
-docker compose -f docker-compose.dev.yml up -d
-
-# 3. Configure environment
-cp .env.example .env
-# Fill in DATABASE_URL, BETTER_AUTH_SECRET, S3_*, TWILIO_*, BASE_URL,
-# STRIPE_SECRET_KEY, RESEND_API_KEY — placeholders are fine until you
-# exercise the corresponding integration. See docs/local-development.md.
-
-# 4. Run the app (validates env, then starts react-router dev on :3000)
-npm run dev
+npm run setup     # services, .env, database schema, storage bucket, seed data
+npm run dev       # http://localhost:3000
 ```
+
+`npm run setup` is idempotent — re-run it any time to repair a broken local
+environment. It starts Postgres/MinIO/mail via docker compose, creates `.env`
+from the example if missing, applies the full database schema, creates the
+object-storage bucket, and seeds test users and workspaces. Sign in with a
+seeded account from [`e2e/fixtures/seed.ts`](./e2e/fixtures/seed.ts).
+
+Already running the services elsewhere? `npm run setup -- --skip-docker`.
+
+Outbound calling additionally needs a public tunnel so Twilio can reach your
+machine — see [docs/local-development.md](./docs/local-development.md), and note
+the shared-TwiML-App hazard documented there before pointing Twilio at a tunnel.
 
 Verify your setup:
 

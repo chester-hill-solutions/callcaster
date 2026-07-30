@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
+    "setup": "node ./scripts/local/setup.mjs",
     "dev": "node ./scripts/local/dev.mjs",
     "dev:local": "node ./scripts/local/dev-local.mjs",
     "dev:calling:sync": "bun ./scripts/local/sync-calling-dev.mjs",
