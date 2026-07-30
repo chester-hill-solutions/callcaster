@@ -6,6 +6,7 @@ import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentia
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
 import { pruneExpiredIdempotencyRecords } from "@/lib/platform-idempotency.server";
+import { pruneCompletedJobs } from "@/lib/worker/job-retention.server";
 import {
   auditWorkspaceTwilioWebhooks,
   repointWorkspaceTwilioWebhooks,
@@ -180,6 +181,20 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
         }
       } catch (error) {
         logger.error("worker.maintenance.idempotency_prune_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      // Same daily tick, same best-effort contract: the job table was never
+      // pruned, so the cron chains and audience_upload's base64 CSV payloads
+      // grew without bound.
+      try {
+        const prunedJobs = await pruneCompletedJobs();
+        if (prunedJobs > 0) {
+          logger.info("worker.maintenance.jobs_pruned", { pruned: prunedJobs });
+        }
+      } catch (error) {
+        logger.error("worker.maintenance.job_prune_failed", {
           error: error instanceof Error ? error.message : String(error),
         });
       }
