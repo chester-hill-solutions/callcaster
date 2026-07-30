@@ -134,16 +134,44 @@ export function OnboardingFirstNumberStep({
   const firstNumberReturnTo = `/workspaces/${workspaceId}/onboarding?step=first_number`;
 
   if (!messagingReady) {
+    // Distinguish "still working on it" from "we gave up". The compliance job
+    // marks the workspace rejected and records why; showing the optimistic
+    // "preparing" copy in that case left customers refreshing forever.
+    const bootstrapFailed =
+      onboarding.subaccountBootstrap.status === "rejected" ||
+      Boolean(onboarding.reviewState.lastError);
+    const reasons = onboarding.reviewState.blockingIssues;
+
     return (
       <Section variant="flat">
         <SectionHeader
           compact
           title="Phone number"
-          description="Messaging setup is still finishing. Refresh in a moment, then add a phone number."
+          description={
+            bootstrapFailed
+              ? "We could not finish setting up messaging for this workspace."
+              : "Messaging setup is still finishing. Refresh in a moment, then add a phone number."
+          }
         />
-        <Alert>
+        <Alert variant={bootstrapFailed ? "destructive" : undefined}>
           <AlertDescription>
-            Workspace messaging is preparing. Once it is ready you can search for numbers here.
+            {bootstrapFailed ? (
+              <>
+                <p>
+                  Setup did not complete, so numbers cannot be added yet. Our team has
+                  been notified.
+                </p>
+                {reasons.length > 0 ? (
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {reasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            ) : (
+              "Workspace messaging is preparing. Once it is ready you can search for numbers here."
+            )}
           </AlertDescription>
         </Alert>
       </Section>

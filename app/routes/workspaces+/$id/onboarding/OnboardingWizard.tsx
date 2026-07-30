@@ -55,6 +55,8 @@ export function OnboardingWizard({
   scripts,
   audienceCount,
   campaignCount,
+  a2pBlockingIssues,
+  a2pErrors,
   actionError,
   actionData,
 }: OnboardingWizardProps) {
@@ -187,6 +189,38 @@ export function OnboardingWizard({
 
   return (
     <div className="space-y-6">
+      {/*
+        Compliance state is computed by the loader and was previously dropped on
+        the floor here, so a workspace stuck in "Action needed by CallCaster
+        support" showed a wizard with no explanation at all. Rendered above the
+        steps so it is visible whichever step the customer is on.
+      */}
+      {a2pErrors.length > 0 ? (
+        <Alert variant="destructive" data-testid="onboarding-compliance-errors">
+          <AlertDescription>
+            <p className="font-medium">We hit a problem setting up your messaging.</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {a2pErrors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {a2pBlockingIssues.length > 0 ? (
+        <Alert variant="warning" data-testid="onboarding-compliance-blocking">
+          <AlertDescription>
+            <p className="font-medium">Needed before your messaging can go live:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {a2pBlockingIssues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {showSkippedFirstNumberNotice ? (
         <Alert variant="warning" data-testid="skipped-first-number-notice">
           <AlertDescription>
