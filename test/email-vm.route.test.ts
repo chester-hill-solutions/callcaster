@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
   return {
     sendEmail: vi.fn(),
     sendWebhookNotification: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
     fetch: vi.fn(),
     env: {
       RESEND_API_KEY: () => "rk",
@@ -274,7 +274,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     );
   });
 
-  test("validates required fields and returns 500 on failures", async () => {
+  test("validates required fields: malformed payloads 4xx, downstream faults 5xx", async () => {
     const mod = await import("../app/routes/api+/email-vm");
     mocks.fetch.mockResolvedValue({
       ok: true,
@@ -282,13 +282,15 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
 
-    // RecordingUrl missing
+    // Missing RecordingUrl/CallSid are PERMANENT client errors -> 4xx.
+    // They used to 500, which makes Twilio retry a callback that can never
+    // succeed (found by the surface prober's first CI run).
     let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
 
     // CallSid missing
     res = await asRouteResponse(mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
 
     // AccountSid missing
     res = await asRouteResponse(mod.action({
@@ -314,8 +316,8 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       }),
       params: {},
     } as any));
-    expect(res.status).toBe(500);
-    expect(mocks.logger.error).toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(mocks.logger.warn).toHaveBeenCalled();
   });
 
   test("webhook retry: does not resend email when the call's recording URL already matches", async () => {
@@ -381,12 +383,14 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   test("covers helper error branches (call not found, number not found, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
     const mod = await import("../app/routes/api+/email-vm");
 
+    // Unknown CallSid is a PERMANENT condition — acked (200), not 500, or
+    // Twilio retries the callback forever. See the 5xx-retry note in the route.
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
     let res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
 
     setupEmailVmMocks();
     inboundDbMocks.findWorkspaceNumberVoicemailContextByPhone.mockResolvedValueOnce(null);
@@ -438,4 +442,5 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any));
     expect(res.status).toBe(500);
   });
+
 });

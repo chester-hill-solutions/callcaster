@@ -58,17 +58,26 @@ export const action = defineAction({
       const recordingSid = params.RecordingSid;
       const recordingDuration = params.RecordingDuration;
 
+      // Malformed payloads and unattributable callbacks must NOT 500: Twilio
+      // retries 5xx, so a permanent condition (bad body, unknown CallSid)
+      // would retry forever. 4xx/2xx both stop the retry cycle. Same
+      // precedent as the Trust Hub status callback.
       if (!recordingUrl || typeof recordingUrl !== "string") {
-        throw new Error("Missing or invalid RecordingUrl");
+        logger.warn("email-vm: missing RecordingUrl", { callSid: callSid ?? null });
+        return routeData({ error: "Missing or invalid RecordingUrl" }, { status: 400 });
       }
       if (!callSid || typeof callSid !== "string") {
-        throw new Error("Missing or invalid CallSid");
+        logger.warn("email-vm: missing CallSid");
+        return routeData({ error: "Missing or invalid CallSid" }, { status: 400 });
       }
 
       const callRow = await findCallBySid(callSid);
 
       if (!callRow) {
-        throw new Error("Error fetching call: not found");
+        logger.warn("email-vm: no call row for CallSid; acking to stop retries", {
+          callSid,
+        });
+        return routeData({ success: true, resolved: false });
       }
       if (!callRow.to) {
         throw new Error("Call destination number not found");

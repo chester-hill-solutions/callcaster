@@ -326,7 +326,13 @@ export const action = defineAction({
     try {
     const dbCall = await findCallBySid(callSidValue);
     if (!dbCall?.workspace) {
-      throw new Error("Failed to fetch call data");
+      // Unattributable callback (unknown CallSid, or a call row that never
+      // got a workspace). Throwing here yields a 500, and Twilio retries 5xx
+      // — forever, for a call that will never exist. Ack instead.
+      logger.warn("auto-dial status: no call row for CallSid; acking to stop retries", {
+        callSid: callSidValue,
+      });
+      return routeData({ success: true, resolved: false });
     }
 
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
