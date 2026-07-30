@@ -257,7 +257,11 @@ export function OnboardingFirstNumberStep({
                     fetcher={purchaseFetcher}
                     workspaceId={workspaceId}
                     creditsBalance={creditsBalance}
-                    billingLink={`/workspaces/${workspaceId}/billing`}
+                    // Carry the wizard position through the billing detour —
+                    // without it the customer lands on /billing, goes to
+                    // Stripe, returns to /billing, and has to find their way
+                    // back into setup unaided.
+                    billingLink={`/workspaces/${workspaceId}/billing?returnTo=${encodeURIComponent(firstNumberReturnTo)}`}
                     onPurchaseComplete={handlePurchaseComplete}
                   />
                 )}

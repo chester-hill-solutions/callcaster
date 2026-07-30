@@ -113,9 +113,17 @@ export const BUSINESS_PROFILE_REQUIRED_FIELDS: Record<
 
 export type BusinessProfileFieldKey = keyof WorkspaceMessagingBusinessProfile;
 
-/** Required fields for the Identity wizard screen. */
+/**
+ * Required fields for the Identity wizard screen.
+ *
+ * `websiteUrl` is deliberately NOT here: contractors, clinics and campaigns
+ * routinely have no website, and blocking them at screen two of setup with no
+ * opt-out is a hard stop for a real segment. Messaging channels still require
+ * it — see the per-channel lists above, which are enforced by the readiness
+ * predicates once a channel is selected.
+ */
 export const BUSINESS_IDENTITY_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =
-  ["legalBusinessName", "websiteUrl"];
+  ["legalBusinessName"];
 
 /** Required fields for the Program details wizard screen. */
 export const BUSINESS_PROGRAM_REQUIRED_FIELDS: readonly BusinessProfileFieldKey[] =

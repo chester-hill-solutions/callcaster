@@ -222,7 +222,6 @@ describe("save_business_profile validation", () => {
   test("baseline required fields are exactly the Identity screen's fields", () => {
     expect([...BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS]).toEqual([
       "legalBusinessName",
-      "websiteUrl",
     ]);
     expect([...BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS]).toEqual([
       ...BUSINESS_IDENTITY_REQUIRED_FIELDS,
@@ -248,7 +247,9 @@ describe("save_business_profile validation", () => {
     if (outcome.result.kind !== "payload") return;
     expect(outcome.result.status).toBe(400);
     expect(outcome.result.data.error).toContain("Legal business name is required.");
-    expect(outcome.result.data.error).toContain("Website URL is required.");
+    // websiteUrl is optional at intake — plenty of customers have no website.
+    // Messaging channels still demand it via the per-channel predicates.
+    expect(outcome.result.data.error).not.toContain("Website URL is required.");
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
   });
 

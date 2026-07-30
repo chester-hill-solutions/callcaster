@@ -1,6 +1,7 @@
-import { Link, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { badgeVariants } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { isWorkspaceIntakeComplete } from "@/lib/messaging-onboarding/intake";
 import { wizardStepsForGoal } from "@/lib/messaging-onboarding/goals";
 import { isWizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
 import { cn } from "@/lib/utils";
@@ -24,10 +25,14 @@ export function OnboardingProgressStrip({
   workspaceName,
 }: OnboardingProgressStripProps) {
   const [searchParams] = useSearchParams();
+  const params = useParams();
   const urlStep = searchParams.get("step");
   if (!urlStep || !isWizardOnboardingStepId(urlStep)) {
     return null;
   }
+
+  const workspaceId = params.id;
+  const canLeaveSetup = Boolean(workspaceId) && isWorkspaceIntakeComplete(onboarding);
 
   const visibleSteps = wizardStepsForGoal(onboarding.selectedGoal);
   const activeStep = readWizardStep(urlStep, onboarding.currentStep, visibleSteps);
@@ -49,6 +54,20 @@ export function OnboardingProgressStrip({
             {activeMeta?.label ?? "Onboarding"}
           </p>
         </div>
+        {/*
+          Offered only once intake is complete. Before that the workspace root
+          still redirects back here, so an exit link would be a dead end that
+          looks like a bug. The remaining steps are all resumable from the
+          workspace, so this is a genuine "finish later".
+        */}
+        {canLeaveSetup ? (
+          <Link
+            to={`/workspaces/${workspaceId}`}
+            className="order-last ml-auto text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:order-none"
+          >
+            I&rsquo;ll finish later
+          </Link>
+        ) : null}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {visibleSteps.map((stepId, index) => {
             const meta = WIZARD_STEP_META.find((step) => step.id === stepId);

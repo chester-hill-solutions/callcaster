@@ -35,7 +35,6 @@ export default function CampaignSettingsRoute() {
     handleSave,
     handleResetData,
     handleConfirmTypeChange,
-    resetCampaign,
   } = useCampaignSettingsController();
 
   /**
@@ -83,10 +82,6 @@ export default function CampaignSettingsRoute() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {(user?.id === "a656121d-17af-414c-97c7-71f2008f8f14" ||
-        user?.id === "60c86cc8-b9fc-4995-b81e-f49e88ec208c") && (
-        <Button onClick={() => resetCampaign()}>Reset Campaign</Button>
-      )}
       <CampaignSettings
         campaignData={draftCampaignData}
         campaignDetails={draftCampaignDetails as never}

@@ -3,13 +3,16 @@ export { action } from "./billing.action.server";
 
 import {
   Form,
+  Link,
   useActionData,
   useLoaderData,
   useNavigation,
   useOutletContext,
+  useParams,
   useSearchParams,
 } from "react-router";
 import type { MetaFunction } from "react-router";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 import { useState } from "react";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 
@@ -62,11 +65,19 @@ export default function Credits() {
   // form isn't shown to a role that will always get a 403 on submit.
   const canPurchase = hasMinRole(userRole ?? undefined, MemberRole.Admin);
   const [searchParams] = useSearchParams();
+  const params = useParams();
   const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(MIN_CREDITS);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
   const actionData = useActionData<{ error?: string }>();
+
+  // A customer sent here mid-setup must be able to get back; without this the
+  // billing detour drops them on /billing -> Stripe -> /billing with no route
+  // back into the wizard. Validated against an allowlist (no open redirect).
+  const returnTo = params.id
+    ? validatePeopleReturnPath(searchParams.get("returnTo"), params.id)
+    : null;
 
   const paymentStatus = searchParams.get("payment_status");
   const paymentMessage = searchParams.get("payment_message");
@@ -93,6 +104,15 @@ export default function Credits() {
       <Heading as="h1" level={2} branded={false}>
         Credits
       </Heading>
+
+      {returnTo ? (
+        <Link
+          to={returnTo}
+          className="inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          &larr; Back to setup
+        </Link>
+      ) : null}
 
       {stripeKeyMode === "test" ? (
         <Alert variant="warning">

@@ -51,7 +51,7 @@ export function OnboardingBusinessIdentityStep({
           <FormField
             htmlFor="websiteUrl"
             label="Website URL"
-            required
+            description="Optional. Required later if you send SMS — carriers ask for it during registration."
             error={requiredFieldError("websiteUrl")}
           >
             <Input
