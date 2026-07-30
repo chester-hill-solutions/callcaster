@@ -1,9 +1,37 @@
 # Worker service config (callcaster-worker).
-# App service uses Dockerfile by default; this file pins the worker image.
+#
+# ⚠ NOT CURRENTLY APPLIED. Railway auto-detects only `railway.toml` /
+# `railway.json` at the repo root; a custom filename is read only when the
+# service's "Config as Code" path is set to it, and no service sets it. Checked
+# against the live dev worker on 2026-07-30: its deploy config carries no
+# restart policy at all, while this file claimed ON_FAILURE/10 — so the file has
+# been silently ignored, and the worker has been running on Railway's defaults.
+# `dockerfilePath` below is likewise inert; the image is selected by the
+# RAILWAY_DOCKERFILE_PATH service variable.
+#
+# To make this file authoritative, set Config as Code to `railway.worker.toml`
+# on callcaster-worker in each environment. Until then, treat the Railway
+# console as the source of truth and change settings there — and do not read
+# the values below as a description of what is running.
 
 [build]
 dockerfilePath = "Dockerfile.worker"
 
 [deploy]
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
+# ALWAYS, not ON_FAILURE with a retry ceiling.
+#
+# With a ceiling the worker stops being restarted once it is reached, and a
+# stopped worker is silent: nothing dials, no status callback side-effect runs,
+# and neither billing cron fires, indefinitely, until a human happens to look
+# at Railway. The queue is durable, so the failure is invisible rather than
+# loud — jobs simply sit there.
+#
+# The ceiling also punishes the recoverable case hardest. A database restart
+# takes the worker down repeatedly in quick succession; it can burn ten
+# restarts inside a minute and then stay dead long after the cause has cleared.
+#
+# Looping forever on a genuinely broken deploy is the acceptable trade: it is
+# visible in Railway as a crash loop, and `worker.boot_failed` /
+# `worker.uncaught_exception` page an operator. Those alerts dedupe in memory
+# and are capped globally at 10/hour, so a loop cannot produce an alert storm.
+restartPolicyType = "ALWAYS"
