@@ -71,12 +71,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   return (
     <>
       <Dialog onOpenChange={() => { navigate(-1) }} open={!isActive}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               This campaign is currently inactive.
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <p className="mb-2">
                 It is currently outside of the designated calling window for this campaign. Please check with your team for calling times.
               </p>
@@ -91,12 +91,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       </Dialog>
 
       <Dialog onOpenChange={setDialog} open={isDialogOpen && !!isActive}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               Welcome to {campaign.title}.
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <p>
                 This is a{" "}
                 {campaign.dial_type === "call"
@@ -131,12 +131,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       </Dialog>
 
       <Dialog onOpenChange={setErrorDialog} open={isErrorDialogOpen}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               NO SCRIPT SET UP
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <p>
                 This campaign has not been configured with a script. Contact
                 your administrator to get one set up
@@ -154,12 +154,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       </Dialog>
 
       <Dialog onOpenChange={setReportDialog} open={isReportDialogOpen}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               Report an Issue
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <Form onSubmit={handleSubmitError}>
                 <p className="mb-2">
                   Please provide a detailed description of your issue, as well
