@@ -67,15 +67,15 @@ structurally cannot verify those three declared behaviors.** Consequently:
 | Where | Mode | Wired in |
 |---|---|---|
 | compose E2E (CI) | relaxed — reachability + non-provider auth | `scripts/e2e/run-compose-e2e.mjs`, after `waitForReady`, before Playwright |
-| any deployed env | `--strict-provider-auth` — also requires unsigned webhooks to 403 | run manually / as a WS-D release gate |
+| any deployed env | strict by default — also requires unsigned webhooks to 403 | run manually / as a WS-D release gate |
 
 Run against a deployed environment before every production release:
 
 ```bash
-npm run probe:surfaces -- --base-url https://callcaster.ca --strict-provider-auth
+npm run probe:prod        # or probe:staging / probe:dev
 ```
 
-Result on deployed dev, 2026-07-29: **191/191 OK**.
+Result on deployed dev, 2026-07-30: **261/261 OK** (191 API + 70 page).
 
 ## Maintenance
 
