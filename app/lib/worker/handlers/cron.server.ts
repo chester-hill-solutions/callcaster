@@ -5,6 +5,7 @@ import { runCronWorkspaceFanout } from "@/lib/cron-workspace-fanout.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
+import { pruneExpiredIdempotencyRecords } from "@/lib/platform-idempotency.server";
 import {
   auditWorkspaceTwilioWebhooks,
   repointWorkspaceTwilioWebhooks,
@@ -166,7 +167,25 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
       delayMs: LOW_CREDIT_NOTIFY_RESCHEDULE_MS,
       completedJobId: job.id,
     },
-    () => runLowCreditNotify(),
+    async () => {
+      const result = await runLowCreditNotify();
+
+      // Daily maintenance tick: expired idempotency records are already ignored
+      // on read, but without a sweep the table only ever grows. Best-effort —
+      // a prune failure must not fail the notify job or break the chain.
+      try {
+        const pruned = await pruneExpiredIdempotencyRecords();
+        if (pruned > 0) {
+          logger.info("worker.maintenance.idempotency_pruned", { pruned });
+        }
+      } catch (error) {
+        logger.error("worker.maintenance.idempotency_prune_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      return result;
+    },
   );
 }
 

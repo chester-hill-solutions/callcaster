@@ -551,6 +551,15 @@ export const rate_limit_bucket = pgTable("rate_limit_bucket", {
   reset_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
 });
 
+export const idempotency_record = pgTable("idempotency_record", {
+  scope: text().notNull(),
+  key: text().notNull(),
+  status: integer().notNull(),
+  body: text().notNull(),
+  headers: jsonb().notNull(),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
+});
+
 export const handset_session = pgTable("handset_session", {
   id: text().notNull().primaryKey(),
   user_id: uuid().notNull(),
