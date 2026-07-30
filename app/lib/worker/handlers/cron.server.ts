@@ -12,7 +12,7 @@ import {
 import { listAllWorkspacesOrdered } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
-import { rescheduleJob, requireNumberParam, requireStringParam } from "./shared.server";
+import { withReschedule, requireNumberParam, requireStringParam } from "./shared.server";
 
 const LOW_CREDIT_NOTIFY_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 const TWILIO_OPEN_SYNC_RESCHEDULE_MS = 5 * 60 * 1000;
@@ -66,76 +66,75 @@ export async function twilioOpenSyncHandler(job: ClaimedJobRow): Promise<unknown
   const messageLimit = requireNumberParam(params, "messageLimit") ?? 50;
   const maxAgeMinutes = requireNumberParam(params, "maxAgeMinutes") ?? 120;
 
-  const result = await withOptionalWorkspaceFanout({
-    job: "twilio_open_sync",
-    workspaceId: workspaceId || undefined,
-    requireTwilioCredentials: true,
-    runOne: async (id) => {
-      const sync = await triggerTwilioOpenSync({
-        workspaceId: id,
-        callLimit,
-        messageLimit,
-        maxAgeMinutes,
-      });
-      if (!sync.ok) {
-        throw new Error(sync.error);
-      }
-      return sync;
+  return withReschedule(
+    {
+      type: "twilio_open_sync",
+      delayMs: TWILIO_OPEN_SYNC_RESCHEDULE_MS,
+      params: { callLimit, messageLimit, maxAgeMinutes },
+      completedJobId: job.id,
+      enabled: !workspaceId,
     },
-  });
-
-  if (!workspaceId) {
-    await rescheduleJob(
-      "twilio_open_sync",
-      TWILIO_OPEN_SYNC_RESCHEDULE_MS,
-      { callLimit, messageLimit, maxAgeMinutes },
-      job.id,
-    );
-  }
-  return result;
+    () =>
+      withOptionalWorkspaceFanout({
+        job: "twilio_open_sync",
+        workspaceId: workspaceId || undefined,
+        requireTwilioCredentials: true,
+        runOne: async (id) => {
+          const sync = await triggerTwilioOpenSync({
+            workspaceId: id,
+            callLimit,
+            messageLimit,
+            maxAgeMinutes,
+          });
+          if (!sync.ok) {
+            throw new Error(sync.error);
+          }
+          return sync;
+        },
+      }),
+  );
 }
 
 export async function billingReconcileHandler(job: ClaimedJobRow): Promise<unknown> {
   const workspaceId = resolveWorkspaceId(job);
 
-  const result = await withOptionalWorkspaceFanout({
-    job: "billing_reconcile",
-    workspaceId,
-    requireTwilioCredentials: true,
-    runOne: async (id) => {
-      if (workspaceId) {
-        const twilioData = await loadWorkspaceTwilioData(id);
-        const creds = readTwilioWorkspaceCredentials(twilioData);
-        if (!creds?.sid) {
-          throw new Error("Workspace has no Twilio credentials");
-        }
-      }
-      const { snapshot } = await reconcileWorkspaceBilling({
-        workspaceId: id,
-        source: "cron",
-      });
-      if (workspaceId) {
-        return {
-          ok: true,
-          materialVariance: snapshot.materialVariance,
-          message: snapshot.materialVariance
-            ? "Reconciliation complete — material variance detected."
-            : "Reconciliation complete — no material variance.",
-        };
-      }
-      return snapshot;
+  return withReschedule(
+    {
+      type: "billing_reconcile",
+      delayMs: BILLING_RECONCILE_RESCHEDULE_MS,
+      completedJobId: job.id,
+      enabled: !workspaceId,
     },
-  });
-
-  if (!workspaceId) {
-    await rescheduleJob(
-      "billing_reconcile",
-      BILLING_RECONCILE_RESCHEDULE_MS,
-      {},
-      job.id,
-    );
-  }
-  return result;
+    () =>
+      withOptionalWorkspaceFanout({
+        job: "billing_reconcile",
+        workspaceId,
+        requireTwilioCredentials: true,
+        runOne: async (id) => {
+          if (workspaceId) {
+            const twilioData = await loadWorkspaceTwilioData(id);
+            const creds = readTwilioWorkspaceCredentials(twilioData);
+            if (!creds?.sid) {
+              throw new Error("Workspace has no Twilio credentials");
+            }
+          }
+          const { snapshot } = await reconcileWorkspaceBilling({
+            workspaceId: id,
+            source: "cron",
+          });
+          if (workspaceId) {
+            return {
+              ok: true,
+              materialVariance: snapshot.materialVariance,
+              message: snapshot.materialVariance
+                ? "Reconciliation complete — material variance detected."
+                : "Reconciliation complete — no material variance.",
+            };
+          }
+          return snapshot;
+        },
+      }),
+  );
 }
 
 export async function numberRentalBillingHandler(
@@ -143,39 +142,49 @@ export async function numberRentalBillingHandler(
 ): Promise<unknown> {
   const workspaceId = resolveWorkspaceId(job);
 
-  const result = await withOptionalWorkspaceFanout({
-    job: "number_rental_billing",
-    workspaceId,
-    requireTwilioCredentials: false,
-    runOne: (id) => runNumberRentalBilling({ workspaceId: id }),
-  });
-
-  if (!workspaceId) {
-    await rescheduleJob(
-      "number_rental_billing",
-      NUMBER_RENTAL_BILLING_RESCHEDULE_MS,
-      {},
-      job.id,
-    );
-  }
-  return result;
+  return withReschedule(
+    {
+      type: "number_rental_billing",
+      delayMs: NUMBER_RENTAL_BILLING_RESCHEDULE_MS,
+      completedJobId: job.id,
+      enabled: !workspaceId,
+    },
+    () =>
+      withOptionalWorkspaceFanout({
+        job: "number_rental_billing",
+        workspaceId,
+        requireTwilioCredentials: false,
+        runOne: (id) => runNumberRentalBilling({ workspaceId: id }),
+      }),
+  );
 }
 
 export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknown> {
-  const result = await runLowCreditNotify();
-  await rescheduleJob(
-    "low_credit_notify",
-    LOW_CREDIT_NOTIFY_RESCHEDULE_MS,
-    {},
-    job.id,
+  return withReschedule(
+    {
+      type: "low_credit_notify",
+      delayMs: LOW_CREDIT_NOTIFY_RESCHEDULE_MS,
+      completedJobId: job.id,
+    },
+    () => runLowCreditNotify(),
   );
-  return result;
 }
 
 /**
  * Scheduled Twilio webhook audit + optional auto-repair. Self-re-enqueuing.
  */
 export async function twilioWebhookAuditHandler(job: ClaimedJobRow): Promise<unknown> {
+  return withReschedule(
+    {
+      type: TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
+      delayMs: TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS,
+      completedJobId: job.id,
+    },
+    () => runTwilioWebhookAudit(job),
+  );
+}
+
+async function runTwilioWebhookAudit(job: ClaimedJobRow): Promise<unknown> {
   const params = (job.params ?? {}) as Record<string, unknown>;
   const autoRepair = params.autoRepair !== false;
 
@@ -235,13 +244,6 @@ export async function twilioWebhookAuditHandler(job: ClaimedJobRow): Promise<unk
       results.push({ workspaceId: ws.id, driftCount: -1, error: message });
     }
   }
-
-  await rescheduleJob(
-    TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
-    TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS,
-    {},
-    job.id,
-  );
 
   return {
     ok: true,

@@ -88,6 +88,11 @@ describe("messaging onboarding helpers", () => {
     expect(afterIntake.shouldRedirectToOnboarding).toBe(false);
     expect(afterIntake.shouldShowOnboardingBanner).toBe(true);
 
+    // NOTE: the profile above includes useCaseSummary/sampleMessages, which the
+    // wizard only ever collects for the SMS goal. That is why this assertion
+    // kept passing while non-SMS customers were trapped — see the dedicated
+    // test below, which supplies only what the Identity screen can produce.
+
     const legacyWorkspaceReadiness = deriveWorkspaceMessagingReadiness({
       onboarding: state,
       workspaceNumbers: [
@@ -530,5 +535,68 @@ describe("messaging onboarding helpers", () => {
     });
 
     expect(readiness.warnings).toContain("A2P 10DLC registration is not approved yet.");
+  });
+});
+
+/**
+ * Regression guard for the onboarding trap.
+ *
+ * The intake gate demanded four business-profile fields while the Identity
+ * screen collects two, and the screen collecting the other two is shown only
+ * for the SMS goal. Every calling / IVR / rent-a-number workspace therefore
+ * failed the gate forever and was bounced back into the wizard.
+ *
+ * These cases deliberately supply ONLY what the Identity screen can produce —
+ * the mistake in the pre-existing coverage was hand-building a profile the UI
+ * could never generate, which is why it stayed green through the outage.
+ */
+describe("intake completes with only what the Identity screen collects", () => {
+  const nonSmsGoals = ["live_call", "ivr", "rent_number"] as const;
+
+  for (const goal of nonSmsGoals) {
+    test(`${goal}: identity fields alone clear the redirect gate`, () => {
+      const base = normalizeWorkspaceMessagingOnboardingState(null);
+      const onboarding = mergeWorkspaceMessagingOnboardingState(base, {
+        status: "collecting_business",
+        selectedGoal: goal,
+        businessProfile: {
+          ...base.businessProfile,
+          legalBusinessName: "Acme Health",
+          websiteUrl: "https://acme.example",
+          // No useCaseSummary, no sampleMessages: the wizard never asks a
+          // non-SMS workspace for them.
+        },
+      });
+
+      const readiness = deriveWorkspaceMessagingReadiness({
+        onboarding,
+        // No numbers and no traffic: the "Skip for now" path, which is the
+        // case that had no escape at all.
+        workspaceNumbers: [],
+        recentOutboundCount: 0,
+      });
+
+      expect(readiness.shouldRedirectToOnboarding).toBe(false);
+    });
+  }
+
+  test("a workspace with no goal still goes to onboarding", () => {
+    const base = normalizeWorkspaceMessagingOnboardingState(null);
+    const onboarding = mergeWorkspaceMessagingOnboardingState(base, {
+      status: "collecting_business",
+      businessProfile: {
+        ...base.businessProfile,
+        legalBusinessName: "Acme Health",
+        websiteUrl: "https://acme.example",
+      },
+    });
+
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding,
+      workspaceNumbers: [],
+      recentOutboundCount: 0,
+    });
+
+    expect(readiness.shouldRedirectToOnboarding).toBe(true);
   });
 });

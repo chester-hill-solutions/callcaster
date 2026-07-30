@@ -5,7 +5,7 @@ vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
-  rescheduleJob: vi.fn(async () => undefined),
+  enqueueJob: vi.fn(async () => ({ enqueued: true })),
   runCronWorkspaceFanout: vi.fn(async () => ({ ok: true })),
   reconcileWorkspaceBilling: vi.fn(async () => ({
     snapshot: { materialVariance: false },
@@ -16,13 +16,12 @@ const mocks = vi.hoisted(() => ({
   runNumberRentalBilling: vi.fn(async () => ({ ok: true, processed: 1 })),
 }));
 
-vi.mock("@/lib/worker/handlers/shared.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/worker/handlers/shared.server")>();
-  return {
-    ...actual,
-    rescheduleJob: (...args: unknown[]) => mocks.rescheduleJob(...args),
-  };
-});
+// Mock the enqueue layer rather than rescheduleJob: the handlers go through
+// withReschedule -> rescheduleJob -> enqueueJob, and stubbing the middle of
+// that chain would not exercise the ordering guarantee these tests exist for.
+vi.mock("@/lib/worker/enqueue-job.server", () => ({
+  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+}));
 
 vi.mock("@/lib/cron-workspace-fanout.server", () => ({
   runCronWorkspaceFanout: (...args: unknown[]) =>
@@ -76,11 +75,8 @@ describe("cron handler self-reschedule gating", () => {
 
   test("coordinator billing_reconcile self-reschedules", async () => {
     await billingReconcileHandler(makeJob({ type: "billing_reconcile" }));
-    expect(mocks.rescheduleJob).toHaveBeenCalledWith(
-      "billing_reconcile",
-      expect.any(Number),
-      {},
-      1,
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "billing_reconcile" }),
     );
   });
 
@@ -92,7 +88,7 @@ describe("cron handler self-reschedule gating", () => {
         params: { workspaceId: "ws-1" },
       }),
     );
-    expect(mocks.rescheduleJob).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
     expect(mocks.reconcileWorkspaceBilling).toHaveBeenCalledWith({
       workspaceId: "ws-1",
       source: "cron",
@@ -101,11 +97,11 @@ describe("cron handler self-reschedule gating", () => {
 
   test("coordinator twilio_open_sync self-reschedules", async () => {
     await twilioOpenSyncHandler(makeJob({ type: "twilio_open_sync" }));
-    expect(mocks.rescheduleJob).toHaveBeenCalledWith(
-      "twilio_open_sync",
-      expect.any(Number),
-      expect.objectContaining({ callLimit: 50 }),
-      1,
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "twilio_open_sync",
+        params: expect.objectContaining({ callLimit: 50 }),
+      }),
     );
   });
 
@@ -117,7 +113,7 @@ describe("cron handler self-reschedule gating", () => {
         params: { workspaceId: "ws-1" },
       }),
     );
-    expect(mocks.rescheduleJob).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
     expect(mocks.triggerTwilioOpenSync).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: "ws-1" }),
     );
@@ -125,11 +121,8 @@ describe("cron handler self-reschedule gating", () => {
 
   test("coordinator number_rental_billing self-reschedules", async () => {
     await numberRentalBillingHandler(makeJob({ type: "number_rental_billing" }));
-    expect(mocks.rescheduleJob).toHaveBeenCalledWith(
-      "number_rental_billing",
-      expect.any(Number),
-      {},
-      1,
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "number_rental_billing" }),
     );
   });
 
@@ -141,9 +134,48 @@ describe("cron handler self-reschedule gating", () => {
         params: { workspaceId: "ws-1" },
       }),
     );
-    expect(mocks.rescheduleJob).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
     expect(mocks.runNumberRentalBilling).toHaveBeenCalledWith({
       workspaceId: "ws-1",
+    });
+  });
+
+  // These chains are the only scheduler. Rescheduling used to happen after the
+  // work, so a throwing tick scheduled no successor: three failed attempts
+  // dead-lettered the job and the money jobs never ran again until someone
+  // redeployed the worker. The next occurrence must be queued regardless.
+  describe("a failing tick must not kill the chain", () => {
+    test("billing_reconcile still reschedules when the work throws", async () => {
+      mocks.runCronWorkspaceFanout.mockRejectedValueOnce(new Error("db down"));
+
+      await expect(
+        billingReconcileHandler(makeJob({ type: "billing_reconcile" })),
+      ).rejects.toThrow("db down");
+
+      expect(mocks.enqueueJob).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "billing_reconcile" }),
+      );
+    });
+
+    test("number_rental_billing still reschedules when the work throws", async () => {
+      mocks.runCronWorkspaceFanout.mockRejectedValueOnce(new Error("boom"));
+
+      await expect(
+        numberRentalBillingHandler(makeJob({ type: "number_rental_billing" })),
+      ).rejects.toThrow("boom");
+
+      expect(mocks.enqueueJob).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "number_rental_billing" }),
+      );
+    });
+
+    test("a failing reschedule does not mask the original error", async () => {
+      mocks.runCronWorkspaceFanout.mockRejectedValueOnce(new Error("original"));
+      mocks.enqueueJob.mockRejectedValueOnce(new Error("enqueue exploded"));
+
+      await expect(
+        billingReconcileHandler(makeJob({ type: "billing_reconcile" })),
+      ).rejects.toThrow("original");
     });
   });
 });

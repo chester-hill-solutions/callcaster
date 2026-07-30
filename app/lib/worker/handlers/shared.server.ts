@@ -2,6 +2,45 @@ import { logger } from "@/lib/logger.server";
 import { enqueueJob } from "@/lib/worker/enqueue-job.server";
 
 /**
+ * Run a self-scheduling job's work, guaranteeing the next occurrence is
+ * enqueued even when the work throws.
+ *
+ * These chains are the only scheduler: there is no pg_cron and no external
+ * trigger. Every handler used to reschedule *after* its work, so a throwing
+ * tick never scheduled a successor — three failed attempts dead-lettered the
+ * job and `billing_reconcile` / `number_rental_billing` then never ran again
+ * until someone redeployed the worker. Silently, and on the money paths.
+ *
+ * Rescheduling in `finally` is safe against duplicates: `rescheduleJob` dedupes
+ * on a live row excluding this job, so a retry of the same job finds the
+ * successor already queued and no-ops.
+ */
+export async function withReschedule<T>(
+  args: {
+    type: string;
+    delayMs: number;
+    params?: Record<string, unknown>;
+    completedJobId: number;
+    /** Skip for per-workspace child jobs; only the root job carries the chain. */
+    enabled?: boolean;
+  },
+  work: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await work();
+  } finally {
+    if (args.enabled !== false) {
+      await rescheduleJob(
+        args.type,
+        args.delayMs,
+        args.params ?? {},
+        args.completedJobId,
+      );
+    }
+  }
+}
+
+/**
  * Enqueue the next run of a self-scheduling cron/coordinator job.
  */
 export async function rescheduleJob(
