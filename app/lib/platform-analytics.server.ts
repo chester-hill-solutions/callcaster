@@ -21,6 +21,7 @@ import { campaign as campaignTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { downloadObject, listObjects } from "@/lib/object-storage.server";
+import { trackBackgroundFailure } from "@/lib/background-task.server";
 
 export type SerializedExportItem = {
   id: string;
@@ -198,35 +199,27 @@ export async function startCampaignExportApi(
   const exportId = generateCampaignExportId();
 
   if (campaignRow.type === "message") {
-    void processMessageCampaignExport(
-      campaignId,
-      workspaceId,
-      exportId,
-      campaignRow.title || "",
-    )
-      .catch((error: unknown) => {
-        logger.error("campaign_export.background_failed", {
-          exportId,
-          campaignId,
-          workspaceId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
+    trackBackgroundFailure(
+      processMessageCampaignExport(
+        campaignId,
+        workspaceId,
+        exportId,
+        campaignRow.title || "",
+      ),
+      "campaign_export.background_failed",
+      { exportId, campaignId, workspaceId },
+    );
   } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
-    void processCallCampaignExport(
-      campaignId,
-      workspaceId,
-      exportId,
-      campaignRow.title || "",
-    )
-      .catch((error: unknown) => {
-        logger.error("campaign_export.background_failed", {
-          exportId,
-          campaignId,
-          workspaceId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
+    trackBackgroundFailure(
+      processCallCampaignExport(
+        campaignId,
+        workspaceId,
+        exportId,
+        campaignRow.title || "",
+      ),
+      "campaign_export.background_failed",
+      { exportId, campaignId, workspaceId },
+    );
   } else {
     return { ok: false as const, error: "Invalid campaign type for export", status: 400 };
   }

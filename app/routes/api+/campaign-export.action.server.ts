@@ -9,6 +9,7 @@ import {
   processMessageCampaignExport,
 } from "@/lib/campaign-export.server";
 import { defineAction } from "@/lib/handler.server";
+import { trackBackgroundFailure } from "@/lib/background-task.server";
 
 const unauthorized = () =>
   new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -53,35 +54,27 @@ export const action = defineAction({
     const exportId = generateCampaignExportId();
 
     if (campaignRow.type === "message") {
-      void processMessageCampaignExport(
-        Number(campaignId),
-        workspaceId.toString(),
-        exportId,
-        campaignRow.title || "",
-      )
-        .catch((error: unknown) => {
-          logger.error("campaign_export.background_failed", {
-            exportId,
-            campaignId,
-            workspaceId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        });
+      trackBackgroundFailure(
+        processMessageCampaignExport(
+          Number(campaignId),
+          workspaceId.toString(),
+          exportId,
+          campaignRow.title || "",
+        ),
+        "campaign_export.background_failed",
+        { exportId, campaignId, workspaceId },
+      );
     } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
-      void processCallCampaignExport(
-        Number(campaignId),
-        workspaceId.toString(),
-        exportId,
-        campaignRow.title || "",
-      )
-        .catch((error: unknown) => {
-          logger.error("campaign_export.background_failed", {
-            exportId,
-            campaignId,
-            workspaceId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        });
+      trackBackgroundFailure(
+        processCallCampaignExport(
+          Number(campaignId),
+          workspaceId.toString(),
+          exportId,
+          campaignRow.title || "",
+        ),
+        "campaign_export.background_failed",
+        { exportId, campaignId, workspaceId },
+      );
     } else {
       return new Response("Invalid campaign type", { status: 400 });
     }
