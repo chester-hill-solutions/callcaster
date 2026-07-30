@@ -81,6 +81,11 @@ export async function resetStaleClaims(): Promise<void> {
   // Reclaims are re-queued WITHOUT bumping attempt_count here: claimNextJob
   // increments attempt_count when it re-claims the row, so a crash-recovery
   // cycle costs exactly one attempt instead of two (reset + reclaim).
+  // Deliberately NO `RETURNING`: the driver already reports affected rows, and
+  // this runs every ~5s on the critical path of the entire job queue. A
+  // RETURNING variant was the one delta in the query implicated in a dev crash
+  // loop. It was never proven to be the cause — it reproduces fine against a
+  // real Postgres — but a row count is a nicety and queue stability is not.
   const result = await db.execute(sql`
     UPDATE job
     SET status = 'queued',
@@ -89,17 +94,17 @@ export async function resetStaleClaims(): Promise<void> {
         updated_at = now()
     WHERE status = 'running'
       AND claimed_until < now()
-    RETURNING id
   `);
 
-  // This runs on every poll tick (~5s). Logging unconditionally buried the
-  // signal in ~17k lines/day per worker; a reset is only interesting when it
-  // actually reclaimed something, which means a worker died mid-job.
-  // Driver shape varies (postgres.js returns an array; pg returns {rows}).
-  const raw = result as unknown as { rows?: unknown[] } | unknown[] | null;
-  const rows = Array.isArray(raw) ? raw : (raw?.rows ?? []);
-  if (rows.length > 0) {
-    logger.warn("worker.stale_claims_reset", { reclaimed: rows.length });
+  // Logging unconditionally buried the signal in ~17k lines/day per worker; a
+  // reset is only interesting when it actually reclaimed something, which
+  // means a worker died mid-job. Driver shape varies (postgres.js exposes
+  // `count`; pg returns `{rows}`), so read defensively.
+  const reclaimed =
+    (result as unknown as { count?: number } | null)?.count ??
+    (Array.isArray(result) ? result.length : 0);
+  if (reclaimed > 0) {
+    logger.warn("worker.stale_claims_reset", { reclaimed });
   }
 }
 
