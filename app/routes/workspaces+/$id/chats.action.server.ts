@@ -16,6 +16,7 @@ import { logger } from "@/lib/logger.server";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import type { BaseUser, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
+import { toUserMessage } from "@/lib/user-message";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -239,7 +240,7 @@ export const action = defineAction({
     return routeData(
       {
         error:
-          error instanceof Error ? error.message : "Failed to send message",
+          toUserMessage(error, "Failed to send message"),
       },
       { status: 400 },
     );

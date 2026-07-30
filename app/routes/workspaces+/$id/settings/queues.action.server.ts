@@ -13,6 +13,7 @@ import {
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import { toUserMessage } from "@/lib/user-message";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -41,7 +42,10 @@ export const action = defineAction({
           return routeData({ ok: true }, { headers });
         } catch (error) {
           logger.error("Failed to create queue", error);
-          return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
+          return routeData(
+            { error: toUserMessage(error, "We could not create that queue.") },
+            { status: 500, headers },
+          );
         }
       }
 
@@ -58,7 +62,10 @@ export const action = defineAction({
           return routeData({ ok: true }, { headers });
         } catch (error) {
           logger.error("Failed to update queue", error);
-          return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
+          return routeData(
+            { error: toUserMessage(error, "We could not save the queue.") },
+            { status: 500, headers },
+          );
         }
       }
 
@@ -71,7 +78,10 @@ export const action = defineAction({
           return routeData({ ok: true }, { headers });
         } catch (error) {
           logger.error("Failed to delete queue", error);
-          return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
+          return routeData(
+            { error: toUserMessage(error, "We could not delete that queue.") },
+            { status: 500, headers },
+          );
         }
       }
 
@@ -90,7 +100,10 @@ export const action = defineAction({
           return routeData({ ok: true }, { headers });
         } catch (error) {
           logger.error("Failed to add member", error);
-          return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
+          return routeData(
+            { error: toUserMessage(error, "We could not add that member to the queue.") },
+            { status: 500, headers },
+          );
         }
       }
 
@@ -109,7 +122,10 @@ export const action = defineAction({
           return routeData({ ok: true }, { headers });
         } catch (error) {
           logger.error("Failed to remove member", error);
-          return routeData({ error: error instanceof Error ? error.message : "Failed" }, { status: 500, headers });
+          return routeData(
+            { error: toUserMessage(error, "We could not remove that member from the queue.") },
+            { status: 500, headers },
+          );
         }
       }
 

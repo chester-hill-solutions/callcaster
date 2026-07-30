@@ -192,7 +192,9 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     );
   });
 
-  test("add_from_audience returns contact lookup errors before enqueueing", async () => {
+  // A technical error must not reach the user verbatim; toUserMessage swaps it
+  // for the route's fallback. See the sibling test for the pass-through case.
+  test("add_from_audience replaces a technical error with a safe message", async () => {
     dbMocks.selectChain.mockRejectedValueOnce(new Error("lookup failed"));
 
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -211,9 +213,33 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       success: false,
-      error: "lookup failed",
+      error: "Failed to add audience to queue",
     });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
+  });
+
+  test("add_from_audience passes through an intentional user-facing message", async () => {
+    dbMocks.selectChain.mockRejectedValueOnce(
+      new Error("That audience has no contacts yet."),
+    );
+
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "add_from_audience",
+      audienceId: "5",
+    });
+
+    const mod = await import(
+      "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
+    );
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://x", { method: "POST" }),
+      params: { selected_id: "99" },
+    } as any)));
+
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "That audience has no contacts yet.",
+    });
   });
 
   test("loader keeps untouched queued contacts visible", async () => {

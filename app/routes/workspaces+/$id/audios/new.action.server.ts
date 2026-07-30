@@ -6,6 +6,7 @@ import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { uploadObject } from "@/lib/object-storage.server";
 import { defineAction } from "@/lib/handler.server";
+import { toUserMessage } from "@/lib/user-message";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -49,7 +50,7 @@ export const action = defineAction({
     } catch (error) {
       logger.error("Workspace audio upload failed", error);
       const message =
-        error instanceof Error ? error.message : "Failed to upload audio.";
+        toUserMessage(error, "Failed to upload audio.");
       const status = error instanceof AudioUploadError ? error.status : 500;
       return routeData({ success: false, error: message }, { headers, status });
     }

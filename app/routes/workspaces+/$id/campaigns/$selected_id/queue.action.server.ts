@@ -19,6 +19,7 @@ import { db } from "@/server/db";
 import type { Contact } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
 import { MemberRole } from "@/lib/member-role";
+import { toUserMessage } from "@/lib/user-message";
 
 const EMPTY_FILTERS: QueueSearchFilters = {
   name: "",
@@ -89,7 +90,7 @@ export const action = defineAction({
       } catch (error) {
         return routeData({
           success: false,
-          error: error instanceof Error ? error.message : "Failed to update queue status",
+          error: toUserMessage(error, "Failed to update queue status"),
         });
       }
     }
@@ -121,7 +122,7 @@ export const action = defineAction({
       } catch (error) {
         return routeData({
           success: false,
-          error: error instanceof Error ? error.message : "Failed to add audience to queue",
+          error: toUserMessage(error, "Failed to add audience to queue"),
         });
       }
     }
@@ -144,7 +145,7 @@ export const action = defineAction({
       } catch (error) {
         return routeData({
           success: false,
-          error: error instanceof Error ? error.message : "Failed to add contacts to queue",
+          error: toUserMessage(error, "Failed to add contacts to queue"),
         });
       }
     }
@@ -173,7 +174,7 @@ export const action = defineAction({
       } catch (error) {
         return routeData({
           success: false,
-          error: error instanceof Error ? error.message : "Failed to remove queue contacts",
+          error: toUserMessage(error, "Failed to remove queue contacts"),
         });
       }
     }

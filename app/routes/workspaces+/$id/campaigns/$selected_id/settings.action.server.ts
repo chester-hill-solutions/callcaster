@@ -40,6 +40,7 @@ import { defineAction } from "@/lib/handler.server";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
+import { toUserMessage } from "@/lib/user-message";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -164,7 +165,7 @@ export const action = defineAction({
         logger.error("Error saving campaign settings", error);
         return routeData(
           {
-            error: error instanceof Error ? error.message : "Campaign changes could not be saved",
+            error: toUserMessage(error, "Campaign changes could not be saved"),
             actionType: "save" as const,
           },
           { status: 400 },
@@ -245,7 +246,7 @@ export const action = defineAction({
         return routeData(
           {
             success: false,
-            error: error instanceof Error ? error.message : "Campaign status could not be updated",
+            error: toUserMessage(error, "Campaign status could not be updated"),
             actionType: "status" as const,
           },
           { status: 400 },
@@ -263,7 +264,7 @@ export const action = defineAction({
         return routeData(
           {
             success: false,
-            error: error instanceof Error ? error.message : "Campaign could not be duplicated",
+            error: toUserMessage(error, "Campaign could not be duplicated"),
             actionType: "duplicate" as const,
           },
           { status: 400 },
@@ -301,7 +302,7 @@ export const action = defineAction({
         return routeData(
           {
             success: false,
-            error: error instanceof Error ? error.message : "Campaign could not be split",
+            error: toUserMessage(error, "Campaign could not be split"),
             actionType: "split" as const,
           },
           { status: 400 },

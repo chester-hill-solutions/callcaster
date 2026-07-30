@@ -11,6 +11,7 @@ import {
 } from "@/lib/platform-onboarding.server";
 import { MemberRole } from "@/lib/member-role";
 import { defineAction } from "@/lib/handler.server";
+import { toUserMessage } from "@/lib/user-message";
 
 export type { OnboardingActionData } from "@/lib/onboarding-actions.server";
 
@@ -117,7 +118,7 @@ export const action = defineAction({
       }
       return routeData<OnboardingActionData>(
         {
-          error: error instanceof Error ? error.message : "Onboarding update failed.",
+          error: toUserMessage(error, "Onboarding update failed."),
         },
         { status: 500 },
       );

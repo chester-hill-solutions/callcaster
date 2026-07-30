@@ -14,6 +14,7 @@ import { defineAction } from "@/lib/handler.server";
 import type { InboundRoutingPresetApplication } from "../../../../../shared/inbound-routing-presets";
 import { parseRoutingPresetApplication } from "@/lib/routing-preset-form";
 import { data as routeData } from "react-router";
+import { toUserMessage } from "@/lib/user-message";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -72,7 +73,7 @@ export const action = defineAction({
         return routeData(
           {
             error:
-              error instanceof Error ? error.message : "Choose valid routing settings",
+              toUserMessage(error, "Choose valid routing settings"),
           },
           { status: 400 },
         );

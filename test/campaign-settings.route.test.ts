@@ -273,7 +273,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
   });
 
-  test("returns a duplicate-specific error when cloning fails", async () => {
+  test("returns a duplicate-specific, non-technical error when cloning fails", async () => {
     const dbClient = makeDbClientForSettingsRoute({
       duplicateInsertError: new Error("duplicate failed"),
     });
@@ -295,7 +295,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     await expect(res.json()).resolves.toMatchObject({
       success: false,
       actionType: "duplicate",
-      error: "duplicate failed",
+      error: "Campaign could not be duplicated",
     });
   });
 
