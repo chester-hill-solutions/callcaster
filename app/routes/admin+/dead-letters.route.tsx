@@ -1,6 +1,7 @@
 export { loader } from "./dead-letters.loader.server";
+export { action } from "./dead-letters.action.server";
 
-import { Link, useLoaderData } from "react-router";
+import { Link, useFetcher, useLoaderData } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,33 @@ type LoaderData = {
   jobs: DeadLetteredJobRow[];
 };
 
+/**
+ * Requeue control for one row.
+ *
+ * A fetcher per row rather than one shared: with a single fetcher every button
+ * shows the pending state while any one job is requeuing, and the result
+ * message cannot be attributed to the row it came from.
+ */
+function RequeueButton({ jobId }: { jobId: number }) {
+  const fetcher = useFetcher<{ error?: string; message?: string }>();
+  const busy = fetcher.state !== "idle";
+
+  return (
+    <fetcher.Form method="post" className="flex flex-col items-end gap-1">
+      <input type="hidden" name="jobId" value={jobId} />
+      <Button type="submit" size="sm" variant="outline" disabled={busy}>
+        {busy ? "Requeuing..." : "Requeue"}
+      </Button>
+      {fetcher.data?.error && (
+        <span className="text-xs text-destructive">{fetcher.data.error}</span>
+      )}
+      {fetcher.data?.message && (
+        <span className="text-xs text-muted-foreground">{fetcher.data.message}</span>
+      )}
+    </fetcher.Form>
+  );
+}
+
 export default function AdminDeadLetters() {
   const { jobs } = useLoaderData<LoaderData>();
 
@@ -36,7 +64,10 @@ export default function AdminDeadLetters() {
             <div>
               <CardTitle>Dead-Letter Jobs</CardTitle>
               <CardDescription>
-                Jobs that exhausted all retry attempts, newest first.
+                Jobs that exhausted all retry attempts, newest first. Requeue
+                returns a job to the worker with a fresh set of attempts; the
+                billing paths are idempotent, so a job that failed after its
+                ledger write will not charge twice.
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
@@ -59,6 +90,7 @@ export default function AdminDeadLetters() {
                     <TableHead>Attempts</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Failed</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -83,6 +115,9 @@ export default function AdminDeadLetters() {
                         {job.failed_at
                           ? new Date(job.failed_at).toLocaleString()
                           : "Unknown"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RequeueButton jobId={job.id} />
                       </TableCell>
                     </TableRow>
                   ))}
