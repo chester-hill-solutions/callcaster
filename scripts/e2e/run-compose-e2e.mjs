@@ -205,7 +205,15 @@ try {
   console.log("[e2e-compose] probing surface contracts…");
   const probe = spawnSync(
     "npx",
-    ["tsx", "--tsconfig", "tsconfig.json", "scripts/probe-surfaces.mjs", "--base-url", baseURL],
+    [
+      "tsx",
+      "--tsconfig",
+      "tsconfig.json",
+      "scripts/probe-surfaces.mjs",
+      "--base-url",
+      baseURL,
+      "--include-pages",
+    ],
     { cwd: rootDir, stdio: "inherit", env: { ...process.env, DATABASE_URL: databaseUrl } },
   );
   if (probe.status !== 0) {

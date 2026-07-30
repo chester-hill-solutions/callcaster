@@ -35,7 +35,10 @@
  *                           and reachability is still enforced.
  *   --include-pages         Also probe non-API page routes (GET only).
  */
-import { writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import { API_SURFACE } from "../app/lib/api-surface.ts";
 import {
@@ -59,6 +62,7 @@ const BASE_URL = (
   "http://127.0.0.1:3100"
 ).replace(/\/$/, "");
 const STRICT_PROVIDER_AUTH = args.includes("--strict-provider-auth");
+const INCLUDE_PAGES = args.includes("--include-pages");
 const JSON_OUT = flagValue("--json");
 const TIMEOUT_MS = Number(flagValue("--timeout", "15000"));
 
@@ -313,6 +317,160 @@ async function probe(entry, operation) {
   };
 }
 
+// ─── Page routes ────────────────────────────────────────────────────────
+// API probing is inventory-driven; page routes have no inventory, so they are
+// enumerated from the router itself and classified by reading the code that
+// guards them (never a hand-maintained list — those drift).
+
+const ROUTE_OPEN = /<Route(?:\s+(index))?(?:\s+path="([^"]*)")?\s+file="([^"]+)"/;
+const ROUTE_CLOSE = /<\/Route>/;
+
+function enumeratePageRoutes() {
+  const tmpFile = path.join(os.tmpdir(), `probe-routes-${process.pid}.txt`);
+  let out = "";
+  try {
+    execSync(`npx react-router routes > ${JSON.stringify(tmpFile)} 2>/dev/null`);
+    out = readFileSync(tmpFile, "utf8");
+  } catch {
+    out = existsSync(tmpFile) ? readFileSync(tmpFile, "utf8") : "";
+  } finally {
+    rmSync(tmpFile, { force: true });
+  }
+
+  const stack = [];
+  const routes = [];
+  for (const line of out.split("\n")) {
+    const trimmed = line.trim();
+    const open = trimmed.match(ROUTE_OPEN);
+    if (open) {
+      const [, isIndex, segment, file] = open;
+      const routeModule = file.replace(/^routes\//, "app/routes/");
+      const selfClosing = trimmed.endsWith("/>");
+      if (segment) stack.push(segment);
+      const joined = stack.join("/");
+      // Index routes inherit the parent's joined path ("" → "/").
+      if (!joined.startsWith("api/") && file !== "root.tsx") {
+        routes.push({ path: `/${joined}`, routeModule, isIndex: Boolean(isIndex) });
+      }
+      if (segment && selfClosing) stack.pop();
+      continue;
+    }
+    if (ROUTE_CLOSE.test(trimmed)) stack.pop();
+  }
+
+  const seen = new Set();
+  return routes.filter((r) => {
+    const key = `${r.path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const LOADER_AUTH_MARKERS = [
+  "verifyAuth",
+  "createAuthLayoutLoader",
+  "requireWorkspaceAccess",
+  "requireUserSession",
+];
+
+/**
+ * Protected = guarded by a route-tree middleware, or by an auth call in the
+ * route's own loader. Both are read from the source, so adding a new guarded
+ * page needs no edit here.
+ */
+function classifyPageRoute(routeModule) {
+  if (
+    routeModule.startsWith("app/routes/workspaces+/$id") ||
+    routeModule.startsWith("app/routes/admin+/")
+  ) {
+    return "protected";
+  }
+  const loaderModule = routeModule.replace(/\.route\.tsx$|\.tsx$/, ".loader.server.ts");
+  if (existsSync(loaderModule)) {
+    const source = readFileSync(loaderModule, "utf8");
+    if (LOADER_AUTH_MARKERS.some((marker) => source.includes(marker))) {
+      return "protected";
+    }
+  }
+  return "public";
+}
+
+async function probePage(route) {
+  const { concrete } = expandPath(route.path);
+  const url = `${BASE_URL}${concrete === "/" ? "" : concrete}/`.replace(/\/+$/, "/");
+  const classification = classifyPageRoute(route.routeModule);
+  const isParameterized = route.path.includes(":");
+
+  let status = 0;
+  let location = "";
+  let bodyText = "";
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "manual",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    status = response.status;
+    location = response.headers.get("location") ?? "";
+    bodyText = (await response.text()).slice(0, 4000);
+  } catch (error) {
+    return {
+      path: route.path,
+      url: concrete,
+      method: "GET",
+      authClass: `page:${classification}`,
+      status: 0,
+      ok: false,
+      reason: `request failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  const base = {
+    path: route.path,
+    url: concrete,
+    method: "GET",
+    authClass: `page:${classification}`,
+    status,
+  };
+
+  if (status >= 500) {
+    return { ...base, ok: false, reason: `server error ${status}` };
+  }
+
+  // A static (param-free) page path that 404s is not routed. Parameterized
+  // pages legitimately 404 on a missing record, so they are exempt.
+  if (status === 404 && !isParameterized) {
+    return {
+      ...base,
+      ok: false,
+      reason: "NOT ROUTED — static page path returned 404",
+    };
+  }
+
+  const redirected = status >= 300 && status < 400;
+
+  if (classification === "protected") {
+    if (redirected && /\/signin|\/workspaces/.test(location)) {
+      return { ...base, ok: true, reason: `redirect -> ${location}` };
+    }
+    if (status === 404) return { ...base, ok: true, reason: "404 (existence hidden)" };
+    if (status === 200) {
+      return {
+        ...base,
+        ok: false,
+        reason: "AUTH BYPASS — protected page served 200 to an anonymous request",
+      };
+    }
+    return { ...base, ok: true, reason: `non-200 (${status})` };
+  }
+
+  if (status === 200 || status === 400 || status === 404 || redirected) {
+    return { ...base, ok: true, reason: redirected ? `redirect -> ${location}` : null };
+  }
+  return { ...base, ok: false, reason: `public page returned ${status}` };
+}
+
 async function mapWithConcurrency(items, limit, fn) {
   const results = [];
   let cursor = 0;
@@ -335,14 +493,21 @@ async function main() {
     }
   }
 
+  const pageRoutes = INCLUDE_PAGES ? enumeratePageRoutes() : [];
+
   console.log(
-    `[probe-surfaces] base=${BASE_URL} probes=${probes.length} ` +
+    `[probe-surfaces] base=${BASE_URL} apiProbes=${probes.length} ` +
+      `pageProbes=${pageRoutes.length} ` +
       `providerAuth=${STRICT_PROVIDER_AUTH ? "strict" : "relaxed"}`,
   );
 
-  const results = await mapWithConcurrency(probes, 8, ({ entry, operation }) =>
+  const apiResults = await mapWithConcurrency(probes, 8, ({ entry, operation }) =>
     probe(entry, operation),
   );
+  const pageResults = await mapWithConcurrency(pageRoutes, 8, (route) =>
+    probePage(route),
+  );
+  const results = [...apiResults, ...pageResults];
 
   const failures = results.filter((r) => !r.ok);
   const unrouted = failures.filter((r) => r.reason?.startsWith("NOT ROUTED"));
@@ -367,6 +532,23 @@ async function main() {
         `  ${r.method} ${r.path} [${r.authClass}] -> ${r.status}: ${r.reason}`,
       );
     }
+  }
+
+  // Report what was actually covered. A green run means nothing if the
+  // classifier quietly decided every page was public.
+  const coverage = {};
+  for (const r of results) {
+    coverage[r.authClass] = (coverage[r.authClass] ?? 0) + 1;
+  }
+  console.log("\n[probe-surfaces] coverage by declared class:");
+  for (const [cls, count] of Object.entries(coverage).sort()) {
+    console.log(`  ${String(count).padStart(4)}  ${cls}`);
+  }
+  if (INCLUDE_PAGES && (coverage["page:protected"] ?? 0) === 0) {
+    console.error(
+      "\nFAIL: page probing found zero protected routes — the classifier is broken.",
+    );
+    process.exit(1);
   }
 
   const passed = results.length - failures.length;

@@ -76,14 +76,40 @@ Result on deployed dev, 2026-07-29: **191/191 OK**.
   Every entry carries a reason. Do not add one to silence a finding you have not
   explained.
 
+## Page routes (`--include-pages`)
+
+70 page routes are enumerated from the router and classified **by reading the
+code that guards them**, never from a hand-maintained list (list drift is this
+repo's most common bug class):
+
+- **protected** — the module sits under a subtree with a
+  `*.middleware.server.ts` (`workspaces+/$id`, `admin+/`), or its sibling
+  `*.loader.server.ts` calls `verifyAuth` / `createAuthLayoutLoader` /
+  `requireWorkspaceAccess`. Adding a newly-guarded page needs no edit here.
+- **public** — everything else.
+
+Assertions: protected pages must redirect to `/signin` (a **200 is reported as
+an auth bypass**), static param-free paths must not 404 (unrouted), and nothing
+may 5xx.
+
+The run prints coverage by class and **fails if zero protected routes were
+found** — a classifier that silently degraded to "everything is public" would
+otherwise produce a meaningless green.
+
+Deployed dev, 2026-07-29: 261/261 (191 API + 70 page); 55 protected pages all
+redirecting, 15 public serving 200.
+
 ## Known gaps (not yet covered)
 
-- **Page routes.** The `--include-pages` flag is declared but not implemented;
-  69 page routes are unprobed. Worth adding: assert protected pages 302 to
-  `/signin`, public pages 200, and no page returns the React error boundary
-  (which would catch the deferred-loader/#419 class).
+- **Hydration errors are invisible here.** React #419 / deferred-loader hangs
+  affect the *browser*, not curl — bots receive fine SSR HTML while real users
+  get a permanent fallback. Catching that class requires Playwright with a real
+  browser, not this prober. Do not read a green page-probe as "the page renders".
 - **Authenticated behavior.** Probing is credential-free by design, so it proves
   endpoints reject correctly, not that they *work* when authorized. That
   remains E2E's job.
 - **Provider-auth in CI.** Nothing verifies signature enforcement inside CI; the
   strict run needs a deployed environment.
+- **`/signin?next=` precision.** `/account/security` redirects to
+  `next=/account` (the parent), because `verifyAuth` takes a static `nextUrl`.
+  Cosmetic; noted rather than fixed.
