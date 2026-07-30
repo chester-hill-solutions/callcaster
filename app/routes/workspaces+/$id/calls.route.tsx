@@ -22,7 +22,7 @@ export default function WorkspaceCallLogPage() {
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <Heading as="h1" level={2} branded={false}>
-          Calls
+          Call History
         </Heading>
         <Button asChild variant="outline" className="font-Zilla-Slab text-base font-semibold">
           <Link to=".." relative="path">

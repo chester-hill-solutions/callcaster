@@ -48,7 +48,11 @@ describe("app/routes/signup.tsx heading structure", () => {
     );
     render(createElement(RouterProvider, { router }));
 
-    expect(await screen.findByText("Request Access")).toBeInTheDocument();
+    // The page heading now matches the card instead of claiming "Sign Up"
+    // while the form underneath asks you to request access.
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Request Access" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
       screen.getByRole("heading", { level: 2, name: "Request Access" }),

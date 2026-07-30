@@ -26,7 +26,9 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
   ownerTest("ERR-07 empty workspace owner CTA", async ({ page }) => {
     const ws = new WorkspacePage(page);
     await ws.goto(E2E_WORKSPACES.empty.id, "campaigns");
-    await expect(page.getByText(/Get started|Add Campaign|Get a Number/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/Get started|Create campaign|Get a Number/i).first(),
+    ).toBeVisible();
   });
 
   ownerTest("ERR-10 chats empty copy", async ({ page }) => {

@@ -77,7 +77,7 @@ const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { name: "Messages", path: "chats", icon: MessageSquare },
-      { name: "Calls", path: "calls", icon: Phone },
+      { name: "Call History", path: "calls", icon: Phone },
       { name: "Voicemails", path: "voicemails", icon: Voicemail },
       { name: "Handset", path: "handset", icon: Headset },
     ],

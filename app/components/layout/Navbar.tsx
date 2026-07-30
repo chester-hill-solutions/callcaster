@@ -270,7 +270,7 @@ export default function Navbar({
           {!isSignedIn && (
             <>
               <NavButton to="/signin">Sign In</NavButton>
-              <NavButton to="/signup">Sign Up</NavButton>
+              <NavButton to="/signup">Get started</NavButton>
             </>
           )}
           {isSignedIn &&

@@ -19,7 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Text , Heading } from "@/components/ui/typography";
 
-export const meta: MetaFunction = () => [{ title: "Sign Up — CallCaster" }];
+// Neutral on purpose: this page is registration when signup is open and a
+// request-access form when it is closed, and meta cannot read loader data here.
+export const meta: MetaFunction = () => [{ title: "Get Started — CallCaster" }];
 
 type FetcherData =
   | {
@@ -59,7 +61,7 @@ export default function SignUp() {
         level={1}
         className="animate-fade-in-up my-4 font-Tabac-Slab"
       >
-        Sign Up
+        {signupOpen ? "Sign Up" : "Request Access"}
       </Heading>
       <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
         {signupOpen ? (

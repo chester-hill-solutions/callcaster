@@ -36,7 +36,7 @@ const CampaignsList = ({
         to={`campaigns/new`}
         className="flex items-center justify-center gap-2 rounded-none border-b border-border/70 bg-brand-primary px-3 py-3 font-Zilla-Slab text-sm font-bold text-primary-foreground md:rounded-t-lg"
       >
-        <span>Add Campaign</span>
+        <span>Create campaign</span>
         <FaPlus size="16" />
       </NavLink>
     </CardHeader>

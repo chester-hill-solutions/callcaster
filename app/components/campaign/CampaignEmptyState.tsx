@@ -25,7 +25,7 @@ const CampaignEmptyState = ({
     (type === "campaign" ? (
       <Button asChild>
         <NavLink to={isCampaignsRoute ? "new" : "campaigns/new"}>
-          Add Campaign
+          Create campaign
         </NavLink>
       </Button>
     ) : (
