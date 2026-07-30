@@ -66,7 +66,7 @@ export async function resetStaleClaims(): Promise<void> {
   // Reclaims are re-queued WITHOUT bumping attempt_count here: claimNextJob
   // increments attempt_count when it re-claims the row, so a crash-recovery
   // cycle costs exactly one attempt instead of two (reset + reclaim).
-  await db.execute(sql`
+  const result = await db.execute(sql`
     UPDATE job
     SET status = 'queued',
         claimed_until = null,
@@ -74,8 +74,18 @@ export async function resetStaleClaims(): Promise<void> {
         updated_at = now()
     WHERE status = 'running'
       AND claimed_until < now()
+    RETURNING id
   `);
-  logger.info("worker.stale_claims_reset");
+
+  // This runs on every poll tick (~5s). Logging unconditionally buried the
+  // signal in ~17k lines/day per worker; a reset is only interesting when it
+  // actually reclaimed something, which means a worker died mid-job.
+  // Driver shape varies (postgres.js returns an array; pg returns {rows}).
+  const raw = result as unknown as { rows?: unknown[] } | unknown[] | null;
+  const rows = Array.isArray(raw) ? raw : (raw?.rows ?? []);
+  if (rows.length > 0) {
+    logger.warn("worker.stale_claims_reset", { reclaimed: rows.length });
+  }
 }
 
 export async function claimNextJob(

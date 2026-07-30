@@ -325,6 +325,35 @@ describe("worker poll-jobs lifecycle", () => {
     expect(stored?.attempt_count).toBe(1);
   });
 
+  test("stale-claim reset is silent when nothing was reclaimed, warns when it was", async () => {
+    const { logger } = await import("@/lib/logger.server");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    try {
+      // Nothing stale: this runs every ~5s per worker, so it must not log.
+      await resetStaleClaims();
+      expect(warn).not.toHaveBeenCalled();
+      expect(info).not.toHaveBeenCalled();
+
+      // A reclaim means a worker died mid-job — that is worth a line.
+      mockState.state.jobs.push(
+        createJob({
+          id: 43,
+          status: "running",
+          claimed_until: new Date(mockState.baseTime.getTime() - 1_000).toISOString(),
+        }),
+      );
+      await resetStaleClaims();
+      expect(warn).toHaveBeenCalledWith(
+        "worker.stale_claims_reset",
+        expect.objectContaining({ reclaimed: 1 }),
+      );
+    } finally {
+      warn.mockRestore();
+      info.mockRestore();
+    }
+  });
+
   test("crash-recovery cycle (reset + reclaim) costs exactly one attempt, not two", async () => {
     mockState.state.jobs.push(
       createJob({
