@@ -99,6 +99,29 @@ Pain to remove: mega business form before goal; link-out checklist cards; sideba
 
 ## 5. Target architecture
 
+> ## ⚠️ SECTIONS 5 AND 6 DESCRIBE A REJECTED DESIGN — DO NOT BUILD FROM THEM
+>
+> The short-intake / "Today as primary path" architecture below was **rejected on
+> 2026-07-18** (see the Status line at the top of this file). It was never built,
+> and the KRs in §3 score the shipped code as failing because they measure the
+> rejected design, not the one that shipped.
+>
+> **What actually shipped** (verified in code 2026-07-30): a goal-first wizard —
+> `path_selection` → `business_identity` → goal-scoped checklist steps, per
+> `wizardStepsForGoal` in `app/lib/messaging-onboarding/goals.ts`. The wizard body
+> was *not* replaced; `/onboarding` is not a thin shell; Today is not the primary
+> path after intake.
+>
+> Two later corrections also apply and are not reflected below:
+> - The intake gate is `BUSINESS_IDENTITY_REQUIRED_FIELDS` (legal business name
+>   only). It previously demanded four fields the wizard never collected for
+>   non-SMS goals, which trapped those workspaces in onboarding permanently.
+> - `websiteUrl` is optional at intake; messaging channels still require it via
+>   the per-channel readiness predicates.
+>
+> Retained for the rationale in §1–§4 and the research context. If you need the
+> current shape, read the code named above, not this section.
+
 ```mermaid
 flowchart TD
   create[Create workspace] --> intake[Intake: name goal country]

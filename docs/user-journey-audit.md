@@ -2,6 +2,21 @@
 
 **Date:** 2026-06-30
 **Scope:** Full audit across all user types
+
+> **Partially stale — re-verified against code 2026-07-30.** Several findings
+> below are fixed; do not re-file them.
+>
+> **Fixed since this audit:** voicemails page has a "Set up voicemail" CTA;
+> contacts can be created from `/contacts`; analytics has a date range;
+> `startDisabledReason` renders on the dedicated launch route; campaign readiness
+> has a unified checklist (`app/lib/campaign-readiness-actions.ts`); the
+> hardcoded-UUID "Reset Campaign" backdoor at `:27` is deleted; a number-purchase
+> top-up link exists and now carries `returnTo`.
+>
+> **Still open from this audit:** the exports page has no export action, only
+> "Refresh"; Calls and Handset remain two competing live-agent destinations.
+>
+> Findings added after 2026-07-30 are tracked in the usability program, not here.
 **Journeys mapped:** 51 | **Routes scanned:** 477 | **Components scanned:** 156
 
 ---

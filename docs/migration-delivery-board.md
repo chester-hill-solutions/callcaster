@@ -8,6 +8,23 @@ Master checklist for the Supabase → Railway Postgres big-bang. **Update this f
 **Railway:** [`visual-asset-review`](./railway-review-env.md) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05)  
 **Last updated:** 2026-07-08 (production-readiness pass: lockfile CI fix, worker image fixed + verified, secrets purged from tree, Dockerfile hardening, /readyz DB probe)
 
+> **Superseded for the data-migration rows — read this first (2026-07-30).**
+>
+> The v2 ship decision is a **fresh production database with no data migration**.
+> Every Phase 5 row below (read-only window, final delta dump, big-bang cutover)
+> and the user/storage import rows in Phase 3 are therefore **void, not pending**.
+>
+> Two of those rows are also simply wrong and misled this session: **3A.3 "User
+> import (bcrypt)" is marked Done and no such script has ever existed** (no
+> import script, no commit, and Better Auth has no bcrypt verify hook); **3E.2
+> "Bulk Supabase → Railway Buckets copy" is marked Done on the strength of
+> "app code no longer references Supabase Storage", which is a code check, not
+> evidence of an object copy.**
+>
+> Production Postgres for v2 was provisioned fresh on 2026-07-30 and bootstrapped
+> via `npm run db:bootstrap:fresh` (ledger verified 34/34). The remaining ship
+> work is tracked in the ship plan, not on this board.
+
 ### Snapshot (rolling)
 
 | Metric | Value | Gate |
