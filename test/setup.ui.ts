@@ -27,6 +27,14 @@ beforeAll(() => {
   window.scrollTo = vi.fn();
   HTMLElement.prototype.scrollIntoView = vi.fn();
 
+  // jsdom implements no pointer-capture API. Radix primitives (Select, Dialog,
+  // Popover) call these during a real click, so without them any test that
+  // opens one dies with "target.hasPointerCapture is not a function" — an
+  // uncaught exception rather than a readable assertion failure.
+  HTMLElement.prototype.hasPointerCapture ??= () => false;
+  HTMLElement.prototype.setPointerCapture ??= () => {};
+  HTMLElement.prototype.releasePointerCapture ??= () => {};
+
   (globalThis as any).EventSource ??= class EventSource {
     url: string;
     withCredentials: boolean;

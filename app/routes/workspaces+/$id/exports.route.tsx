@@ -1,9 +1,25 @@
 export { loader } from "./exports.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, useLoaderData, useRevalidator } from "react-router";
+import {
+  data as routeData,
+  LoaderFunctionArgs,
+  useLoaderData,
+  useParams,
+  useRevalidator,
+} from "react-router";
+import { useState } from "react";
 
-import { Download, RefreshCw } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import { usePollingRevalidator } from "@/hooks/utils";
+import { logger } from "@/lib/logger.client";
+import { toUserMessage } from "@/lib/user-message";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import {
   Table,
@@ -47,13 +63,60 @@ interface SerializedExportItem {
   total?: number;
 }
 
+interface ExportableCampaign {
+  id: number;
+  title: string;
+  type: string | null;
+}
+
 interface LoaderData {
   exports: SerializedExportItem[];
+  campaigns?: ExportableCampaign[];
 }
 
 export default function WorkspaceExports() {
-  const { exports: serializedExports = [] } = useLoaderData<LoaderData>();
+  const { exports: serializedExports = [], campaigns = [] } = useLoaderData<LoaderData>();
+  const { id: workspaceId } = useParams();
   const { revalidate } = useRevalidator();
+  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
+  const [startState, setStartState] = useState<
+    { status: "idle" } | { status: "starting" } | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  // Starting an export only needs the POST: the row it creates is picked up by
+  // this page's existing poll, which already renders progress and the download
+  // link. No second progress widget, and no duplicate of the polling in
+  // AsyncExportButton.
+  const startExport = async () => {
+    if (!selectedCampaign || !workspaceId) return;
+    setStartState({ status: "starting" });
+    try {
+      const body = new FormData();
+      body.append("campaignId", selectedCampaign);
+      body.append("workspaceId", workspaceId);
+      const response = await fetch("/api/campaign-export", { method: "POST", body });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setStartState({
+          status: "error",
+          message: toUserMessage(
+            payload?.error,
+            "Could not start the export. Please try again.",
+          ),
+        });
+        return;
+      }
+      setStartState({ status: "idle" });
+      setSelectedCampaign("");
+      await revalidate();
+    } catch (error) {
+      logger.error("Failed to start export", error);
+      setStartState({
+        status: "error",
+        message: "Could not reach the server. Check your connection and try again.",
+      });
+    }
+  };
 
   // Convert serialized dates back to Date objects
   const exports = serializedExports.map(exp => ({
@@ -117,9 +180,53 @@ export default function WorkspaceExports() {
         </Button>
       </div>
 
+      {/*
+        Until this existed the page was a dead end: it could list and download
+        exports but offered no way to create one, and its empty state told you
+        to "export data from your campaigns" without saying where.
+      */}
+      {campaigns.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center">
+          <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+            <SelectTrigger className="w-full sm:w-[320px]" aria-label="Campaign to export">
+              <SelectValue placeholder="Choose a campaign to export" />
+            </SelectTrigger>
+            <SelectContent>
+              {campaigns.map((campaign) => (
+                <SelectItem key={campaign.id} value={String(campaign.id)}>
+                  {campaign.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={startExport}
+            disabled={!selectedCampaign || startState.status === "starting"}
+            className="w-full sm:w-auto"
+          >
+            {startState.status === "starting" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              "Export"
+            )}
+          </Button>
+        </div>
+      )}
+
+      {startState.status === "error" && (
+        <Text variant="muted" className="text-destructive">
+          {startState.message}
+        </Text>
+      )}
+
       {exports.length === 0 ? (
         <Text variant="muted" className="py-12 text-center">
-          No exports available. Export data from your campaigns to see them here.
+          {campaigns.length > 0
+            ? "No exports yet. Choose a campaign above to create one."
+            : "No exports available. Create a campaign first, then export its results here."}
         </Text>
       ) : (
         <div className="overflow-x-auto">

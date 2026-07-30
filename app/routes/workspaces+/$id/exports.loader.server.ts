@@ -3,6 +3,7 @@ import { logger } from "@/lib/logger.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import { listObjects, downloadObject } from "@/lib/object-storage.server";
 import { defineLoader } from "@/lib/handler.server";
+import { listExportableCampaignsInWorkspace } from "@/lib/campaign-ivr.server";
 
 interface ExportItem {
   id: string;
@@ -34,16 +35,39 @@ interface SerializedExportItem {
   total?: number;
 }
 
+interface ExportableCampaign {
+  id: number;
+  title: string;
+  type: string | null;
+}
+
 interface LoaderData {
   exports: SerializedExportItem[];
+  campaigns: ExportableCampaign[];
 }
 
 export const loader = defineLoader({
   auth: ({ request, params }) => requireWorkspaceLoaderContext(request, params["id"]),
-  sideEffects: ["external"],
+  sideEffects: ["db-read", "external"],
   handler: async ({ auth }) => {
   if (!auth.ok) return auth.response;
   const { user, workspaceId } = auth.ctx;
+
+  // Populates the "export a campaign" picker. Object storage is the flaky
+  // dependency here, not the database, so this is read before the try block
+  // that owns storage failures — a picker that works is still useful on a page
+  // whose export list failed to load.
+  let campaigns: ExportableCampaign[] = [];
+  try {
+    const rows = await listExportableCampaignsInWorkspace(workspaceId);
+    campaigns = rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      type: row.type,
+    }));
+  } catch (error) {
+    logger.error("Error listing exportable campaigns:", error);
+  }
 
   try {
     // List all files in the workspace's exports directory
@@ -104,6 +128,7 @@ export const loader = defineLoader({
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return routeData<LoaderData>({
+      campaigns,
       exports: validExports.map((exp) => ({
         ...exp,
         createdAt: exp.createdAt.toISOString(),
@@ -113,7 +138,7 @@ export const loader = defineLoader({
   } catch (error) {
     logger.error("Error fetching exports:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
-    return routeData({ error: message }, { status: 500 });
+    return routeData({ campaigns, error: message, exports: [] }, { status: 500 });
   }
   },
 });

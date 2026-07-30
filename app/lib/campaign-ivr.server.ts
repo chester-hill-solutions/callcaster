@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Database } from "@/lib/db-types";
 import type { Script } from "@/lib/types";
 import {
@@ -202,6 +202,21 @@ export async function fetchCampaignForScriptEdit(
     .from(campaignAudienceTable)
     .where(eq(campaignAudienceTable.campaign_id, campaignId));
   return { ...campaign, script, campaign_audience: campaignAudience };
+}
+
+/**
+ * Campaigns the export endpoint will accept.
+ *
+ * `/api/campaign-export` rejects anything outside these three types with a bare
+ * 400, so the picker must not offer the others.
+ */
+export async function listExportableCampaignsInWorkspace(workspaceId: string) {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.campaign.findMany({
+    columns: { id: true, title: true, type: true },
+    where: inArray(campaignTable.type, ["message", "live_call", "robocall"]),
+    orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
+  });
 }
 
 export async function listArchivedCampaignsInWorkspace(workspaceId: string) {
