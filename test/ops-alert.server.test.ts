@@ -36,6 +36,29 @@ describe("notifyOps", () => {
     resetOpsAlertsForTests();
   });
 
+  test("suppresses the email when the dedupe store is unreachable", async () => {
+    // A crash-looping process restarts constantly and wipes the in-memory map,
+    // so without a durable dedupe one incident mails on every restart. That
+    // happened in production. Fail CLOSED: the log line is already written.
+    mocks.checkRateLimit.mockRejectedValue(new Error("db down"));
+    // Emails are normally short-circuited under test; lift that here so the
+    // dedupe path is actually exercised.
+    vi.stubEnv("VITEST", "");
+    process.env.NODE_ENV = "production";
+    try {
+      const result = await notifyOps({ event: "worker.uncaught_exception", summary: "boom" });
+      expect(mocks.send).not.toHaveBeenCalled();
+      expect(result).toEqual({ sent: false, reason: "capped" });
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        "ops.alert",
+        expect.objectContaining({ event: "worker.uncaught_exception" }),
+      );
+    } finally {
+      process.env.NODE_ENV = "test";
+      vi.unstubAllEnvs();
+    }
+  });
+
   test("logs before anything that can fail, so the alert survives an outage", async () => {
     // Both the rate limiter and the mailer are down.
     mocks.checkRateLimit.mockRejectedValue(new Error("db down"));

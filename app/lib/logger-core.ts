@@ -50,9 +50,21 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function serializeError(error: Error, includeStack: boolean) {
+  // Unwrap `cause`: DrizzleQueryError's own message is only
+  // "Failed query: … params: …" — the actual Postgres detail (missing column,
+  // FK violation, connection failure) lives on cause. Logging without it
+  // produces alerts nobody can act on, which is exactly what happened.
+  const causes: string[] = [];
+  let current: unknown = error.cause;
+  for (let depth = 0; depth < 3 && current instanceof Error; depth += 1) {
+    causes.push(`${current.name}: ${current.message}`);
+    current = current.cause;
+  }
+
   return {
     name: error.name,
     message: error.message,
+    ...(causes.length > 0 ? { cause: causes.join(' <- ') } : {}),
     ...(includeStack && error.stack
       ? { stack: error.stack.split('\n').slice(0, 12).join('\n') }
       : {}),

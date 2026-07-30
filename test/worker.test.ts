@@ -325,6 +325,35 @@ describe("worker poll-jobs lifecycle", () => {
     expect(stored?.attempt_count).toBe(1);
   });
 
+  // The boot-time reset used to be un-guarded: a transient DB error escaped as
+  // an unhandled rejection and killed the worker before the loop started,
+  // taking the entire job queue with it. It must never be fatal.
+  test("a failing boot-time stale-claim reset does not kill the poll loop", async () => {
+    const controller = new AbortController();
+    const original = mockState.fakeDb.execute;
+    let calls = 0;
+
+    mockState.fakeDb.execute = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("db unreachable at boot");
+      }
+      // Loop reached: stop it so the test terminates.
+      controller.abort();
+      return [];
+    }) as typeof original;
+
+    try {
+      await expect(
+        runWorkerPollLoop(controller.signal, {}, { pollIntervalMs: 1 }),
+      ).resolves.toBeUndefined();
+      // Proof the boot failure did not abort startup: the loop ran after it.
+      expect(calls).toBeGreaterThan(1);
+    } finally {
+      mockState.fakeDb.execute = original;
+    }
+  });
+
   test("stale-claim reset is silent when nothing was reclaimed, warns when it was", async () => {
     const { logger } = await import("@/lib/logger.server");
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});

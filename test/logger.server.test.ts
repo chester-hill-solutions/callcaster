@@ -61,6 +61,25 @@ describe("logger.server", () => {
     expect(typeof errorEntry.error.stack).toBe("string");
   });
 
+  // DrizzleQueryError's own message is only "Failed query: … params: …"; the
+  // Postgres detail lives on cause. An alert without it is unactionable —
+  // which is exactly how a production incident arrived.
+  test("unwraps error.cause so the real failure is visible", async () => {
+    process.env.NODE_ENV = "production";
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { logger } = await vi.importActual<typeof import("../app/lib/logger.server")>(
+      "../app/lib/logger.server",
+    );
+    const wrapped = new Error("Failed query: UPDATE job ...");
+    wrapped.cause = new Error('column "id" does not exist');
+    logger.error("worker.query_failed", wrapped);
+
+    const entry = JSON.parse(error.mock.calls[0][0] as string);
+    expect(entry.error.message).toContain("Failed query");
+    expect(entry.error.cause).toContain('column "id" does not exist');
+  });
+
   test("JSON output survives circular structures", async () => {
     process.env.NODE_ENV = "production";
     const error = vi.spyOn(console, "error").mockImplementation(() => {});

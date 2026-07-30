@@ -158,9 +158,15 @@ export async function notifyOps(input: OpsAlertInput): Promise<OpsAlertResult> {
     return { sent: false, reason: "no_recipient" };
   }
 
-  // 4/5. Cross-process dedupe + global cap. Fail open: the in-memory check
-  // above already bounded the blast radius, and this path runs precisely when
-  // the database may be the thing that is broken.
+  // 4/5. Cross-process dedupe + global cap.
+  //
+  // This is load-bearing, not belt-and-braces: the in-memory map above dies
+  // with the process, and a crash-looping worker restarts constantly — so
+  // without a durable check, one incident mails on every restart. That
+  // happened. Consequently this must FAIL CLOSED when the store is
+  // unreachable: an alert nobody can dedupe is worse than a missed one,
+  // because the log line has already been written either way.
+  let dedupeStoreReachable = false;
   try {
     const { checkRateLimit } = await import("@/lib/platform-rate-limit.server");
     const perKey = await checkRateLimit({
@@ -168,6 +174,7 @@ export async function notifyOps(input: OpsAlertInput): Promise<OpsAlertResult> {
       limit: 1,
       windowMs,
     });
+    dedupeStoreReachable = true;
     if (!perKey.ok) return { sent: false, reason: "deduped" };
 
     const global = await checkRateLimit({
@@ -179,8 +186,17 @@ export async function notifyOps(input: OpsAlertInput): Promise<OpsAlertResult> {
       logger.error("ops.alert.capped", { event: input.event });
       return { sent: false, reason: "capped" };
     }
-  } catch {
-    // Fall through and send.
+  } catch (error) {
+    logger.error("ops.alert.dedupe_unavailable", {
+      event: input.event,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  if (!dedupeStoreReachable) {
+    // The alert is already in the logs; suppress the email rather than risk
+    // one email per restart of a crash-looping process.
+    return { sent: false, reason: "capped" };
   }
 
   try {

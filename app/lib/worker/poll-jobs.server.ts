@@ -213,7 +213,21 @@ export async function runWorkerPollLoop(
     options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
   const claimTtlMinutes = options.claimTtlMinutes ?? DEFAULT_CLAIM_TTL_MINUTES;
 
-  await resetStaleClaims();
+  // Best-effort boot recovery. This used to be un-guarded, so a transient
+  // database error here escaped as an unhandled rejection and killed the
+  // worker before the loop ever started — taking the whole job queue with it.
+  // The loop below retries it every tick anyway.
+  try {
+    await resetStaleClaims();
+  } catch (error) {
+    logger.error("worker.stale_claims_reset_failed", {
+      phase: "boot",
+      error: error instanceof Error ? error.message : String(error),
+      cause: error instanceof Error && error.cause instanceof Error
+        ? error.cause.message
+        : null,
+    });
+  }
 
   while (!signal.aborted) {
     try {
