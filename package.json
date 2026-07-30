@@ -6,6 +6,7 @@
   "scripts": {
     "build": "react-router build",
     "setup": "node ./scripts/local/setup.mjs",
+    "doctor": "node ./scripts/local/doctor.mjs",
     "dev": "node ./scripts/local/dev.mjs",
     "dev:local": "node ./scripts/local/dev-local.mjs",
     "dev:calling:sync": "bun ./scripts/local/sync-calling-dev.mjs",
