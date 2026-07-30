@@ -1,6 +1,18 @@
 # Surface contract probing
 
-**Added:** 2026-07-29 · **Script:** `scripts/probe-surfaces.mjs` · **Run:** `npm run probe:surfaces -- --base-url <url>`
+**Added:** 2026-07-29 · **Script:** `scripts/probe-surfaces.mjs`
+
+```bash
+npm run probe:dev       # or probe:staging / probe:prod / probe:local
+npm run probe -- --help
+```
+
+Named targets carry the right defaults, so the common case takes no flags:
+deployed targets probe with strict provider auth and page routes on; `local`
+relaxes provider auth because the compose harness disables it. Override with
+`--strict` / `--relaxed` / `--no-pages`; point at an arbitrary host with
+`npm run probe -- https://…`. Staging has no URL until it is provisioned —
+set `PROBE_URL_STAGING` (the script says so if you forget).
 
 ## Why this exists
 

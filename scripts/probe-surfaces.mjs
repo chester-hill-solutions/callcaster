@@ -21,19 +21,15 @@
  * resource-level 404 (JSON from a loader). An HTML body on an `/api/` path is
  * the signature of "no route matched".
  *
- * Usage:
- *   node scripts/probe-surfaces.mjs --base-url http://127.0.0.1:3100
- *   node scripts/probe-surfaces.mjs --base-url https://... --strict-provider-auth
- *   node scripts/probe-surfaces.mjs --base-url https://... --json report.json
+ * Usage — named targets, correct defaults, no flags needed:
  *
- * Flags:
- *   --strict-provider-auth  Require provider webhooks to reject unsigned
- *                           requests (403). Correct for any environment where
- *                           TWILIO_VALIDATE_WEBHOOKS is not disabled — i.e.
- *                           every deployed environment. The compose E2E
- *                           harness sets it to "false", so omit the flag there
- *                           and reachability is still enforced.
- *   --include-pages         Also probe non-API page routes (GET only).
+ *   npm run probe:dev        npm run probe:staging      npm run probe:prod
+ *   npm run probe:local      npm run probe -- --help
+ *
+ * Deployed targets default to strict provider auth + page routes; `local`
+ * relaxes provider auth because the compose harness sets
+ * TWILIO_VALIDATE_WEBHOOKS=false. Override with --strict / --relaxed /
+ * --no-pages.
  */
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -56,13 +52,79 @@ function flagValue(name, fallback = null) {
   const i = args.indexOf(name);
   return i !== -1 && args[i + 1] ? args[i + 1] : fallback;
 }
-const BASE_URL = (
-  flagValue("--base-url") ??
-  process.env.PROBE_BASE_URL ??
-  "http://127.0.0.1:3100"
-).replace(/\/$/, "");
-const STRICT_PROVIDER_AUTH = args.includes("--strict-provider-auth");
-const INCLUDE_PAGES = args.includes("--include-pages");
+
+/**
+ * Named targets so nobody has to remember a Railway hostname. Override any of
+ * them with an env var (that is how staging gets a URL before it is a
+ * hard-coded constant).
+ */
+const TARGETS = {
+  local: process.env.PROBE_URL_LOCAL ?? "http://127.0.0.1:3100",
+  dev:
+    process.env.PROBE_URL_DEV ??
+    "https://callcaster-review-visual-asset-review.up.railway.app",
+  staging: process.env.PROBE_URL_STAGING ?? null,
+  prod: process.env.PROBE_URL_PROD ?? "https://callcaster.ca",
+};
+
+function usage() {
+  return [
+    "Usage: npm run probe:<target>        (target: local | dev | staging | prod)",
+    "   or: npm run probe -- <target|url> [flags]",
+    "",
+    "Defaults are chosen per target — you should not normally need flags:",
+    "  deployed targets  strict provider auth ON, page routes ON",
+    "  local             provider auth RELAXED (the compose harness sets",
+    "                    TWILIO_VALIDATE_WEBHOOKS=false), page routes ON",
+    "",
+    "Flags: --strict | --relaxed | --no-pages | --json <file> | --timeout <ms>",
+    "Env:   PROBE_URL_LOCAL / PROBE_URL_DEV / PROBE_URL_STAGING / PROBE_URL_PROD",
+  ].join("\n");
+}
+
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(usage());
+  process.exit(0);
+}
+
+// First non-flag argument is the target; --base-url still works for scripts.
+const positional = args.find((a) => !a.startsWith("-"));
+const explicitUrl = flagValue("--base-url") ?? process.env.PROBE_BASE_URL;
+const targetName =
+  positional && !positional.startsWith("http") ? positional : null;
+
+if (targetName && !(targetName in TARGETS)) {
+  console.error(`Unknown target "${targetName}".\n\n${usage()}`);
+  process.exit(1);
+}
+if (targetName === "staging" && !TARGETS.staging) {
+  console.error(
+    "Staging has no URL yet. Set PROBE_URL_STAGING=https://… (or add it to\n" +
+      "TARGETS in this file once the environment is provisioned).",
+  );
+  process.exit(1);
+}
+
+const resolvedUrl =
+  explicitUrl ??
+  (targetName ? TARGETS[targetName] : null) ??
+  (positional?.startsWith("http") ? positional : null) ??
+  TARGETS.local;
+
+const BASE_URL = resolvedUrl.replace(/\/$/, "");
+const isLocalTarget =
+  targetName === "local" ||
+  /^https?:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0)(:|\/|$)/.test(BASE_URL);
+
+// Deployed environments enforce provider signatures; the compose harness
+// disables them. Default accordingly so the common case needs no flags, and
+// let either side be forced explicitly.
+const STRICT_PROVIDER_AUTH = args.includes("--strict")
+  ? true
+  : args.includes("--relaxed")
+    ? false
+    : !isLocalTarget;
+const INCLUDE_PAGES = !args.includes("--no-pages");
 const JSON_OUT = flagValue("--json");
 const TIMEOUT_MS = Number(flagValue("--timeout", "15000"));
 
@@ -225,7 +287,7 @@ function evaluateAuthContract(entry, status, hasUnresolvedParams) {
       if (status === 403 || status === 400) return { ok: true };
       return {
         ok: false,
-        reason: `unsigned provider webhook returned ${status}, expected 403`,
+        reason: `unsigned provider webhook returned ${status}, expected 403 (or 400)`,
       };
 
     case "session":
@@ -398,7 +460,9 @@ function classifyPageRoute(routeModule) {
 
 async function probePage(route) {
   const { concrete } = expandPath(route.path);
-  const url = `${BASE_URL}${concrete === "/" ? "" : concrete}/`.replace(/\/+$/, "/");
+  // Probe the exact path; appending a trailing slash would invite avoidable
+  // normalisation redirects and blur the real response.
+  const url = `${BASE_URL}${concrete === "/" ? "/" : concrete}`;
   const classification = classifyPageRoute(route.routeModule);
   const isParameterized = route.path.includes(":");
 
@@ -451,7 +515,9 @@ async function probePage(route) {
   const redirected = status >= 300 && status < 400;
 
   if (classification === "protected") {
-    if (redirected && /\/signin|\/workspaces/.test(location)) {
+    // Anchored: an unanchored match would accept a redirect to somewhere like
+    // /admin/workspaces-old and call a broken guard "protected".
+    if (redirected && /^\/(signin|workspaces)(\/|\?|$)/.test(location)) {
       return { ...base, ok: true, reason: `redirect -> ${location}` };
     }
     if (status === 404) return { ...base, ok: true, reason: "404 (existence hidden)" };

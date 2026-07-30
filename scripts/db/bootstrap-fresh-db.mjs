@@ -231,10 +231,23 @@ async function main() {
     await ledgerSql.end({ timeout: 5 });
   }
 
-  console.log(
-    "[bootstrap-fresh-db] complete. Verify with:\n" +
-      "  DATABASE_URL=... npm run db:ledger:check -- --require-db",
+  // Verify inline rather than printing a command to copy — a bootstrap that
+  // is never ledger-checked is exactly how a deployed database drifts.
+  console.log("[bootstrap-fresh-db] verifying ledger…");
+  const check = spawnSync(
+    "node",
+    [path.join(rootDir, "scripts/db/check-migration-ledger.mjs"), "--require-db"],
+    { stdio: "inherit", env: { ...process.env, DATABASE_URL: databaseUrl } },
   );
+  if (check.status !== 0) {
+    console.error(
+      "[bootstrap-fresh-db] LEDGER CHECK FAILED — the database is bootstrapped but " +
+        "does not match the repo. Do not deploy against it.",
+    );
+    process.exit(check.status ?? 1);
+  }
+
+  console.log("[bootstrap-fresh-db] complete — schema applied and ledger verified.");
 }
 
 main();
