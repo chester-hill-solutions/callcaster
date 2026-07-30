@@ -3,6 +3,7 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { stripeSessionKey } from "@/lib/billing-keys";
 import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
+import { STRIPE_CLIENT_OPTIONS } from "@/lib/stripe-client-options";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
@@ -33,9 +34,7 @@ export const action = defineAction({
       return new Response("Invalid body", { status: 400 });
     }
 
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY(), {
-      apiVersion: "2024-06-20",
-    });
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS);
 
     let event: Stripe.Event;
     try {

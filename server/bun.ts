@@ -488,7 +488,27 @@ function gracefulShutdown(server: ReturnType<typeof Bun.serve>, readyState: Read
     }, SHUTDOWN_GRACE_PERIOD_MS);
 
     try {
-      server.stop(true);
+      // stop(false): refuse new connections but let in-flight requests finish.
+      // This previously passed `true`, which terminates active connections
+      // immediately — and the grace timer below was cleared on the very next
+      // line, so the 10s window never applied. Every deploy therefore dropped
+      // requests mid-flight: a Twilio sms/status callback cut before it
+      // enqueued its side-effect job means that message is never billed.
+      server.stop(false);
+
+      // Wait for the connection count to drain, bounded by the grace period.
+      const deadline = Date.now() + SHUTDOWN_GRACE_PERIOD_MS;
+      while (server.pendingRequests > 0 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (server.pendingRequests > 0) {
+        log("warn", "forcing shutdown with requests still in flight", {
+          signal,
+          pendingRequests: server.pendingRequests,
+        });
+        server.stop(true);
+      }
+
       clearTimeout(timer);
       log("info", "shutdown finished", { signal });
       process.exit(exitCode);

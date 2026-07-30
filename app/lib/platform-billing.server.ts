@@ -18,6 +18,7 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { stripeSessionKey } from "@/lib/billing-keys";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
+import { STRIPE_CLIENT_OPTIONS } from "@/lib/stripe-client-options";
 
 export const billingPricing = billingPricingSchema.parse({
   credit_price_cad: CREDIT_PRICE_CAD,
@@ -26,7 +27,7 @@ export const billingPricing = billingPricingSchema.parse({
 });
 
 function createStripeClient() {
-  return new Stripe(env.STRIPE_SECRET_KEY());
+  return new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS);
 }
 
 async function ensureStripeCustomer(

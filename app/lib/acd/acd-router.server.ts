@@ -27,6 +27,7 @@ import {
   resolveTwilioWebhookAuthToken,
 } from "@/lib/twilio-workspace-credentials";
 import { validateTwilioWebhookParams } from "@/twilio.server";
+import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
 import { isObject } from "@/lib/type-safety-utils";
@@ -158,6 +159,7 @@ export async function dialAgent(args: {
   const client = new TwilioRestClient(
     args.twilioCredentials.accountSid,
     args.twilioCredentials.authToken,
+    { timeout: TWILIO_REQUEST_TIMEOUT_MS },
   );
   const queueName = makeQueueName(args.queueId);
   const agentBridgeUrl = `${args.baseUrl}/api/acd-router/agent-bridge?queue_name=${queueName}&entry_id=${args.entryId}`;

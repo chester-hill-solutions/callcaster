@@ -3,6 +3,7 @@ import TwilioRestClient from "twilio/lib/rest/Twilio.js";
 import { validateRequest } from "twilio/lib/webhooks/webhooks.js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
 
 /** When false, skips X-Twilio-Signature checks (local dev only). Defaults to true. */
 export function shouldValidateTwilioWebhooks(): boolean {
@@ -108,7 +109,9 @@ export function singleton<Value>(name: string, factory: () => Value): Value {
 
 function getTwilioSingleton(): Twilio.Twilio {
   return singleton<Twilio.Twilio>("twilio", () =>
-    new TwilioRestClient(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN()),
+    new TwilioRestClient(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN(), {
+      timeout: TWILIO_REQUEST_TIMEOUT_MS,
+    }),
   );
 }
 
@@ -125,5 +128,7 @@ export const twilio = new Proxy({} as Twilio.Twilio, {
  * must not call `new Twilio.Twilio(...)` inline (ADR-0011 / issue #1007).
  */
 export function createParentTwilioInstance(): Twilio.Twilio {
-  return new TwilioRestClient(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
+  return new TwilioRestClient(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN(), {
+    timeout: TWILIO_REQUEST_TIMEOUT_MS,
+  });
 }

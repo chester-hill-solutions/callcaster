@@ -8,6 +8,7 @@ import { env } from "../env.server";
 import { logger } from "../logger.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { STRIPE_CLIENT_OPTIONS } from "@/lib/stripe-client-options";
 
 export async function createStripeContact({
   workspace_id,
@@ -56,9 +57,7 @@ export async function createStripeContact({
     throw new Error("Owner user has no email or username");
   }
 
-  const stripe = new Stripe(env.STRIPE_SECRET_KEY(), {
-    apiVersion: "2024-06-20",
-  });
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS);
 
   return await stripe.customers.create({
     name: workspaceRow.name,
@@ -80,7 +79,7 @@ export async function meterEvent({
     columns: { stripe_id: true },
   });
   if (!workspaceRow?.stripe_id) return;
-  const stripe = new Stripe(env.STRIPE_SECRET_KEY());
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS);
   return await stripe.billing.meterEvents.create({
     event_name: type,
     payload: {

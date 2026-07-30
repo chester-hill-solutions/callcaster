@@ -216,7 +216,13 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       ],
     });
     expect(listMock).toHaveBeenCalledWith({ areaCode: 416, limit: 20 });
-    expect(twilioCtor).toHaveBeenCalledWith("sid", "token");
+    // Clients carry an explicit request timeout — the SDK otherwise waits
+    // forever, which stalls the single-threaded worker queue.
+    expect(twilioCtor).toHaveBeenCalledWith(
+      "sid",
+      "token",
+      expect.objectContaining({ timeout: expect.any(Number) }),
+    );
   });
 
   test("loader uses workspace Twilio when workspace_id is provided", async () => {

@@ -34,6 +34,7 @@ import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { data as routeData } from "react-router";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
+import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
 import {
   addUserToWorkspace,
   getUserRole,
@@ -448,6 +449,7 @@ export async function handleNewUserOTPVerification(
  */
 const WORKSPACE_TWILIO_CLIENT_CACHE_TTL_MS = 60_000;
 
+
 type WorkspaceTwilioClientCacheEntry = {
   client: Twilio.Twilio;
   version: number;
@@ -489,10 +491,19 @@ export async function createWorkspaceTwilioInstance({
   const apiKey = typeof data.key === "string" ? data.key.trim() : "";
   const apiSecret = typeof data.token === "string" ? data.token.trim() : "";
   const TwilioSdk = await loadTwilioSdk();
+  // Without an explicit timeout the SDK waits indefinitely. The worker is a
+  // single-threaded poll loop, so one hung socket stalls EVERY queued job; on
+  // the web side it holds a request and one of only ten DB pool slots.
+  // withTwilioRetry already handles retries, so this only bounds one attempt.
   const twilio =
     apiKey && apiSecret
-      ? new TwilioSdk.Twilio(apiKey, apiSecret, { accountSid: creds.sid })
-      : new TwilioSdk.Twilio(creds.sid, creds.authToken);
+      ? new TwilioSdk.Twilio(apiKey, apiSecret, {
+          accountSid: creds.sid,
+          timeout: TWILIO_REQUEST_TIMEOUT_MS,
+        })
+      : new TwilioSdk.Twilio(creds.sid, creds.authToken, {
+          timeout: TWILIO_REQUEST_TIMEOUT_MS,
+        });
 
   workspaceTwilioClientCache.set(workspace_id, {
     client: twilio,
