@@ -68,7 +68,7 @@
     "check:dry": "node scripts/check-dry.mjs",
     "tools:dry:baseline": "node scripts/check-dry.mjs --update",
     "check:handlers": "node scripts/check-handlers.mjs",
-    "ci:local": "npm run vendor:build && npm run typecheck && npm run lint && npm run test:node && npm run test:ui && npm run tools:routes:verify && npm run tools:api:surface:check && npm run check:route-server-leaks && npm run check:route-authz && npm run check:workspace-projection && npm run check:twilio-webhooks && npm run check:request-body-consumption && npm run check:middleware && npm run check:credit-writes && npm run check:effects && npm run check:type-safety && npm run check:dry && npm run check:handlers && npm run db:ledger:check && npm run build && npm run check:client-bundle && npm run tools:api:codegen && git diff --exit-code",
+    "ci:local": "npm run vendor:build && npm run typecheck && npm run lint && npm run test:node && npm run test:ui && npm run tools:routes:verify && npm run tools:api:surface:check && npm run check:route-server-leaks && npm run check:route-authz && npm run check:workspace-projection && npm run check:twilio-webhooks && npm run check:request-body-consumption && npm run check:middleware && npm run check:credit-writes && npm run check:effects && npm run check:type-safety && npm run check:dry && npm run check:handlers && npm run db:ledger:check && npm run tools:check-file-size && npm run build && npm run check:client-bundle",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
     "test:e2e:debug": "playwright test -c e2e/playwright.config.ts --headed --debug",
@@ -77,7 +77,8 @@
     "test:e2e:server": "node scripts/e2e/start-e2e-server.mjs",
     "test:e2e:compose": "node scripts/e2e/run-compose-e2e.mjs",
     "test:e2e:review": "node scripts/e2e/run-review-e2e.mjs",
-    "check:route-authz": "node scripts/check-route-authz.mjs"
+    "check:route-authz": "node scripts/check-route-authz.mjs",
+    "ci:codegen:verify": "npm run tools:api:codegen && git diff --exit-code -- openapi app/lib/api-generated docs/api-surface-inventory.md"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1077.0",

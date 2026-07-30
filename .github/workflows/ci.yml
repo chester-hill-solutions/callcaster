@@ -49,6 +49,11 @@ jobs:
       - run: npm run check:request-body-consumption
       - run: npm run check:middleware
       - run: npm run check:credit-writes
+      # Security gates. These previously ran ONLY in `ci:local`, so a regression
+      # in workspace write authorization, or a loader leaking twilio_data /
+      # stripe_id to the client, could merge unnoticed.
+      - run: npm run check:route-authz
+      - run: npm run check:workspace-projection
       - run: npm run check:effects
       - run: npm run check:type-safety
       - run: npm run check:dry
@@ -56,8 +61,10 @@ jobs:
       - run: npm run db:ledger:check
       # Ratchet (#1048): fail on new >800-line app files or growth of allowlisted offenders.
       - run: npm run tools:check-file-size
-      - run: npm run tools:api:codegen
-      - run: git diff --exit-code
+      # Codegen drift. Split out of `ci:local` because it requires a clean tree,
+      # which made the canonical pre-PR command unusable during the work it
+      # gates. Run it yourself before pushing: `npm run ci:codegen:verify`.
+      - run: npm run ci:codegen:verify
 
   bundle-guard:
     runs-on: ubuntu-latest
