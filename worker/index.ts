@@ -25,15 +25,19 @@ import {
   captureException,
   initializeSentry,
 } from "../app/lib/sentry.server.ts";
+import { notifyOps } from "../app/lib/ops-alert.server.ts";
 
 initializeSentry("callcaster-worker");
 
 try {
   validateWorkerEnv(process.env);
 } catch (error) {
-  captureException(error, { source: "worker.boot" });
-  console.error("worker.boot_failed", {
-    error: error instanceof Error ? error.message : String(error),
+  // A worker that cannot boot means the whole job queue is dead — including
+  // every billing debit. Highest-value single alert in the system.
+  await notifyOps({
+    event: "worker.boot_failed",
+    summary: "Worker failed to boot — the job queue is not running",
+    error,
   });
   process.exit(1);
 }
@@ -60,12 +64,44 @@ function shutdown(signal: string) {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+/**
+ * These handlers previously called captureException ONLY — which is a no-op
+ * without a Sentry DSN, so an uncaught error in the worker produced literally
+ * zero output and left the process alive in an unknown state. The entire job
+ * queue (including both billing debit paths) runs here.
+ */
 process.on("uncaughtException", (error) => {
-  captureException(error, { source: "worker.uncaughtException" });
+  void withAlertTimeout(
+    notifyOps({
+      event: "worker.uncaught_exception",
+      summary: "Worker hit an uncaught exception and is restarting",
+      error,
+    }),
+  ).finally(() => {
+    // Exit so Railway restarts us: continuing in an undefined state is worse
+    // than a restart, and the 1h dedupe means a crash-loop is one email.
+    process.exit(1);
+  });
 });
+
 process.on("unhandledRejection", (reason) => {
-  captureException(reason, { source: "worker.unhandledRejection" });
+  // Deliberately does not exit, mirroring the web server's default.
+  void withAlertTimeout(
+    notifyOps({
+      event: "worker.unhandled_rejection",
+      summary: "Worker hit an unhandled promise rejection",
+      error: reason,
+    }),
+  );
 });
+
+/** An alert must never delay shutdown indefinitely. */
+function withAlertTimeout<T>(promise: Promise<T>): Promise<unknown> {
+  return Promise.race([
+    promise.catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 3_000)),
+  ]);
+}
 
 // Seed the first row for self-re-enqueuing job types (low-credit notify,
 // webhook audit) so a fresh database never needs the manual insert from the

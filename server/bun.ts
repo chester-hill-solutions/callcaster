@@ -16,6 +16,8 @@ import {
 import type { DatabaseReadiness } from "../app/server/db-health.server.ts";
 import { isTwilioWebhookPath } from "./twilio-webhook-paths.ts";
 import { runBootSmokeChecks } from "../app/server/boot-checks.server.ts";
+import { setErrorRateHandler } from "../app/lib/error-rate.server.ts";
+import { notifyOps } from "../app/lib/ops-alert.server.ts";
 import { ensureEnvironmentTwimlApp } from "../app/server/environment-twiml-app.server.ts";
 type TwilioWebhookModule = typeof import("./twilio-webhook.ts");
 let twilioWebhookModule: TwilioWebhookModule | null = null;
@@ -557,6 +559,17 @@ export async function startServer({
   buildPath?: string;
 } = {}) {
   initializeSentry("callcaster-web", env);
+
+  // Give the 5xx-rate counter somewhere to report. Injected here rather than
+  // imported by error-rate.server.ts so that module stays dependency-free and
+  // safe to call from an error path.
+  setErrorRateHandler(({ count, windowMs }) =>
+    notifyOps({
+      event: "web.error_rate_elevated",
+      summary: `${count} server errors in ${Math.round(windowMs / 60_000)} minutes`,
+      context: { count, windowMs },
+    }),
+  );
 
   // Sets TWILIO_APP_SID on non-production environments, so must precede the
   // required-env check that reads it. No-ops in production and outside Railway.
