@@ -203,14 +203,30 @@ export async function startCampaignExportApi(
       workspaceId,
       exportId,
       campaignRow.title || "",
-    );
+    )
+      .catch((error: unknown) => {
+        logger.error("campaign_export.background_failed", {
+          exportId,
+          campaignId,
+          workspaceId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
   } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
     void processCallCampaignExport(
       campaignId,
       workspaceId,
       exportId,
       campaignRow.title || "",
-    );
+    )
+      .catch((error: unknown) => {
+        logger.error("campaign_export.background_failed", {
+          exportId,
+          campaignId,
+          workspaceId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
   } else {
     return { ok: false as const, error: "Invalid campaign type for export", status: 400 };
   }

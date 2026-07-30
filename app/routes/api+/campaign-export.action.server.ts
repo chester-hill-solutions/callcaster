@@ -58,14 +58,30 @@ export const action = defineAction({
         workspaceId.toString(),
         exportId,
         campaignRow.title || "",
-      );
+      )
+        .catch((error: unknown) => {
+          logger.error("campaign_export.background_failed", {
+            exportId,
+            campaignId,
+            workspaceId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
     } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
       void processCallCampaignExport(
         Number(campaignId),
         workspaceId.toString(),
         exportId,
         campaignRow.title || "",
-      );
+      )
+        .catch((error: unknown) => {
+          logger.error("campaign_export.background_failed", {
+            exportId,
+            campaignId,
+            workspaceId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
     } else {
       return new Response("Invalid campaign type", { status: 400 });
     }
