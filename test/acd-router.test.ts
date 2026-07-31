@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(),
   loadWorkspaceTwilioCredentialsForAcd: vi.fn(),
   rpcClaimInboundQueueEntry: vi.fn(),
+  rpcResetStaleInboundOffers: vi.fn(),
   rpcCompleteInboundQueueEntry: vi.fn(),
   rpcAbandonInboundQueueEntry: vi.fn(),
   hangupTwiml: vi.fn(() => "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>"),
@@ -43,6 +44,8 @@ vi.mock("@/server/db", () => ({ db: mocks.db }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcClaimInboundQueueEntry: (...args: unknown[]) =>
     mocks.rpcClaimInboundQueueEntry(...args),
+  rpcResetStaleInboundOffers: (...args: unknown[]) =>
+    mocks.rpcResetStaleInboundOffers(...args),
   rpcAcceptInboundOffer: vi.fn(),
   rpcAbandonInboundQueueEntry: (...args: unknown[]) =>
     mocks.rpcAbandonInboundQueueEntry(...args),
@@ -94,7 +97,43 @@ describe("app/lib/acd/acd-router.server handleWaitUrl", () => {
       authToken: "token",
     });
     mocks.rpcClaimInboundQueueEntry.mockReset().mockResolvedValue(null);
+    mocks.rpcResetStaleInboundOffers.mockReset().mockResolvedValue(0);
     mocks.hangupTwiml.mockClear();
+  });
+
+  /**
+   * claim_inbound_queue_entry marks the chosen agent `busy`, and only the
+   * Twilio status callback releases them. A lost callback would otherwise
+   * remove that agent from inbound routing permanently, so stale offers are
+   * swept before every claim.
+   */
+  test("sweeps stale offers before claiming an agent", async () => {
+    const { claimAgentForQueue } = await import("@/lib/acd/acd-router.server");
+
+    await claimAgentForQueue({
+      queueId: 1,
+      workspaceId: "w1",
+      callSid: "CA1",
+      callerNumber: "+15551234567",
+    });
+
+    expect(mocks.rpcResetStaleInboundOffers).toHaveBeenCalledTimes(1);
+    expect(mocks.rpcClaimInboundQueueEntry).toHaveBeenCalledTimes(1);
+  });
+
+  test("a failing sweep still lets the caller be routed", async () => {
+    mocks.rpcResetStaleInboundOffers.mockRejectedValueOnce(new Error("db blip"));
+    const { claimAgentForQueue } = await import("@/lib/acd/acd-router.server");
+
+    await expect(
+      claimAgentForQueue({
+        queueId: 1,
+        workspaceId: "w1",
+        callSid: "CA1",
+        callerNumber: "+15551234567",
+      }),
+    ).resolves.toBeNull();
+    expect(mocks.rpcClaimInboundQueueEntry).toHaveBeenCalledTimes(1);
   });
 
   test("does not create a new offer when an active entry already exists for the call", async () => {

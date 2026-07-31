@@ -415,6 +415,24 @@ export type InboundQueueOfferRow = {
   entry_id: number;
 };
 
+/**
+ * Release inbound offers whose status callback never arrived, returning the
+ * count. Each release also returns its agent to `available`.
+ *
+ * Claiming sets the agent to `busy`; only the Twilio status callback undoes
+ * that. A lost callback therefore removes an agent from inbound routing
+ * permanently, so this runs before each claim.
+ */
+export async function rpcResetStaleInboundOffers(
+  executor: RpcExecutor,
+): Promise<number> {
+  const rows = await queryRows<{ released: number }>(
+    executor,
+    sql`select reset_stale_inbound_offers() as released`,
+  );
+  return Number(rows[0]?.released ?? 0);
+}
+
 export async function rpcClaimInboundQueueEntry(
   executor: RpcExecutor,
   args: {

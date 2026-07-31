@@ -15,6 +15,7 @@ import {
 import {
   rpcAcceptInboundOffer,
   rpcAbandonInboundQueueEntry,
+  rpcResetStaleInboundOffers,
   rpcClaimInboundQueueEntry,
   rpcCompleteInboundQueueEntry,
   rpcReleaseInboundOffer,
@@ -132,6 +133,25 @@ export async function claimAgentForQueue(args: {
   callSid: string;
   callerNumber: string;
 }): Promise<{ agentUserId: string; entryId: number } | null> {
+  // Reclaim offers whose status callback never arrived before looking for an
+  // agent. Claiming marks an agent `busy` and only the callback releases them,
+  // so a single lost webhook would otherwise remove that agent from inbound
+  // routing permanently. Sweeping here means the repair happens exactly when it
+  // matters — a caller needs an agent — with no scheduler involved.
+  //
+  // Trade-off: an agent stranded while no calls are arriving stays `busy` in
+  // the UI until the next inbound call sweeps them. That costs nothing
+  // functionally, since there is no call to route in the meantime.
+  // Best-effort: a failed sweep must not stop us trying to route this caller.
+  try {
+    const released = await rpcResetStaleInboundOffers(db);
+    if (released > 0) {
+      logger.info("acd.stale_offers_released", { released, queueId: args.queueId });
+    }
+  } catch (error) {
+    logger.error("reset_stale_inbound_offers RPC error", error);
+  }
+
   try {
     const row = await rpcClaimInboundQueueEntry(db, {
       queueId: args.queueId,
