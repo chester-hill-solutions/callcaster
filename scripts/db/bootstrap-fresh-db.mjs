@@ -84,6 +84,8 @@ const steps = [
   "client/migrations/20260722110000_contact_other_data_jsonb.sql",
   "client/migrations/20260722120000_fix_stale_status_queue_rpcs.sql",
   "client/migrations/20260730120000_idempotency_record.sql",
+  "client/migrations/20260731120000_create_claim_next_queue_contact.sql",
+  "client/migrations/20260731130000_create_acd_inbound_queue_functions.sql",
 ];
 
 /**

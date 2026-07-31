@@ -58,6 +58,7 @@ jobs:
       - run: npm run check:type-safety
       - run: npm run check:dry
       - run: npm run check:handlers
+      - run: npm run check:db-rpcs
       - run: npm run db:ledger:check
       # Ratchet (#1048): fail on new >800-line app files or growth of allowlisted offenders.
       - run: npm run tools:check-file-size
