@@ -134,8 +134,8 @@ const TIMEOUT_MS = Number(flagValue("--timeout", "15000"));
  * acceptable answer (it still proves the route matched).
  */
 const PARAM_VALUES = {
-  workspaceId: WORKSPACES.ready,
-  id: WORKSPACES.ready,
+  workspaceId: WORKSPACES.ready.id,
+  id: WORKSPACES.ready.id,
   campaignId: String(CAMPAIGNS.liveCall),
   campaign_id: String(CAMPAIGNS.liveCall),
   audienceId: String(AUDIENCE_ID),
@@ -159,8 +159,29 @@ const PARAM_VALUES = {
   pin: "000000",
   fileName: "probe.mp3",
   userId: "b1000000-0000-4000-8000-000000000001",
-  selected_id: WORKSPACES.ready,
+  selected_id: WORKSPACES.ready.id,
 };
+
+
+/**
+ * Every param value must be a usable path segment.
+ *
+ * `workspaceId` was `WORKSPACES.ready` — the seed *object* `{id, name}` — not
+ * `.id`, so every workspace-scoped probe requested
+ * `/api/workspaces/[object Object]/...` and the run still reported 261/261.
+ * The probe's auth-conformance checks stayed meaningful (an unauthenticated
+ * request is rejected whatever the id), but nothing workspace-scoped was
+ * really being exercised. Fail loudly rather than silently probing nonsense.
+ */
+for (const [param, value] of Object.entries(PARAM_VALUES)) {
+  if (typeof value !== "string" || value === "" || value.includes("[object")) {
+    console.error(
+      `[probe-surfaces] PARAM_VALUES.${param} is not a usable path segment: ${JSON.stringify(value)}\n` +
+        "  Pass the id (e.g. WORKSPACES.ready.id), not the seed object.",
+    );
+    process.exit(2);
+  }
+}
 
 /**
  * Param names are not globally unique: `:id` is a workspace UUID on page
