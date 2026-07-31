@@ -9,10 +9,17 @@ import { createTenantDb } from "@/server/tenant-db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { notifyOps } from "@/lib/ops-alert.server";
+import {
+  rentalActionForUnpaidCycles,
+  type RentalLifecycleAction,
+} from "@/lib/number-rental-lifecycle";
 import { numberRentalCycleKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import {
+  createWorkspaceTwilioInstance,
+  removeWorkspacePhoneNumber,
+} from "@/lib/database/workspace.server";
 import { listWorkspaceOwnerAdminEmails } from "@/lib/workspace-members-db.server";
 import { env } from "@/lib/env.server";
 
@@ -129,13 +136,140 @@ async function sendNumberRentalReminderEmail(args: {
 }
 
 /**
+ * Apply one rung of the non-payment ladder to a single number.
+ *
+ * Returns the action actually taken, which may be "none" — a release is
+ * skipped when the number has no Twilio SID, because there is nothing to
+ * release and deleting the row would lose the record of a number the customer
+ * may still believe they own.
+ *
+ * Every step notifies ops. Suspension and release also email the workspace
+ * owners/admins, because both are things a customer must be told about rather
+ * than discover.
+ */
+async function applyRentalLifecycleAction(args: {
+  action: RentalLifecycleAction;
+  number: { id: number; workspace: string; twilio_phone_number_sid: string | null; suspended_at?: unknown };
+  phoneNumberLabel: string;
+  unpaidCycles: number;
+  tdb: ReturnType<typeof createTenantDb>;
+}): Promise<RentalLifecycleAction> {
+  const { action, number, phoneNumberLabel, unpaidCycles, tdb } = args;
+  if (action === "none") return "none";
+
+  const context = {
+    numberId: number.id,
+    workspaceId: number.workspace,
+    phoneNumber: phoneNumberLabel,
+    unpaidCycles,
+  };
+
+  const recipients = await listWorkspaceOwnerAdminEmails(number.workspace).catch(() => []);
+
+  if (action === "warn") {
+    await notifyOps({
+      event: "billing.rental_unpaid_warned",
+      severity: "warn",
+      summary: `Rental unpaid for ${phoneNumberLabel} — customer warned`,
+      dedupeKey: `rental_warn:${number.id}`,
+      context,
+    });
+    await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
+      logger.error("number_rental_billing.warn_email_failed", { ...context, error: String(error) });
+    });
+    return "warn";
+  }
+
+  if (action === "suspend") {
+    // Idempotent: a number already suspended is not re-suspended or re-emailed
+    // on every subsequent daily run.
+    if (number.suspended_at) return "none";
+    await tdb.workspace_number.update({
+      set: { suspended_at: new Date().toISOString() },
+      where: eq(workspaceNumberTable.id, number.id),
+    });
+    await notifyOps({
+      event: "billing.rental_suspended",
+      severity: "warn",
+      summary: `Rental unpaid for ${phoneNumberLabel} — number suspended for outbound use`,
+      dedupeKey: `rental_suspend:${number.id}`,
+      context,
+    });
+    await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
+      logger.error("number_rental_billing.suspend_email_failed", { ...context, error: String(error) });
+    });
+    return "suspend";
+  }
+
+  // release — irreversible at Twilio.
+  if (!number.twilio_phone_number_sid) {
+    logger.error("number_rental_billing.release_skipped_no_sid", context);
+    return "none";
+  }
+
+  // Tell the customer BEFORE releasing: if the release succeeds and the email
+  // then fails, they lose a number with no notice at all.
+  await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
+    logger.error("number_rental_billing.release_email_failed", { ...context, error: String(error) });
+  });
+
+  await removeWorkspacePhoneNumber({
+    workspaceId: number.workspace,
+    numberId: BigInt(number.id),
+    tdb,
+  });
+
+  await notifyOps({
+    event: "billing.rental_released",
+    severity: "page",
+    summary: `Rental unpaid for ${phoneNumberLabel} — number RELEASED at Twilio (irreversible)`,
+    dedupeKey: `rental_release:${number.id}`,
+    context,
+  });
+  return "release";
+}
+
+async function sendRentalLifecycleEmail(args: {
+  action: RentalLifecycleAction;
+  recipients: string[];
+  phoneNumberLabel: string;
+}): Promise<void> {
+  if (args.recipients.length === 0) return;
+  const copy = {
+    warn: {
+      subject: `Payment needed for ${args.phoneNumberLabel}`,
+      body: `We could not renew ${args.phoneNumberLabel} because your workspace is short on credits. Add credits to keep the number — if it stays unpaid it will be suspended, and then released.`,
+    },
+    suspend: {
+      subject: `${args.phoneNumberLabel} is suspended`,
+      body: `${args.phoneNumberLabel} has been suspended for outbound use because its rental is unpaid. You can still receive calls on it. Add credits to restore it — if it stays unpaid it will be released and you will lose the number.`,
+    },
+    release: {
+      subject: `${args.phoneNumberLabel} has been released`,
+      body: `${args.phoneNumberLabel} has been released because its rental went unpaid. This cannot be undone and the number is no longer yours. You can rent a new number at any time.`,
+    },
+  }[args.action as "warn" | "suspend" | "release"];
+  if (!copy) return;
+
+  const resend = new Resend(env.RESEND_API_KEY());
+  await resend.emails.send({
+    from: "Callcaster <info@callcaster.ca>",
+    to: args.recipients,
+    subject: copy.subject,
+    html: `<p>${copy.body}</p>`,
+    text: copy.body,
+  });
+}
+
+/**
  * Daily sweep for number rental billing.
  * Runs as the self-scheduling `number_rental_billing` worker job (or via
  * admin action / the CRON_SECRET-gated enqueue route).
  *
- * Note: automatic release of unpaid rented numbers is not implemented yet
- * (`released` is always `0` and `autoReleaseImplemented` is always `false`).
- * Numbers with unpaid renewals must currently be released manually.
+ * Unpaid rentals escalate: one unpaid cycle warns the customer, the next
+ * suspends the number for outbound use, the next releases it at Twilio. See
+ * number-rental-lifecycle.ts for the ladder and applyRentalLifecycleAction for
+ * what each rung does.
  */
 export async function runNumberRentalBilling(args: {
   workspaceId?: string;
@@ -146,9 +280,11 @@ export async function runNumberRentalBilling(args: {
   charged: number;
   unpaid: number;
   released: number;
+  suspended: number;
+  warned: number;
   remindersSent: number;
   remindersFailed: number;
-  autoReleaseImplemented: false;
+  autoReleaseImplemented: true;
 }> {
   const today = args.today ?? new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -174,7 +310,9 @@ export async function runNumberRentalBilling(args: {
 
   let charged = 0;
   let unpaid = 0;
-  const released = 0;
+  let released = 0;
+  let suspended = 0;
+  let warned = 0;
   let remindersSent = 0;
   let remindersFailed = 0;
 
@@ -221,7 +359,22 @@ export async function runNumberRentalBilling(args: {
     // missed while the worker wasn't running (previously a missed anchor day
     // meant a permanently unbilled month). An unpaid cycle is retried on
     // every subsequent daily run until the workspace can afford it.
-    for (const dueDate of elapsedDueDates(anchorDate, today)) {
+    // Unpaid cycles for THIS number, derived from the ledger rather than a
+    // counter column: a cycle is unpaid exactly when it has no
+    // transaction_history row, the same fact the idempotency check below
+    // already relies on. Nothing to keep in sync, and a credit applied
+    // out-of-band de-escalates the number automatically on the next run.
+    //
+    // Counted as "elapsed cycles minus those already billed minus those
+    // charged now" rather than incremented in the unaffordable branch, because
+    // that branch BREAKS on the first cycle it cannot pay — incrementing there
+    // caps the count at 1 no matter how many cycles are owed, so suspend and
+    // release could never be reached.
+    const dueDates = elapsedDueDates(anchorDate, today);
+    let previouslyBilledCycles = 0;
+    let chargedCyclesForNumber = 0;
+
+    for (const dueDate of dueDates) {
       const cycleKey = getCycleKey(dueDate);
       const idempotencyKey = numberRentalCycleKey(number.id, cycleKey);
 
@@ -234,7 +387,10 @@ export async function runNumberRentalBilling(args: {
         where: eq(transactionHistoryTable.idempotency_key, idempotencyKey),
         columns: { id: true },
       });
-      if (alreadyBilled) continue;
+      if (alreadyBilled) {
+        previouslyBilledCycles++;
+        continue;
+      }
 
       // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
       // failed charge does NOT throw — it would silently drive the balance
@@ -263,6 +419,7 @@ export async function runNumberRentalBilling(args: {
           idempotencyKey,
         });
         charged++;
+        chargedCyclesForNumber++;
       } catch (error) {
         unpaid++;
         logger.error("Number rental charge failed", {
@@ -274,33 +431,38 @@ export async function runNumberRentalBilling(args: {
       }
     }
 
-    // Auto-release of numbers with an unpaid previous cycle is deliberately
-    // NOT implemented. Releasing a number at Twilio is irreversible — the
-    // customer loses that number permanently and inbound calls to it stop — so
-    // when to do it (how many unpaid cycles, what grace period, whether to
-    // suspend instead) is a business policy decision, not a default. Until
-    // that policy exists the alert below is what makes the cost visible;
-    // release stays a deliberate human action.
-  }
+    // Non-payment ladder: 1 unpaid cycle warns, 2 suspends, 3 releases.
+    // The action is derived from the count in one place
+    // (number-rental-lifecycle.ts) so the ladder is not spread through nested
+    // conditionals here. Each step is best-effort and independent: failing to
+    // send a warning must not prevent a later suspend, and failing to suspend
+    // must not prevent the eventual release.
+    const unpaidCyclesForNumber =
+      dueDates.length - previouslyBilledCycles - chargedCyclesForNumber;
 
-  // An unpaid rental is an ongoing cost to us that the customer is not paying,
-  // and it was previously announced by nothing louder than an `info` log: the
-  // count is returned in `job.result`, which nothing reads. Dedupe is by day so
-  // a persistent shortfall pages once, not once per cron tick.
-  if (unpaid > 0) {
-    void notifyOps({
-      event: "billing.number_rental_unpaid",
-      severity: "warn",
-      summary: `${unpaid} number rental(s) went unpaid — numbers are still active and costing us`,
-      dedupeKey: `rental_unpaid:${new Date().toISOString().slice(0, 10)}`,
-      context: {
-        unpaid,
-        charged,
-        processed: numbers.length,
-        monthlyCredits: NUMBER_RENTAL_MONTHLY_CREDITS,
-        note: "Auto-release is not implemented; release is a manual decision.",
-      },
-    });
+    if (unpaidCyclesForNumber > 0) {
+      const action = rentalActionForUnpaidCycles(unpaidCyclesForNumber);
+      try {
+        const outcome = await applyRentalLifecycleAction({
+          action,
+          number,
+          phoneNumberLabel,
+          unpaidCycles: unpaidCyclesForNumber,
+          tdb,
+        });
+        if (outcome === "warn") warned++;
+        if (outcome === "suspend") suspended++;
+        if (outcome === "release") released++;
+      } catch (error) {
+        logger.error("number_rental_billing.lifecycle_action_failed", {
+          numberId: number.id,
+          workspaceId: number.workspace,
+          action,
+          unpaidCycles: unpaidCyclesForNumber,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   return {
@@ -309,8 +471,10 @@ export async function runNumberRentalBilling(args: {
     charged,
     unpaid,
     released,
+    suspended,
+    warned,
     remindersSent,
     remindersFailed,
-    autoReleaseImplemented: false,
+    autoReleaseImplemented: true,
   };
 }

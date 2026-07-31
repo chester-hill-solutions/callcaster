@@ -187,6 +187,8 @@ export const workspace_number = pgTable("workspace_number", {
   inbound_ring_count: integer().notNull(),
   inbound_script_id: serial(),
   phone_number: text(),
+  /** Unpaid-rental suspension: blocks outbound use, inbound still works. */
+  suspended_at: timestamp({ withTimezone: true, mode: "string" }),
   twilio_phone_number_sid: text(),
   type: text().notNull(),
   workspace: uuid().notNull(),

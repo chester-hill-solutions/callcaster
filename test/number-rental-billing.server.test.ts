@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const tdbMocks = vi.hoisted(() => ({
   workspace_number: {
     findMany: vi.fn(),
+    update: vi.fn(),
   },
   transaction_history: {
     findFirst: vi.fn(),
@@ -14,6 +15,7 @@ const transactionHistoryMocks = vi.hoisted(() => ({
 }));
 
 const opsMocks = vi.hoisted(() => ({ notifyOps: vi.fn() }));
+const lifecycleMocks = vi.hoisted(() => ({ removeWorkspacePhoneNumber: vi.fn() }));
 const creditsMocks = vi.hoisted(() => ({
   getWorkspaceCreditsBalance: vi.fn(),
 }));
@@ -32,6 +34,7 @@ vi.mock("@/server/tenant-db", () => ({
 
 vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: vi.fn(),
+  removeWorkspacePhoneNumber: (...a: unknown[]) => lifecycleMocks.removeWorkspacePhoneNumber(...a),
 }));
 
 vi.mock("@/lib/transaction-history.server", () => transactionHistoryMocks);
@@ -57,6 +60,8 @@ function makeNumber(overrides: Partial<Record<string, unknown>> = {}) {
     id: 1,
     workspace: "workspace-1",
     type: "rented",
+    twilio_phone_number_sid: "PN123",
+    suspended_at: null,
     phone_number: "+15551234567",
     friendly_name: null,
     created_at: "2026-04-01",
@@ -114,7 +119,7 @@ describe("runNumberRentalBilling", () => {
         released: 0,
         remindersSent: 1,
         remindersFailed: 0,
-        autoReleaseImplemented: false,
+        autoReleaseImplemented: true,
       });
       expect(workspaceMembersMocks.listWorkspaceOwnerAdminEmails).toHaveBeenCalledWith(
         "workspace-1",
@@ -193,7 +198,7 @@ describe("runNumberRentalBilling", () => {
       remindersSent: 0,
       remindersFailed: 0,
       released: 0,
-      autoReleaseImplemented: false,
+      autoReleaseImplemented: true,
     });
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -257,8 +262,9 @@ describe("runNumberRentalBilling", () => {
    */
   test("alerts ops when a rental goes unpaid", async () => {
     opsMocks.notifyOps.mockClear();
+    // One elapsed cycle: anchored in the same month as `today`.
     tdbMocks.workspace_number.findMany.mockResolvedValue([
-      makeNumber({ created_at: "2026-04-01" }),
+      makeNumber({ created_at: "2026-05-01" }),
     ]);
     creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(40);
 
@@ -267,11 +273,95 @@ describe("runNumberRentalBilling", () => {
       today: new Date("2026-05-01T00:00:00.000Z"),
     });
 
+    // One alert, from the ladder, naming the number and the rung reached — a
+    // separate aggregate alert would report the same fact less usefully.
     expect(opsMocks.notifyOps).toHaveBeenCalledTimes(1);
     expect(opsMocks.notifyOps.mock.calls[0]![0]).toMatchObject({
-      event: "billing.number_rental_unpaid",
-      context: expect.objectContaining({ unpaid: 1 }),
+      event: "billing.rental_unpaid_warned",
+      context: expect.objectContaining({ unpaidCycles: 1, numberId: 1 }),
     });
+  });
+
+  /**
+   * Ladder: 1 unpaid cycle warns, 2 suspends, 3 releases. Release is
+   * irreversible at Twilio, so these assert the rung reached — not merely that
+   * "something happened".
+   */
+  test("two unpaid cycles suspends the number rather than releasing it", async () => {
+    opsMocks.notifyOps.mockClear();
+    lifecycleMocks.removeWorkspacePhoneNumber.mockClear();
+    tdbMocks.workspace_number.update.mockResolvedValue([{ id: 1 }]);
+    // Two elapsed cycles with no ledger rows (2026-04-01 and 2026-05-01).
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ suspended: 1, released: 0 });
+    expect(tdbMocks.workspace_number.update).toHaveBeenCalledTimes(1);
+    expect(lifecycleMocks.removeWorkspacePhoneNumber).not.toHaveBeenCalled();
+  });
+
+  test("three unpaid cycles releases the number at Twilio", async () => {
+    opsMocks.notifyOps.mockClear();
+    lifecycleMocks.removeWorkspacePhoneNumber.mockClear().mockResolvedValue(undefined);
+    // Three elapsed cycles: 2026-03-01, 2026-04-01, 2026-05-01.
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-03-01" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ released: 1 });
+    expect(lifecycleMocks.removeWorkspacePhoneNumber).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "workspace-1", numberId: BigInt(1) }),
+    );
+    expect(opsMocks.notifyOps).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "billing.rental_released", severity: "page" }),
+    );
+  });
+
+  test("a number with no Twilio SID is never released", async () => {
+    lifecycleMocks.removeWorkspacePhoneNumber.mockClear();
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-03-01", twilio_phone_number_sid: null }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    // Nothing to release at the provider, and deleting the row would erase a
+    // number the customer may still believe they own.
+    expect(result).toMatchObject({ released: 0 });
+    expect(lifecycleMocks.removeWorkspacePhoneNumber).not.toHaveBeenCalled();
+  });
+
+  test("an already-suspended number is not suspended or emailed again", async () => {
+    tdbMocks.workspace_number.update.mockClear();
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01", suspended_at: "2026-04-02T00:00:00.000Z" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ suspended: 0 });
+    expect(tdbMocks.workspace_number.update).not.toHaveBeenCalled();
   });
 
   test("does not alert when every rental is paid", async () => {
@@ -329,7 +419,7 @@ describe("runNumberRentalBilling", () => {
     ).not.toHaveBeenCalled();
   });
 
-  test("result shape is always honest about auto-release: released is 0 and autoReleaseImplemented is false", async () => {
+  test("an empty workspace reports zeroes across the whole ladder", async () => {
     tdbMocks.workspace_number.findMany.mockResolvedValue([]);
 
     const result = await runNumberRentalBilling({
@@ -343,9 +433,11 @@ describe("runNumberRentalBilling", () => {
       charged: 0,
       unpaid: 0,
       released: 0,
+      suspended: 0,
+      warned: 0,
       remindersSent: 0,
       remindersFailed: 0,
-      autoReleaseImplemented: false,
+      autoReleaseImplemented: true,
     });
   });
 });

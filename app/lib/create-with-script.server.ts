@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { canSpendFromNumber } from "@/lib/number-rental-lifecycle";
 import { script as scriptTable } from "@/db/schema";
 import type { Json , Database } from "@/lib/db-types";
 import type { CampaignType } from "@/lib/database/campaign.server";
@@ -34,16 +35,23 @@ export async function validateCreateWithScriptPreflight(args: {
 
   try {
     const workspaceNumbers = await tdb.workspace_number.findMany({
-      columns: { phone_number: true },
+      columns: { phone_number: true, suspended_at: true },
     });
+    const ownsNumber = workspaceNumbers.some((row) => row.phone_number === args.callerId);
+    // A number suspended for an unpaid rental stays owned and keeps receiving
+    // calls, but must not be used to spend — otherwise "suspended" means
+    // nothing and the unpaid balance keeps growing.
     const validNumbers = workspaceNumbers
+      .filter((row) => canSpendFromNumber(row))
       .map((row) => row.phone_number)
       .filter((phone): phone is string => Boolean(phone));
 
     if (!validNumbers.includes(args.callerId)) {
       return {
         ok: false,
-        error: "caller_id must be a phone number that belongs to this workspace",
+        error: ownsNumber
+          ? "caller_id is suspended for an unpaid rental — add credits to restore it"
+          : "caller_id must be a phone number that belongs to this workspace",
         status: 400,
       };
     }

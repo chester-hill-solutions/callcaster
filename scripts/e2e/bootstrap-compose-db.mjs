@@ -55,6 +55,7 @@ const steps = [
   "client/migrations/20260731120000_create_claim_next_queue_contact.sql",
   "client/migrations/20260731130000_create_acd_inbound_queue_functions.sql",
   "client/migrations/20260731150000_reset_stale_inbound_offers.sql",
+  "client/migrations/20260731160000_workspace_number_rental_lifecycle.sql",
 ];
 
 /**
