@@ -4,6 +4,7 @@ import { defineLoader } from "@/lib/handler.server";
 import {
   WORKSPACE_EVENTS_NOTIFY_CHANNEL,
   fetchWorkspaceEventsAfter,
+  getLatestWorkspaceEventId,
 } from "@/lib/workspace-events.server";
 // directPool is required for Postgres LISTEN/NOTIFY; tdb cannot provide raw pool access.
 // eslint-disable-next-line no-restricted-imports
@@ -12,11 +13,18 @@ import { directPool } from "@/server/db";
 const POLL_INTERVAL_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
-function parseCursor(request: Request): number {
+/**
+ * Resume point, or null for a first connection.
+ *
+ * EventSource replays `Last-Event-ID` automatically on reconnect, so a resuming
+ * client gets exactly what it missed. A first connection has no header, and
+ * must NOT start at 0 — see `getLatestWorkspaceEventId`.
+ */
+function parseCursor(request: Request): number | null {
   const header = request.headers.get("Last-Event-ID");
-  if (!header) return 0;
+  if (!header) return null;
   const parsed = Number.parseInt(header, 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function formatSseEvent(event: {
@@ -49,7 +57,11 @@ async function streamWorkspaceEvents(request: Request, workspaceId: string | und
 
   const { headers } = await getSession(request);
 
-  const initialCursor = parseCursor(request);
+  // A reconnect resumes from its last id; a fresh connection starts from the
+  // current tip, because its state was just built by loaders and replaying the
+  // backlog would re-apply stale row changes over it.
+  const resumeFrom = parseCursor(request);
+  const initialCursor = resumeFrom ?? (await getLatestWorkspaceEventId(workspaceId));
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {

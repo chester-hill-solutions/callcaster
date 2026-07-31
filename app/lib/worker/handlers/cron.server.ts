@@ -6,7 +6,7 @@ import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentia
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
 import { pruneExpiredIdempotencyRecords } from "@/lib/platform-idempotency.server";
-import { pruneCompletedJobs } from "@/lib/worker/job-retention.server";
+import { pruneCompletedJobs, pruneWorkspaceEvents } from "@/lib/worker/job-retention.server";
 import {
   auditWorkspaceTwilioWebhooks,
   repointWorkspaceTwilioWebhooks,
@@ -195,6 +195,18 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
         }
       } catch (error) {
         logger.error("worker.maintenance.job_prune_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      // The SSE event log is append-only and was likewise never pruned.
+      try {
+        const prunedEvents = await pruneWorkspaceEvents();
+        if (prunedEvents > 0) {
+          logger.info("worker.maintenance.workspace_events_pruned", { pruned: prunedEvents });
+        }
+      } catch (error) {
+        logger.error("worker.maintenance.workspace_events_prune_failed", {
           error: error instanceof Error ? error.message : String(error),
         });
       }

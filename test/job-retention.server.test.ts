@@ -7,6 +7,7 @@ vi.mock("@/server/db", () => ({ db: { execute: (...a: unknown[]) => mocks.execut
 import {
   JOB_PRUNE_BATCH_SIZE,
   pruneCompletedJobs,
+  pruneWorkspaceEvents,
 } from "@/lib/worker/job-retention.server";
 
 /** A DELETE ... RETURNING result of `n` rows. */
@@ -60,6 +61,38 @@ describe("pruneCompletedJobs", () => {
 
     await pruneCompletedJobs(30);
 
+    expect(JSON.stringify(mocks.execute.mock.calls[0])).toContain("30");
+  });
+});
+
+describe("pruneWorkspaceEvents", () => {
+  beforeEach(() => mocks.execute.mockReset());
+
+  test("batches like the job prune and stops on a short batch", async () => {
+    mocks.execute
+      .mockResolvedValueOnce(rows(JOB_PRUNE_BATCH_SIZE))
+      .mockResolvedValueOnce(rows(7));
+
+    expect(await pruneWorkspaceEvents()).toBe(JOB_PRUNE_BATCH_SIZE + 7);
+    expect(mocks.execute).toHaveBeenCalledTimes(2);
+  });
+
+  test("deletes by age only — the log has no status to filter on", async () => {
+    mocks.execute.mockResolvedValueOnce(rows(0));
+
+    await pruneWorkspaceEvents(3);
+
+    const query = JSON.stringify(mocks.execute.mock.calls[0]);
+    expect(query).toContain("workspace_events");
+    expect(query).toContain("created_at");
+    // Must not be scoped to a workspace: this is global maintenance, and
+    // scoping it would leave every other workspace's log growing forever.
+    expect(query).not.toContain("workspace_id");
+  });
+
+  test("honours a caller-supplied retention window", async () => {
+    mocks.execute.mockResolvedValueOnce(rows(0));
+    await pruneWorkspaceEvents(30);
     expect(JSON.stringify(mocks.execute.mock.calls[0])).toContain("30");
   });
 });

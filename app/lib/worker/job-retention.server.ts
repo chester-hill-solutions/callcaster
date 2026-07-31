@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/server/db";
 
+/** workspace_events rows older than this are deleted. */
+export const WORKSPACE_EVENT_RETENTION_DAYS = 3;
+
 /** Completed jobs older than this are deleted. */
 export const COMPLETED_JOB_RETENTION_DAYS = 7;
 
@@ -47,6 +50,45 @@ export async function pruneCompletedJobs(
           AND completed_at IS NOT NULL
           AND completed_at < now() - make_interval(days => ${retentionDays})
         ORDER BY completed_at
+        LIMIT ${JOB_PRUNE_BATCH_SIZE}
+      )
+      RETURNING id
+    `);
+
+    const count = Array.isArray(rows) ? rows.length : 0;
+    deleted += count;
+    if (count < JOB_PRUNE_BATCH_SIZE) break;
+  }
+
+  return deleted;
+}
+
+/**
+ * Delete workspace_events past the retention window.
+ *
+ * The SSE log is append-only and nothing ever pruned it: every queue, call and
+ * chat row change appends a row, forever. It is a transport, not a record —
+ * consumers are live EventSource connections that resume from a recent id, and
+ * `workspace_audit_event` is the durable audit trail. Three days is far more
+ * than any reconnect needs while keeping the table small enough that the
+ * `(workspace_id, id)` index stays useful.
+ *
+ * Same bounded-batch treatment as the job prune, and for the same reason: the
+ * pool enforces a 30s statement_timeout, so one unbounded DELETE over a log
+ * that has never been pruned would be cancelled partway and never progress.
+ */
+export async function pruneWorkspaceEvents(
+  retentionDays: number = WORKSPACE_EVENT_RETENTION_DAYS,
+): Promise<number> {
+  let deleted = 0;
+
+  for (let batch = 0; batch < MAX_BATCHES_PER_RUN; batch += 1) {
+    const rows = await db.execute(sql`
+      DELETE FROM workspace_events
+      WHERE id IN (
+        SELECT id FROM workspace_events
+        WHERE created_at < now() - make_interval(days => ${retentionDays})
+        ORDER BY id
         LIMIT ${JOB_PRUNE_BATCH_SIZE}
       )
       RETURNING id

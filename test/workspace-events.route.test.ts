@@ -8,6 +8,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   fetchWorkspaceEventsAfter: vi.fn(),
+  getLatestWorkspaceEventId: vi.fn(),
   listen: vi.fn(),
   getSession: vi.fn(),
 }));
@@ -16,6 +17,8 @@ vi.mock("@/lib/workspace-events.server", () => ({
   WORKSPACE_EVENTS_NOTIFY_CHANNEL: "workspace_events",
   fetchWorkspaceEventsAfter: (...args: unknown[]) =>
     mocks.fetchWorkspaceEventsAfter(...args),
+  getLatestWorkspaceEventId: (...args: unknown[]) =>
+    mocks.getLatestWorkspaceEventId(...args),
 }));
 
 vi.mock("@/server/db", () => ({
@@ -32,11 +35,58 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.fetchWorkspaceEventsAfter.mockReset();
+    mocks.getLatestWorkspaceEventId.mockReset();
+    mocks.getLatestWorkspaceEventId.mockResolvedValue(0);
     mocks.listen.mockReset();
     mocks.getSession.mockReset();
     mocks.getSession.mockResolvedValue({ user: { id: "u1" }, headers: new Headers() });
     mocks.fetchWorkspaceEventsAfter.mockResolvedValue([]);
     mocks.listen.mockRejectedValue(new Error("LISTEN unavailable"));
+  });
+
+  /**
+   * A fresh connection used to start at cursor 0, replaying the workspace's
+   * entire event history to a client whose state had just been built by
+   * loaders — re-applying stale row changes over current data, and growing
+   * without bound because the log is append-only and was never pruned.
+   */
+  test("a first connection starts at the current tip, not the beginning", async () => {
+    mocks.getLatestWorkspaceEventId.mockResolvedValue(4821);
+    const mod = await import(
+      "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
+    );
+
+    await mod.loader(
+      await withDataPlaneRouteArgs({
+        request: new Request("http://localhost/api/workspaces/ws-1/events"),
+        params: { workspaceId: "ws-1" },
+      }),
+    );
+
+    await vi.waitFor(() => expect(mocks.fetchWorkspaceEventsAfter).toHaveBeenCalled());
+    expect(mocks.fetchWorkspaceEventsAfter).toHaveBeenCalledWith("ws-1", 4821);
+    expect(mocks.fetchWorkspaceEventsAfter).not.toHaveBeenCalledWith("ws-1", 0);
+  });
+
+  test("a reconnect resumes from Last-Event-ID and does not skip ahead", async () => {
+    mocks.getLatestWorkspaceEventId.mockResolvedValue(4821);
+    const mod = await import(
+      "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
+    );
+
+    await mod.loader(
+      await withDataPlaneRouteArgs({
+        request: new Request("http://localhost/api/workspaces/ws-1/events", {
+          headers: { "Last-Event-ID": "300" },
+        }),
+        params: { workspaceId: "ws-1" },
+      }),
+    );
+
+    // Resuming must replay what the client missed, so the tip is not consulted.
+    await vi.waitFor(() => expect(mocks.fetchWorkspaceEventsAfter).toHaveBeenCalled());
+    expect(mocks.fetchWorkspaceEventsAfter).toHaveBeenCalledWith("ws-1", 300);
+    expect(mocks.getLatestWorkspaceEventId).not.toHaveBeenCalled();
   });
 
   test("loader returns SSE stream when data-plane context is present", async () => {

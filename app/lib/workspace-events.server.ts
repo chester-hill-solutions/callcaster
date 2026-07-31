@@ -1,4 +1,4 @@
-import { and, asc, eq, gt , sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt , sql } from "drizzle-orm";
 import { workspace_events } from "@/db/schema";
 import type { PostgresChangePayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.server";
@@ -168,6 +168,24 @@ export async function emitPredictiveBroadcast(
     });
     return null;
   }
+}
+
+/**
+ * Newest event id for a workspace, or 0 when it has none.
+ *
+ * A fresh SSE connection resumes from here rather than from 0. Starting at 0
+ * replays the workspace's entire history to a client whose state was just
+ * built by loaders — so old row changes get re-applied over current data, and
+ * the replay grows without bound because this log is append-only.
+ */
+export async function getLatestWorkspaceEventId(workspaceId: string): Promise<number> {
+  const [row] = await dbDirect
+    .select({ id: workspace_events.id })
+    .from(workspace_events)
+    .where(eq(workspace_events.workspace_id, workspaceId))
+    .orderBy(desc(workspace_events.id))
+    .limit(1);
+  return row?.id ?? 0;
 }
 
 export async function fetchWorkspaceEventsAfter(
