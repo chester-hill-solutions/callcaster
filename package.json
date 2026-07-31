@@ -18,6 +18,7 @@
     "db:studio": "drizzle-kit studio",
     "db:ledger:check": "node scripts/db/check-migration-ledger.mjs",
     "db:bootstrap:fresh": "node scripts/db/bootstrap-fresh-db.mjs",
+    "db:schema:check": "node scripts/db/check-schema-drift.mjs",
     "probe": "tsx --tsconfig tsconfig.json scripts/probe-surfaces.mjs",
     "probe:local": "npm run probe -- local",
     "probe:dev": "npm run probe -- dev",

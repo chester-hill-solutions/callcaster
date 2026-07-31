@@ -95,6 +95,9 @@ const steps = [
  * gate keys on every file in the directory.
  */
 const coveredByBaseline = new Set([
+  // Created by drizzle/0002_workspace_events.sql on the baseline lineage;
+  // the migration exists so the non-baseline lineage (dev) also gets it.
+  "20260731140000_create_workspace_events.sql",
   "20260704000000_update_pg_cron_to_remix_routes.sql",
   "20260704000002_unique_workspace_api_key_prefix.sql",
   "20260704000003_extend_job_table.sql",
