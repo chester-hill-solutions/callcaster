@@ -7,11 +7,37 @@ import {
   campaign_queue as campaignQueueTable,
   message as messageTable,
   workspace as workspaceTable,
+  workspace_events as workspaceEventsTable,
   workspace_invite as workspaceInviteTable,
 } from "@/db/schema";
 
 export function getServiceClient() {
   return adminDb;
+}
+
+/**
+ * Append a workspace event, the way a real row change does via
+ * `insertWorkspaceEvent`, and return its id.
+ *
+ * Written directly rather than through a mutation helper because most test
+ * mutations (setWorkspaceCredits among them) write to the database without
+ * emitting anything — so they can never exercise the SSE path.
+ */
+export async function appendWorkspaceEvent(
+  workspaceId: string,
+  payload: Record<string, unknown>,
+): Promise<number> {
+  const [row] = await adminDb
+    .insert(workspaceEventsTable)
+    .values({
+      workspace_id: workspaceId,
+      event_type: "postgres_change",
+      payload,
+      created_at: new Date().toISOString(),
+    })
+    .returning({ id: workspaceEventsTable.id });
+  if (!row) throw new Error("Failed to append workspace event");
+  return row.id;
 }
 
 export async function setWorkspaceCredits(workspaceId: string, credits: number): Promise<void> {
