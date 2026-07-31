@@ -13,6 +13,7 @@ const transactionHistoryMocks = vi.hoisted(() => ({
   insertTransactionHistoryIdempotent: vi.fn(),
 }));
 
+const opsMocks = vi.hoisted(() => ({ notifyOps: vi.fn() }));
 const creditsMocks = vi.hoisted(() => ({
   getWorkspaceCreditsBalance: vi.fn(),
 }));
@@ -36,6 +37,7 @@ vi.mock("@/lib/database/workspace.server", () => ({
 vi.mock("@/lib/transaction-history.server", () => transactionHistoryMocks);
 
 vi.mock("@/lib/workspace-credits.server", () => creditsMocks);
+vi.mock("@/lib/ops-alert.server", () => ({ notifyOps: (...a: unknown[]) => opsMocks.notifyOps(...a) }));
 
 vi.mock("@/lib/workspace-members-db.server", () => workspaceMembersMocks);
 
@@ -244,6 +246,47 @@ describe("runNumberRentalBilling", () => {
     expect(
       transactionHistoryMocks.insertTransactionHistoryIdempotent,
     ).not.toHaveBeenCalled();
+  });
+
+  /**
+   * An unpaid rental is an ongoing cost we absorb while the customer is not
+   * charged, and it used to be announced only by an `info` log — the count goes
+   * into `job.result`, which nothing reads. Auto-release is deliberately not
+   * implemented (releasing a number at Twilio is irreversible), so the alert is
+   * the entire signal that anything is wrong.
+   */
+  test("alerts ops when a rental goes unpaid", async () => {
+    opsMocks.notifyOps.mockClear();
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(40);
+
+    await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(opsMocks.notifyOps).toHaveBeenCalledTimes(1);
+    expect(opsMocks.notifyOps.mock.calls[0]![0]).toMatchObject({
+      event: "billing.number_rental_unpaid",
+      context: expect.objectContaining({ unpaid: 1 }),
+    });
+  });
+
+  test("does not alert when every rental is paid", async () => {
+    opsMocks.notifyOps.mockClear();
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(5_000);
+
+    await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(opsMocks.notifyOps).not.toHaveBeenCalled();
   });
 
   test("leaves the rental unpaid (no debit) when the workspace can't afford it", async () => {

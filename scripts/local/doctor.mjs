@@ -174,6 +174,22 @@ try {
     );
   }
 
+  // ── Rental affordability ─────────────────────────────────────────────
+  // A rental that cannot be paid does not fail loudly: the number stays active
+  // and keeps costing us while the customer is not charged. Auto-release is
+  // deliberately not implemented, so this is the early warning.
+  const RENTAL_MONTHLY_CREDITS = 100;
+  const rentedCount = numbers.filter((n) => n.type === "rented").length;
+  const nextRenewalCost = rentedCount * RENTAL_MONTHLY_CREDITS;
+  report.rentals = { rented: rentedCount, nextRenewalCost, credits: ws.credits };
+  if (rentedCount > 0 && ws.credits < nextRenewalCost) {
+    warn(
+      `Cannot afford the next rental cycle: ${rentedCount} rented number(s) need ` +
+        `${nextRenewalCost} credits but the workspace has ${ws.credits}. The numbers ` +
+        "stay active and unbilled until someone acts.",
+    );
+  }
+
   // ── Jobs ─────────────────────────────────────────────────────────────
   const jobStats = await sql`
     select status, count(*)::int as count, max(created_at) as newest

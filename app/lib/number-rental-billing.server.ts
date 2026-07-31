@@ -8,6 +8,7 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { notifyOps } from "@/lib/ops-alert.server";
 import { numberRentalCycleKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
@@ -273,9 +274,33 @@ export async function runNumberRentalBilling(args: {
       }
     }
 
-    // Auto-release of numbers with an unpaid previous cycle is not
-    // implemented yet — see the `autoReleaseImplemented: false` flag on the
-    // return value. Numbers must be released manually for now.
+    // Auto-release of numbers with an unpaid previous cycle is deliberately
+    // NOT implemented. Releasing a number at Twilio is irreversible — the
+    // customer loses that number permanently and inbound calls to it stop — so
+    // when to do it (how many unpaid cycles, what grace period, whether to
+    // suspend instead) is a business policy decision, not a default. Until
+    // that policy exists the alert below is what makes the cost visible;
+    // release stays a deliberate human action.
+  }
+
+  // An unpaid rental is an ongoing cost to us that the customer is not paying,
+  // and it was previously announced by nothing louder than an `info` log: the
+  // count is returned in `job.result`, which nothing reads. Dedupe is by day so
+  // a persistent shortfall pages once, not once per cron tick.
+  if (unpaid > 0) {
+    void notifyOps({
+      event: "billing.number_rental_unpaid",
+      severity: "warn",
+      summary: `${unpaid} number rental(s) went unpaid — numbers are still active and costing us`,
+      dedupeKey: `rental_unpaid:${new Date().toISOString().slice(0, 10)}`,
+      context: {
+        unpaid,
+        charged,
+        processed: numbers.length,
+        monthlyCredits: NUMBER_RENTAL_MONTHLY_CREDITS,
+        note: "Auto-release is not implemented; release is a manual decision.",
+      },
+    });
   }
 
   return {
