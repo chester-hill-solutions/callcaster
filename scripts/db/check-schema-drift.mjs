@@ -23,60 +23,22 @@
  *   DATABASE_URL=postgresql://... node scripts/db/check-schema-drift.mjs
  *   DATABASE_URL=postgresql://... npm run db:schema:check
  */
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
 
+import { collectCalledRpcs, collectSchemaTables } from "../lib/app-db-objects.mjs";
+
 const ROOT = join(import.meta.dirname, "../..");
-const SCHEMA_FILES = [
-  "app/db/schema.ts",
-  "app/db/auth-schema.ts",
-  "app/db/schema-transcription.ts",
-];
+
+const expected = collectSchemaTables(ROOT);
+if (expected.size === 0) {
+  console.error("Parsed zero tables from the Drizzle schema — the parser is broken, not the database.");
+  process.exit(2);
+}
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.error("DATABASE_URL is not set. Point it at the environment to check.");
-  process.exit(2);
-}
-
-/**
- * Parse `pgTable("name", { ... })` blocks.
- *
- * A column's database name is the explicit first string argument when present
- * (`emailVerified: boolean("email_verified")`) and otherwise the property key.
- * Getting this wrong reports every camelCase Better Auth column as missing.
- */
-function parseSchema() {
-  const tables = new Map();
-  for (const relPath of SCHEMA_FILES) {
-    let src;
-    try {
-      src = readFileSync(join(ROOT, relPath), "utf8");
-    } catch {
-      continue;
-    }
-    const tableRe = /pgTable\(\s*\n?\s*"([a-z_0-9]+)"\s*,\s*\{([\s\S]*?)\n\s*\}\s*[,)]/g;
-    let match;
-    while ((match = tableRe.exec(src))) {
-      const [, tableName, body] = match;
-      const columns = [];
-      const colRe = /^\s{2,}(?:\/\*\*[\s\S]*?\*\/\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*([a-zA-Z_]+)\s*\(\s*("([^"]+)")?/gm;
-      let col;
-      while ((col = colRe.exec(body))) {
-        const [, key, , , explicitName] = col;
-        if (["columns", "where", "with", "extras"].includes(key)) continue;
-        columns.push(explicitName ?? key);
-      }
-      tables.set(tableName, [...new Set(columns)]);
-    }
-  }
-  return tables;
-}
-
-const expected = parseSchema();
-if (expected.size === 0) {
-  console.error("Parsed zero tables from the Drizzle schema — the parser is broken, not the database.");
   process.exit(2);
 }
 
@@ -107,11 +69,30 @@ try {
     if (gone.length > 0) missingColumns.push({ table, columns: gone });
   }
 
-  const host = connectionString.replace(/^.*@/, "").replace(/\/.*$/, "");
-  console.log(`\nschema drift vs ${host} — ${expected.size} tables in the Drizzle schema\n`);
+  // The other half: functions the app invokes must exist in THIS database.
+  // check:db-rpcs proves some SQL in the repo creates them; only the database
+  // can say whether this one ran it. The ACD inbound RPCs were missing from
+  // production while present on dev, and nothing else would have shown that.
+  const calledRpcs = collectCalledRpcs(ROOT);
+  const presentFns = new Set(
+    (
+      await sql`
+        select p.proname as name
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+      `
+    ).map((r) => r.name),
+  );
+  const missingFunctions = [...calledRpcs.keys()].filter((fn) => !presentFns.has(fn)).sort();
 
-  if (missingTables.length === 0 && missingColumns.length === 0) {
-    console.log("  No drift: every table and column the app compiles against exists.\n");
+  const host = connectionString.replace(/^.*@/, "").replace(/\/.*$/, "");
+  console.log(
+    `\nschema drift vs ${host} — ${expected.size} tables, ${calledRpcs.size} functions required by the app\n`,
+  );
+
+  if (missingTables.length === 0 && missingColumns.length === 0 && missingFunctions.length === 0) {
+    console.log("  No drift: every table, column and function the app needs exists.\n");
   } else {
     exitCode = 1;
     for (const table of missingTables) {
@@ -119,6 +100,9 @@ try {
     }
     for (const { table, columns } of missingColumns) {
       console.log(`  MISSING COLUMNS ${table}: ${columns.join(", ")}`);
+    }
+    for (const fn of missingFunctions) {
+      console.log(`  MISSING FUNCTION ${fn}()  — called from ${[...calledRpcs.get(fn)].join(", ")}`);
     }
     console.log(
       "\n  Every read or write the app makes against these fails at runtime.\n" +
