@@ -16,10 +16,13 @@ vi.mock("@/lib/logger.server", () => ({
 const rpcMocks = vi.hoisted(() => ({
   rpcCreateOutreachAttempt: vi.fn(),
   rpcDequeueContact: vi.fn(),
+  rpcTryCompleteCampaignIfDrained: vi.fn(),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => rpcMocks.rpcCreateOutreachAttempt(...args),
   rpcDequeueContact: (...args: unknown[]) => rpcMocks.rpcDequeueContact(...args),
+  rpcTryCompleteCampaignIfDrained: (...args: unknown[]) =>
+    rpcMocks.rpcTryCompleteCampaignIfDrained(...args),
 }));
 
 const claimNextQueueContactMock = vi.hoisted(() => vi.fn());
@@ -221,6 +224,33 @@ describe("auto-dial.server", () => {
       timezone: "America/Vancouver",
       reason: "in_window",
     };
+
+    /**
+     * Until this was wired, NOTHING set a campaign to "complete": the only
+     * caller of the completion RPC lived in the dead Supabase-era dispatch
+     * module. A campaign that had dialed its entire queue displayed "Running"
+     * forever and a customer had no way to tell it had finished.
+     */
+    test("marks the campaign complete when the queue is drained", async () => {
+      claimNextQueueContactMock.mockResolvedValueOnce(null);
+      rpcMocks.rpcTryCompleteCampaignIfDrained.mockResolvedValueOnce(true);
+
+      const result = await runAutoDialerTurn(turnInput);
+
+      expect(result).toMatchObject({ success: true });
+      expect(rpcMocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalledWith(
+        expect.anything(),
+        5,
+      );
+    });
+
+    test("a failure to mark complete does not fail the dial turn", async () => {
+      claimNextQueueContactMock.mockResolvedValueOnce(null);
+      rpcMocks.rpcTryCompleteCampaignIfDrained.mockRejectedValueOnce(new Error("db down"));
+
+      // Losing a status label must never take down dialing.
+      await expect(runAutoDialerTurn(turnInput)).resolves.toMatchObject({ success: true });
+    });
 
     test("requeues out-of-window contacts and stops without dialing", async () => {
       // The released row is claimable again immediately; seeing it a second

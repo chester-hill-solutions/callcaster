@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import {
   rpcCreateOutreachAttempt,
   rpcDequeueContact,
+  rpcTryCompleteCampaignIfDrained,
 } from "@/lib/db-rpc.server";
 import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
 import { updateCallBySid } from "@/lib/telephony-db.server";
@@ -343,6 +344,23 @@ export async function runAutoDialerTurn(
     }
 
     await completeAllConferences(twilioClient, conferenceId);
+
+    // Nothing left to dial: mark the campaign complete. Until this was wired,
+    // NOTHING set that status — the only caller of the completion RPC lived in
+    // the dead Supabase-era dispatch module — so a campaign that had dialed its
+    // entire queue displayed "Running" forever and a customer had no way to
+    // tell it had finished. The RPC re-checks pending work, so an
+    // out-of-window release does not complete a campaign early.
+    // Best-effort: failing to update a label must never fail a dial turn.
+    try {
+      const completed = await rpcTryCompleteCampaignIfDrained(db, campaign_id);
+      if (completed) {
+        logger.info("campaign.completed_on_drain", { campaignId: campaign_id });
+      }
+    } catch (error) {
+      logger.error("Failed to mark campaign complete after queue drain", error);
+    }
+
     return {
       success: true,
       message:

@@ -60,14 +60,26 @@ export function walk(dir, out = [], exts = [".ts", ".tsx"]) {
 /**
  * Function names the app invokes, mapped to the files invoking them.
  *
- * Only matches inside sql`...` templates, so ordinary JavaScript calls are
- * never mistaken for database functions.
+ * Two call shapes exist and both must be covered: sql`...` templates, and the
+ * Supabase-style `.rpc("name")` that survives in the campaign-dispatch modules.
+ * Matching only the former left nine functions unchecked.
  */
 export function collectCalledRpcs(root) {
   const called = new Map();
   for (const dir of APP_DIRS) {
     for (const file of walk(join(root, dir))) {
       const src = readFileSync(file, "utf8");
+      // Supabase-style `.rpc("name", ...)` survives in the campaign-dispatch
+      // modules. These are invisible to the sql`` scan below, so a function
+      // called only this way could go missing exactly as
+      // claim_next_queue_contact did.
+      for (const m of src.matchAll(/\.rpc\(\s*["'`]([a-z_][a-z0-9_]*)["'`]/gi)) {
+        const name = m[1].toLowerCase();
+        if (SQL_BUILTINS.has(name)) continue;
+        if (!called.has(name)) called.set(name, new Set());
+        called.get(name).add(file.slice(root.length + 1));
+      }
+
       for (const tpl of src.match(/sql`[^`]*`/gs) ?? []) {
         for (const m of tpl.matchAll(
           /\b(?:from|select|call|perform)\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(/gi,

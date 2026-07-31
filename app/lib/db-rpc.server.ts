@@ -85,6 +85,25 @@ export async function rpcAutoDialQueue(
   return rows[0] ?? null;
 }
 
+/**
+ * Mark a campaign complete when its queue has drained. Returns whether it did.
+ *
+ * The function re-checks `campaign_queue_has_pending_work` itself and only
+ * updates active campaigns, so calling it opportunistically is safe: a contact
+ * released back to `queued` (out of the recipient calling window, say) still
+ * counts as pending and will not be mistaken for a drained queue.
+ */
+export async function rpcTryCompleteCampaignIfDrained(
+  executor: RpcExecutor,
+  campaignId: number,
+): Promise<boolean> {
+  const rows = await queryRows<{ completed: boolean }>(
+    executor,
+    sql`select try_complete_campaign_if_drained(${campaignId}) as completed`,
+  );
+  return rows[0]?.completed ?? false;
+}
+
 export async function rpcCreateOutreachAttempt(
   executor: RpcExecutor,
   args: {
