@@ -641,7 +641,9 @@ describe("api.campaign-export", () => {
       },
     } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "bad form" });
+    // A thrown formData error is internal plumbing, not something a user can
+    // act on — toUserMessage replaces it with the route's fallback.
+    await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
 
     requireWorkspaceAccess.mockImplementationOnce(async () => {
       throw "nope";

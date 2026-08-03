@@ -32,6 +32,9 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
           const response = await fetch(`/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`);
           const data = await response.json();
 
+          // Transient 404/500 from status endpoint must not end polling — skip this tick and keep trying
+          if (!response.ok || typeof data?.status !== "string") return;
+
           setExportStatus(data.status);
           if (data.progress) setProgress(data.progress);
 

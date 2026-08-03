@@ -1,6 +1,6 @@
 # CallCaster
 
-CallCaster is a contact-center platform for calling and SMS campaigns: campaign scripts and IVR, live power dialing, surveys, audiences/contacts, billing by credits, and a public integrator API. Built with React Router 7, a Bun production server, Railway Postgres (Drizzle ORM), S3-compatible object storage, Twilio, Stripe, and Resend.
+CallCaster is a contact-center platform for calling and SMS campaigns: campaign scripts and IVR, live power dialing, surveys, audiences/contacts, billing by credits, and a public integrator API. Built with React Router 8, a Bun production server, Railway Postgres (Drizzle ORM), S3-compatible object storage, Twilio, Stripe, and Resend.
 
 ## Quickstart
 

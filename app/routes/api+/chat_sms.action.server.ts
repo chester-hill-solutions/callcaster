@@ -11,6 +11,7 @@ import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { chatSmsBodySchema } from "@/lib/schemas/api/chat-sms";
+import { toUserMessage } from "@/lib/user-message";
 import type { TwilioMessageIntent } from "@/lib/types";
 import { eq } from "drizzle-orm";
 import { contact as contactTable } from "@/db/schema";
@@ -252,8 +253,7 @@ export const action = defineAction({
     logger.error("Error in chat_sms action:", error);
     return new Response(
       JSON.stringify({
-        error:
-          error instanceof Error ? error.message : "Failed to send message",
+        error: toUserMessage(error, "Failed to send message"),
       }),
       {
         headers: {

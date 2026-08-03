@@ -7,7 +7,7 @@ Decisions captured during the grilling session that shape the implementation pla
 - **Finish the Bun worker.** Cron jobs will stop being exposed as HTTP routes.
 - **Canonical schema:** the Drizzle `job` table is the source of truth, extended with `attempt_count`, `max_attempts`, `retry_at`, `claimed_until`, `started_at`, `completed_at`, `failed_at`, `dead_letter_reason`, `error_message`.
 - **Deployment model:** hybrid. Long-running worker for real-time jobs (call status, IVR/SMS webhooks, CSV exports, billing, sync, webhook delivery). Drain/cron enqueues scheduled jobs into the same table.
-- **Job queue stays in Postgres.** Redis is used for rate limiting and caching, not as the job broker.
+- **Job queue stays in Postgres.** Rate limiting is Postgres-backed via `app/lib/platform-rate-limit-db.server.ts` and the `rate_limit_bucket` table, not Redis.
 
 ## Media Stream
 
@@ -37,7 +37,7 @@ Decisions captured during the grilling session that shape the implementation pla
 
 ## Rate Limiting
 
-- Redis-backed in production, in-memory fallback for local dev.
+- Postgres-backed via `app/lib/platform-rate-limit-db.server.ts` and the `rate_limit_bucket` table.
 - Key by API key ID for integrator routes, IP for public routes, user ID for authenticated HTML routes.
 
 ## Testing

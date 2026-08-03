@@ -10,6 +10,7 @@ import {
 } from "@/lib/campaign-export.server";
 import { defineAction } from "@/lib/handler.server";
 import { trackBackgroundFailure } from "@/lib/background-task.server";
+import { toUserMessage } from "@/lib/user-message";
 
 const unauthorized = () =>
   new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -88,7 +89,7 @@ export const action = defineAction({
     logger.error("Export request error:", error);
     return routeData(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: toUserMessage(error, "Unknown error"),
       },
       { status: 500 },
     );

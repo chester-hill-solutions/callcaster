@@ -4,6 +4,7 @@ import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { defineAction } from "@/lib/handler.server";
 import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
+import { toUserMessage } from "@/lib/user-message";
 
 export const action = defineAction({
   sideEffects: ["db-write"],
@@ -56,7 +57,7 @@ export const action = defineAction({
         throw error;
       }
       return routeData({
-        error: error instanceof Error ? error.message : "Verification failed",
+        error: toUserMessage(error, "Verification failed"),
       });
     }
   },

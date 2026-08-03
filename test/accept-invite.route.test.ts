@@ -107,7 +107,11 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
       status: "error",
-      error: "email taken",
+      // Better Auth messages are lowercase, which toUserMessage classifies as
+      // internal — so the user sees the actionable fallback, not the raw
+      // provider string. The raw message still reaches the logger.
+      error:
+        "Could not create your account. That email may already be registered — try signing in instead.",
     });
   });
 });

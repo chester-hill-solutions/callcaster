@@ -61,12 +61,12 @@ export const action = defineAction({
       const newStatus = data.status as string;
       const isAllSelected =
         data.isAllSelected === true || data.isAllSelected === "true";
-      const filters =
-        typeof data.filters === "string"
-          ? (JSON.parse(data.filters) as QueueSearchFilters)
-          : ((data.filters as QueueSearchFilters | undefined) ?? EMPTY_FILTERS);
 
       try {
+        const filters =
+          typeof data.filters === "string"
+            ? (JSON.parse(data.filters) as QueueSearchFilters)
+            : ((data.filters as QueueSearchFilters | undefined) ?? EMPTY_FILTERS);
         if (isAllSelected) {
           const filteredIds = await searchCampaignQueueIds({
             campaignId: campaignIdNum,
@@ -128,13 +128,12 @@ export const action = defineAction({
     }
 
     if (intent === "add_contacts") {
-      const contacts = (
-        typeof data.contacts === "string"
-          ? JSON.parse(data.contacts)
-          : data.contacts
-      ) as Contact[];
-
       try {
+        const contacts = (
+          typeof data.contacts === "string"
+            ? JSON.parse(data.contacts)
+            : data.contacts
+        ) as Contact[];
         await enqueueContactsForCampaign(
           campaignIdNum,
           contacts.map((contact) => contact.id),

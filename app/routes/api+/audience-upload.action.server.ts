@@ -18,6 +18,7 @@ import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { toUserMessage } from "@/lib/user-message";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/db-types";
 import {
@@ -262,7 +263,7 @@ export const action = defineAction({
       return routeData({ error: error.message }, { status: error.statusCode, headers });
     }
     return routeData({
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: toUserMessage(error, "Unknown error")
     }, { status: 500, headers });
   }
   },

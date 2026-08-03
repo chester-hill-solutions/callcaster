@@ -1,6 +1,7 @@
 export { loader } from "./route.loader.server";
 export { action } from "./route.action.server";
 export { middleware } from "./route.middleware.server";
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 import { Outlet, useOutlet } from "react-router";
 

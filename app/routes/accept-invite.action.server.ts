@@ -8,6 +8,7 @@ import { auth } from "@/server/auth-instance";
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import { toUserMessage } from "@/lib/user-message";
 import type { ActionData } from "./accept-invite.types";
 import type { Database } from "@/lib/db-types";
 import type { User } from "@/lib/types";
@@ -76,10 +77,17 @@ export const action = defineAction({
         );
       } catch (error) {
         logger.error("Error in signUpEmail:", error);
-        const message =
-          error instanceof Error ? error.message : "An unexpected error occurred";
         return routeData<ActionData>(
-          { status: "error", error: message },
+          {
+            status: "error",
+            // Better Auth's messages are lowercase ("email taken"), which
+            // toUserMessage treats as not-user-facing — so the fallback is what
+            // this flow actually shows. Make it actionable rather than generic.
+            error: toUserMessage(
+              error,
+              "Could not create your account. That email may already be registered — try signing in instead.",
+            ),
+          },
           { headers, status: 500 },
         );
       }

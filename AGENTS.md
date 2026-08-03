@@ -13,7 +13,7 @@
 
 ## Routes (React Router 8)
 
-- Route discovery: [app/routes.ts](app/routes.ts) uses `remix-flat-routes` hybrid folders (`workspaces+/`, `api+/`, …). Each route is a **single module** (`folder/route.tsx`); React Router splits `loader` / `action` / UI automatically — no manual `route.server.tsx`.
+- Route discovery: [app/routes.ts](app/routes.ts) uses `remix-flat-routes` hybrid folders (`workspaces+/`, `api+/`, …). Route modules are **split** into a main module (`folder/route.tsx`) with sibling loader and action server files (`*.loader.server.ts` / `*.action.server.ts` suffixes); [app/routes.ts](app/routes.ts) lines 11-12 list both patterns in `ignoredRouteFiles` so they don't become routes themselves.
 - **Auth middleware:** `workspaces+/$id` uses [`app/lib/workspace-middleware.server.ts`](app/lib/workspace-middleware.server.ts) → `workspaceContext`; nested `api+/workspaces+/$workspaceId/*` uses [`app/lib/data-plane-middleware.server.ts`](app/lib/data-plane-middleware.server.ts) → `dataPlaneAuthContext`; `admin+/` uses [`app/lib/admin-middleware.server.ts`](app/lib/admin-middleware.server.ts) → `adminContext`. Child loaders read context via `getWorkspaceRouteContext` / `getDataPlaneRouteContext` / `getAdminRouteContext`. Twilio webhooks, `/api/jobs/*`, stripe, and auth catch-all stay outside product middleware. SSE at [`events.loader.server.ts`](app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts) lives under data-plane middleware for auth context but returns a streaming Response directly (see ADR-0005, ADR-0031).
 - **Inline auth (not middleware):** These routes intentionally keep inline `verifyAuth` / dual-auth — do not migrate to layout middleware:
 
@@ -32,7 +32,7 @@
 - **`@react-router/fs-routes`:** Deferred — `remix-flat-routes` + route tooling baselines remain; evaluate fs-routes only after RR8 is stable in production.
 - Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).
 - **Pre-PR CI bar:** `npm run ci:local` mirrors the quality + bundle-guard jobs (typecheck, lint, tests, route-tree verify, API surface/codegen drift, structural guards).
-- **Structural guards:** `check:route-server-leaks`, `check:twilio-webhooks`, `check:middleware`, `check:credit-writes` — wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+- **Structural guards:** 13 `check:*` commands wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — 12 in the `quality` job (`check:route-server-leaks`, `check:twilio-webhooks`, `check:request-body-consumption`, `check:middleware`, `check:credit-writes`, `check:route-authz`, `check:workspace-projection`, `check:effects`, `check:type-safety`, `check:dry`, `check:handlers`, `check:db-rpcs`) plus `check:client-bundle` in `bundle-guard`. That job list also runs `tools:routes:verify`, `tools:api:surface:check`, `db:ledger:check`, `db:bootstrap:check`, `tools:check-file-size` and `ci:codegen:verify`.
 
 ## Public APIs (doc-first / Hey API)
 
@@ -51,13 +51,10 @@
 - Local Twilio/calling development uses Localtunnel-style public URLs, and `BASE_URL` should match the current public tunnel URL.
 - Queue progress/completion should treat rows with `status = "dequeued"` or a non-null `dequeued_at` as completed work, including duplication dequeues.
 - Workspace audio uploads are normalized to canonical MP3 on upload via `ffmpeg`, and production Docker builds install `ffmpeg` for that path.
-- Postgres Edge Functions called by **Twilio** (`sms-status`, `ivr-status`, `ivr-recording`, `ivr-flow`, `acd-router`) must use `verify_jwt = false` in [`client/config.toml`](client/config.toml); Twilio sends `X-Twilio-Signature`, not a Postgres JWT. Each validates the signature with the workspace subaccount auth token.
-- **`number-rental-billing`** is invoked by pg_cron via `net.http_post` without an `Authorization` header ([`client/migrations/202604140001_number_rental_billing_cron.sql`](client/migrations/202604140001_number_rental_billing_cron.sql)); it needs `verify_jwt = false`. **`twilio-open-sync`** cron sends `Authorization: Bearer` from `app.settings.AUTH_service_role_jwt` ([`client/migrations/20260414200000_twilio_open_sync_cron.sql`](client/migrations/20260414200000_twilio_open_sync_cron.sql)); default JWT verification can stay on.
-- If any Edge Function is wired only from the **Postgres Dashboard** (Database Webhooks, schedules), confirm whether the caller sends a JWT before changing `verify_jwt`; in-repo SQL only registers the two cron jobs above.
 
 ## Billing & Credits
 
-- Credits sync is via the `apply_ledger_entry_and_sync_credits` plpgsql RPC ([`client/migrations/20260628120000_apply_ledger_entry_and_sync_credits.sql`](client/migrations/20260628120000_apply_ledger_entry_and_sync_credits.sql)) — atomic idempotent ledger insert + `workspace.credits` update. The old Postgres trigger (`transaction_history_update_credits`) is dropped. Both app and Edge Function billing paths call this RPC through `insertTransactionHistoryIdempotent`.
+- Credits sync is via the `apply_ledger_entry_and_sync_credits` plpgsql RPC ([`client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql`](client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql)) — atomic idempotent ledger insert + `workspace.credits` update. The old Postgres trigger (`transaction_history_update_credits`) is dropped. Both app and Edge Function billing paths call this RPC through `insertTransactionHistoryIdempotent`.
 - All billing debit sites use `debitAmountFromCredits(credits)` from `shared/pricing.ts` — never hand-roll `amount: -X` (a sign flip silently *adds* credits).
 - Idempotency keys are built via `shared/billing-keys.ts` (`smsKey`, `callKey`, `numberRentalPurchaseKey`, `numberRentalCycleKey`, `stripeSessionKey`, `stripeEventKey`). Voice keys are namespaced by billing kind: `call:${sid}:${kind}`. Both `getBillingEventSource` (app) and `categorizeLedgerRow` (shared) classify via `bucketFromIdempotencyKey`.
 - Canonical terminal-billable status sets are `TERMINAL_BILLABLE_CALL_STATUSES` and `TERMINAL_BILLABLE_SMS_STATUSES` in `shared/pricing.ts`; reconciliation uses the same set as the debit gate.
@@ -65,11 +62,11 @@
 
 ## Drizzle / tenant data access (ADR-0004)
 
-- **Scoped client is the only tenant-data accessor for route code.** Use `createTenantDb(workspaceId)` from [`app/server/tenant-db.ts`](app/server/tenant-db.ts) — every table in [`app/db/workspace-scoped-tables.ts`](app/db/workspace-scoped-tables.ts) (28 tables) is auto-filtered by its tenancy column (`workspace` or `workspace_id`) on every read/update/delete and auto-injected on every insert. Use `@/db/schema` for column references in `where`/`orderBy`; never import `@/server/db` or `@/server/admin-db` from a route (enforced by `no-restricted-imports` in [`.eslintrc.cjs`](.eslintrc.cjs)).
+- **Scoped client is the only tenant-data accessor for route code.** Use `createTenantDb(workspaceId)` from [`app/server/tenant-db.ts`](app/server/tenant-db.ts) — every table in [`app/db/workspace-scoped-tables.ts`](app/db/workspace-scoped-tables.ts) (26 tables) is auto-filtered by its tenancy column (`workspace` or `workspace_id`) on every read/update/delete and auto-injected on every insert. Use `@/db/schema` for column references in `where`/`orderBy`; never import `@/server/db` or `@/server/admin-db` from a route (enforced by `no-restricted-imports` in [`.eslintrc.cjs`](.eslintrc.cjs)).
 - API: `tdb.campaign.findMany({ where, with, orderBy, limit, offset })` (full Drizzle relational opts), `findFirst`, `insert(values)` / `insertMany(values)` (tenancy col stripped from input, auto-set), `update({ set, where })`, `delete({ where })`, `count({ where })`. Pass a second arg `createTenantDb(wsId, txDb)` to scope inside a transaction.
 - `withAppCurrentUser(userId, fn)` runs `fn` inside `db.transaction()` with `app.current_user_id` set (transaction-local) so SECURITY DEFINER plpgsql RPCs see the actor; `fn` receives the tx-bound Drizzle instance — compose with `createTenantDb(wsId, tx)`.
 - **Non-members get a uniform 404, not 403** (`requireWorkspaceAccess`, `requireWorkspaceLoaderContext`, `withWorkspaceApiLoader/Action`) to avoid workspace-id inference. A member with insufficient role for a min-role-gated route still gets 403.
-- No RLS. The last RLS policy (`phone_verification`) is dropped in [`client/migrations/20260628130500_adr_0004_drop_phone_verification_rls.sql`](client/migrations/20260628130500_adr_0004_drop_phone_verification_rls.sql); `phone_verification` is a global user-scoped table gated in app code by `user_id` (the `verify-audio-session` loader uses the service-role client + explicit `user_id` filter).
+- No RLS. The last RLS policy (`phone_verification`) is dropped in [`client/migrations/20260715140000_drop_legacy_rls.sql`](client/migrations/20260715140000_drop_legacy_rls.sql); `phone_verification` is a global user-scoped table gated in app code by `user_id` (the `verify-audio-session` loader uses the service-role client + explicit `user_id` filter).
 
 ## Railway (CallCaster project)
 
@@ -96,5 +93,4 @@
 
 - App **`DATABASE_URL`** should reference the single Postgres service variable (e.g. `${{PostgreSQL 18.DATABASE_URL}}`).
 - Schema/data restore: dump from linked Postgres (`client db dump --linked` + **PostgreSQL 17+ `pg_dump`** locally), restore via `psql "$DATABASE_PUBLIC_URL"`, seed `AUTH_migrations.schema_migrations`, then `client db push --db-url "$DATABASE_PUBLIC_URL" --yes`.
-- **`client/config.toml` `major_version`** — keep at **17** until Postgres CLI supports 18; Railway can run PG 18 regardless.
 - One volume per Postgres service; changing major PG version requires a **fresh volume** (cannot reuse PG18 data dir on PG17 image).
