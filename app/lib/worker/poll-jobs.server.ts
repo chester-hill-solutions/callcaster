@@ -77,6 +77,20 @@ export function getWorkerId(): string {
   return `bun-worker-${process.pid}-${Date.now()}`;
 }
 
+/**
+ * Rows affected by a write, across drivers: postgres.js exposes `count`, pg
+ * returns an array-like `{ rows }`. Read defensively rather than casting at
+ * each call site.
+ */
+function affectedRowCount(result: unknown): number {
+  if (Array.isArray(result)) return result.length;
+  if (result && typeof result === "object" && "count" in result) {
+    const { count } = result as { count?: unknown };
+    return typeof count === "number" ? count : 0;
+  }
+  return 0;
+}
+
 export async function resetStaleClaims(): Promise<void> {
   // Reclaims are re-queued WITHOUT bumping attempt_count here: claimNextJob
   // increments attempt_count when it re-claims the row, so a crash-recovery
@@ -98,13 +112,46 @@ export async function resetStaleClaims(): Promise<void> {
 
   // Logging unconditionally buried the signal in ~17k lines/day per worker; a
   // reset is only interesting when it actually reclaimed something, which
-  // means a worker died mid-job. Driver shape varies (postgres.js exposes
-  // `count`; pg returns `{rows}`), so read defensively.
-  const reclaimed =
-    (result as unknown as { count?: number } | null)?.count ??
-    (Array.isArray(result) ? result.length : 0);
+  // means a worker died mid-job.
+  const reclaimed = affectedRowCount(result);
   if (reclaimed > 0) {
     logger.warn("worker.stale_claims_reset", { reclaimed });
+  }
+
+  await deadLetterExhaustedJobs();
+}
+
+/**
+ * Dead-letter jobs that exhausted their attempts without ever throwing.
+ *
+ * failJob handles the normal path — a handler raises, the attempt is counted,
+ * and the job is dead-lettered once it runs out. A job that kills the worker
+ * process never reaches it, so those rows would otherwise sit `queued` at or
+ * past max_attempts forever: invisible to the claim query (which now bounds on
+ * attempt_count), never retried, never dead-lettered, and never surfaced on the
+ * dead-letter admin page.
+ */
+async function deadLetterExhaustedJobs(): Promise<void> {
+  // Same columns failJob writes on its terminal branch, so both kinds of
+  // dead letter look identical to the admin page and to log search.
+  const reason =
+    "Exhausted max_attempts without a handler error — the worker process likely died mid-job.";
+  const result = await db.execute(sql`
+    UPDATE job
+    SET status = 'dead_letter',
+        failed_at = now(),
+        dead_letter_reason = coalesce(dead_letter_reason, ${reason}),
+        error_message = coalesce(error_message, ${reason}),
+        updated_at = now()
+    WHERE status = 'queued'
+      AND attempt_count >= max_attempts
+  `);
+
+  const buried = affectedRowCount(result);
+  if (buried > 0) {
+    // A process-killing job is a different failure from a throwing one, and the
+    // dead-letter page is the only place it becomes visible.
+    logger.warn("worker.exhausted_jobs_dead_lettered", { buried });
   }
 }
 
@@ -118,6 +165,14 @@ export async function claimNextJob(
       FROM job
       WHERE status = 'queued'
         AND (retry_at IS NULL OR retry_at <= now())
+        -- Dead-lettering happens in failJob, which is only reached when a
+        -- handler THROWS. A job that kills the process instead — OOM, an
+        -- uncaughtException exit — never gets there: the platform restarts,
+        -- resetStaleClaims re-queues the row after its TTL, and this SELECT
+        -- picks it straight back up. Without this bound that is an unbounded
+        -- crash loop that starves every other job, while attempt_count climbs
+        -- past max_attempts with nothing reading it.
+        AND attempt_count < max_attempts
       ORDER BY created_at ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED

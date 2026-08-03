@@ -99,17 +99,38 @@ const mockState = vi.hoisted(() => {
       return reset;
     }
 
+    // Dead-letter jobs that exhausted their attempts without ever throwing.
+    if (
+      queryString.includes("UPDATE job") &&
+      queryString.includes("SET status = 'dead_letter'") &&
+      queryString.includes("attempt_count >= max_attempts")
+    ) {
+      const buried = state.jobs.filter(
+        (j) => j.status === "queued" && j.attempt_count >= j.max_attempts,
+      );
+      buried.forEach((j) => {
+        j.status = "dead_letter";
+        j.dead_letter_reason ??=
+          "Exhausted max_attempts without a handler error — the worker process likely died mid-job.";
+      });
+      return buried;
+    }
+
     // Select queued job
     if (
       queryString.includes("SELECT") &&
       queryString.includes("FROM job") &&
       queryString.includes("WHERE status = 'queued'")
     ) {
+      // Honour the attempt bound only when the real query asks for it, so a
+      // test cannot pass against a claim query that forgot the clause.
+      const boundsAttempts = queryString.includes("attempt_count < max_attempts");
       const job = state.jobs
         .filter(
           (j) =>
             j.status === "queued" &&
-            (!j.retry_at || new Date(j.retry_at) <= state.now),
+            (!j.retry_at || new Date(j.retry_at) <= state.now) &&
+            (!boundsAttempts || j.attempt_count < j.max_attempts),
         )
         .sort(
           (a, b) =>
@@ -452,5 +473,45 @@ describe("worker poll-jobs lifecycle", () => {
 
     // One reset before the loop starts, plus at least one per iteration.
     expect(resetCalls.length).toBeGreaterThan(1);
+  });
+  /**
+   * A job that kills the worker process never reaches failJob, so it is never
+   * dead-lettered by the normal path. The platform restarts, resetStaleClaims
+   * re-queues the row, and it is claimed again — an unbounded crash loop that
+   * starves every other job while attempt_count climbs past max_attempts with
+   * nothing reading it.
+   */
+  test("a job at max_attempts is not claimed again", async () => {
+    mockState.state.jobs.length = 0;
+    mockState.state.jobs.push(
+      createJob({ id: 90, attempt_count: 3, max_attempts: 3 }),
+    );
+
+    expect(await claimNextJob("worker-1")).toBeNull();
+  });
+
+  test("a job below max_attempts is still claimed", async () => {
+    mockState.state.jobs.length = 0;
+    mockState.state.jobs.push(
+      createJob({ id: 91, attempt_count: 2, max_attempts: 3 }),
+    );
+
+    const claimed = await claimNextJob("worker-1");
+    expect(claimed).toMatchObject({ id: 91, attempt_count: 3 });
+  });
+
+  test("an exhausted job is dead-lettered rather than left queued forever", async () => {
+    mockState.state.jobs.length = 0;
+    mockState.state.jobs.push(
+      createJob({ id: 92, attempt_count: 3, max_attempts: 3 }),
+    );
+
+    await resetStaleClaims();
+
+    const job = mockState.state.jobs.find((j) => j.id === 92);
+    expect(job?.status).toBe("dead_letter");
+    // Otherwise it is invisible: unclaimable, never retried, and absent from
+    // the dead-letter admin page that exists to surface exactly this.
+    expect(job?.dead_letter_reason).toContain("Exhausted max_attempts");
   });
 });
