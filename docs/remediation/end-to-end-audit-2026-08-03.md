@@ -441,6 +441,23 @@ places despite `app/lib/phone.ts` exporting `stripPhoneNumber`; `formatAnswer` i
 
 Do not treat this as cleanup. Every Phase 0–3 finding got through a green CI run.
 
+0a. **The production bootstrap's drift guard never runs in CI — and the compose one does.**
+   *(Added 2026-08-03 during planning; not in the original sweep.)* Two ordered migration lists must
+   stay in lockstep: `scripts/e2e/bootstrap-compose-db.mjs` (the test DB) and
+   `scripts/db/bootstrap-fresh-db.mjs` (**the production install path — #1120 provisions prod with
+   `db:bootstrap:fresh`**). Both carry a drift guard that fails on an unwired migration. Only the
+   compose one ever executes: `e2e.yml` runs it, while `db:bootstrap:fresh` is invoked by no
+   workflow and no script, and `bootstrap-fresh-db.mjs:38-44` exits on a missing `DATABASE_URL`
+   **before** reaching its guard at `:116`.
+
+   Consequence: a migration appended to the compose list but not the fresh list is **fully green in
+   CI** and yields a production schema missing that migration. The failure surfaces as a missing RPC
+   after cutover. Three of the Phase 1 fixes add migrations, so this is live risk, not theory.
+
+   **Fix:** let the guard run without `DATABASE_URL` (move it above the exit, or add a
+   `--check-only` mode) and invoke it in `ci.yml`. Until then, treat "both lists updated" as a
+   reviewer checkbox on every migration PR — green CI does not prove it.
+
 0. **`npm run typecheck` checks `app/` and `shared/` only — nothing else.** `tsconfig.json:2-8`
    includes `app/env.ts`, `app/**/*.{ts,tsx}`, `shared/**/*.ts` and the generated route types.
    `npx tsc --listFiles` confirms the real number: **1134 files from `app/`, 23 from `shared/`, and
