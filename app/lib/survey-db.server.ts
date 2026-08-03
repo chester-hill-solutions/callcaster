@@ -150,14 +150,6 @@ export async function loadSurveyDetailByPublicId(
   };
 }
 
-export async function loadContactById(contactId: number) {
-  const [row] = await db
-    .select()
-    .from(contactTable)
-    .where(eq(contactTable.id, contactId))
-    .limit(1);
-  return row ?? null;
-}
 
 export async function loadRecentSurveyResponses(surveyInternalId: number, limit = 10) {
   const responses = await db

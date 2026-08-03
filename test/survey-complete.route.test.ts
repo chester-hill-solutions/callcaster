@@ -19,7 +19,7 @@ const surveyDbMocks = vi.hoisted(() => ({
     is_active: true,
     workspace: "ws-1",
   })),
-  loadContactById: vi.fn(async () => ({
+  loadSurveyRespondentContact: vi.fn(async () => ({
     id: 100,
     workspace: "ws-1",
   })),
@@ -32,7 +32,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/survey-db.server", () => ({
   completeSurveyResponse: (...args: unknown[]) => surveyDbMocks.completeSurveyResponse(...args),
   getActiveSurveyByPublicId: (...args: unknown[]) => surveyDbMocks.getActiveSurveyByPublicId(...args),
-  loadContactById: (...args: unknown[]) => surveyDbMocks.loadContactById(...args),
+}));
+
+vi.mock("@/lib/survey-respondent.server", () => ({
+  loadSurveyRespondentContact: (...args: unknown[]) =>
+    surveyDbMocks.loadSurveyRespondentContact(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -58,8 +62,8 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
       is_active: true,
       workspace: "ws-1",
     });
-    surveyDbMocks.loadContactById.mockReset();
-    surveyDbMocks.loadContactById.mockResolvedValue({
+    surveyDbMocks.loadSurveyRespondentContact.mockReset();
+    surveyDbMocks.loadSurveyRespondentContact.mockResolvedValue({
       id: 100,
       workspace: "ws-1",
     });
@@ -163,7 +167,8 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
   });
 
   test("rejects contact outside survey workspace", async () => {
-    surveyDbMocks.loadContactById.mockResolvedValueOnce({ id: 100, workspace: "ws-other" });
+    // Scoped at the query, so a contact in another workspace does not resolve.
+    surveyDbMocks.loadSurveyRespondentContact.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/survey-complete");
     const res = await asRouteResponse(mod.action({
       request: makeReq({

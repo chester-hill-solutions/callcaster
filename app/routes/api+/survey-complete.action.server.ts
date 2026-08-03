@@ -11,8 +11,8 @@ import {
 import {
   completeSurveyResponse,
   getActiveSurveyByPublicId,
-  loadContactById,
 } from "@/lib/survey-db.server";
+import { loadSurveyRespondentContact } from "@/lib/survey-respondent.server";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -83,8 +83,9 @@ async function handleCompleteSurvey(request: Request) {
     return routeData({ error: "Invalid contact ID" }, { status: 400 });
   }
   if (contactIdNum !== null) {
-    const contact = await loadContactById(contactIdNum);
-    if (!contact || contact.workspace !== survey.workspace) {
+    // Scoped to the survey's workspace, so a foreign id simply does not resolve.
+    const contact = await loadSurveyRespondentContact(contactIdNum, survey.workspace);
+    if (!contact) {
       return routeData({ error: "Invalid contact" }, { status: 400 });
     }
   }
