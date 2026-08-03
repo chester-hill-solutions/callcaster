@@ -10,9 +10,6 @@ import { data as routeData } from "react-router";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";
 import { rpcDequeueContact } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
-// adminDb is used for Supabase Realtime channels (not available via tdb).
-// eslint-disable-next-line no-restricted-imports
-import { adminDb } from "@/server/admin-db";
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/db-types";
@@ -28,8 +25,6 @@ import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
 
 type TwilioClient = Twilio.Twilio;
-
-type RealtimeChannel = any;
 
 const updateCall = async (sid: string, workspaceId: string, update: Partial<Tables<"call">>) => {
   try {
@@ -126,7 +121,6 @@ const handleCallStatus = async (
   parsedBody: { [x: string]: string },
   dbCall: Tables<"call">,
   twilio: TwilioClient,
-  realtime: RealtimeChannel,
   status: Tables<"call">["status"],
 ) => {
   try {
@@ -164,13 +158,11 @@ const handleCallStatus = async (
     await rpcDequeueContact(tdb, {
       contactId: outreachStatus.contact_id,
       groupOnHousehold: true,
-      dequeuedById: callUpdate.conference_id ?? "",
+      // A conference name is `${userId}~${uuid}`, and this argument is bound
+      // as ::uuid — passing the raw name raised 22P02 on every terminal call,
+      // so the contact was never dequeued and the dialer stopped after one.
+      dequeuedById: resolveUserIdFromConferenceName(callUpdate.conference_id) || null,
       dequeuedReasonText: `Call ${status?.toLowerCase()}`,
-    });
-    realtime.send({
-      type: "broadcast",
-      event: "message",
-      payload: { contact_id: outreachStatus.contact_id, status },
     });
     const conferences = await twilio.conferences.list({
       friendlyName: callUpdate.conference_id ?? "",
@@ -188,7 +180,6 @@ const handleCallStatus = async (
 const handleParticipantLeave = async (
   parsedBody: { [x: string]: string },
   twilio: TwilioClient,
-  realtime: RealtimeChannel,
 ) => {
   const underCase = twilioParamsToUnderCase(parsedBody);
 
@@ -215,14 +206,6 @@ const handleParticipantLeave = async (
       throw new Error("Outreach attempt not found for participant leave");
     }
 
-    realtime.send({
-      type: "broadcast",
-      event: "message",
-      payload: {
-        contact_id: outreachStatus.contact_id,
-        status: "completed",
-      },
-    });
     const conferences = await twilio.conferences.list({
       friendlyName: typeof underCase.friendly_name === "string" ? underCase.friendly_name : (typeof underCase.conference_sid === "string" ? underCase.conference_sid : ""),
       status: "in-progress",
@@ -241,7 +224,6 @@ const handleParticipantLeave = async (
 const handleParticipantJoin = async (
   parsedBody: { [x: string]: string },
   dbCall: Tables<"call">,
-  realtime: RealtimeChannel,
 ) => {
   const underCase = twilioParamsToUnderCase(parsedBody);
   try {
@@ -283,14 +265,6 @@ const handleParticipantJoin = async (
         ),
       });
 
-      realtime.send({
-        type: "broadcast",
-        event: "message",
-        payload: {
-          contact_id: outreachStatus.contact_id,
-          status: "connected",
-        },
-      });
     }
   } catch (error) {
     logger.error("Error in handleParticipantJoin:", error);
@@ -322,7 +296,6 @@ export const action = defineAction({
   sideEffects: ["db-write", "credit", "twilio"],
   handler: async ({ auth }) => {
     const { parsedBody, underCase, callSidValue } = auth;
-    let realtime: any;
     try {
     const dbCall = await findCallBySid(callSidValue);
     if (!dbCall?.workspace) {
@@ -337,11 +310,6 @@ export const action = defineAction({
 
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
-    realtime = (adminDb as any).channel(
-      (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null) ??
-        dbCall.conference_id ??
-        "default",
-    );
     const callStatusValue =
       typeof underCase.call_status === "string" ? underCase.call_status : "";
     switch (callStatusValue) {
@@ -353,7 +321,6 @@ export const action = defineAction({
           parsedBody,
           dbCall,
           twilio,
-          realtime,
           callStatusValue?.toLowerCase() as Tables<"call">["status"],
         );
         break;
@@ -366,13 +333,13 @@ export const action = defineAction({
             ? underCase.reason_participant_left
             : "") === "participant_hung_up"
         ) {
-          await handleParticipantLeave(parsedBody, twilio, realtime);
+          await handleParticipantLeave(parsedBody, twilio);
         } else if (
           (typeof underCase.status_callback_event === "string"
             ? underCase.status_callback_event
             : "") === "participant-join"
         ) {
-          await handleParticipantJoin(parsedBody, dbCall, realtime);
+          await handleParticipantJoin(parsedBody, dbCall);
         }
     }
 
@@ -383,10 +350,6 @@ export const action = defineAction({
       { error: "Failed to process action: " + (error instanceof Error ? error.message : "Unknown error") },
       { status: 500 },
     );
-  } finally {
-    if (realtime) {
-      (adminDb as any).removeChannel(realtime);
-    }
   }
   },
 });

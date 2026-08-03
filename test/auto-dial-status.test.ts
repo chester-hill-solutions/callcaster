@@ -211,7 +211,6 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
 
   return {
     from,
-    realtime: { channel: () => ({ send: vi.fn() }) },
     rpc: vi.fn(async (fn: string, rpcArgs: any) => {
       if (fn === "apply_ledger_entry_and_sync_credits") {
         return makeApplyLedgerEntryRpcStub(transactionRows)(fn, rpcArgs);
@@ -244,8 +243,6 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
       }
       return [];
     }),
-    channel: () => ({ send: vi.fn() }),
-    removeChannel: vi.fn(),
     _transactionRows: transactionRows,
     _outreachUpdateCalls: outreachUpdateCalls,
     _telephonyConfig: {
@@ -269,10 +266,19 @@ vi.mock("@/lib/auth.server", () => ({
   getAdminDb: () => clientState.client,
 }));
 
+// Deliberately NOT a catch-all Proxy. One here manufactured any property asked
+// for, including a Supabase `.channel()` that does not exist on the real Drizzle
+// client — which is how a route that 500'd on every callback passed CI. Reading
+// a property the real adminDb does not have now throws instead.
 vi.mock("@/server/admin-db", () => ({
   adminDb: new Proxy({} as any, {
     get(_target, prop) {
       const client = clientState.client;
+      if (typeof prop === "string" && !(prop in (client ?? {}))) {
+        throw new TypeError(
+          `adminDb.${prop} does not exist on the real Drizzle client — do not mock it into existence.`,
+        );
+      }
       return client?.[prop];
     },
   }),
@@ -425,6 +431,47 @@ describe("api.auto-dial.status", () => {
     expect(rpcDequeueContactMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ contactId: 1 }),
+    );
+  });
+
+  /**
+   * Conference names are minted as `${userId}~${uuid}`, and dequeue_contact
+   * binds this argument as ::uuid. Passing the raw name raised 22P02 on every
+   * terminal call, so the contact was never dequeued and the dialer stopped
+   * after a single call with the campaign stuck on "Running".
+   */
+  test("dequeues with the user id from the conference name, not the name itself", async () => {
+    const userId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA1",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: `${userId}~9f3ae1b2-0000-4000-8000-00000000abcd`,
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "10");
+    fd.set("CallDuration", "10");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+
+    expect(res.status).toBe(200);
+    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ dequeuedById: userId }),
     );
   });
 
