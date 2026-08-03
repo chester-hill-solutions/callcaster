@@ -35,8 +35,18 @@ import postgres from "postgres";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 
+/**
+ * `--check-only` runs the drift guard below and exits, without touching a
+ * database. It exists so CI can gate on it: this file is the PRODUCTION install
+ * path, but nothing invoked it, and the DATABASE_URL exit below sits ABOVE the
+ * guard — so a migration wired into the compose list but not this one was
+ * green in CI and produced a production schema missing that migration. The
+ * compose bootstrap's identical guard runs on every E2E job; this one never ran
+ * anywhere.
+ */
+const checkOnly = process.argv.includes("--check-only");
 const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
+if (!databaseUrl && !checkOnly) {
   console.error(
     "[bootstrap-fresh-db] DATABASE_URL is required (no default — this targets real environments).",
   );
@@ -137,6 +147,13 @@ if (unwired.length > 0) {
       "bootstrap (scripts/e2e/bootstrap-compose-db.mjs) in the same commit.",
   );
   process.exit(1);
+}
+
+if (checkOnly) {
+  console.log(
+    `[bootstrap-fresh-db] migration wiring OK: ${allMigrationFiles.length} client migration(s), none unwired.`,
+  );
+  process.exit(0);
 }
 
 function versionFromFilename(name) {
