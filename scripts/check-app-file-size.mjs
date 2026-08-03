@@ -12,7 +12,7 @@ import path from "node:path";
 
 const ROOT = path.resolve("app");
 const MAX_LINES = 800;
-const EXEMPT = new Set(["lib/database.types.ts"]);
+const EXEMPT = new Set([]);
 
 /**
  * Relative paths under `app/` → maximum permitted line count (inclusive).
@@ -25,8 +25,8 @@ const BASELINE_ALLOWLIST = {
   // split this file by domain (workspace / campaign / telephony / survey)
   // instead of raising the number again.
   "db/schema.ts": 801,
-  "lib/platform-data.server.ts": 1181,
-  "lib/database/workspace.server.ts": 1059,
+  "lib/platform-data.server.ts": 1080,
+  "lib/database/workspace.server.ts": 826,
   "lib/survey-db.server.ts": 928,
 };
 
@@ -48,12 +48,16 @@ async function walk(dir) {
 const offenders = [];
 const allowlistViolations = [];
 const seenAllowlisted = new Set();
+const seenExempt = new Set();
 
 for (const file of await walk(ROOT)) {
   const relFromApp = path
     .relative(ROOT, file)
     .replaceAll("\\", "/");
-  if (EXEMPT.has(relFromApp)) continue;
+  if (EXEMPT.has(relFromApp)) {
+    seenExempt.add(relFromApp);
+    continue;
+  }
 
   const content = await readFile(file, "utf8");
   const lines = content.split("\n").length;
@@ -78,6 +82,10 @@ for (const file of await walk(ROOT)) {
 
 const missingAllowlisted = Object.keys(BASELINE_ALLOWLIST).filter(
   (rel) => !seenAllowlisted.has(rel),
+);
+
+const missingExempt = [...EXEMPT].filter(
+  (rel) => !seenExempt.has(rel),
 );
 
 let failed = false;
@@ -111,6 +119,16 @@ if (missingAllowlisted.length > 0) {
     `Baseline allowlist entries missing on disk (remove from allowlist if split/deleted):`,
   );
   for (const rel of missingAllowlisted) {
+    console.error(`  app/${rel}`);
+  }
+}
+
+if (missingExempt.length > 0) {
+  failed = true;
+  console.error(
+    `Exempt list entries missing on disk (remove from exempt set if deleted):`,
+  );
+  for (const rel of missingExempt) {
     console.error(`  app/${rel}`);
   }
 }

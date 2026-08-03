@@ -28,8 +28,6 @@ const EXCLUDED_SUFFIXES = [
   "connect-phone-device.action.server.ts",
   "hangup.action.server.ts",
   "error-report.action.server.ts",
-  "verify-audio-session.action.server.ts",
-  "verify-pin-input.action.server.ts",
 ];
 
 /** Twilio webhook handlers (POST from Twilio). Loader-only conference connect validated separately. */

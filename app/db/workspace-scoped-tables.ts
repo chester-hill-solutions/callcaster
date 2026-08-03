@@ -20,6 +20,7 @@ import {
   transaction_history,
   webhook,
   workspace_api_key,
+  workspace_audio,
   workspace_events,
   workspace_audit_event,
   workspace_invite,
@@ -33,7 +34,9 @@ import {
  *
  * `createTenantDb(workspaceId)` auto-scopes each of these tables on every
  * read/update/delete and auto-injects the tenancy column on every insert (ADR-0004).
- * Count: 26 tables (Phase C adds CHS `workspace_member`; tenancy col is text).
+ * Count is asserted in test/tenant-db.test.ts against the tables declared in
+ * schema.ts, so a new workspace-scoped table cannot be added without either
+ * registering it here or explicitly opting out.
  */
 export const WORKSPACE_SCOPED_TABLES = {
   campaign: { table: campaign, workspaceColumn: campaign.workspace },
@@ -48,6 +51,7 @@ export const WORKSPACE_SCOPED_TABLES = {
   survey: { table: survey, workspaceColumn: survey.workspace },
   webhook: { table: webhook, workspaceColumn: webhook.workspace },
   workspace_number: { table: workspace_number, workspaceColumn: workspace_number.workspace },
+  workspace_audio: { table: workspace_audio, workspaceColumn: workspace_audio.workspace_id },
   workspace_invite: { table: workspace_invite, workspaceColumn: workspace_invite.workspace },
   transaction_history: {
     table: transaction_history,

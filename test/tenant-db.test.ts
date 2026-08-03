@@ -20,6 +20,7 @@ const SCOPED_TABLE_NAMES = [
   "agent_status", "agent_status_event", "handset_session", "workspace_users",
   "workspace_member",
   "workspace_api_key", "workspace_events", "workspace_audit_event",
+  "workspace_audio",
 ] as const;
 
 type Captured = {
@@ -191,11 +192,54 @@ describe("createTenantDb — registry completeness", () => {
     }
   });
 
-  test("registry covers exactly the 26 workspace-scoped tables", () => {
-    expect(Object.keys(WORKSPACE_SCOPED_TABLES)).toHaveLength(26);
+  test("registry matches the inline name list", () => {
     const registryNames = Object.keys(WORKSPACE_SCOPED_TABLES).sort();
     const inlineNames = [...SCOPED_TABLE_NAMES].sort();
     expect(registryNames).toEqual(inlineNames);
+  });
+
+  /**
+   * Derived from schema.ts rather than from a number typed in by hand.
+   *
+   * The previous assertion was `toHaveLength(26)` compared against
+   * SCOPED_TABLE_NAMES — a second hand-maintained list in this same file. Two
+   * hand lists agreeing with each other proved only that someone updated both;
+   * neither was checked against the schema. `workspace_audio` carries
+   * `workspace_id NOT NULL` and was missing from the registry the whole time,
+   * so its data access hand-wrote the scope filter at three call sites — the
+   * exact thing ADR-0004 exists to remove.
+   */
+  test("every workspace-scoped table in schema.ts is registered or opted out", async () => {
+    const schema = await import("@/db/schema");
+
+    // Cross-workspace by design; each needs a stated reason to stay out.
+    const DELIBERATELY_UNSCOPED = new Set([
+      "job", // the queue is global; handlers scope themselves per job
+      "workspace", // the tenant row itself
+      "workspace_role_row",
+      "workspace_feature",
+      "workspace_feature_permission",
+      "workspace_invitation",
+      "client_migration_bootstrap",
+      "rate_limit_bucket",
+    ]);
+
+    const scopedInSchema = Object.entries(schema)
+      .filter(([, value]) => {
+        const columns = (value as { [k: string]: unknown })?.workspace
+          ?? (value as { [k: string]: unknown })?.workspace_id;
+        return Boolean(columns);
+      })
+      .map(([name]) => name)
+      .filter((name) => !DELIBERATELY_UNSCOPED.has(name));
+
+    const registered = new Set(Object.keys(WORKSPACE_SCOPED_TABLES));
+    const unregistered = scopedInSchema.filter((name) => !registered.has(name));
+
+    expect(
+      unregistered,
+      `these tables have a workspace tenancy column but are not in WORKSPACE_SCOPED_TABLES — register them or add them to DELIBERATELY_UNSCOPED with a reason`,
+    ).toEqual([]);
   });
 });
 

@@ -32,6 +32,11 @@ const normalized = [...new Set(
     .filter(Boolean),
 )].sort().join("\n");
 
+if (!normalized) {
+  console.error("react-router routes produced empty output; check if the build succeeded");
+  process.exit(1);
+}
+
 if (update) {
   fs.mkdirSync(path.dirname(BASELINE), { recursive: true });
   fs.writeFileSync(BASELINE, normalized + "\n");
