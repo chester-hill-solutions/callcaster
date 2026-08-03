@@ -182,10 +182,9 @@ describe("runNumberRentalBilling", () => {
     tdbMocks.workspace_number.findMany.mockResolvedValue([
       makeNumber({ created_at: "2026-04-01" }),
     ]);
-    // April (creation) cycle already billed; May is due today and unbilled.
-    tdbMocks.transaction_history.findFirst
-      .mockResolvedValueOnce({ id: 7 })
-      .mockResolvedValueOnce(null);
+    // The April (creation) month is charged at purchase, not by the sweep, so
+    // the only cycle in scope is the May renewal — and it is unbilled.
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
 
     const result = await runNumberRentalBilling({
@@ -210,17 +209,54 @@ describe("runNumberRentalBilling", () => {
     expect(resendMocks.send).not.toHaveBeenCalled();
   });
 
+  /**
+   * The purchase flow debits the first month under `number_rent_purchase:*`,
+   * the sweep under `number_rent:*`. The already-billed probe only looks up the
+   * cycle key, so it cannot see the purchase debit — including the creation
+   * month here charged that month twice, on the very day the number was bought.
+   *
+   * The second assertion is the important half: pushing the boundary one month
+   * the other way would skip a month permanently, and because every charge is
+   * idempotency-keyed nothing would error, retry, or alarm.
+   */
+  test("does not re-charge the creation month, and still bills the next one", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-15" }),
+    ]);
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
+
+    // Same day the number was bought: the purchase debit is the only charge.
+    const onPurchaseDay = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-04-15T00:00:00.000Z"),
+    });
+    expect(onPurchaseDay).toMatchObject({ charged: 0, unpaid: 0 });
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
+
+    // One month later the renewal is due and must be charged exactly once.
+    const atRenewal = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-15T00:00:00.000Z"),
+    });
+    expect(atRenewal).toMatchObject({ charged: 1 });
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.objectContaining({ note: expect.stringContaining("2026-05") }),
+    );
+  });
+
   test("catches up cycles missed while the worker was down (BILL-02)", async () => {
     tdbMocks.workspace_number.findMany.mockResolvedValue([
       makeNumber({ created_at: "2026-04-10" }),
     ]);
-    // Neither the April nor May cycle was ever billed; the sweep runs late.
+    // Neither the May nor June renewal was ever billed; the sweep runs late.
     tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
 
     const result = await runNumberRentalBilling({
       workspaceId: "workspace-1",
-      today: new Date("2026-05-12T00:00:00.000Z"),
+      today: new Date("2026-06-12T00:00:00.000Z"),
     });
 
     expect(result).toMatchObject({ charged: 2, unpaid: 0 });
@@ -228,8 +264,8 @@ describe("runNumberRentalBilling", () => {
       ([args]) => (args as { note: string }).note,
     );
     expect(notes).toEqual([
-      expect.stringContaining("2026-04"),
       expect.stringContaining("2026-05"),
+      expect.stringContaining("2026-06"),
     ]);
   });
 
@@ -262,7 +298,7 @@ describe("runNumberRentalBilling", () => {
    */
   test("alerts ops when a rental goes unpaid", async () => {
     opsMocks.notifyOps.mockClear();
-    // One elapsed cycle: anchored in the same month as `today`.
+    // One elapsed renewal cycle: rented in May, unpaid at the June renewal.
     tdbMocks.workspace_number.findMany.mockResolvedValue([
       makeNumber({ created_at: "2026-05-01" }),
     ]);
@@ -270,7 +306,7 @@ describe("runNumberRentalBilling", () => {
 
     await runNumberRentalBilling({
       workspaceId: "workspace-1",
-      today: new Date("2026-05-01T00:00:00.000Z"),
+      today: new Date("2026-06-01T00:00:00.000Z"),
     });
 
     // One alert, from the ladder, naming the number and the rung reached — a
@@ -291,7 +327,7 @@ describe("runNumberRentalBilling", () => {
     opsMocks.notifyOps.mockClear();
     lifecycleMocks.removeWorkspacePhoneNumber.mockClear();
     tdbMocks.workspace_number.update.mockResolvedValue([{ id: 1 }]);
-    // Two elapsed cycles with no ledger rows (2026-04-01 and 2026-05-01).
+    // Two elapsed renewal cycles with no ledger rows (2026-05-01, 2026-06-01).
     tdbMocks.workspace_number.findMany.mockResolvedValue([
       makeNumber({ created_at: "2026-04-01" }),
     ]);
@@ -299,7 +335,7 @@ describe("runNumberRentalBilling", () => {
 
     const result = await runNumberRentalBilling({
       workspaceId: "workspace-1",
-      today: new Date("2026-05-01T00:00:00.000Z"),
+      today: new Date("2026-06-01T00:00:00.000Z"),
     });
 
     expect(result).toMatchObject({ suspended: 1, released: 0 });
@@ -310,7 +346,7 @@ describe("runNumberRentalBilling", () => {
   test("three unpaid cycles releases the number at Twilio", async () => {
     opsMocks.notifyOps.mockClear();
     lifecycleMocks.removeWorkspacePhoneNumber.mockClear().mockResolvedValue(undefined);
-    // Three elapsed cycles: 2026-03-01, 2026-04-01, 2026-05-01.
+    // Three elapsed renewal cycles: 2026-04-01, 2026-05-01, 2026-06-01.
     tdbMocks.workspace_number.findMany.mockResolvedValue([
       makeNumber({ created_at: "2026-03-01" }),
     ]);
@@ -318,7 +354,7 @@ describe("runNumberRentalBilling", () => {
 
     const result = await runNumberRentalBilling({
       workspaceId: "workspace-1",
-      today: new Date("2026-05-01T00:00:00.000Z"),
+      today: new Date("2026-06-01T00:00:00.000Z"),
     });
 
     expect(result).toMatchObject({ released: 1 });

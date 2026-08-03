@@ -55,11 +55,17 @@ function isSameDay(a: Date, b: Date): boolean {
 const MAX_CATCHUP_CYCLES = 36;
 
 /**
- * Every rental due date from the anchor (inclusive — the creation-month cycle
- * is due on the anchor day itself) through `today`. Billing from this list
- * instead of "is today the anchor day?" means a run that was skipped (worker
- * down, deploy gap) charges the missed cycle on the next run rather than
- * leaving it unbilled forever.
+ * Every rental *renewal* due date after the anchor, through `today`.
+ *
+ * The creation month is excluded: `purchaseWorkspaceNumber` already debits it
+ * at purchase under `numberRentalPurchaseKey`. This function's keys are
+ * `numberRentalCycleKey`, and the already-billed probe below only looks up the
+ * cycle key — so including the anchor month charged the first month twice, once
+ * on purchase and again on the same day's sweep.
+ *
+ * Billing from a list rather than "is today the anchor day?" means a run that
+ * was skipped (worker down, deploy gap) charges the missed cycle on the next
+ * run instead of leaving it unbilled forever.
  */
 function elapsedDueDates(anchorDate: string, today: Date): Date[] {
   const anchor = new Date(anchorDate);
@@ -71,7 +77,10 @@ function elapsedDueDates(anchorDate: string, today: Date): Date[] {
   while (dues.length < MAX_CATCHUP_CYCLES) {
     const due = getDueDate(anchorDate, cursor);
     if (due.getTime() > today.getTime()) break;
-    if (due.getTime() >= anchor.getTime()) dues.push(due);
+    // Strictly after the anchor. Getting this boundary wrong in the other
+    // direction skips a month permanently and silently — every charge is
+    // idempotency-keyed, so nothing errors and nothing retries.
+    if (due.getTime() > anchor.getTime()) dues.push(due);
     cursor.setUTCMonth(cursor.getUTCMonth() + 1);
   }
   return dues;

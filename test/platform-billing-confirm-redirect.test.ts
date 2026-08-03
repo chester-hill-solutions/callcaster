@@ -43,6 +43,7 @@ describe("confirmStripeCheckoutSessionForRedirect", () => {
   test("credits the workspace when the session is complete", async () => {
     sessionsRetrieve.mockResolvedValue({
       status: "complete",
+      payment_status: "paid",
       metadata: { workspaceId: WORKSPACE_ID, creditAmount: "500" },
     });
     insertTransactionHistoryIdempotent.mockResolvedValue({ inserted: true });
@@ -63,6 +64,7 @@ describe("confirmStripeCheckoutSessionForRedirect", () => {
   test("keeps the workspace id when the ledger insert throws", async () => {
     sessionsRetrieve.mockResolvedValue({
       status: "complete",
+      payment_status: "paid",
       metadata: { workspaceId: WORKSPACE_ID, creditAmount: "500" },
     });
     insertTransactionHistoryIdempotent.mockRejectedValue(
@@ -94,6 +96,7 @@ describe("confirmStripeCheckoutSessionForRedirect", () => {
   test("keeps the workspace id when credit metadata is missing", async () => {
     sessionsRetrieve.mockResolvedValue({
       status: "complete",
+      payment_status: "paid",
       metadata: { workspaceId: WORKSPACE_ID },
     });
 
@@ -111,5 +114,33 @@ describe("confirmStripeCheckoutSessionForRedirect", () => {
 
     expect(result.ok).toBe(false);
     expect(result.workspaceId).toBeNull();
+  });
+
+  // `status: "complete"` means the Checkout Session finished, not that money
+  // moved. Delayed-notification methods complete as "unpaid" and settle later.
+  test("grants nothing when a completed session is still unpaid", async () => {
+    sessionsRetrieve.mockResolvedValue({
+      status: "complete",
+      payment_status: "unpaid",
+      metadata: { workspaceId: WORKSPACE_ID, creditAmount: "500" },
+    });
+
+    const result = await confirm();
+
+    expect(result.ok).toBe(false);
+    expect(insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
+  });
+
+  test("grants nothing for a zero-amount session", async () => {
+    sessionsRetrieve.mockResolvedValue({
+      status: "complete",
+      payment_status: "no_payment_required",
+      metadata: { workspaceId: WORKSPACE_ID, creditAmount: "500" },
+    });
+
+    const result = await confirm();
+
+    expect(result.ok).toBe(false);
+    expect(insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 });

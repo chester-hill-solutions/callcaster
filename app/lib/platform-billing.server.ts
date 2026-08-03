@@ -306,7 +306,12 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
     const workspaceId = session.metadata?.workspaceId ?? null;
     fallbackWorkspaceId = workspaceId;
 
-    if (session.status !== "complete") {
+    // `status: "complete"` only means the Checkout Session finished, not that
+    // money moved — it fires with payment_status "unpaid" for delayed-notification
+    // methods and "no_payment_required" for zero-amount sessions. Both sibling
+    // paths (pollBillingCheckoutSession, the stripe-webhook handler) check both
+    // fields; this is the primary grant path and was the one missing it.
+    if (session.status !== "complete" || session.payment_status !== "paid") {
       throw new Error("Payment not completed");
     }
 
