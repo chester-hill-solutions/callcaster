@@ -19,10 +19,15 @@ let count = 0;
 /** Set when the current window has already alerted, so one burst pages once. */
 let alertedForWindow = false;
 
+/**
+ * Resolved value is ignored — the caller only ever attaches a `.catch`. Typed
+ * as `unknown` so a handler may return its own result (e.g. `notifyOps`)
+ * without the call site needing a cast.
+ */
 type ErrorRateHandler = (info: {
   count: number;
   windowMs: number;
-}) => void | Promise<void>;
+}) => void | Promise<unknown>;
 
 let onThresholdCrossed: ErrorRateHandler | null = null;
 

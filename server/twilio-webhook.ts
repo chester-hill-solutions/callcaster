@@ -51,7 +51,9 @@ function resolveTwilioWebhookOptions(
   return {};
 }
 
-async function readRawBody(request: Request): Promise<Uint8Array> {
+// Returns a freshly allocated buffer, so the view is over a real ArrayBuffer —
+// stated explicitly because `BodyInit` will not accept `ArrayBufferLike`.
+async function readRawBody(request: Request): Promise<Uint8Array<ArrayBuffer>> {
   if (request.method === "GET" || request.method === "HEAD") {
     return new Uint8Array(0);
   }
@@ -86,12 +88,13 @@ async function readRawBody(request: Request): Promise<Uint8Array> {
   return body;
 }
 
-function requestWithBody(request: Request, body: Uint8Array): Request {
+function requestWithBody(request: Request, body: Uint8Array<ArrayBuffer>): Request {
   return new Request(request.url, {
     method: request.method,
     headers: request.headers,
+    // No `duplex` — that is only required for a ReadableStream body, and this
+    // always passes a fully-buffered Uint8Array.
     body: body.byteLength > 0 ? body : undefined,
-    duplex: "half",
   });
 }
 

@@ -22,7 +22,9 @@ export const parseRequestData = async (request: Request) => {
 function formDataToObject(formData: FormData): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of formData.entries()) {
-    const v = value instanceof File ? value : String(value);
+    // FormData entries are `string | File`. `instanceof` rejects a union with a
+    // primitive as its left operand, so narrow on the primitive instead.
+    const v = typeof value === "string" ? String(value) : value;
     if (key in result) {
       const existing = result[key];
       if (Array.isArray(existing)) {
