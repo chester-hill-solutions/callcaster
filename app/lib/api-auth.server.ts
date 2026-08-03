@@ -1,4 +1,5 @@
-import { createHash, timingSafeEqual } from "crypto";
+import { createHash } from "crypto";
+import { secureCompare } from "@/lib/secure-compare";
 import { getSession, resolveBearerSessionUser } from "./auth.server";
 import { jsonError } from "./platform-api.server";
 import type { ProductCapabilityId } from "@/lib/capabilities";
@@ -13,13 +14,6 @@ const KEY_PREFIX_LENGTH = 24;
 
 function hashApiKey(key: string): string {
   return createHash("sha256").update(key, "utf8").digest("hex");
-}
-
-function secureCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a, "utf8");
-  const bufB = Buffer.from(b, "utf8");
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
 }
 
 function extractBearerToken(request: Request): string | null {

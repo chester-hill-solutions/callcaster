@@ -1,4 +1,5 @@
 import { data as routeData, redirect } from "react-router";
+import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import { verifyAuth } from "@/lib/auth.server";
 import {
   isTwoFactorEnabled,
@@ -109,8 +110,8 @@ export const action = defineAction({
           returnHeaders: true,
         });
 
-        if (next && next.startsWith("/") && !next.startsWith("//")) {
-          throw redirect(next, { headers });
+        if (next) {
+          throw redirect(getSafeRedirectPath(next), { headers });
         }
 
         return routeData({ success: "Two-factor authentication is enabled.", enabled: true }, { headers });

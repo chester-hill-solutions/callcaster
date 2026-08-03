@@ -10,6 +10,16 @@ function parseMs(value: FormDataEntryValue | null) {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+/**
+ * A route param arrives URL-decoded, so `%2F` and `%2E%2E` become real path
+ * separators. These are concatenated into an object key, and while S3 treats
+ * keys as opaque strings today, that is a property of the store rather than a
+ * check we perform — so reject the traversal characters outright.
+ */
+function isSafeObjectName(name: string): boolean {
+  return !name.includes("/") && !name.includes("\\") && !name.includes("..");
+}
+
 export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write", "external"],
@@ -31,7 +41,7 @@ export const action = defineAction({
     }
 
     const sourceFileName = params.fileName;
-    if (!sourceFileName) {
+    if (!sourceFileName || !isSafeObjectName(sourceFileName)) {
       return routeData(
         { success: false, error: "Audio not found" },
         { headers, status: 404 },

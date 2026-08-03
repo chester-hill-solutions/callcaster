@@ -1,3 +1,4 @@
+import { secureCompare } from "@/lib/secure-compare";
 import { data as routeData } from "react-router";
 import {
   enqueueJob,
@@ -17,7 +18,11 @@ function toEnqueueResponse(result: EnqueueJobResult) {
 function verifyCronSecret(request: Request): boolean {
   const cronSecret = process.env.CRON_SECRET;
   const headerSecret = request.headers.get("x-cron-secret");
-  return Boolean(cronSecret && headerSecret === cronSecret);
+  if (!cronSecret || !headerSecret) return false;
+  // Constant-time, like every other shared-secret comparison in the codebase
+  // (api-auth.server.ts, twilio-webhook.server.ts, media-stream-token.server.ts).
+  // This was the only one left using ===.
+  return secureCompare(headerSecret, cronSecret);
 }
 
 export function parseCronWorkspaceId(

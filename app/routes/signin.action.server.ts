@@ -1,6 +1,7 @@
 import { loginWithPassword } from "@/lib/platform-auth.server";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { data as routeData, redirect } from "react-router";
+import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
 import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
@@ -36,10 +37,13 @@ export const action = defineAction({
 
     if (login.ok && "token" in login) {
       const headers = mergeBetterAuthSetCookieHeaders(login.headers);
-      if (next && next.startsWith("/") && !next.startsWith("/signin")) {
-        return redirect(next, { headers });
-      }
-      return redirect("/workspaces", { headers });
+      return redirect(
+        getSafeRedirectPath(next, {
+          fallback: "/workspaces",
+          disallowPrefixes: ["/signin"],
+        }),
+        { headers },
+      );
     }
     logger.error("Sign-in error", !login.ok ? login.error : "Two-factor required");
     return routeData({ error: !login.ok ? login.error : "Two-factor verification required" });

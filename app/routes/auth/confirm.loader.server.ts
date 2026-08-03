@@ -1,5 +1,6 @@
 import { redirect } from "react-router";
 import { auth } from "@/server/auth-instance";
+import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -8,7 +9,9 @@ export const loader = defineLoader({
   handler: async ({ request, url }) => {
     const token_hash = url.searchParams.get("token_hash");
     const type = url.searchParams.get("type");
-    const next = url.searchParams.get("next") || "/";
+    // Unvalidated before: this response carries the session cookies set by
+    // verifyEmail, so an absolute ?next handed those to another origin.
+    const next = getSafeRedirectPath(url.searchParams.get("next"));
 
     if (token_hash && type) {
       try {

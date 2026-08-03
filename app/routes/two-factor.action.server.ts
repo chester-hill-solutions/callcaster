@@ -1,3 +1,4 @@
+import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import { redirect, data as routeData } from "react-router";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
@@ -43,11 +44,13 @@ export const action = defineAction({
 
       const headers = mergeBetterAuthSetCookieHeaders(result?.headers);
 
-      if (next && next.startsWith("/") && !next.startsWith("/signin")) {
-        throw redirect(next, { headers });
-      }
-
-      throw redirect("/workspaces", { headers });
+      throw redirect(
+        getSafeRedirectPath(next, {
+          fallback: "/workspaces",
+          disallowPrefixes: ["/signin"],
+        }),
+        { headers },
+      );
     } catch (error) {
       if (error instanceof Response) {
         throw error;

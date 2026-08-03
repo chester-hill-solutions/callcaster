@@ -1,16 +1,9 @@
 import { logger } from "@/lib/logger.server";
 import { redirect } from "react-router";
 import { auth } from "@/server/auth-instance";
+import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import { defineLoader } from "@/lib/handler.server";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
-
-function getSafeRedirectPath(next: string | null): string {
-  if (!next || !next.startsWith("/")) {
-    return "/";
-  }
-
-  return next.startsWith("//") ? "/" : next;
-}
 
 export const loader = defineLoader({
   sideEffects: ["db-write"],
