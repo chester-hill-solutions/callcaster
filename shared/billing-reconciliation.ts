@@ -48,6 +48,13 @@ export type BillingEntityAudit = {
   billableCalls: number;
   debitedCalls: number;
   callGap: number;
+  /**
+   * Started minutes across billable calls, on Twilio's own rounding
+   * (`ceil(seconds / 60)`, minimum 1). This is the only figure comparable to
+   * Twilio's `calls-outbound` usage; the ledger cannot supply it, because voice
+   * credits are 2–5 per minute depending on whether the call was IVR or staffed.
+   */
+  billedVoiceMinutes: number;
 };
 
 export type BillingReconciliationReport = {
@@ -190,14 +197,21 @@ export function buildBillingReconciliationReport(args: {
         twilioUnitLabel: "segments",
         ledgerEvents: ledgerSummary.sms.events,
         ledgerCredits: ledgerSummary.sms.credits,
-        variance: smsTwilioUnits - ledgerSummary.sms.events,
+        // Segments against segments. SMS_SEGMENT_CREDITS is 1, so the credit
+        // total IS the segment count — whereas the row count is one per
+        // message, making every multi-segment SMS look like drift.
+        variance: smsTwilioUnits - ledgerSummary.sms.credits,
       },
       voice: {
         twilioUnits: voiceTwilioMinutes,
         twilioUnitLabel: "minutes",
         ledgerEvents: ledgerSummary.voice.events,
         ledgerCredits: ledgerSummary.voice.credits,
-        variance: voiceTwilioMinutes - ledgerSummary.voice.events,
+        // Minutes against minutes. Neither the row count (one per call, so a
+        // 10-minute call read as 9 minutes of drift) nor the credit total
+        // (2–5 credits per minute depending on IVR vs staffed) is comparable
+        // to Twilio's minutes.
+        variance: voiceTwilioMinutes - args.entityAudit.billedVoiceMinutes,
       },
       numbers: {
         twilioUnits: numbersTwilioUnits,

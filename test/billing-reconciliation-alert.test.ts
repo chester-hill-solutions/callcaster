@@ -84,7 +84,7 @@ describe("billing reconciliation alerting", () => {
     expect(details.period.startDate).toBe("2026-05-01");
   });
 
-  test("shouldSendBillingReconciliationDriftEmail dedupes within the same period", () => {
+  test("shouldSendBillingReconciliationDriftEmail sends once per drift episode", () => {
     const snapshot = {
       lastRunAt: "2026-06-01T00:00:00.000Z",
       lastRunSource: "cron" as const,
@@ -111,6 +111,12 @@ describe("billing reconciliation alerting", () => {
     expect(
       shouldSendBillingReconciliationDriftEmail({ snapshot, marker }),
     ).toBe(false);
+
+    // The reporting period is a rolling 30 days ending today, so its dates
+    // change every single day. Keying dedupe on them meant the guard never
+    // suppressed anything and affected workspaces were emailed daily, forever.
+    // A marker from any period must still suppress; the marker is cleared by
+    // the caller once drift resolves, which re-arms the next send.
     expect(
       shouldSendBillingReconciliationDriftEmail({
         snapshot,
@@ -118,6 +124,11 @@ describe("billing reconciliation alerting", () => {
           ? { ...marker, periodStart: "2026-04-01", periodEnd: "2026-04-30" }
           : null,
       }),
+    ).toBe(false);
+
+    // No marker means this is the transition into drift — send.
+    expect(
+      shouldSendBillingReconciliationDriftEmail({ snapshot, marker: null }),
     ).toBe(true);
   });
 

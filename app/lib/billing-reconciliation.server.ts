@@ -11,7 +11,7 @@ import {
   TERMINAL_BILLABLE_SMS_STATUSES,
 } from "@/lib/pricing";
 import type { Database } from "@/lib/db-types";
-import { and, gte, inArray, like, lte, ne, eq } from "drizzle-orm";
+import { and, gt, gte, inArray, like, lte, ne, eq, sql } from "drizzle-orm";
 import {
   call as callTable,
   message as messageTable,
@@ -39,8 +39,18 @@ export async function loadBillingEntityAudit(args: {
     gte(messageTable.date_created, periodStart),
     lte(messageTable.date_created, periodEnd),
   );
+  // The debit gate is status AND non-zero duration (twilio-call-status.server.ts
+  // returns null when duration <= 0; shared/pricing.ts documents why). Counting
+  // on status alone here made every failed/busy/no-answer call an unmatched
+  // "billable" call, so callGap grew with dial volume and the variance alarm was
+  // permanently true. Both sides must mean the same thing by "billable".
+  const callDurationSeconds = sql<number>`greatest(
+    coalesce(nullif(${callTable.duration}, '')::numeric, 0),
+    coalesce(${callTable.call_duration}, 0)
+  )`;
   const callWhere = and(
     inArray(callTable.status, [...BILLABLE_CALL_STATUSES]),
+    gt(callDurationSeconds, 0),
     gte(callTable.date_created, periodStart),
     lte(callTable.date_created, periodEnd),
   );
@@ -57,13 +67,28 @@ export async function loadBillingEntityAudit(args: {
     like(transactionHistoryTable.idempotency_key, "call:%"),
   );
 
-  const [billableMessages, billableCalls, debitedMessages, debitedCalls] =
+  const [billableMessages, billableCalls, debitedMessages, debitedCalls, minuteRows] =
     await Promise.all([
       tdb.message.count({ where: messageWhere }),
       tdb.call.count({ where: callWhere }),
       tdb.transaction_history.count({ where: smsDebitWhere }),
       tdb.transaction_history.count({ where: callDebitWhere }),
+      // Started minutes, summed with Twilio's rounding so the figure is
+      // comparable to its usage records rather than to a credit total.
+      tdb.call.findMany({
+        where: callWhere,
+        extras: {
+          startedMinutes:
+            sql<number>`ceil(${callDurationSeconds} / 60.0)`.as("started_minutes"),
+        },
+        columns: { sid: true },
+      }),
     ]);
+
+  const billedVoiceMinutes = minuteRows.reduce(
+    (total, row) => total + Number((row as { startedMinutes?: unknown }).startedMinutes ?? 0),
+    0,
+  );
 
   return {
     billableMessages,
@@ -72,6 +97,7 @@ export async function loadBillingEntityAudit(args: {
     billableCalls,
     debitedCalls,
     callGap: billableCalls - debitedCalls,
+    billedVoiceMinutes,
   };
 }
 

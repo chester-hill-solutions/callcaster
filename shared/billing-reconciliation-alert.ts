@@ -41,6 +41,15 @@ export function getBillingReconciliationDriftMarker(
   };
 }
 
+/**
+ * Send on the transition into drift, and not again until it clears.
+ *
+ * This used to compare the marker's period against the snapshot's. The period
+ * is a rolling 30 days ending today, so both dates changed every single day and
+ * the guard never suppressed anything — every affected workspace received an
+ * internal-metrics email daily, forever. Presence-based dedupe, cleared on
+ * recovery, is the pattern `runLowCreditNotify` already uses.
+ */
 export function shouldSendBillingReconciliationDriftEmail(args: {
   snapshot: BillingReconciliationSnapshot;
   marker: BillingReconciliationDriftMarker | null;
@@ -48,11 +57,8 @@ export function shouldSendBillingReconciliationDriftEmail(args: {
   if (!args.snapshot.materialVariance) {
     return false;
   }
-  if (!args.marker) {
-    return true;
-  }
-  return (
-    args.marker.periodStart !== args.snapshot.period.startDate ||
-    args.marker.periodEnd !== args.snapshot.period.endDate
-  );
+  // Clearing is already handled by the caller, which passes
+  // `cleared: !snapshot.materialVariance` into handleBillingReconciliationDrift
+  // and drops the marker there. Only the send side was wrong.
+  return args.marker === null;
 }

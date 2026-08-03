@@ -31,6 +31,24 @@ function getCycleKey(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+/**
+ * The next renewal due date at or after `today`.
+ *
+ * Reminders used to be measured against the due date in *today's own month*, so
+ * `daysUntilDue` was `anchorDay - todayDay` and went negative the moment the day
+ * passed. Reaching the 25-day window therefore required an anchor day of 26 or
+ * later, the 15-day window an anchor of 16+, and the 3-day window an anchor of
+ * 4+ — a number rented on the 2nd got no reminder at all, ever.
+ */
+function getNextDueDate(anchorDate: string, today: Date): Date {
+  const thisMonth = getDueDate(anchorDate, today);
+  if (thisMonth.getTime() >= today.getTime()) return thisMonth;
+  const nextMonthCursor = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1),
+  );
+  return getDueDate(anchorDate, nextMonthCursor);
+}
+
 function getDueDate(anchorDate: string, targetDate: Date): Date {
   const anchor = new Date(anchorDate);
   const year = targetDate.getUTCFullYear();
@@ -343,12 +361,12 @@ export async function runNumberRentalBilling(args: {
 
   for (const number of numbers) {
     const anchorDate = number.created_at;
-    const currentMonthDue = getDueDate(anchorDate, today);
+    const nextDue = getNextDueDate(anchorDate, today);
     const phoneNumberLabel = number.phone_number ?? number.friendly_name ?? String(number.id);
 
     // Reminder windows for the upcoming due date (independent of catch-up).
-    if (!isSameDay(today, currentMonthDue)) {
-      const daysUntilDue = daysBetween(today, currentMonthDue);
+    if (!isSameDay(today, nextDue)) {
+      const daysUntilDue = daysBetween(today, nextDue);
       if (REMINDER_WINDOWS_DAYS.includes(daysUntilDue)) {
         try {
           const recipients = await listWorkspaceOwnerAdminEmails(number.workspace);
@@ -364,7 +382,7 @@ export async function runNumberRentalBilling(args: {
               recipients,
               phoneNumberLabel,
               daysUntilDue,
-              dueDate: currentMonthDue,
+              dueDate: nextDue,
             });
             remindersSent++;
           }
