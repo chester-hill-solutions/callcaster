@@ -10,6 +10,7 @@ import {
 import {
   inbound_queue as inboundQueueTable,
   inbound_queue_entry as inboundQueueEntryTable,
+  queue_entry_state,
   workspace as workspaceTable,
 } from "@/db/schema";
 import {
@@ -46,13 +47,38 @@ export const POLL_INTERVAL_MS = 3000;
 export const MAX_QUEUE_TIME_SECONDS = 3600;
 export const MAX_OFFER_ATTEMPTS = 5;
 
+type QueueEntryState = (typeof queue_entry_state.enumValues)[number];
+
+/** Renders a `(…)` list for `in`, with the labels checked against the enum. */
+function entryStateList(...states: QueueEntryState[]) {
+  return sql.raw(`(${states.map((state) => `'${state}'`).join(", ")})`);
+}
+
+/**
+ * States in which a queue entry is still working its way to an agent.
+ *
+ * Positive, not an exclusion list, for two independent reasons. This filter
+ * previously excluded `'failed'`, which is not a label of queue_entry_state at
+ * all — Postgres rejected the coercion on every inbound call, and the error was
+ * swallowed upstream into generic hold TwiML, so no agent was ever dialed. And
+ * an exclusion list counted `declined` / `timed_out` entries as still active,
+ * which blocked re-offering the call that MAX_OFFER_ATTEMPTS exists to allow.
+ *
+ * Built from the enum's own values so a label that does not exist cannot
+ * compile, rather than failing at runtime where nothing was watching.
+ */
+const ACTIVE_ENTRY_STATES_SQL = entryStateList("queued", "offered", "accepted");
+
+/** Entries that were offered to an agent but did not result in a connection. */
+const RETRYABLE_ENTRY_STATES_SQL = entryStateList("offered", "declined", "timed_out");
+
 export type InboundQueueEntryRow = {
   id: number;
   queue_id: number;
   workspace_id: string;
   call_sid: string | null;
   caller_number: string | null;
-  status: string;
+  status: QueueEntryState;
   offered_to_user_id: string | null;
 };
 
@@ -65,7 +91,7 @@ export async function findExistingInboundQueueEntry(args: {
     from ${inboundQueueEntryTable}
     where queue_id = ${args.queueId}
       and call_sid = ${args.callSid}
-      and status not in ('completed', 'abandoned', 'failed')
+      and status in ${ACTIVE_ENTRY_STATES_SQL}
     limit 1
   `);
   return (rows[0] as InboundQueueEntryRow | undefined) ?? null;
@@ -80,7 +106,7 @@ export async function countInboundQueueOfferAttempts(args: {
     from ${inboundQueueEntryTable}
     where queue_id = ${args.queueId}
       and call_sid = ${args.callSid}
-      and status in ('offered', 'declined', 'timed_out')
+      and status in ${RETRYABLE_ENTRY_STATES_SQL}
   `);
   const value = (rows[0] as { count: number } | undefined)?.count ?? 0;
   return typeof value === "string" ? parseInt(value, 10) : value;

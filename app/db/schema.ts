@@ -477,7 +477,7 @@ export const inbound_queue_entry = pgTable("inbound_queue_entry", {
   offered_at: text(),
   offered_to_user_id: text(),
   queue_id: serial().notNull(),
-  status: text().notNull(),
+  status: queue_entry_state().notNull(),
   twilio_queue_sid: text(),
   updated_at: text().notNull(),
   workspace_id: uuid().notNull(),
