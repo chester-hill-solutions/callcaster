@@ -22,12 +22,22 @@ export const RENTAL_RELEASE_AFTER_CYCLES = 3;
  *
  * Escalation is by count, not by "the step after the last one", so a number
  * that skipped a run — the worker was down, the cron was missed — still lands
- * on the correct rung rather than resuming one behind. Anything at or beyond
- * the release threshold releases, so a long-dormant number cannot sit
- * indefinitely at four or five unpaid cycles.
+ * on the correct rung rather than resuming one behind.
+ *
+ * `alreadySuspended` is the one piece of history the count cannot supply, and
+ * it guards the only irreversible rung. Releasing a number that was never
+ * suspended would take it away from a customer who received no warning and no
+ * suspension notice — which is exactly what a backlog of unpaid cycles produces
+ * the first time this ladder runs against pre-existing numbers. Such a number
+ * suspends instead, and releases on a later run once the suspension is real.
  */
-export function rentalActionForUnpaidCycles(unpaidCycles: number): RentalLifecycleAction {
-  if (unpaidCycles >= RENTAL_RELEASE_AFTER_CYCLES) return "release";
+export function rentalActionForUnpaidCycles(
+  unpaidCycles: number,
+  options: { alreadySuspended?: boolean } = {},
+): RentalLifecycleAction {
+  if (unpaidCycles >= RENTAL_RELEASE_AFTER_CYCLES) {
+    return options.alreadySuspended ? "release" : "suspend";
+  }
   if (unpaidCycles === RENTAL_SUSPEND_AFTER_CYCLES) return "suspend";
   if (unpaidCycles === RENTAL_WARN_AFTER_CYCLES) return "warn";
   return "none";

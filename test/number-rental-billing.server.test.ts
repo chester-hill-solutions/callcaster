@@ -345,10 +345,12 @@ describe("runNumberRentalBilling", () => {
 
   test("three unpaid cycles releases the number at Twilio", async () => {
     opsMocks.notifyOps.mockClear();
-    lifecycleMocks.removeWorkspacePhoneNumber.mockClear().mockResolvedValue(undefined);
+    // The real function never throws — it returns { error }.
+    lifecycleMocks.removeWorkspacePhoneNumber.mockClear().mockResolvedValue({ error: null });
     // Three elapsed renewal cycles: 2026-04-01, 2026-05-01, 2026-06-01.
+    // Already suspended, so release is the correct next rung.
     tdbMocks.workspace_number.findMany.mockResolvedValue([
-      makeNumber({ created_at: "2026-03-01" }),
+      makeNumber({ created_at: "2026-03-01", suspended_at: "2026-05-02T00:00:00.000Z" }),
     ]);
     creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
 
@@ -455,6 +457,86 @@ describe("runNumberRentalBilling", () => {
     ).not.toHaveBeenCalled();
   });
 
+  /**
+   * `suspended_at` was written in exactly one place and cleared in none, so a
+   * customer who paid stayed suspended forever — while the suspension email
+   * told them to "add credits to restore it".
+   */
+  test("paying clears the suspension", async () => {
+    tdbMocks.workspace_number.update.mockResolvedValue([{ id: 1 }]);
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01", suspended_at: "2026-05-02T00:00:00.000Z" }),
+    ]);
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(10_000);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 1, unsuspended: 1 });
+    expect(tdbMocks.workspace_number.update).toHaveBeenCalledWith(
+      expect.objectContaining({ set: { suspended_at: null } }),
+    );
+  });
+
+  /**
+   * Release is the only irreversible rung. A number carrying a backlog of
+   * unpaid cycles — the ladder meeting numbers that predate it, or a long
+   * worker outage — must not be taken away without the customer ever having
+   * been suspended.
+   */
+  test("a never-suspended number suspends instead of releasing, however far behind", async () => {
+    lifecycleMocks.removeWorkspacePhoneNumber.mockClear();
+    tdbMocks.workspace_number.update.mockResolvedValue([{ id: 1 }]);
+    // Six unpaid renewal cycles, but suspended_at was never set.
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-01-01", suspended_at: null }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-07-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ suspended: 1, released: 0 });
+    expect(lifecycleMocks.removeWorkspacePhoneNumber).not.toHaveBeenCalled();
+  });
+
+  /**
+   * removeWorkspacePhoneNumber catches internally and returns `{ error }`.
+   * Unchecked, a failed release still told the customer the number was gone
+   * for good and paged ops that an irreversible action had completed.
+   */
+  test("a failed release is not reported as a release", async () => {
+    opsMocks.notifyOps.mockClear();
+    resendMocks.send.mockClear();
+    lifecycleMocks.removeWorkspacePhoneNumber
+      .mockClear()
+      .mockResolvedValue({ error: new Error("Twilio 20404") });
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-03-01", suspended_at: "2026-05-02T00:00:00.000Z" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-06-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ released: 0 });
+    expect(opsMocks.notifyOps).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event: "billing.rental_released" }),
+    );
+    // And the customer is not told they lost a number they still own.
+    expect(resendMocks.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ subject: expect.stringContaining("has been released") }),
+    );
+  });
+
   test("an empty workspace reports zeroes across the whole ladder", async () => {
     tdbMocks.workspace_number.findMany.mockResolvedValue([]);
 
@@ -470,6 +552,7 @@ describe("runNumberRentalBilling", () => {
       unpaid: 0,
       released: 0,
       suspended: 0,
+      unsuspended: 0,
       warned: 0,
       remindersSent: 0,
       remindersFailed: 0,

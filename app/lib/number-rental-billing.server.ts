@@ -216,16 +216,30 @@ async function applyRentalLifecycleAction(args: {
     return "none";
   }
 
-  // Tell the customer BEFORE releasing: if the release succeeds and the email
-  // then fails, they lose a number with no notice at all.
-  await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
-    logger.error("number_rental_billing.release_email_failed", { ...context, error: String(error) });
-  });
-
-  await removeWorkspacePhoneNumber({
+  // removeWorkspacePhoneNumber catches everything internally and RETURNS
+  // `{ error }` — it never throws. Left unchecked, a failed Twilio release
+  // still emailed the customer "this cannot be undone", paged ops claiming an
+  // irreversible action had completed, counted a release that never happened,
+  // and repeated the whole thing the next day on a number the workspace still
+  // owns and still is not paying for.
+  const release = await removeWorkspacePhoneNumber({
     workspaceId: number.workspace,
     numberId: BigInt(number.id),
     tdb,
+  });
+  if (release?.error) {
+    throw release.error instanceof Error
+      ? release.error
+      : new Error(String(release.error));
+  }
+
+  // Only after the release actually succeeded. This used to run first, so that
+  // a failed email could not silently deprive the customer of a number — but
+  // that ordering is only safe while the release cannot fail, and it can. A
+  // false "your number has been released" is worse than a late true one; the
+  // release is logged here if the email is what fails.
+  await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
+    logger.error("number_rental_billing.release_email_failed", { ...context, error: String(error) });
   });
 
   await notifyOps({
@@ -290,6 +304,7 @@ export async function runNumberRentalBilling(args: {
   unpaid: number;
   released: number;
   suspended: number;
+  unsuspended: number;
   warned: number;
   remindersSent: number;
   remindersFailed: number;
@@ -321,6 +336,7 @@ export async function runNumberRentalBilling(args: {
   let unpaid = 0;
   let released = 0;
   let suspended = 0;
+  let unsuspended = 0;
   let warned = 0;
   let remindersSent = 0;
   let remindersFailed = 0;
@@ -429,6 +445,24 @@ export async function runNumberRentalBilling(args: {
         });
         charged++;
         chargedCyclesForNumber++;
+
+        // Paying restores outbound use. Without this `suspended_at` is written
+        // once and never cleared by anything, so a suspended customer who pays
+        // stays suspended forever — while the suspension email tells them to
+        // "add credits to restore it".
+        if (number.suspended_at) {
+          await tdb.workspace_number.update({
+            set: { suspended_at: null },
+            where: eq(workspaceNumberTable.id, number.id),
+          });
+          number.suspended_at = null;
+          unsuspended++;
+          logger.info("number_rental_billing.unsuspended_after_payment", {
+            numberId: number.id,
+            workspaceId: number.workspace,
+            cycleKey,
+          });
+        }
       } catch (error) {
         unpaid++;
         logger.error("Number rental charge failed", {
@@ -450,7 +484,9 @@ export async function runNumberRentalBilling(args: {
       dueDates.length - previouslyBilledCycles - chargedCyclesForNumber;
 
     if (unpaidCyclesForNumber > 0) {
-      const action = rentalActionForUnpaidCycles(unpaidCyclesForNumber);
+      const action = rentalActionForUnpaidCycles(unpaidCyclesForNumber, {
+        alreadySuspended: Boolean(number.suspended_at),
+      });
       try {
         const outcome = await applyRentalLifecycleAction({
           action,
@@ -481,6 +517,7 @@ export async function runNumberRentalBilling(args: {
     unpaid,
     released,
     suspended,
+    unsuspended,
     warned,
     remindersSent,
     remindersFailed,
