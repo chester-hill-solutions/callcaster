@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { resolveContactWorkspaceId } from "@/lib/platform-telephony.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { defineAction } from "@/lib/handler.server";
 
 interface OutreachAttemptRequest {
@@ -26,6 +27,12 @@ export const action = defineAction({
     if (!workspaceId) {
       return routeData({ error: "Contact not found" }, { headers });
     }
+
+    // The workspace is derived from a caller-supplied contact_id, so resolving
+    // it proves nothing about the caller. No minRole: recording an outreach
+    // attempt is a `caller`'s core job on the dial screen.
+    await requireWorkspaceAccess({ user, workspaceId });
+
     const tdb = createTenantDb(workspaceId);
 
     try {

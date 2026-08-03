@@ -9,6 +9,7 @@ import { getQueuedContactIdsForCampaign } from "@/lib/campaign-queue-db.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { defineLoader } from "@/lib/handler.server";
 
 export async function searchContactsLoader(request: Request) {
@@ -26,6 +27,16 @@ export async function searchContactsLoader(request: Request) {
   if (!searchQuery) {
     return routeData({ data: [] });
   }
+
+  // `workspace_id` is caller-supplied and flows straight into createTenantDb,
+  // which scopes to whatever id it is handed. requireDualAuth proves a session,
+  // never membership. No minRole: a `caller` legitimately searches contacts
+  // from the chat composer and the queue picker.
+  //
+  // Outside the try below: that catch reports every failure as a 500, which
+  // would turn this gate's 404 into a server error. Let defineLoader map the
+  // AppError to its real status instead.
+  await requireWorkspaceAccess({ user, workspaceId });
 
   try {
     const allContacts = await searchContactsForQueuePicker(workspaceId, searchQuery);

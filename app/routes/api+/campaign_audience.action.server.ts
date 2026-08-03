@@ -14,9 +14,13 @@ import {
   listContactIdsForAudience,
   listContactIdsForAudiences,
 } from "@/lib/campaign-audience-db.server";
+import { AppError } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/request-utils.server";
-import { requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";
+import { MemberRole } from "@/lib/member-role";
 import { defineAction } from "@/lib/handler.server";
 
 import type { ActionFunctionArgs } from "react-router";
@@ -24,24 +28,68 @@ import type { ActionFunctionArgs } from "react-router";
 export const action = defineAction({
   auth: ({ request }: ActionFunctionArgs) => requireDualAuth(request),
   sideEffects: ["db-write"],
-  handler: async ({ request }) => {
+  handler: async ({ request, auth }) => {
   const { headers } = await getSession(request);  const method = request.method;
+
+  // This surface is declared session-only (api-surface-internal-1.ts), but
+  // requireDualAuth also admits API keys — and an API key carries its own bound
+  // workspace that requireWorkspaceAccess cannot check, since it has no user.
+  // Reject those here so the declared exposure is actually true.
+  const user = getDualAuthUser(auth);
+  if (!user) {
+    return routeData({ error: "Unauthorized" }, { status: 401, headers });
+  }
+
+  /**
+   * Shared preamble for both verbs: parse the ids, prove the caller may act on
+   * the campaign, then prove the audience belongs with it.
+   *
+   * `campaignAndAudienceShareWorkspace` only proves the two *resources* match
+   * each other — never that the caller belongs to that workspace. Without the
+   * membership check the route links audiences onto other tenants' campaigns
+   * and mass-enqueues their contacts for live dialing.
+   */
+  const resolveLinkRequest = async () => {
+    const { audience_id, campaign_id } = await safeParseJson<{
+      audience_id: string | number;
+      campaign_id: string | number;
+    }>(request);
+    const audienceId = Number(audience_id);
+    const campaignId = Number(campaign_id);
+    if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
+      return {
+        ok: false as const,
+        response: routeData(
+          { error: "Invalid audience_id or campaign_id" },
+          { status: 400, headers },
+        ),
+      };
+    }
+
+    const workspaceId = await resolveCampaignWorkspaceId(campaignId);
+    if (!workspaceId) {
+      return {
+        ok: false as const,
+        response: routeData({ error: "Campaign or audience not found" }, { status: 404, headers }),
+      };
+    }
+    await requireWorkspaceAccess({ user, workspaceId, minRole: MemberRole.Member });
+
+    if (!(await campaignAndAudienceShareWorkspace(campaignId, audienceId))) {
+      return {
+        ok: false as const,
+        response: routeData({ error: "Campaign or audience not found" }, { status: 404, headers }),
+      };
+    }
+
+    return { ok: true as const, campaignId, audienceId };
+  };
 
   try {
     if (method === "POST") {
-      const { audience_id, campaign_id } = await safeParseJson<{
-        audience_id: string | number;
-        campaign_id: string | number;
-      }>(request);
-      const audienceId = Number(audience_id);
-      const campaignId = Number(campaign_id);
-      if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
-        return routeData({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
-      }
-
-      if (!(await campaignAndAudienceShareWorkspace(campaignId, audienceId))) {
-        return routeData({ error: "Campaign or audience not found" }, { status: 404, headers });
-      }
+      const resolved = await resolveLinkRequest();
+      if (!resolved.ok) return resolved.response;
+      const { campaignId, audienceId } = resolved;
 
       const existing = await findCampaignAudienceLink(campaignId, audienceId);
       if (existing) {
@@ -103,19 +151,9 @@ export const action = defineAction({
     }
 
     if (method === "DELETE") {
-      const { audience_id, campaign_id } = await safeParseJson<{
-        audience_id: string | number;
-        campaign_id: string | number;
-      }>(request);
-      const audienceId = Number(audience_id);
-      const campaignId = Number(campaign_id);
-      if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
-        return routeData({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
-      }
-
-      if (!(await campaignAndAudienceShareWorkspace(campaignId, audienceId))) {
-        return routeData({ error: "Campaign or audience not found" }, { status: 404, headers });
-      }
+      const resolved = await resolveLinkRequest();
+      if (!resolved.ok) return resolved.response;
+      const { campaignId, audienceId } = resolved;
 
       await deleteCampaignAudienceLink(campaignId, audienceId);
 
@@ -145,6 +183,12 @@ export const action = defineAction({
 
     return routeData({ error: "Method not allowed" }, { status: 405, headers });
   } catch (error: unknown) {
+    // Authorization failures carry their own status (404 for a non-member, 403
+    // for an insufficient role). Without this they collapse into a 500 and the
+    // gate looks like a server fault. Matches campaign_queue.action.server.ts.
+    if (error instanceof AppError) {
+      return routeData({ error: error.message }, { status: error.statusCode, headers });
+    }
     logger.error("Error in campaign_audience action:", error);
     return routeData(
       { error: error instanceof Error ? error.message : "An unexpected error occurred" },

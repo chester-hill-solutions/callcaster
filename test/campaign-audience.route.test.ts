@@ -46,6 +46,14 @@ vi.mock("@/lib/queue.server", () => ({
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
+// The route now proves workspace membership before touching any audience.
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/platform-telephony.server", () => ({
+  resolveCampaignWorkspaceId: vi.fn(async () => "ws-1"),
+}));
+
 vi.mock("@/lib/campaign-audience-db.server", () => ({
   campaignAndAudienceShareWorkspace: (...args: unknown[]) =>
     audienceDbMocks.campaignAndAudienceShareWorkspace(...args),

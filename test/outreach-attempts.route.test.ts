@@ -20,6 +20,11 @@ vi.mock("@/lib/db-rpc.server", () => ({
 vi.mock("@/lib/platform-telephony.server", () => ({
   resolveContactWorkspaceId: vi.fn(async () => "w1"),
 }));
+// The route now proves workspace membership before writing the attempt.
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => ({
     execute: vi.fn(async () => []),
