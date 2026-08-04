@@ -18,7 +18,13 @@ services:
       POSTGRES_PASSWORD: callcaster
       POSTGRES_DB: callcaster
     volumes:
-      - callcaster_pgdata:/var/lib/postgresql/data
+      # Mount at /var/lib/postgresql, NOT .../data. From 18 the official images
+      # store data in a major-version subdirectory (/var/lib/postgresql/18/docker)
+      # so pg_upgrade --link works across a single mount point. They also refuse
+      # to boot when a mount is present at the old .../data path — even an empty
+      # one — so the legacy mount fails on a fresh volume, not just an upgrade.
+      # See docker-library/postgres#1259.
+      - callcaster_pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U callcaster -d callcaster"]
       interval: 5s
