@@ -69,6 +69,12 @@ export function useTwilioDevice(
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
+    onCallStateChange: (newCallState) => {
+      if (newCallState === "dialing") send({ type: "START_DIALING" });
+      if (newCallState === "connected") send({ type: "CONNECT" });
+      if (newCallState === "completed") send({ type: "HANG_UP" });
+      if (newCallState === "failed") send({ type: "FAIL" });
+    },
     onStatusChange: (newStatus) => {
       setStatus(newStatus);
     },

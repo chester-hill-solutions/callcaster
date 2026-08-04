@@ -72,6 +72,12 @@ export async function startAutoDialConference(
     return { ok: false, status: 404, error: "Campaign not found" };
   }
   if (!checkSchedule(campaign)) {
+    if (campaign.status === "draft" || campaign.status === "pending") {
+      return { ok: false, status: 400, error: "Campaign is not live yet. Start it from the Launch page." };
+    }
+    if (campaign.status === "paused") {
+      return { ok: false, status: 400, error: "Campaign is paused." };
+    }
     return { ok: false, status: 400, error: "Campaign is not currently active" };
   }
 

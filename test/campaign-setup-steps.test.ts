@@ -161,7 +161,7 @@ describe("app/lib/campaign-setup-steps.ts", () => {
       "Message content",
       "Send schedule",
       "Message recipients",
-      "Ready to go",
+      "Start your campaign",
     ]);
     expect(result.guideTitle).toBe("Set up your text campaign");
   });
@@ -190,7 +190,7 @@ describe("app/lib/campaign-setup-steps.ts", () => {
       "Calling schedule",
       "Phone menu script",
       "Contacts to dial",
-      "Ready to go",
+      "Start your campaign",
     ]);
     expect(result.guideTitle).toBe("Set up your automated phone menu");
     expect(result.launchActionLabel).toBe("Start phone menu");

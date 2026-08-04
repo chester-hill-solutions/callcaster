@@ -508,9 +508,9 @@ export function getCampaignSetupSteps(
 
   stepDefinitions.push({
     id: "launch",
-    label: "Ready to go",
+    label: "Start your campaign",
     description: prerequisitesComplete
-      ? "Everything is set. Save any changes, then start your campaign."
+      ? "Everything is set. Go to the Launch page and click \"Start calling\" to activate your campaign."
       : "Complete the steps above before starting this campaign.",
     complete: prerequisitesComplete && readiness.issues.length === 0,
   });

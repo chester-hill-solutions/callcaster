@@ -245,6 +245,7 @@ export function useCallScreen() {
     workspaceId,
     recentAttempt,
     selectedDevice: phoneVerification.selectedDevice,
+    send: send as unknown as (action: { type: string }) => void,
   });
 
   const handleDequeueNext = useCampaignDequeueActions({

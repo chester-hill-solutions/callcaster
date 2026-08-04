@@ -298,7 +298,9 @@ export function CallScreenLayout({
       </TopChrome>
       <OperatorColumn
         incoming={
-          incomingCall ? (
+          incomingCall &&
+          callState !== "dialing" &&
+          callState !== "connected" ? (
             <IncomingCallPanel
               incomingCall={incomingCall as Call}
               callHandling={{
@@ -450,6 +452,7 @@ export function CallScreenLayout({
           title: campaign.title,
           dial_type: campaign.dial_type || "call",
           voicemail_file: Boolean(campaign.voicemail_file),
+          status: campaign.status,
         }}
         fetchMore={
           fetchMore as unknown as (params: Record<string, unknown>) => void

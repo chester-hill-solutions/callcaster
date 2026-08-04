@@ -31,6 +31,7 @@ type UseCampaignDialActionsOptions = {
   workspaceId: string;
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string;
+  send: (action: { type: string }) => void;
 };
 
 export function useCampaignDialActions({
@@ -45,6 +46,7 @@ export function useCampaignDialActions({
   workspaceId,
   recentAttempt,
   selectedDevice,
+  send,
 }: UseCampaignDialActionsOptions) {
   return useCallback(() => {
     if (!campaign) return;
@@ -57,6 +59,7 @@ export function useCampaignDialActions({
     } else if (campaign.dial_type === "call") {
       if (!nextRecipient?.contact) return;
 
+      send({ type: "START_DIALING" });
       startCall({
         contact: nextRecipient.contact,
         campaign,
@@ -79,6 +82,7 @@ export function useCampaignDialActions({
     workspaceId,
     recentAttempt,
     selectedDevice,
+    send,
   ]);
 }
 
