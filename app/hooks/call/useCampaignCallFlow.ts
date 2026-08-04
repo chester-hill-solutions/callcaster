@@ -99,6 +99,14 @@ export function useCampaignCallFlow({
     },
   });
 
+  /**
+   * @effect Reset provider call state back to idle when the active call SID
+   * clears (call ended, navigated away, or component unmount).
+   * @effect-deps callSid (only fires when the tracked SID changes to null)
+   * @effect-side-effects none (plain setState)
+   * @effect-why-not-loader Call lifecycle state is ephemeral client state,
+   * not request/response data.
+   */
   useEffect(() => {
     if (!callSid) {
       setProviderState({ callSid: null, status: null });

@@ -72,6 +72,15 @@ export function useCallScreen() {
     onChange: () => revalidator.revalidate(),
   });
 
+  /**
+   * @effect Periodically revalidate the call-screen loader data every 50
+   * minutes so stale workspace/campaign info is refreshed during long sessions.
+   * @effect-deps revalidator (re-subscribes when the revalidator instance changes)
+   * @effect-side-effects timer (setInterval) + fetch (revalidator.revalidate);
+   * cleared on unmount or revalidator change
+   * @effect-why-not-loader Polling for client-side freshness; a loader
+   * cannot self-schedule periodic re-fetches.
+   */
   useEffect(() => {
     const interval = setInterval(() => {
       revalidator.revalidate();

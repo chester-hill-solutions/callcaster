@@ -146,6 +146,13 @@ export function CallControls({
   const [confirmingHangUp, setConfirmingHangUp] = useState(false);
   const confirmTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  /**
+   * @effect Clean up the hang-up confirmation timer on unmount to prevent
+   * a stale timeout callback from firing after the component is gone.
+   * @effect-deps [] — fire-once cleanup, no external state to track
+   * @effect-side-effects timer (clearTimeout on unmount)
+   * @effect-why-not-loader Component lifecycle cleanup, not data fetching.
+   */
   useEffect(() => () => {
     if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
   }, []);
