@@ -11,7 +11,19 @@ const ROOT = process.cwd();
 const SCAN_DIRS = [
   path.join(ROOT, "app"),
   path.join(ROOT, "worker"),
-  path.join(ROOT, "client/functions"),
+  // The media-stream Bun service debits credits too (live transcription,
+  // coaching cues). It was outside this scan until 2026-07, which is how those
+  // debits shipped bypassing shared/billing-keys.ts unnoticed.
+  path.join(ROOT, "services"),
+  // The Bun web server and the shared/ helpers are equally capable of writing
+  // credits; scanning only app/ + worker/ was an accident of what existed when
+  // this guard was written.
+  path.join(ROOT, "server"),
+  path.join(ROOT, "shared"),
+  // Deliberately NOT scripts/: seed and repair tooling writes credits directly
+  // by design (scripts/e2e/seed-database.mjs), so including it would need an
+  // allowlist of legitimate seeders — another hand-maintained list to drift.
+  // This guard is about runtime code reaching the ledger.
 ];
 
 const APPROVED_FILES = new Set([
@@ -50,6 +62,20 @@ const VIOLATION_PATTERNS = [
   {
     pattern: /credits\s*=\s*credits\s*[+-]/,
     label: "in-place credits arithmetic assignment",
+  },
+  {
+    // The TenantDb API — `tdb.workspace.update({ set: { credits } })` — is the
+    // idiom this codebase actually prefers, and it was the one shape the guard
+    // could not see. Its `set` is a property of an options object, not a
+    // chained `.set(...)` call, so none of the patterns above matched it.
+    pattern: /\.update\s*\(\s*\{[\s\S]{0,200}?\bset\s*:\s*\{[^}]*\bcredits\b/,
+    label: "tdb.<table>.update({ set: { credits } })",
+  },
+  {
+    // `INSERT ... ON CONFLICT DO UPDATE SET credits = ...` writes the column
+    // without ever naming an UPDATE statement.
+    pattern: /on\s+conflict[\s\S]{0,200}?\bset\b[^;]*\bcredits\b/i,
+    label: "raw SQL ON CONFLICT DO UPDATE SET credits",
   },
 ];
 

@@ -49,6 +49,10 @@ jobs:
       - run: npm run check:request-body-consumption
       - run: npm run check:middleware
       - run: npm run check:credit-writes
+      # requireDualAuth admits API keys, which carry no user — so
+      # requireWorkspaceAccess cannot check them. One route was declared
+      # session-only and authed dual, leaving key callers entirely unguarded.
+      - run: npm run check:dual-auth
       # Security gates. These previously ran ONLY in `ci:local`, so a regression
       # in workspace write authorization, or a loader leaking twilio_data /
       # stripe_id to the client, could merge unnoticed.

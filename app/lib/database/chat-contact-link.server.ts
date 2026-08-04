@@ -14,6 +14,7 @@ import { and, inArray, isNull, or } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { buildExactPhoneCandidates } from "./contact.server";
+import { stripPhoneNumber } from "@/lib/phone";
 
 export type LinkContactToConversationArgs = {
   workspaceId: string;
@@ -46,7 +47,7 @@ export async function linkContactToConversation({
     return { linkedCount: 0 };
   }
 
-  const fullNumber = (contactPhone || "").replace(/\D/g, "");
+  const fullNumber = stripPhoneNumber(contactPhone || "");
   const candidates = buildExactPhoneCandidates(fullNumber);
 
   if (candidates.length === 0) {

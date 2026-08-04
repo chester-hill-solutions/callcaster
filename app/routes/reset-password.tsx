@@ -1,7 +1,7 @@
 export { loader } from "./reset-password.loader.server";
 export { action } from "./reset-password.action.server";
 
-import { data as routeData, Form, useActionData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
+import { Form, useActionData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { Button } from "@/components/ui/button";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { FormField } from "@/components/ui/form-field";

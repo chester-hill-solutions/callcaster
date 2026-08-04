@@ -47,11 +47,18 @@ export const action = defineAction({
     });
 
     const formData = await request.formData();
+    // Normalize phone using the same helper as CSV import path (app/lib/csv-contacts.ts).
+    // Read-side compensates today via buildExactPhoneCandidates fan-out;
+    // normalizing on write fixes silent lookup failures for non-candidate formats.
+    const phoneInput = (formData.get("phone") as string) || undefined;
+    const { parsePhoneNumber } = await import("@/lib/phone");
+    const normalizedPhone = phoneInput ? parsePhoneNumber(phoneInput) : undefined;
+
     const contactData: ContactFormData = {
       id: formData.get("id") ? Number(formData.get("id")) : undefined,
       firstname: (formData.get("firstname") as string) || undefined,
       surname: (formData.get("surname") as string) || undefined,
-      phone: (formData.get("phone") as string) || undefined,
+      phone: normalizedPhone || undefined,
       email: (formData.get("email") as string) || undefined,
       address: (formData.get("address") as string) || undefined,
       city: (formData.get("city") as string) || undefined,

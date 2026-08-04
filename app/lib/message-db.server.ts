@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 import { logger } from "@/lib/logger.server";
+import { stripPhoneNumber } from "@/lib/phone";
 
 type MessageRow = typeof messageTable.$inferSelect;
 
@@ -35,7 +36,7 @@ const DEFAULT_MESSAGE_PAGE_SIZE = 50;
 export function expandPhoneMatchVariants(phone: string): string[] {
   if (!phone) return [phone];
 
-  const digits = phone.replace(/\D/g, "");
+  const digits = stripPhoneNumber(phone);
   if (!digits) return [phone];
 
   const e164 =
@@ -49,7 +50,7 @@ export function expandPhoneMatchVariants(phone: string): string[] {
 
   const variants = new Set<string>([phone, e164]);
 
-  const e164Digits = e164.replace(/\D/g, "");
+  const e164Digits = stripPhoneNumber(e164);
   variants.add(e164Digits);
   if (e164Digits.length === 11 && e164Digits.startsWith("1")) {
     variants.add(e164Digits.slice(1));

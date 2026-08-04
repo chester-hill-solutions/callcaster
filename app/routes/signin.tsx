@@ -1,7 +1,7 @@
 export { loader } from "./signin.loader.server";
 export { action } from "./signin.action.server";
 
-import { data as routeData, redirect, Form, NavLink, useActionData } from "react-router";
+import { redirect, Form, NavLink, useActionData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";

@@ -16,6 +16,7 @@ import {
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { householdKeyFor } from "@/lib/household-key";
+import { stripPhoneNumber } from "@/lib/phone";
 
 function dedupeContactsById(contacts: Contact[]): Contact[] {
   return Array.from(
@@ -90,7 +91,7 @@ export async function findContactsByPhone(
   phoneNumber: string,
   tdb?: TenantDb,
 ): Promise<Contact[]> {
-  const fullNumber = phoneNumber.replace(/\D/g, "");
+  const fullNumber = stripPhoneNumber(phoneNumber);
   if (!fullNumber) {
     return [];
   }
@@ -170,7 +171,7 @@ export const findPotentialContacts = async (
   workspaceId: string,
   tdb?: TenantDb,
 ) => {
-  const fullNumber = phoneNumber.replace(/\D/g, "");
+  const fullNumber = stripPhoneNumber(phoneNumber);
   if (!fullNumber) {
     return { data: [], error: null };
   }

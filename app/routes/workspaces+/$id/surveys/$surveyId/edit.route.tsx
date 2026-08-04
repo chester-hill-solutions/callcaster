@@ -1,6 +1,6 @@
 export { loader } from "./edit.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, Link, useLoaderData, useFetcher, useNavigate } from "react-router";
+import { type LoaderFunctionArgs, Link, useLoaderData, useFetcher, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 
 import { SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";

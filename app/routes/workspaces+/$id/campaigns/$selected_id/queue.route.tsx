@@ -1,7 +1,7 @@
 export { loader } from "./queue.loader.server";
 export { action } from "./queue.action.server";
 
-import { data as routeData, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
+import { redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
 import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 

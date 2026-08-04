@@ -1,8 +1,9 @@
 export { loader } from "./responses.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
+import { type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
 
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
+import { formatSurveyAnswer } from "@/lib/survey-db.server";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -78,20 +79,6 @@ export default function SurveyResponsesPage() {
     (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
     [];
 
-  const formatAnswer = (answer: ResponseAnswerWithQuestion) => {
-    if (!answer) return "-";
-
-    if (answer.survey_question?.question_type === "checkbox") {
-      try {
-        const values = JSON.parse(answer.answer_value);
-        return Array.isArray(values) ? values.join(", ") : answer.answer_value;
-      } catch {
-        return answer.answer_value;
-      }
-    }
-    return answer.answer_value;
-  };
-
   const getContactName = (response: SurveyResponseWithContact) => {
     if (response.contact?.firstname && response.contact?.surname) {
       return `${response.contact.firstname} ${response.contact.surname}`;
@@ -115,7 +102,7 @@ export default function SurveyResponsesPage() {
     const answer = response.response_answer?.find(
       (a) => a.question_id === question.id,
     );
-    return answer ? formatAnswer(answer) : "-";
+    return answer ? formatSurveyAnswer(answer) : "-";
   };
 
   // Card width classes for consistency
@@ -436,7 +423,7 @@ export default function SurveyResponsesPage() {
                                 Type: {answer.survey_question?.question_type}
                               </Text>
                               <p className="mt-2">
-                                <strong>Answer:</strong> {formatAnswer(answer)}
+                                <strong>Answer:</strong> {formatSurveyAnswer(answer)}
                               </p>
                             </div>
                           ),

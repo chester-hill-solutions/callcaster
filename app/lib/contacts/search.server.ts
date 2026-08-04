@@ -1,5 +1,6 @@
 import { eq, ilike, or, type SQL } from "drizzle-orm";
 import { contact as contactTable } from "@/db/schema";
+import { stripPhoneNumber } from "@/lib/phone";
 
 const SHORT_QUERY_MAX_LENGTH = 2;
 const PHONE_SUBSTRING_MIN_LENGTH = 4;
@@ -23,7 +24,7 @@ export function buildContactSearchFilter(rawSearchQuery: string): string {
   const textSearchPattern = isShortQuery
     ? `${escapedQuery}%`
     : `%${escapedQuery}%`;
-  const normalizedDigits = rawSearchQuery.replace(/\D/g, "");
+  const normalizedDigits = stripPhoneNumber(rawSearchQuery);
   const escapedDigits = escapeIlikeTerm(normalizedDigits);
   const filters = [
     `firstname.ilike.${textSearchPattern}`,
@@ -57,7 +58,7 @@ export function buildContactSearchWhere(rawSearchQuery: string): SQL | undefined
   const textSearchPattern = isShortQuery
     ? `${escapedQuery}%`
     : `%${escapedQuery}%`;
-  const normalizedDigits = rawSearchQuery.replace(/\D/g, "");
+  const normalizedDigits = stripPhoneNumber(rawSearchQuery);
 
   const filters: SQL[] = [
     ilike(contactTable.firstname, textSearchPattern),

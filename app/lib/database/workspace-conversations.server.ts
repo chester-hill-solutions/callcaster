@@ -12,6 +12,7 @@ import {
   sumUnreadConversationCount,
   UNREAD_CONVERSATION_PAGE_SIZE,
 } from "@/lib/chats/unread-count";
+import { stripPhoneNumber } from "@/lib/phone";
 
 type FetchConversationSummaryOptions = {
   enrichContacts?: boolean;
@@ -95,7 +96,7 @@ function buildSearchPredicate(workspaceId: string, search: string | undefined): 
   if (!trimmed) return sql`true`;
 
   const likePattern = `%${escapeLikePattern(trimmed)}%`;
-  const digits = trimmed.replace(/\D/g, "");
+  const digits = stripPhoneNumber(trimmed);
   const phoneCondition =
     digits.length > 0
       ? sql`regexp_replace(a.contact_phone, '[^0-9]', '', 'g') LIKE ${`%${digits}%`}`

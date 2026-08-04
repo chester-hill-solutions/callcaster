@@ -1,6 +1,6 @@
 export { loader } from "./$workspaceId.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link, Outlet, useLocation } from "react-router";
+import { LoaderFunctionArgs, redirect, useLoaderData, Link, Outlet, useLocation } from "react-router";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

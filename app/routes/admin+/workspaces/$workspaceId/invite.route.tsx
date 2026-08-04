@@ -1,7 +1,7 @@
 export { loader } from "./invite.loader.server";
 export { action } from "./invite.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";

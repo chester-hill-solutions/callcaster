@@ -1,7 +1,7 @@
 export { loader } from "./scripts.loader.server";
 export { action } from "./scripts.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext , useFetcher } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext , useFetcher } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { ContextType , User } from "@/lib/types";
 

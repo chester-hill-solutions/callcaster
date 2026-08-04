@@ -14,6 +14,8 @@
  * unit-testable; `platform-workspace-numbers.server.ts` wires it to live data.
  */
 
+import { stripPhoneNumber } from "@/lib/phone";
+
 export const ADDRESS_REQUIREMENTS = ["none", "any", "local", "foreign"] as const;
 
 export type AddressRequirement = (typeof ADDRESS_REQUIREMENTS)[number];
@@ -137,7 +139,7 @@ const NANP_TOLL_FREE_AREA_CODES = new Set([
  * number's `addressRequirements` at purchase time.
  */
 export function isNanpTollFreeNumber(phoneNumber: string): boolean {
-  const digits = phoneNumber.replace(/\D/g, "");
+  const digits = stripPhoneNumber(phoneNumber);
   const national =
     digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
   return national.length === 10 && NANP_TOLL_FREE_AREA_CODES.has(national.slice(0, 3));

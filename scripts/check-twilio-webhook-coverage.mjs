@@ -9,15 +9,26 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dirname, "..");
 const API_DIR = join(ROOT, "app/routes/api+");
 
+/**
+ * Constructs that actually authenticate a TWILIO request.
+ *
+ * Deliberately narrow. This list previously also accepted `requireWorkspaceAccess`,
+ * `verifyAuth`, `verifyApiKey` and `safeOutboundUrl`. None of those proves a
+ * request came from Twilio: the first three prove a *session or API key*, which
+ * an inbound webhook never carries, and `safeOutboundUrl` is an EGRESS SSRF
+ * guard that says nothing about the inbound request at all. With them present, a
+ * route could swap its signature check for a session check and stay green — the
+ * guard would report success on a webhook anyone could forge.
+ *
+ * Every route inventoried below was verified to use one of these before the
+ * broader patterns were removed, so this narrowing changed no result today. It
+ * closes the false pass, not a live hole.
+ */
 const VALIDATION_PATTERNS = [
   /requireTwilioSignature/,
   /requireTwilioEventsSinkSecret/,
   /validateTwilioWebhook/,
   /validateWorkspaceTwilioWebhook/,
-  /requireWorkspaceAccess/,
-  /verifyAuth/,
-  /verifyApiKey/,
-  /safeOutboundUrl/,
 ];
 
 /** Routes that are app-authenticated or non-Twilio; excluded from Twilio signature audit. */

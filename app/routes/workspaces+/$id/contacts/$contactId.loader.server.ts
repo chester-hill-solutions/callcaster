@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import {
+  audience as audienceTable,
   campaign as campaignTable,
   contact as contactTable,
   contact_audience as contactAudienceTable,
@@ -14,7 +15,7 @@ import { createTenantDb } from "@/server/tenant-db";
 // contact_audience is a join table without a workspace column; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
 import { db } from "@/server/db";
-import { eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import type { Audience, Contact } from "@/lib/types";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -64,8 +65,12 @@ export const loader = defineLoader({
         return redirect(`/workspaces/${workspace_id}/contacts`);
       }
 
+      // Limit and order outreach attempts to prevent loading unbounded history
+      // for heavily-dialled contacts. Repeated dial attempts accumulate one row each.
       const outreachAttempts = await tdb.outreach_attempt.findMany({
         where: eq(outreachAttemptTable.contact_id, contactId),
+        orderBy: [desc(outreachAttemptTable.created_at)],
+        limit: 200,
       });
 
       const campaignIds = [
@@ -97,7 +102,11 @@ export const loader = defineLoader({
       } as Contact;
     }
 
-    const audiences = (await tdb.audience.findMany({})) as Audience[];
+    // Limit audience list to prevent unbounded growth in workspace audience count.
+    const audiences = (await tdb.audience.findMany({
+      orderBy: [desc(audienceTable.created_at)],
+      limit: 200,
+    })) as Audience[];
 
     return routeData({
       workspace: workspaceData,

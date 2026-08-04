@@ -1,18 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 import {
-  billingUnitsFromDurationSeconds,
   canTransitionOutreachDisposition,
-  checkWorkspaceCredits,
   getCallWithRetry,
 } from "../shared/ivr-status-logic.ts";
 
 describe("ivr-status shared logic", () => {
-  test("billingUnitsFromDurationSeconds rounds up per started minute", () => {
-    expect(billingUnitsFromDurationSeconds(0, "ivr")).toBe(-2);
-    expect(billingUnitsFromDurationSeconds(1, "ivr")).toBe(-2);
-    expect(billingUnitsFromDurationSeconds(60, "ivr")).toBe(-2);
-    expect(billingUnitsFromDurationSeconds(61, "ivr")).toBe(-5);
-  });
 
   test("canTransitionOutreachDisposition blocks terminal -> different", () => {
     expect(canTransitionOutreachDisposition("completed", "busy")).toBe(false);
@@ -47,46 +39,4 @@ describe("ivr-status shared logic", () => {
     expect(sleep).toHaveBeenCalledTimes(2);
   });
 
-  test("checkWorkspaceCredits disables campaign and cancels call when credits are 0", async () => {
-    const updates: any[] = [];
-    const client: any = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { credits: 0 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "campaign") {
-          return {
-            update: (patch: any) => ({
-              eq: async () => {
-                updates.push(patch);
-                return { data: null, error: null };
-              },
-            }),
-          };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    };
-    const twilioClient = {
-      calls: () => ({
-        update: vi.fn(async () => ({})),
-      }),
-    };
-
-    const ok = await checkWorkspaceCredits({
-      client,
-      workspaceId: "w1",
-      campaignId: "c1",
-      callSid: "CA1",
-      twilioClient,
-    });
-    expect(ok).toBe(false);
-    expect(updates).toEqual([{ is_active: false }]);
-  });
 });

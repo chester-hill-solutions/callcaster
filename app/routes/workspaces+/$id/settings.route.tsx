@@ -3,7 +3,7 @@ export { action } from "./settings.action.server";
 
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs , Form, Link, NavLink, Outlet, useSearchParams, useActionData, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs , Form, Link, NavLink, Outlet, useSearchParams, useActionData, useLoaderData, useOutlet, useOutletContext } from "react-router";
 import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => [{ title: "Settings — CallCaster" }];

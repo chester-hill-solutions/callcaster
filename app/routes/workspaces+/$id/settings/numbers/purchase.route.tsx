@@ -1,6 +1,6 @@
 export { loader } from "./purchase.loader.server";
 
-import { data as routeData, Link, redirect, useFetcher, useLoaderData } from "react-router";
+import { Link, redirect, useFetcher, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";

@@ -1,6 +1,6 @@
 export { loader } from "./archive.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, useFetcher, Link } from "react-router";
+import { LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, useFetcher, Link } from "react-router";
 
 import { Campaign } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";

@@ -78,87 +78,11 @@ export function isArray(value: unknown): value is unknown[] {
   return Array.isArray(value);
 }
 
-export function isJson(value: unknown): value is Json {
-  if (value === null || isString(value) || isNumber(value) || isBoolean(value)) {
-    return true;
-  }
-  if (isArray(value)) {
-    return value.every(isJson);
-  }
-  if (isObject(value)) {
-    return Object.values(value).every(isJson);
-  }
-  return false;
-}
-
-// Type-safe environment variable access
-export function getEnvVar(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Environment variable ${key} is not defined`);
-  }
-  return value;
-}
-
-export function getOptionalEnvVar(key: string): string | undefined {
-  return process.env[key];
-}
-
 // Type-safe Postgres client typing (deprecated with Drizzle migration)
 
 // Type-safe Twilio client typing
 export type TwilioClient = import('twilio').Twilio;
 
-// Type-safe form data handling
-export function parseFormData<T extends Record<string, unknown>>(
-  formData: FormData,
-  schema: Record<keyof T, (value: string) => unknown>
-): T {
-  const result = {} as T;
-  
-  for (const [key, value] of formData.entries()) {
-    if (key in schema && typeof value === "string") {
-      const parser = schema[key as keyof T];
-      result[key as keyof T] = parser(value) as T[keyof T];
-    }
-  }
-  
-  return result;
-}
-
-// Type-safe JSON parsing (validates that the parsed value is JSON)
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
-  try {
-    const parsed = JSON.parse(jsonString);
-    return isJson(parsed) ? (parsed as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-// Type-safe object property access
-export function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
-  return obj[key];
-}
-
-export function hasProperty<T extends object, K extends keyof T>(obj: T, key: K): obj is T & Record<K, unknown> {
-  return key in obj;
-}
-
-// Type-safe array operations
-export function filterArray<T>(
-  array: T[],
-  predicate: (item: T, index: number) => boolean
-): T[] {
-  return array.filter(predicate);
-}
-
-export function mapArray<T, U>(
-  array: T[],
-  mapper: (item: T, index: number) => U
-): U[] {
-  return array.map(mapper);
-}
 
 // Type-safe async operations
 export async function safeAsync<T>(
@@ -243,36 +167,6 @@ export function createWebhookPayload(
     workspace_id: workspaceId,
     payload,
   };
-}
-
-// Type-safe performance monitoring
-export interface PerformanceMetrics {
-  duration: number;
-  memoryUsage?: number;
-  timestamp: number;
-}
-
-export function measurePerformance<T>(
-  name: string,
-  operation: () => Promise<T>
-): Promise<{ result: T; metrics: PerformanceMetrics }> {
-  const start = performance.now();
-  const startMemory = (performance as typeof performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
-  
-  return operation().then(result => {
-    const end = performance.now();
-    const endMemory = (performance as typeof performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
-    
-    const metrics: PerformanceMetrics = {
-      duration: end - start,
-      memoryUsage: endMemory && startMemory ? endMemory - startMemory : undefined,
-      timestamp: Date.now(),
-    };
-    
-    logger.debug(`Performance: ${name}`, metrics);
-    
-    return { result, metrics };
-  });
 }
 
 // Type-safe utility functions

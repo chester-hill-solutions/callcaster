@@ -550,7 +550,10 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     );
     const data = await loadTwilioData("w1");
 
-    expect(usageList).toHaveBeenCalledWith();
+    // Bounded: an unbounded list() makes the Twilio helper auto-page the whole
+    // usage history, which is what pushed this admin loader past the SSR
+    // stream timeout.
+    expect(usageList).toHaveBeenCalledWith({ limit: 200 });
     expect(data.twilioUsage).toEqual([
       expect.objectContaining({
         category: "sms-outbound",

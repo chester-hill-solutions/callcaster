@@ -86,7 +86,8 @@ export async function loadTwilioData(
       const [account, numbers, usageRecords] = await Promise.all([
         twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch(),
         twilio.incomingPhoneNumbers.list({ limit: 20 }),
-        twilio.usage.records.list(),
+        // Limit usage records fetch to prevent auto-paging the entire usage history.
+        twilio.usage.records.list({ limit: 200 }),
       ]);
 
       twilioAccountInfo = {

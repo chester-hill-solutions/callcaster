@@ -16,6 +16,25 @@ import {
 import { db, type Database } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 
+/**
+ * Format survey answer for display, handling checkbox arrays
+ */
+export function formatSurveyAnswer(answer: {
+  answer_value: string;
+  survey_question?: { question_type: string } | null;
+} | undefined): string {
+  if (!answer) return "-";
+  if (answer.survey_question?.question_type === "checkbox") {
+    try {
+      const values = JSON.parse(answer.answer_value) as unknown;
+      return Array.isArray(values) ? values.join(", ") : answer.answer_value;
+    } catch {
+      return answer.answer_value;
+    }
+  }
+  return answer.answer_value;
+}
+
 type SurveyRow = typeof surveyTable.$inferSelect;
 type SurveyResponseRow = typeof surveyResponseTable.$inferSelect;
 
@@ -852,19 +871,6 @@ export async function buildSurveyResponsesCsv(args: {
 
   type ResponseRow = (typeof result.responses)[number];
 
-  const formatAnswer = (answer: ResponseRow["response_answer"][number] | undefined) => {
-    if (!answer) return "-";
-    if (answer.survey_question?.question_type === "checkbox") {
-      try {
-        const values = JSON.parse(answer.answer_value) as unknown;
-        return Array.isArray(values) ? values.join(", ") : answer.answer_value;
-      } catch {
-        return answer.answer_value;
-      }
-    }
-    return answer.answer_value;
-  };
-
   const getContactName = (response: ResponseRow) => {
     if (response.contact?.firstname && response.contact?.surname) {
       return `${response.contact.firstname} ${response.contact.surname}`;
@@ -878,7 +884,7 @@ export async function buildSurveyResponsesCsv(args: {
     const question = allQuestions.find((q) => q.question_id === questionId);
     if (!question) return "-";
     const answer = response.response_answer?.find((a) => a.question_id === question.id);
-    return answer ? formatAnswer(answer) : "-";
+    return answer ? formatSurveyAnswer(answer) : "-";
   };
 
   const headers = [

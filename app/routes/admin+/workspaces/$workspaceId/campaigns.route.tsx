@@ -1,6 +1,6 @@
 export { loader } from "./campaigns.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
+import { LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

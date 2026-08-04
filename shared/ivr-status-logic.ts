@@ -36,16 +36,8 @@ export function canTransitionOutreachDisposition(
   return !(TERMINAL_OUTREACH_DISPOSITIONS.has(c) && c !== n);
 }
 
-export function billingUnitsFromDurationSeconds(
-  durationSeconds: number,
-  kind: VoiceBillingKind,
-): number {
-  return debitAmountFromCredits(
-    voiceCreditsFromDurationSeconds(durationSeconds, kind),
-  );
-}
-
-export async function sleepMs(ms: number): Promise<void> {
+/** Default for the injectable `sleep` seam below; not part of the public API. */
+async function sleepMs(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -101,38 +93,3 @@ export async function getCallWithRetry<TCall = Record<string, unknown>>(
   throw new Error("Failed to retrieve call after multiple attempts");
 }
 
-export async function checkWorkspaceCredits(args: {
-  client: DbClientLike;
-  workspaceId: string;
-  campaignId: string | number;
-  callSid: string;
-  twilioClient: {
-    calls: (sid: string) => { update: (args: { status: string }) => Promise<unknown> };
-  };
-}): Promise<boolean> {
-  const { data: workspaceCredits, error: workspaceCreditsError } = (await args.client
-    .from("workspace")
-    .select("credits")
-    .eq("id", args.workspaceId)
-    .single()) as Awaited<PostgresSingleResult<{ credits: number }>>;
-
-  if (workspaceCreditsError) {
-    return false;
-  }
-
-  if ((workspaceCredits?.credits ?? 0) <= 0) {
-    await args.client
-      .from("campaign")
-      .update({ is_active: false })
-      .eq("id", args.campaignId);
-
-    try {
-      await args.twilioClient.calls(args.callSid).update({ status: "canceled" });
-    } catch {
-      // best-effort cancellation
-    }
-    return false;
-  }
-
-  return true;
-}
