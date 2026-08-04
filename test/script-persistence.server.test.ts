@@ -142,12 +142,12 @@ describe("script persistence", () => {
     );
   });
 
-  test("forks and relinks when another campaign references the script", async () => {
+  test("updates in-place when another campaign references the script and saveAsCopy is false", async () => {
     const { persistCampaignScript } = await import("@/lib/script-persistence.server");
     mocks.tdb.script.findFirst.mockResolvedValueOnce({ id: 4, name: "Survey" });
     mocks.tdb.campaign.count.mockResolvedValueOnce(1);
-    mocks.tdb.script.insert.mockResolvedValueOnce([{ id: 8, name: "Survey (Copy)" }]);
-    mocks.tdb.campaign.update.mockResolvedValueOnce([{ id: 9, script_id: 8 }]);
+    mocks.tdb.script.update.mockResolvedValueOnce([{ id: 4, name: "Survey" }]);
+    mocks.tdb.campaign.update.mockResolvedValueOnce([{ id: 9, script_id: 4 }]);
 
     const result = await persistCampaignScript({
       workspaceId: "w1",
@@ -159,21 +159,19 @@ describe("script persistence", () => {
       content: { name: "Survey", steps: {} },
     });
 
-    expect(result.id).toBe(8);
-    expect(mocks.tdb.script.update).not.toHaveBeenCalled();
-    expect(mocks.tdb.campaign.update).toHaveBeenCalledWith(
-      expect.objectContaining({ set: { script_id: 8 } }),
-    );
+    expect(result).toMatchObject({ id: 4, name: "Survey" });
+    expect(mocks.tdb.script.update).toHaveBeenCalledOnce();
+    expect(mocks.tdb.script.insert).not.toHaveBeenCalled();
   });
 
-  test("forks when an inbound number references the script", async () => {
+  test("updates in-place when an inbound number references the script and saveAsCopy is false", async () => {
     const { persistCampaignScript } = await import("@/lib/script-persistence.server");
     mocks.tdb.script.findFirst.mockResolvedValueOnce({ id: 4, name: "Survey" });
     mocks.tdb.workspace_number.count.mockResolvedValueOnce(1);
-    mocks.tdb.script.insert.mockResolvedValueOnce([{ id: 8, name: "Survey (Copy)" }]);
-    mocks.tdb.campaign.update.mockResolvedValueOnce([{ id: 9, script_id: 8 }]);
+    mocks.tdb.script.update.mockResolvedValueOnce([{ id: 4, name: "Survey" }]);
+    mocks.tdb.campaign.update.mockResolvedValueOnce([{ id: 9, script_id: 4 }]);
 
-    await persistCampaignScript({
+    const result = await persistCampaignScript({
       workspaceId: "w1",
       campaignId: 9,
       scriptId: 4,
@@ -182,10 +180,9 @@ describe("script persistence", () => {
       content: { name: "Survey", steps: {} },
     });
 
-    expect(mocks.tdb.script.insert).toHaveBeenCalledOnce();
-    expect(mocks.tdb.campaign.update).toHaveBeenCalledWith(
-      expect.objectContaining({ set: { script_id: 8 } }),
-    );
+    expect(result).toMatchObject({ id: 4, name: "Survey" });
+    expect(mocks.tdb.script.update).toHaveBeenCalledOnce();
+    expect(mocks.tdb.script.insert).not.toHaveBeenCalled();
   });
 
   test("explicit campaign copy remains compatible when the script is exclusive", async () => {

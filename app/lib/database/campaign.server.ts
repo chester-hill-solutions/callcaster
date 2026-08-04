@@ -697,7 +697,7 @@ export function checkSchedule(campaignData: Campaign) {
   if (
     !start_date ||
     !end_date ||
-    !(utcNow > new Date(start_date) && utcNow < new Date(end_date))
+    !(utcNow >= new Date(start_date) && utcNow <= new Date(end_date))
   ) {
     return false;
   }
@@ -724,6 +724,7 @@ export function checkSchedule(campaignData: Campaign) {
   const currentTime = utcNow.toISOString().slice(11, 16);
   return todaySchedule.intervals.some(
     (interval: { start: string; end: string }) => {
+      if (interval.start === interval.end) return false;
       if (interval.end < interval.start) {
         return currentTime >= interval.start || currentTime < interval.end;
       }

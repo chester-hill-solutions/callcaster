@@ -70,6 +70,7 @@ export function useTwilioDevice(
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
+    autoAcceptIncoming: true,
     onCallStateChange: (newCallState) => {
       switch (newCallState) {
         case "dialing": send({ type: "START_DIALING" }); break;
@@ -86,9 +87,6 @@ export function useTwilioDevice(
     },
     onDeviceBusyChange: (isBusy) => {
       setIsBusy(isBusy);
-    },
-    onConnect: () => {
-      send({ type: "CONNECT" });
     },
   });
 

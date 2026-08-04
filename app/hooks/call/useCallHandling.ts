@@ -31,7 +31,6 @@ interface UseCallHandlingOptions {
   onStatusChange?: (status: string) => void;
   onError?: (error: Error) => void;
   onDeviceBusyChange?: (isBusy: boolean) => void;
-  onConnect?: () => void;
 }
 
 interface UseCallHandlingReturn {
@@ -83,7 +82,6 @@ export function useCallHandling({
   onStatusChange,
   onError,
   onDeviceBusyChange,
-  onConnect,
 }: UseCallHandlingOptions): UseCallHandlingReturn {
   const [activeCall, setActiveCallState] = useState<Call | null>(null);
   const [heldCalls, setHeldCalls] = useState<Call[]>([]);
@@ -299,7 +297,6 @@ export function useCallHandling({
         updateCallState("connected");
         updateActiveCall(call);
         updateIncomingCall(null);
-        onConnect?.();
         return;
       }
 
@@ -311,7 +308,6 @@ export function useCallHandling({
       updateActiveCall,
       updateCallState,
       onStatusChange,
-      onConnect,
       setupIncomingCallListeners,
     ],
   );
