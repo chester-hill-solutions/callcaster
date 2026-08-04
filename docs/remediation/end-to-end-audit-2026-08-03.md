@@ -1,6 +1,15 @@
 # End-to-end audit and remediation plan — 2026-08-03
 
 **Branch audited:** `dev` @ `41d162f0` (clean tree, identical to `origin/dev`)
+> **STATUS 2026-08-04 — remediated on `fix/audit-remediation-2026-08` (21 commits).**
+> Every finding below is fixed except where noted. Corrections found while
+> fixing them are recorded inline as **[CORRECTION]**. The three telephony SQL
+> defects were reproduced and verified against PostgreSQL 18.4, which also
+> surfaced a fourth nobody had identified (`claimed_at` never set, making both
+> queue guards blind). Four new guards now gate the classes involved:
+> `check:route-membership`, `check:dual-auth`, `db:bootstrap:check`, and a
+> widened `check:credit-writes`.
+
 **Prod status:** `origin/prod` @ `44518484` is **238 commits behind** `dev`. Every finding below is
 dev-only. None has reached customers — **yet**.
 
@@ -62,9 +71,13 @@ all tenants into the loader payload. The sibling *actions* already guard this
 (`api+/survey-answer.action.server.ts:91`, `survey-complete.action.server.ts:86` both check
 `contact.workspace !== survey.workspace`); the loader was missed.
 
-**Fix:** require the signed respondent token (`verifyRespondentToken`, already used by the actions)
-instead of a raw id, and reject unless `contact.workspace === survey.workspace`. Return only the
-fields the survey UI renders, not `select()`.
+**Fix:** reject unless `contact.workspace === survey.workspace`, project to the three fields the
+page renders, and rate-limit id enumeration.
+
+**[CORRECTION]** This originally recommended requiring the signed respondent token. That is wrong.
+The token is a *result-id continuity cookie* minted on demand by the actions with a 24h TTL, not an
+authorization credential — and no code path issues a tokenised link, so requiring one would have
+rejected every survey link in existence. Scoping is what closes the cross-tenant read.
 
 ### P0-2. Three cross-tenant IDOR routes on the legacy `api+` surface
 
@@ -430,6 +443,8 @@ places despite `app/lib/phone.ts` exporting `stripPhoneNumber`; `formatAnswer` i
   comparison in the repo not using the existing `secureCompare`.
 - **Dev TLS private key committed to a public repo** — `scripts/dev/certs/server.key`. Dev-only
   self-signed material, but delete it, generate on demand, and gitignore the directory.
+  **[CORRECTION]** Deleting it does not purge git history on a public repo — the directory was
+  gitignored *after* these files were committed. Treat that key as disclosed and never reuse it.
 - **Unsanitised path segment into an S3 key** —
   `workspaces+/$id/audios/$fileName.edit.{loader,action}.server.ts` build
   `${workspaceId}/${fileName}` from a decoded param that can contain `/` and `..`. Safe today only
